@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "582503168867",
+    "project_id": "sphot-ab80b",
+    "storage_bucket": "sphot-ab80b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:582503168867:android:aaff341684299eebdb7156",
+        "android_client_info": {
+          "package_name": "com.example.bathing_spots_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCNn9fur3Er1sWXRIi1B2bIOVKLKHcguSA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
