@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Accès plage - Longeville-sur-Mer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+
+    #map {
+      width: 100%;
+      height: 100vh;
+    }
+
+    .popup-title {
+      font-weight: bold;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script>
+    const accesPlage = [
+      { nom: "LONGE 01 – Plage du Goulet", lat: 46.4098229, lon: -1.5398990 },
+      { nom: "LONGE 02 - Plage de la Cartière aux Chats", lat: 46.4094508, lon: -1.5371528 },
+      { nom: "LONGE 03 - Plage du Bouil", lat: 46.4088190, lon: -1.5326231 },
+      { nom: "LONGE 04 - Plage de la Crabasse du puits", lat: 46.4081614, lon: -1.5309625 },
+      { nom: "LONGE 05 - Plage du Raisinet", lat: 46.4065897, lon: -1.5268165 },
+      { nom: "LONGE 06 - Plage de Rampillon", lat: 46.4054441, lon: -1.5211524 },
+      { nom: "LONGE 07 - Plage des Roses", lat: 46.4036159, lon: -1.5127937 },
+      { nom: "LONGE 08 - Plage des Flots Bleus", lat: 46.4022012, lon: -1.5100681 },
+      { nom: "LONGE 09 - Plage du Rocher", lat: 46.4006176, lon: -1.5064563 },
+      { nom: "LONGE 10 - Plage des Grandes Plantes", lat: 46.3992650, lon: -1.5039532 },
+      { nom: "LONGE 11 - Plage d'Indre et Loire", lat: 46.3970057, lon: -1.5009539 },
+      { nom: "LONGE 12 - Plage de la Forêt", lat: 46.3906899, lon: -1.4950759 },
+      { nom: "LONGE 13 - Plage des Conches", lat: 46.3893825, lon: -1.4942598 },
+      { nom: "LONGE 14 - Plage des Pignons", lat: 46.3861807, lon: -1.4915892 },
+      { nom: "LONGE 15 - Plage de la Caloge", lat: 46.3844687, lon: -1.4902618 },
+      { nom: "LONGE 16 - Plage de Bud", lat: 46.3838843, lon: -1.4896761 },
+      { nom: "LONGE 17 - Plage de la Casse à la Reine", lat: 46.3813781, lon: -1.4876387 },
+      { nom: "LONGE 18 - Plage de la Passerelle", lat: 46.3728694, lon: -1.4816701 }
+    ];
+
+    const map = L.map('map').setView([46.392, -1.507], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    function getSizeFromZoom(zoom) {
+      return Math.max(20, zoom * 3);
+    }
+
+    function createIcon(size) {
+      return L.icon({
+        iconUrl: '/data/icons/fire_icon.png',
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size],
+        popupAnchor: [0, -size + 5]
+      });
+    }
+
+    const markers = [];
+    const bounds = [];
+
+    accesPlage.forEach(point => {
+      const marker = L.marker([point.lat, point.lon], {
+        icon: createIcon(getSizeFromZoom(map.getZoom())),
+        riseOnHover: true
+      }).addTo(map);
+
+      marker.bindPopup(`<div class="popup-title">${point.nom}</div>`);
+
+      marker.on('mouseover', function () {
+        const hoverSize = getSizeFromZoom(map.getZoom()) * 1.3;
+        marker.setIcon(createIcon(hoverSize));
+      });
+
+      marker.on('mouseout', function () {
+        marker.setIcon(createIcon(getSizeFromZoom(map.getZoom())));
+      });
+
+      markers.push(marker);
+      bounds.push([point.lat, point.lon]);
+    });
+
+    function updateIcons() {
+      const size = getSizeFromZoom(map.getZoom());
+      markers.forEach(marker => {
+        marker.setIcon(createIcon(size));
+      });
+    }
+
+    map.on('zoomend', updateIcons);
+
+    if (bounds.length > 0) {
+      map.fitBounds(bounds, { padding: [30, 30] });
+    }
+  </script>
+</body>
+</html>
