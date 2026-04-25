@@ -42,51 +42,51 @@ class _MapPageState extends State<MapPage> {
   }
 
   String _getMarkerIconPath(SpotFlagState spot) {
-  final type = spot.normalizedType;
+    final type = spot.normalizedType;
 
-  if (spot.isNaturisme) return 'data/icons/fire_icon.png';
-  if (type.contains('ACCES PLAGE')) return 'data/icons/fire_kaki_icon.png';
+    if (spot.isNaturisme) return 'data/icons/fire_icon.png';
+    if (type.contains('ACCES PLAGE')) return 'data/icons/fire_kaki_icon.png';
 
-  if (type.contains('LAC') ||
-      type.contains('BARRAGE') ||
-      type.contains('CASCADE')) {
-    return 'data/icons/fire_blue_icon.png';
+    if (type.contains('LAC') ||
+        type.contains('BARRAGE') ||
+        type.contains('CASCADE')) {
+      return 'data/icons/fire_blue_icon.png';
+    }
+
+    if (type.contains('FLEUVE') || type.contains('RIVIERE')) {
+      return 'data/icons/fire_green_icon.png';
+    }
+
+    if (type.contains('LAGON') || type.contains('PISCINE NATURELLE')) {
+      return 'data/icons/fire_cyan_icon.png';
+    }
+
+    return 'data/icons/fire_yellow_icon.png';
   }
-
-  if (type.contains('FLEUVE') || type.contains('RIVIERE')) {
-    return 'data/icons/fire_green_icon.png';
-  }
-
-  if (type.contains('LAGON') || type.contains('PISCINE NATURELLE')) {
-    return 'data/icons/fire_cyan_icon.png';
-  }
-
-  return 'data/icons/fire_yellow_icon.png';
-}
 
   Color _typeColor(SpotFlagState spot) {
-  final type = spot.normalizedType;
+    final type = spot.normalizedType;
 
-  if (spot.isPosteSecours) return const Color(0xFFFF0000);
-  if (spot.isNaturisme) return const Color(0xFFFEC3AC);
-  if (type.contains('ACCES PLAGE')) return const Color(0xFF568203);
+    if (spot.isPosteSecours) return const Color(0xFFFF0000);
+    if (spot.isNaturisme) return const Color(0xFFFEC3AC);
+    if (type.contains('ACCES PLAGE')) return const Color(0xFF568203);
 
-  if (type.contains('LAC') ||
-      type.contains('BARRAGE') ||
-      type.contains('CASCADE')) {
-    return const Color(0xFF0A53A8);
+    if (type.contains('LAC') ||
+        type.contains('BARRAGE') ||
+        type.contains('CASCADE')) {
+      return const Color(0xFF0A53A8);
+    }
+
+    if (type.contains('FLEUVE') || type.contains('RIVIERE')) {
+      return const Color(0xFF4201FF);
+    }
+
+    if (type.contains('LAGON') || type.contains('PISCINE NATURELLE')) {
+      return const Color(0xFF00FFFA);
+    }
+
+    return Colors.black;
   }
-
-  if (type.contains('FLEUVE') || type.contains('RIVIERE')) {
-    return const Color(0xFF4201FF);
-  }
-
-  if (type.contains('LAGON') || type.contains('PISCINE NATURELLE')) {
-    return const Color(0xFF00FFFA);
-  }
-
-  return Colors.black;
-}
 
   bool _matchesFilter(SpotFlagState spot) {
     final type = spot.normalizedType;
@@ -413,6 +413,7 @@ class _MapPageState extends State<MapPage> {
       shadowColor: Colors.transparent,
       elevation: 0,
       centerTitle: true,
+      toolbarHeight: 64,
       leading: Builder(
         builder: (context) => IconButton(
           tooltip: '',
@@ -420,26 +421,27 @@ class _MapPageState extends State<MapPage> {
           icon: const _ColoredHamburgerIcon(size: 25),
         ),
       ),
-      title: const Text(
-        'SPHOT',
-        style: TextStyle(
-          color: Color(0xFF111111),
-          fontSize: 28,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.2,
-          shadows: [
-            Shadow(
-              color: Colors.white,
-              offset: Offset(0, 0),
-              blurRadius: 4,
+      title: LayoutBuilder(
+        builder: (context, constraints) {
+          final screenWidth = MediaQuery.of(context).size.width;
+          final bool isDesktop = screenWidth >= 900;
+
+          final double logoWidth = isDesktop
+              ? (screenWidth * 0.13).clamp(150.0, 210.0)
+              : (screenWidth * 0.24).clamp(110.0, 170.0);
+
+          final double logoHeight = (logoWidth * 0.35).clamp(38.0, 60.0);
+
+          return SizedBox(
+            width: logoWidth,
+            height: logoHeight,
+            child: Image.asset(
+              'data/icons/title.png',
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
             ),
-            Shadow(
-              color: Colors.white,
-              offset: Offset(1, 1),
-              blurRadius: 2,
-            ),
-          ],
-        ),
+          );
+        },
       ),
       actions: [
         IconButton(
@@ -487,6 +489,7 @@ class _MapPageState extends State<MapPage> {
                 builder: (context) {
                   final zoom = MapCamera.of(context).zoom;
                   final markers = _buildMarkers(spots, zoom);
+
                   return MarkerClusterLayerWidget(
                     options: MarkerClusterLayerOptions(
                       markers: markers,
@@ -554,13 +557,14 @@ class _ColoredHamburgerIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lineHeight = size * 0.12;
+
     return SizedBox(
       width: size,
       height: size,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _line(size, lineHeight, const Color(0xFF00A651)),
+          _line(size, lineHeight, const Color(0xFFFF0000)),
           SizedBox(height: size * 0.15),
           _line(size, lineHeight, const Color(0xFFFFFF00)),
           SizedBox(height: size * 0.15),
@@ -773,6 +777,7 @@ class _SimplePostePoint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasFlag = spot.hasValidFlag;
+
     return Container(
       width: 12,
       height: 12,
@@ -817,32 +822,32 @@ class _HoverMarkerState extends State<_HoverMarker> {
   }
 
   Widget _warningLine(String text) {
-  return Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(
-        Icons.warning_amber_rounded,
-        size: _labelSize(18), // 👈 PLUS GRAND
-        color: const Color(0xFFFF0000),
-        shadows: const [
-          Shadow(color: Colors.white, blurRadius: 2),
-        ],
-      ),
-      const SizedBox(width: 2), // 👈 ESPACE
-      Flexible(
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: _mapLabelStyle(
-            fontSize: _labelSize(10),
-            fontWeight: FontWeight.w900,
-            color: const Color(0xFFFF0000),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.warning_amber_rounded,
+          size: _labelSize(18),
+          color: const Color(0xFFFF0000),
+          shadows: const [
+            Shadow(color: Colors.white, blurRadius: 2),
+          ],
+        ),
+        const SizedBox(width: 2),
+        Flexible(
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: _mapLabelStyle(
+              fontSize: _labelSize(10),
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFFFF0000),
+            ),
           ),
         ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
