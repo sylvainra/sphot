@@ -1,0 +1,17 @@
+{
+  "name": "import_spots",
+  "version": "1.0.0",
+  "description": "",
+  "main": "import_spots.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "csv-parser": "^3.2.0",
+    "firebase-admin": "^13.8.0"
+  }
+}

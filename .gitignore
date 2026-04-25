@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Node (IMPORTANT)
+tools/import_spots/node_modules/
+
+tools/import_spots/serviceAccountKey.json
