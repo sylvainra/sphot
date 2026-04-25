@@ -42,50 +42,51 @@ class _MapPageState extends State<MapPage> {
   }
 
   String _getMarkerIconPath(SpotFlagState spot) {
-    final type = spot.normalizedType;
+  final type = spot.normalizedType;
 
-    if (spot.isNaturisme) return 'data/icons/fire_icon.png';
-    if (type.contains('ACCES PLAGE')) return 'data/icons/fire_kaki_icon.png';
+  if (spot.isNaturisme) return 'data/icons/fire_icon.png';
+  if (type.contains('ACCES PLAGE')) return 'data/icons/fire_kaki_icon.png';
 
-    if (type.contains('LAC') ||
-        type.contains('PISCINE NATURELLE') ||
-        type.contains('CASCADE')) {
-      return 'data/icons/fire_blue_icon.png';
-    }
-
-    if (type.contains('FLEUVE') ||
-        type.contains('RIVIERE') ||
-        type.contains('BARRAGE')) {
-      return 'data/icons/fire_green_icon.png';
-    }
-
-    if (type.contains('LAGON')) return 'data/icons/fire_cyan_icon.png';
-
-    return 'data/icons/fire_yellow_icon.png';
+  if (type.contains('LAC') ||
+      type.contains('BARRAGE') ||
+      type.contains('CASCADE')) {
+    return 'data/icons/fire_blue_icon.png';
   }
+
+  if (type.contains('FLEUVE') || type.contains('RIVIERE')) {
+    return 'data/icons/fire_green_icon.png';
+  }
+
+  if (type.contains('LAGON') || type.contains('PISCINE NATURELLE')) {
+    return 'data/icons/fire_cyan_icon.png';
+  }
+
+  return 'data/icons/fire_yellow_icon.png';
+}
 
   Color _typeColor(SpotFlagState spot) {
-    final type = spot.normalizedType;
+  final type = spot.normalizedType;
 
-    if (spot.isPosteSecours) return const Color(0xFFFF0000);
-    if (spot.isNaturisme) return const Color(0xFFFEC3AC);
-    if (type.contains('ACCES PLAGE')) return const Color(0xFF568203);
+  if (spot.isPosteSecours) return const Color(0xFFFF0000);
+  if (spot.isNaturisme) return const Color(0xFFFEC3AC);
+  if (type.contains('ACCES PLAGE')) return const Color(0xFF568203);
 
-    if (type.contains('LAC') ||
-        type.contains('FLEUVE') ||
-        type.contains('CASCADE') ||
-        type.contains('BARRAGE')) {
-      return const Color(0xFF0A53A8);
-    }
-
-    if (type.contains('RIVIERE') || type.contains('PISCINE NATURELLE')) {
-      return const Color(0xFF4201FF);
-    }
-
-    if (type.contains('LAGON')) return const Color(0xFF00FFFA);
-
-    return Colors.black;
+  if (type.contains('LAC') ||
+      type.contains('BARRAGE') ||
+      type.contains('CASCADE')) {
+    return const Color(0xFF0A53A8);
   }
+
+  if (type.contains('FLEUVE') || type.contains('RIVIERE')) {
+    return const Color(0xFF4201FF);
+  }
+
+  if (type.contains('LAGON') || type.contains('PISCINE NATURELLE')) {
+    return const Color(0xFF00FFFA);
+  }
+
+  return Colors.black;
+}
 
   bool _matchesFilter(SpotFlagState spot) {
     final type = spot.normalizedType;
@@ -295,7 +296,6 @@ class _MapPageState extends State<MapPage> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   children: [
-                    _sectionTitle('SPHOTS'),
                     ...SpotFilter.values.map((filter) {
                       final selected = filter == _selectedFilter;
                       final color = _filterColor(filter);
@@ -335,7 +335,6 @@ class _MapPageState extends State<MapPage> {
                       );
                     }),
                     const Divider(height: 28),
-                    _sectionTitle('INFORMATIONS'),
                     _infoItem(Icons.info_outline, 'À propos de SPHOT'),
                     _infoItem(Icons.description_outlined, 'Mentions légales'),
                     _infoItem(
@@ -350,21 +349,6 @@ class _MapPageState extends State<MapPage> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _sectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w900,
-          color: Colors.black54,
-          letterSpacing: 0.7,
         ),
       ),
     );
@@ -431,7 +415,7 @@ class _MapPageState extends State<MapPage> {
       centerTitle: true,
       leading: Builder(
         builder: (context) => IconButton(
-          tooltip: 'Menu',
+          tooltip: '',
           onPressed: () => Scaffold.of(context).openDrawer(),
           icon: const _ColoredHamburgerIcon(size: 25),
         ),
@@ -439,9 +423,22 @@ class _MapPageState extends State<MapPage> {
       title: const Text(
         'SPHOT',
         style: TextStyle(
-          color: Colors.black87,
+          color: Color(0xFF111111),
+          fontSize: 28,
           fontWeight: FontWeight.w900,
-          letterSpacing: 0.5,
+          letterSpacing: 1.2,
+          shadows: [
+            Shadow(
+              color: Colors.white,
+              offset: Offset(0, 0),
+              blurRadius: 4,
+            ),
+            Shadow(
+              color: Colors.white,
+              offset: Offset(1, 1),
+              blurRadius: 2,
+            ),
+          ],
         ),
       ),
       actions: [
@@ -819,6 +816,34 @@ class _HoverMarkerState extends State<_HoverMarker> {
     return base - 0.5;
   }
 
+  Widget _warningLine(String text) {
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(
+        Icons.warning_amber_rounded,
+        size: _labelSize(18), // 👈 PLUS GRAND
+        color: const Color(0xFFFF0000),
+        shadows: const [
+          Shadow(color: Colors.white, blurRadius: 2),
+        ],
+      ),
+      const SizedBox(width: 2), // 👈 ESPACE
+      Flexible(
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: _mapLabelStyle(
+            fontSize: _labelSize(10),
+            fontWeight: FontWeight.w900,
+            color: const Color(0xFFFF0000),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     final spot = widget.spot;
@@ -887,24 +912,8 @@ class _HoverMarkerState extends State<_HoverMarker> {
                         ),
                         const SizedBox(height: 2),
                         if (spot.isMissingFlagColorDuringSurveillance) ...[
-                          Text(
-                            '⚠️ COULEUR DE LA FLAMME NON RENSEIGNÉE',
-                            textAlign: TextAlign.center,
-                            style: _mapLabelStyle(
-                              fontSize: _labelSize(10),
-                              fontWeight: FontWeight.w900,
-                              color: const Color(0xFFFF0000),
-                            ),
-                          ),
-                          Text(
-                            '⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
-                            textAlign: TextAlign.center,
-                            style: _mapLabelStyle(
-                              fontSize: _labelSize(10),
-                              fontWeight: FontWeight.w900,
-                              color: const Color(0xFFFF0000),
-                            ),
-                          ),
+                          _warningLine('COULEUR DE LA FLAMME NON RENSEIGNÉE'),
+                          _warningLine('BAIGNADE À VOS RISQUES ET PÉRILS'),
                         ] else
                           Text(
                             spot.displayStatut,
