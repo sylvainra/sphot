@@ -45,7 +45,7 @@ class _MapPageState extends State<MapPage> {
     final type = spot.normalizedType;
 
     if (spot.isNaturisme) return 'data/icons/fire_icon.png';
-    if (type.contains('ACCES PLAGE')) return 'data/icons/fire_kaki_icon.png';
+    if (type.contains('ACCES PLAGE')) return 'data/icons/fire_orange_icon.png';
 
     if (type.contains('LAC') ||
         type.contains('BARRAGE') ||
@@ -61,28 +61,28 @@ class _MapPageState extends State<MapPage> {
       return 'data/icons/fire_cyan_icon.png';
     }
 
-    return 'data/icons/fire_yellow_icon.png';
+    return 'data/icons/fire_orange_icon.png';
   }
 
   Color _typeColor(SpotFlagState spot) {
     final type = spot.normalizedType;
 
     if (spot.isPosteSecours) return const Color(0xFFFF0000);
-    if (spot.isNaturisme) return const Color(0xFFFEC3AC);
-    if (type.contains('ACCES PLAGE')) return const Color(0xFF568203);
+    if (spot.isNaturisme) return const Color(0xFFD87A5C);
+    if (type.contains('ACCES PLAGE')) return const Color(0xFFFF7F00);
 
     if (type.contains('LAC') ||
         type.contains('BARRAGE') ||
         type.contains('CASCADE')) {
-      return const Color(0xFF0A53A8);
+      return const Color(0xFF1E3A8A);
     }
 
     if (type.contains('FLEUVE') || type.contains('RIVIERE')) {
-      return const Color(0xFF4201FF);
+      return const Color(0xFF2E7D32);
     }
 
     if (type.contains('LAGON') || type.contains('PISCINE NATURELLE')) {
-      return const Color(0xFF00FFFA);
+      return const Color(0xFF00ACC1);
     }
 
     return Colors.black;
@@ -114,25 +114,25 @@ class _MapPageState extends State<MapPage> {
   }
 
   String _filterLabel(SpotFilter filter) {
-    switch (filter) {
-      case SpotFilter.all:
-        return 'Tous les SPHOTS';
-      case SpotFilter.secours:
-        return 'SPHOT Secours';
-      case SpotFilter.accesPlage:
-        return 'SPHOT Accès plage';
-      case SpotFilter.eauBleue:
-        return 'SPHOT Lac / Cascade / Barrage';
-      case SpotFilter.eauVerte:
-        return 'SPHOT Fleuve / Rivière';
-      case SpotFilter.lagon:
-        return 'SPHOT Lagon / Piscine naturelle';
-      case SpotFilter.naturisme:
-        return 'SPHOT Naturisme';
-      case SpotFilter.autre:
-        return 'SPHOT Autre / Non renseigné';
-    }
+  switch (filter) {
+    case SpotFilter.all:
+      return 'Tous les SPHOTS';
+    case SpotFilter.secours:
+      return 'SPHOT\nPoste de secours';
+    case SpotFilter.accesPlage:
+      return 'SPHOT\nAccès plage';
+    case SpotFilter.eauBleue:
+      return 'SPHOT\nLac\nCascade\nBarrage';
+    case SpotFilter.eauVerte:
+      return 'SPHOT\nFleuve\nRivière';
+    case SpotFilter.lagon:
+      return 'SPHOT\nLagon\nPiscine naturelle';
+    case SpotFilter.naturisme:
+      return 'SPHOT\nNaturisme';
+    case SpotFilter.autre:
+      return 'SPHOT\nAutre\nNon renseigné';
   }
+}
 
   Color _filterColor(SpotFilter filter) {
     switch (filter) {
@@ -141,32 +141,22 @@ class _MapPageState extends State<MapPage> {
       case SpotFilter.secours:
         return const Color(0xFFFF0000);
       case SpotFilter.accesPlage:
-        return const Color(0xFF568203);
+        return const Color(0xFFFF7F00);
       case SpotFilter.eauBleue:
-        return const Color(0xFF0A53A8);
+        return const Color(0xFF1E3A8A);
       case SpotFilter.eauVerte:
-        return const Color(0xFF4201FF);
+        return const Color(0xFF2E7D32);
       case SpotFilter.lagon:
-        return const Color(0xFF00FFFA);
+        return const Color(0xFF00ACC1);
       case SpotFilter.naturisme:
-        return const Color(0xFFFEC3AC);
+        return const Color(0xFFD87A5C);
       case SpotFilter.autre:
         return Colors.black87;
     }
   }
 
-  Color _filterOutlineColor(SpotFilter filter) {
-    switch (filter) {
-      case SpotFilter.lagon:
-        return const Color(0xFF00B8B5);
-      case SpotFilter.naturisme:
-        return const Color(0xFFE97958);
-      default:
-        return Colors.transparent;
-    }
-  }
-
-  Widget _drawerAssetIcon(String path) {
+  
+   Widget _drawerAssetIcon(String path) {
     return Image.asset(path, width: 40, height: 40, fit: BoxFit.contain);
   }
 
@@ -177,7 +167,7 @@ class _MapPageState extends State<MapPage> {
       case SpotFilter.secours:
         return const _DrawerFlagIcon();
       case SpotFilter.accesPlage:
-        return _drawerAssetIcon('data/icons/fire_kaki_icon.png');
+        return _drawerAssetIcon('data/icons/fire_orange_icon.png');
       case SpotFilter.eauBleue:
         return _drawerAssetIcon('data/icons/fire_blue_icon.png');
       case SpotFilter.eauVerte:
@@ -315,13 +305,10 @@ class _MapPageState extends State<MapPage> {
                             child: Center(child: _filterIcon(filter)),
                           ),
                           title: _OutlinedMenuText(
-                            text: _filterLabel(filter),
-                            color: color,
-                            outlineColor: _filterOutlineColor(filter),
-                            outlined: filter == SpotFilter.lagon ||
-                                filter == SpotFilter.naturisme,
-                            selected: selected,
-                          ),
+  text: _filterLabel(filter),
+  color: color,
+  selected: selected,
+),
                           trailing: selected
                               ? Icon(Icons.check, color: color, size: 24)
                               : null,
@@ -511,39 +498,42 @@ class _MapPageState extends State<MapPage> {
 class _OutlinedMenuText extends StatelessWidget {
   final String text;
   final Color color;
-  final Color outlineColor;
-  final bool outlined;
   final bool selected;
 
   const _OutlinedMenuText({
     required this.text,
     required this.color,
-    required this.outlineColor,
-    required this.outlined,
     required this.selected,
   });
 
   @override
   Widget build(BuildContext context) {
-    final weight = selected ? FontWeight.w900 : FontWeight.w700;
+    final lines = text.split('\n');
 
-    if (!outlined) {
-      return Text(text, style: TextStyle(color: color, fontWeight: weight));
-    }
-
-    return Stack(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          text,
+          lines.first,
           style: TextStyle(
-            fontWeight: weight,
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 1.1
-              ..color = outlineColor,
+            color: color,
+            fontWeight: selected ? FontWeight.w900 : FontWeight.w800,
+            fontSize: 15,
+            height: 1.1,
           ),
         ),
-        Text(text, style: TextStyle(color: color, fontWeight: weight)),
+        ...lines.skip(1).map(
+          (line) => Text(
+            line,
+            style: TextStyle(
+              color: color.withOpacity(0.85),
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+              fontSize: 13,
+              height: 1.15,
+            ),
+          ),
+        ),
       ],
     );
   }
