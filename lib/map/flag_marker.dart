@@ -26,7 +26,7 @@ class _FlagMarkerState extends State<FlagMarker>
   static const double poleLeft = (markerWidth - poleWidth) / 2;
 
   static const double flagLeft = poleLeft + poleWidth - 1;
-  static const double flagWidth = 34;
+  static const double flagWidth = 26;
   static const double flagHeight = 30;
 
   static const double flagTopHisse = 18;

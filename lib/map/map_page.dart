@@ -1,4 +1,6 @@
+import 'dart:math';
 import 'dart:ui' as ui;
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -114,25 +116,25 @@ class _MapPageState extends State<MapPage> {
   }
 
   String _filterLabel(SpotFilter filter) {
-  switch (filter) {
-    case SpotFilter.all:
-      return 'Tous les SPHOTS';
-    case SpotFilter.secours:
-      return 'SPHOT\nPoste de secours';
-    case SpotFilter.accesPlage:
-      return 'SPHOT\nAccès plage';
-    case SpotFilter.eauBleue:
-      return 'SPHOT\nLac\nCascade\nBarrage';
-    case SpotFilter.eauVerte:
-      return 'SPHOT\nFleuve\nRivière';
-    case SpotFilter.lagon:
-      return 'SPHOT\nLagon\nPiscine naturelle';
-    case SpotFilter.naturisme:
-      return 'SPHOT\nNaturisme';
-    case SpotFilter.autre:
-      return 'SPHOT\nAutre\nNon renseigné';
+    switch (filter) {
+      case SpotFilter.all:
+        return 'SPHOTS';
+      case SpotFilter.secours:
+        return 'SPHOT\nPoste de secours';
+      case SpotFilter.accesPlage:
+        return 'SPHOT\nAccès plage';
+      case SpotFilter.eauBleue:
+        return 'SPHOT\nLac\nCascade\nBarrage';
+      case SpotFilter.eauVerte:
+        return 'SPHOT\nFleuve\nRivière';
+      case SpotFilter.lagon:
+        return 'SPHOT\nLagon\nPiscine naturelle';
+      case SpotFilter.naturisme:
+        return 'SPHOT\nNaturisme';
+      case SpotFilter.autre:
+        return 'SPHOT\nAutre\nNon renseigné';
+    }
   }
-}
 
   Color _filterColor(SpotFilter filter) {
     switch (filter) {
@@ -155,15 +157,14 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  
-   Widget _drawerAssetIcon(String path) {
+  Widget _drawerAssetIcon(String path) {
     return Image.asset(path, width: 40, height: 40, fit: BoxFit.contain);
   }
 
   Widget _filterIcon(SpotFilter filter) {
     switch (filter) {
       case SpotFilter.all:
-        return const Text('🌍', style: TextStyle(fontSize: 22));
+  return const _SphotSpinnerIcon();
       case SpotFilter.secours:
         return const _DrawerFlagIcon();
       case SpotFilter.accesPlage:
@@ -255,32 +256,17 @@ class _MapPageState extends State<MapPage> {
           ),
           child: Column(
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(18, 18, 18, 12),
-                child: Row(
-                  children: [
-                    _ColoredHamburgerIcon(size: 26),
-                    SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'SPHOT',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        Text(
-                          'Menu',
-                          style: TextStyle(fontSize: 14, color: Colors.black54),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              Padding(
+  padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+  child: Center(
+    child: Image.asset(
+      'data/icons/title.png',
+      height: 76,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+    ),
+  ),
+),
               const Divider(height: 1),
               Expanded(
                 child: ListView(
@@ -305,10 +291,10 @@ class _MapPageState extends State<MapPage> {
                             child: Center(child: _filterIcon(filter)),
                           ),
                           title: _OutlinedMenuText(
-  text: _filterLabel(filter),
-  color: color,
-  selected: selected,
-),
+                            text: _filterLabel(filter),
+                            color: color,
+                            selected: selected,
+                          ),
                           trailing: selected
                               ? Icon(Icons.check, color: color, size: 24)
                               : null,
@@ -400,7 +386,7 @@ class _MapPageState extends State<MapPage> {
       shadowColor: Colors.transparent,
       elevation: 0,
       centerTitle: true,
-      toolbarHeight: 64,
+      toolbarHeight: 90,
       leading: Builder(
         builder: (context) => IconButton(
           tooltip: '',
@@ -408,27 +394,11 @@ class _MapPageState extends State<MapPage> {
           icon: const _ColoredHamburgerIcon(size: 25),
         ),
       ),
-      title: LayoutBuilder(
-        builder: (context, constraints) {
-          final screenWidth = MediaQuery.of(context).size.width;
-          final bool isDesktop = screenWidth >= 900;
-
-          final double logoWidth = isDesktop
-              ? (screenWidth * 0.13).clamp(150.0, 210.0)
-              : (screenWidth * 0.24).clamp(110.0, 170.0);
-
-          final double logoHeight = (logoWidth * 0.35).clamp(38.0, 60.0);
-
-          return SizedBox(
-            width: logoWidth,
-            height: logoHeight,
-            child: Image.asset(
-              'data/icons/title.png',
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
-            ),
-          );
-        },
+      title: Image.asset(
+        'data/icons/title.png',
+        height: 110,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
       ),
       actions: [
         IconButton(
@@ -495,6 +465,36 @@ class _MapPageState extends State<MapPage> {
   }
 }
 
+class _ColoredSphotsText extends StatelessWidget {
+  const _ColoredSphotsText();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text.rich(
+      TextSpan(
+        text: 'SPHOTS',
+        style: TextStyle(
+          fontSize: 15.4,
+          fontWeight: FontWeight.w800,
+          height: 1.1,
+          letterSpacing: -0.1,
+          foreground: Paint()
+            ..shader = const LinearGradient(
+              colors: [
+                Color(0xFFFF7F00),
+                Color(0xFF1E3A8A),
+                Color(0xFF2E7D32),
+                Color(0xFF00ACC1),
+                Color(0xFFD87A5C),
+                Colors.black87,
+              ],
+            ).createShader(Rect.fromLTWH(0, 0, 120, 20)),
+        ),
+      ),
+    );
+  }
+}
+
 class _OutlinedMenuText extends StatelessWidget {
   final String text;
   final Color color;
@@ -514,26 +514,29 @@ class _OutlinedMenuText extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          lines.first,
-          style: TextStyle(
-            color: color,
-            fontWeight: selected ? FontWeight.w900 : FontWeight.w800,
-            fontSize: 15,
-            height: 1.1,
-          ),
-        ),
+        if (lines.first == 'SPHOTS')
+  const _ColoredSphotsText()
+else
+  Text(
+    lines.first,
+    style: TextStyle(
+      color: color,
+      fontWeight: selected ? FontWeight.w900 : FontWeight.w800,
+      fontSize: 15,
+      height: 1.1,
+    ),
+  ),
         ...lines.skip(1).map(
-          (line) => Text(
-            line,
-            style: TextStyle(
-              color: color.withOpacity(0.85),
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-              fontSize: 13,
-              height: 1.15,
+              (line) => Text(
+                line,
+                style: TextStyle(
+                  color: color.withOpacity(0.85),
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  fontSize: 13,
+                  height: 1.15,
+                ),
+              ),
             ),
-          ),
-        ),
       ],
     );
   }
@@ -577,23 +580,147 @@ class _ColoredHamburgerIcon extends StatelessWidget {
   }
 }
 
-class _DrawerFlagIcon extends StatelessWidget {
+class _SphotSpinnerIcon extends StatefulWidget {
+  const _SphotSpinnerIcon();
+
+  @override
+  State<_SphotSpinnerIcon> createState() => _SphotSpinnerIconState();
+}
+
+class _SphotSpinnerIconState extends State<_SphotSpinnerIcon> {
+  late final Timer _timer;
+  int _step = 0;
+
+  static const List<String> _icons = [
+    'data/icons/fire_orange_icon.png',
+    'data/icons/fire_blue_icon.png',
+    'data/icons/fire_green_icon.png',
+    'data/icons/fire_cyan_icon.png',
+    'data/icons/fire_icon.png',
+    'data/icons/fire_black_icon.png',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+
+    _timer = Timer.periodic(const Duration(milliseconds: 800), (_) {
+      if (!mounted) return;
+      setState(() => _step = _step + 1);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const size = 42.0;
+    const iconSize = 22.0;
+    const radius = 10.0;
+    const count = 6;
+
+    final angles = List.generate(
+      count,
+      (i) => -pi / 2 + (2 * pi * i / count),
+    );
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: List.generate(count, (index) {
+          final angle = angles[index];
+          final path = _icons[index % _icons.length];
+
+          final activeIndex = _step % count;
+          final isActive = index == activeIndex;
+
+          return Positioned(
+            left: size / 2 + cos(angle) * radius - iconSize / 2,
+            top: size / 2 + sin(angle) * radius - iconSize / 2,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 500),
+              opacity: isActive ? 1.0 : 0.18,
+              child: AnimatedScale(
+                duration: const Duration(milliseconds: 300),
+                scale: isActive ? 1.18 : 0.78,
+                child: Transform.rotate(
+                  angle: angle + pi / 2,
+                  child: Image.asset(
+                    path,
+                    width: iconSize,
+                    height: iconSize,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _DrawerFlagIcon extends StatefulWidget {
   const _DrawerFlagIcon();
+
+  @override
+  State<_DrawerFlagIcon> createState() => _DrawerFlagIconState();
+}
+
+class _DrawerFlagIconState extends State<_DrawerFlagIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  static const double iconWidth = 28;
+  static const double iconHeight = 34;
+
+  static const double poleWidth = 3;
+  static const double poleHeight = 31;
+  static const double poleLeft = 7;
+
+  static const double flagLeft = poleLeft + poleWidth - 0.5;
+  static const double flagTop = -1;
+  static const double flagWidth = 16;
+  static const double flagHeight = 22;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 28,
-      height: 34,
+      width: iconWidth,
+      height: iconHeight,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Positioned(
-            left: 7,
+            left: poleLeft,
             bottom: 0,
             child: Container(
-              width: 3,
-              height: 31,
+              width: poleWidth,
+              height: poleHeight,
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border.all(color: Colors.black, width: 0.7),
@@ -602,11 +729,19 @@ class _DrawerFlagIcon extends StatelessWidget {
             ),
           ),
           Positioned(
-            left: 10,
-            top: 4,
-            child: CustomPaint(
-              size: const Size(20, 15),
-              painter: _MiniFlagPainter(color: const Color(0xFF22C55E)),
+            left: flagLeft,
+            top: flagTop,
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                return CustomPaint(
+                  size: const Size(flagWidth, flagHeight),
+                  painter: MiniWavingFlagPainter(
+                    color: const Color(0xFF22C55E),
+                    phase: _controller.value * 2 * pi,
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -615,38 +750,65 @@ class _DrawerFlagIcon extends StatelessWidget {
   }
 }
 
-class _MiniFlagPainter extends CustomPainter {
+class MiniWavingFlagPainter extends CustomPainter {
   final Color color;
+  final double phase;
 
-  _MiniFlagPainter({required this.color});
+  MiniWavingFlagPainter({
+    required this.color,
+    required this.phase,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = ui.Path()
-      ..moveTo(0, 2)
-      ..quadraticBezierTo(size.width * 0.45, -2, size.width, 2)
-      ..lineTo(size.width, size.height - 3)
-      ..quadraticBezierTo(
-        size.width * 0.45,
-        size.height + 2,
-        0,
-        size.height - 2,
-      )
-      ..close();
+    final fillPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
 
-    canvas.drawPath(path, Paint()..color = color);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = Colors.black.withOpacity(0.25)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.5,
-    );
+    final borderPaint = Paint()
+      ..color = Colors.black.withOpacity(0.25)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.5;
+
+    final path = ui.Path();
+
+    const int steps = 30;
+    const double verticalMargin = 5;
+
+    final topPoints = <Offset>[];
+    final bottomPoints = <Offset>[];
+
+    for (int i = 0; i <= steps; i++) {
+      final t = i / steps;
+      final x = size.width * t;
+
+      final amplitude = 0.3 + 1.2 * t;
+      final wave = sin(phase + t * pi * 1.8) * amplitude;
+
+      topPoints.add(Offset(x, verticalMargin + wave));
+      bottomPoints.add(Offset(x, size.height - verticalMargin + wave));
+    }
+
+    path.moveTo(topPoints.first.dx, topPoints.first.dy);
+
+    for (final point in topPoints) {
+      path.lineTo(point.dx, point.dy);
+    }
+
+    for (final point in bottomPoints.reversed) {
+      path.lineTo(point.dx, point.dy);
+    }
+
+    path.close();
+
+    canvas.drawPath(path, fillPaint);
+    canvas.drawPath(path, borderPaint);
   }
 
   @override
-  bool shouldRepaint(covariant _MiniFlagPainter oldDelegate) =>
-      oldDelegate.color != color;
+  bool shouldRepaint(covariant MiniWavingFlagPainter oldDelegate) {
+    return oldDelegate.phase != phase || oldDelegate.color != color;
+  }
 }
 
 class _OtherSpotMarker extends StatefulWidget {
@@ -724,14 +886,34 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                         ),
                         const SizedBox(height: 1),
                         Text(
-                          spot.typeSphot,
-                          textAlign: TextAlign.center,
-                          style: _mapLabelStyle(
-                            fontSize: _labelSize(10),
-                            fontWeight: FontWeight.w700,
-                            color: widget.typeTextColor,
-                          ),
-                        ),
+  spot.typeSphot,
+  textAlign: TextAlign.center,
+  style: _mapLabelStyle(
+    fontSize: _labelSize(10),
+    fontWeight: FontWeight.w700,
+    color: widget.typeTextColor,
+  ),
+),
+const SizedBox(height: 1),
+Text(
+  '⚠️ BAIGNADE NON SURVEILLÉE',
+  textAlign: TextAlign.center,
+  style: _mapLabelStyle(
+    fontSize: _labelSize(10),
+    fontWeight: FontWeight.w900,
+    color: const Color(0xFFFF0000),
+  ),
+),
+const SizedBox(height: 1),
+Text(
+  '⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
+  textAlign: TextAlign.center,
+  style: _mapLabelStyle(
+    fontSize: _labelSize(10),
+    fontWeight: FontWeight.w900,
+    color: const Color(0xFFFF0000),
+  ),
+),
                       ],
                     ),
                   ),
