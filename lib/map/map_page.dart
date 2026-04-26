@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'dart:async';
+import 'lifeguard_login_page.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -30,6 +31,7 @@ class MapPage extends StatefulWidget {
 }
 
 class _MapPageState extends State<MapPage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final FirestoreService _firestoreService = FirestoreService();
   SpotFilter _selectedFilter = SpotFilter.all;
 
@@ -380,45 +382,70 @@ class _MapPageState extends State<MapPage> {
   }
 
   PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: Colors.transparent,
-      surfaceTintColor: Colors.transparent,
-      shadowColor: Colors.transparent,
-      elevation: 0,
-      centerTitle: true,
-      toolbarHeight: 90,
-      leading: Builder(
-        builder: (context) => IconButton(
-          tooltip: '',
-          onPressed: () => Scaffold.of(context).openDrawer(),
+  return AppBar(
+    backgroundColor: Colors.transparent,
+    surfaceTintColor: Colors.transparent,
+    shadowColor: Colors.transparent,
+    elevation: 0,
+    centerTitle: true,
+    toolbarHeight: 90,
+
+    // 👉 MENU À GAUCHE
+    leading: Builder(
+      builder: (context) => Padding(
+        padding: const EdgeInsets.only(left: 14),
+        child: IconButton(
+          tooltip: 'Menu',
+          onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
           icon: const _ColoredHamburgerIcon(size: 25),
         ),
       ),
-      title: Image.asset(
-        'data/icons/title.png',
-        height: 110,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.high,
-      ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.account_circle_outlined),
-          color: Colors.black87,
+    ),
+
+    // 👉 LOGO SPHOT CENTRE
+    title: Image.asset(
+      'data/icons/title.png',
+      height: 110,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+    ),
+
+    // 👉 LOGO SAUVETEUR À DROITE
+    actions: [
+      Padding(
+        padding: const EdgeInsets.only(right: 14),
+        child: IconButton(
           tooltip: 'Connexion sauveteurs',
-          onPressed: () {},
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const LifeguardLoginPage(),
+              ),
+            );
+          },
+          icon: Image.asset(
+            'data/icons/lifeguard_logo.png',
+            width: 70,
+            height: 70,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawerScrimColor: Colors.transparent,
-      backgroundColor: Colors.transparent,
-      extendBodyBehindAppBar: true,
-      appBar: _buildAppBar(),
-      drawer: _buildDrawer(),
+  key: _scaffoldKey, // 👈 AJOUT
+  drawerScrimColor: Colors.transparent,
+  backgroundColor: Colors.transparent,
+  extendBodyBehindAppBar: true,
+  appBar: _buildAppBar(),
+
+  endDrawer: _buildDrawer(), // 👈 CHANGEMENT ICI
       body: StreamBuilder<List<SpotFlagState>>(
         stream: _firestoreService.getSpotsStream(),
         builder: (context, snapshot) {
