@@ -36,7 +36,17 @@ class _MapPageState extends State<MapPage> {
   SpotFilter _selectedFilter = SpotFilter.all;
 
   bool _showFlagForZoom(double zoom) => zoom >= 12.5;
-  bool _showTextForZoom(double zoom) => zoom >= 13.0;
+  bool _showTextForZoom(double zoom) {
+  final isTouchDevice =
+      Theme.of(context).platform == TargetPlatform.android ||
+      Theme.of(context).platform == TargetPlatform.iOS;
+
+  if (isTouchDevice) {
+    return zoom >= 16.0;
+  }
+
+  return zoom >= 13.0;
+}
 
   double _labelOpacity(double zoom) {
     if (zoom >= 14.5) return 1.0;
@@ -184,64 +194,76 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  Marker _buildOtherSpotMarker(SpotFlagState spot, bool showText, double zoom) {
-    return Marker(
-      point: LatLng(spot.lat, spot.lng),
-      width: 56,
-      height: 56,
-      alignment: Alignment.center,
-      child: _OtherSpotMarker(
-        spot: spot,
-        iconPath: _getMarkerIconPath(spot),
-        showTextAllowed: showText,
-        zoom: zoom,
-        labelOpacity: _labelOpacity(zoom),
-        typeTextColor: _typeColor(spot),
-      ),
-    );
-  }
+Marker _buildOtherSpotMarker(
+  SpotFlagState spot,
+  bool showText,
+  double zoom,
+  double rotation,
+) {
+  return Marker(
+    point: LatLng(spot.lat, spot.lng),
+    width: 56,
+    height: 56,
+    alignment: Alignment.center,
+    child: _OtherSpotMarker(
+      spot: spot,
+      iconPath: _getMarkerIconPath(spot),
+      showTextAllowed: showText,
+      zoom: zoom,
+      rotation: rotation,
+      labelOpacity: _labelOpacity(zoom),
+      typeTextColor: _typeColor(spot),
+    ),
+  );
+}
 
   Marker _buildSecoursMarker(
-    SpotFlagState spot,
-    bool showFlag,
-    bool showText,
-    double zoom,
-  ) {
-    if (!showFlag) {
-      return Marker(
-        point: LatLng(spot.lat, spot.lng),
-        width: 18,
-        height: 18,
-        alignment: Alignment.center,
-        child: _SimplePostePoint(spot: spot),
-      );
-    }
-
+  SpotFlagState spot,
+  bool showFlag,
+  bool showText,
+  double zoom,
+  double rotation,
+) {
+  if (!showFlag) {
     return Marker(
       point: LatLng(spot.lat, spot.lng),
-      width: 70,
-      height: 95,
+      width: 18,
+      height: 18,
       alignment: Alignment.center,
-      child: _HoverMarker(
-        spot: spot,
-        showTextAllowed: showText,
-        zoom: zoom,
-        labelOpacity: _labelOpacity(zoom),
-      ),
+      child: _SimplePostePoint(spot: spot),
     );
   }
 
-  List<Marker> _buildMarkers(List<SpotFlagState> spots, double zoom) {
-    final showFlag = _showFlagForZoom(zoom);
-    final showText = _showTextForZoom(zoom);
+  return Marker(
+    point: LatLng(spot.lat, spot.lng),
+    width: 70,
+    height: 95,
+    alignment: Alignment.center,
+    child: _HoverMarker(
+      spot: spot,
+      showTextAllowed: showText,
+      zoom: zoom,
+      rotation: rotation,
+      labelOpacity: _labelOpacity(zoom),
+    ),
+  );
+}
 
-    return spots.where(_matchesFilter).map((spot) {
-      if (spot.isPosteSecours) {
-        return _buildSecoursMarker(spot, showFlag, showText, zoom);
-      }
-      return _buildOtherSpotMarker(spot, showText, zoom);
-    }).toList();
-  }
+  List<Marker> _buildMarkers(
+  List<SpotFlagState> spots,
+  double zoom,
+  double rotation,
+) {
+  final showFlag = _showFlagForZoom(zoom);
+  final showText = _showTextForZoom(zoom);
+
+  return spots.where(_matchesFilter).map((spot) {
+    if (spot.isPosteSecours) {
+      return _buildSecoursMarker(spot, showFlag, showText, zoom, rotation);
+    }
+    return _buildOtherSpotMarker(spot, showText, zoom, rotation);
+  }).toList();
+}
 
   Widget _buildDrawer() {
     return Drawer(
@@ -370,25 +392,30 @@ class _MapPageState extends State<MapPage> {
         color: Colors.transparent,
         border: Border.all(color: borderColor, width: 2.2),
       ),
-      child: Text(
-        markers.length.toString(),
-        style: _mapLabelStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w900,
-          color: borderColor,
-        ),
-      ),
+      child: Transform.rotate(
+  angle: -MapCamera.of(context).rotation * pi / 180,
+  alignment: Alignment.center,
+  child: Text(
+    markers.length.toString(),
+    style: _mapLabelStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w900,
+      color: borderColor,
+    ),
+  ),
+),
     );
   }
 
   PreferredSizeWidget _buildAppBar() {
   return AppBar(
+    primary: false,
     backgroundColor: Colors.transparent,
     surfaceTintColor: Colors.transparent,
     shadowColor: Colors.transparent,
     elevation: 0,
     centerTitle: true,
-    toolbarHeight: 90,
+    toolbarHeight: 70,
 
     // 👉 MENU À GAUCHE
     leading: Builder(
@@ -405,7 +432,7 @@ class _MapPageState extends State<MapPage> {
     // 👉 LOGO SPHOT CENTRE
     title: Image.asset(
       'data/icons/title.png',
-      height: 110,
+      height: 90,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.high,
     ),
@@ -425,8 +452,8 @@ class _MapPageState extends State<MapPage> {
           },
           icon: Image.asset(
             'data/icons/lifeguard_logo.png',
-            width: 70,
-            height: 70,
+            width: 50,
+            height: 50,
             fit: BoxFit.contain,
             filterQuality: FilterQuality.high,
           ),
@@ -472,7 +499,8 @@ class _MapPageState extends State<MapPage> {
               Builder(
                 builder: (context) {
                   final zoom = MapCamera.of(context).zoom;
-                  final markers = _buildMarkers(spots, zoom);
+                  final rotation = MapCamera.of(context).rotation;
+                  final markers = _buildMarkers(spots, zoom, rotation);
 
                   return MarkerClusterLayerWidget(
                     options: MarkerClusterLayerOptions(
@@ -843,6 +871,7 @@ class _OtherSpotMarker extends StatefulWidget {
   final String iconPath;
   final bool showTextAllowed;
   final double zoom;
+  final double rotation;
   final double labelOpacity;
   final Color typeTextColor;
 
@@ -851,6 +880,7 @@ class _OtherSpotMarker extends StatefulWidget {
     required this.iconPath,
     required this.showTextAllowed,
     required this.zoom,
+    required this.rotation,
     required this.labelOpacity,
     required this.typeTextColor,
   });
@@ -873,7 +903,13 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
   @override
   Widget build(BuildContext context) {
     final spot = widget.spot;
-    final showText = isHovering && widget.showTextAllowed;
+
+    final isTouchDevice =
+        Theme.of(context).platform == TargetPlatform.android ||
+        Theme.of(context).platform == TargetPlatform.iOS;
+
+    final showText =
+        widget.showTextAllowed && (isTouchDevice || isHovering);
 
     return MouseRegion(
       onEnter: (_) => setState(() => isHovering = true),
@@ -881,72 +917,77 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
       child: SizedBox(
         width: 56,
         height: 56,
-        child: Stack(
-          clipBehavior: Clip.none,
+        child: Transform.rotate(
+          angle: -widget.rotation * pi / 180,
           alignment: Alignment.center,
-          children: [
-            Image.asset(
-              widget.iconPath,
-              width: spot.isNaturisme ? 52 : 48,
-              height: spot.isNaturisme ? 52 : 48,
-              fit: BoxFit.contain,
-            ),
-            if (showText)
-              Positioned(
-                top: 48,
-                left: -160,
-                child: Opacity(
-                  opacity: widget.labelOpacity,
-                  child: SizedBox(
-                    width: 380,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '${spot.name} - ${spot.nomSphot}',
-                          textAlign: TextAlign.center,
-                          style: _mapLabelStyle(
-                            fontSize: _labelSize(11),
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Image.asset(
+                widget.iconPath,
+                width: spot.isNaturisme ? 52 : 48,
+                height: spot.isNaturisme ? 52 : 48,
+                fit: BoxFit.contain,
+              ),
+
+              if (showText)
+                Positioned(
+                  top: 50,
+                  left: -160,
+                  child: Opacity(
+                    opacity: widget.labelOpacity,
+                    child: SizedBox(
+                      width: 380,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${spot.name} - ${spot.nomSphot}',
+                            textAlign: TextAlign.center,
+                            style: _mapLabelStyle(
+                              fontSize: _labelSize(11),
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-  spot.typeSphot,
-  textAlign: TextAlign.center,
-  style: _mapLabelStyle(
-    fontSize: _labelSize(10),
-    fontWeight: FontWeight.w700,
-    color: widget.typeTextColor,
-  ),
-),
-const SizedBox(height: 1),
-Text(
-  '⚠️ BAIGNADE NON SURVEILLÉE',
-  textAlign: TextAlign.center,
-  style: _mapLabelStyle(
-    fontSize: _labelSize(10),
-    fontWeight: FontWeight.w900,
-    color: const Color(0xFFFF0000),
-  ),
-),
-const SizedBox(height: 1),
-Text(
-  '⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
-  textAlign: TextAlign.center,
-  style: _mapLabelStyle(
-    fontSize: _labelSize(10),
-    fontWeight: FontWeight.w900,
-    color: const Color(0xFFFF0000),
-  ),
-),
-                      ],
+                          const SizedBox(height: 1),
+                          Text(
+                            spot.typeSphot,
+                            textAlign: TextAlign.center,
+                            style: _mapLabelStyle(
+                              fontSize: _labelSize(10),
+                              fontWeight: FontWeight.w700,
+                              color: widget.typeTextColor,
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            '⚠️ BAIGNADE NON SURVEILLÉE',
+                            textAlign: TextAlign.center,
+                            style: _mapLabelStyle(
+                              fontSize: _labelSize(10),
+                              fontWeight: FontWeight.w900,
+                              color: const Color(0xFFFF0000),
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            '⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
+                            textAlign: TextAlign.center,
+                            style: _mapLabelStyle(
+                              fontSize: _labelSize(10),
+                              fontWeight: FontWeight.w900,
+                              color: const Color(0xFFFF0000),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -996,12 +1037,14 @@ class _HoverMarker extends StatefulWidget {
   final SpotFlagState spot;
   final bool showTextAllowed;
   final double zoom;
+  final double rotation;
   final double labelOpacity;
 
   const _HoverMarker({
     required this.spot,
     required this.showTextAllowed,
     required this.zoom,
+    required this.rotation,
     required this.labelOpacity,
   });
 
@@ -1028,9 +1071,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
           Icons.warning_amber_rounded,
           size: _labelSize(18),
           color: const Color(0xFFFF0000),
-          shadows: const [
-            Shadow(color: Colors.white, blurRadius: 2),
-          ],
+          shadows: const [Shadow(color: Colors.white, blurRadius: 2)],
         ),
         const SizedBox(width: 2),
         Flexible(
@@ -1051,7 +1092,13 @@ class _HoverMarkerState extends State<_HoverMarker> {
   @override
   Widget build(BuildContext context) {
     final spot = widget.spot;
-    final showText = isHovering && widget.showTextAllowed;
+
+    final isTouchDevice =
+        Theme.of(context).platform == TargetPlatform.android ||
+        Theme.of(context).platform == TargetPlatform.iOS;
+
+    final showText =
+        widget.showTextAllowed && (isTouchDevice || isHovering);
 
     return MouseRegion(
       onEnter: (_) => setState(() => isHovering = true),
@@ -1059,81 +1106,86 @@ class _HoverMarkerState extends State<_HoverMarker> {
       child: SizedBox(
         width: 70,
         height: 95,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Transform.translate(
-              offset: const Offset(0, -47.5),
-              child: FlagMarker(spot: spot),
-            ),
-            if (showText)
-              Positioned(
-                top: 52,
-                left: -175,
-                child: Opacity(
-                  opacity: widget.labelOpacity,
-                  child: SizedBox(
-                    width: 420,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '${spot.name} - ${spot.nomSphot}',
-                          textAlign: TextAlign.center,
-                          style: _mapLabelStyle(
-                            fontSize: _labelSize(11),
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        RichText(
-                          textAlign: TextAlign.center,
-                          text: TextSpan(
-                            style: _mapLabelStyle(
-                              fontSize: _labelSize(10),
-                              fontWeight: FontWeight.w700,
-                              color: Colors.black,
-                            ),
-                            children: [
-                              const TextSpan(
-                                text: '🚨 POSTE DE SECOURS 🚨',
-                                style: TextStyle(
-                                  color: Color(0xFFFF0000),
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              if (spot.phone.trim().isNotEmpty)
-                                TextSpan(text: ' - 📞 ${spot.phone}'),
-                              if (spot.heureDebut.trim().isNotEmpty &&
-                                  spot.heureFin.trim().isNotEmpty)
-                                TextSpan(
-                                  text:
-                                      ' - 🕘 ${spot.heureDebut} - ${spot.heureFin}',
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        if (spot.isMissingFlagColorDuringSurveillance) ...[
-                          _warningLine('COULEUR DE LA FLAMME NON RENSEIGNÉE'),
-                          _warningLine('BAIGNADE À VOS RISQUES ET PÉRILS'),
-                        ] else
+        child: Transform.rotate(
+          angle: -widget.rotation * pi / 180,
+          alignment: Alignment.center,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Transform.translate(
+                offset: const Offset(0, -47.5),
+                child: FlagMarker(spot: spot),
+              ),
+
+              if (showText)
+                Positioned(
+                  top: 54,
+                  left: -175,
+                  child: Opacity(
+                    opacity: widget.labelOpacity,
+                    child: SizedBox(
+                      width: 420,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                           Text(
-                            spot.displayStatut,
+                            '${spot.name} - ${spot.nomSphot}',
                             textAlign: TextAlign.center,
                             style: _mapLabelStyle(
-                              fontSize: _labelSize(10),
-                              fontWeight: FontWeight.w900,
-                              color: Color(spot.statutColor),
+                              fontSize: _labelSize(11),
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
                             ),
                           ),
-                      ],
+                          const SizedBox(height: 2),
+                          RichText(
+                            textAlign: TextAlign.center,
+                            text: TextSpan(
+                              style: _mapLabelStyle(
+                                fontSize: _labelSize(10),
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black,
+                              ),
+                              children: [
+                                const TextSpan(
+                                  text: '🚨 POSTE DE SECOURS 🚨',
+                                  style: TextStyle(
+                                    color: Color(0xFFFF0000),
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                if (spot.phone.trim().isNotEmpty)
+                                  TextSpan(text: ' - 📞 ${spot.phone}'),
+                                if (spot.heureDebut.trim().isNotEmpty &&
+                                    spot.heureFin.trim().isNotEmpty)
+                                  TextSpan(
+                                    text:
+                                        ' - 🕘 ${spot.heureDebut} - ${spot.heureFin}',
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          if (spot.isMissingFlagColorDuringSurveillance) ...[
+                            _warningLine('COULEUR DE LA FLAMME NON RENSEIGNÉE'),
+                            _warningLine('BAIGNADE À VOS RISQUES ET PÉRILS'),
+                          ] else
+                            Text(
+                              spot.displayStatut,
+                              textAlign: TextAlign.center,
+                              style: _mapLabelStyle(
+                                fontSize: _labelSize(10),
+                                fontWeight: FontWeight.w900,
+                                color: Color(spot.statutColor),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
