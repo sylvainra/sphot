@@ -6,6 +6,7 @@ import 'lifeguard_login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../models/flag_state.dart';
@@ -23,6 +24,16 @@ enum SpotFilter {
   autre,
 }
 
+class _MapTileStyle {
+  final String name;
+  final String url;
+
+  const _MapTileStyle({
+    required this.name,
+    required this.url,
+  });
+}
+
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
 
@@ -33,14 +44,37 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final FirestoreService _firestoreService = FirestoreService();
+  final MapController _mapController = MapController();
+
   SpotFilter _selectedFilter = SpotFilter.all;
+
+  double _currentRotation = 0;
+  int _selectedTileStyle = 0;
+  bool _isMovingMap = false;
+  Timer? _mapMoveTimer;
+
+  static const List<_MapTileStyle> _tileStyles = [
+    _MapTileStyle(
+      name: 'Classique',
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    ),
+    _MapTileStyle(
+      name: 'Topo',
+      url: 'https://tile.opentopomap.org/{z}/{x}/{y}.png',
+    ),
+    _MapTileStyle(
+      name: 'Clair',
+      url:
+          'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png',
+    ),
+  ];
 
   bool _showFlagForZoom(double zoom) => zoom >= 12.5;
 
   bool _showTextForZoom(double zoom) {
     final isTouchDevice =
         Theme.of(context).platform == TargetPlatform.android ||
-        Theme.of(context).platform == TargetPlatform.iOS;
+            Theme.of(context).platform == TargetPlatform.iOS;
 
     if (isTouchDevice) {
       return zoom >= 16.0;
@@ -57,46 +91,46 @@ class _MapPageState extends State<MapPage> {
   }
 
   List<Marker> _buildTerritoryLogoMarkers(double zoom, double rotation) {
-  final markers = <Marker>[];
+    final markers = <Marker>[];
 
-  if (zoom >= 9 && zoom < 12) {
-    markers.add(
-      Marker(
-        point: const LatLng(46.6706076, -1.4266839),
-        width: 80,
-        height: 80,
-        child: Transform.rotate(
-          angle: -rotation * pi / 180,
-          child: Image.asset(
-            'data/logos_departements/france/pays_de_la_loire/vendee.png',
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+    if (zoom >= 9 && zoom < 12) {
+      markers.add(
+        Marker(
+          point: const LatLng(46.6706076, -1.4266839),
+          width: 80,
+          height: 80,
+          child: Transform.rotate(
+            angle: -rotation * pi / 180,
+            child: Image.asset(
+              'data/logos_departements/france/pays_de_la_loire/vendee.png',
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  if (zoom >= 12) {
-    markers.add(
-      Marker(
-        point: const LatLng(46.4239682, -1.4897203),
-        width: 70,
-        height: 70,
-        child: Transform.rotate(
-          angle: -rotation * pi / 180,
-          child: Image.asset(
-            'data/logos_communes/france/pays_de_la_loire/vendee/longeville_sur_mer.png',
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+    if (zoom >= 12) {
+      markers.add(
+        Marker(
+          point: const LatLng(46.4239682, -1.4897203),
+          width: 70,
+          height: 70,
+          child: Transform.rotate(
+            angle: -rotation * pi / 180,
+            child: Image.asset(
+              'data/logos_communes/france/pays_de_la_loire/vendee/longeville_sur_mer.png',
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  return markers;
-}
+    return markers;
+  }
 
   String _getMarkerIconPath(SpotFlagState spot) {
     final type = spot.normalizedType;
@@ -145,10 +179,10 @@ class _MapPageState extends State<MapPage> {
     return Colors.black;
   }
 
-  bool _matchesFilter(SpotFlagState spot) {
+  bool _matchesFilterFor(SpotFlagState spot, SpotFilter filter) {
     final type = spot.normalizedType;
 
-    switch (_selectedFilter) {
+    switch (filter) {
       case SpotFilter.all:
         return true;
       case SpotFilter.secours:
@@ -168,6 +202,10 @@ class _MapPageState extends State<MapPage> {
       case SpotFilter.autre:
         return type.contains('AUTRE') || type.contains('NON RENSEIGNE');
     }
+  }
+
+  bool _matchesFilter(SpotFlagState spot) {
+    return _matchesFilterFor(spot, _selectedFilter);
   }
 
   String _filterLabel(SpotFilter filter) {
@@ -236,6 +274,325 @@ class _MapPageState extends State<MapPage> {
         return _drawerAssetIcon('data/icons/fire_black_icon.png');
     }
   }
+
+  String _normalizeSearch(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll('é', 'e')
+        .replaceAll('è', 'e')
+        .replaceAll('ê', 'e')
+        .replaceAll('ë', 'e')
+        .replaceAll('à', 'a')
+        .replaceAll('â', 'a')
+        .replaceAll('î', 'i')
+        .replaceAll('ï', 'i')
+        .replaceAll('ô', 'o')
+        .replaceAll('ù', 'u')
+        .replaceAll('û', 'u')
+        .replaceAll('ç', 'c')
+        .trim();
+  }
+
+  void _showMapMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _resetNorth() {
+    _mapController.rotate(0);
+    setState(() => _currentRotation = 0);
+  }
+
+  void _changeMapStyle() {
+    setState(() {
+      _selectedTileStyle = (_selectedTileStyle + 1) % _tileStyles.length;
+    });
+
+    _showMapMessage('Carte : ${_tileStyles[_selectedTileStyle].name}');
+  }
+
+  Future<void> _goToUserLocation() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+
+      if (!serviceEnabled) {
+        _showMapMessage('Active la localisation de ton appareil.');
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _showMapMessage('Autorisation de localisation refusée.');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      _mapController.move(
+        LatLng(position.latitude, position.longitude),
+        15.5,
+      );
+    } catch (_) {
+      _showMapMessage('Position actuelle indisponible.');
+    }
+  }
+
+  void _openSearchSheet(List<SpotFlagState> spots) {
+    String query = '';
+    SpotFilter sheetFilter = _selectedFilter;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final filteredSpots = spots.where((spot) {
+              final normalizedQuery = _normalizeSearch(query);
+
+              final searchZone =
+                  '${spot.name} ${spot.nomSphot} ${spot.typeSphot}';
+
+              final matchesText = normalizedQuery.isEmpty ||
+                  _normalizeSearch(searchZone).contains(normalizedQuery);
+
+              final matchesType = _matchesFilterFor(spot, sheetFilter);
+
+              return matchesText && matchesType;
+            }).toList();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.58,
+              minChildSize: 0.32,
+              maxChildSize: 0.92,
+              builder: (context, scrollController) {
+                return Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(26),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      Container(
+                        width: 46,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+                        child: TextField(
+                          autofocus: true,
+                          decoration: InputDecoration(
+                            hintText: 'Rechercher un nom de SPHOT',
+                            prefixIcon: const Icon(Icons.search),
+                            filled: true,
+                            fillColor: const Color(0xFFF1F5F9),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                          onChanged: (value) {
+                            setSheetState(() => query = value);
+                          },
+                        ),
+                      ),
+                      SizedBox(
+                        height: 54,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          children: SpotFilter.values.map((filter) {
+                            final selected = filter == sheetFilter;
+                            final color = _filterColor(filter);
+
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChoiceChip(
+                                selected: selected,
+                                label: Text(
+                                  _filterLabel(filter).replaceAll('\n', ' '),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: selected ? Colors.white : color,
+                                  ),
+                                ),
+                                selectedColor: color,
+                                backgroundColor: color.withOpacity(0.08),
+                                onSelected: (_) {
+                                  setSheetState(() => sheetFilter = filter);
+                                  setState(() => _selectedFilter = filter);
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: filteredSpots.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'Aucun SPHOT trouvé',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
+                                controller: scrollController,
+                                itemCount: filteredSpots.length,
+                                separatorBuilder: (_, __) =>
+                                    const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final spot = filteredSpots[index];
+                                  final color = _typeColor(spot);
+
+                                  return ListTile(
+                                    leading: SizedBox(
+                                      width: 42,
+                                      height: 42,
+                                      child: Center(
+                                        child: spot.isPosteSecours
+                                            ? const _DrawerFlagIcon()
+                                            : Image.asset(
+                                                _getMarkerIconPath(spot),
+                                                width: 36,
+                                                height: 36,
+                                              ),
+                                      ),
+                                    ),
+                                    title: Text(
+                                      '${spot.name} - ${spot.nomSphot}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      spot.typeSphot,
+                                      style: TextStyle(
+                                        color: color,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    trailing: const Icon(Icons.chevron_right),
+                                    onTap: () {
+                                      Navigator.of(context).pop();
+                                      _mapController.move(
+                                        LatLng(spot.lat, spot.lng),
+                                        16,
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _mapControlButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+    double rotation = 0,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Colors.white.withOpacity(0.92),
+        shape: const CircleBorder(),
+        elevation: 4,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Tooltip(
+            message: tooltip,
+            child: SizedBox(
+              width: 46,
+              height: 46,
+              child: Center(
+                child: Transform.rotate(
+                  angle: rotation,
+                  child: Icon(
+                    icon,
+                    color: Colors.black87,
+                    size: 25,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+Widget _buildLeftMapControls(List<SpotFlagState> spots) {
+  return Positioned(
+    left: 16,
+    top: MediaQuery.of(context).padding.top + 70,
+    child: IgnorePointer(
+      ignoring: _isMovingMap,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 250),
+        opacity: _isMovingMap ? 0.0 : 1.0,
+        child: Column(
+          children: [
+            _mapControlButton(
+              icon: Icons.search,
+              tooltip: 'Rechercher un SPHOT',
+              onTap: () => _openSearchSheet(spots),
+            ),
+            _mapControlButton(
+              icon: Icons.layers_outlined,
+              tooltip: 'Changer la carte',
+              onTap: _changeMapStyle,
+            ),
+            _mapControlButton(
+              icon: Icons.navigation,
+              tooltip: 'Remettre le Nord',
+              rotation: _currentRotation * pi / 180,
+              onTap: _resetNorth,
+            ),
+            _mapControlButton(
+              icon: Icons.my_location,
+              tooltip: 'Ma position',
+              onTap: _goToUserLocation,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
 
   Marker _buildOtherSpotMarker(
     SpotFlagState spot,
@@ -504,6 +861,12 @@ class _MapPageState extends State<MapPage> {
   }
 
   @override
+  void dispose() {
+    _mapMoveTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
@@ -525,42 +888,68 @@ class _MapPageState extends State<MapPage> {
 
           final spots = snapshot.data!;
 
-          return FlutterMap(
-            options: const MapOptions(
-              initialCenter: LatLng(46.4006176, -1.5064563),
-              initialZoom: 13,
-            ),
+          return Stack(
             children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.sphot',
-              ),
-              Builder(
-  builder: (context) {
-    final zoom = MapCamera.of(context).zoom;
-    final rotation = MapCamera.of(context).rotation;
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+  initialCenter: const LatLng(46.4006176, -1.5064563),
+  initialZoom: 13,
+  onPositionChanged: (position, hasGesture) {
+    setState(() {
+      _currentRotation = position.rotation;
 
-    return MarkerLayer(
-      markers: _buildTerritoryLogoMarkers(zoom, rotation),
-    );
+      if (hasGesture) {
+        _isMovingMap = true;
+      }
+    });
+
+    if (hasGesture) {
+      _mapMoveTimer?.cancel();
+      _mapMoveTimer = Timer(const Duration(milliseconds: 650), () {
+        if (!mounted) return;
+
+        setState(() {
+          _isMovingMap = false;
+        });
+      });
+    }
   },
 ),
-              Builder(
-                builder: (context) {
-                  final zoom = MapCamera.of(context).zoom;
-                  final rotation = MapCamera.of(context).rotation;
-                  final markers = _buildMarkers(spots, zoom, rotation);
+                children: [
+                  TileLayer(
+                    urlTemplate: _tileStyles[_selectedTileStyle].url,
+                    userAgentPackageName: 'com.example.sphot',
+                  ),
+                  Builder(
+                    builder: (context) {
+                      final zoom = MapCamera.of(context).zoom;
+                      final rotation = MapCamera.of(context).rotation;
 
-                  return MarkerClusterLayerWidget(
-                    options: MarkerClusterLayerOptions(
-                      markers: markers,
-                      size: const Size(42, 42),
-                      maxClusterRadius: 45,
-                      builder: _buildCluster,
-                    ),
-                  );
-                },
+                      return MarkerLayer(
+                        markers: _buildTerritoryLogoMarkers(zoom, rotation),
+                      );
+                    },
+                  ),
+                  Builder(
+                    builder: (context) {
+                      final zoom = MapCamera.of(context).zoom;
+                      final rotation = MapCamera.of(context).rotation;
+                      final markers = _buildMarkers(spots, zoom, rotation);
+
+                      return MarkerClusterLayerWidget(
+                        options: MarkerClusterLayerOptions(
+                          markers: markers,
+                          size: const Size(42, 42),
+                          maxClusterRadius: 45,
+                          builder: _buildCluster,
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
+              _buildLeftMapControls(spots),
             ],
           );
         },
@@ -955,10 +1344,9 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
 
     final isTouchDevice =
         Theme.of(context).platform == TargetPlatform.android ||
-        Theme.of(context).platform == TargetPlatform.iOS;
+            Theme.of(context).platform == TargetPlatform.iOS;
 
-    final showText =
-        widget.showTextAllowed && (isTouchDevice || isHovering);
+    final showText = widget.showTextAllowed && (isTouchDevice || isHovering);
 
     return MouseRegion(
       onEnter: (_) => setState(() => isHovering = true),
@@ -1107,10 +1495,9 @@ class _HoverMarkerState extends State<_HoverMarker> {
 
     final isTouchDevice =
         Theme.of(context).platform == TargetPlatform.android ||
-        Theme.of(context).platform == TargetPlatform.iOS;
+            Theme.of(context).platform == TargetPlatform.iOS;
 
-    final showText =
-        widget.showTextAllowed && (isTouchDevice || isHovering);
+    final showText = widget.showTextAllowed && (isTouchDevice || isHovering);
 
     return MouseRegion(
       onEnter: (_) => setState(() => isHovering = true),
