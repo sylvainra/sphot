@@ -52,6 +52,13 @@ class _MapPageState extends State<MapPage> {
   int _selectedTileStyle = 0;
   bool _isMovingMap = false;
   Timer? _mapMoveTimer;
+Timer? _searchTimer;
+
+bool _isSearchOpen = false;
+bool _isFilterOpen = false;
+
+final TextEditingController _searchController = TextEditingController();
+final FocusNode _searchFocusNode = FocusNode();
 
   static const List<_MapTileStyle> _tileStyles = [
     _MapTileStyle(
@@ -275,23 +282,104 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  String _normalizeSearch(String value) {
-    return value
-        .toLowerCase()
-        .replaceAll('é', 'e')
-        .replaceAll('è', 'e')
-        .replaceAll('ê', 'e')
-        .replaceAll('ë', 'e')
-        .replaceAll('à', 'a')
-        .replaceAll('â', 'a')
-        .replaceAll('î', 'i')
-        .replaceAll('ï', 'i')
-        .replaceAll('ô', 'o')
-        .replaceAll('ù', 'u')
-        .replaceAll('û', 'u')
-        .replaceAll('ç', 'c')
-        .trim();
+ String _normalizeSearch(String value) {
+  return value
+      .toLowerCase()
+      .replaceAll('é', 'e')
+      .replaceAll('è', 'e')
+      .replaceAll('ê', 'e')
+      .replaceAll('ë', 'e')
+      .replaceAll('à', 'a')
+      .replaceAll('â', 'a')
+      .replaceAll('î', 'i')
+      .replaceAll('ï', 'i')
+      .replaceAll('ô', 'o')
+      .replaceAll('ù', 'u')
+      .replaceAll('û', 'u')
+      .replaceAll('ç', 'c')
+      .trim();
+}
+
+int _levenshtein(String s1, String s2) {
+  final m = s1.length;
+  final n = s2.length;
+
+  final dp = List.generate(
+    m + 1,
+    (_) => List.filled(n + 1, 0),
+  );
+
+  for (int i = 0; i <= m; i++) {
+    dp[i][0] = i;
   }
+
+  for (int j = 0; j <= n; j++) {
+    dp[0][j] = j;
+  }
+
+  for (int i = 1; i <= m; i++) {
+    for (int j = 1; j <= n; j++) {
+      final cost = s1[i - 1] == s2[j - 1] ? 0 : 1;
+
+      dp[i][j] = [
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost,
+      ].reduce((a, b) => a < b ? a : b);
+    }
+  }
+
+  return dp[m][n];
+}
+
+SpotFlagState? _findBestSpotMatch(
+  List<SpotFlagState> spots,
+  String rawQuery,
+) {
+  final query = _normalizeSearch(rawQuery);
+
+  if (query.length < 2) {
+    return null;
+  }
+
+  SpotFlagState? bestMatch;
+  int bestScore = 999;
+
+  for (final spot in spots) {
+    final fields = [
+      spot.name,
+      spot.nomSphot,
+      spot.typeSphot,
+      '${spot.name} ${spot.nomSphot}',
+      '${spot.name} ${spot.nomSphot} ${spot.typeSphot}',
+    ].map(_normalizeSearch).toList();
+
+    for (final field in fields) {
+      int score;
+
+      if (field.contains(query)) {
+        score = 0;
+      } else {
+        final words = field.split(RegExp(r'\s+'));
+
+        score = words
+            .map((word) => _levenshtein(query, word))
+            .reduce((a, b) => a < b ? a : b);
+      }
+
+      if (score < bestScore) {
+        bestScore = score;
+        bestMatch = spot;
+      }
+    }
+  }
+
+  if (bestMatch != null && bestScore <= 3) {
+    return bestMatch;
+  }
+
+  return null;
+}
 
   void _showMapMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -349,174 +437,53 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  void _openSearchSheet(List<SpotFlagState> spots) {
-    String query = '';
-    SpotFilter sheetFilter = _selectedFilter;
+void _toggleSearchBar() {
+  setState(() {
+    _isSearchOpen = !_isSearchOpen;
+    if (_isSearchOpen) {
+      _isFilterOpen = false;
+    }
+  });
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final filteredSpots = spots.where((spot) {
-              final normalizedQuery = _normalizeSearch(query);
-
-              final searchZone =
-                  '${spot.name} ${spot.nomSphot} ${spot.typeSphot}';
-
-              final matchesText = normalizedQuery.isEmpty ||
-                  _normalizeSearch(searchZone).contains(normalizedQuery);
-
-              final matchesType = _matchesFilterFor(spot, sheetFilter);
-
-              return matchesText && matchesType;
-            }).toList();
-
-            return DraggableScrollableSheet(
-              initialChildSize: 0.58,
-              minChildSize: 0.32,
-              maxChildSize: 0.92,
-              builder: (context, scrollController) {
-                return Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(26),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 10),
-                      Container(
-                        width: 46,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: Colors.black26,
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
-                        child: TextField(
-                          autofocus: true,
-                          decoration: InputDecoration(
-                            hintText: 'Rechercher un nom de SPHOT',
-                            prefixIcon: const Icon(Icons.search),
-                            filled: true,
-                            fillColor: const Color(0xFFF1F5F9),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(18),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                          onChanged: (value) {
-                            setSheetState(() => query = value);
-                          },
-                        ),
-                      ),
-                      SizedBox(
-                        height: 54,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          children: SpotFilter.values.map((filter) {
-                            final selected = filter == sheetFilter;
-                            final color = _filterColor(filter);
-
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: ChoiceChip(
-                                selected: selected,
-                                label: Text(
-                                  _filterLabel(filter).replaceAll('\n', ' '),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: selected ? Colors.white : color,
-                                  ),
-                                ),
-                                selectedColor: color,
-                                backgroundColor: color.withOpacity(0.08),
-                                onSelected: (_) {
-                                  setSheetState(() => sheetFilter = filter);
-                                  setState(() => _selectedFilter = filter);
-                                },
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: filteredSpots.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  'Aucun SPHOT trouvé',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.black54,
-                                  ),
-                                ),
-                              )
-                            : ListView.separated(
-                                controller: scrollController,
-                                itemCount: filteredSpots.length,
-                                separatorBuilder: (_, __) =>
-                                    const Divider(height: 1),
-                                itemBuilder: (context, index) {
-                                  final spot = filteredSpots[index];
-                                  final color = _typeColor(spot);
-
-                                  return ListTile(
-                                    leading: SizedBox(
-                                      width: 42,
-                                      height: 42,
-                                      child: Center(
-                                        child: spot.isPosteSecours
-                                            ? const _DrawerFlagIcon()
-                                            : Image.asset(
-                                                _getMarkerIconPath(spot),
-                                                width: 36,
-                                                height: 36,
-                                              ),
-                                      ),
-                                    ),
-                                    title: Text(
-                                      '${spot.name} - ${spot.nomSphot}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      spot.typeSphot,
-                                      style: TextStyle(
-                                        color: color,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    trailing: const Icon(Icons.chevron_right),
-                                    onTap: () {
-                                      Navigator.of(context).pop();
-                                      _mapController.move(
-                                        LatLng(spot.lat, spot.lng),
-                                        16,
-                                      );
-                                    },
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
-    );
+  if (_isSearchOpen) {
+    Future.delayed(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      _searchFocusNode.requestFocus();
+    });
+  } else {
+    _searchController.clear();
+    _searchFocusNode.unfocus();
   }
+}
+
+void _searchAndMoveToSpot(
+  List<SpotFlagState> spots,
+  String value,
+) {
+  _searchTimer?.cancel();
+
+  _searchTimer = Timer(
+    const Duration(milliseconds: 650),
+    () {
+      final spot = _findBestSpotMatch(spots, value);
+
+      if (spot == null) return;
+      if (!mounted) return;
+
+      _searchController.clear();
+      _searchFocusNode.unfocus();
+
+      setState(() {
+        _isSearchOpen = false;
+      });
+
+      _mapController.move(
+        LatLng(spot.lat, spot.lng),
+        16.5,
+      );
+    },
+  );
+}
 
   Widget _mapControlButton({
     required IconData icon,
@@ -555,6 +522,134 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
+void _toggleFilterBar() {
+  setState(() {
+    _isFilterOpen = !_isFilterOpen;
+
+    if (_isFilterOpen) {
+      _isSearchOpen = false;
+      _searchController.clear();
+      _searchFocusNode.unfocus();
+    }
+  });
+}
+
+String _filterShortLabel(SpotFilter filter) {
+  switch (filter) {
+    case SpotFilter.all:
+      return 'Tous';
+    case SpotFilter.secours:
+      return 'Secours';
+    case SpotFilter.accesPlage:
+      return 'Accès plage';
+    case SpotFilter.eauBleue:
+      return 'Lac';
+    case SpotFilter.eauVerte:
+      return 'Rivière';
+    case SpotFilter.lagon:
+      return 'Lagon';
+    case SpotFilter.naturisme:
+      return 'Naturisme';
+    case SpotFilter.autre:
+      return 'Autre';
+  }
+}
+
+Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
+  final selected = filter == _selectedFilter;
+  final color = _filterColor(filter);
+
+  return AnimatedOpacity(
+    duration: Duration(milliseconds: 180 + index * 45),
+    opacity: _isFilterOpen ? 1.0 : 0.0,
+    child: AnimatedSlide(
+      duration: Duration(milliseconds: 260 + index * 45),
+      curve: Curves.easeOutBack,
+      offset: _isFilterOpen ? Offset.zero : const Offset(0, -0.35),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(
+          color: Colors.white.withOpacity(0.94),
+          elevation: 4,
+          borderRadius: BorderRadius.circular(18),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () {
+              setState(() {
+                _selectedFilter = filter;
+                _isFilterOpen = false;
+              });
+            },
+            child: Container(
+              width: 158,
+              height: 66,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: selected ? color : Colors.black.withOpacity(0.12),
+                  width: selected ? 2 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 50,
+                    height: 50,
+                    child: Center(child: _filterIcon(filter)),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _filterShortLabel(filter),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 12,
+                        height: 1.05,
+                        fontWeight:
+                            selected ? FontWeight.w900 : FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _buildVerticalFilterMenu() {
+  return Positioned(
+    left: 70,
+    top: MediaQuery.of(context).padding.top + 126,
+    child: IgnorePointer(
+      ignoring: !_isFilterOpen,
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height -
+            MediaQuery.of(context).padding.top -
+            150,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: List.generate(
+              SpotFilter.values.length,
+              (index) => _verticalFilterChoiceButton(
+                SpotFilter.values[index],
+                index,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   return Positioned(
     left: 16,
@@ -565,12 +660,71 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
         duration: const Duration(milliseconds: 250),
         opacity: _isMovingMap ? 0.0 : 1.0,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _mapControlButton(
-              icon: Icons.search,
-              tooltip: 'Rechercher un SPHOT',
-              onTap: () => _openSearchSheet(spots),
+            Row(
+              children: [
+                _mapControlButton(
+                  icon: Icons.search,
+                  tooltip: 'Rechercher un SPHOT',
+                  onTap: _toggleSearchBar,
+                ),
+
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOutCubic,
+                  width: _isSearchOpen ? 260 : 0,
+                  height: 46,
+                  margin: EdgeInsets.only(
+                    left: _isSearchOpen ? 8 : 0,
+                    bottom: 10,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: _isSearchOpen
+                        ? Material(
+                            color: Colors.white.withOpacity(0.94),
+                            elevation: 4,
+                            child: TextField(
+                              controller: _searchController,
+                              focusNode: _searchFocusNode,
+                              onChanged: (value) {
+                                _searchAndMoveToSpot(spots, value);
+                              },
+                              decoration: InputDecoration(
+                                hintText: 'Rechercher un SPHOT',
+                                suffixIcon: IconButton(
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _searchFocusNode.unfocus();
+                                    setState(() {
+                                      _isSearchOpen = false;
+                                    });
+                                  },
+                                ),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.only(
+                                  left: 18,
+                                  right: 8,
+                                  top: 13,
+                                  bottom: 13,
+                                ),
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ),
+              ],
             ),
+
+    _mapControlButton(
+      icon: Icons.tune,
+      tooltip: 'Filtrer les SPHOTS',
+      onTap: _toggleFilterBar,
+    ),
+   
             _mapControlButton(
               icon: Icons.layers_outlined,
               tooltip: 'Changer la carte',
@@ -861,10 +1015,13 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   }
 
   @override
-  void dispose() {
-    _mapMoveTimer?.cancel();
-    super.dispose();
-  }
+void dispose() {
+  _mapMoveTimer?.cancel();
+  _searchTimer?.cancel();
+  _searchController.dispose();
+  _searchFocusNode.dispose();
+  super.dispose();
+}
 
   @override
   Widget build(BuildContext context) {
@@ -950,6 +1107,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
                 ],
               ),
               _buildLeftMapControls(spots),
+_buildVerticalFilterMenu(),
             ],
           );
         },
