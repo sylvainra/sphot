@@ -56,25 +56,25 @@ Timer? _searchTimer;
 
 bool _isSearchOpen = false;
 bool _isFilterOpen = false;
+bool _isMapStyleOpen = false;
 
 final TextEditingController _searchController = TextEditingController();
 final FocusNode _searchFocusNode = FocusNode();
 
   static const List<_MapTileStyle> _tileStyles = [
-    _MapTileStyle(
-      name: 'Classique',
-      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    ),
-    _MapTileStyle(
-      name: 'Topo',
-      url: 'https://tile.opentopomap.org/{z}/{x}/{y}.png',
-    ),
-    _MapTileStyle(
-      name: 'Clair',
-      url:
-          'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png',
-    ),
-  ];
+  _MapTileStyle(
+    name: 'Plan',
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  ),
+  _MapTileStyle(
+    name: 'Satellite',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  ),
+  _MapTileStyle(
+    name: 'Relief',
+    url: 'https://tile.opentopomap.org/{z}/{x}/{y}.png',
+  ),
+];
 
   bool _showFlagForZoom(double zoom) => zoom >= 12.5;
 
@@ -146,8 +146,8 @@ final FocusNode _searchFocusNode = FocusNode();
     if (type.contains('ACCES PLAGE')) return 'data/icons/fire_orange_icon.png';
 
     if (type.contains('LAC') ||
-        type.contains('BARRAGE') ||
-        type.contains('CASCADE')) {
+        type.contains("PLAN D'EAU") ||
+        type.contains('BARRAGE')) {
       return 'data/icons/fire_blue_icon.png';
     }
 
@@ -170,8 +170,8 @@ final FocusNode _searchFocusNode = FocusNode();
     if (type.contains('ACCES PLAGE')) return const Color(0xFFFF7F00);
 
     if (type.contains('LAC') ||
-        type.contains('BARRAGE') ||
-        type.contains('CASCADE')) {
+        type.contains("PLAN D'EAU") ||
+        type.contains('BARRAGE')) {
       return const Color(0xFF1E3A8A);
     }
 
@@ -198,7 +198,7 @@ final FocusNode _searchFocusNode = FocusNode();
         return type.contains('ACCES PLAGE');
       case SpotFilter.eauBleue:
         return type.contains('LAC') ||
-            type.contains('CASCADE') ||
+            type.contains("PLAN D'EAU") ||
             type.contains('BARRAGE');
       case SpotFilter.eauVerte:
         return type.contains('FLEUVE') || type.contains('RIVIERE');
@@ -224,7 +224,7 @@ final FocusNode _searchFocusNode = FocusNode();
       case SpotFilter.accesPlage:
         return 'SPHOT\nAccès plage';
       case SpotFilter.eauBleue:
-        return 'SPHOT\nLac\nCascade\nBarrage';
+        return "SPHOT\nLac\nPlan d'eau\nBarrage";
       case SpotFilter.eauVerte:
         return 'SPHOT\nFleuve\nRivière';
       case SpotFilter.lagon:
@@ -395,13 +395,29 @@ SpotFlagState? _findBestSpotMatch(
     setState(() => _currentRotation = 0);
   }
 
-  void _changeMapStyle() {
-    setState(() {
-      _selectedTileStyle = (_selectedTileStyle + 1) % _tileStyles.length;
-    });
+  void _toggleMapStyleBar() {
+  setState(() {
+    _isMapStyleOpen = !_isMapStyleOpen;
 
-    _showMapMessage('Carte : ${_tileStyles[_selectedTileStyle].name}');
-  }
+    if (_isMapStyleOpen) {
+      _isSearchOpen = false;
+      _isFilterOpen = false;
+      _searchController.clear();
+      _searchFocusNode.unfocus();
+    }
+  });
+}
+
+void _selectMapStyle(int index) {
+  setState(() {
+    _selectedTileStyle = index;
+    _isMapStyleOpen = false;
+    _isSearchOpen = false;
+    _isFilterOpen = false;
+  });
+
+  _showMapMessage('Carte : ${_tileStyles[index].name}');
+}
 
   Future<void> _goToUserLocation() async {
     try {
@@ -439,11 +455,12 @@ SpotFlagState? _findBestSpotMatch(
 
 void _toggleSearchBar() {
   setState(() {
-    _isSearchOpen = !_isSearchOpen;
-    if (_isSearchOpen) {
-      _isFilterOpen = false;
-    }
-  });
+  _isSearchOpen = !_isSearchOpen;
+  if (_isSearchOpen) {
+    _isFilterOpen = false;
+    _isMapStyleOpen = false;
+  }
+});
 
   if (_isSearchOpen) {
     Future.delayed(const Duration(milliseconds: 250), () {
@@ -528,6 +545,7 @@ void _toggleFilterBar() {
 
     if (_isFilterOpen) {
       _isSearchOpen = false;
+      _isMapStyleOpen = false;
       _searchController.clear();
       _searchFocusNode.unfocus();
     }
@@ -537,21 +555,21 @@ void _toggleFilterBar() {
 String _filterShortLabel(SpotFilter filter) {
   switch (filter) {
     case SpotFilter.all:
-      return 'Tous';
+      return 'Tous les SPHOTS';
     case SpotFilter.secours:
-      return 'Secours';
+      return 'Poste de secours';
     case SpotFilter.accesPlage:
       return 'Accès plage';
     case SpotFilter.eauBleue:
-      return 'Lac';
+      return "Lac\nPlan d'eau\nBarrage";
     case SpotFilter.eauVerte:
-      return 'Rivière';
+      return 'Fleuve\nRivière';
     case SpotFilter.lagon:
-      return 'Lagon';
+      return 'Lagon\nPiscine naturelle';
     case SpotFilter.naturisme:
       return 'Naturisme';
     case SpotFilter.autre:
-      return 'Autre';
+      return 'Autre\nNon renseigné';
   }
 }
 
@@ -571,9 +589,9 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
         child: Material(
           color: Colors.white.withOpacity(0.94),
           elevation: 4,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(10),
           child: InkWell(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(10),
             onTap: () {
               setState(() {
                 _selectedFilter = filter;
@@ -581,15 +599,17 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
               });
             },
             child: Container(
-              width: 158,
-              height: 66,
+              width: 190,
+              height: 52,
               padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: selected ? color : Colors.black.withOpacity(0.12),
-                  width: selected ? 2 : 1,
-                ),
+  color: selected
+      ? color
+      : Colors.grey.withOpacity(0.5), // 👈 même logique que map
+  width: selected ? 2 : 1.2,
+),
               ),
               child: Row(
                 children: [
@@ -602,7 +622,7 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
                   Expanded(
                     child: Text(
                       _filterShortLabel(filter),
-                      maxLines: 2,
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: color,
@@ -650,7 +670,110 @@ Widget _buildVerticalFilterMenu() {
   );
 }
 
+Widget _buildMapStyleVerticalMenu() {
+  return AnimatedOpacity(
+    duration: const Duration(milliseconds: 250),
+    opacity: _isMapStyleOpen ? 1.0 : 0.0,
+    child: AnimatedSlide(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutBack,
+      offset: _isMapStyleOpen ? Offset.zero : const Offset(0, -0.2),
+      child: IgnorePointer(
+        ignoring: !_isMapStyleOpen,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: List.generate(
+            _tileStyles.length,
+            (index) => _mapStyleVerticalButton(index),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _mapStyleVerticalButton(int index) {
+  final selected = index == _selectedTileStyle;
+
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Material(
+      color: Colors.white.withOpacity(0.94),
+      elevation: 4,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => _selectMapStyle(index),
+        child: Container(
+          width: 150, // ⬅️ un peu plus large
+          height: 52, // ⬅️ plus haut
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+  color: selected
+      ? Colors.black
+      : Colors.grey.withOpacity(0.5), // 👈 contour grisé visible
+  width: selected ? 2.2 : 1.2,
+),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 42,
+                height: 42,
+                child: Center(child: _mapStyleIcon(index)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _tileStyles[index].name,
+                  style: TextStyle(
+                    fontSize: 14.5, // ⬅️ texte plus grand
+                    fontWeight:
+                        selected ? FontWeight.w900 : FontWeight.w700,
+                    color: _mapStyleColor(index).withOpacity(selected ? 1.0 : 0.6),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Color _mapStyleColor(int index) {
+  switch (index) {
+    case 0:
+      return const Color(0xFF2E7D32); // Plan
+    case 1:
+      return const Color(0xFF1E3A8A); // Satellite
+    case 2:
+      return const Color(0xFF8B5E3C); // Relief
+    default:
+      return Colors.black;
+  }
+}
+
+Widget _mapStyleIcon(int index) {
+  final selected = index == _selectedTileStyle;
+
+  return Icon(
+    index == 0
+        ? Icons.map
+        : index == 1
+            ? Icons.satellite_alt
+            : Icons.terrain,
+    size: 26,
+    color: _mapStyleColor(index).withOpacity(selected ? 1.0 : 0.6),
+  );
+}
+
 Widget _buildLeftMapControls(List<SpotFlagState> spots) {
+  final showCompass = _currentRotation.abs() > 1.0;
+
   return Positioned(
     left: 16,
     top: MediaQuery.of(context).padding.top + 70,
@@ -669,9 +792,8 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
                   tooltip: 'Rechercher un SPHOT',
                   onTap: _toggleSearchBar,
                 ),
-
                 AnimatedContainer(
-                  duration: const Duration(milliseconds: 600),
+                  duration: const Duration(milliseconds: 750),
                   curve: Curves.easeOutCubic,
                   width: _isSearchOpen ? 260 : 0,
                   height: 46,
@@ -682,65 +804,92 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(99),
                     child: _isSearchOpen
-                        ? Material(
-                            color: Colors.white.withOpacity(0.94),
-                            elevation: 4,
-                            child: TextField(
-                              controller: _searchController,
-                              focusNode: _searchFocusNode,
-                              onChanged: (value) {
-                                _searchAndMoveToSpot(spots, value);
-                              },
-                              decoration: InputDecoration(
-                                hintText: 'Rechercher un SPHOT',
-                                suffixIcon: IconButton(
-                                  icon: const Icon(Icons.close),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    _searchFocusNode.unfocus();
-                                    setState(() {
-                                      _isSearchOpen = false;
-                                    });
-                                  },
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.only(
-                                  left: 18,
-                                  right: 8,
-                                  top: 13,
-                                  bottom: 13,
-                                ),
-                              ),
-                            ),
-                          )
+    ? Material(
+        color: Colors.white.withOpacity(0.94),
+        elevation: 4,
+        borderRadius: BorderRadius.circular(99),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(
+  color: _searchFocusNode.hasFocus
+      ? Colors.black
+      : Colors.black.withOpacity(0.4),
+  width: _searchFocusNode.hasFocus ? 2 : 1.2,
+),
+          ),
+          child: TextField(
+  controller: _searchController,
+  focusNode: _searchFocusNode,
+  textAlignVertical: TextAlignVertical.center, // 👈 clé
+  onChanged: (value) {
+    _searchAndMoveToSpot(spots, value);
+  },
+  decoration: InputDecoration(
+    hintText: 'Rechercher un SPHOT',
+    suffixIcon: IconButton(
+      icon: const Icon(Icons.close),
+      onPressed: () {
+        _searchController.clear();
+        _searchFocusNode.unfocus();
+        setState(() {
+          _isSearchOpen = false;
+        });
+      },
+    ),
+    border: InputBorder.none,
+    contentPadding: const EdgeInsets.fromLTRB(
+  18,
+  10,
+  8,
+  10,
+),
+  ),
+)
+        ),
+      )
                         : const SizedBox.shrink(),
                   ),
                 ),
               ],
             ),
 
+            _mapControlButton(
+              icon: Icons.tune,
+              tooltip: 'Filtrer les SPHOTS',
+              onTap: _toggleFilterBar,
+            ),
+
+            Stack(
+  clipBehavior: Clip.none,
+  children: [
     _mapControlButton(
-      icon: Icons.tune,
-      tooltip: 'Filtrer les SPHOTS',
-      onTap: _toggleFilterBar,
+      icon: Icons.layers_outlined,
+      tooltip: 'Changer la carte',
+      onTap: _toggleMapStyleBar,
     ),
-   
-            _mapControlButton(
-              icon: Icons.layers_outlined,
-              tooltip: 'Changer la carte',
-              onTap: _changeMapStyle,
-            ),
-            _mapControlButton(
-              icon: Icons.navigation,
-              tooltip: 'Remettre le Nord',
-              rotation: _currentRotation * pi / 180,
-              onTap: _resetNorth,
-            ),
-            _mapControlButton(
-              icon: Icons.my_location,
-              tooltip: 'Ma position',
-              onTap: _goToUserLocation,
-            ),
+
+    Positioned(
+      left: 54,
+      top: 0,
+      child: _buildMapStyleVerticalMenu(),
+    ),
+  ],
+),
+
+_mapControlButton(
+  icon: Icons.my_location,
+  tooltip: 'Ma position',
+  onTap: _goToUserLocation,
+),
+
+            if (showCompass)
+              _mapControlButton(
+                icon: Icons.navigation,
+                tooltip: 'Remettre le Nord',
+                rotation: _currentRotation * pi / 180,
+                onTap: _resetNorth,
+              ),
           ],
         ),
       ),
@@ -1075,9 +1224,9 @@ void dispose() {
 ),
                 children: [
                   TileLayer(
-                    urlTemplate: _tileStyles[_selectedTileStyle].url,
-                    userAgentPackageName: 'com.example.sphot',
-                  ),
+  urlTemplate: _tileStyles[_selectedTileStyle].url,
+  userAgentPackageName: 'com.sylvainra.sphot',
+),
                   Builder(
                     builder: (context) {
                       final zoom = MapCamera.of(context).zoom;
