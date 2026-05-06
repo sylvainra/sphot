@@ -27,10 +27,14 @@ enum SpotFilter {
 class _MapTileStyle {
   final String name;
   final String url;
+  final List<String> subdomains;
+  final int maxZoom;
 
   const _MapTileStyle({
     required this.name,
     required this.url,
+    this.subdomains = const [],
+    this.maxZoom = 19,
   });
 }
 
@@ -65,14 +69,18 @@ final FocusNode _searchFocusNode = FocusNode();
   _MapTileStyle(
     name: 'Plan',
     url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    maxZoom: 19,
   ),
   _MapTileStyle(
     name: 'Satellite',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    url: 'https://tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+    maxZoom: 19,
   ),
   _MapTileStyle(
     name: 'Relief',
-    url: 'https://tile.opentopomap.org/{z}/{x}/{y}.png',
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    subdomains: ['a', 'b', 'c'],
+    maxZoom: 17,
   ),
 ];
 
@@ -409,6 +417,9 @@ SpotFlagState? _findBestSpotMatch(
 }
 
 void _selectMapStyle(int index) {
+  debugPrint('STYLE CLIQUÉ : $index - ${_tileStyles[index].name}');
+  debugPrint('URL : ${_tileStyles[index].url}');
+
   setState(() {
     _selectedTileStyle = index;
     _isMapStyleOpen = false;
@@ -860,20 +871,16 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
               onTap: _toggleFilterBar,
             ),
 
-            Stack(
-  clipBehavior: Clip.none,
+            Row(
+  crossAxisAlignment: CrossAxisAlignment.start,
   children: [
     _mapControlButton(
       icon: Icons.layers_outlined,
       tooltip: 'Changer la carte',
       onTap: _toggleMapStyleBar,
     ),
-
-    Positioned(
-      left: 54,
-      top: 0,
-      child: _buildMapStyleVerticalMenu(),
-    ),
+    const SizedBox(width: 8),
+    _buildMapStyleVerticalMenu(),
   ],
 ),
 
@@ -1087,31 +1094,33 @@ _mapControlButton(
   }
 
   Widget _buildCluster(BuildContext context, List<Marker> markers) {
-    final borderColor = _clusterBorderColor(markers);
+  final count = markers.length;
 
-    return Container(
-      width: 42,
-      height: 42,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.transparent,
-        border: Border.all(color: borderColor, width: 2.2),
+  return Container(
+    width: 44,
+    height: 44,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: const LinearGradient(
+        colors: [Color(0xFF1E3A8A), Color(0xFF00ACC1)],
       ),
-      child: Transform.rotate(
-        angle: -MapCamera.of(context).rotation * pi / 180,
-        alignment: Alignment.center,
-        child: Text(
-          markers.length.toString(),
-          style: _mapLabelStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w900,
-            color: borderColor,
-          ),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.25),
+          blurRadius: 6,
         ),
+      ],
+    ),
+    alignment: Alignment.center,
+    child: Text(
+      count.toString(),
+      style: const TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.w900,
       ),
-    );
-  }
+    ),
+  );
+}
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
@@ -1201,20 +1210,23 @@ void dispose() {
                 options: MapOptions(
   initialCenter: const LatLng(46.4006176, -1.5064563),
   initialZoom: 13,
+  interactionOptions: const InteractionOptions(
+    flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+  ),
   onPositionChanged: (position, hasGesture) {
-    setState(() {
-      _currentRotation = position.rotation;
-
-      if (hasGesture) {
-        _isMovingMap = true;
-      }
-    });
+    if ((_currentRotation - position.rotation).abs() > 0.5 || hasGesture) {
+      setState(() {
+        _currentRotation = position.rotation;
+        if (hasGesture) {
+          _isMovingMap = true;
+        }
+      });
+    }
 
     if (hasGesture) {
       _mapMoveTimer?.cancel();
       _mapMoveTimer = Timer(const Duration(milliseconds: 650), () {
         if (!mounted) return;
-
         setState(() {
           _isMovingMap = false;
         });
@@ -1224,8 +1236,16 @@ void dispose() {
 ),
                 children: [
                   TileLayer(
+  key: ValueKey('tile_style_$_selectedTileStyle'),
   urlTemplate: _tileStyles[_selectedTileStyle].url,
+  maxZoom: _tileStyles[_selectedTileStyle].maxZoom.toDouble(),
+  maxNativeZoom: _tileStyles[_selectedTileStyle].maxZoom,
   userAgentPackageName: 'com.sylvainra.sphot',
+  tileFadeInDuration: const Duration(milliseconds: 150),
+  keepBuffer: 5,
+  errorTileCallback: (tile, error, stackTrace) {
+    debugPrint('ERREUR TILE MAP : $error');
+  },
 ),
                   Builder(
                     builder: (context) {
@@ -1245,11 +1265,13 @@ void dispose() {
 
                       return MarkerClusterLayerWidget(
                         options: MarkerClusterLayerOptions(
-                          markers: markers,
-                          size: const Size(42, 42),
-                          maxClusterRadius: 45,
-                          builder: _buildCluster,
-                        ),
+                          MarkerClusterLayerOptions(
+  markers: markers,
+  size: const Size(42, 42),
+  maxClusterRadius: 45,
+  disableClusteringAtZoom: 16,
+  builder: _buildCluster,
+),
                       );
                     },
                   ),
