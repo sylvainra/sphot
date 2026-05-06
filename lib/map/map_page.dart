@@ -72,9 +72,10 @@ final FocusNode _searchFocusNode = FocusNode();
     maxZoom: 19,
   ),
   _MapTileStyle(
-    name: 'Satellite',
-    url: 'https://tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-    maxZoom: 19,
+  name: 'Satellite',
+  url:
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  maxZoom: 19,
   ),
   _MapTileStyle(
     name: 'Relief',
@@ -1095,28 +1096,30 @@ _mapControlButton(
 
   Widget _buildCluster(BuildContext context, List<Marker> markers) {
   final count = markers.length;
+  final borderColor = _clusterBorderColor(markers);
+  final rotation = MapCamera.of(context).rotation;
 
-  return Container(
-    width: 44,
-    height: 44,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      gradient: const LinearGradient(
-        colors: [Color(0xFF1E3A8A), Color(0xFF00ACC1)],
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.25),
-          blurRadius: 6,
+  return Transform.rotate(
+    angle: -rotation * pi / 180,
+    child: Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.transparent,
+        border: Border.all(
+          color: borderColor,
+          width: 2.2,
         ),
-      ],
-    ),
-    alignment: Alignment.center,
-    child: Text(
-      count.toString(),
-      style: const TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.w900,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        count.toString(),
+        style: TextStyle(
+          color: borderColor,
+          fontWeight: FontWeight.w900,
+          fontSize: 15,
+        ),
       ),
     ),
   );
@@ -1211,8 +1214,8 @@ void dispose() {
   initialCenter: const LatLng(46.4006176, -1.5064563),
   initialZoom: 13,
   interactionOptions: const InteractionOptions(
-    flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-  ),
+  flags: InteractiveFlag.all,
+),
   onPositionChanged: (position, hasGesture) {
     if ((_currentRotation - position.rotation).abs() > 0.5 || hasGesture) {
       setState(() {
@@ -1238,10 +1241,10 @@ void dispose() {
                   TileLayer(
   key: ValueKey('tile_style_$_selectedTileStyle'),
   urlTemplate: _tileStyles[_selectedTileStyle].url,
+  subdomains: _tileStyles[_selectedTileStyle].subdomains,
   maxZoom: _tileStyles[_selectedTileStyle].maxZoom.toDouble(),
   maxNativeZoom: _tileStyles[_selectedTileStyle].maxZoom,
   userAgentPackageName: 'com.sylvainra.sphot',
-  tileFadeInDuration: const Duration(milliseconds: 150),
   keepBuffer: 5,
   errorTileCallback: (tile, error, stackTrace) {
     debugPrint('ERREUR TILE MAP : $error');
@@ -1265,20 +1268,19 @@ void dispose() {
 
                       return MarkerClusterLayerWidget(
                         options: MarkerClusterLayerOptions(
-                          MarkerClusterLayerOptions(
-  markers: markers,
-  size: const Size(42, 42),
-  maxClusterRadius: 45,
-  disableClusteringAtZoom: 16,
-  builder: _buildCluster,
-),
+                          markers: markers,
+                          size: const Size(42, 42),
+                          maxClusterRadius: 45,
+                          disableClusteringAtZoom: 16,
+                          builder: _buildCluster,
+                        ),
                       );
                     },
                   ),
                 ],
               ),
               _buildLeftMapControls(spots),
-_buildVerticalFilterMenu(),
+              _buildVerticalFilterMenu(),
             ],
           );
         },
@@ -1659,6 +1661,13 @@ class _OtherSpotMarker extends StatefulWidget {
 class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
   bool isHovering = false;
 
+  double _lineSpacing() {
+    if (widget.zoom >= 16) return 3.0;
+    if (widget.zoom >= 15) return 2.6;
+    if (widget.zoom >= 14) return 2.2;
+    return 2.0;
+  }
+
   double _labelSize(double base) {
     if (widget.zoom >= 16) return base + 2;
     if (widget.zoom >= 15) return base + 1.5;
@@ -1716,7 +1725,7 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                               color: Colors.black,
                             ),
                           ),
-                          const SizedBox(height: 1),
+                          SizedBox(height: _lineSpacing() + 1.5),
                           Text(
                             spot.typeSphot,
                             textAlign: TextAlign.center,
@@ -1726,15 +1735,15 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                               color: widget.typeTextColor,
                             ),
                           ),
-                          const SizedBox(height: 1),
+                          SizedBox(height: _lineSpacing() - 1.8),
                           _warningLineUniform(
                             'BAIGNADE NON SURVEILLÉE',
-                            _labelSize(18),
+                            _labelSize(22),
                           ),
-                          const SizedBox(height: 1),
+                          SizedBox(height: _lineSpacing() - 1.8),
                           _warningLineUniform(
                             'BAIGNADE À VOS RISQUES ET PÉRILS',
-                            _labelSize(18),
+                            _labelSize(22),
                           ),
                         ],
                       ),
@@ -1810,6 +1819,13 @@ class _HoverMarker extends StatefulWidget {
 class _HoverMarkerState extends State<_HoverMarker> {
   bool isHovering = false;
 
+double _lineSpacing() {
+  if (widget.zoom >= 16) return 3.0;
+  if (widget.zoom >= 15) return 2.6;
+  if (widget.zoom >= 14) return 2.2;
+  return 2.0;
+}
+
   double _labelSize(double base) {
     if (widget.zoom >= 16) return base + 2;
     if (widget.zoom >= 15) return base + 1.5;
@@ -1864,7 +1880,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                               color: Colors.black,
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          SizedBox(height: _lineSpacing() + 1.2),
                           RichText(
                             textAlign: TextAlign.center,
                             text: TextSpan(
@@ -1892,23 +1908,23 @@ class _HoverMarkerState extends State<_HoverMarker> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          SizedBox(height: _lineSpacing() + 1.2),
                           if (spot.isMissingFlagColorDuringSurveillance) ...[
                             _warningLineUniform(
                               'COULEUR DE LA FLAMME NON RENSEIGNÉE',
-                              _labelSize(18),
+                              _labelSize(22),
                             ),
-                            const SizedBox(height: 1),
+                            SizedBox(height: _lineSpacing() - 1.8),
                             _warningLineUniform(
                               'BAIGNADE À VOS RISQUES ET PÉRILS',
-                              _labelSize(18),
+                              _labelSize(22),
                             ),
                           ] else
                             Text(
                               spot.displayStatut,
                               textAlign: TextAlign.center,
                               style: _mapLabelStyle(
-                                fontSize: _labelSize(10),
+                                fontSize: _labelSize(12) + 3,
                                 fontWeight: FontWeight.w900,
                                 color: Color(spot.statutColor),
                               ),
@@ -1929,13 +1945,30 @@ class _HoverMarkerState extends State<_HoverMarker> {
 Widget _warningLineUniform(String text, double size) {
   return Row(
     mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(
-        Icons.warning_amber_rounded,
-        size: size,
-        color: const Color(0xFFFF0000),
-        shadows: const [
-          Shadow(color: Colors.white, blurRadius: 2),
+        children: [
+      Stack(
+        children: [
+          Transform.translate(
+            offset: const Offset(1, 0),
+            child: Icon(Icons.warning_amber_rounded, size: size, color: Colors.white),
+          ),
+          Transform.translate(
+            offset: const Offset(-1, 0),
+            child: Icon(Icons.warning_amber_rounded, size: size, color: Colors.white),
+          ),
+          Transform.translate(
+            offset: const Offset(0, 1),
+            child: Icon(Icons.warning_amber_rounded, size: size, color: Colors.white),
+          ),
+          Transform.translate(
+            offset: const Offset(0, -1),
+            child: Icon(Icons.warning_amber_rounded, size: size, color: Colors.white),
+          ),
+          Icon(
+            Icons.warning_amber_rounded,
+            size: size,
+            color: const Color(0xFFFF0000),
+          ),
         ],
       ),
       const SizedBox(width: 2),
@@ -1963,14 +1996,20 @@ TextStyle _mapLabelStyle({
     fontSize: fontSize,
     fontWeight: fontWeight,
     color: color,
-    height: 1.1,
+    height: 1.0,
     letterSpacing: -0.1,
     shadows: const [
-      Shadow(color: Colors.white, offset: Offset(0, 0), blurRadius: 2),
-      Shadow(color: Colors.white, offset: Offset(1, 0), blurRadius: 1),
-      Shadow(color: Colors.white, offset: Offset(-1, 0), blurRadius: 1),
-      Shadow(color: Colors.white, offset: Offset(0, 1), blurRadius: 1),
-      Shadow(color: Colors.white, offset: Offset(0, -1), blurRadius: 1),
-    ],
+  Shadow(color: Colors.white, offset: Offset(0, 0), blurRadius: 5),
+
+  Shadow(color: Colors.white, offset: Offset(1.5, 0), blurRadius: 2),
+  Shadow(color: Colors.white, offset: Offset(-1.5, 0), blurRadius: 2),
+  Shadow(color: Colors.white, offset: Offset(0, 1.5), blurRadius: 2),
+  Shadow(color: Colors.white, offset: Offset(0, -1.5), blurRadius: 2),
+
+  Shadow(color: Colors.white, offset: Offset(1.2, 1.2), blurRadius: 2),
+  Shadow(color: Colors.white, offset: Offset(-1.2, 1.2), blurRadius: 2),
+  Shadow(color: Colors.white, offset: Offset(1.2, -1.2), blurRadius: 2),
+  Shadow(color: Colors.white, offset: Offset(-1.2, -1.2), blurRadius: 2),
+],
   );
 }
