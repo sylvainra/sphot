@@ -12,6 +12,7 @@ import 'package:latlong2/latlong.dart';
 import '../models/flag_state.dart';
 import '../services/firestore_service.dart';
 import 'flag_marker.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 enum SpotFilter {
   all,
@@ -54,18 +55,21 @@ class _MapPageState extends State<MapPage> {
 
   double _currentRotation = 0;
   int _selectedTileStyle = 0;
+  int _selectedBottomIndex = 1;
   bool _isMovingMap = false;
   Timer? _mapMoveTimer;
 Timer? _searchTimer;
 
-bool _isSearchOpen = false;
 bool _isFilterOpen = false;
 bool _isMapStyleOpen = false;
 
 final TextEditingController _searchController = TextEditingController();
 final FocusNode _searchFocusNode = FocusNode();
 
-  static const List<_MapTileStyle> _tileStyles = [
+late stt.SpeechToText _speech;
+bool _isListening = false;
+
+static const List<_MapTileStyle> _tileStyles = [
   _MapTileStyle(
     name: 'Plan',
     url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -84,6 +88,12 @@ final FocusNode _searchFocusNode = FocusNode();
     maxZoom: 17,
   ),
 ];
+
+@override
+void initState() {
+  super.initState();
+  _speech = stt.SpeechToText();
+}
 
   bool _showFlagForZoom(double zoom) => zoom >= 12.5;
 
@@ -292,8 +302,9 @@ final FocusNode _searchFocusNode = FocusNode();
   }
 
  String _normalizeSearch(String value) {
-  return value
+  var normalized = value
       .toLowerCase()
+      .replaceAll('’', "'")
       .replaceAll('é', 'e')
       .replaceAll('è', 'e')
       .replaceAll('ê', 'e')
@@ -307,6 +318,16 @@ final FocusNode _searchFocusNode = FocusNode();
       .replaceAll('û', 'u')
       .replaceAll('ç', 'c')
       .trim();
+
+  normalized = normalized.replaceAll(RegExp(r"\bl[' ]"), '');
+  normalized = normalized.replaceAll(
+    RegExp(r'\b(le|la|les|des|de|du|d|un|une|aux|au)\b'),
+    '',
+  );
+
+  normalized = normalized.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  return normalized;
 }
 
 int _levenshtein(String s1, String s2) {
@@ -356,12 +377,26 @@ SpotFlagState? _findBestSpotMatch(
 
   for (final spot in spots) {
     final fields = [
-      spot.name,
-      spot.nomSphot,
-      spot.typeSphot,
-      '${spot.name} ${spot.nomSphot}',
-      '${spot.name} ${spot.nomSphot} ${spot.typeSphot}',
-    ].map(_normalizeSearch).toList();
+  spot.name,
+  spot.nomSphot,
+  spot.typeSphot,
+  spot.ville,
+  spot.departement,
+
+  '${spot.ville} ${spot.name}',
+  '${spot.ville} ${spot.nomSphot}',
+  '${spot.ville} ${spot.typeSphot}',
+
+  '${spot.departement} ${spot.ville}',
+  '${spot.departement} ${spot.name}',
+  '${spot.departement} ${spot.nomSphot}',
+  '${spot.departement} ${spot.typeSphot}',
+
+  '${spot.name} ${spot.nomSphot}',
+  '${spot.name} ${spot.nomSphot} ${spot.typeSphot}',
+  '${spot.ville} ${spot.name} ${spot.nomSphot} ${spot.typeSphot}',
+  '${spot.departement} ${spot.ville} ${spot.name} ${spot.nomSphot}',
+].map(_normalizeSearch).toList();
 
     for (final field in fields) {
       int score;
@@ -409,7 +444,6 @@ SpotFlagState? _findBestSpotMatch(
     _isMapStyleOpen = !_isMapStyleOpen;
 
     if (_isMapStyleOpen) {
-      _isSearchOpen = false;
       _isFilterOpen = false;
       _searchController.clear();
       _searchFocusNode.unfocus();
@@ -424,7 +458,6 @@ void _selectMapStyle(int index) {
   setState(() {
     _selectedTileStyle = index;
     _isMapStyleOpen = false;
-    _isSearchOpen = false;
     _isFilterOpen = false;
   });
 
@@ -465,26 +498,6 @@ void _selectMapStyle(int index) {
     }
   }
 
-void _toggleSearchBar() {
-  setState(() {
-  _isSearchOpen = !_isSearchOpen;
-  if (_isSearchOpen) {
-    _isFilterOpen = false;
-    _isMapStyleOpen = false;
-  }
-});
-
-  if (_isSearchOpen) {
-    Future.delayed(const Duration(milliseconds: 250), () {
-      if (!mounted) return;
-      _searchFocusNode.requestFocus();
-    });
-  } else {
-    _searchController.clear();
-    _searchFocusNode.unfocus();
-  }
-}
-
 void _searchAndMoveToSpot(
   List<SpotFlagState> spots,
   String value,
@@ -500,11 +513,7 @@ void _searchAndMoveToSpot(
       if (!mounted) return;
 
       _searchController.clear();
-      _searchFocusNode.unfocus();
-
-      setState(() {
-        _isSearchOpen = false;
-      });
+      setState(() {});
 
       _mapController.move(
         LatLng(spot.lat, spot.lng),
@@ -514,6 +523,40 @@ void _searchAndMoveToSpot(
   );
 }
 
+void _startVoiceSearch(List<SpotFlagState> spots) async {
+  if (!_isListening) {
+    bool available = await _speech.initialize();
+
+    if (available) {
+      setState(() => _isListening = true);
+
+      _speech.listen(
+        localeId: 'fr_FR',
+        onResult: (result) {
+          final text = result.recognizedWords;
+
+         _searchController.text = text;
+_searchController.selection = TextSelection.fromPosition(
+  TextPosition(offset: _searchController.text.length),
+);
+
+setState(() {});
+
+if (result.finalResult) {
+  _searchAndMoveToSpot(spots, text);
+  setState(() => _isListening = false);
+}
+        },
+      );
+    } else {
+      _showMapMessage('Micro non disponible');
+    }
+  } else {
+    setState(() => _isListening = false);
+    _speech.stop();
+  }
+}
+
   Widget _mapControlButton({
     required IconData icon,
     required String tooltip,
@@ -521,7 +564,7 @@ void _searchAndMoveToSpot(
     double rotation = 0,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.zero,
       child: Material(
         color: Colors.white.withOpacity(0.92),
         shape: const CircleBorder(),
@@ -556,7 +599,6 @@ void _toggleFilterBar() {
     _isFilterOpen = !_isFilterOpen;
 
     if (_isFilterOpen) {
-      _isSearchOpen = false;
       _isMapStyleOpen = false;
       _searchController.clear();
       _searchFocusNode.unfocus();
@@ -590,14 +632,14 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
   final color = _filterColor(filter);
 
   return AnimatedOpacity(
-    duration: Duration(milliseconds: 180 + index * 45),
+    duration: Duration(milliseconds: 350 + index * 80),
     opacity: _isFilterOpen ? 1.0 : 0.0,
     child: AnimatedSlide(
-      duration: Duration(milliseconds: 260 + index * 45),
+      duration: Duration(milliseconds: 850 + index * 180),
       curve: Curves.easeOutBack,
-      offset: _isFilterOpen ? Offset.zero : const Offset(0, -0.35),
+      offset: _isFilterOpen ? Offset.zero : const Offset(0, 0.35),
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.only(bottom: 4),
         child: Material(
           color: Colors.white.withOpacity(0.94),
           elevation: 4,
@@ -657,23 +699,27 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
 
 Widget _buildVerticalFilterMenu() {
   return Positioned(
-    left: 70,
-    top: MediaQuery.of(context).padding.top + 126,
+    left: 8,
+    bottom: 120,
     child: IgnorePointer(
       ignoring: !_isFilterOpen,
       child: SizedBox(
-        height: MediaQuery.of(context).size.height -
-            MediaQuery.of(context).padding.top -
-            150,
+        height: MediaQuery.of(context).size.height * 0.68,
         child: SingleChildScrollView(
+          reverse: true,
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: List.generate(
               SpotFilter.values.length,
-              (index) => _verticalFilterChoiceButton(
-                SpotFilter.values[index],
-                index,
-              ),
+              (index) {
+                final reversedIndex = SpotFilter.values.length - 1 - index;
+
+                return _verticalFilterChoiceButton(
+                  SpotFilter.values[reversedIndex],
+                  index,
+                );
+              },
             ),
           ),
         ),
@@ -683,23 +729,40 @@ Widget _buildVerticalFilterMenu() {
 }
 
 Widget _buildMapStyleVerticalMenu() {
+  return IgnorePointer(
+    ignoring: !_isMapStyleOpen,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: List.generate(
+        _tileStyles.length,
+        (index) {
+          final reversedIndex = _tileStyles.length - 1 - index;
+
+          return _animatedMapStyleButton(
+            reversedIndex,
+            index,
+          );
+        },
+      ),
+    ),
+  );
+}
+
+Widget _animatedMapStyleButton(int tileIndex, int animationIndex) {
   return AnimatedOpacity(
-    duration: const Duration(milliseconds: 250),
+    duration: Duration(
+      milliseconds: 350 + animationIndex * 80,
+    ),
     opacity: _isMapStyleOpen ? 1.0 : 0.0,
     child: AnimatedSlide(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutBack,
-      offset: _isMapStyleOpen ? Offset.zero : const Offset(0, -0.2),
-      child: IgnorePointer(
-        ignoring: !_isMapStyleOpen,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: List.generate(
-            _tileStyles.length,
-            (index) => _mapStyleVerticalButton(index),
-          ),
-        ),
+      duration: Duration(
+        milliseconds: 850 + animationIndex * 180,
       ),
+      curve: Curves.easeOutBack,
+      offset: _isMapStyleOpen
+          ? Offset.zero
+          : const Offset(0, 0.35),
+      child: _mapStyleVerticalButton(tileIndex),
     ),
   );
 }
@@ -718,7 +781,7 @@ Widget _mapStyleVerticalButton(int index) {
         onTap: () => _selectMapStyle(index),
         child: Container(
           width: 150, // ⬅️ un peu plus large
-          height: 52, // ⬅️ plus haut
+          height: 48, // ⬅️ plus haut
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
@@ -784,123 +847,98 @@ Widget _mapStyleIcon(int index) {
 }
 
 Widget _buildLeftMapControls(List<SpotFlagState> spots) {
-  final showCompass = _currentRotation.abs() > 1.0;
+  
+  final isSearching = _searchController.text.trim().isNotEmpty || _isListening;
 
   return Positioned(
-    left: 16,
-    top: MediaQuery.of(context).padding.top + 70,
-    child: IgnorePointer(
-      ignoring: _isMovingMap,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 250),
-        opacity: _isMovingMap ? 0.0 : 1.0,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _mapControlButton(
-                  icon: Icons.search,
-                  tooltip: 'Rechercher un SPHOT',
-                  onTap: _toggleSearchBar,
-                ),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 750),
-                  curve: Curves.easeOutCubic,
-                  width: _isSearchOpen ? 260 : 0,
-                  height: 46,
-                  margin: EdgeInsets.only(
-                    left: _isSearchOpen ? 8 : 0,
-                    bottom: 10,
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(99),
-                    child: _isSearchOpen
-    ? Material(
-        color: Colors.white.withOpacity(0.94),
-        elevation: 4,
-        borderRadius: BorderRadius.circular(99),
-        child: Container(
-          decoration: BoxDecoration(
+    left: 8,
+    right: 8,
+    top: MediaQuery.of(context).padding.top + 50,
+    child: Row(
+      children: [
+        Expanded(
+          child: Material(
+            color: Colors.white.withOpacity(0.94),
+            elevation: 4,
             borderRadius: BorderRadius.circular(99),
-            border: Border.all(
-  color: _searchFocusNode.hasFocus
-      ? Colors.black
-      : Colors.black.withOpacity(0.4),
-  width: _searchFocusNode.hasFocus ? 2 : 1.2,
-),
-          ),
-          child: TextField(
-  controller: _searchController,
-  focusNode: _searchFocusNode,
-  textAlignVertical: TextAlignVertical.center, // 👈 clé
-  onChanged: (value) {
-    _searchAndMoveToSpot(spots, value);
-  },
-  decoration: InputDecoration(
-    hintText: 'Rechercher un SPHOT',
-    suffixIcon: IconButton(
-      icon: const Icon(Icons.close),
-      onPressed: () {
-        _searchController.clear();
-        _searchFocusNode.unfocus();
-        setState(() {
-          _isSearchOpen = false;
-        });
-      },
-    ),
-    border: InputBorder.none,
-    contentPadding: const EdgeInsets.fromLTRB(
-  18,
-  10,
-  8,
-  10,
-),
-  ),
-)
-        ),
-      )
-                        : const SizedBox.shrink(),
-                  ),
+            child: Container(
+              height: 42,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(99),
+                border: Border.all(
+                  color: Colors.black.withOpacity(0.4),
+                  width: 1.2,
                 ),
-              ],
-            ),
-
-            _mapControlButton(
-              icon: Icons.tune,
-              tooltip: 'Filtrer les SPHOTS',
-              onTap: _toggleFilterBar,
-            ),
-
-            Row(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-    _mapControlButton(
-      icon: Icons.layers_outlined,
-      tooltip: 'Changer la carte',
-      onTap: _toggleMapStyleBar,
-    ),
-    const SizedBox(width: 8),
-    _buildMapStyleVerticalMenu(),
-  ],
-),
-
-_mapControlButton(
-  icon: Icons.my_location,
-  tooltip: 'Ma position',
-  onTap: _goToUserLocation,
-),
-
-            if (showCompass)
-              _mapControlButton(
-                icon: Icons.navigation,
-                tooltip: 'Remettre le Nord',
-                rotation: _currentRotation * pi / 180,
-                onTap: _resetNorth,
               ),
-          ],
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                textAlignVertical: TextAlignVertical.center,
+                onChanged: (value) {
+                  setState(() {});
+                  _searchAndMoveToSpot(spots, value);
+                },
+                decoration: InputDecoration(
+  hintText: 'Rechercher un SPHOT',
+  prefixIcon: const Icon(Icons.search, size: 21),
+  prefixIconConstraints: const BoxConstraints(
+    minHeight: 0,
+    minWidth: 40,
+  ),
+  suffixIcon: Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      if (_searchController.text.trim().isNotEmpty)
+        IconButton(
+          icon: const Icon(Icons.close, size: 20),
+          onPressed: () {
+            _searchTimer?.cancel();
+            _searchController.clear();
+            setState(() {});
+          },
         ),
-      ),
+      IconButton(
+  icon: AnimatedSwitcher(
+    duration: const Duration(milliseconds: 250),
+    child: Icon(
+      _isListening
+          ? Icons.radio_button_checked
+          : Icons.keyboard_voice_rounded,
+      key: ValueKey(_isListening),
+      color: _isListening
+          ? const Color(0xFFFF0000)
+          : Colors.black87,
+      size: 22,
+    ),
+  ),
+  onPressed: () => _startVoiceSearch(spots),
+),
+    ],
+  ),
+  isDense: true,
+  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+  border: InputBorder.none,
+),
+              ),
+            ),
+          ),
+        ),
+        if (!isSearching) ...[
+  const SizedBox(width: 6),
+  _mapControlButton(
+    icon: Icons.my_location,
+    tooltip: 'Ma position',
+    onTap: _goToUserLocation,
+  ),
+  const SizedBox(width: 4),
+  _mapControlButton(
+    icon: Icons.navigation,
+    tooltip: 'Remettre le Nord',
+    rotation: _currentRotation * pi / 180,
+    onTap: _resetNorth,
+  ),
+],
+      ],
     ),
   );
 }
@@ -961,23 +999,24 @@ _mapControlButton(
   }
 
   List<Marker> _buildMarkers(
-    List<SpotFlagState> spots,
-    double zoom,
-    double rotation,
-  ) {
-    final showFlag = _showFlagForZoom(zoom);
-    final showText = _showTextForZoom(zoom);
+  List<SpotFlagState> spots,
+  double zoom,
+  double rotation,
+) {
+  final showFlag = _showFlagForZoom(zoom);
+  final showText = _showTextForZoom(zoom);
 
-    return spots
-        .where(_matchesFilter)
-        .where((spot) => spot.lat.isFinite && spot.lng.isFinite)
-        .map((spot) {
-      if (spot.isPosteSecours) {
-        return _buildSecoursMarker(spot, showFlag, showText, zoom, rotation);
-      }
-      return _buildOtherSpotMarker(spot, showText, zoom, rotation);
-    }).toList();
-  }
+  debugPrint('MARKERS À AFFICHER : ${spots.length}');
+
+  return spots
+      .where((spot) => spot.lat.isFinite && spot.lng.isFinite)
+      .map((spot) {
+    if (spot.isPosteSecours) {
+      return _buildSecoursMarker(spot, showFlag, showText, zoom, rotation);
+    }
+    return _buildOtherSpotMarker(spot, showText, zoom, rotation);
+  }).toList();
+}
 
   Widget _buildDrawer() {
     return Drawer(
@@ -1125,6 +1164,194 @@ _mapControlButton(
   );
 }
 
+Widget _buildAdBanner() {
+  return Positioned(
+    left: 8,
+    right: 8,
+    bottom: 58, // juste au-dessus de la bottom bar
+    child: Container(
+      height: 62,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.94),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+        border: Border.all(
+          color: Colors.black.withOpacity(0.08),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 12),
+
+          /// LOGO / IMAGE PUB
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              width: 52,
+              height: 52,
+              color: Colors.blueGrey.withOpacity(0.08),
+              child: const Icon(
+                Icons.campaign,
+                size: 28,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          /// TEXTE PUB
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PUBLICITÉ LOCALE',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black87,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+
+                const SizedBox(height: 2),
+
+                Text(
+                  'Camping • Surf Shop • Restaurant',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black.withOpacity(0.65),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          /// CTA
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.black87,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: const Text(
+                'VOIR',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildBottomBar() {
+  final items = [
+    {'icon': Icons.tune, 'label': 'FILTRES'},
+    {'icon': Icons.layers_outlined, 'label': 'CARTES'},
+    {'icon': Icons.star_border, 'label': 'FAVORIS'},
+    {'icon': Icons.info_outline, 'label': 'INFOS'},
+    {'icon': Icons.settings_outlined, 'label': 'RÉGLAGES'},
+  ];
+
+  return Positioned(
+    left: 8,
+    right: 8,
+    bottom: 6,
+    child: Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.94),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.14),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: List.generate(items.length, (index) {
+          final selected = index == _selectedBottomIndex;
+
+          return InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () {
+              setState(() {
+                _selectedBottomIndex = index;
+              });
+
+              if (index == 0) {
+                _toggleFilterBar();
+              } else if (index == 1) {
+                _toggleMapStyleBar();
+              } else if (index == 2) {
+                _showMapMessage('Favoris bientôt disponibles');
+              } else if (index == 3) {
+                _showMapMessage('Infos bientôt disponibles');
+              } else if (index == 4) {
+                _showMapMessage('Réglages bientôt disponibles');
+              }
+            },
+            child: SizedBox(
+              width: 58,
+              height: 50,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    items[index]['icon'] as IconData,
+                    size: 22,
+                    color: selected ? Colors.black : Colors.grey,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    items[index]['label'] as String,
+                    maxLines: 1,
+                    overflow: TextOverflow.visible,
+                    style: TextStyle(
+                      fontSize: 8.8,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.2,
+                      color: selected ? Colors.black : Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ),
+    ),
+  );
+}
+
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       primary: false,
@@ -1133,7 +1360,7 @@ _mapControlButton(
       shadowColor: Colors.transparent,
       elevation: 0,
       centerTitle: true,
-      toolbarHeight: 70,
+      toolbarHeight: 64,
       leading: Builder(
         builder: (context) => Padding(
           padding: const EdgeInsets.only(left: 14),
@@ -1146,7 +1373,7 @@ _mapControlButton(
       ),
       title: Image.asset(
         'data/icons/title.png',
-        height: 90,
+        height: 72,
         fit: BoxFit.contain,
         filterQuality: FilterQuality.high,
       ),
@@ -1204,7 +1431,11 @@ void dispose() {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final spots = snapshot.data!;
+          final allSpots = snapshot.data!;
+final spots = allSpots.where(_matchesFilter).toList();
+
+debugPrint('SPHOTS CHARGÉS : ${allSpots.length}');
+debugPrint('SPHOTS AFFICHÉS : ${spots.length}');
 
           return Stack(
             children: [
@@ -1216,26 +1447,47 @@ void dispose() {
   interactionOptions: const InteractionOptions(
   flags: InteractiveFlag.all,
 ),
-  onPositionChanged: (position, hasGesture) {
-    if ((_currentRotation - position.rotation).abs() > 0.5 || hasGesture) {
+
+onTap: (_, __) {
+  if (_isFilterOpen || _isMapStyleOpen) {
+    _searchFocusNode.unfocus();
+
+    setState(() {
+      _isFilterOpen = false;
+      _isMapStyleOpen = false;
+    });
+  }
+},
+
+onPositionChanged: (position, hasGesture) {
+  if ((_currentRotation - position.rotation).abs() > 0.5 || hasGesture) {
+    setState(() {
+      _currentRotation = position.rotation;
+      if (hasGesture) {
+        _isMovingMap = true;
+      }
+    });
+  }
+
+  if (hasGesture) {
+    if (_isFilterOpen || _isMapStyleOpen) {
+      _searchFocusNode.unfocus();
+
       setState(() {
-        _currentRotation = position.rotation;
-        if (hasGesture) {
-          _isMovingMap = true;
-        }
+        _isFilterOpen = false;
+        _isMapStyleOpen = false;
       });
     }
 
-    if (hasGesture) {
-      _mapMoveTimer?.cancel();
-      _mapMoveTimer = Timer(const Duration(milliseconds: 650), () {
-        if (!mounted) return;
-        setState(() {
-          _isMovingMap = false;
-        });
+    _mapMoveTimer?.cancel();
+    _mapMoveTimer = Timer(const Duration(milliseconds: 650), () {
+      if (!mounted) return;
+      setState(() {
+        _isMovingMap = false;
       });
-    }
-  },
+    });
+  }
+},
 ),
                 children: [
                   TileLayer(
@@ -1280,7 +1532,16 @@ void dispose() {
                 ],
               ),
               _buildLeftMapControls(spots),
-              _buildVerticalFilterMenu(),
+
+Positioned(
+  left: 8,
+  bottom: 120,
+  child: _buildMapStyleVerticalMenu(),
+),
+
+_buildVerticalFilterMenu(),
+_buildAdBanner(),
+_buildBottomBar(),
             ],
           );
         },
@@ -1607,7 +1868,7 @@ class MiniWavingFlagPainter extends CustomPainter {
       final x = size.width * t;
 
       final amplitude = 0.3 + 1.2 * t;
-      final wave = sin(phase + t * pi * 1.8) * amplitude;
+      final wave = sin(t * pi * 1.8 - phase) * amplitude;
 
       topPoints.add(Offset(x, verticalMargin + wave));
       bottomPoints.add(Offset(x, size.height - verticalMargin + wave));
@@ -1880,7 +2141,7 @@ double _lineSpacing() {
                               color: Colors.black,
                             ),
                           ),
-                          SizedBox(height: _lineSpacing() + 1.2),
+                          SizedBox(height: _lineSpacing() + 5),
                           RichText(
                             textAlign: TextAlign.center,
                             text: TextSpan(
@@ -1908,7 +2169,7 @@ double _lineSpacing() {
                               ],
                             ),
                           ),
-                          SizedBox(height: _lineSpacing() + 1.2),
+                          SizedBox(height: _lineSpacing() + 5),
                           if (spot.isMissingFlagColorDuringSurveillance) ...[
                             _warningLineUniform(
                               'COULEUR DE LA FLAMME NON RENSEIGNÉE',

@@ -149,7 +149,7 @@ class WavingFlagPainter extends CustomPainter {
       final x = size.width * t;
 
       final amplitude = 0.8 + 3.0 * t;
-      final wave = sin(phase + t * pi * 2.1) * amplitude;
+      final wave = sin( t * pi * 2.1 - phase) * amplitude;
 
       topPoints.add(Offset(x, verticalMargin + wave));
       bottomPoints.add(Offset(x, size.height - verticalMargin + wave));

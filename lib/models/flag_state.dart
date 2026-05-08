@@ -2,8 +2,17 @@ class SpotFlagState {
   final String id;
   final String name;
   final String nomSphot;
+  final String ville;
+  final String departement;
+
+  final double villeLat;
+  final double villeLng;
+  final double departementLat;
+  final double departementLng;
+
   final double lat;
   final double lng;
+
   final String typeSphot;
   final String statutBaignade;
   final String periode;
@@ -17,6 +26,12 @@ class SpotFlagState {
     required this.id,
     required this.name,
     required this.nomSphot,
+    required this.ville,
+    required this.departement,
+    required this.villeLat,
+    required this.villeLng,
+    required this.departementLat,
+    required this.departementLng,
     required this.lat,
     required this.lng,
     required this.typeSphot,
@@ -34,6 +49,14 @@ class SpotFlagState {
       id: id,
       name: _readString(data['name']),
       nomSphot: _readString(data['nom_sphot']),
+      ville: _readString(data['ville']),
+      departement: _readString(data['departement']),
+
+      villeLat: _readDouble(data['ville_lat']),
+      villeLng: _readDouble(data['ville_lng']),
+      departementLat: _readDouble(data['departement_lat']),
+      departementLng: _readDouble(data['departement_lng']),
+
       lat: _readDouble(data['lat']),
       lng: _readDouble(data['lng']),
       typeSphot: _readString(data['type_sphot']),

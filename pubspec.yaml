@@ -11,7 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  geolocator: ^13.0.2
+  geolocator: ^14.0.2
 
   cupertino_icons: ^1.0.8
   provider: ^6.1.5+1
@@ -23,6 +23,7 @@ dependencies:
   flutter_map_tile_caching: ^10.1.1
   latlong2: ^0.9.1
   flutter_map_marker_cluster: ^8.2.2
+  speech_to_text: ^7.3.0
 
 dev_dependencies:
   flutter_test:
