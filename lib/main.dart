@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
-import 'map/map_page.dart';
 import 'firebase_options.dart';
+import 'map/map_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,11 +11,11 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  runApp(const MyApp());
+  runApp(const SphotApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class SphotApp extends StatelessWidget {
+  const SphotApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: MapPage(),
+      home: const MapPage(),
     );
   }
 }

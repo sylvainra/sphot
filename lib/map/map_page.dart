@@ -301,9 +301,11 @@ void initState() {
     }
   }
 
- String _normalizeSearch(String value) {
+String _normalizeSearch(String value) {
   var normalized = value
       .toLowerCase()
+      .replaceAll('-', ' ')
+      .replaceAll('_', ' ')
       .replaceAll('’', "'")
       .replaceAll('é', 'e')
       .replaceAll('è', 'e')
@@ -321,9 +323,9 @@ void initState() {
 
   normalized = normalized.replaceAll(RegExp(r"\bl[' ]"), '');
   normalized = normalized.replaceAll(
-    RegExp(r'\b(le|la|les|des|de|du|d|un|une|aux|au)\b'),
-    '',
-  );
+  RegExp(r'\b(le|la|les|des|de|du|un|une|aux|au)\b'),
+  '',
+);
 
   normalized = normalized.replaceAll(RegExp(r'\s+'), ' ').trim();
 
@@ -507,10 +509,75 @@ void _searchAndMoveToSpot(
   _searchTimer = Timer(
     const Duration(milliseconds: 650),
     () {
+      if (!mounted) return;
+
+      final query = _normalizeSearch(value);
+
+      if (query.length < 2) return;
+
+      bool matchText(String field) {
+        final normalizedField = _normalizeSearch(field);
+
+        return normalizedField == query ||
+            normalizedField.contains(query) ||
+            query.contains(normalizedField);
+      }
+
+      final cityMatch = spots.where((spot) {
+        return matchText(spot.ville) &&
+            spot.villeLat != 0 &&
+            spot.villeLng != 0;
+      }).toList();
+
+      if (cityMatch.isNotEmpty) {
+        final spot = cityMatch.first;
+
+        debugPrint('VILLE TROUVÉE : ${spot.ville}');
+        debugPrint('GPS VILLE : ${spot.villeLat}, ${spot.villeLng}');
+
+        _searchController.clear();
+        setState(() {});
+
+        _mapController.move(
+          LatLng(spot.villeLat, spot.villeLng),
+          12.5,
+        );
+        return;
+      }
+
+      final departementMatch = spots.where((spot) {
+        return matchText(spot.departement) &&
+            spot.departementLat != 0 &&
+            spot.departementLng != 0;
+      }).toList();
+
+      if (departementMatch.isNotEmpty) {
+        final spot = departementMatch.first;
+
+        debugPrint('DÉPARTEMENT TROUVÉ : ${spot.departement}');
+        debugPrint(
+          'GPS DÉPARTEMENT : ${spot.departementLat}, ${spot.departementLng}',
+        );
+
+        _searchController.clear();
+        setState(() {});
+
+        _mapController.move(
+          LatLng(spot.departementLat, spot.departementLng),
+          9.5,
+        );
+        return;
+      }
+
       final spot = _findBestSpotMatch(spots, value);
 
-      if (spot == null) return;
-      if (!mounted) return;
+      if (spot == null) {
+        debugPrint('AUCUN RÉSULTAT POUR : $value');
+        return;
+      }
+
+      debugPrint('SPHOT TROUVÉ : ${spot.name}');
+      debugPrint('GPS SPHOT : ${spot.lat}, ${spot.lng}');
 
       _searchController.clear();
       setState(() {});
@@ -1531,7 +1598,7 @@ onPositionChanged: (position, hasGesture) {
                   ),
                 ],
               ),
-              _buildLeftMapControls(spots),
+              _buildLeftMapControls(allSpots),
 
 Positioned(
   left: 8,

@@ -35,6 +35,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/data/spots.json
     - data/icons/
     - data/logos_departements/france/pays_de_la_loire/
     - data/logos_communes/france/pays_de_la_loire/vendee/

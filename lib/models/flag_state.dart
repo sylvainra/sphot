@@ -45,32 +45,34 @@ class SpotFlagState {
   });
 
   factory SpotFlagState.fromFirestore(String id, Map<String, dynamic> data) {
-    return SpotFlagState(
-      id: id,
-      name: _readString(data['name']),
-      nomSphot: _readString(data['nom_sphot']),
-      ville: _readString(data['ville']),
-      departement: _readString(data['departement']),
+  return SpotFlagState(
+    id: id,
+    name: _readString(data['nomSecours']),
+    nomSphot: _readString(data['nomSphot']),
+    ville: _readString(data['ville']),
+    departement: _readString(data['departement']),
 
-      villeLat: _readDouble(data['ville_lat']),
-      villeLng: _readDouble(data['ville_lng']),
-      departementLat: _readDouble(data['departement_lat']),
-      departementLng: _readDouble(data['departement_lng']),
+    villeLat: _readDouble(data['villeLat']),
+    villeLng: _readDouble(data['villeLng']),
+    departementLat: _readDouble(data['departementLat']),
+    departementLng: _readDouble(data['departementLng']),
 
-      lat: _readDouble(data['lat']),
-      lng: _readDouble(data['lng']),
-      typeSphot: _readString(data['type_sphot']),
-      statutBaignade: _readString(data['statut_baignade']),
-      periode: _readString(data['periode']),
-      heureDebut: _readString(data['heure_debut']),
-      heureFin: _readString(data['heure_fin']),
-      phone: _readString(data['phone']),
-      activite: _readString(data['activite']),
-      liveFlag: data['liveFlag'] is Map<String, dynamic>
-          ? data['liveFlag'] as Map<String, dynamic>
-          : null,
-    );
-  }
+    lat: _readDouble(data['sphotLat']),
+    lng: _readDouble(data['sphotLng']),
+
+    typeSphot: _readString(data['typeSphot']),
+    statutBaignade: _readString(data['statutBaignade']),
+    periode: _readString(data['periode']),
+    heureDebut: _readString(data['heureDebut']),
+    heureFin: _readString(data['heureFin']),
+    phone: _readString(data['phone']),
+    activite: _readString(data['activite']),
+
+    liveFlag: data['liveFlag'] is Map<String, dynamic>
+        ? data['liveFlag'] as Map<String, dynamic>
+        : null,
+  );
+}
 
   bool get isPosteSecours {
     return typeSphot.toLowerCase().contains('poste de secours');
