@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../pages/lifeguard_info_page.dart';
 
 class LifeguardLoginPage extends StatefulWidget {
   const LifeguardLoginPage({super.key});
@@ -20,9 +22,29 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage> {
     super.dispose();
   }
 
-  void _login() {
-    // Connexion réelle à brancher plus tard
+  Future<void> _login() async {
+  try {
+    final userCredential =
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: _identifierController.text.trim(),
+      password: _passwordController.text.trim(),
+    );
+
+    if (userCredential.user != null) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const LifeguardInfoPage(),
+        ),
+      );
+    }
+  } on FirebaseAuthException catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Erreur Firebase : ${e.code}'),
+      ),
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {

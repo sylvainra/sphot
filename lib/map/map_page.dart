@@ -1420,16 +1420,18 @@ Widget _buildBottomBar() {
 }
 
   PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      primary: false,
-      backgroundColor: Colors.transparent,
-      surfaceTintColor: Colors.transparent,
-      shadowColor: Colors.transparent,
-      elevation: 0,
-      centerTitle: true,
-      toolbarHeight: 64,
-      leading: Builder(
-        builder: (context) => Padding(
+  return AppBar(
+    primary: false,
+    backgroundColor: Colors.transparent,
+    surfaceTintColor: Colors.transparent,
+    shadowColor: Colors.transparent,
+    elevation: 0,
+    centerTitle: true,
+    toolbarHeight: 64,
+    leading: Builder(
+      builder: (context) => Transform.translate(
+        offset: const Offset(0, 14),
+        child: Padding(
           padding: const EdgeInsets.only(left: 14),
           child: IconButton(
             tooltip: 'Menu',
@@ -1438,14 +1440,20 @@ Widget _buildBottomBar() {
           ),
         ),
       ),
-      title: Image.asset(
+    ),
+    title: Transform.translate(
+      offset: const Offset(0, 14),
+      child: Image.asset(
         'data/icons/title.png',
         height: 72,
         fit: BoxFit.contain,
         filterQuality: FilterQuality.high,
       ),
-      actions: [
-        Padding(
+    ),
+    actions: [
+      Transform.translate(
+        offset: const Offset(0, 14),
+        child: Padding(
           padding: const EdgeInsets.only(right: 14),
           child: IconButton(
             tooltip: 'Connexion sauveteurs',
@@ -1465,9 +1473,10 @@ Widget _buildBottomBar() {
             ),
           ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
   @override
 void dispose() {
@@ -1481,13 +1490,13 @@ void dispose() {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: _scaffoldKey,
-      drawerScrimColor: Colors.transparent,
-      backgroundColor: Colors.transparent,
-      extendBodyBehindAppBar: true,
-      appBar: _buildAppBar(),
-      endDrawer: _buildDrawer(),
-      body: StreamBuilder<List<SpotFlagState>>(
+  key: _scaffoldKey,
+  drawerScrimColor: Colors.transparent,
+  backgroundColor: Colors.transparent,
+  extendBodyBehindAppBar: true,
+  appBar: _buildAppBar(),
+  endDrawer: _buildDrawer(),
+  body: StreamBuilder<List<SpotFlagState>>(
         stream: _firestoreService.getSpotsStream(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
@@ -1599,6 +1608,7 @@ onPositionChanged: (position, hasGesture) {
                 ],
               ),
               _buildLeftMapControls(allSpots),
+
 
 Positioned(
   left: 8,
@@ -2147,12 +2157,12 @@ class _HoverMarker extends StatefulWidget {
 class _HoverMarkerState extends State<_HoverMarker> {
   bool isHovering = false;
 
-double _lineSpacing() {
-  if (widget.zoom >= 16) return 3.0;
-  if (widget.zoom >= 15) return 2.6;
-  if (widget.zoom >= 14) return 2.2;
-  return 2.0;
-}
+  double _lineSpacing() {
+    if (widget.zoom >= 16) return 3.0;
+    if (widget.zoom >= 15) return 2.6;
+    if (widget.zoom >= 14) return 2.2;
+    return 2.0;
+  }
 
   double _labelSize(double base) {
     if (widget.zoom >= 16) return base + 2;
@@ -2168,7 +2178,7 @@ double _lineSpacing() {
 
     final isTouchDevice =
         Theme.of(context).platform == TargetPlatform.android ||
-            Theme.of(context).platform == TargetPlatform.iOS;
+        Theme.of(context).platform == TargetPlatform.iOS;
 
     final showText = widget.showTextAllowed && (isTouchDevice || isHovering);
 
@@ -2208,55 +2218,32 @@ double _lineSpacing() {
                               color: Colors.black,
                             ),
                           ),
+
                           SizedBox(height: _lineSpacing() + 5),
-                          RichText(
+
+                          Text(
+                            '🚨 POSTE DE SECOURS 🚨',
                             textAlign: TextAlign.center,
-                            text: TextSpan(
-                              style: _mapLabelStyle(
-                                fontSize: _labelSize(10),
-                                fontWeight: FontWeight.w700,
-                                color: Colors.black,
-                              ),
-                              children: [
-                                const TextSpan(
-                                  text: '🚨 POSTE DE SECOURS 🚨',
-                                  style: TextStyle(
-                                    color: Color(0xFFFF0000),
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                if (spot.phone.trim().isNotEmpty)
-                                  TextSpan(text: ' - 📞 ${spot.phone}'),
-                                if (spot.heureDebut.trim().isNotEmpty &&
-                                    spot.heureFin.trim().isNotEmpty)
-                                  TextSpan(
-                                    text:
-                                        ' - 🕘 ${spot.heureDebut} - ${spot.heureFin}',
-                                  ),
-                              ],
+                            style: _mapLabelStyle(
+                              fontSize: _labelSize(10),
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFFF0000),
                             ),
                           ),
-                          SizedBox(height: _lineSpacing() + 5),
-                          if (spot.isMissingFlagColorDuringSurveillance) ...[
-                            _warningLineUniform(
-                              'COULEUR DE LA FLAMME NON RENSEIGNÉE',
-                              _labelSize(22),
-                            ),
-                            SizedBox(height: _lineSpacing() - 1.8),
-                            _warningLineUniform(
-                              'BAIGNADE À VOS RISQUES ET PÉRILS',
-                              _labelSize(22),
-                            ),
-                          ] else
-                            Text(
-                              spot.displayStatut,
-                              textAlign: TextAlign.center,
-                              style: _mapLabelStyle(
-                                fontSize: _labelSize(12) + 3,
-                                fontWeight: FontWeight.w900,
-                                color: Color(spot.statutColor),
-                              ),
-                            ),
+
+                          SizedBox(height: _lineSpacing() - 1.8),
+
+                          _warningLineUniform(
+                            'BAIGNADE NON SURVEILLÉE',
+                            _labelSize(22),
+                          ),
+
+                          SizedBox(height: _lineSpacing() - 1.8),
+
+                          _warningLineUniform(
+                            'BAIGNADE À VOS RISQUES ET PÉRILS',
+                            _labelSize(22),
+                          ),
                         ],
                       ),
                     ),
