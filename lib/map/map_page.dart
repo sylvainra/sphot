@@ -161,7 +161,7 @@ void initState() {
   String _getMarkerIconPath(SpotFlagState spot) {
     final type = spot.normalizedType;
 
-    if (spot.isNaturisme) return 'data/icons/fire_icon.png';
+    if (spot.isNaturisme) return 'data/icons/fire_skin_icon.png';
     if (type.contains('ACCES PLAGE')) return 'data/icons/fire_orange_icon.png';
 
     if (type.contains('LAC') ||
@@ -295,7 +295,7 @@ void initState() {
       case SpotFilter.lagon:
         return _drawerAssetIcon('data/icons/fire_cyan_icon.png');
       case SpotFilter.naturisme:
-        return _drawerAssetIcon('data/icons/fire_icon.png');
+        return _drawerAssetIcon('data/icons/fire_skin_icon.png');
       case SpotFilter.autre:
         return _drawerAssetIcon('data/icons/fire_black_icon.png');
     }
@@ -1758,7 +1758,7 @@ class _SphotSpinnerIconState extends State<_SphotSpinnerIcon> {
     'data/icons/fire_blue_icon.png',
     'data/icons/fire_green_icon.png',
     'data/icons/fire_cyan_icon.png',
-    'data/icons/fire_icon.png',
+    'data/icons/fire_skin_icon.png',
     'data/icons/fire_black_icon.png',
   ];
 
