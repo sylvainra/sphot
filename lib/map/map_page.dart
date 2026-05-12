@@ -186,7 +186,7 @@ void initState() {
 
     if (spot.isPosteSecours) return const Color(0xFFFF0000);
     if (spot.isNaturisme) return const Color(0xFFD87A5C);
-    if (type.contains('ACCES PLAGE')) return const Color(0xFFFF7F00);
+    if (type.contains('ACCES PLAGE')) return const Color(0xFFFFD000);
 
     if (type.contains('LAC') ||
         type.contains("PLAN D'EAU") ||
@@ -262,7 +262,7 @@ void initState() {
       case SpotFilter.secours:
         return const Color(0xFFFF0000);
       case SpotFilter.accesPlage:
-        return const Color(0xFFFF7F00);
+        return const Color(0xFFFFD000);
       case SpotFilter.eauBleue:
         return const Color(0xFF1E3A8A);
       case SpotFilter.eauVerte:
@@ -1186,24 +1186,31 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   }
 
   Color _clusterBorderColor(List<Marker> markers) {
-    final colors = <Color>{};
+  final colors = <Color>{};
 
-    for (final marker in markers) {
-      final child = marker.child;
-      if (child is _OtherSpotMarker) {
-        colors.add(child.typeTextColor);
-      } else if (child is _SimplePostePoint || child is _HoverMarker) {
-        colors.add(const Color(0xFFFF0000));
-      }
+  for (final marker in markers) {
+    final child = marker.child;
+    if (child is _OtherSpotMarker) {
+      colors.add(child.typeTextColor);
+    } else if (child is _SimplePostePoint || child is _HoverMarker) {
+      colors.add(const Color(0xFFFF0000));
     }
-
-    return colors.length == 1 ? colors.first : Colors.black;
   }
+
+  return colors.length == 1
+      ? (colors.first == const Color(0xFFFF7F00)
+          ? const Color(0xFFFFD000)
+          : colors.first)
+      : Colors.black;
+}
 
   Widget _buildCluster(BuildContext context, List<Marker> markers) {
   final count = markers.length;
   final borderColor = _clusterBorderColor(markers);
   final rotation = MapCamera.of(context).rotation;
+
+  final outlineColor =
+      borderColor == Colors.black ? Colors.white : Colors.black;
 
   return Transform.rotate(
     angle: -rotation * pi / 180,
@@ -1214,17 +1221,46 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
         shape: BoxShape.circle,
         color: Colors.transparent,
         border: Border.all(
-          color: borderColor,
+          color: outlineColor,
           width: 2.2,
         ),
       ),
-      alignment: Alignment.center,
-      child: Text(
-        count.toString(),
-        style: TextStyle(
-          color: borderColor,
-          fontWeight: FontWeight.w900,
-          fontSize: 15,
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.transparent,
+          border: Border.all(
+            color: borderColor,
+            width: 2.2,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            /// CONTOUR TEXTE
+            Text(
+              count.toString(),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                foreground: Paint()
+                  ..style = PaintingStyle.stroke
+                  ..strokeWidth = 2.2
+                  ..color = outlineColor,
+              ),
+            ),
+
+            /// TEXTE COULEUR
+            Text(
+              count.toString(),
+              style: TextStyle(
+                color: borderColor,
+                fontWeight: FontWeight.w900,
+                fontSize: 15,
+              ),
+            ),
+          ],
         ),
       ),
     ),
@@ -1342,7 +1378,10 @@ Widget _buildBottomBar() {
     {'icon': Icons.layers_outlined, 'label': 'CARTES'},
     {'icon': Icons.star_border, 'label': 'FAVORIS'},
     {'icon': Icons.info_outline, 'label': 'INFOS'},
-    {'icon': Icons.settings_outlined, 'label': 'RÉGLAGES'},
+    {
+  'iconAsset': 'data/icons/fire_lifeguard_icon.png',
+  'label': 'PROFIL'
+},
   ];
 
   return Positioned(
@@ -1383,8 +1422,12 @@ Widget _buildBottomBar() {
               } else if (index == 3) {
                 _showMapMessage('Infos bientôt disponibles');
               } else if (index == 4) {
-                _showMapMessage('Réglages bientôt disponibles');
-              }
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => const LifeguardLoginPage(),
+    ),
+  );
+}
             },
             child: SizedBox(
               width: 58,
@@ -1392,23 +1435,32 @@ Widget _buildBottomBar() {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    items[index]['icon'] as IconData,
-                    size: 22,
-                    color: selected ? Colors.black : Colors.grey,
-                  ),
+                  items[index]['iconAsset'] != null
+    ? Image.asset(
+        items[index]['iconAsset'] as String,
+        width: 32,
+        height: 32,
+        fit: BoxFit.contain,
+      )
+    : Icon(
+        items[index]['icon'] as IconData,
+        size: 22,
+        color: selected ? Colors.black : Colors.grey,
+      ),
                   const SizedBox(height: 2),
                   Text(
-                    items[index]['label'] as String,
-                    maxLines: 1,
-                    overflow: TextOverflow.visible,
-                    style: TextStyle(
-                      fontSize: 8.8,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.2,
-                      color: selected ? Colors.black : Colors.grey,
-                    ),
-                  ),
+  items[index]['label'] as String,
+  maxLines: 1,
+  overflow: TextOverflow.visible,
+  style: TextStyle(
+    fontSize: 8.8,
+    fontWeight: FontWeight.w900,
+    letterSpacing: -0.2,
+    color: index == 4
+        ? const Color(0xFFFF0000)
+        : (selected ? Colors.black : Colors.grey),
+  ),
+),
                 ],
               ),
             ),
@@ -1420,6 +1472,34 @@ Widget _buildBottomBar() {
 }
 
   PreferredSizeWidget _buildAppBar() {
+  const double headerIconSize = 50;
+
+  Widget headerImageButton({
+    required String tooltip,
+    required String asset,
+    required VoidCallback onPressed,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Tooltip(
+        message: tooltip,
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(
+            child: Image.asset(
+              asset,
+              width: headerIconSize,
+              height: headerIconSize,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   return AppBar(
     primary: false,
     backgroundColor: Colors.transparent,
@@ -1433,10 +1513,10 @@ Widget _buildBottomBar() {
         offset: const Offset(0, 14),
         child: Padding(
           padding: const EdgeInsets.only(left: 14),
-          child: IconButton(
+          child: headerImageButton(
             tooltip: 'Menu',
+            asset: 'data/icons/fire_informations_icon.png',
             onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-            icon: const _ColoredHamburgerIcon(size: 25),
           ),
         ),
       ),
@@ -1450,31 +1530,7 @@ Widget _buildBottomBar() {
         filterQuality: FilterQuality.high,
       ),
     ),
-    actions: [
-      Transform.translate(
-        offset: const Offset(0, 14),
-        child: Padding(
-          padding: const EdgeInsets.only(right: 14),
-          child: IconButton(
-            tooltip: 'Connexion sauveteurs',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const LifeguardLoginPage(),
-                ),
-              );
-            },
-            icon: Image.asset(
-              'data/icons/lifeguard_logo.png',
-              width: 50,
-              height: 50,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
-            ),
-          ),
-        ),
-      ),
-    ],
+    actions: const [],
   );
 }
 
@@ -1704,43 +1760,7 @@ class _OutlinedMenuText extends StatelessWidget {
   }
 }
 
-class _ColoredHamburgerIcon extends StatelessWidget {
-  final double size;
 
-  const _ColoredHamburgerIcon({required this.size});
-
-  @override
-  Widget build(BuildContext context) {
-    final lineHeight = size * 0.12;
-
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _line(size, lineHeight, const Color(0xFFFF0000)),
-          SizedBox(height: size * 0.15),
-          _line(size, lineHeight, const Color(0xFFFFFF00)),
-          SizedBox(height: size * 0.15),
-          _line(size, lineHeight, const Color(0xFFFF0000)),
-        ],
-      ),
-    );
-  }
-
-  Widget _line(double width, double height, Color color) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: Colors.black.withOpacity(0.25), width: 0.3),
-      ),
-    );
-  }
-}
 
 class _SphotSpinnerIcon extends StatefulWidget {
   const _SphotSpinnerIcon();
@@ -2328,3 +2348,9 @@ TextStyle _mapLabelStyle({
 ],
   );
 }
+
+
+
+
+
+

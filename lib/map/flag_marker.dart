@@ -176,3 +176,6 @@ class WavingFlagPainter extends CustomPainter {
     return oldDelegate.phase != phase || oldDelegate.color != color;
   }
 }
+
+
+

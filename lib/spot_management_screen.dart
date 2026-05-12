@@ -32,3 +32,6 @@ class SpotManagementScreen extends StatelessWidget {
     );
   }
 }
+
+
+

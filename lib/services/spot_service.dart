@@ -14,3 +14,6 @@ class SpotService {
     return jsonData.map((e) => Spot.fromJson(e)).toList();
   }
 }
+
+
+
