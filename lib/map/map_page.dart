@@ -742,17 +742,41 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      _filterShortLabel(filter),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 12,
-                        height: 1.05,
-                        fontWeight:
-                            selected ? FontWeight.w900 : FontWeight.w700,
-                      ),
-                    ),
+  _filterShortLabel(filter),
+  maxLines: 3,
+  overflow: TextOverflow.ellipsis,
+  style: TextStyle(
+    color: color,
+    fontSize: 12,
+    height: 1.05,
+    fontWeight:
+        selected ? FontWeight.w900 : FontWeight.w700,
+    shadows: filter == SpotFilter.accesPlage
+        ? const [
+            Shadow(
+              color: Colors.black,
+              offset: Offset(0.5, 0),
+              blurRadius: 0.7,
+            ),
+            Shadow(
+              color: Colors.black,
+              offset: Offset(-0.5, 0),
+              blurRadius: 0.7,
+            ),
+            Shadow(
+              color: Colors.black,
+              offset: Offset(0, 0.5),
+              blurRadius: 0.7,
+            ),
+            Shadow(
+              color: Colors.black,
+              offset: Offset(0, -0.5),
+              blurRadius: 0.7,
+            ),
+          ]
+        : null,
+  ),
+),
                   ),
                 ],
               ),
@@ -1379,7 +1403,7 @@ Widget _buildBottomBar() {
     {'icon': Icons.star_border, 'label': 'FAVORIS'},
     {'icon': Icons.info_outline, 'label': 'INFOS'},
     {
-  'iconAsset': 'data/icons/fire_lifeguard_icon.png',
+  'icon': Icons.add,
   'label': 'PROFIL'
 },
   ];
@@ -1435,12 +1459,31 @@ Widget _buildBottomBar() {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  items[index]['iconAsset'] != null
-    ? Image.asset(
-        items[index]['iconAsset'] as String,
-        width: 32,
-        height: 32,
-        fit: BoxFit.contain,
+                  index == 4
+    ? SizedBox(
+        width: 26,
+        height: 26,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 8,
+              height: 26,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF0000),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Container(
+              width: 26,
+              height: 8,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF0000),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
+        ),
       )
     : Icon(
         items[index]['icon'] as IconData,
@@ -1472,55 +1515,19 @@ Widget _buildBottomBar() {
 }
 
   PreferredSizeWidget _buildAppBar() {
-  const double headerIconSize = 50;
-
-  Widget headerImageButton({
-    required String tooltip,
-    required String asset,
-    required VoidCallback onPressed,
-  }) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Tooltip(
-        message: tooltip,
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Center(
-            child: Image.asset(
-              asset,
-              width: headerIconSize,
-              height: headerIconSize,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   return AppBar(
     primary: false,
+    automaticallyImplyLeading: false,
     backgroundColor: Colors.transparent,
     surfaceTintColor: Colors.transparent,
     shadowColor: Colors.transparent,
     elevation: 0,
     centerTitle: true,
     toolbarHeight: 64,
-    leading: Builder(
-      builder: (context) => Transform.translate(
-        offset: const Offset(0, 14),
-        child: Padding(
-          padding: const EdgeInsets.only(left: 14),
-          child: headerImageButton(
-            tooltip: 'Menu',
-            asset: 'data/icons/fire_informations_icon.png',
-            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-          ),
-        ),
-      ),
-    ),
+
+    leading: const SizedBox.shrink(),
+    actions: const [SizedBox.shrink()],
+
     title: Transform.translate(
       offset: const Offset(0, 14),
       child: Image.asset(
@@ -1530,7 +1537,6 @@ Widget _buildBottomBar() {
         filterQuality: FilterQuality.high,
       ),
     ),
-    actions: const [],
   );
 }
 
@@ -1736,23 +1742,61 @@ class _OutlinedMenuText extends StatelessWidget {
           const _ColoredSphotsText()
         else
           Text(
-            lines.first,
-            style: TextStyle(
-              color: color,
-              fontWeight: selected ? FontWeight.w900 : FontWeight.w800,
-              fontSize: 15,
-              height: 1.1,
+  lines.first,
+  style: TextStyle(
+    color: color,
+    fontWeight: selected ? FontWeight.w900 : FontWeight.w800,
+    fontSize: 15,
+    height: 1.1,
+    shadows: color == const Color(0xFFFFD000)
+        ? const [
+            Shadow(
+              color: Colors.black,
+              offset: Offset(0.6, 0),
+              blurRadius: 0.8,
             ),
-          ),
+            Shadow(
+              color: Colors.black,
+              offset: Offset(-0.6, 0),
+              blurRadius: 0.8,
+            ),
+            Shadow(
+              color: Colors.black,
+              offset: Offset(0, 0.6),
+              blurRadius: 0.8,
+            ),
+            Shadow(
+              color: Colors.black,
+              offset: Offset(0, -0.6),
+              blurRadius: 0.8,
+            ),
+          ]
+        : null,
+  ),
+),
         ...lines.skip(1).map(
               (line) => Text(
                 line,
                 style: TextStyle(
-                  color: color.withOpacity(0.85),
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                  fontSize: 13,
-                  height: 1.15,
-                ),
+  color: color.withOpacity(0.85),
+  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+  fontSize: 13,
+  height: 1.15,
+  shadows: color == const Color(0xFFFFD000)
+      ? const [
+          Shadow(
+            color: Colors.black,
+            offset: Offset(0.5, 0),
+            blurRadius: 0.7,
+          ),
+          Shadow(
+            color: Colors.black,
+            offset: Offset(-0.5, 0),
+            blurRadius: 0.7,
+          ),
+        ]
+      : null,
+),
               ),
             ),
       ],
@@ -2085,14 +2129,15 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                           ),
                           SizedBox(height: _lineSpacing() + 1.5),
                           Text(
-                            spot.typeSphot,
-                            textAlign: TextAlign.center,
-                            style: _mapLabelStyle(
-                              fontSize: _labelSize(10),
-                              fontWeight: FontWeight.w700,
-                              color: widget.typeTextColor,
-                            ),
-                          ),
+  spot.typeSphot,
+  textAlign: TextAlign.center,
+  style: _mapLabelStyle(
+    fontSize: _labelSize(12),
+    fontWeight: FontWeight.w700,
+    color: widget.typeTextColor,
+    useBlackOutline: spot.normalizedType.contains('ACCES PLAGE'),
+  ),
+),
                           SizedBox(height: _lineSpacing() - 1.8),
                           _warningLineUniform(
                             'BAIGNADE NON SURVEILLÉE',
@@ -2245,8 +2290,8 @@ class _HoverMarkerState extends State<_HoverMarker> {
                             '🚨 POSTE DE SECOURS 🚨',
                             textAlign: TextAlign.center,
                             style: _mapLabelStyle(
-                              fontSize: _labelSize(10),
-                              fontWeight: FontWeight.w700,
+                              fontSize: _labelSize(12),
+                              fontWeight: FontWeight.w900,
                               color: const Color(0xFFFF0000),
                             ),
                           ),
@@ -2326,7 +2371,40 @@ TextStyle _mapLabelStyle({
   required double fontSize,
   required FontWeight fontWeight,
   required Color color,
+  bool useBlackOutline = false,
 }) {
+  if (useBlackOutline) {
+    return TextStyle(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      height: 1.0,
+      letterSpacing: -0.1,
+      shadows: const [
+        Shadow(
+          color: Colors.black,
+          offset: Offset(0.8, 0),
+          blurRadius: 1,
+        ),
+        Shadow(
+          color: Colors.black,
+          offset: Offset(-0.8, 0),
+          blurRadius: 1,
+        ),
+        Shadow(
+          color: Colors.black,
+          offset: Offset(0, 0.8),
+          blurRadius: 1,
+        ),
+        Shadow(
+          color: Colors.black,
+          offset: Offset(0, -0.8),
+          blurRadius: 1,
+        ),
+      ],
+    );
+  }
+
   return TextStyle(
     fontSize: fontSize,
     fontWeight: fontWeight,
@@ -2334,21 +2412,20 @@ TextStyle _mapLabelStyle({
     height: 1.0,
     letterSpacing: -0.1,
     shadows: const [
-  Shadow(color: Colors.white, offset: Offset(0, 0), blurRadius: 5),
+      Shadow(color: Colors.white, offset: Offset(0, 0), blurRadius: 5),
 
-  Shadow(color: Colors.white, offset: Offset(1.5, 0), blurRadius: 2),
-  Shadow(color: Colors.white, offset: Offset(-1.5, 0), blurRadius: 2),
-  Shadow(color: Colors.white, offset: Offset(0, 1.5), blurRadius: 2),
-  Shadow(color: Colors.white, offset: Offset(0, -1.5), blurRadius: 2),
+      Shadow(color: Colors.white, offset: Offset(1.5, 0), blurRadius: 2),
+      Shadow(color: Colors.white, offset: Offset(-1.5, 0), blurRadius: 2),
+      Shadow(color: Colors.white, offset: Offset(0, 1.5), blurRadius: 2),
+      Shadow(color: Colors.white, offset: Offset(0, -1.5), blurRadius: 2),
 
-  Shadow(color: Colors.white, offset: Offset(1.2, 1.2), blurRadius: 2),
-  Shadow(color: Colors.white, offset: Offset(-1.2, 1.2), blurRadius: 2),
-  Shadow(color: Colors.white, offset: Offset(1.2, -1.2), blurRadius: 2),
-  Shadow(color: Colors.white, offset: Offset(-1.2, -1.2), blurRadius: 2),
-],
+      Shadow(color: Colors.white, offset: Offset(1.2, 1.2), blurRadius: 2),
+      Shadow(color: Colors.white, offset: Offset(-1.2, 1.2), blurRadius: 2),
+      Shadow(color: Colors.white, offset: Offset(1.2, -1.2), blurRadius: 2),
+      Shadow(color: Colors.white, offset: Offset(-1.2, -1.2), blurRadius: 2),
+    ],
   );
 }
-
 
 
 
