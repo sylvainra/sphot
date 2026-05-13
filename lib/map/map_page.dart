@@ -14,6 +14,8 @@ import '../services/firestore_service.dart';
 import 'flag_marker.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+import 'app_info_page.dart';
+
 enum SpotFilter {
   all,
   secours,
@@ -702,7 +704,7 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
     duration: Duration(milliseconds: 350 + index * 80),
     opacity: _isFilterOpen ? 1.0 : 0.0,
     child: AnimatedSlide(
-      duration: Duration(milliseconds: 850 + index * 180),
+      duration: Duration(milliseconds: 1400 + index * 260),
       curve: Curves.easeOutBack,
       offset: _isFilterOpen ? Offset.zero : const Offset(0, 0.35),
       child: Padding(
@@ -823,7 +825,7 @@ Widget _animatedMapStyleButton(int tileIndex, int animationIndex) {
     opacity: _isMapStyleOpen ? 1.0 : 0.0,
     child: AnimatedSlide(
       duration: Duration(
-        milliseconds: 850 + animationIndex * 180,
+        milliseconds: 1400 + animationIndex * 260,
       ),
       curve: Curves.easeOutBack,
       offset: _isMapStyleOpen
@@ -1468,26 +1470,31 @@ Widget _buildBottomBar() {
           return InkWell(
             borderRadius: BorderRadius.circular(10),
             onTap: () {
-              setState(() {
-                _selectedBottomIndex = index;
-              });
+  setState(() {
+    _selectedBottomIndex = index;
+  });
 
-              if (index == 0) {
-                _toggleFilterBar();
-              } else if (index == 1) {
-                _toggleMapStyleBar();
-              } else if (index == 2) {
-                _showMapMessage('Favoris bientôt disponibles');
-              } else if (index == 3) {
-                _showMapMessage('Infos bientôt disponibles');
-              } else if (index == 4) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const LifeguardLoginPage(),
-                  ),
-                );
-              }
-            },
+  if (index == 0) {
+    _toggleFilterBar();
+  } else if (index == 1) {
+    _toggleMapStyleBar();
+  } else if (index == 2) {
+    _showMapMessage('Favoris bientôt disponibles');
+  } else if (index == 3) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const AppInfoPage(),
+      ),
+    );
+  } else if (index == 4) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const LifeguardLoginPage(),
+      ),
+    );
+  }
+},
+
             child: SizedBox(
               width: 58,
               height: 50,
@@ -1568,26 +1575,27 @@ Widget _buildBottomBar() {
 }
 
   PreferredSizeWidget _buildAppBar() {
-  return AppBar(
-    primary: false,
-    automaticallyImplyLeading: false,
-    backgroundColor: Colors.transparent,
-    surfaceTintColor: Colors.transparent,
-    shadowColor: Colors.transparent,
-    elevation: 0,
-    centerTitle: true,
-    toolbarHeight: 64,
-
-    leading: const SizedBox.shrink(),
-    actions: const [SizedBox.shrink()],
-
-    title: Transform.translate(
-      offset: const Offset(0, 14),
-      child: Image.asset(
-        'data/icons/title.png',
-        height: 72,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.high,
+  return PreferredSize(
+    preferredSize: const Size.fromHeight(58),
+    child: SafeArea(
+      bottom: false,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          Positioned(
+            top: -5,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Image.asset(
+                'data/icons/title.png',
+                height: 68,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+              ),
+            ),
+          ),
+        ],
       ),
     ),
   );
