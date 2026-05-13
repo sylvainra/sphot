@@ -256,25 +256,25 @@ void initState() {
   }
 
   Color _filterColor(SpotFilter filter) {
-    switch (filter) {
-      case SpotFilter.all:
-        return Colors.black87;
-      case SpotFilter.secours:
-        return const Color(0xFFFF0000);
-      case SpotFilter.accesPlage:
-        return const Color(0xFFFFD000);
-      case SpotFilter.eauBleue:
-        return const Color(0xFF1E3A8A);
-      case SpotFilter.eauVerte:
-        return const Color(0xFF2E7D32);
-      case SpotFilter.lagon:
-        return const Color(0xFF00ACC1);
-      case SpotFilter.naturisme:
-        return const Color(0xFFD87A5C);
-      case SpotFilter.autre:
-        return Colors.black87;
-    }
+  switch (filter) {
+    case SpotFilter.all:
+      return const Color(0xFFFF0000);
+    case SpotFilter.secours:
+      return const Color(0xFFFF0000);
+    case SpotFilter.accesPlage:
+      return const Color(0xFFFFD000);
+    case SpotFilter.eauBleue:
+      return const Color(0xFF1E3A8A);
+    case SpotFilter.eauVerte:
+      return const Color(0xFF2E7D32);
+    case SpotFilter.lagon:
+      return const Color(0xFF00ACC1);
+    case SpotFilter.naturisme:
+      return const Color(0xFFD87A5C);
+    case SpotFilter.autre:
+      return Colors.black87;
   }
+}
 
   Widget _drawerAssetIcon(String path) {
     return Image.asset(path, width: 40, height: 40, fit: BoxFit.contain);
@@ -726,11 +726,9 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-  color: selected
-      ? color
-      : Colors.grey.withOpacity(0.5), // 👈 même logique que map
-  width: selected ? 2 : 1.2,
-),
+                  color: selected ? color : Colors.grey.withOpacity(0.5),
+                  width: selected ? 2 : 1.2,
+                ),
               ),
               child: Row(
                 children: [
@@ -746,7 +744,9 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: color,
+                        color: filter == SpotFilter.all
+    ? Colors.black87
+    : color,
                         fontSize: 14,
                         height: 1.05,
                         fontWeight:
@@ -854,8 +854,8 @@ Widget _mapStyleVerticalButton(int index) {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
   color: selected
-      ? Colors.black
-      : Colors.grey.withOpacity(0.5), // 👈 contour grisé visible
+      ? _mapStyleColor(index)
+      : Colors.grey.withOpacity(0.5),
   width: selected ? 2.2 : 1.2,
 ),
           ),
@@ -1129,90 +1129,90 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
 }
 
   Widget _buildDrawer() {
-    return Drawer(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      child: SafeArea(
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.35),
-            borderRadius: const BorderRadius.only(
-              topRight: Radius.circular(18),
-              bottomRight: Radius.circular(18),
-            ),
-          ),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-                child: Center(
-                  child: Image.asset(
-                    'data/icons/title.png',
-                    height: 76,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                  ),
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  children: [
-                    ...SpotFilter.values.map((filter) {
-                      final selected = filter == _selectedFilter;
-                      final color = _filterColor(filter);
-
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        child: ListTile(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          leading: SizedBox(
-                            width: 42,
-                            height: 42,
-                            child: Center(child: _filterIcon(filter)),
-                          ),
-                          title: _OutlinedMenuText(
-                            text: _filterLabel(filter),
-                            color: color,
-                            selected: selected,
-                          ),
-                          trailing: selected
-                              ? Icon(Icons.check, color: color, size: 24)
-                              : null,
-                          selected: selected,
-                          selectedTileColor: color.withOpacity(0.10),
-                          onTap: () {
-                            setState(() => _selectedFilter = filter);
-                            Navigator.of(context).pop();
-                          },
-                        ),
-                      );
-                    }),
-                    const Divider(height: 28),
-                    _infoItem(Icons.info_outline, 'À propos de SPHOT'),
-                    _infoItem(Icons.description_outlined, 'Mentions légales'),
-                    _infoItem(
-                      Icons.privacy_tip_outlined,
-                      'Politique de confidentialité',
-                    ),
-                    _infoItem(Icons.gavel_outlined, 'Conditions d’utilisation'),
-                    _infoItem(Icons.contact_support_outlined, 'Contact'),
-                    _infoItem(Icons.settings_outlined, 'Paramètres'),
-                  ],
-                ),
-              ),
-            ],
+  return Drawer(
+    backgroundColor: Colors.transparent,
+    elevation: 0,
+    child: SafeArea(
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.35),
+          borderRadius: const BorderRadius.only(
+            topRight: Radius.circular(18),
+            bottomRight: Radius.circular(18),
           ),
         ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+              child: Center(
+                child: Image.asset(
+                  'data/icons/title.png',
+                  height: 76,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  ...SpotFilter.values.map((filter) {
+                    final selected = filter == _selectedFilter;
+                    final color = _filterColor(filter);
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        leading: SizedBox(
+                          width: 42,
+                          height: 42,
+                          child: Center(child: _filterIcon(filter)),
+                        ),
+                        title: _OutlinedMenuText(
+                          text: _filterLabel(filter),
+                          color: color,
+                          selected: selected,
+                        ),
+                        trailing: selected
+                            ? Icon(Icons.check, color: color, size: 24)
+                            : null,
+                        selected: selected,
+                        selectedTileColor: color.withOpacity(0.10),
+                        onTap: () {
+                          setState(() => _selectedFilter = filter);
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    );
+                  }),
+                  const Divider(height: 28),
+                  _infoItem(Icons.info_outline, 'À propos de SPHOT'),
+                  _infoItem(Icons.description_outlined, 'Mentions légales'),
+                  _infoItem(
+                    Icons.privacy_tip_outlined,
+                    'Politique de confidentialité',
+                  ),
+                  _infoItem(Icons.gavel_outlined, 'Conditions d’utilisation'),
+                  _infoItem(Icons.contact_support_outlined, 'Contact'),
+                  _infoItem(Icons.settings_outlined, 'Paramètres'),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _infoItem(IconData icon, String label) {
     return ListTile(
@@ -1527,14 +1527,14 @@ Widget _buildBottomBar() {
             color: Color(0xFF8B5E3C),
           )
         : Icon(
-            items[index]['icon'] as IconData,
-            size: 30,
-            color: index == 2
-                ? const Color(0xFFFFD000)
-                : index == 3
-                    ? const Color(0xFF1E3A8A)
-                    : (selected ? Colors.black : Colors.grey),
-          ),
+    items[index]['icon'] as IconData,
+    size: 30,
+    color: index == 2
+        ? const Color(0xFFFFD000)
+        : index == 3
+            ? const Color(0xFF1E3A8A)
+            : Colors.black87
+  ),
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -1543,7 +1543,7 @@ Widget _buildBottomBar() {
                     maxLines: 1,
                     overflow: TextOverflow.visible,
                     style: TextStyle(
-                      fontSize: 9.6,
+                      fontSize: 10.4,
                       fontWeight: FontWeight.w900,
                       letterSpacing: -0.2,
                       color: index == 1
@@ -1554,7 +1554,7 @@ Widget _buildBottomBar() {
                                   ? const Color(0xFF1E3A8A)
                                   : index == 4
                                       ? const Color(0xFFFF0000)
-                                      : (selected ? Colors.black : Colors.grey),
+                                      : Colors.black87
                     ),
                   ),
                 ],
