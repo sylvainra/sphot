@@ -739,44 +739,20 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
                     height: 50,
                     child: Center(child: _filterIcon(filter)),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 0),
                   Expanded(
                     child: Text(
-  _filterShortLabel(filter),
-  maxLines: 3,
-  overflow: TextOverflow.ellipsis,
-  style: TextStyle(
-    color: color,
-    fontSize: 12,
-    height: 1.05,
-    fontWeight:
-        selected ? FontWeight.w900 : FontWeight.w700,
-    shadows: filter == SpotFilter.accesPlage
-        ? const [
-            Shadow(
-              color: Colors.black,
-              offset: Offset(0.5, 0),
-              blurRadius: 0.7,
-            ),
-            Shadow(
-              color: Colors.black,
-              offset: Offset(-0.5, 0),
-              blurRadius: 0.7,
-            ),
-            Shadow(
-              color: Colors.black,
-              offset: Offset(0, 0.5),
-              blurRadius: 0.7,
-            ),
-            Shadow(
-              color: Colors.black,
-              offset: Offset(0, -0.5),
-              blurRadius: 0.7,
-            ),
-          ]
-        : null,
-  ),
-),
+                      _filterShortLabel(filter),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 14,
+                        height: 1.05,
+                        fontWeight:
+                            selected ? FontWeight.w900 : FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -895,7 +871,7 @@ Widget _mapStyleVerticalButton(int index) {
                 child: Text(
                   _tileStyles[index].name,
                   style: TextStyle(
-                    fontSize: 14.5, // ⬅️ texte plus grand
+                    fontSize: 16, // ⬅️ texte plus grand
                     fontWeight:
                         selected ? FontWeight.w900 : FontWeight.w700,
                     color: _mapStyleColor(index).withOpacity(selected ? 1.0 : 0.6),
@@ -926,14 +902,57 @@ Color _mapStyleColor(int index) {
 Widget _mapStyleIcon(int index) {
   final selected = index == _selectedTileStyle;
 
-  return Icon(
-    index == 0
-        ? Icons.map
-        : index == 1
-            ? Icons.satellite_alt
-            : Icons.terrain,
-    size: 26,
-    color: _mapStyleColor(index).withOpacity(selected ? 1.0 : 0.6),
+  /// STYLE PLAN
+  if (index == 0) {
+    return Icon(
+      Icons.map,
+      size: 26,
+      color: _mapStyleColor(index).withOpacity(selected ? 1.0 : 0.6),
+    );
+  }
+
+  /// STYLE SATELLITE
+  if (index == 1) {
+    return Icon(
+      Icons.satellite_alt,
+      size: 26,
+      color: _mapStyleColor(index).withOpacity(selected ? 1.0 : 0.6),
+    );
+  }
+
+  /// STYLE RELIEF
+  return SizedBox(
+    width: 28,
+    height: 28,
+    child: Stack(
+      alignment: Alignment.center,
+      children: [
+        Transform.rotate(
+          angle: -0.18,
+          child: Icon(
+            Icons.map,
+            size: 24,
+            color: const Color(0xFF8B5E3C).withOpacity(
+              selected ? 1.0 : 0.6,
+            ), // marron relief
+          ),
+        ),
+
+        Transform.translate(
+          offset: const Offset(4, -2),
+          child: Transform.rotate(
+            angle: 0.12,
+            child: Icon(
+              Icons.map,
+              size: 20,
+              color: const Color(0xFF2E7D32).withOpacity(
+                selected ? 1.0 : 0.6,
+              ), // vert rivière
+            ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 
@@ -1221,11 +1240,31 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
     }
   }
 
-  return colors.length == 1
-      ? (colors.first == const Color(0xFFFF7F00)
-          ? const Color(0xFFFFD000)
-          : colors.first)
-      : Colors.black;
+  if (colors.contains(const Color(0xFFFF0000))) {
+    return const Color(0xFFFF0000); // Poste de secours
+  }
+
+  if (colors.contains(const Color(0xFFD87A5C))) {
+    return const Color(0xFFD87A5C); // Naturisme
+  }
+
+  if (colors.contains(const Color(0xFFFFD000))) {
+    return const Color(0xFFFFD000); // Accès plage
+  }
+
+  if (colors.contains(const Color(0xFF1E3A8A))) {
+    return const Color(0xFF1E3A8A); // Lac / plan d'eau / barrage
+  }
+
+  if (colors.contains(const Color(0xFF2E7D32))) {
+    return const Color(0xFF2E7D32); // Fleuve / rivière
+  }
+
+  if (colors.contains(const Color(0xFF00ACC1))) {
+    return const Color(0xFF00ACC1); // Lagon
+  }
+
+  return Colors.white;
 }
 
   Widget _buildCluster(BuildContext context, List<Marker> markers) {
@@ -1233,8 +1272,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   final borderColor = _clusterBorderColor(markers);
   final rotation = MapCamera.of(context).rotation;
 
-  final outlineColor =
-      borderColor == Colors.black ? Colors.white : Colors.black;
+  final outlineColor = Colors.white;
 
   return Transform.rotate(
     angle: -rotation * pi / 180,
@@ -1402,10 +1440,7 @@ Widget _buildBottomBar() {
     {'icon': Icons.layers_outlined, 'label': 'CARTES'},
     {'icon': Icons.star_border, 'label': 'FAVORIS'},
     {'icon': Icons.info_outline, 'label': 'INFOS'},
-    {
-  'icon': Icons.add,
-  'label': 'PROFIL'
-},
+    {'icon': Icons.add, 'label': 'SAUVETEUR'},
   ];
 
   return Positioned(
@@ -1446,12 +1481,12 @@ Widget _buildBottomBar() {
               } else if (index == 3) {
                 _showMapMessage('Infos bientôt disponibles');
               } else if (index == 4) {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => const LifeguardLoginPage(),
-    ),
-  );
-}
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const LifeguardLoginPage(),
+                  ),
+                );
+              }
             },
             child: SizedBox(
               width: 58,
@@ -1459,51 +1494,69 @@ Widget _buildBottomBar() {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  index == 4
-    ? SizedBox(
-        width: 26,
-        height: 26,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Container(
-              width: 8,
-              height: 26,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF0000),
-                borderRadius: BorderRadius.circular(2),
-              ),
+                  SizedBox(
+                    width: 26,
+                    height: 26,
+                    child: Center(
+                      child: index == 4
+    ? Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 8,
+            height: 26,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF0000),
+              borderRadius: BorderRadius.circular(2),
             ),
-            Container(
-              width: 26,
-              height: 8,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF0000),
-                borderRadius: BorderRadius.circular(2),
-              ),
+          ),
+          Container(
+            width: 26,
+            height: 8,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFD000),
+              borderRadius: BorderRadius.circular(2),
             ),
-          ],
-        ),
+          ),
+        ],
       )
-    : Icon(
-        items[index]['icon'] as IconData,
-        size: 22,
-        color: selected ? Colors.black : Colors.grey,
-      ),
+    : index == 1
+        ? const Icon(
+            Icons.layers_outlined,
+            size: 30,
+            color: Color(0xFF8B5E3C),
+          )
+        : Icon(
+            items[index]['icon'] as IconData,
+            size: 30,
+            color: index == 2
+                ? const Color(0xFFFFD000)
+                : index == 3
+                    ? const Color(0xFF1E3A8A)
+                    : (selected ? Colors.black : Colors.grey),
+          ),
+                    ),
+                  ),
                   const SizedBox(height: 2),
                   Text(
-  items[index]['label'] as String,
-  maxLines: 1,
-  overflow: TextOverflow.visible,
-  style: TextStyle(
-    fontSize: 8.8,
-    fontWeight: FontWeight.w900,
-    letterSpacing: -0.2,
-    color: index == 4
-        ? const Color(0xFFFF0000)
-        : (selected ? Colors.black : Colors.grey),
-  ),
-),
+                    items[index]['label'] as String,
+                    maxLines: 1,
+                    overflow: TextOverflow.visible,
+                    style: TextStyle(
+                      fontSize: 9.6,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.2,
+                      color: index == 1
+                          ? const Color(0xFF2E7D32)
+                          : index == 2
+                              ? const Color(0xFFFFD000)
+                              : index == 3
+                                  ? const Color(0xFF1E3A8A)
+                                  : index == 4
+                                      ? const Color(0xFFFF0000)
+                                      : (selected ? Colors.black : Colors.grey),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1751,22 +1804,22 @@ class _OutlinedMenuText extends StatelessWidget {
     shadows: color == const Color(0xFFFFD000)
         ? const [
             Shadow(
-              color: Colors.black,
+              color: Colors.white,
               offset: Offset(0.6, 0),
               blurRadius: 0.8,
             ),
             Shadow(
-              color: Colors.black,
+              color: Colors.white,
               offset: Offset(-0.6, 0),
               blurRadius: 0.8,
             ),
             Shadow(
-              color: Colors.black,
+              color: Colors.white,
               offset: Offset(0, 0.6),
               blurRadius: 0.8,
             ),
             Shadow(
-              color: Colors.black,
+              color: Colors.white,
               offset: Offset(0, -0.6),
               blurRadius: 0.8,
             ),
@@ -2378,30 +2431,30 @@ TextStyle _mapLabelStyle({
       fontSize: fontSize,
       fontWeight: fontWeight,
       color: color,
-      height: 1.0,
+      height: 1,
       letterSpacing: -0.1,
       shadows: const [
-        Shadow(
-          color: Colors.black,
-          offset: Offset(0.8, 0),
-          blurRadius: 1,
-        ),
-        Shadow(
-          color: Colors.black,
-          offset: Offset(-0.8, 0),
-          blurRadius: 1,
-        ),
-        Shadow(
-          color: Colors.black,
-          offset: Offset(0, 0.8),
-          blurRadius: 1,
-        ),
-        Shadow(
-          color: Colors.black,
-          offset: Offset(0, -0.8),
-          blurRadius: 1,
-        ),
-      ],
+  Shadow(
+    color: Colors.white,
+    offset: Offset(0.8, 0),
+    blurRadius: 1,
+  ),
+  Shadow(
+    color: Colors.white,
+    offset: Offset(-0.8, 0),
+    blurRadius: 1,
+  ),
+  Shadow(
+    color: Colors.white,
+    offset: Offset(0, 0.8),
+    blurRadius: 1,
+  ),
+  Shadow(
+    color: Colors.white,
+    offset: Offset(0, -0.8),
+    blurRadius: 1,
+  ),
+],
     );
   }
 
@@ -2409,7 +2462,7 @@ TextStyle _mapLabelStyle({
     fontSize: fontSize,
     fontWeight: fontWeight,
     color: color,
-    height: 1.0,
+    height: 1,
     letterSpacing: -0.1,
     shadows: const [
       Shadow(color: Colors.white, offset: Offset(0, 0), blurRadius: 5),
