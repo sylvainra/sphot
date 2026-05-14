@@ -12,7 +12,8 @@ class LifeguardLoginPage extends StatefulWidget {
   State<LifeguardLoginPage> createState() => _LifeguardLoginPageState();
 }
 
-class _LifeguardLoginPageState extends State<LifeguardLoginPage> {
+class _LifeguardLoginPageState extends State<LifeguardLoginPage>
+    with WidgetsBindingObserver {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
@@ -23,11 +24,40 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage> {
   bool _isEditing = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+
+    final bottomInset =
+        WidgetsBinding.instance.platformDispatcher.views.first.viewInsets.bottom;
+
+    if (bottomInset == 0 && _isEditing) {
+      Future.delayed(const Duration(milliseconds: 80), () {
+        if (!mounted) return;
+
+        FocusScope.of(context).unfocus();
+
+        setState(() {
+          _isEditing = false;
+        });
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+
     _idController.dispose();
     _passwordController.dispose();
     _idFocusNode.dispose();
     _passwordFocusNode.dispose();
+
     super.dispose();
   }
 
@@ -103,12 +133,14 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage> {
                     ),
                     const SizedBox(height: 12),
 
-                    AnimatedSlide(
+                    AnimatedContainer(
                       duration: const Duration(milliseconds: 260),
                       curve: Curves.easeOutCubic,
-                      offset: _isEditing
-                          ? const Offset(0, -0.28)
-                          : Offset.zero,
+                      transform: Matrix4.translationValues(
+                        0,
+                        _isEditing ? -110 : 0,
+                        0,
+                      ),
                       child: Column(
                         children: [
                           Visibility(
