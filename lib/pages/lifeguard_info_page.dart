@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
 class LifeguardInfoPage extends StatefulWidget {
-  const LifeguardInfoPage({super.key});
+  final Color profileColor;
+
+  const LifeguardInfoPage({
+    super.key,
+    required this.profileColor,
+  });
 
   @override
   State<LifeguardInfoPage> createState() => _LifeguardInfoPageState();
@@ -12,16 +17,57 @@ class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
   String flagPosition = 'Hissé';
   String status = 'Baignade surveillée';
 
+  String nomSecours = 'LONGE 09';
+  String nomSphot = 'Le Rocher';
+  String typeSphot = 'Poste de secours';
+
+  final ScrollController _scrollController = ScrollController();
+  bool isScrollingDown = false;
+  bool isSphotMenuOpen = false;
+
+  final List<Map<String, String>> postesSecoursCommune = [
+    {
+      'nomSecours': 'LONGE 09',
+      'nomSphot': 'Le Rocher',
+      'typeSphot': 'Poste de secours',
+    },
+    {
+      'nomSecours': 'LONGE 13',
+      'nomSphot': 'Les Conches',
+      'typeSphot': 'Poste de secours',
+    },
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+
+    _scrollController.addListener(() {
+      if (_scrollController.offset > 40 && !isScrollingDown) {
+        setState(() => isScrollingDown = true);
+      } else if (_scrollController.offset <= 40 && isScrollingDown) {
+        setState(() => isScrollingDown = false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   void updateFlagPosition(String position) {
     setState(() {
       flagPosition = position;
-
-      if (position == 'Affalé') {
-        status = 'Baignade non surveillée temporairement';
-      } else {
-        status = 'Baignade surveillée';
-      }
+      status = position == 'Affalé'
+          ? 'Baignade non surveillée temporairement'
+          : 'Baignade surveillée';
     });
+  }
+
+  void _goHome() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override
@@ -29,108 +75,341 @@ class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
     final bool isTemporaryClosed = flagPosition == 'Affalé';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F7FA),
-      appBar: AppBar(
-        title: const Text('Renseignements sauveteurs'),
-        backgroundColor: const Color(0xFF003B5C),
-        foregroundColor: Colors.white,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            if (isTemporaryClosed) _dangerBanner(),
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'data/images/map_background.jpg',
+            fit: BoxFit.cover,
+          ),
 
-            _sectionCard(
-              title: 'Infos du poste',
-              icon: Icons.info_outline,
-              children: const [
-                _InfoLine(label: 'Spot / plage', value: 'LONGE 09'),
-                _InfoLine(label: 'Statut', value: 'Baignade surveillée'),
-                _InfoLine(label: 'Horaires', value: '09:00 - 19:00'),
-                _InfoLine(label: 'Poste de secours', value: '04 00 00 00 00'),
-              ],
-            ),
-
-            _sectionCard(
-              title: 'Équipe de sauveteurs',
-              icon: Icons.groups,
-              children: const [
-                _RescuerTile(
-                  name: 'Jean Martin',
-                  role: 'Chef de poste',
-                  contact: 'Radio canal 1',
-                ),
-                _RescuerTile(
-                  name: 'Laura Bernard',
-                  role: 'Sauveteur',
-                  contact: 'Radio canal 2',
-                ),
-              ],
-            ),
-
-            _sectionCard(
-              title: 'Actions rapides',
-              icon: Icons.flash_on,
+          SafeArea(
+            child: Column(
               children: [
-                _dropdownAction(
-                  label: 'Couleur du drapeau',
-                  value: flagColor,
-                  items: const ['Vert', 'Jaune', 'Rouge'],
-                  onChanged: (value) {
-                    setState(() {
-                      flagColor = value!;
-                    });
-                  },
-                ),
-                const SizedBox(height: 12),
-                _dropdownAction(
-                  label: 'Position du drapeau',
-                  value: flagPosition,
-                  items: const ['Hissé', 'Affalé'],
-                  onChanged: (value) {
-                    updateFlagPosition(value!);
-                  },
-                ),
-                const SizedBox(height: 16),
-                _ActionButton(
-                  icon: Icons.warning_amber_rounded,
-                  label: 'Déclarer un danger',
-                  color: Colors.orange,
-                  onTap: () {},
-                ),
-                _ActionButton(
-                  icon: Icons.note_add,
-                  label: 'Ajouter une note d’intervention',
-                  color: Colors.blue,
-                  onTap: () {},
-                ),
-                _ActionButton(
-                  icon: Icons.phone,
-                  label: 'Appeler les secours',
-                  color: Colors.red,
-                  onTap: () {},
-                ),
-              ],
-            ),
+                const SizedBox(height: 2),
 
-            _sectionCard(
-              title: 'Notes / consignes du jour',
-              icon: Icons.assignment,
-              children: const [
-                _InfoLine(label: 'Météo terrestre', value: '24°C, vent faible'),
-                _InfoLine(label: 'Météo maritime', value: 'Mer peu agitée'),
-                _InfoLine(label: 'Marées', value: 'Basse : 08:42 / Haute : 15:10'),
-                _InfoLine(label: 'Coefficient', value: '72'),
-                _InfoLine(label: 'Courants', value: 'Courant latéral modéré'),
-                _InfoLine(label: 'Pollution', value: 'Aucune pollution signalée'),
-                _InfoLine(label: 'Méduses', value: 'Présence faible'),
-                _InfoLine(label: 'Événement spécial', value: 'Cours de paddle à 14h'),
-                _InfoLine(label: 'Message interne', value: 'Surveillance renforcée zone nord'),
+                Image.asset(
+                  'data/icons/title.png',
+                  height: 56,
+                  fit: BoxFit.contain,
+                ),
+
+                Text(
+                  'RENSEIGNEMENTS SAUVETEURS',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: widget.profileColor,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                    child: Column(
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          height: isScrollingDown
+                              ? 0
+                              : isSphotMenuOpen
+                                  ? 160
+                                  : 104,
+                          curve: Curves.easeOut,
+                          child: SingleChildScrollView(
+                            physics: const NeverScrollableScrollPhysics(),
+                            child: _sectionCard(
+                              title: 'Choix du sphot',
+                              icon: Icons.place_rounded,
+                              children: [
+                                Column(
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          isSphotMenuOpen = !isSphotMenuOpen;
+                                        });
+                                      },
+                                      child: _SphotMenuItem(
+                                        title: '$nomSecours - $nomSphot',
+                                        color: widget.profileColor,
+                                        selected: true,
+                                        showArrow: true,
+                                        isOpen: isSphotMenuOpen,
+                                      ),
+                                    ),
+
+                                    if (isSphotMenuOpen)
+                                      const SizedBox(height: 4),
+
+                                    if (isSphotMenuOpen)
+                                      ...postesSecoursCommune.map((poste) {
+                                        final secours = poste['nomSecours']!;
+                                        final sphot = poste['nomSphot']!;
+                                        final type = poste['typeSphot']!;
+
+                                        if (secours == nomSecours) {
+                                          return const SizedBox.shrink();
+                                        }
+
+                                        return GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              nomSecours = secours;
+                                              nomSphot = sphot;
+                                              typeSphot = type;
+                                              isSphotMenuOpen = false;
+                                            });
+                                          },
+                                          child: _SphotMenuItem(
+                                            title: '$secours - $sphot',
+                                            color: widget.profileColor,
+                                            selected: false,
+                                            showArrow: false,
+                                            isOpen: false,
+                                          ),
+                                        );
+                                      }).toList(),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        if (!isTemporaryClosed)
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(top: 3, bottom: 3),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 16,
+                              horizontal: 14,
+                            ),
+                            decoration: BoxDecoration(
+                              color: flagColor == 'Vert'
+                                  ? const Color(0xFF22C55E)
+                                  : flagColor == 'Jaune'
+                                      ? const Color(0xFFFDE047)
+                                      : const Color(0xFFEF4444),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.black,
+                                width: 3,
+                              ),
+                            ),
+                            child: Text(
+                              flagColor == 'Vert'
+                                  ? 'BAIGNADE SURVEILLÉE ET AUTORISÉE'
+                                  : flagColor == 'Jaune'
+                                      ? 'BAIGNADE SURVEILLÉE MAIS DANGEREUSE'
+                                      : 'BAIGNADE INTERDITE',
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: flagColor == 'Jaune'
+                                    ? Colors.black
+                                    : Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+
+                        if (isTemporaryClosed) _dangerBanner(),
+
+                        _sectionCard(
+                          title: 'Actions rapides',
+                          icon: Icons.flash_on,
+                          children: [
+                            const Text(
+                              'Couleur du drapeau',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            Row(
+                              children: [
+                                _FlagColorButton(
+                                  label: 'Vert',
+                                  color: const Color(0xFF22C55E),
+                                  selected: flagColor == 'Vert',
+                                  onTap: () {
+                                    setState(() => flagColor = 'Vert');
+                                  },
+                                ),
+                                const SizedBox(width: 10),
+                                _FlagColorButton(
+                                  label: 'Jaune',
+                                  color: const Color(0xFFFDE047),
+                                  selected: flagColor == 'Jaune',
+                                  onTap: () {
+                                    setState(() => flagColor = 'Jaune');
+                                  },
+                                ),
+                                const SizedBox(width: 10),
+                                _FlagColorButton(
+                                  label: 'Rouge',
+                                  color: const Color(0xFFEF4444),
+                                  selected: flagColor == 'Rouge',
+                                  onTap: () {
+                                    setState(() => flagColor = 'Rouge');
+                                  },
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 14),
+
+                            const Text(
+  'Position du drapeau',
+  style: TextStyle(fontWeight: FontWeight.w600),
+),
+
+const SizedBox(height: 8),
+
+_FlagPositionSwitch(
+  isAffale: flagPosition == 'Affalé',
+  color: widget.profileColor,
+  onChanged: (isAffale) {
+    updateFlagPosition(isAffale ? 'Affalé' : 'Hissé');
+  },
+),
+
+                            const SizedBox(height: 16),
+
+                            _ActionButton(
+                              icon: Icons.warning_amber_rounded,
+                              label: 'Déclarer un danger',
+                              color: Colors.orange,
+                              onTap: () {},
+                            ),
+
+                            _ActionButton(
+                              icon: Icons.note_add,
+                              label: 'Ajouter une note d’intervention',
+                              color: Colors.blue,
+                              onTap: () {},
+                            ),
+
+                            _ActionButton(
+                              icon: Icons.phone,
+                              label: 'Appeler les secours',
+                              color: Colors.red,
+                              onTap: () {},
+                            ),
+                          ],
+                        ),
+
+                        _sectionCard(
+                          title: 'Notes / consignes du jour',
+                          icon: Icons.assignment,
+                          children: const [
+                            _InfoLine(
+                              label: 'Météo terrestre',
+                              value: '24°C, vent faible',
+                            ),
+                            _InfoLine(
+                              label: 'Météo maritime',
+                              value: 'Mer peu agitée',
+                            ),
+                            _InfoLine(
+                              label: 'Marées',
+                              value: 'Basse : 08:42 / Haute : 15:10',
+                            ),
+                            _InfoLine(
+                              label: 'Coefficient',
+                              value: '72',
+                            ),
+                            _InfoLine(
+                              label: 'Courants',
+                              value: 'Courant latéral modéré',
+                            ),
+                            _InfoLine(
+                              label: 'Pollution',
+                              value: 'Aucune pollution signalée',
+                            ),
+                            _InfoLine(
+                              label: 'Méduses',
+                              value: 'Présence faible',
+                            ),
+                            _InfoLine(
+                              label: 'Événement spécial',
+                              value: 'Cours de paddle à 14h',
+                            ),
+                            _InfoLine(
+                              label: 'Message interne',
+                              value: 'Surveillance renforcée zone nord',
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
-          ],
-        ),
+          ),
+
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: Container(
+                height: 78,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.transparent,
+                  border: Border(
+                    top: BorderSide(
+                      color: Colors.white.withOpacity(0.35),
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _BottomLogoButton(
+                      icon: Icons.home_rounded,
+                      color: widget.profileColor,
+                      onTap: _goHome,
+                    ),
+                    _BottomLogoButton(
+                      icon: Icons.watch_later_rounded,
+                      color: widget.profileColor,
+                      onTap: () {},
+                    ),
+                    _BottomLogoButton(
+                      icon: Icons.groups_rounded,
+                      color: widget.profileColor,
+                      onTap: () {},
+                    ),
+                    _BottomLogoButton(
+                      icon: Icons.info_rounded,
+                      color: widget.profileColor,
+                      onTap: () {},
+                    ),
+                    _BottomLogoButton(
+                      icon: Icons.account_circle,
+                      color: widget.profileColor,
+                      onTap: () {},
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -138,25 +417,35 @@ class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
   Widget _dangerBanner() {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(top: 3, bottom: 3),
+      padding: const EdgeInsets.symmetric(
+  vertical: 8,
+  horizontal: 14,
+),
       decoration: BoxDecoration(
-        color: Colors.red,
-        borderRadius: BorderRadius.circular(16),
-      ),
+  color: Colors.red,
+  borderRadius: BorderRadius.circular(16),
+  border: Border.all(
+    color: Colors.black,
+    width: 3,
+  ),
+),
       child: const Column(
         children: [
-          Icon(Icons.warning_rounded, color: Colors.white, size: 36),
-          SizedBox(height: 8),
+          Icon(Icons.warning_rounded, color: Colors.white, size: 28),
+          SizedBox(height: 4),
           Text(
-            'BAIGNADE NON SURVEILLÉE TEMPORAIREMENT',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 17,
-            ),
-          ),
+  'BAIGNADE NON SURVEILLÉE TEMPORAIREMENT',
+  textAlign: TextAlign.center,
+  maxLines: 1,
+  overflow: TextOverflow.ellipsis,
+  style: const TextStyle(
+    color: Colors.white,
+    fontWeight: FontWeight.bold,
+    fontSize: 11,
+    height: 1,
+  ),
+),
           SizedBox(height: 4),
           Text(
             'Baignade à vos risques et périls',
@@ -175,14 +464,14 @@ class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
   }) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 3),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.white.withOpacity(0.94),
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withOpacity(0.12),
             blurRadius: 12,
             offset: const Offset(0, 5),
           ),
@@ -193,19 +482,20 @@ class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
         children: [
           Row(
             children: [
-              Icon(icon, color: const Color(0xFF003B5C)),
+              Icon(icon, color: widget.profileColor),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF003B5C),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.bold,
+                    color: widget.profileColor,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
           ...children,
         ],
       ),
@@ -221,16 +511,19 @@ class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
           value: value,
-          items: items
-              .map((item) => DropdownMenuItem(
-                    value: item,
-                    child: Text(item),
-                  ))
-              .toList(),
+          items: items.map((item) {
+            return DropdownMenuItem(
+              value: item,
+              child: Text(item),
+            );
+          }).toList(),
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
@@ -242,6 +535,109 @@ class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SphotMenuItem extends StatelessWidget {
+  final String title;
+  final Color color;
+  final bool selected;
+  final bool showArrow;
+  final bool isOpen;
+
+  const _SphotMenuItem({
+    required this.title,
+    required this.color,
+    required this.selected,
+    required this.showArrow,
+    required this.isOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 13,
+      ),
+      decoration: BoxDecoration(
+        color: selected ? const Color(0xFFF3F7FA) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: selected
+    ? Colors.black
+    : Colors.black12,
+          width: selected ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.place_rounded,
+            color: color,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              ),
+            ),
+          ),
+          if (showArrow)
+            AnimatedRotation(
+              turns: isOpen ? 0.5 : 0,
+              duration: const Duration(milliseconds: 180),
+              child: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: color,
+                size: 28,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BottomLogoButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _BottomLogoButton({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 42,
+      height: 42,
+      child: IconButton(
+        onPressed: onTap,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+        icon: Icon(icon, color: color, size: 30),
+      ),
     );
   }
 }
@@ -279,42 +675,137 @@ class _InfoLine extends StatelessWidget {
   }
 }
 
-class _RescuerTile extends StatelessWidget {
-  final String name;
-  final String role;
-  final String contact;
+class _FlagColorButton extends StatelessWidget {
+  final String label;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
 
-  const _RescuerTile({
-    required this.name,
-    required this.role,
-    required this.contact,
+  const _FlagColorButton({
+    required this.label,
+    required this.color,
+    required this.selected,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: selected ? 54 : 46,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? Colors.black : Colors.transparent,
+              width: selected ? 3 : 0,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Center(
+            child: Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                color: label == 'Jaune' ? Colors.black : Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: selected ? 15 : 13,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FlagPositionSwitch extends StatelessWidget {
+  final bool isAffale;
+  final Color color;
+  final ValueChanged<bool> onChanged;
+
+  const _FlagPositionSwitch({
+    required this.isAffale,
+    required this.color,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      height: 54,
+      padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
         color: const Color(0xFFF3F7FA),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Colors.black,
+          width: 2,
+        ),
       ),
-      child: Row(
+      child: Stack(
         children: [
-          const CircleAvatar(
-            backgroundColor: Color(0xFF003B5C),
-            child: Icon(Icons.person, color: Colors.white),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(role),
-                Text(contact, style: const TextStyle(color: Colors.black54)),
-              ],
+          AnimatedAlign(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            alignment: isAffale ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.39,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                color: isAffale ? Colors.red : color,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Colors.black,
+                  width: 2,
+                ),
+              ),
             ),
+          ),
+
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => onChanged(false),
+                  child: Center(
+                    child: Text(
+                      'HISSÉ',
+                      style: TextStyle(
+                        color: isAffale ? Colors.black54 : Colors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => onChanged(true),
+                  child: Center(
+                    child: Text(
+                      'AFFALÉ',
+                      style: TextStyle(
+                        color: isAffale ? Colors.white : Colors.black54,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -356,6 +847,3 @@ class _ActionButton extends StatelessWidget {
     );
   }
 }
-
-
-

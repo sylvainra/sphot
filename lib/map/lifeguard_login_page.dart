@@ -68,15 +68,19 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
     if (_selectedProfile == LoginProfile.lifeguard) {
       if (id == 'sauveteur' && password == '1234') {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => LifeguardInfoPage()),
-        );
+  MaterialPageRoute(
+    builder: (_) => const LifeguardInfoPage(
+      profileColor: Color(0xFFFF0000),
+    ),
+  ),
+);
       } else {
         _showLoginError();
       }
     } else {
       if (id == 'admin' && password == 'admin2026') {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => AdminInfoPage()),
+          MaterialPageRoute(builder: (_) => const AdminInfoPage()),
         );
       } else {
         _showLoginError();
