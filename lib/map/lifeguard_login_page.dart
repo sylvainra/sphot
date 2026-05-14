@@ -3,10 +3,7 @@ import 'package:flutter/material.dart';
 import '../pages/lifeguard_info_page.dart';
 import 'admin_info_page.dart';
 
-enum LoginProfile {
-  lifeguard,
-  admin,
-}
+enum LoginProfile { lifeguard, admin }
 
 class LifeguardLoginPage extends StatefulWidget {
   const LifeguardLoginPage({super.key});
@@ -41,9 +38,7 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage> {
     if (_selectedProfile == LoginProfile.lifeguard) {
       if (id == 'sauveteur' && password == '1234') {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => LifeguardInfoPage(),
-          ),
+          MaterialPageRoute(builder: (_) => LifeguardInfoPage()),
         );
       } else {
         _showLoginError();
@@ -51,9 +46,7 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage> {
     } else {
       if (id == 'admin' && password == 'admin2026') {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => AdminInfoPage(),
-          ),
+          MaterialPageRoute(builder: (_) => AdminInfoPage()),
         );
       } else {
         _showLoginError();
@@ -72,17 +65,13 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage> {
 
   void _activateEditingMode() {
     if (!_isEditing) {
-      setState(() {
-        _isEditing = true;
-      });
+      setState(() => _isEditing = true);
     }
   }
 
   void _closeKeyboard() {
     FocusScope.of(context).unfocus();
-    setState(() {
-      _isEditing = false;
-    });
+    setState(() => _isEditing = false);
   }
 
   @override
@@ -101,58 +90,59 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage> {
               'data/images/map_background.jpg',
               fit: BoxFit.cover,
             ),
-
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 26),
                 child: Column(
                   children: [
-                    const SizedBox(height: 0),
-
                     Image.asset(
                       'data/icons/title.png',
                       height: 64,
                       fit: BoxFit.contain,
                       filterQuality: FilterQuality.high,
                     ),
-
                     const SizedBox(height: 12),
 
                     AnimatedSlide(
                       duration: const Duration(milliseconds: 260),
                       curve: Curves.easeOutCubic,
                       offset: _isEditing
-                          ? const Offset(0, -0.04)
+                          ? const Offset(0, -0.28)
                           : Offset.zero,
                       child: Column(
                         children: [
-                          if (!_isEditing) ...[
-                            const Text(
-                              'CONNEXION',
-                              style: TextStyle(
-                                fontSize: 34,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.black,
-                                letterSpacing: 1,
-                              ),
+                          Visibility(
+                            visible: !_isEditing,
+                            maintainSize: true,
+                            maintainAnimation: true,
+                            maintainState: true,
+                            child: Column(
+                              children: [
+                                const Text(
+                                  'CONNEXION',
+                                  style: TextStyle(
+                                    fontSize: 34,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.black,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  isLifeguard
+                                      ? 'Accès réservé sauveteurs'
+                                      : 'Accès réservé administration',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
                             ),
-
-                            const SizedBox(height: 6),
-
-                            Text(
-                              isLifeguard
-                                  ? 'Accès réservé sauveteurs'
-                                  : 'Accès réservé administration',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.black,
-                              ),
-                            ),
-
-                            const SizedBox(height: 16),
-                          ],
+                          ),
 
                           Row(
                             children: [
@@ -289,9 +279,7 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage> {
                           shape: BoxShape.circle,
                         ),
                         child: IconButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
+                          onPressed: () => Navigator.of(context).pop(),
                           icon: const Icon(
                             Icons.arrow_back,
                             color: Colors.black,
@@ -325,10 +313,7 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage> {
         decoration: BoxDecoration(
           color: selected ? color : Colors.white.withOpacity(0.92),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: color,
-            width: 2,
-          ),
+          border: Border.all(color: color, width: 2),
         ),
         child: Center(
           child: Text(
