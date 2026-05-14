@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import '../pages/lifeguard_info_page.dart';
+import 'admin_info_page.dart';
+
+enum LoginProfile {
+  lifeguard,
+  admin,
+}
 
 class LifeguardLoginPage extends StatefulWidget {
   const LifeguardLoginPage({super.key});
@@ -10,313 +16,330 @@ class LifeguardLoginPage extends StatefulWidget {
 }
 
 class _LifeguardLoginPageState extends State<LifeguardLoginPage> {
-  final TextEditingController _identifierController =
-      TextEditingController();
+  final TextEditingController _idController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
-  final TextEditingController _passwordController =
-      TextEditingController();
+  final FocusNode _idFocusNode = FocusNode();
+  final FocusNode _passwordFocusNode = FocusNode();
 
-  bool _obscurePassword = true;
+  LoginProfile _selectedProfile = LoginProfile.lifeguard;
+  bool _isEditing = false;
 
   @override
   void dispose() {
-    _identifierController.dispose();
+    _idController.dispose();
     _passwordController.dispose();
+    _idFocusNode.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
-    try {
-      final userCredential =
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _identifierController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+  void _login() {
+    final id = _idController.text.trim().toLowerCase();
+    final password = _passwordController.text.trim();
 
-      if (userCredential.user != null) {
+    if (_selectedProfile == LoginProfile.lifeguard) {
+      if (id == 'sauveteur' && password == '1234') {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => const LifeguardInfoPage(),
+            builder: (_) => LifeguardInfoPage(),
           ),
         );
+      } else {
+        _showLoginError();
       }
-    } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur Firebase : ${e.code}'),
-        ),
-      );
+    } else {
+      if (id == 'admin' && password == 'admin2026') {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => AdminInfoPage(),
+          ),
+        );
+      } else {
+        _showLoginError();
+      }
     }
+  }
+
+  void _showLoginError() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Identifiant ou mot de passe incorrect'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _activateEditingMode() {
+    if (!_isEditing) {
+      setState(() {
+        _isEditing = true;
+      });
+    }
+  }
+
+  void _closeKeyboard() {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isEditing = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final isLifeguard = _selectedProfile == LoginProfile.lifeguard;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
-
-      body: Stack(
-        children: [
-          /// FOND CARTE
-          Positioned.fill(
-            child: Image.asset(
+      resizeToAvoidBottomInset: false,
+      body: GestureDetector(
+        onTap: _closeKeyboard,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
               'data/images/map_background.jpg',
               fit: BoxFit.cover,
             ),
-          ),
 
-          /// VOILE LÉGER
-          Positioned.fill(
-            child: Container(
-              color: Colors.white.withOpacity(0.08),
-            ),
-          ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 26),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 0),
 
-          SafeArea(
-            child: Column(
-              children: [
-                /// HEADER
-                SizedBox(
-                  height: 92,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Positioned(
-                        left: 10,
-                        child: Material(
-                          color: Colors.white.withOpacity(0.92),
-                          shape: const CircleBorder(),
-                          elevation: 4,
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: () => Navigator.of(context).pop(),
-                            child: const SizedBox(
-                              width: 42,
-                              height: 42,
-                              child: Center(
-                                child: Icon(
-                                  Icons.arrow_back_ios_new_rounded,
-                                  color: Colors.black87,
-                                  size: 20,
-                                ),
+                    Image.asset(
+                      'data/icons/title.png',
+                      height: 64,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    AnimatedSlide(
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                      offset: _isEditing
+                          ? const Offset(0, -0.04)
+                          : Offset.zero,
+                      child: Column(
+                        children: [
+                          if (!_isEditing) ...[
+                            const Text(
+                              'CONNEXION',
+                              style: TextStyle(
+                                fontSize: 34,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.black,
+                                letterSpacing: 1,
                               ),
                             ),
-                          ),
-                        ),
-                      ),
 
-                      Transform.translate(
-                        offset: const Offset(0, -4),
-                        child: Image.asset(
-                          'data/icons/title.png',
-                          height: 62,
-                          fit: BoxFit.contain,
-                          filterQuality: FilterQuality.high,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                            const SizedBox(height: 6),
 
-                /// CONTENU
-                Expanded(
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 18,
-                      ),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: 420,
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.fromLTRB(
-                            22,
-                            28,
-                            22,
-                            24,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.92),
-                            borderRadius: BorderRadius.circular(28),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.18),
-                                blurRadius: 28,
-                                offset: const Offset(0, 10),
+                            Text(
+                              isLifeguard
+                                  ? 'Accès réservé sauveteurs'
+                                  : 'Accès réservé administration',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.black,
                               ),
-                            ],
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.55),
-                              width: 1,
                             ),
-                          ),
 
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
+                            const SizedBox(height: 16),
+                          ],
+
+                          Row(
                             children: [
-                              const Icon(
-                                Icons.shield_outlined,
-                                size: 54,
-                                color: Color(0xFFFF1E00),
-                              ),
-
-                              const SizedBox(height: 14),
-
-                              const Text(
-                                'Connexion sauveteur',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.black87,
-                                  letterSpacing: -0.3,
+                              Expanded(
+                                child: _profileButton(
+                                  label: 'SAUVETEUR',
+                                  selected: isLifeguard,
+                                  color: const Color(0xFFFF0000),
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedProfile =
+                                          LoginProfile.lifeguard;
+                                    });
+                                  },
                                 ),
                               ),
-
-                              const SizedBox(height: 6),
-
-                              const Text(
-                                'Accès réservé aux postes de secours',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black54,
-                                  height: 1.25,
-                                ),
-                              ),
-
-                              const SizedBox(height: 30),
-
-                              /// IDENTIFIANT
-                              TextField(
-                                controller: _identifierController,
-                                textInputAction: TextInputAction.next,
-                                decoration: InputDecoration(
-                                  labelText: 'Identifiant',
-                                  prefixIcon: const Icon(
-                                    Icons.person_outline,
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  contentPadding:
-                                      const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                    vertical: 18,
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(18),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(18),
-                                    borderSide: BorderSide(
-                                      color: Colors.black.withOpacity(0.10),
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 18),
-
-                              /// MOT DE PASSE
-                              TextField(
-                                controller: _passwordController,
-                                obscureText: _obscurePassword,
-                                textInputAction: TextInputAction.done,
-                                onSubmitted: (_) => _login(),
-                                decoration: InputDecoration(
-                                  labelText: 'Mot de passe',
-                                  prefixIcon: const Icon(
-                                    Icons.lock_outline,
-                                  ),
-                                  suffixIcon: IconButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        _obscurePassword =
-                                            !_obscurePassword;
-                                      });
-                                    },
-                                    icon: Icon(
-                                      _obscurePassword
-                                          ? Icons.visibility_outlined
-                                          : Icons.visibility_off_outlined,
-                                    ),
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  contentPadding:
-                                      const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                    vertical: 18,
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(18),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(18),
-                                    borderSide: BorderSide(
-                                      color: Colors.black.withOpacity(0.10),
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 28),
-
-                              /// BOUTON
-                              SizedBox(
-                                width: double.infinity,
-                                height: 56,
-                                child: ElevatedButton(
-                                  onPressed: _login,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor:
-                                        const Color(0xFFFF1E00),
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(20),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Se connecter',
-                                    style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 14),
-
-                              TextButton(
-                                onPressed: () {},
-                                child: const Text(
-                                  'Mot de passe oublié ?',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.black87,
-                                  ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _profileButton(
+                                  label: 'ADMIN',
+                                  selected: !isLifeguard,
+                                  color: const Color(0xFF1E3A8A),
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedProfile = LoginProfile.admin;
+                                    });
+                                  },
                                 ),
                               ),
                             ],
                           ),
-                        ),
+
+                          const SizedBox(height: 18),
+
+                          TextField(
+                            controller: _idController,
+                            focusNode: _idFocusNode,
+                            textInputAction: TextInputAction.next,
+                            onTap: _activateEditingMode,
+                            onSubmitted: (_) {
+                              FocusScope.of(context)
+                                  .requestFocus(_passwordFocusNode);
+                            },
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Identifiant',
+                              hintStyle:
+                                  const TextStyle(color: Colors.black54),
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 16,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          TextField(
+                            controller: _passwordController,
+                            focusNode: _passwordFocusNode,
+                            obscureText: true,
+                            textInputAction: TextInputAction.done,
+                            onTap: _activateEditingMode,
+                            onSubmitted: (_) => _login(),
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Mot de passe',
+                              hintStyle:
+                                  const TextStyle(color: Colors.black54),
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 16,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 22),
+
+                          SizedBox(
+                            width: double.infinity,
+                            height: 54,
+                            child: ElevatedButton(
+                              onPressed: _login,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isLifeguard
+                                    ? const Color(0xFFFF0000)
+                                    : const Color(0xFF1E3A8A),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                              ),
+                              child: const Text(
+                                'SE CONNECTER',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+
+                    const Spacer(),
+
+                    if (!_isEditing)
+                      Container(
+                        width: 62,
+                        height: 62,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.black,
+                            size: 30,
+                          ),
+                        ),
+                      ),
+
+                    const SizedBox(height: 18),
+                  ],
                 ),
-              ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _profileButton({
+    required String label,
+    required bool selected,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        height: 54,
+        decoration: BoxDecoration(
+          color: selected ? color : Colors.white.withOpacity(0.92),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: color,
+            width: 2,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.white : color,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
             ),
           ),
-        ],
+        ),
       ),
     );
   }

@@ -1339,7 +1339,7 @@ Widget _buildAdBanner() {
     child: Container(
       height: 62,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.94),
+        color: Colors.white.withOpacity(0.22),
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -1451,50 +1451,37 @@ Widget _buildBottomBar() {
     bottom: 6,
     child: Container(
       height: 48,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.94),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.14),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
+      color: Colors.transparent,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: List.generate(items.length, (index) {
-          final selected = index == _selectedBottomIndex;
-
           return InkWell(
             borderRadius: BorderRadius.circular(10),
             onTap: () {
-  setState(() {
-    _selectedBottomIndex = index;
-  });
+              setState(() {
+                _selectedBottomIndex = index;
+              });
 
-  if (index == 0) {
-    _toggleFilterBar();
-  } else if (index == 1) {
-    _toggleMapStyleBar();
-  } else if (index == 2) {
-    _showMapMessage('Favoris bientôt disponibles');
-  } else if (index == 3) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const AppInfoPage(),
-      ),
-    );
-  } else if (index == 4) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const LifeguardLoginPage(),
-      ),
-    );
-  }
-},
-
+              if (index == 0) {
+                _toggleFilterBar();
+              } else if (index == 1) {
+                _toggleMapStyleBar();
+              } else if (index == 2) {
+                _showMapMessage('Favoris bientôt disponibles');
+              } else if (index == 3) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AppInfoPage(),
+                  ),
+                );
+              } else if (index == 4) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const LifeguardLoginPage(),
+                  ),
+                );
+              }
+            },
             child: SizedBox(
               width: 58,
               height: 50,
@@ -1506,42 +1493,42 @@ Widget _buildBottomBar() {
                     height: 26,
                     child: Center(
                       child: index == 4
-    ? Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 8,
-            height: 26,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF0000),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Container(
-            width: 26,
-            height: 8,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFD000),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ],
-      )
-    : index == 1
-        ? const Icon(
-            Icons.layers_outlined,
-            size: 30,
-            color: Color(0xFF8B5E3C),
-          )
-        : Icon(
-    items[index]['icon'] as IconData,
-    size: 30,
-    color: index == 2
-        ? const Color(0xFFFFD000)
-        : index == 3
-            ? const Color(0xFF1E3A8A)
-            : Colors.black87
-  ),
+                          ? Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 26,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFF0000),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                Container(
+                                  width: 26,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFD000),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : index == 1
+                              ? const Icon(
+                                  Icons.layers_outlined,
+                                  size: 30,
+                                  color: Color(0xFF8B5E3C),
+                                )
+                              : Icon(
+                                  items[index]['icon'] as IconData,
+                                  size: 30,
+                                  color: index == 2
+                                      ? const Color(0xFFFFD000)
+                                      : index == 3
+                                          ? const Color(0xFF1E3A8A)
+                                          : Colors.black87,
+                                ),
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -1561,7 +1548,7 @@ Widget _buildBottomBar() {
                                   ? const Color(0xFF1E3A8A)
                                   : index == 4
                                       ? const Color(0xFFFF0000)
-                                      : Colors.black87
+                                      : Colors.black87,
                     ),
                   ),
                 ],
