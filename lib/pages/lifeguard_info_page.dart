@@ -21,9 +21,44 @@ class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
   String nomSphot = 'Le Rocher';
   String typeSphot = 'Poste de secours';
 
-  final ScrollController _scrollController = ScrollController();
-  bool isScrollingDown = false;
+  
   bool isSphotMenuOpen = false;
+
+  bool isDangerMenuOpen = false;
+final Set<String> selectedDangers = {};
+
+final List<String> dangerChoices = [
+  '⚠️ COURANTS',
+  '⚠️ BAÏNES',
+  '🌊 SHORE BREAK',
+  '🌊 VAGUES FORTES',
+  '🌊 HOULE',
+  '🟥 CONDITIONS DÉFAVORABLES DE VENT POUR CERTAINS ÉQUIPEMENTS NAUTIQUES',
+  '☀️ CHÂLEURS',
+  '☀️ CANICULE NIVEAU 1',
+  '☀️ CANICULE NIVEAU 2',
+  '☀️ CANICULE NIVEAU 3',
+  '☀️ CANICULE NIVEAU 4',
+  '🟪 ALTÉRATION DE LA QUALITÉ DES EAUX DE BAIGNADE',
+  '🟪 PRÉSENCE D’ESPÈCES DANGEREUSES (MÉDUSES...)',
+  '🟪 EXISTANCE D’UNE ZONE MARINE OU SOUS-MARINE PROTÉGÉE',
+  '❄️ EAU FROIDE',
+  '🪨 ROCHERS / RÉCIFS',
+  '⚠️ DÉVERSEMENT',
+  '⚠️ CRUE',
+  '⚠️ FAIBLE PROFONDEUR',
+  '⚠️ ASPIRATION',
+  '🚤 ⛵ 🛥️ TRAFFIC MARITIME',
+  '🌀 TOURBILLONS',
+  '⚠️ REMOUS',
+  '⚠️ VASE / SABLE MOUVANT',
+  '⚠️ LÂCHER DE BARRAGE',
+  '🐎 CHEVAUX',
+  '⚠️ REQUINS SIGNALÉS',
+  '⚠️ CONDITIONS MÉTÉOROLOGIQUES PROPICES À LA PRÉSENCE DE REQUINS',
+  '⚠️ AUTRE',
+  '⚠️ NON RENSEIGNÉ',
+];
 
   final List<Map<String, String>> postesSecoursCommune = [
     {
@@ -38,25 +73,7 @@ class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
     },
   ];
 
-  @override
-  void initState() {
-    super.initState();
-
-    _scrollController.addListener(() {
-      if (_scrollController.offset > 40 && !isScrollingDown) {
-        setState(() => isScrollingDown = true);
-      } else if (_scrollController.offset <= 40 && isScrollingDown) {
-        setState(() => isScrollingDown = false);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
+  
   void updateFlagPosition(String position) {
     setState(() {
       flagPosition = position;
@@ -109,83 +126,72 @@ class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
                 const SizedBox(height: 4),
 
                 Expanded(
-                  child: SingleChildScrollView(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                    child: Column(
+  child: Padding(
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+    child: Column(
                       children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          height: isScrollingDown
-                              ? 0
-                              : isSphotMenuOpen
-                                  ? 160
-                                  : 104,
-                          curve: Curves.easeOut,
-                          child: SingleChildScrollView(
-                            physics: const NeverScrollableScrollPhysics(),
-                            child: _sectionCard(
-                              title: 'Choix du sphot',
-                              icon: Icons.place_rounded,
-                              children: [
-                                Column(
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          isSphotMenuOpen = !isSphotMenuOpen;
-                                        });
-                                      },
-                                      child: _SphotMenuItem(
-                                        title: '$nomSecours - $nomSphot',
-                                        color: widget.profileColor,
-                                        selected: true,
-                                        showArrow: true,
-                                        isOpen: isSphotMenuOpen,
-                                      ),
-                                    ),
+                        _sectionCard(
+  title: 'Choix du sphot',
+  icon: Icons.place_rounded,
+  children: [
+    PopupMenuButton<Map<String, String>>(
+      offset: Offset.zero,
+shape: RoundedRectangleBorder(
+  borderRadius: BorderRadius.circular(22),
+),
+color: Colors.white.withOpacity(0.98),
+elevation: 12,
+constraints: const BoxConstraints(
+  minWidth: 320,
+),
+      onOpened: () {
+        setState(() => isSphotMenuOpen = true);
+      },
+      onCanceled: () {
+        setState(() => isSphotMenuOpen = false);
+      },
+      onSelected: (poste) {
+        setState(() {
+          nomSecours = poste['nomSecours']!;
+          nomSphot = poste['nomSphot']!;
+          typeSphot = poste['typeSphot']!;
+          isSphotMenuOpen = false;
+        });
+      },
+      itemBuilder: (context) {
+  return postesSecoursCommune.map((poste) {
+    final secours = poste['nomSecours']!;
+    final sphot = poste['nomSphot']!;
+    final bool selected = secours == nomSecours;
 
-                                    if (isSphotMenuOpen)
-                                      const SizedBox(height: 4),
-
-                                    if (isSphotMenuOpen)
-                                      ...postesSecoursCommune.map((poste) {
-                                        final secours = poste['nomSecours']!;
-                                        final sphot = poste['nomSphot']!;
-                                        final type = poste['typeSphot']!;
-
-                                        if (secours == nomSecours) {
-                                          return const SizedBox.shrink();
-                                        }
-
-                                        return GestureDetector(
-                                          onTap: () {
-                                            setState(() {
-                                              nomSecours = secours;
-                                              nomSphot = sphot;
-                                              typeSphot = type;
-                                              isSphotMenuOpen = false;
-                                            });
-                                          },
-                                          child: _SphotMenuItem(
-                                            title: '$secours - $sphot',
-                                            color: widget.profileColor,
-                                            selected: false,
-                                            showArrow: false,
-                                            isOpen: false,
-                                          ),
-                                        );
-                                      }).toList(),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+    return PopupMenuItem<Map<String, String>>(
+      value: poste,
+      padding: EdgeInsets.zero,
+      child: _SphotMenuItem(
+        title: '$secours - $sphot',
+        color: widget.profileColor,
+        selected: selected,
+        showArrow: false,
+        isOpen: false,
+      ),
+    );
+  }).toList();
+},
+      child: _SphotMenuItem(
+        title: '$nomSecours - $nomSphot',
+        color: widget.profileColor,
+        selected: true,
+        showArrow: true,
+        isOpen: isSphotMenuOpen,
+      ),
+    ),
+   ],
+),
 
                         if (!isTemporaryClosed)
                           Container(
                             width: double.infinity,
+                            height: 58,
                             margin: const EdgeInsets.only(top: 3, bottom: 3),
                             padding: const EdgeInsets.symmetric(
                               vertical: 16,
@@ -228,135 +234,138 @@ class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
                           title: 'Actions rapides',
                           icon: Icons.flash_on,
                           children: [
-                            const Text(
-                              'Couleur du drapeau',
-                              style: TextStyle(fontWeight: FontWeight.w600),
-                            ),
+  const Text(
+    'Couleur du drapeau',
+    style: TextStyle(fontWeight: FontWeight.w600),
+  ),
 
-                            const SizedBox(height: 8),
+  const SizedBox(height: 8),
 
-                            Row(
-                              children: [
-                                _FlagColorButton(
-                                  label: 'Vert',
-                                  color: const Color(0xFF22C55E),
-                                  selected: flagColor == 'Vert',
-                                  onTap: () {
-                                    setState(() => flagColor = 'Vert');
-                                  },
-                                ),
-                                const SizedBox(width: 10),
-                                _FlagColorButton(
-                                  label: 'Jaune',
-                                  color: const Color(0xFFFDE047),
-                                  selected: flagColor == 'Jaune',
-                                  onTap: () {
-                                    setState(() => flagColor = 'Jaune');
-                                  },
-                                ),
-                                const SizedBox(width: 10),
-                                _FlagColorButton(
-                                  label: 'Rouge',
-                                  color: const Color(0xFFEF4444),
-                                  selected: flagColor == 'Rouge',
-                                  onTap: () {
-                                    setState(() => flagColor = 'Rouge');
-                                  },
-                                ),
-                              ],
-                            ),
+  Row(
+    children: [
+      _FlagColorButton(
+        label: 'Vert',
+        color: const Color(0xFF22C55E),
+        selected: flagColor == 'Vert',
+        onTap: () => setState(() => flagColor = 'Vert'),
+      ),
+      const SizedBox(width: 10),
+      _FlagColorButton(
+        label: 'Jaune',
+        color: const Color(0xFFFDE047),
+        selected: flagColor == 'Jaune',
+        onTap: () => setState(() => flagColor = 'Jaune'),
+      ),
+      const SizedBox(width: 10),
+      _FlagColorButton(
+        label: 'Rouge',
+        color: const Color(0xFFEF4444),
+        selected: flagColor == 'Rouge',
+        onTap: () => setState(() => flagColor = 'Rouge'),
+      ),
+    ],
+  ),
 
-                            const SizedBox(height: 14),
+  const SizedBox(height: 10),
 
-                            const Text(
-  'Position du drapeau',
-  style: TextStyle(fontWeight: FontWeight.w600),
-),
+  const Text(
+    'Position du drapeau',
+    style: TextStyle(fontWeight: FontWeight.w600),
+  ),
 
-const SizedBox(height: 8),
+  const SizedBox(height: 10),
 
-_FlagPositionSwitch(
-  isAffale: flagPosition == 'Affalé',
-  color: widget.profileColor,
-  onChanged: (isAffale) {
-    updateFlagPosition(isAffale ? 'Affalé' : 'Hissé');
-  },
-),
+  _FlagPositionSwitch(
+    isAffale: flagPosition == 'Affalé',
+    color: widget.profileColor,
+    onChanged: (isAffale) {
+      updateFlagPosition(isAffale ? 'Affalé' : 'Hissé');
+    },
+  ),
 
-                            const SizedBox(height: 16),
+  const SizedBox(height: 10),
 
-                            _ActionButton(
-                              icon: Icons.warning_amber_rounded,
-                              label: 'Déclarer un danger',
-                              color: Colors.orange,
-                              onTap: () {},
-                            ),
+  Stack(
+    clipBehavior: Clip.none,
+    children: [
+      _ActionButton(
+        icon: Icons.warning_amber_rounded,
+        label: selectedDangers.isEmpty
+            ? 'Déclarer un danger'
+            : '${selectedDangers.length} danger(s) sélectionné(s)',
+        color: const Color(0xFFFDE047),
+        onTap: () {
+          setState(() {
+            isDangerMenuOpen = !isDangerMenuOpen;
+          });
+        },
+      ),
 
-                            _ActionButton(
-                              icon: Icons.note_add,
-                              label: 'Ajouter une note d’intervention',
-                              color: Colors.blue,
-                              onTap: () {},
-                            ),
-
-                            _ActionButton(
-                              icon: Icons.phone,
-                              label: 'Appeler les secours',
-                              color: Colors.red,
-                              onTap: () {},
-                            ),
-                          ],
-                        ),
-
-                        _sectionCard(
-                          title: 'Notes / consignes du jour',
-                          icon: Icons.assignment,
-                          children: const [
-                            _InfoLine(
-                              label: 'Météo terrestre',
-                              value: '24°C, vent faible',
-                            ),
-                            _InfoLine(
-                              label: 'Météo maritime',
-                              value: 'Mer peu agitée',
-                            ),
-                            _InfoLine(
-                              label: 'Marées',
-                              value: 'Basse : 08:42 / Haute : 15:10',
-                            ),
-                            _InfoLine(
-                              label: 'Coefficient',
-                              value: '72',
-                            ),
-                            _InfoLine(
-                              label: 'Courants',
-                              value: 'Courant latéral modéré',
-                            ),
-                            _InfoLine(
-                              label: 'Pollution',
-                              value: 'Aucune pollution signalée',
-                            ),
-                            _InfoLine(
-                              label: 'Méduses',
-                              value: 'Présence faible',
-                            ),
-                            _InfoLine(
-                              label: 'Événement spécial',
-                              value: 'Cours de paddle à 14h',
-                            ),
-                            _InfoLine(
-                              label: 'Message interne',
-                              value: 'Surveillance renforcée zone nord',
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+      if (isDangerMenuOpen)
+  Positioned(
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: MediaQuery.of(context).size.width * 0.66,
+    child: SafeArea(
+      child: Material(
+        elevation: 24,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(22),
+          bottomLeft: Radius.circular(22),
+        ),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.98),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(22),
+              bottomLeft: Radius.circular(22),
+            ),
+            border: Border.all(
+              color: Colors.black,
+              width: 2,
             ),
           ),
+          child: Column(
+            children: dangerChoices.map((danger) {
+              final bool selected =
+                  selectedDangers.contains(danger);
+
+              return Expanded(
+                child: CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: selected,
+                  activeColor: const Color(0xFFFDE047),
+                  checkColor: Colors.black,
+                  title: Text(
+                    danger,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      height: 1,
+                    ),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        selectedDangers.add(danger);
+                      } else {
+                        selectedDangers.remove(danger);
+                      }
+                    });
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    ),
+  ),
 
           Positioned(
             left: 0,
@@ -415,47 +424,66 @@ _FlagPositionSwitch(
   }
 
   Widget _dangerBanner() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 3, bottom: 3),
-      padding: const EdgeInsets.symmetric(
-  vertical: 8,
-  horizontal: 14,
-),
-      decoration: BoxDecoration(
-  color: Colors.red,
-  borderRadius: BorderRadius.circular(16),
-  border: Border.all(
-    color: Colors.black,
-    width: 3,
-  ),
-),
-      child: const Column(
-        children: [
-          Icon(Icons.warning_rounded, color: Colors.white, size: 28),
-          SizedBox(height: 4),
-          Text(
-  'BAIGNADE NON SURVEILLÉE TEMPORAIREMENT',
-  textAlign: TextAlign.center,
-  maxLines: 1,
-  overflow: TextOverflow.ellipsis,
-  style: const TextStyle(
-    color: Colors.white,
-    fontWeight: FontWeight.bold,
-    fontSize: 11,
-    height: 1,
-  ),
-),
-          SizedBox(height: 4),
-          Text(
-            'Baignade à vos risques et périls',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontSize: 15),
-          ),
-        ],
+  return Container(
+    width: double.infinity,
+    height: 58,
+    margin: const EdgeInsets.only(top: 3, bottom: 3),
+    padding: const EdgeInsets.symmetric(
+      vertical: 6,
+      horizontal: 14,
+    ),
+    decoration: BoxDecoration(
+      color: Colors.red,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: Colors.black,
+        width: 3,
       ),
-    );
-  }
+    ),
+    child: const Row(
+      children: [
+        Icon(
+          Icons.warning_rounded,
+          color: Colors.white,
+          size: 20,
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'BAIGNADE NON SURVEILLÉE TEMPORAIREMENT',
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 11,
+                  height: 1,
+                ),
+              ),
+              SizedBox(height: 3),
+              Text(
+                'BAIGNADE À VOS RISQUES ET PÉRILS',
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                  height: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _sectionCard({
     required String title,
@@ -642,38 +670,6 @@ class _BottomLogoButton extends StatelessWidget {
   }
 }
 
-class _InfoLine extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _InfoLine({
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 4,
-            child: Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-          Expanded(
-            flex: 6,
-            child: Text(value),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _FlagColorButton extends StatelessWidget {
   final String label;
@@ -829,7 +825,7 @@ class _ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 3),
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: onTap,
@@ -837,7 +833,9 @@ class _ActionButton extends StatelessWidget {
         label: Text(label),
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
-          foregroundColor: Colors.white,
+          foregroundColor: color == const Color(0xFFFDE047)
+    ? Colors.black
+    : Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
