@@ -27,36 +27,36 @@ class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
   final Set<String> selectedDangers = {};
 
   final List<String> dangerChoices = [
-    '⚠️ COURANTS',
-    '⚠️ BAÏNES',
-    '🌊 SHORE BREAK',
-    '🌊 VAGUES FORTES',
-    '🌊 HOULE',
-    '🟥 CONDITIONS DÉFAVORABLES DE VENT POUR CERTAINS ÉQUIPEMENTS NAUTIQUES',
-    '☀️ CHÂLEURS',
-    '☀️ CANICULE NIVEAU 1',
-    '☀️ CANICULE NIVEAU 2',
-    '☀️ CANICULE NIVEAU 3',
-    '☀️ CANICULE NIVEAU 4',
-    '🟪 ALTÉRATION DE LA QUALITÉ DES EAUX DE BAIGNADE',
-    '🟪 PRÉSENCE D’ESPÈCES DANGEREUSES (MÉDUSES...)',
-    '🟪 EXISTANCE D’UNE ZONE MARINE OU SOUS-MARINE PROTÉGÉE',
-    '❄️ EAU FROIDE',
-    '🪨 ROCHERS / RÉCIFS',
-    '⚠️ DÉVERSEMENT',
-    '⚠️ CRUE',
-    '⚠️ FAIBLE PROFONDEUR',
-    '⚠️ ASPIRATION',
-    '🚤 ⛵ 🛥️ TRAFFIC MARITIME',
-    '🌀 TOURBILLONS',
-    '⚠️ REMOUS',
-    '⚠️ VASE / SABLE MOUVANT',
-    '⚠️ LÂCHER DE BARRAGE',
-    '🐎 CHEVAUX',
-    '⚠️ REQUINS SIGNALÉS',
-    '⚠️ CONDITIONS MÉTÉOROLOGIQUES PROPICES À LA PRÉSENCE DE REQUINS',
-    '⚠️ AUTRE',
-    '⚠️ NON RENSEIGNÉ',
+    'COURANTS',
+    'BAÏNES',
+    'SHORE BREAK',
+    'VAGUES FORTES',
+    'HOULE',
+    'CONDITIONS DÉFAVORABLES DE VENT POUR CERTAINS ÉQUIPEMENTS NAUTIQUES',
+    'CHÂLEURS',
+    'CANICULE NIVEAU 1',
+    'CANICULE NIVEAU 2',
+    'CANICULE NIVEAU 3',
+    'CANICULE NIVEAU 4',
+    'ALTÉRATION DE LA QUALITÉ DES EAUX DE BAIGNADE',
+    'PRÉSENCE D’ESPÈCES DANGEREUSES (MÉDUSES...)',
+    'EXISTANCE D’UNE ZONE MARINE OU SOUS-MARINE PROTÉGÉE',
+    'EAU FROIDE',
+    'ROCHERS / RÉCIFS',
+    'DÉVERSEMENT',
+    'CRUE',
+    'FAIBLE PROFONDEUR',
+    'ASPIRATION',
+    'TRAFFIC MARITIME',
+    'TOURBILLONS',
+    'REMOUS',
+    'VASE / SABLE MOUVANT',
+    'LÂCHER DE BARRAGE',
+    'CHEVAUX',
+    'REQUINS SIGNALÉS',
+    'CONDITIONS MÉTÉOROLOGIQUES PROPICES À LA PRÉSENCE DE REQUINS',
+    'AUTRE',
+   
   ];
 
   final List<Map<String, String>> postesSecoursCommune = [
@@ -121,11 +121,11 @@ class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
                   ),
                 ),
 
-                const SizedBox(height: 4),
+                const SizedBox(height: 14),
 
                 Expanded(
   child: Padding(
-    padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 56),
     child: Column(
       children: [
                           _sectionCard(
@@ -238,7 +238,7 @@ _sectionCard(
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
 
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 10),
 
                               Row(
                                 children: [
@@ -271,14 +271,14 @@ _sectionCard(
                                 ],
                               ),
 
-                              const SizedBox(height: 5),
+                              const SizedBox(height: 10),
 
                               const Text(
                                 'Position du drapeau',
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
 
-                              const SizedBox(height: 5),
+                              const SizedBox(height: 10),
 
                               _FlagPositionSwitch(
                                 isAffale: flagPosition == 'Affalé',
@@ -290,7 +290,7 @@ _sectionCard(
                                 },
                               ),
 
-                              const SizedBox(height: 5),
+                              const SizedBox(height: 10),
 
 _ActionButton(
   icon: Icons.warning_amber_rounded,
@@ -305,7 +305,7 @@ _ActionButton(
   },
 ),
 
-const SizedBox(height: 4),
+const SizedBox(height: 10),
 
 _ActionButton(
   icon: Icons.notifications_active_rounded,
@@ -332,13 +332,13 @@ _ActionButton(
             ),
 
           if (isDangerMenuOpen)
-            Positioned(
-              top: 0,
-              right: 0,
-              bottom: 0,
-              width: MediaQuery.of(context).size.width * 0.66,
-              child: _dangerSidePanel(),
-            ),
+  Positioned(
+    left: 16,
+    right: 16,
+    bottom: 190,
+    height: 470,
+    child: _dangerSidePanel(),
+  ),
 
           Positioned(
             left: 0,
@@ -352,110 +352,104 @@ _ActionButton(
   }
 
   Widget _dangerSidePanel() {
-    return SafeArea(
-      child: Material(
-        elevation: 24,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(22),
-          bottomLeft: Radius.circular(22),
-        ),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.98),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(22),
-              bottomLeft: Radius.circular(22),
-            ),
-            border: Border.all(
-              color: Colors.black,
-              width: 2,
-            ),
-          ),
-          child: Column(
-            children: [
-              Text(
-                'DANGERS',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: widget.profileColor,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              Expanded(
-                child: ListView.builder(
-                  itemCount: dangerChoices.length,
-                  itemBuilder: (context, index) {
-                    final danger = dangerChoices[index];
-                    final bool selected = selectedDangers.contains(danger);
-
-                    return CheckboxListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      value: selected,
-                      activeColor: const Color(0xFFFDE047),
-                      checkColor: Colors.black,
-                      title: Text(
-                        danger,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          height: 1,
-                        ),
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          if (value == true) {
-                            selectedDangers.add(danger);
-                          } else {
-                            selectedDangers.remove(danger);
-                          }
-                        });
-                      },
-                    );
-                  },
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    setState(() => isDangerMenuOpen = false);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: widget.profileColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Text(
-                    'VALIDER',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-              ),
-            ],
-          ),
+  return Material(
+    elevation: 24,
+    borderRadius: BorderRadius.circular(22),
+    child: Container(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.98),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: Colors.black,
+          width: 2,
         ),
       ),
-    );
-  }
+      child: Column(
+        children: [
+          const Text(
+            'DANGERS',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.red,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.8,
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          Expanded(
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              itemCount: dangerChoices.length,
+              itemBuilder: (context, index) {
+                final danger = dangerChoices[index];
+                final bool selected = selectedDangers.contains(danger);
+
+                return CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: selected,
+                  activeColor: const Color(0xFFFDE047),
+                  checkColor: Colors.black,
+                  title: Text(
+                    danger,
+                    softWrap: true,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      height: 1.15,
+                    ),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        selectedDangers.add(danger);
+                      } else {
+                        selectedDangers.remove(danger);
+                      }
+                    });
+                  },
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          SizedBox(
+            width: double.infinity,
+            height: 42,
+            child: ElevatedButton(
+              onPressed: () {
+                setState(() => isDangerMenuOpen = false);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                'VALIDER',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _bottomNavBar() {
     return SafeArea(
       top: false,
       child: Container(
-        height: 62,
+        height: 48,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: const BoxDecoration(
   color: Colors.transparent,
@@ -622,7 +616,7 @@ class _SphotMenuItem extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 4),
+      margin: const EdgeInsets.only(bottom: 6),
       height: 46,
 padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
@@ -690,7 +684,7 @@ class _BottomLogoButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: 42,
-      height: 42,
+      height: 34,
       child: IconButton(
         onPressed: onTap,
         padding: EdgeInsets.zero,
@@ -721,7 +715,7 @@ class _FlagColorButton extends StatelessWidget {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          height: 46,
+          height: 52,
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(14),
@@ -769,7 +763,7 @@ class _FlagPositionSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 46,
+      height: 52,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         padding: const EdgeInsets.all(5),
@@ -850,29 +844,39 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-  height: 46,
-  width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 20),
-        label: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+    final bool isYellow = color == const Color(0xFFFDE047);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 52,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(14),
         ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor:
-              color == const Color(0xFFFDE047) ? Colors.black : Colors.white,
-          minimumSize: const Size(double.infinity, 46),
-          maximumSize: const Size(double.infinity, 46),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          visualDensity: VisualDensity.compact,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isYellow ? Colors.black : Colors.white,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isYellow ? Colors.black : Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
