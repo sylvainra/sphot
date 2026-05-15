@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 
-class LifeguardInfoPage extends StatefulWidget {
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+
+class LifeguardActionsPage extends StatefulWidget {
   final Color profileColor;
 
-  const LifeguardInfoPage({
+  const LifeguardActionsPage({
     super.key,
     required this.profileColor,
   });
 
   @override
-  State<LifeguardInfoPage> createState() => _LifeguardInfoPageState();
+  State<LifeguardActionsPage> createState() =>
+      _LifeguardActionsPageState();
 }
 
-class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
+class _LifeguardActionsPageState extends State<LifeguardActionsPage> {
   String flagColor = 'Vert';
   String flagPosition = 'Hissé';
   String status = 'Baignade surveillée';
@@ -111,7 +114,7 @@ class _LifeguardInfoPageState extends State<LifeguardInfoPage> {
                 ),
 
                 Text(
-                  'RENSEIGNEMENTS SAUVETEURS',
+                  'ACTIONS RAPIDES',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 22,
@@ -308,10 +311,18 @@ _ActionButton(
 const SizedBox(height: 10),
 
 _ActionButton(
-  icon: Icons.notifications_active_rounded,
+  icon: Icons.mode_edit_outline_rounded,
   label: 'Ajouter une notification',
-  color: const Color(0xFF2563EB),
-  onTap: () {},
+  color: Colors.red,
+  onTap: () {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => NotificationWritePage(
+          profileColor: widget.profileColor,
+        ),
+      ),
+    );
+  },
 ),
                             ],
                           ),
@@ -367,16 +378,37 @@ _ActionButton(
       ),
       child: Column(
         children: [
-          const Text(
-            'DANGERS',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.red,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.8,
-            ),
-          ),
+          Row(
+  mainAxisAlignment: MainAxisAlignment.center,
+  children: [
+    const Icon(
+      Icons.unfold_more_rounded,
+      color: Colors.black45,
+      size: 22,
+    ),
+
+    const SizedBox(width: 4),
+
+    const Text(
+      'DANGERS',
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: Colors.red,
+        fontSize: 20,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 0.8,
+      ),
+    ),
+
+    const SizedBox(width: 4),
+
+    const Icon(
+      Icons.unfold_more_rounded,
+      color: Colors.black45,
+      size: 22,
+    ),
+  ],
+),
 
           const SizedBox(height: 8),
 
@@ -878,6 +910,249 @@ class _ActionButton extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class NotificationWritePage extends StatefulWidget {
+  final Color profileColor;
+
+  const NotificationWritePage({
+    super.key,
+    required this.profileColor,
+  });
+
+  @override
+  State<NotificationWritePage> createState() => _NotificationWritePageState();
+}
+
+class _NotificationWritePageState extends State<NotificationWritePage> {
+  late stt.SpeechToText _speech;
+
+  bool _isListening = false;
+
+  final TextEditingController controller = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _speech = stt.SpeechToText();
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    _speech.stop();
+    super.dispose();
+  }
+
+  void _listen() async {
+    if (!_isListening) {
+      final bool available = await _speech.initialize();
+
+      if (available) {
+        setState(() => _isListening = true);
+
+        _speech.listen(
+          localeId: 'fr_FR',
+          onResult: (result) {
+            setState(() {
+              controller.text = result.recognizedWords;
+              controller.selection = TextSelection.fromPosition(
+                TextPosition(offset: controller.text.length),
+              );
+            });
+          },
+        );
+      }
+    } else {
+      setState(() => _isListening = false);
+      _speech.stop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'data/images/map_background.jpg',
+            fit: BoxFit.cover,
+          ),
+
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                children: [
+                  Image.asset(
+                    'data/icons/title.png',
+                    height: 56,
+                    fit: BoxFit.contain,
+                  ),
+
+                  Text(
+                    'ÉCRIRE UNE NOTIFICATION',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: widget.profileColor,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.94),
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.12),
+                            blurRadius: 12,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+  children: [
+    Icon(
+      Icons.mode_edit_outline_rounded,
+      color: widget.profileColor,
+      size: 20,
+    ),
+
+    const SizedBox(width: 8),
+
+    Expanded(
+      child: Text(
+        'Message',
+        style: TextStyle(
+          color: widget.profileColor,
+          fontSize: 19,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ),
+
+    IconButton(
+      onPressed: _listen,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(
+        minWidth: 34,
+        minHeight: 34,
+      ),
+      icon: Icon(
+        _isListening
+            ? Icons.mic_rounded
+            : Icons.mic_none_rounded,
+        color: _isListening
+            ? Colors.red
+            : widget.profileColor,
+        size: 24,
+      ),
+    ),
+  ],
+),
+
+                          if (_isListening)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 4),
+                              child: Text(
+                                'Écoute en cours...',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+
+                          const SizedBox(height: 16),
+
+                          Expanded(
+                            child: TextField(
+                              controller: controller,
+                              maxLines: null,
+                              expands: true,
+                              textAlignVertical: TextAlignVertical.top,
+                              decoration: InputDecoration(
+                                hintText: 'Écrivez votre notification ici...',
+                                filled: true,
+                                fillColor: const Color(0xFFF3F7FA),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(
+                                    color: Colors.black,
+                                    width: 2,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(
+                                    color: widget.profileColor,
+                                    width: 3,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                              },
+                              icon: const Icon(Icons.check_rounded),
+                              label: const Text(
+                                'VALIDER LA NOTIFICATION',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: widget.profileColor,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(
+                      Icons.arrow_back_rounded,
+                      color: widget.profileColor,
+                      size: 34,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

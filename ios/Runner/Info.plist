@@ -66,5 +66,10 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+<string>Cette application utilise le micro pour dicter une notification.</string>
+
+<key>NSSpeechRecognitionUsageDescription</key>
+<string>Cette application utilise la reconnaissance vocale pour écrire une notification.</string>
 </dict>
 </plist>

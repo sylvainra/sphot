@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../pages/lifeguard_info_page.dart';
 import 'admin_info_page.dart';
+
+import '../pages/lifeguard/lifeguard_menu_page.dart';
 
 enum LoginProfile { lifeguard, admin }
 
@@ -69,9 +70,9 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
       if (id == 'sauveteur' && password == '1234') {
         Navigator.of(context).pushReplacement(
   MaterialPageRoute(
-    builder: (_) => const LifeguardInfoPage(
-      profileColor: Color(0xFFFF0000),
-    ),
+    builder: (_) => LifeguardMenuPage(
+  profileColor: const Color(0xFFFF0000),
+),
   ),
 );
       } else {
