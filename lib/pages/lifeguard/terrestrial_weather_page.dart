@@ -3,6 +3,8 @@ import 'package:numberpicker/numberpicker.dart';
 
 import 'dart:math';
 
+import 'lifeguard_actions_page.dart';
+
 class TerrestrialWeatherPage extends StatefulWidget {
   final Color profileColor;
 
@@ -169,7 +171,7 @@ class _TerrestrialWeatherPageState extends State<TerrestrialWeatherPage> {
                               child: GridView.count(
                                 physics:
                                     const NeverScrollableScrollPhysics(),
-                                childAspectRatio: 1.35,
+                                childAspectRatio: 1.45,
                                 crossAxisCount: 2,
                                 crossAxisSpacing: 12,
                                 mainAxisSpacing: 12,
@@ -204,16 +206,10 @@ class _TerrestrialWeatherPageState extends State<TerrestrialWeatherPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 2),
-
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: Color(0xFF5D4037),
-                      size: 24,
-                    ),
-                  ),
+                  Transform.translate(
+  offset: const Offset(0, 10),
+  child: const _BottomQuickNavBar(),
+),
                 ],
               ),
             ),
@@ -566,7 +562,6 @@ class _WeatherSkyCard extends StatefulWidget {
 }
 
 class _WeatherSkyCardState extends State<_WeatherSkyCard> {
-
   final List<String> emojis = [
     '❄️',
     '🌫️',
@@ -597,7 +592,6 @@ class _WeatherSkyCardState extends State<_WeatherSkyCard> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-
           const Text(
             'CIEL',
             style: TextStyle(
@@ -612,12 +606,15 @@ class _WeatherSkyCardState extends State<_WeatherSkyCard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-
-              const Text(
-                'Matin',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
+              const SizedBox(
+                width: 74,
+                child: Text(
+                  'Matin',
+                  textAlign: TextAlign.left,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
 
@@ -657,12 +654,15 @@ class _WeatherSkyCardState extends State<_WeatherSkyCard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-
-              const Text(
-                'Après-midi',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
+              const SizedBox(
+                width: 74,
+                child: Text(
+                  'Après-midi',
+                  textAlign: TextAlign.left,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
 
@@ -1005,6 +1005,115 @@ class _SmallWindPicker extends StatelessWidget {
         fontWeight: FontWeight.w900,
       ),
       onChanged: onChanged,
+    );
+  }
+}
+
+class _BottomQuickNavBar extends StatelessWidget {
+  const _BottomQuickNavBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 58,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.88),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF5D4037),
+          width: 2,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+  _BottomQuickNavItem(
+    icon: Icons.waves_rounded,
+    label: 'MÉTÉO\nMARINE',
+  ),
+
+  _BottomQuickNavItem(
+    icon: Icons.menu_book_rounded,
+    label: 'MAIN\nCOURANTE',
+  ),
+
+  _BottomQuickNavItem(
+  icon: Icons.warning_amber_rounded,
+  label: 'ACTIONS\nRAPIDES',
+  isCenter: true,
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LifeguardActionsPage(
+  profileColor: const Color(0xFF5D4037),
+),
+      ),
+    );
+  },
+),
+
+  _BottomQuickNavItem(
+    icon: Icons.calendar_month_rounded,
+    label: 'EMPLOI\nDU TEMPS',
+  ),
+
+  _BottomQuickNavItem(
+    icon: Icons.bar_chart_rounded,
+    label: 'STATS',
+  ),
+],
+      ),
+    );
+  }
+}
+
+class _BottomQuickNavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isCenter;
+  final VoidCallback? onTap;
+
+  const _BottomQuickNavItem({
+    required this.icon,
+    required this.label,
+    this.isCenter = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color:
+                  isCenter ? Colors.red : const Color(0xFF5D4037),
+              size: isCenter ? 28 : 24,
+            ),
+
+            const SizedBox(height: 2),
+
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: isCenter ? 9 : 8,
+                fontWeight: FontWeight.w900,
+                height: 1.05,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
