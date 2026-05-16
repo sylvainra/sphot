@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:numberpicker/numberpicker.dart';
 
+import 'dart:math';
+
 class TerrestrialWeatherPage extends StatefulWidget {
   final Color profileColor;
 
@@ -17,6 +19,16 @@ class TerrestrialWeatherPage extends StatefulWidget {
 class _TerrestrialWeatherPageState extends State<TerrestrialWeatherPage> {
   int airMin = 22;
   int airMax = 28;
+
+  int uvIndex = 7;
+
+  String windDirectionMorning = 'O';
+  String windDirectionEvening = 'NO';
+
+  int windMorningSpeed = 10;
+  int windEveningSpeed = 20;
+
+  int gusts = 35;
 
   @override
   Widget build(BuildContext context) {
@@ -51,12 +63,12 @@ class _TerrestrialWeatherPageState extends State<TerrestrialWeatherPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 2),
 
                   Expanded(
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                       decoration: BoxDecoration(
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(24),
@@ -65,76 +77,134 @@ class _TerrestrialWeatherPageState extends State<TerrestrialWeatherPage> {
                           width: 2,
                         ),
                       ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'PRÉVISIONS',
-                            style: TextStyle(
-                              color: Color(0xFF5D4037),
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.8,
+                      child: Transform.translate(
+                        offset: const Offset(0, -4),
+                        child: Column(
+                          children: [
+                            Transform.translate(
+                              offset: const Offset(0, 6),
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 2),
+                                child: Text(
+                                  'PRÉVISIONS',
+                                  style: TextStyle(
+                                    color: Color(0xFF5D4037),
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
 
-                          const SizedBox(height: 18),
+                            const SizedBox(height: 6),
 
-                          SizedBox(
-                            height: 320,
-                            child: GridView.count(
-                              physics: const NeverScrollableScrollPhysics(),
-                              childAspectRatio: 1.35,
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
+                            Row(
                               children: [
-                                _WeatherPickerCard(
-  title: 'AIR',
-  icon: Icons.thermostat_rounded,
-  minValue: airMin,
-  maxValue: airMax,
-  onMinChanged: (value) {
-    setState(() => airMin = value);
-  },
-  onMaxChanged: (value) {
-    setState(() => airMax = value);
-  },
-),
+                                Expanded(
+                                  child: _WeatherPickerCard(
+                                    title: 'AIR',
+                                    icon: Icons.thermostat_rounded,
+                                    minValue: airMin,
+                                    maxValue: airMax,
+                                    onMinChanged: (value) {
+                                      setState(() {
+                                        airMin = value;
+                                      });
+                                    },
+                                    onMaxChanged: (value) {
+                                      setState(() {
+                                        airMax = value;
+                                      });
+                                    },
+                                  ),
+                                ),
 
-_WeatherSkyCard(),
+                                const SizedBox(width: 12),
 
-const _WeatherInfoCard(
-  title: 'UV',
-  value: '7 / ÉLEVÉ',
-  icon: Icons.wb_sunny_outlined,
-),
-
-const _WeatherInfoCard(
-  title: 'VENT',
-  value: '18 km/h',
-  icon: Icons.air_rounded,
-),
-
-const _WeatherInfoCard(
-  title: 'CANICULE',
-  value: 'NIVEAU 0',
-  icon: Icons.local_fire_department_rounded,
-),
-
-const _WeatherInfoCard(
-  title: 'HUMIDITÉ',
-  value: '62%',
-  icon: Icons.water_drop_rounded,
-),
+                                Expanded(
+                                  child: _WeatherSkyCard(),
+                                ),
                               ],
                             ),
-                          ),
-                        ],
+
+                            const SizedBox(height: 6),
+
+                            _WindFullWidthCard(
+                              directionMorning: windDirectionMorning,
+                              directionEvening: windDirectionEvening,
+                              morningSpeed: windMorningSpeed,
+                              eveningSpeed: windEveningSpeed,
+                              gusts: gusts,
+                              onDirectionMorningChanged: (value) {
+                                setState(() {
+                                  windDirectionMorning = value;
+                                });
+                              },
+                              onDirectionEveningChanged: (value) {
+                                setState(() {
+                                  windDirectionEvening = value;
+                                });
+                              },
+                              onMorningSpeedChanged: (value) {
+                                setState(() {
+                                  windMorningSpeed = value;
+                                });
+                              },
+                              onEveningSpeedChanged: (value) {
+                                setState(() {
+                                  windEveningSpeed = value;
+                                });
+                              },
+                              onGustsChanged: (value) {
+                                setState(() {
+                                  gusts = value;
+                                });
+                              },
+                            ),
+
+                            const SizedBox(height: 6),
+
+                            Expanded(
+                              child: GridView.count(
+                                physics:
+                                    const NeverScrollableScrollPhysics(),
+                                childAspectRatio: 1.35,
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                                children: [
+                                  _UVCard(
+                                    uvIndex: uvIndex,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        uvIndex = value;
+                                      });
+                                    },
+                                  ),
+
+                                  const _WeatherInfoCard(
+                                    title: 'CANICULE',
+                                    value: 'NIVEAU 0',
+                                    icon: Icons
+                                        .local_fire_department_rounded,
+                                  ),
+
+                                  const _WeatherInfoCard(
+                                    title: 'HUMIDITÉ',
+                                    value: '62%',
+                                    icon: Icons.water_drop_rounded,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 2),
 
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
@@ -204,6 +274,99 @@ class _WeatherInfoCard extends StatelessWidget {
               color: Color(0xFF5D4037),
               fontSize: 13,
               fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UVCard extends StatelessWidget {
+  final int uvIndex;
+  final ValueChanged<int> onChanged;
+
+  const _UVCard({
+    required this.uvIndex,
+    required this.onChanged,
+  });
+
+  Color _uvColor(int value) {
+    if (value <= 2) return const Color(0xFFD6D6D6);
+    if (value <= 4) return const Color(0xFFD8CF9B);
+    if (value <= 6) return const Color(0xFFE6DD3B);
+    if (value <= 8) return const Color(0xFFF3EA00);
+    return const Color(0xFFFFFF00);
+  }
+
+  String _uvLabel(int value) {
+    if (value <= 2) return 'FAIBLE';
+    if (value <= 4) return 'MODÉRÉ';
+    if (value <= 6) return 'ÉLEVÉ';
+    if (value <= 8) return 'TRÈS FORT';
+    return 'EXTRÊME';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uvColor = _uvColor(uvIndex);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.94),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: uvColor,
+          width: 3,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.wb_sunny_rounded,
+                color: Color(0xFFFDE047),
+                size: 24,
+              ),
+              SizedBox(width: 5),
+              Text(
+                'UV',
+                style: TextStyle(
+                  color: Color(0xFFFDE047),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+
+          Transform.translate(
+            offset: const Offset(0, 4),
+            child: NumberPicker(
+              value: uvIndex,
+              minValue: 1,
+              maxValue: 12,
+              itemWidth: 105,
+              itemHeight: 15,
+              textMapper: (numberText) {
+                final value = int.parse(numberText);
+                return '$value ${_uvLabel(value)}';
+              },
+              textStyle: const TextStyle(
+                fontSize: 8,
+                color: Colors.black38,
+                fontWeight: FontWeight.w700,
+              ),
+              selectedTextStyle: TextStyle(
+                color: uvColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+              onChanged: onChanged,
             ),
           ),
         ],
@@ -535,6 +698,313 @@ class _WeatherSkyCardState extends State<_WeatherSkyCard> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _WindFullWidthCard extends StatelessWidget {
+  final String directionMorning;
+  final String directionEvening;
+  final int morningSpeed;
+  final int eveningSpeed;
+  final int gusts;
+
+  final ValueChanged<String> onDirectionMorningChanged;
+  final ValueChanged<String> onDirectionEveningChanged;
+  final ValueChanged<int> onMorningSpeedChanged;
+  final ValueChanged<int> onEveningSpeedChanged;
+  final ValueChanged<int> onGustsChanged;
+
+  const _WindFullWidthCard({
+    required this.directionMorning,
+    required this.directionEvening,
+    required this.morningSpeed,
+    required this.eveningSpeed,
+    required this.gusts,
+    required this.onDirectionMorningChanged,
+    required this.onDirectionEveningChanged,
+    required this.onMorningSpeedChanged,
+    required this.onEveningSpeedChanged,
+    required this.onGustsChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final gustColor = _windColor(gusts);
+
+    return Container(
+      width: double.infinity,
+      height: 230,
+      padding: const EdgeInsets.fromLTRB(10, 2, 10, 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.78),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: gustColor,
+          width: 3,
+        ),
+      ),
+      child: Column(
+        children: [
+          Transform.translate(
+            offset: const Offset(0, 4),
+            child: const Text(
+              'VENT',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 2),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _WindCompassPicker(
+                label: 'Matin',
+                value: directionMorning,
+                speed: morningSpeed,
+                onChanged: onDirectionMorningChanged,
+                onSpeedChanged: onMorningSpeedChanged,
+              ),
+              _WindCompassPicker(
+                label: 'Après-midi',
+                value: directionEvening,
+                speed: eveningSpeed,
+                onChanged: onDirectionEveningChanged,
+                onSpeedChanged: onEveningSpeedChanged,
+              ),
+            ],
+          ),
+
+          Transform.translate(
+            offset: const Offset(0, 2),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  'Rafales à',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+
+                const SizedBox(width: 6),
+
+                _SmallWindPicker(
+                  value: gusts,
+                  onChanged: onGustsChanged,
+                ),
+
+                const SizedBox(width: 6),
+
+                const Text(
+                  'km/h',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Color _windColor(int value) {
+  if (value <= 10) return const Color(0xFF2E7D32);
+  if (value <= 20) return const Color(0xFF7CB342);
+  if (value <= 30) return const Color(0xFFFBC02D);
+  if (value <= 40) return const Color(0xFFFB8C00);
+  if (value <= 60) return const Color(0xFFE53935);
+  if (value <= 80) return const Color(0xFF8E24AA);
+  return const Color(0xFF4A148C);
+}
+
+class _WindCompassPicker extends StatelessWidget {
+  final String label;
+  final String value;
+  final ValueChanged<String> onChanged;
+  final int speed;
+  final ValueChanged<int> onSpeedChanged;
+
+  const _WindCompassPicker({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    required this.speed,
+    required this.onSpeedChanged,
+  });
+
+  static const List<String> directions = [
+    'N',
+    'NNE',
+    'NE',
+    'ENE',
+    'E',
+    'ESE',
+    'SE',
+    'SSE',
+    'S',
+    'SSO',
+    'SO',
+    'OSO',
+    'O',
+    'ONO',
+    'NO',
+    'NNO',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Transform.translate(
+          offset: const Offset(0, -4),
+          child: Text(
+  label,
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+
+        Transform.translate(
+          offset: const Offset(0, 4),
+          child: SizedBox(
+            width: 132,
+            height: 108,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      NumberPicker(
+                        value: speed,
+                        minValue: 0,
+                        maxValue: 150,
+                        itemWidth: 34,
+                        itemHeight: 20,
+                        textStyle: const TextStyle(
+                          fontSize: 8,
+                          color: Colors.black38,
+                        ),
+                        selectedTextStyle: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: _windColor(speed),
+                        ),
+                        onChanged: onSpeedChanged,
+                      ),
+
+                      const SizedBox(width: 2),
+
+                      const Text(
+                        'km/h',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                ...List.generate(directions.length, (index) {
+                  final angle =
+                      (index * 22.5 - 90) * pi / 180;
+
+                  final x = 52 * cos(angle);
+                  final y = 52 * sin(angle);
+
+                  final dir = directions[index];
+                  final selected = dir == value;
+
+                  return Transform.translate(
+                    offset: Offset(x, y),
+                    child: GestureDetector(
+                      onTap: () => onChanged(dir),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? Colors.black
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.black,
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          dir,
+                          style: TextStyle(
+                            color: selected
+                                ? Colors.white
+                                : Colors.black,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SmallWindPicker extends StatelessWidget {
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  const _SmallWindPicker({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return NumberPicker(
+      value: value,
+      minValue: 0,
+      maxValue: 150,
+      step: 1,
+      itemWidth: 44,
+      itemHeight: 18,
+      textStyle: const TextStyle(
+        color: Colors.black38,
+        fontSize: 9,
+      ),
+      selectedTextStyle: TextStyle(
+        color: _windColor(value),
+        fontSize: 16,
+        fontWeight: FontWeight.w900,
+      ),
+      onChanged: onChanged,
     );
   }
 }
