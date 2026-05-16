@@ -89,42 +89,43 @@ class _TerrestrialWeatherPageState extends State<TerrestrialWeatherPage> {
                               mainAxisSpacing: 12,
                               children: [
                                 _WeatherPickerCard(
-                                  title: 'AIR',
-                                  icon: Icons.thermostat_rounded,
-                                  minValue: airMin,
-                                  maxValue: airMax,
-                                  onMinChanged: (value) {
-                                    setState(() => airMin = value);
-                                  },
-                                  onMaxChanged: (value) {
-                                    setState(() => airMax = value);
-                                  },
-                                ),
-                                const _WeatherInfoCard(
-                                  title: 'VENT',
-                                  value: '18 km/h',
-                                  icon: Icons.air_rounded,
-                                ),
-                                const _WeatherInfoCard(
-                                  title: 'UV',
-                                  value: '7 / ÉLEVÉ',
-                                  icon: Icons.wb_sunny_outlined,
-                                ),
-                                const _WeatherInfoCard(
-                                  title: 'ORAGE',
-                                  value: 'FAIBLE',
-                                  icon: Icons.thunderstorm_rounded,
-                                ),
-                                const _WeatherInfoCard(
-                                  title: 'CANICULE',
-                                  value: 'NIVEAU 0',
-                                  icon: Icons.local_fire_department_rounded,
-                                ),
-                                const _WeatherInfoCard(
-                                  title: 'HUMIDITÉ',
-                                  value: '62%',
-                                  icon: Icons.water_drop_rounded,
-                                ),
+  title: 'AIR',
+  icon: Icons.thermostat_rounded,
+  minValue: airMin,
+  maxValue: airMax,
+  onMinChanged: (value) {
+    setState(() => airMin = value);
+  },
+  onMaxChanged: (value) {
+    setState(() => airMax = value);
+  },
+),
+
+_WeatherSkyCard(),
+
+const _WeatherInfoCard(
+  title: 'UV',
+  value: '7 / ÉLEVÉ',
+  icon: Icons.wb_sunny_outlined,
+),
+
+const _WeatherInfoCard(
+  title: 'VENT',
+  value: '18 km/h',
+  icon: Icons.air_rounded,
+),
+
+const _WeatherInfoCard(
+  title: 'CANICULE',
+  value: 'NIVEAU 0',
+  icon: Icons.local_fire_department_rounded,
+),
+
+const _WeatherInfoCard(
+  title: 'HUMIDITÉ',
+  value: '62%',
+  icon: Icons.water_drop_rounded,
+),
                               ],
                             ),
                           ),
@@ -280,7 +281,7 @@ class _WeatherPickerCard extends StatelessWidget {
         color: Colors.white.withOpacity(0.94),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Colors.black,
+          color: _temperatureColor(maxValue),
           width: 2,
         ),
       ),
@@ -390,6 +391,148 @@ const SizedBox(width: 8),
     ),
   ],
 ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeatherSkyCard extends StatefulWidget {
+  @override
+  State<_WeatherSkyCard> createState() => _WeatherSkyCardState();
+}
+
+class _WeatherSkyCardState extends State<_WeatherSkyCard> {
+
+  final List<String> emojis = [
+    '❄️',
+    '🌫️',
+    '☀️',
+    '🌤️',
+    '⛅',
+    '🌦️',
+    '🌧️',
+    '⛈️',
+    '🥵',
+  ];
+
+  int morningIndex = 2;
+  int afternoonIndex = 4;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.94),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFF1E88E5),
+          width: 2,
+        ),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+
+          const Text(
+            'CIEL',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF1E88E5),
+            ),
+          ),
+
+          const SizedBox(height: 2),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+
+              const Text(
+                'Matin',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+
+              const SizedBox(width: 6),
+
+              SizedBox(
+                width: 36,
+                height: 30,
+                child: ListWheelScrollView.useDelegate(
+                  itemExtent: 26,
+                  perspective: 0.003,
+                  diameterRatio: 1.2,
+                  physics: const FixedExtentScrollPhysics(),
+                  onSelectedItemChanged: (index) {
+                    setState(() {
+                      morningIndex = index;
+                    });
+                  },
+                  childDelegate: ListWheelChildBuilderDelegate(
+                    childCount: emojis.length,
+                    builder: (context, index) {
+                      return Center(
+                        child: Text(
+                          emojis[index],
+                          style: const TextStyle(fontSize: 20),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 2),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+
+              const Text(
+                'Après-midi',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+
+              const SizedBox(width: 6),
+
+              SizedBox(
+                width: 36,
+                height: 30,
+                child: ListWheelScrollView.useDelegate(
+                  itemExtent: 26,
+                  perspective: 0.003,
+                  diameterRatio: 1.2,
+                  physics: const FixedExtentScrollPhysics(),
+                  onSelectedItemChanged: (index) {
+                    setState(() {
+                      afternoonIndex = index;
+                    });
+                  },
+                  childDelegate: ListWheelChildBuilderDelegate(
+                    childCount: emojis.length,
+                    builder: (context, index) {
+                      return Center(
+                        child: Text(
+                          emojis[index],
+                          style: const TextStyle(fontSize: 20),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
