@@ -1442,7 +1442,7 @@ Widget _buildBottomBar() {
     {'icon': Icons.layers_outlined, 'label': 'CARTES'},
     {'icon': Icons.star_border, 'label': 'FAVORIS'},
     {'icon': Icons.info_outline, 'label': 'INFOS'},
-    {'icon': Icons.add, 'label': 'SAUVETEUR'},
+    {'icon': Icons.add, 'label': 'LOGIN'},
   ];
 
   return Positioned(
@@ -1455,7 +1455,7 @@ Widget _buildBottomBar() {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Colors.black,
+          color: const Color(0xFFFF0000),
           width: 2,
         ),
       ),
@@ -1541,48 +1541,25 @@ Widget _buildBottomBar() {
 
                   const SizedBox(height: 2),
 
-                  index == 4
-                      ? RichText(
-  text: const TextSpan(
-    children: [
-      TextSpan(
-        text: 'PRO',
-        style: TextStyle(
-          fontSize: 10.4,
-          fontWeight: FontWeight.w900,
-          letterSpacing: -0.2,
-          color: Color(0xFFFF0000),
-        ),
-      ),
-      TextSpan(
-        text: 'FIL',
-        style: TextStyle(
-          fontSize: 10.4,
-          fontWeight: FontWeight.w900,
-          letterSpacing: -0.2,
-          color: Color(0xFF1E3A8A),
-        ),
-      ),
-    ],
-  ),
-)
-                      : Text(
-                          items[index]['label'] as String,
-                          maxLines: 1,
-                          overflow: TextOverflow.visible,
-                          style: TextStyle(
-                            fontSize: 10.4,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.2,
-                            color: index == 1
-                                ? const Color(0xFF2E7D32)
-                                : index == 2
-                                    ? const Color(0xFFFFD000)
-                                    : index == 3
-                                        ? const Color(0xFF1E3A8A)
-                                        : Colors.black87,
-                          ),
-                        ),
+                  Text(
+                    items[index]['label'] as String,
+                    maxLines: 1,
+                    overflow: TextOverflow.visible,
+                    style: TextStyle(
+                      fontSize: 10.4,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.2,
+                      color: index == 4
+                          ? const Color(0xFFFF0000)
+                          : index == 1
+                              ? const Color(0xFF2E7D32)
+                              : index == 2
+                                  ? const Color(0xFFFFD000)
+                                  : index == 3
+                                      ? const Color(0xFF1E3A8A)
+                                      : Colors.black87,
+                    ),
+                  ),
                 ],
               ),
             ),

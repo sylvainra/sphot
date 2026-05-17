@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'lifeguard_actions_page.dart';
 import 'placeholder_page.dart';
-
 import 'terrestrial_weather_page.dart';
 
 class LifeguardMenuPage extends StatelessWidget {
@@ -27,12 +26,12 @@ class LifeguardMenuPage extends StatelessWidget {
 
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
               child: Column(
                 children: [
                   Image.asset(
                     'data/icons/title.png',
-                    height: 56,
+                    height: 52,
                     fit: BoxFit.contain,
                   ),
 
@@ -40,32 +39,44 @@ class LifeguardMenuPage extends StatelessWidget {
                     'RENSEIGNEMENTS SAUVETEURS',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.w900,
                       color: profileColor,
                       letterSpacing: 0.6,
                     ),
                   ),
 
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 14),
 
-                  Expanded(
+                  Container(
+                    height:
+                        MediaQuery.of(context).size.height * 0.69,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: Colors.black,
+                        width: 2.5,
+                      ),
+                    ),
                     child: GridView.count(
+                      physics:
+                          const NeverScrollableScrollPhysics(),
                       crossAxisCount: 2,
-                      crossAxisSpacing: 14,
-                      mainAxisSpacing: 14,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 1.02,
                       children: [
                         _MenuSquare(
-  title: 'ACTIONS RAPIDES',
-  icon: Icons.warning_amber_rounded,
-  color: const Color(0xFFFFD600),
-  backgroundColor: const Color(0xFFD50000),
-  textColor: Colors.white,
-  iconColor: Colors.white,
+                          title: 'ACTIONS RAPIDES',
+                          icon: Icons.warning_amber_rounded,
+                          color: const Color(0xFFD50000),
                           onTap: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => LifeguardActionsPage(
+                                builder: (_) =>
+                                    LifeguardActionsPage(
                                   profileColor: profileColor,
                                 ),
                               ),
@@ -73,31 +84,28 @@ class LifeguardMenuPage extends StatelessWidget {
                           },
                         ),
 
-                       _MenuSquare(
-  title: 'MÉTÉO TERRESTRE',
-  icon: Icons.wb_sunny_rounded,
-  color: const Color(0xFF5D4037),
-  backgroundColor: const Color(0xFF8D6E63),
-  textColor: Colors.white,
-  iconColor: Colors.white,
+                        _MenuSquare(
+                          title: 'MÉTÉO TERRESTRE',
+                          icon: Icons.wb_sunny_rounded,
+                          color: const Color(0xFF8D6E63),
+                          iconColor:
+                              const Color(0xFFFBC02D),
                           onTap: () {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => TerrestrialWeatherPage(
-        profileColor: profileColor,
-      ),
-    ),
-  );
-},
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    TerrestrialWeatherPage(
+                                  profileColor: profileColor,
+                                ),
+                              ),
+                            );
+                          },
                         ),
 
                         _MenuSquare(
-  title: 'MÉTÉO MARINE',
-  icon: Icons.waves_rounded,
-  color: const Color(0xFF1565C0),
-  backgroundColor: const Color(0xFF1E88E5),
-  textColor: Colors.white,
-  iconColor: Colors.white,
+                          title: 'MÉTÉO MARINE',
+                          icon: Icons.waves_rounded,
+                          color: const Color(0xFF1E88E5),
                           onTap: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
@@ -110,13 +118,11 @@ class LifeguardMenuPage extends StatelessWidget {
                           },
                         ),
 
-                       _MenuSquare(
-  title: 'EMPLOI DU TEMPS',
-  icon: Icons.calendar_month_rounded,
-  color: const Color(0xFF2E7D32),
-  backgroundColor: const Color(0xFF43A047),
-  textColor: Colors.white,
-  iconColor: Colors.white,
+                        _MenuSquare(
+                          title: 'EMPLOI DU TEMPS',
+                          icon:
+                              Icons.calendar_month_rounded,
+                          color: const Color(0xFF43A047),
                           onTap: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
@@ -129,13 +135,10 @@ class LifeguardMenuPage extends StatelessWidget {
                           },
                         ),
 
-                       _MenuSquare(
-  title: 'MAIN COURANTE',
-  icon: Icons.menu_book_rounded,
-  color: const Color(0xFF6A1B9A),
-  backgroundColor: const Color(0xFF8E24AA),
-  textColor: Colors.white,
-  iconColor: Colors.white,
+                        _MenuSquare(
+                          title: 'MAIN COURANTE',
+                          icon: Icons.menu_book_rounded,
+                          color: const Color(0xFF8E24AA),
                           onTap: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
@@ -149,12 +152,9 @@ class LifeguardMenuPage extends StatelessWidget {
                         ),
 
                         _MenuSquare(
-  title: 'STATS',
-  icon: Icons.bar_chart_rounded,
-  color: const Color(0xFF37474F),
-  backgroundColor: const Color(0xFF546E7A),
-  textColor: Colors.white,
-  iconColor: Colors.white,
+                          title: 'STATS',
+                          icon: Icons.bar_chart_rounded,
+                          color: const Color(0xFF546E7A),
                           onTap: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
@@ -167,6 +167,33 @@ class LifeguardMenuPage extends StatelessWidget {
                           },
                         ),
                       ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                    },
+                    child: Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.black,
+                          width: 2.5,
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.black,
+                          size: 24,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -183,18 +210,14 @@ class _MenuSquare extends StatelessWidget {
   final String title;
   final IconData icon;
   final Color color;
-final Color? backgroundColor;
-final Color? textColor;
-final Color? iconColor;
   final VoidCallback onTap;
+  final Color? iconColor;
 
   const _MenuSquare({
   required this.title,
   required this.icon,
   required this.color,
   required this.onTap,
-  this.backgroundColor,
-  this.textColor,
   this.iconColor,
 });
 
@@ -204,41 +227,34 @@ final Color? iconColor;
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: backgroundColor ?? Colors.white.withOpacity(0.94),
-          borderRadius: BorderRadius.circular(24),
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
-  color: color,
-  width: 2.5,
-),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            ),
-          ],
+            color: color,
+            width: 2.3,
+          ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(10),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
                 color: iconColor ?? color,
-                size: 42,
+                size: 36,
               ),
 
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
 
               Text(
                 title,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: textColor ?? color,
-                  fontSize: 15,
+                  color: color,
+                  fontSize: 13,
                   fontWeight: FontWeight.w900,
-                  height: 1.1,
+                  height: 1.05,
                 ),
               ),
             ],

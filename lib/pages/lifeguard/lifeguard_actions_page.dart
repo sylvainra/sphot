@@ -103,8 +103,9 @@ class _LifeguardActionsPageState extends State<LifeguardActionsPage> {
           ),
 
           SafeArea(
-            child: Column(
-              children: [
+  child: Column(
+    mainAxisAlignment: MainAxisAlignment.start,
+    children: [
                 const SizedBox(height: 2),
 
                 Image.asset(
@@ -124,11 +125,11 @@ class _LifeguardActionsPageState extends State<LifeguardActionsPage> {
                   ),
                 ),
 
-                const SizedBox(height: 4),
+                const SizedBox(height: 0),
 
                 Expanded(
   child: Padding(
-    padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 50),
     child: Column(
       children: [
                           _sectionCard(
@@ -482,52 +483,36 @@ _ActionButton(
 }
 
   Widget _bottomNavBar() {
-    return SafeArea(
-      top: false,
-      child: Container(
-        height: 44,
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 2),
-        decoration: BoxDecoration(
-  color: Colors.transparent,
-  border: Border.all(
-    color: Colors.black,
-    width: 2,
-  ),
-  borderRadius: BorderRadius.circular(18),
-),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _BottomLogoButton(
-              icon: Icons.home_rounded,
-              color: widget.profileColor,
-              onTap: _goHome,
+  return SafeArea(
+    top: false,
+    child: Center(
+      child: GestureDetector(
+        onTap: () {
+          Navigator.of(context).pop();
+        },
+        child: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.black,
+              width: 2,
             ),
-            _BottomLogoButton(
-              icon: Icons.watch_later_rounded,
-              color: widget.profileColor,
-              onTap: () {},
+          ),
+          child: const Center(
+            child: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.black,
+              size: 22,
             ),
-            _BottomLogoButton(
-              icon: Icons.groups_rounded,
-              color: widget.profileColor,
-              onTap: () {},
-            ),
-            _BottomLogoButton(
-              icon: Icons.info_rounded,
-              color: widget.profileColor,
-              onTap: () {},
-            ),
-            _BottomLogoButton(
-              icon: Icons.account_circle,
-              color: widget.profileColor,
-              onTap: () {},
-            ),
-          ],
+          ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _dangerBanner() {
     return Container(
@@ -628,7 +613,7 @@ _ActionButton(
                   style: TextStyle(
                     fontSize: 19,
                     fontWeight: FontWeight.bold,
-                    color: widget.profileColor,
+                    color: Colors.black,
                   ),
                 ),
               ),
@@ -1324,7 +1309,10 @@ class _NotificationWritePageState
                   ),
 
                   Container(
+  width: 48,
+  height: 48,
   decoration: BoxDecoration(
+    color: Colors.transparent,
     shape: BoxShape.circle,
     border: Border.all(
       color: Colors.black,
@@ -1335,10 +1323,12 @@ class _NotificationWritePageState
     onPressed: () =>
         Navigator.of(context).pop(),
 
-    icon: Icon(
-      Icons.arrow_back_rounded,
-      color: widget.profileColor,
-      size: 34,
+    padding: EdgeInsets.zero,
+
+    icon: const Icon(
+      Icons.arrow_back_ios_new_rounded,
+      color: Colors.black,
+      size: 20,
     ),
   ),
 ),

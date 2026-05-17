@@ -110,76 +110,87 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
   }
 
   @override
-  Widget build(BuildContext context) {
-    final isLifeguard = _selectedProfile == LoginProfile.lifeguard;
+Widget build(BuildContext context) {
+  final isLifeguard = _selectedProfile == LoginProfile.lifeguard;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false,
-      body: GestureDetector(
-        onTap: _closeKeyboard,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.asset(
-              'data/images/map_background.jpg',
-              fit: BoxFit.cover,
-            ),
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 26),
-                child: Column(
-                  children: [
-                    Image.asset(
-                      'data/icons/title.png',
-                      height: 64,
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.high,
+  return Scaffold(
+    backgroundColor: Colors.transparent,
+    resizeToAvoidBottomInset: false,
+    body: GestureDetector(
+      onTap: _closeKeyboard,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'data/images/map_background.jpg',
+            fit: BoxFit.cover,
+          ),
+
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 26),
+              child: Column(
+                children: [
+                  Image.asset(
+                    'data/icons/title.png',
+                    height: 64,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Visibility(
+                    visible: !_isEditing,
+                    maintainSize: true,
+                    maintainAnimation: true,
+                    maintainState: true,
+                    child: const Text(
+                      'CONNEXION',
+                      style: TextStyle(
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFFFF0000),
+                        letterSpacing: 1,
+                      ),
                     ),
-                    const SizedBox(height: 12),
+                  ),
 
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      transform: Matrix4.translationValues(
-                        0,
-                        _isEditing ? -110 : 0,
-                        0,
+                  const SizedBox(height: 16),
+
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    transform: Matrix4.translationValues(
+                      0,
+                      _isEditing ? -150 : 0,
+                      0,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: Colors.black,
+                          width: 2.5,
+                        ),
                       ),
                       child: Column(
                         children: [
-                          Visibility(
-                            visible: !_isEditing,
-                            maintainSize: true,
-                            maintainAnimation: true,
-                            maintainState: true,
-                            child: Column(
-                              children: [
-                                const Text(
-                                  'CONNEXION',
-                                  style: TextStyle(
-                                    fontSize: 34,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.black,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  isLifeguard
-                                      ? 'Accès sauveteurs'
-                                      : 'Accès administration',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                              ],
+                          Text(
+                            isLifeguard
+                                ? 'Accès sauveteurs'
+                                : 'Accès administration',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.black,
                             ),
                           ),
+
+                          const SizedBox(height: 16),
 
                           Row(
                             children: [
@@ -196,7 +207,9 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
                                   },
                                 ),
                               ),
+
                               const SizedBox(width: 12),
+
                               Expanded(
                                 child: _profileButton(
                                   label: 'ADMIN',
@@ -238,28 +251,26 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
                                 vertical: 16,
                               ),
                               border: OutlineInputBorder(
-  borderRadius: BorderRadius.circular(16),
-  borderSide: const BorderSide(
-    color: Colors.black,
-    width: 2,
-  ),
-),
-
-enabledBorder: OutlineInputBorder(
-  borderRadius: BorderRadius.circular(16),
-  borderSide: const BorderSide(
-    color: Colors.black,
-    width: 2,
-  ),
-),
-
-focusedBorder: OutlineInputBorder(
-  borderRadius: BorderRadius.circular(16),
-  borderSide: const BorderSide(
-    color: Colors.black,
-    width: 2.4,
-  ),
-),
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(
+                                  color: Colors.black,
+                                  width: 2,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(
+                                  color: Colors.black,
+                                  width: 2,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(
+                                  color: Colors.black,
+                                  width: 2.4,
+                                ),
+                              ),
                             ),
                           ),
 
@@ -287,28 +298,26 @@ focusedBorder: OutlineInputBorder(
                                 vertical: 16,
                               ),
                               border: OutlineInputBorder(
-  borderRadius: BorderRadius.circular(16),
-  borderSide: const BorderSide(
-    color: Colors.black,
-    width: 2,
-  ),
-),
-
-enabledBorder: OutlineInputBorder(
-  borderRadius: BorderRadius.circular(16),
-  borderSide: const BorderSide(
-    color: Colors.black,
-    width: 2,
-  ),
-),
-
-focusedBorder: OutlineInputBorder(
-  borderRadius: BorderRadius.circular(16),
-  borderSide: const BorderSide(
-    color: Colors.black,
-    width: 2.4,
-  ),
-),
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(
+                                  color: Colors.black,
+                                  width: 2,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(
+                                  color: Colors.black,
+                                  width: 2,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(
+                                  color: Colors.black,
+                                  width: 2.4,
+                                ),
+                              ),
                             ),
                           ),
 
@@ -326,12 +335,12 @@ focusedBorder: OutlineInputBorder(
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
-  borderRadius: BorderRadius.circular(18),
-  side: const BorderSide(
-    color: Colors.black,
-    width: 2,
-  ),
-),
+                                  borderRadius: BorderRadius.circular(18),
+                                  side: const BorderSide(
+                                    color: Colors.black,
+                                    width: 2,
+                                  ),
+                                ),
                               ),
                               child: const Text(
                                 'SE CONNECTER',
@@ -346,41 +355,42 @@ focusedBorder: OutlineInputBorder(
                         ],
                       ),
                     ),
+                  ),
 
-                    const Spacer(),
+                  const Spacer(),
 
-                    if (!_isEditing)
-                      Container(
-                        width: 62,
-                        height: 62,
-                        decoration: BoxDecoration(
-  color: Colors.transparent,
-  shape: BoxShape.circle,
-  border: Border.all(
-    color: Colors.black,
-    width: 2,
-  ),
-),
-                        child: IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.black,
-                            size: 30,
-                          ),
+                  if (!_isEditing)
+                    Container(
+                      width: 62,
+                      height: 62,
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.black,
+                          width: 2,
                         ),
                       ),
+                      child: IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          color: Colors.black,
+                          size: 30,
+                        ),
+                      ),
+                    ),
 
-                    const SizedBox(height: 18),
-                  ],
-                ),
+                  const SizedBox(height: 18),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _profileButton({
     required String label,

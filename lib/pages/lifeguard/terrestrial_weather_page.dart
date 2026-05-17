@@ -24,6 +24,8 @@ class _TerrestrialWeatherPageState extends State<TerrestrialWeatherPage> {
 
   int uvIndex = 7;
 
+  int heatwaveLevel = 1;
+
   String windDirectionMorning = 'O';
   String windDirectionEvening = 'NO';
 
@@ -33,249 +35,212 @@ class _TerrestrialWeatherPageState extends State<TerrestrialWeatherPage> {
   int gusts = 35;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(
-            'data/images/map_background.jpg',
-            fit: BoxFit.cover,
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Column(
-                children: [
-                  Image.asset(
-                    'data/icons/title.png',
-                    height: 56,
-                    fit: BoxFit.contain,
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.transparent,
+    body: Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          'data/images/map_background.jpg',
+          fit: BoxFit.cover,
+        ),
+
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              children: [
+                Image.asset(
+                  'data/icons/title.png',
+                  height: 56,
+                  fit: BoxFit.contain,
+                ),
+
+                const Text(
+                  'MÉTÉO TERRESTRE',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFFF0000),
+                    letterSpacing: 0.6,
                   ),
+                ),
 
-                  const Text(
-                    'MÉTÉO TERRESTRE',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF5D4037),
-                      letterSpacing: 0.6,
-                    ),
-                  ),
+                const SizedBox(height: 2),
 
-                  const SizedBox(height: 2),
-
-                  Expanded(
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                      decoration: BoxDecoration(
-                        color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: const Color(0xFF5D4037),
-                          width: 2,
-                        ),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: const Color(0xFF5D4037),
+                        width: 2,
                       ),
-                      child: Transform.translate(
-                        offset: const Offset(0, -4),
-                        child: Column(
-                          children: [
-                            Transform.translate(
-                              offset: const Offset(0, 6),
-                              child: const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 2),
-                                child: Text(
-                                  'PRÉVISIONS',
-                                  style: TextStyle(
-                                    color: Color(0xFF5D4037),
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.8,
-                                  ),
+                    ),
+                    child: Transform.translate(
+                      offset: const Offset(0, -4),
+                      child: Column(
+                        children: [
+                          Transform.translate(
+                            offset: const Offset(0, 6),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 2),
+                              child: Text(
+                                'PRÉVISIONS',
+                                style: TextStyle(
+                                  color: Color(0xFF5D4037),
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.8,
                                 ),
                               ),
                             ),
+                          ),
 
-                            const SizedBox(height: 6),
+                          const SizedBox(height: 6),
 
-                            Row(
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _WeatherPickerCard(
+                                  title: 'AIR',
+                                  icon: Icons.thermostat_rounded,
+                                  minValue: airMin,
+                                  maxValue: airMax,
+                                  onMinChanged: (value) {
+                                    setState(() {
+                                      airMin = value;
+                                    });
+                                  },
+                                  onMaxChanged: (value) {
+                                    setState(() {
+                                      airMax = value;
+                                    });
+                                  },
+                                ),
+                              ),
+
+                              const SizedBox(width: 12),
+
+                              Expanded(
+                                child: _WeatherSkyCard(),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 6),
+
+                          _WindFullWidthCard(
+                            directionMorning: windDirectionMorning,
+                            directionEvening: windDirectionEvening,
+                            morningSpeed: windMorningSpeed,
+                            eveningSpeed: windEveningSpeed,
+                            gusts: gusts,
+                            onDirectionMorningChanged: (value) {
+                              setState(() {
+                                windDirectionMorning = value;
+                              });
+                            },
+                            onDirectionEveningChanged: (value) {
+                              setState(() {
+                                windDirectionEvening = value;
+                              });
+                            },
+                            onMorningSpeedChanged: (value) {
+                              setState(() {
+                                windMorningSpeed = value;
+                              });
+                            },
+                            onEveningSpeedChanged: (value) {
+                              setState(() {
+                                windEveningSpeed = value;
+                              });
+                            },
+                            onGustsChanged: (value) {
+                              setState(() {
+                                gusts = value;
+                              });
+                            },
+                          ),
+
+                          const SizedBox(height: 6),
+
+                          Expanded(
+                            child: GridView.count(
+                              physics:
+                                  const NeverScrollableScrollPhysics(),
+                              childAspectRatio: 1.45,
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
                               children: [
-                                Expanded(
-                                  child: _WeatherPickerCard(
-                                    title: 'AIR',
-                                    icon: Icons.thermostat_rounded,
-                                    minValue: airMin,
-                                    maxValue: airMax,
-                                    onMinChanged: (value) {
-                                      setState(() {
-                                        airMin = value;
-                                      });
-                                    },
-                                    onMaxChanged: (value) {
-                                      setState(() {
-                                        airMax = value;
-                                      });
-                                    },
-                                  ),
+                                _UVCard(
+                                  uvIndex: uvIndex,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      uvIndex = value;
+                                    });
+                                  },
                                 ),
 
-                                const SizedBox(width: 12),
-
-                                Expanded(
-                                  child: _WeatherSkyCard(),
+                                _HeatwaveCard(
+                                  level: heatwaveLevel,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      heatwaveLevel = value;
+                                    });
+                                  },
                                 ),
                               ],
                             ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
 
-                            const SizedBox(height: 6),
-
-                            _WindFullWidthCard(
-                              directionMorning: windDirectionMorning,
-                              directionEvening: windDirectionEvening,
-                              morningSpeed: windMorningSpeed,
-                              eveningSpeed: windEveningSpeed,
-                              gusts: gusts,
-                              onDirectionMorningChanged: (value) {
-                                setState(() {
-                                  windDirectionMorning = value;
-                                });
-                              },
-                              onDirectionEveningChanged: (value) {
-                                setState(() {
-                                  windDirectionEvening = value;
-                                });
-                              },
-                              onMorningSpeedChanged: (value) {
-                                setState(() {
-                                  windMorningSpeed = value;
-                                });
-                              },
-                              onEveningSpeedChanged: (value) {
-                                setState(() {
-                                  windEveningSpeed = value;
-                                });
-                              },
-                              onGustsChanged: (value) {
-                                setState(() {
-                                  gusts = value;
-                                });
-                              },
-                            ),
-
-                            const SizedBox(height: 6),
-
-                            Expanded(
-                              child: GridView.count(
-                                physics:
-                                    const NeverScrollableScrollPhysics(),
-                                childAspectRatio: 1.45,
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
-                                children: [
-                                  _UVCard(
-                                    uvIndex: uvIndex,
-                                    onChanged: (value) {
-                                      setState(() {
-                                        uvIndex = value;
-                                      });
-                                    },
-                                  ),
-
-                                  const _WeatherInfoCard(
-                                    title: 'CANICULE',
-                                    value: 'NIVEAU 0',
-                                    icon: Icons
-                                        .local_fire_department_rounded,
-                                  ),
-
-                                  const _WeatherInfoCard(
-                                    title: 'HUMIDITÉ',
-                                    value: '62%',
-                                    icon: Icons.water_drop_rounded,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                Transform.translate(
+                  offset: const Offset(0, 6),
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.black,
+                          width: 2,
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.black,
+                          size: 22,
                         ),
                       ),
                     ),
                   ),
-
-                  Transform.translate(
-  offset: const Offset(0, 10),
-  child: const _BottomQuickNavBar(),
-),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 }
 
-class _WeatherInfoCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-
-  const _WeatherInfoCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.black,
-          width: 2,
-        ),
-      ),
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            color: const Color(0xFF5D4037),
-            size: 34,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.black87,
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFF5D4037),
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _UVCard extends StatelessWidget {
@@ -333,7 +298,7 @@ class _UVCard extends StatelessWidget {
                 'UV',
                 style: TextStyle(
                   color: Color(0xFFFDE047),
-                  fontSize: 15,
+                  fontSize: 22,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -341,7 +306,7 @@ class _UVCard extends StatelessWidget {
           ),
 
           Transform.translate(
-            offset: const Offset(0, 4),
+            offset: const Offset(0, -2),
             child: NumberPicker(
               value: uvIndex,
               minValue: 1,
@@ -1009,110 +974,125 @@ class _SmallWindPicker extends StatelessWidget {
   }
 }
 
-class _BottomQuickNavBar extends StatelessWidget {
-  const _BottomQuickNavBar();
+class _HeatwaveCard extends StatelessWidget {
+  final int level;
+  final ValueChanged<int> onChanged;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 58,
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFF5D4037),
-          width: 2,
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-  _BottomQuickNavItem(
-    icon: Icons.waves_rounded,
-    label: 'MÉTÉO\nMARINE',
-  ),
-
-  _BottomQuickNavItem(
-    icon: Icons.menu_book_rounded,
-    label: 'MAIN\nCOURANTE',
-  ),
-
-  _BottomQuickNavItem(
-  icon: Icons.warning_amber_rounded,
-  label: 'ACTIONS\nRAPIDES',
-  isCenter: true,
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => LifeguardActionsPage(
-  profileColor: const Color(0xFF5D4037),
-),
-      ),
-    );
-  },
-),
-
-  _BottomQuickNavItem(
-    icon: Icons.calendar_month_rounded,
-    label: 'EMPLOI\nDU TEMPS',
-  ),
-
-  _BottomQuickNavItem(
-    icon: Icons.bar_chart_rounded,
-    label: 'STATS',
-  ),
-],
-      ),
-    );
-  }
-}
-
-class _BottomQuickNavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isCenter;
-  final VoidCallback? onTap;
-
-  const _BottomQuickNavItem({
-    required this.icon,
-    required this.label,
-    this.isCenter = false,
-    this.onTap,
+  const _HeatwaveCard({
+    required this.level,
+    required this.onChanged,
   });
 
+  Color _heatwaveColor(int value) {
+    switch (value) {
+      case 1:
+        return const Color(0xFF2FA354);
+      case 2:
+        return const Color(0xFFFFD426);
+      case 3:
+        return const Color(0xFFFF6F1A);
+      case 4:
+        return const Color(0xFFF92B3F);
+      default:
+        return const Color(0xFF2FA354);
+    }
+  }
+
+  String _heatwaveTitle(int value) {
+    switch (value) {
+      case 1:
+        return 'VEILLE\nSAISONNIÈRE';
+      case 2:
+        return 'AVERTISSEMENT\nCHALEUR';
+      case 3:
+        return 'ALERTE\nCANICULE';
+      case 4:
+        return 'MOBILISATION\nMAXIMALE';
+      default:
+        return 'VEILLE\nSAISONNIÈRE';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color:
-                  isCenter ? Colors.red : const Color(0xFF5D4037),
-              size: isCenter ? 28 : 24,
+    final color = _heatwaveColor(level);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: color,
+          width: 3,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.local_fire_department_rounded,
+                color: color,
+                size: 22,
+              ),
+              const SizedBox(width: 5),
+              const Text(
+                'CANICULE',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+
+          Transform.translate(
+            offset: const Offset(0, -8),
+            child: NumberPicker(
+              value: level,
+              minValue: 1,
+              maxValue: 4,
+              itemWidth: 120,
+              itemHeight: 15,
+              textMapper: (numberText) {
+                final value = int.parse(numberText);
+                return 'NIVEAU $value';
+              },
+              textStyle: const TextStyle(
+                fontSize: 8,
+                color: Colors.black38,
+                fontWeight: FontWeight.w700,
+              ),
+              selectedTextStyle: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+              onChanged: onChanged,
             ),
+          ),
 
-            const SizedBox(height: 2),
-
-            Text(
-              label,
+          Transform.translate(
+            offset: const Offset(0, -10),
+            child: Text(
+              _heatwaveTitle(level),
               textAlign: TextAlign.center,
               maxLines: 2,
+              overflow: TextOverflow.visible,
               style: TextStyle(
-                color: Colors.black,
-                fontSize: isCenter ? 9 : 8,
+                color: color,
+                fontSize: 9,
                 fontWeight: FontWeight.w900,
-                height: 1.05,
+                height: 1.0,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
