@@ -124,11 +124,11 @@ class _LifeguardActionsPageState extends State<LifeguardActionsPage> {
                   ),
                 ),
 
-                const SizedBox(height: 14),
+                const SizedBox(height: 4),
 
                 Expanded(
   child: Padding(
-    padding: const EdgeInsets.fromLTRB(16, 0, 16, 56),
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
     child: Column(
       children: [
                           _sectionCard(
@@ -352,9 +352,9 @@ _ActionButton(
   ),
 
           Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
+            left: 16,
+            right: 16,
+            bottom: 10,
             child: _bottomNavBar(),
           ),
         ],
@@ -459,12 +459,16 @@ _ActionButton(
                 setState(() => isDangerMenuOpen = false);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
+  backgroundColor: Colors.red,
+  foregroundColor: Colors.white,
+  side: const BorderSide(
+    color: Colors.black,
+    width: 2,
+  ),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(14),
+  ),
+),
               child: const Text(
                 'VALIDER',
                 style: TextStyle(fontWeight: FontWeight.w900),
@@ -481,10 +485,15 @@ _ActionButton(
     return SafeArea(
       top: false,
       child: Container(
-        height: 48,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: const BoxDecoration(
+        height: 44,
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 2),
+        decoration: BoxDecoration(
   color: Colors.transparent,
+  border: Border.all(
+    color: Colors.black,
+    width: 2,
+  ),
+  borderRadius: BorderRadius.circular(18),
 ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -592,8 +601,12 @@ _ActionButton(
       margin: const EdgeInsets.only(bottom: 3),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.94),
-        borderRadius: BorderRadius.circular(18),
+  color: Colors.transparent,
+  borderRadius: BorderRadius.circular(18),
+  border: Border.all(
+    color: Colors.black,
+    width: 2,
+  ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.12),
@@ -652,7 +665,7 @@ class _SphotMenuItem extends StatelessWidget {
       height: 46,
 padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: selected ? const Color(0xFFF3F7FA) : Colors.white,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: selected ? Colors.black : Colors.black12,
@@ -800,10 +813,13 @@ class _FlagPositionSwitch extends StatelessWidget {
         duration: const Duration(milliseconds: 220),
         padding: const EdgeInsets.all(5),
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F7FA),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.black, width: 2),
-        ),
+  color: Colors.transparent,
+  borderRadius: BorderRadius.circular(18),
+  border: Border.all(
+    color: Colors.black,
+    width: 2,
+  ),
+),
         child: Stack(
           children: [
             AnimatedAlign(
@@ -884,9 +900,13 @@ class _ActionButton extends StatelessWidget {
         height: 52,
         width: double.infinity,
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(14),
-        ),
+  color: color,
+  borderRadius: BorderRadius.circular(14),
+  border: Border.all(
+    color: Colors.black,
+    width: 2,
+  ),
+),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -924,15 +944,18 @@ class NotificationWritePage extends StatefulWidget {
   });
 
   @override
-  State<NotificationWritePage> createState() => _NotificationWritePageState();
+  State<NotificationWritePage> createState() =>
+      _NotificationWritePageState();
 }
 
-class _NotificationWritePageState extends State<NotificationWritePage> {
+class _NotificationWritePageState
+    extends State<NotificationWritePage> {
   late stt.SpeechToText _speech;
 
   bool _isListening = false;
 
-  final TextEditingController controller = TextEditingController();
+  final TextEditingController controller =
+      TextEditingController();
 
   @override
   void initState() {
@@ -949,7 +972,8 @@ class _NotificationWritePageState extends State<NotificationWritePage> {
 
   void _listen() async {
     if (!_isListening) {
-      final bool available = await _speech.initialize();
+      final bool available =
+          await _speech.initialize();
 
       if (available) {
         setState(() => _isListening = true);
@@ -958,9 +982,14 @@ class _NotificationWritePageState extends State<NotificationWritePage> {
           localeId: 'fr_FR',
           onResult: (result) {
             setState(() {
-              controller.text = result.recognizedWords;
-              controller.selection = TextSelection.fromPosition(
-                TextPosition(offset: controller.text.length),
+              controller.text =
+                  result.recognizedWords;
+
+              controller.selection =
+                  TextSelection.fromPosition(
+                TextPosition(
+                  offset: controller.text.length,
+                ),
               );
             });
           },
@@ -976,8 +1005,10 @@ class _NotificationWritePageState extends State<NotificationWritePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
+
       body: Stack(
         fit: StackFit.expand,
+
         children: [
           Image.asset(
             'data/images/map_background.jpg',
@@ -986,7 +1017,14 @@ class _NotificationWritePageState extends State<NotificationWritePage> {
 
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              padding:
+                  const EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                16,
+              ),
+
               child: Column(
                 children: [
                   Image.asset(
@@ -1000,8 +1038,10 @@ class _NotificationWritePageState extends State<NotificationWritePage> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: widget.profileColor,
+                      fontWeight:
+                          FontWeight.w900,
+                      color:
+                          widget.profileColor,
                       letterSpacing: 0.6,
                     ),
                   ),
@@ -1011,96 +1051,199 @@ class _NotificationWritePageState extends State<NotificationWritePage> {
                   Expanded(
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(16),
+
+                      padding:
+                          const EdgeInsets.all(
+                        16,
+                      ),
+
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.94),
-                        borderRadius: BorderRadius.circular(22),
+                        color: Colors.transparent,
+
+                        borderRadius:
+                            BorderRadius.circular(
+                          22,
+                        ),
+
+                        border: Border.all(
+                          color: Colors.black,
+                          width: 2,
+                        ),
+
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.12),
+                            color: Colors.black
+                                .withOpacity(
+                              0.12,
+                            ),
                             blurRadius: 12,
-                            offset: const Offset(0, 5),
+                            offset:
+                                const Offset(
+                              0,
+                              5,
+                            ),
                           ),
                         ],
                       ),
+
                       child: Column(
                         children: [
                           Row(
-  children: [
-    Icon(
-      Icons.mode_edit_outline_rounded,
-      color: widget.profileColor,
-      size: 20,
-    ),
+                            children: [
+                              Icon(
+                                Icons
+                                    .mode_edit_outline_rounded,
+                                color: widget
+                                    .profileColor,
+                                size: 20,
+                              ),
 
-    const SizedBox(width: 8),
+                              const SizedBox(
+                                width: 8,
+                              ),
 
-    Expanded(
-      child: Text(
-        'Message',
-        style: TextStyle(
-          color: widget.profileColor,
-          fontSize: 19,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    ),
+                              Expanded(
+                                child: Text(
+                                  'Message',
+                                  style:
+                                      TextStyle(
+                                    color: widget
+                                        .profileColor,
+                                    fontSize:
+                                        19,
+                                    fontWeight:
+                                        FontWeight
+                                            .bold,
+                                  ),
+                                ),
+                              ),
 
-    IconButton(
-      onPressed: _listen,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(
-        minWidth: 34,
-        minHeight: 34,
-      ),
-      icon: Icon(
-        _isListening
-            ? Icons.mic_rounded
-            : Icons.mic_none_rounded,
-        color: _isListening
-            ? Colors.red
-            : widget.profileColor,
-        size: 24,
-      ),
-    ),
-  ],
-),
+                              IconButton(
+                                onPressed:
+                                    _listen,
+
+                                padding:
+                                    EdgeInsets
+                                        .zero,
+
+                                constraints:
+                                    const BoxConstraints(
+                                  minWidth:
+                                      34,
+                                  minHeight:
+                                      34,
+                                ),
+
+                                icon: Icon(
+                                  _isListening
+                                      ? Icons
+                                          .mic_rounded
+                                      : Icons
+                                          .mic_none_rounded,
+
+                                  color: _isListening
+                                      ? Colors
+                                          .red
+                                      : widget
+                                          .profileColor,
+
+                                  size: 24,
+                                ),
+                              ),
+                            ],
+                          ),
 
                           if (_isListening)
                             const Padding(
-                              padding: EdgeInsets.only(top: 4),
+                              padding:
+                                  EdgeInsets.only(
+                                top: 4,
+                              ),
+
                               child: Text(
                                 'Écoute en cours...',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.w800,
+                                style:
+                                    TextStyle(
+                                  color:
+                                      Colors
+                                          .red,
+                                  fontWeight:
+                                      FontWeight
+                                          .w800,
                                 ),
                               ),
                             ),
 
-                          const SizedBox(height: 16),
+                          const SizedBox(
+                            height: 16,
+                          ),
 
                           Expanded(
                             child: TextField(
-                              controller: controller,
+                              controller:
+                                  controller,
+
                               maxLines: null,
+
                               expands: true,
-                              textAlignVertical: TextAlignVertical.top,
-                              decoration: InputDecoration(
-                                hintText: 'Écrivez votre notification ici...',
+
+                              textAlignVertical:
+                                  TextAlignVertical
+                                      .top,
+
+                              decoration:
+                                  InputDecoration(
+                                hintText:
+                                    'Écrivez ou dictez ici...',
+
                                 filled: true,
-                                fillColor: const Color(0xFFF3F7FA),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: const BorderSide(
-                                    color: Colors.black,
+
+                                fillColor:
+                                    const Color(
+                                  0xFFF3F7FA,
+                                ),
+
+                                enabledBorder:
+                                    OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(
+                                    16,
+                                  ),
+
+                                  borderSide:
+                                      const BorderSide(
+                                    color: Colors
+                                        .black,
                                     width: 2,
                                   ),
                                 ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: BorderSide(
-                                    color: widget.profileColor,
+
+                                border:
+                                    OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(
+                                    16,
+                                  ),
+
+                                  borderSide:
+                                      const BorderSide(
+                                    color: Colors
+                                        .black,
+                                    width: 2,
+                                  ),
+                                ),
+
+                                focusedBorder:
+                                    OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(
+                                    16,
+                                  ),
+
+                                  borderSide:
+                                      BorderSide(
+                                    color: widget
+                                        .profileColor,
                                     width: 3,
                                   ),
                                 ),
@@ -1108,27 +1251,65 @@ class _NotificationWritePageState extends State<NotificationWritePage> {
                             ),
                           ),
 
-                          const SizedBox(height: 14),
+                          const SizedBox(
+                            height: 14,
+                          ),
 
                           SizedBox(
-                            width: double.infinity,
+                            width:
+                                double.infinity,
+
                             height: 52,
-                            child: ElevatedButton.icon(
+
+                            child:
+                                ElevatedButton
+                                    .icon(
                               onPressed: () {
-                                Navigator.of(context).pop();
+                                Navigator.of(
+                                        context)
+                                    .pop();
                               },
-                              icon: const Icon(Icons.check_rounded),
-                              label: const Text(
+
+                              icon: const Icon(
+                                Icons
+                                    .check_rounded,
+                              ),
+
+                              label:
+                                  const Text(
                                 'VALIDER LA NOTIFICATION',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
+                                style:
+                                    TextStyle(
+                                  fontWeight:
+                                      FontWeight
+                                          .w900,
                                 ),
                               ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: widget.profileColor,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+
+                              style:
+                                  ElevatedButton
+                                      .styleFrom(
+                                backgroundColor:
+                                    widget
+                                        .profileColor,
+
+                                foregroundColor:
+                                    Colors
+                                        .white,
+
+                                side:
+                                    const BorderSide(
+                                  color: Colors
+                                      .black,
+                                  width: 2,
+                                ),
+
+                                shape:
+                                    RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(
+                                    16,
+                                  ),
                                 ),
                               ),
                             ),
@@ -1138,16 +1319,29 @@ class _NotificationWritePageState extends State<NotificationWritePage> {
                     ),
                   ),
 
-                  const SizedBox(height: 10),
-
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: Icon(
-                      Icons.arrow_back_rounded,
-                      color: widget.profileColor,
-                      size: 34,
-                    ),
+                  const SizedBox(
+                    height: 10,
                   ),
+
+                  Container(
+  decoration: BoxDecoration(
+    shape: BoxShape.circle,
+    border: Border.all(
+      color: Colors.black,
+      width: 2,
+    ),
+  ),
+  child: IconButton(
+    onPressed: () =>
+        Navigator.of(context).pop(),
+
+    icon: Icon(
+      Icons.arrow_back_rounded,
+      color: widget.profileColor,
+      size: 34,
+    ),
+  ),
+),
                 ],
               ),
             ),

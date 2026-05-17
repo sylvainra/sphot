@@ -235,7 +235,7 @@ class _WeatherInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.94),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: Colors.black,
@@ -309,7 +309,7 @@ class _UVCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.94),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: uvColor,
@@ -437,7 +437,7 @@ class _WeatherPickerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.94),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: _temperatureColor(maxValue),
@@ -581,7 +581,7 @@ class _WeatherSkyCardState extends State<_WeatherSkyCard> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.94),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: const Color(0xFF1E88E5),
@@ -737,7 +737,7 @@ class _WindFullWidthCard extends StatelessWidget {
       height: 230,
       padding: const EdgeInsets.fromLTRB(10, 2, 10, 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.78),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: gustColor,
@@ -1019,7 +1019,7 @@ class _BottomQuickNavBar extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.88),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: const Color(0xFF5D4037),

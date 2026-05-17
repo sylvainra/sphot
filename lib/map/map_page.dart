@@ -1451,7 +1451,14 @@ Widget _buildBottomBar() {
     bottom: 6,
     child: Container(
       height: 48,
-      color: Colors.transparent,
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Colors.black,
+          width: 2,
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: List.generate(items.length, (index) {
@@ -1489,27 +1496,27 @@ Widget _buildBottomBar() {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SizedBox(
-                    width: 26,
-                    height: 26,
+                    width: 22,
+                    height: 22,
                     child: Center(
                       child: index == 4
                           ? Stack(
                               alignment: Alignment.center,
                               children: [
                                 Container(
-                                  width: 8,
-                                  height: 26,
+                                  width: 5,
+                                  height: 22,
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFFF0000),
-                                    borderRadius: BorderRadius.circular(2),
+                                    borderRadius: BorderRadius.circular(1.5),
                                   ),
                                 ),
                                 Container(
-                                  width: 26,
-                                  height: 8,
+                                  width: 22,
+                                  height: 5,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFFD000),
-                                    borderRadius: BorderRadius.circular(2),
+                                    color: const Color(0xFF1E3A8A),
+                                    borderRadius: BorderRadius.circular(1.5),
                                   ),
                                 ),
                               ],
@@ -1517,12 +1524,12 @@ Widget _buildBottomBar() {
                           : index == 1
                               ? const Icon(
                                   Icons.layers_outlined,
-                                  size: 30,
+                                  size: 24,
                                   color: Color(0xFF8B5E3C),
                                 )
                               : Icon(
                                   items[index]['icon'] as IconData,
-                                  size: 30,
+                                  size: 24,
                                   color: index == 2
                                       ? const Color(0xFFFFD000)
                                       : index == 3
@@ -1531,26 +1538,51 @@ Widget _buildBottomBar() {
                                 ),
                     ),
                   ),
+
                   const SizedBox(height: 2),
-                  Text(
-                    items[index]['label'] as String,
-                    maxLines: 1,
-                    overflow: TextOverflow.visible,
-                    style: TextStyle(
-                      fontSize: 10.4,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.2,
-                      color: index == 1
-                          ? const Color(0xFF2E7D32)
-                          : index == 2
-                              ? const Color(0xFFFFD000)
-                              : index == 3
-                                  ? const Color(0xFF1E3A8A)
-                                  : index == 4
-                                      ? const Color(0xFFFF0000)
-                                      : Colors.black87,
-                    ),
-                  ),
+
+                  index == 4
+                      ? RichText(
+  text: const TextSpan(
+    children: [
+      TextSpan(
+        text: 'PRO',
+        style: TextStyle(
+          fontSize: 10.4,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -0.2,
+          color: Color(0xFFFF0000),
+        ),
+      ),
+      TextSpan(
+        text: 'FIL',
+        style: TextStyle(
+          fontSize: 10.4,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -0.2,
+          color: Color(0xFF1E3A8A),
+        ),
+      ),
+    ],
+  ),
+)
+                      : Text(
+                          items[index]['label'] as String,
+                          maxLines: 1,
+                          overflow: TextOverflow.visible,
+                          style: TextStyle(
+                            fontSize: 10.4,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.2,
+                            color: index == 1
+                                ? const Color(0xFF2E7D32)
+                                : index == 2
+                                    ? const Color(0xFFFFD000)
+                                    : index == 3
+                                        ? const Color(0xFF1E3A8A)
+                                        : Colors.black87,
+                          ),
+                        ),
                 ],
               ),
             ),

@@ -167,8 +167,8 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
                                 const SizedBox(height: 6),
                                 Text(
                                   isLifeguard
-                                      ? 'Accès réservé sauveteurs'
-                                      : 'Accès réservé administration',
+                                      ? 'Accès sauveteurs'
+                                      : 'Accès administration',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     fontSize: 22,
@@ -232,15 +232,34 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
                               hintStyle:
                                   const TextStyle(color: Colors.black54),
                               filled: true,
-                              fillColor: Colors.white,
+                              fillColor: Colors.white.withOpacity(0.08),
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 18,
                                 vertical: 16,
                               ),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
+  borderRadius: BorderRadius.circular(16),
+  borderSide: const BorderSide(
+    color: Colors.black,
+    width: 2,
+  ),
+),
+
+enabledBorder: OutlineInputBorder(
+  borderRadius: BorderRadius.circular(16),
+  borderSide: const BorderSide(
+    color: Colors.black,
+    width: 2,
+  ),
+),
+
+focusedBorder: OutlineInputBorder(
+  borderRadius: BorderRadius.circular(16),
+  borderSide: const BorderSide(
+    color: Colors.black,
+    width: 2.4,
+  ),
+),
                             ),
                           ),
 
@@ -262,15 +281,34 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
                               hintStyle:
                                   const TextStyle(color: Colors.black54),
                               filled: true,
-                              fillColor: Colors.white,
+                              fillColor: Colors.white.withOpacity(0.08),
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 18,
                                 vertical: 16,
                               ),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
+  borderRadius: BorderRadius.circular(16),
+  borderSide: const BorderSide(
+    color: Colors.black,
+    width: 2,
+  ),
+),
+
+enabledBorder: OutlineInputBorder(
+  borderRadius: BorderRadius.circular(16),
+  borderSide: const BorderSide(
+    color: Colors.black,
+    width: 2,
+  ),
+),
+
+focusedBorder: OutlineInputBorder(
+  borderRadius: BorderRadius.circular(16),
+  borderSide: const BorderSide(
+    color: Colors.black,
+    width: 2.4,
+  ),
+),
                             ),
                           ),
 
@@ -288,8 +326,12 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
+  borderRadius: BorderRadius.circular(18),
+  side: const BorderSide(
+    color: Colors.black,
+    width: 2,
+  ),
+),
                               ),
                               child: const Text(
                                 'SE CONNECTER',
@@ -311,10 +353,14 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
                       Container(
                         width: 62,
                         height: 62,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
+                        decoration: BoxDecoration(
+  color: Colors.transparent,
+  shape: BoxShape.circle,
+  border: Border.all(
+    color: Colors.black,
+    width: 2,
+  ),
+),
                         child: IconButton(
                           onPressed: () => Navigator.of(context).pop(),
                           icon: const Icon(
@@ -348,7 +394,9 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
         duration: const Duration(milliseconds: 220),
         height: 54,
         decoration: BoxDecoration(
-          color: selected ? color : Colors.white.withOpacity(0.92),
+          color: selected
+    ? color.withOpacity(0.18)
+    : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: color, width: 2),
         ),
