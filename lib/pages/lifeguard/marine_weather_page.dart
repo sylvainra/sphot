@@ -270,7 +270,8 @@ Widget build(BuildContext context) {
           SizedBox(
             height: 225,
 
-            child: _SwellFullWidthCard(
+            child: ClipRect(
+  child: _SwellFullWidthCard(
               borderColor: swellColor,
 
               directionMorning:
@@ -353,7 +354,8 @@ Widget build(BuildContext context) {
                   periodMax = value;
                 });
               },
-            ),
+              ),
+),
           ),
         ],
       ),
@@ -538,7 +540,7 @@ class _WaterTemperatureCard extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                     fontSize: 15,
                     height: 1.4,
-                    color: Color(0xFF0277BD),
+                    color: Colors.black,
                   ),
                 ),
               ],
@@ -1233,13 +1235,13 @@ class _SwellCompassPicker extends StatelessWidget {
 
                         children: [
                           SizedBox(
-                            width: 30,
+                            width: 24,
                             height: 54,
 
                             child: NumberPicker(
                               value: height,
                               minValue: 0,
-                              maxValue: 9,
+                              maxValue: 25,
 
                               itemWidth: 30,
                               itemHeight: 28,
@@ -1269,7 +1271,7 @@ class _SwellCompassPicker extends StatelessWidget {
 
                               style: TextStyle(
                                 color: color,
-                                fontSize: 17,
+                                fontSize: 24,
                                 height: 1.0,
                                 fontWeight:
                                     FontWeight.w900,
@@ -1278,13 +1280,13 @@ class _SwellCompassPicker extends StatelessWidget {
                           ),
 
                           SizedBox(
-                            width: 30,
+                            width: 24,
                             height: 54,
 
                             child: NumberPicker(
                               value: decimal,
                               minValue: 0,
-                              maxValue: 9,
+                              maxValue: 25,
 
                               itemWidth: 30,
                               itemHeight: 28,
@@ -1317,7 +1319,7 @@ class _SwellCompassPicker extends StatelessWidget {
 
                               style: TextStyle(
                                 color: Colors.black,
-                                fontSize: 9,
+                                fontSize: 14,
                                 height: 1.0,
                                 fontWeight:
                                     FontWeight.w900,
@@ -1365,7 +1367,7 @@ class _SwellCompassPicker extends StatelessWidget {
                                 : Colors.transparent,
 
                             borderRadius:
-                                BorderRadius.circular(7),
+                                BorderRadius.circular(8),
 
                             border: Border.all(
                               color: color,
@@ -1381,7 +1383,7 @@ class _SwellCompassPicker extends StatelessWidget {
                                   ? Colors.white
                                   : Colors.black,
 
-                              fontSize: 10,
+                              fontSize: 8,
                               fontWeight:
                                   FontWeight.w900,
                             ),
