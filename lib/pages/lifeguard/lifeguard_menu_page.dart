@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'lifeguard_actions_page.dart';
 import 'placeholder_page.dart';
 import 'terrestrial_weather_page.dart';
+import 'marine_weather_page.dart';
 
 class LifeguardMenuPage extends StatelessWidget {
   final Color profileColor;
@@ -107,15 +108,14 @@ class LifeguardMenuPage extends StatelessWidget {
                           icon: Icons.waves_rounded,
                           color: const Color(0xFF1E88E5),
                           onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => PlaceholderPage(
-                                  title: 'MÉTÉO MARINE',
-                                  profileColor: profileColor,
-                                ),
-                              ),
-                            );
-                          },
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => MarineWeatherPage(
+        profileColor: profileColor,
+      ),
+    ),
+  );
+},
                         ),
 
                         _MenuSquare(
