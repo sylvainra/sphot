@@ -70,8 +70,9 @@ Widget build(BuildContext context) {
 
                 const SizedBox(height: 2),
 
-                Expanded(
-                  child: Container(
+                SizedBox(
+  height: 497,
+  child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                     decoration: BoxDecoration(
@@ -206,7 +207,7 @@ Widget build(BuildContext context) {
                 ),
 
                 Transform.translate(
-                  offset: const Offset(0, 6),
+                  offset: const Offset(0, 9),
                   child: GestureDetector(
                     onTap: () {
                       Navigator.of(context).pop();
@@ -747,7 +748,7 @@ class _WindFullWidthCard extends StatelessWidget {
           ),
 
           Transform.translate(
-            offset: const Offset(0, 2),
+            offset: const Offset(0, 6),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -847,7 +848,7 @@ class _WindCompassPicker extends StatelessWidget {
         ),
 
         Transform.translate(
-          offset: const Offset(0, 4),
+          offset: const Offset(0, 6),
           child: SizedBox(
             width: 132,
             height: 108,
@@ -882,7 +883,7 @@ class _WindCompassPicker extends StatelessWidget {
                         'km/h',
                         style: TextStyle(
                           color: Colors.black,
-                          fontSize: 9,
+                          fontSize: 12,
                           fontWeight: FontWeight.w900,
                         ),
                       ),

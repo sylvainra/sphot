@@ -47,362 +47,334 @@ class _MarineWeatherPageState extends State<MarineWeatherPage> {
   int periodMax = 12;
 
   @override
-Widget build(BuildContext context) {
-  final tideColor = _tideColor(highTideCoef);
+  Widget build(BuildContext context) {
+    final tideColor = _tideColor(highTideCoef);
 
-  final swellColor = _swellColor(
-    max(
-      swellMorningHeight * 10 + swellMorningDecimal,
-      swellAfternoonHeight * 10 + swellAfternoonDecimal,
-    ),
-  );
-
-  return Scaffold(
-    backgroundColor: Colors.transparent,
-    body: Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.asset(
-          'data/images/map_background.jpg',
-          fit: BoxFit.cover,
-        ),
-
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-
-            child: Column(
-              children: [
-                Image.asset(
-                  'data/icons/title.png',
-                  height: 56,
-                  fit: BoxFit.contain,
-                ),
-
-                const Text(
-                  'MÉTÉO MARINE',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFFFF0000),
-                    letterSpacing: 0.6,
-                  ),
-                ),
-
-                const SizedBox(height: 2),
-
-                SizedBox(
-  height: 500,
-  child: Container(
-    width: double.infinity,
-
-    padding: const EdgeInsets.fromLTRB(
-      16,
-      0,
-      16,
-      0,
-    ),
-
-    decoration: BoxDecoration(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(24),
-
-      border: Border.all(
-        color: Colors.black,
-        width: 2,
+    final swellColor = _swellColor(
+      max(
+        swellMorningHeight * 10 + swellMorningDecimal,
+        swellAfternoonHeight * 10 + swellAfternoonDecimal,
       ),
-    ),
+    );
 
-    child: Transform.translate(
-      offset: const Offset(0, -12),
-
-      child: Column(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        fit: StackFit.expand,
         children: [
-          Transform.translate(
-            offset: const Offset(0, 10),
-
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 2),
-
-              child: Text(
-                'PRÉVISIONS',
-
-                style: TextStyle(
-                  color: Color(0xFF0277BD),
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.8,
-                ),
-              ),
-            ),
+          Image.asset(
+            'data/images/map_background.jpg',
+            fit: BoxFit.cover,
           ),
 
-          const SizedBox(height: 6),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
 
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 92,
-
-                  child: _WaterTemperatureCard(
-                    minValue: waterMin,
-                    maxValue: waterMax,
-
-                    onMinChanged: (value) {
-                      setState(() {
-                        waterMin = value;
-                      });
-                    },
-
-                    onMaxChanged: (value) {
-                      setState(() {
-                        waterMax = value;
-                      });
-                    },
+              child: Column(
+                children: [
+                  Image.asset(
+                    'data/icons/title.png',
+                    height: 56,
+                    fit: BoxFit.contain,
                   ),
-                ),
-              ),
 
-              const SizedBox(width: 12),
-
-              Expanded(
-                child: SizedBox(
-                  height: 92,
-
-                  child: _SeaStateCard(
-                    value: seaStateIndex,
-
-                    onChanged: (value) {
-                      setState(() {
-                        seaStateIndex = value;
-                      });
-                    },
+                  const Text(
+                    'MÉTÉO MARINE',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFF0000),
+                      letterSpacing: 0.6,
+                    ),
                   ),
-                ),
-              ),
-            ],
-          ),
 
-          Transform.translate(
-            offset: const Offset(0, 6),
+                  const SizedBox(height: 2),
 
-            child: _TidesFullWidthCard(
-              borderColor: tideColor,
-
-              highHour1: highTideHour1,
-              highMinute1: highTideMinute1,
-              highHour2: highTideHour2,
-              highMinute2: highTideMinute2,
-              highCoef: highTideCoef,
-
-              lowHour1: lowTideHour1,
-              lowMinute1: lowTideMinute1,
-              lowHour2: lowTideHour2,
-              lowMinute2: lowTideMinute2,
-              lowCoef: lowTideCoef,
-
-              onHighHour1Changed: (value) {
-                setState(() {
-                  highTideHour1 = value;
-                });
-              },
-
-              onHighMinute1Changed: (value) {
-                setState(() {
-                  highTideMinute1 = value;
-                });
-              },
-
-              onHighHour2Changed: (value) {
-                setState(() {
-                  highTideHour2 = value;
-                });
-              },
-
-              onHighMinute2Changed: (value) {
-                setState(() {
-                  highTideMinute2 = value;
-                });
-              },
-
-              onHighCoefChanged: (value) {
-                setState(() {
-                  highTideCoef = value;
-                });
-              },
-
-              onLowHour1Changed: (value) {
-                setState(() {
-                  lowTideHour1 = value;
-                });
-              },
-
-              onLowMinute1Changed: (value) {
-                setState(() {
-                  lowTideMinute1 = value;
-                });
-              },
-
-              onLowHour2Changed: (value) {
-                setState(() {
-                  lowTideHour2 = value;
-                });
-              },
-
-              onLowMinute2Changed: (value) {
-                setState(() {
-                  lowTideMinute2 = value;
-                });
-              },
-
-              onLowCoefChanged: (value) {
-                setState(() {
-                  lowTideCoef = value;
-                });
-              },
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          SizedBox(
-            height: 225,
-
-            child: ClipRect(
-  child: _SwellFullWidthCard(
-              borderColor: swellColor,
-
-              directionMorning:
-                  swellDirectionMorning,
-
-              directionAfternoon:
-                  swellDirectionAfternoon,
-
-              morningHeight:
-                  swellMorningHeight,
-
-              morningDecimal:
-                  swellMorningDecimal,
-
-              afternoonHeight:
-                  swellAfternoonHeight,
-
-              afternoonDecimal:
-                  swellAfternoonDecimal,
-
-              periodMin: periodMin,
-              periodMax: periodMax,
-
-              onDirectionMorningChanged:
-                  (value) {
-                setState(() {
-                  swellDirectionMorning =
-                      value;
-                });
-              },
-
-              onDirectionAfternoonChanged:
-                  (value) {
-                setState(() {
-                  swellDirectionAfternoon =
-                      value;
-                });
-              },
-
-              onMorningHeightChanged:
-                  (value) {
-                setState(() {
-                  swellMorningHeight =
-                      value;
-                });
-              },
-
-              onMorningDecimalChanged:
-                  (value) {
-                setState(() {
-                  swellMorningDecimal =
-                      value;
-                });
-              },
-
-              onAfternoonHeightChanged:
-                  (value) {
-                setState(() {
-                  swellAfternoonHeight =
-                      value;
-                });
-              },
-
-              onAfternoonDecimalChanged:
-                  (value) {
-                setState(() {
-                  swellAfternoonDecimal =
-                      value;
-                });
-              },
-
-              onPeriodMinChanged: (value) {
-                setState(() {
-                  periodMin = value;
-                });
-              },
-
-              onPeriodMaxChanged: (value) {
-                setState(() {
-                  periodMax = value;
-                });
-              },
-              ),
-),
-          ),
-        ],
-      ),
-    ),
-  ),
-),
-
-                Transform.translate(
-                  offset: const Offset(0, 12),
-
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).pop();
-                    },
-
+                  SizedBox(
+                    height: 500,
                     child: Container(
-                      width: 50,
-                      height: 50,
-
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                       decoration: BoxDecoration(
                         color: Colors.transparent,
-                        shape: BoxShape.circle,
-
+                        borderRadius: BorderRadius.circular(24),
                         border: Border.all(
                           color: Colors.black,
                           width: 2,
                         ),
                       ),
 
-                      child: const Center(
-                        child: Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: Colors.black,
-                          size: 22,
+                      child: Transform.translate(
+                        offset: const Offset(0, -12),
+
+                        child: SingleChildScrollView(
+  physics: const NeverScrollableScrollPhysics(),
+  clipBehavior: Clip.none,
+
+                          child: Column(
+                            children: [
+                              Transform.translate(
+                                offset: const Offset(0, 10),
+
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 2),
+
+                                  child: Text(
+                                    'PRÉVISIONS',
+                                    style: TextStyle(
+                                      color: Color(0xFF0277BD),
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 6),
+
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 92,
+
+                                      child: _WaterTemperatureCard(
+                                        minValue: waterMin,
+                                        maxValue: waterMax,
+
+                                        onMinChanged: (value) {
+                                          setState(() {
+                                            waterMin = value;
+                                          });
+                                        },
+
+                                        onMaxChanged: (value) {
+                                          setState(() {
+                                            waterMax = value;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 12),
+
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 92,
+
+                                      child: _SeaStateCard(
+                                        value: seaStateIndex,
+
+                                        onChanged: (value) {
+                                          setState(() {
+                                            seaStateIndex = value;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              Transform.translate(
+                                offset: const Offset(0, 6),
+
+                                child: _TidesFullWidthCard(
+                                  borderColor: tideColor,
+
+                                  highHour1: highTideHour1,
+                                  highMinute1: highTideMinute1,
+                                  highHour2: highTideHour2,
+                                  highMinute2: highTideMinute2,
+                                  highCoef: highTideCoef,
+
+                                  lowHour1: lowTideHour1,
+                                  lowMinute1: lowTideMinute1,
+                                  lowHour2: lowTideHour2,
+                                  lowMinute2: lowTideMinute2,
+                                  lowCoef: lowTideCoef,
+
+                                  onHighHour1Changed: (value) {
+                                    setState(() {
+                                      highTideHour1 = value;
+                                    });
+                                  },
+
+                                  onHighMinute1Changed: (value) {
+                                    setState(() {
+                                      highTideMinute1 = value;
+                                    });
+                                  },
+
+                                  onHighHour2Changed: (value) {
+                                    setState(() {
+                                      highTideHour2 = value;
+                                    });
+                                  },
+
+                                  onHighMinute2Changed: (value) {
+                                    setState(() {
+                                      highTideMinute2 = value;
+                                    });
+                                  },
+
+                                  onHighCoefChanged: (value) {
+                                    setState(() {
+                                      highTideCoef = value;
+                                    });
+                                  },
+
+                                  onLowHour1Changed: (value) {
+                                    setState(() {
+                                      lowTideHour1 = value;
+                                    });
+                                  },
+
+                                  onLowMinute1Changed: (value) {
+                                    setState(() {
+                                      lowTideMinute1 = value;
+                                    });
+                                  },
+
+                                  onLowHour2Changed: (value) {
+                                    setState(() {
+                                      lowTideHour2 = value;
+                                    });
+                                  },
+
+                                  onLowMinute2Changed: (value) {
+                                    setState(() {
+                                      lowTideMinute2 = value;
+                                    });
+                                  },
+
+                                  onLowCoefChanged: (value) {
+                                    setState(() {
+                                      lowTideCoef = value;
+                                    });
+                                  },
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              SizedBox(
+                                height: 226,
+
+                                child: _SwellFullWidthCard(
+                                    borderColor: swellColor,
+
+                                    directionMorning: swellDirectionMorning,
+                                    directionAfternoon: swellDirectionAfternoon,
+
+                                    morningHeight: swellMorningHeight,
+                                    morningDecimal: swellMorningDecimal,
+
+                                    afternoonHeight: swellAfternoonHeight,
+                                    afternoonDecimal: swellAfternoonDecimal,
+
+                                    periodMin: periodMin,
+                                    periodMax: periodMax,
+
+                                    onDirectionMorningChanged: (value) {
+                                      setState(() {
+                                        swellDirectionMorning = value;
+                                      });
+                                    },
+
+                                    onDirectionAfternoonChanged: (value) {
+                                      setState(() {
+                                        swellDirectionAfternoon = value;
+                                      });
+                                    },
+
+                                    onMorningHeightChanged: (value) {
+                                      setState(() {
+                                        swellMorningHeight = value;
+                                      });
+                                    },
+
+                                    onMorningDecimalChanged: (value) {
+                                      setState(() {
+                                        swellMorningDecimal = value;
+                                      });
+                                    },
+
+                                    onAfternoonHeightChanged: (value) {
+                                      setState(() {
+                                        swellAfternoonHeight = value;
+                                      });
+                                    },
+
+                                    onAfternoonDecimalChanged: (value) {
+                                      setState(() {
+                                        swellAfternoonDecimal = value;
+                                      });
+                                    },
+
+                                    onPeriodMinChanged: (value) {
+                                      setState(() {
+                                        periodMin = value;
+                                      });
+                                    },
+
+                                    onPeriodMaxChanged: (value) {
+                                      setState(() {
+                                        periodMax = value;
+                                      });
+                                    },
+                                  
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+
+                  Transform.translate(
+                    offset: const Offset(0, 12),
+
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).pop();
+                      },
+
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.black,
+                            width: 2,
+                          ),
+                        ),
+
+                        child: const Center(
+                          child: Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Colors.black,
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
-    ),
+        ],
+      ),
     );
-}
+  }
 }
 
 class _WaterTemperatureCard extends StatelessWidget {
@@ -1052,7 +1024,7 @@ class _SwellFullWidthCard extends StatelessWidget {
         ),
       ),
       child: Stack(
-        clipBehavior: Clip.none,
+  clipBehavior: Clip.none,
         children: [
           const Positioned(
             top: -6,
@@ -1075,7 +1047,7 @@ class _SwellFullWidthCard extends StatelessWidget {
             top: 24,
             left: 0,
             right: 0,
-            height: 130,
+            height: 136,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
