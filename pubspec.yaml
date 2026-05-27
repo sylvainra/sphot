@@ -12,7 +12,6 @@ dependencies:
     sdk: flutter
 
   geolocator: ^14.0.2
-
   cupertino_icons: ^1.0.8
   numberpicker: ^2.1.2
   provider: ^6.1.5+1
@@ -25,6 +24,8 @@ dependencies:
   latlong2: ^0.9.1
   flutter_map_marker_cluster: ^8.2.2
   speech_to_text: ^7.3.0
+  image_picker: ^1.1.2
+  csv: ^5.1.1
 
 dev_dependencies:
   flutter_test:
@@ -41,3 +42,4 @@ flutter:
     - data/images/
     - data/logos_departements/france/pays_de_la_loire/
     - data/logos_communes/france/pays_de_la_loire/vendee/
+    - data/pays/france/pays_de_la_loire/vendee/longeville_sur_mer/

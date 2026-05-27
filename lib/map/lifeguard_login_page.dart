@@ -23,6 +23,27 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
 
   LoginProfile _selectedProfile = LoginProfile.lifeguard;
   bool _isEditing = false;
+  final Map<String, Map<String, String>> lifeguardAccounts = {
+  'chef': {
+    'password': '1234',
+    'role': 'Chef de poste',
+  },
+
+  'adjoint': {
+    'password': '1234',
+    'role': 'Adjoint chef de poste',
+  },
+
+  'sauveteur1': {
+    'password': '1234',
+    'role': 'Sauveteur',
+  },
+
+  'sauveteur2': {
+    'password': '1234',
+    'role': 'Sauveteur',
+  },
+};
 
   @override
   void initState() {
@@ -63,31 +84,42 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
   }
 
   void _login() {
-    final id = _idController.text.trim().toLowerCase();
-    final password = _passwordController.text.trim();
+  final id = _idController.text.trim().toLowerCase();
+  final password = _passwordController.text.trim();
 
-    if (_selectedProfile == LoginProfile.lifeguard) {
-      if (id == 'sauveteur' && password == '1234') {
-        Navigator.of(context).pushReplacement(
-  MaterialPageRoute(
-    builder: (_) => LifeguardMenuPage(
-  profileColor: const Color(0xFFFF0000),
-),
-  ),
-);
-      } else {
-        _showLoginError();
-      }
+  if (_selectedProfile == LoginProfile.lifeguard) {
+    final account = lifeguardAccounts[id];
+
+    if (account != null &&
+        account['password'] == password) {
+
+      final String userRole = account['role']!;
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => LifeguardMenuPage(
+            profileColor: const Color(0xFFFF0000),
+            userRole: userRole,
+          ),
+        ),
+      );
     } else {
-      if (id == 'admin' && password == 'admin2026') {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const AdminInfoPage()),
-        );
-      } else {
-        _showLoginError();
-      }
+      _showLoginError();
+    }
+  } else {
+    if (id == 'admin' &&
+        password == 'admin2026') {
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const AdminInfoPage(),
+        ),
+      );
+    } else {
+      _showLoginError();
     }
   }
+}
 
   void _showLoginError() {
     ScaffoldMessenger.of(context).showSnackBar(
