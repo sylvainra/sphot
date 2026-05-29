@@ -1,7 +1,7 @@
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'dart:async';
-import 'lifeguard_login_page.dart';
+import 'profil_login_page.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -1484,7 +1484,7 @@ Widget _buildBottomBar() {
               } else if (index == 4) {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const LifeguardLoginPage(),
+                    builder: (_) => const ProfilLoginPage(),
                   ),
                 );
               }

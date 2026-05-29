@@ -1,22 +1,20 @@
+
 import 'package:flutter/material.dart';
 
-import 'lifeguard_actions_page.dart';
-import 'placeholder_page.dart';
-import 'terrestrial_weather_page.dart';
-import 'marine_weather_page.dart';
+import 'sauveteur_actions_rapides_page.dart';
+import 'sauveteur_espace_reserve_page.dart';
+import 'sauveteur_meteo_terrestre_page.dart';
+import 'sauveteur_meteo_marine_page.dart';
+import 'sauveteur_recherche_personne_page.dart';
+import 'sauveteur_ephemeride_dicton_page.dart';
+import 'sauveteur_planning_page.dart';
 
-import 'person_search_page.dart';
-
-import 'ephemeride_dicton_page.dart';
-
-import 'schedule_page.dart';
-
-class LifeguardMenuPage extends StatelessWidget {
+class SauveteurMenuPage extends StatelessWidget {
   final Color profileColor;
 
 final String userRole;
 
-  const LifeguardMenuPage({
+  const SauveteurMenuPage({
   super.key,
   required this.profileColor,
   required this.userRole,
@@ -81,7 +79,7 @@ final String userRole;
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => LifeguardActionsPage(
+                                  builder: (_) => SauveteurActionsRapidesPage(
                                     profileColor: profileColor,
                                   ),
                                 ),
@@ -107,7 +105,7 @@ final String userRole;
                                   onTap: () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (_) => TerrestrialWeatherPage(
+                                        builder: (_) => SauveteurMeteoTerrestrePage(
                                           profileColor: profileColor,
                                         ),
                                       ),
@@ -122,7 +120,7 @@ final String userRole;
                                   onTap: () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (_) => MarineWeatherPage(
+                                        builder: (_) => SauveteurMeteoMarinePage(
                                           profileColor: profileColor,
                                         ),
                                       ),
@@ -137,7 +135,7 @@ final String userRole;
   onTap: () {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => EphemerideDictonPage(
+        builder: (_) => SauveteurEphemerideDictonPage(
   profileColor: profileColor,
 ),
       ),
@@ -152,7 +150,7 @@ final String userRole;
   onTap: () {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => PersonSearchPage(
+        builder: (_) => SauveteurRecherchePersonnePage(
           profileColor: profileColor,
         ),
       ),
@@ -167,7 +165,7 @@ _MenuSquare(
   onTap: () {
   Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (_) => SchedulePage(
+      builder: (_) => SauveteurPlanningPage(
   profileColor: const Color(0xFF43A047),
   userRole: userRole,
 ),
@@ -183,7 +181,7 @@ _MenuSquare(
   onTap: () {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => PlaceholderPage(
+        builder: (_) => SauveteurEspaceReservePage(
           title: 'STATS',
           profileColor: profileColor,
         ),
@@ -205,10 +203,10 @@ _MenuSquare(
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => PlaceholderPage(
-                                    title: 'MAIN COURANTE',
-                                    profileColor: profileColor,
-                                  ),
+                                  builder: (_) => SauveteurEspaceReservePage(
+  title: 'MAIN COURANTE',
+  profileColor: profileColor,
+),
                                 ),
                               );
                             },

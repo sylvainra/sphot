@@ -2,20 +2,20 @@ import 'package:flutter/material.dart';
 
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
-class LifeguardActionsPage extends StatefulWidget {
+class SauveteurActionsRapidesPage extends StatefulWidget {
   final Color profileColor;
 
-  const LifeguardActionsPage({
+  const SauveteurActionsRapidesPage({
     super.key,
     required this.profileColor,
   });
 
   @override
-  State<LifeguardActionsPage> createState() =>
-      _LifeguardActionsPageState();
+  State<SauveteurActionsRapidesPage> createState() =>
+      _SauveteurActionsRapidesPageState();
 }
 
-class _LifeguardActionsPageState extends State<LifeguardActionsPage> {
+class _SauveteurActionsRapidesPageState extends State<SauveteurActionsRapidesPage> {
   String flagColor = 'Vert';
   String flagPosition = 'Hissé';
   String status = 'Baignade surveillée';
@@ -318,9 +318,9 @@ _ActionButton(
   onTap: () {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => NotificationWritePage(
-          profileColor: widget.profileColor,
-        ),
+        builder: (_) => SauveteurNotificationPage(
+  profileColor: widget.profileColor,
+),
       ),
     );
   },
@@ -920,21 +920,21 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-class NotificationWritePage extends StatefulWidget {
+class SauveteurNotificationPage extends StatefulWidget {
   final Color profileColor;
 
-  const NotificationWritePage({
+  const SauveteurNotificationPage({
     super.key,
     required this.profileColor,
   });
 
   @override
-  State<NotificationWritePage> createState() =>
-      _NotificationWritePageState();
+  State<SauveteurNotificationPage> createState() =>
+      _SauveteurNotificationPageState();
 }
 
-class _NotificationWritePageState
-    extends State<NotificationWritePage> {
+class _SauveteurNotificationPageState
+    extends State<SauveteurNotificationPage> {
   late stt.SpeechToText _speech;
 
   bool _isListening = false;

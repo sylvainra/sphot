@@ -5,21 +5,21 @@ import 'package:image_picker/image_picker.dart';
 
 import 'dart:io';
 
-class PersonSearchPage extends StatefulWidget {
+class SauveteurRecherchePersonnePage extends StatefulWidget {
   final Color profileColor;
 
-  const PersonSearchPage({
+  const SauveteurRecherchePersonnePage({
     super.key,
     required this.profileColor,
   });
 
   @override
-  State<PersonSearchPage> createState() =>
-      _PersonSearchPageState();
+  State<SauveteurRecherchePersonnePage> createState() =>
+      _SauveteurRecherchePersonnePageState();
 }
 
-class _PersonSearchPageState
-    extends State<PersonSearchPage> {
+class _SauveteurRecherchePersonnePageState
+    extends State<SauveteurRecherchePersonnePage> {
   late stt.SpeechToText _speech;
 
   bool _isListening = false;

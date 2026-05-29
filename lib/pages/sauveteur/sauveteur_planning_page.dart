@@ -3,21 +3,21 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:csv/csv.dart';
 
-class SchedulePage extends StatefulWidget {
+class SauveteurPlanningPage extends StatefulWidget {
   final Color profileColor;
   final String userRole;
 
-  const SchedulePage({
+  const SauveteurPlanningPage({
     super.key,
     required this.profileColor,
     required this.userRole,
   });
 
   @override
-  State<SchedulePage> createState() => _SchedulePageState();
+  State<SauveteurPlanningPage> createState() => _SauveteurPlanningPageState();
 }
 
-class _SchedulePageState extends State<SchedulePage> {
+class _SauveteurPlanningPageState extends State<SauveteurPlanningPage> {
   bool get canEdit {
     final role = widget.userRole.trim().toLowerCase();
 

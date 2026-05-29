@@ -2,18 +2,18 @@ import 'package:flutter/material.dart';
 
 import 'admin_info_page.dart';
 
-import '../pages/lifeguard/lifeguard_menu_page.dart';
+import '../pages/sauveteur/sauveteur_menu_page.dart';
 
-enum LoginProfile { lifeguard, admin }
+enum LoginProfile { sauveteur, admin }
 
-class LifeguardLoginPage extends StatefulWidget {
-  const LifeguardLoginPage({super.key});
+class ProfilLoginPage extends StatefulWidget {
+  const ProfilLoginPage({super.key});
 
   @override
-  State<LifeguardLoginPage> createState() => _LifeguardLoginPageState();
+  State<ProfilLoginPage> createState() => _ProfilLoginPageState();
 }
 
-class _LifeguardLoginPageState extends State<LifeguardLoginPage>
+class _ProfilLoginPageState extends State<ProfilLoginPage>
     with WidgetsBindingObserver {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -21,9 +21,9 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
   final FocusNode _idFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
 
-  LoginProfile _selectedProfile = LoginProfile.lifeguard;
+  LoginProfile _selectedProfile = LoginProfile.sauveteur;
   bool _isEditing = false;
-  final Map<String, Map<String, String>> lifeguardAccounts = {
+  final Map<String, Map<String, String>> sauveteurAccounts = {
   'chef': {
     'password': '1234',
     'role': 'Chef de poste',
@@ -87,8 +87,8 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
   final id = _idController.text.trim().toLowerCase();
   final password = _passwordController.text.trim();
 
-  if (_selectedProfile == LoginProfile.lifeguard) {
-    final account = lifeguardAccounts[id];
+  if (_selectedProfile == LoginProfile.sauveteur) {
+    final account = sauveteurAccounts[id];
 
     if (account != null &&
         account['password'] == password) {
@@ -97,7 +97,7 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => LifeguardMenuPage(
+          builder: (_) => SauveteurMenuPage(
             profileColor: const Color(0xFFFF0000),
             userRole: userRole,
           ),
@@ -143,7 +143,7 @@ class _LifeguardLoginPageState extends State<LifeguardLoginPage>
 
   @override
 Widget build(BuildContext context) {
-  final isLifeguard = _selectedProfile == LoginProfile.lifeguard;
+  final isSauveteur = _selectedProfile == LoginProfile.sauveteur;
 
   return Scaffold(
     backgroundColor: Colors.transparent,
@@ -211,7 +211,7 @@ Widget build(BuildContext context) {
                       child: Column(
                         children: [
                           Text(
-                            isLifeguard
+                            isSauveteur
                                 ? 'Accès sauveteurs'
                                 : 'Accès administration',
                             textAlign: TextAlign.center,
@@ -229,12 +229,12 @@ Widget build(BuildContext context) {
                               Expanded(
                                 child: _profileButton(
                                   label: 'SAUVETEUR',
-                                  selected: isLifeguard,
+                                  selected: isSauveteur,
                                   color: const Color(0xFFFF0000),
                                   onTap: () {
                                     setState(() {
                                       _selectedProfile =
-                                          LoginProfile.lifeguard;
+                                          LoginProfile.sauveteur;
                                     });
                                   },
                                 ),
@@ -245,7 +245,7 @@ Widget build(BuildContext context) {
                               Expanded(
                                 child: _profileButton(
                                   label: 'ADMIN',
-                                  selected: !isLifeguard,
+                                  selected: !isSauveteur,
                                   color: const Color(0xFF1E3A8A),
                                   onTap: () {
                                     setState(() {
@@ -361,7 +361,7 @@ Widget build(BuildContext context) {
                             child: ElevatedButton(
                               onPressed: _login,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isLifeguard
+                                backgroundColor: isSauveteur
                                     ? const Color(0xFFFF0000)
                                     : const Color(0xFF1E3A8A),
                                 foregroundColor: Colors.white,

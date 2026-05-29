@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
-class EphemerideDictonPage extends StatefulWidget {
+class SauveteurEphemerideDictonPage extends StatefulWidget {
   final Color profileColor;
 
-  const EphemerideDictonPage({
+  const SauveteurEphemerideDictonPage({
     super.key,
     required this.profileColor,
   });
 
   @override
-  State<EphemerideDictonPage> createState() =>
-      _EphemerideDictonPageState();
+State<SauveteurEphemerideDictonPage> createState() =>
+    _SauveteurEphemerideDictonPageState();
 }
 
-class _EphemerideDictonPageState extends State<EphemerideDictonPage> {
+class _SauveteurEphemerideDictonPageState
+    extends State<SauveteurEphemerideDictonPage> {
   late stt.SpeechToText _speech;
 
   bool _isListening = false;

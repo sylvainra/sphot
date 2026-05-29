@@ -4,19 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:numberpicker/numberpicker.dart';
 
 
-class MarineWeatherPage extends StatefulWidget {
+class SauveteurMeteoMarinePage extends StatefulWidget {
   final Color profileColor;
 
-  const MarineWeatherPage({
+  const SauveteurMeteoMarinePage({
     super.key,
     required this.profileColor,
   });
 
   @override
-  State<MarineWeatherPage> createState() => _MarineWeatherPageState();
+  State<SauveteurMeteoMarinePage> createState() => _SauveteurMeteoMarinePageState();
 }
 
-class _MarineWeatherPageState extends State<MarineWeatherPage> {
+class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
   int waterMin = 18;
   int waterMax = 22;
 

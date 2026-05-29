@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-class PlaceholderPage extends StatelessWidget {
+class SauveteurEspaceReservePage extends StatelessWidget {
   final String title;
   final Color profileColor;
 
-  const PlaceholderPage({
+  const SauveteurEspaceReservePage({
     super.key,
     required this.title,
     required this.profileColor,

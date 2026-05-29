@@ -3,22 +3,20 @@ import 'package:numberpicker/numberpicker.dart';
 
 import 'dart:math';
 
-import 'lifeguard_actions_page.dart';
-
-class TerrestrialWeatherPage extends StatefulWidget {
+class SauveteurMeteoTerrestrePage extends StatefulWidget {
   final Color profileColor;
 
-  const TerrestrialWeatherPage({
+  const SauveteurMeteoTerrestrePage({
     super.key,
     required this.profileColor,
   });
 
   @override
-  State<TerrestrialWeatherPage> createState() =>
-      _TerrestrialWeatherPageState();
+  State<SauveteurMeteoTerrestrePage> createState() =>
+      _SauveteurMeteoTerrestrePageState();
 }
 
-class _TerrestrialWeatherPageState extends State<TerrestrialWeatherPage> {
+class _SauveteurMeteoTerrestrePageState extends State<SauveteurMeteoTerrestrePage> {
   int airMin = 22;
   int airMax = 28;
 
