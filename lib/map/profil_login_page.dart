@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'admin_info_page.dart';
+import '../pages/admin/admin_menu_page.dart';
 
 import '../pages/sauveteur/sauveteur_menu_page.dart';
 
@@ -112,7 +112,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => const AdminInfoPage(),
+          builder: (_) => const AdminMenuPage(),
         ),
       );
     } else {
