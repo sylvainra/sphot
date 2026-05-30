@@ -1,6 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import 'package:latlong2/latlong.dart';
+
+import 'admin_map_picker_page.dart';
+
+import 'dart:io';
+
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+
 enum AdminSphotMode { none, create, copy, edit }
 
 class AdminSphotsCommunePage extends StatefulWidget {
@@ -508,6 +517,70 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
     );
   }
 
+Future<void> _openMapPicker({
+  required String title,
+  required String latKey,
+  required String lngKey,
+}) async {
+  final currentLat =
+      double.tryParse(_value(latKey).replaceAll(',', '.')) ?? 0.0;
+  final currentLng =
+      double.tryParse(_value(lngKey).replaceAll(',', '.')) ?? 0.0;
+
+  final result = await Navigator.of(context).push<LatLng>(
+    MaterialPageRoute(
+      builder: (_) => AdminMapPickerPage(
+        title: title,
+        initialLat: currentLat,
+        initialLng: currentLng,
+      ),
+    ),
+  );
+
+  if (result == null) return;
+
+  setState(() {
+    _controller(latKey).text = result.latitude.toStringAsFixed(6);
+    _controller(lngKey).text = result.longitude.toStringAsFixed(6);
+  });
+}
+
+Future<void> _importLogoVille() async {
+  final picker = ImagePicker();
+
+  final pickedFile = await picker.pickImage(
+    source: ImageSource.gallery,
+    imageQuality: 90,
+  );
+
+  if (pickedFile == null) return;
+
+  final file = File(pickedFile.path);
+  final fileName = pickedFile.name;
+
+  final ville = _value('ville').isEmpty
+      ? 'ville_non_renseignee'
+      : _value('ville')
+          .toLowerCase()
+          .replaceAll(' ', '_')
+          .replaceAll('-', '_')
+          .replaceAll("'", '_');
+
+  final ref = FirebaseStorage.instance.ref(
+    'logos_villes/$ville/$fileName',
+  );
+
+  await ref.putFile(file);
+
+  final url = await ref.getDownloadURL();
+
+  setState(() {
+    _controller('logoVille').text = url;
+  });
+
+  _showMessage('Logo de la ville importé');
+}
+
   Widget _currentStep() {
     switch (step) {
       case 0:
@@ -531,10 +604,49 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
             _textField('ville', 'Ville'),
             const SizedBox(height: 8),
 
-_textField(
-  'logoVille',
-  'Logo de la ville (format png ou jpg)',
+SizedBox(
+  width: double.infinity,
+  height: 46,
+  child: ElevatedButton.icon(
+    onPressed: _importLogoVille,
+    icon: const Icon(Icons.upload_file_rounded),
+    label: const Text(
+      'IMPORTER LE LOGO DE LA VILLE',
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: adminColor,
+      foregroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Colors.black, width: 2),
+      ),
+    ),
+  ),
 ),
+
+const SizedBox(height: 8),
+
+if (_value('logoVille').isNotEmpty)
+  Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: Colors.green.withOpacity(0.15),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.green),
+    ),
+    child: const Text(
+      '✅ Logo de la ville importé',
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  ),
 const SizedBox(height: 8),
 
 _textField(
@@ -549,8 +661,12 @@ SizedBox(
   height: 46,
   child: ElevatedButton.icon(
     onPressed: () {
-      _showMessage('Positionnement de la ville sur carte bientôt disponible');
-    },
+  _openMapPicker(
+    title: 'POSITIONNER LA VILLE',
+    latKey: 'villeLat',
+    lngKey: 'villeLng',
+  );
+},
     icon: const Icon(Icons.map_outlined),
     label: const Text(
       'POSITIONNER LA VILLE SUR LA CARTE',
@@ -624,8 +740,12 @@ const SizedBox(height: 8),
   height: 46,
   child: ElevatedButton.icon(
           onPressed: () {
-            _showMessage('Positionnement sur carte bientôt disponible');
-          },
+  _openMapPicker(
+    title: 'POSITIONNER LE SPHOT',
+    latKey: 'sphotLat',
+    lngKey: 'sphotLng',
+  );
+},
           icon: const Icon(Icons.map_outlined),
           label: const Text(
   'POSITIONNER LE SPHOT SUR LA CARTE',

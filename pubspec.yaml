@@ -26,6 +26,8 @@ dependencies:
   speech_to_text: ^7.3.0
   image_picker: ^1.1.2
   csv: ^5.1.1
+  firebase_storage: ^13.4.1
+  file_picker: ^11.0.2
 
 dev_dependencies:
   flutter_test:
