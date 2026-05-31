@@ -26,6 +26,8 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
   int step = 0;
   String? selectedDocId;
 
+  OverlayEntry? _dropdownOverlay;
+
   final controllers = <String, TextEditingController>{};
 
   final List<String> fields = [
@@ -108,6 +110,7 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
     for (final controller in controllers.values) {
       controller.dispose();
     }
+    _dropdownOverlay?.remove();
     super.dispose();
   }
 
@@ -411,62 +414,157 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
     );
   }
 
-  Widget _dropdownField(String key, String label, List<String> choices) {
+  Widget _dropdownField(
+  String key,
+  String label,
+  List<String> choices, {
+  double maxMenuHeight = 180,
+}) {
   final current = _value(key);
-  final safeValue = choices.contains(current) ? current : null;
+  final fieldKey = GlobalKey();
 
-  return PopupMenuButton<String>(
-    offset: Offset.zero,
-    position: PopupMenuPosition.under,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(22),
-    ),
-    color: Colors.white.withOpacity(0.98),
-    elevation: 12,
-    constraints: BoxConstraints(
-      minWidth: MediaQuery.of(context).size.width - 56,
-      maxWidth: MediaQuery.of(context).size.width - 56,
-    ),
-    onSelected: (value) {
-      setState(() {
-        _controller(key).text = value;
-      });
-    },
-    itemBuilder: (context) {
-      return choices.map((choice) {
-        final selected = choice == current;
+  void closeMenu() {
+    _dropdownOverlay?.remove();
+    _dropdownOverlay = null;
+  }
 
-        return PopupMenuItem<String>(
-          value: choice,
-          padding: EdgeInsets.zero,
-          child: _AdminDropdownMenuItem(
-            title: choice,
-            color: adminColor,
-            selected: selected,
-          ),
+  void openMenu() {
+    closeMenu();
+
+    final renderBox =
+        fieldKey.currentContext!.findRenderObject() as RenderBox;
+    final position = renderBox.localToGlobal(Offset.zero);
+    final size = renderBox.size;
+
+    _dropdownOverlay = OverlayEntry(
+      builder: (context) {
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: closeMenu,
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+            Positioned(
+              left: position.dx,
+              top: position.dy + size.height - 10,
+              width: size.width,
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight: maxMenuHeight,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.88),
+                    border: const Border(
+                      left: BorderSide(color: adminColor, width: 1.4),
+                      right: BorderSide(color: adminColor, width: 1.4),
+                      bottom: BorderSide(color: adminColor, width: 1.4),
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(10),
+                      bottomRight: Radius.circular(10),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.18),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      itemCount: choices.length,
+                      itemBuilder: (context, index) {
+                        final choice = choices[index];
+
+                        return InkWell(
+                          onTap: () {
+                            setState(() {
+                              _controller(key).text = choice;
+                            });
+                            closeMenu();
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            child: Text(
+                              choice,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         );
-      }).toList();
-    },
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            color: Colors.black87,
+      },
+    );
+
+    Overlay.of(context).insert(_dropdownOverlay!);
+  }
+
+  return GestureDetector(
+    key: fieldKey,
+    onTap: openMenu,
+    child: InputDecorator(
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(fontSize: 14),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.32),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.black, width: 1.6),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.black, width: 1.6),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              current.isEmpty ? label : current,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight:
+                    current.isEmpty ? FontWeight.w400 : FontWeight.w700,
+                color: current.isEmpty
+                    ? Colors.black.withOpacity(0.60)
+                    : Colors.black,
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
-        _AdminDropdownMenuItem(
-          title: safeValue ?? 'Sélectionner',
-          color: adminColor,
-          selected: true,
-          showArrow: true,
-          isOpen: false,
-        ),
-      ],
+          const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: adminColor,
+            size: 26,
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -715,15 +813,25 @@ const SizedBox(height: 8),
           children: [
             _stepHeader(
               '2. IDENTIFICATION',
-              'Nommez le SPHOT et choisissez son type.',
+              'Nommez le SPHOT et choisissez son type\net sa nature.',
             ),
             _textField('nomSecours', 'Repère secours (ex.: LONGE 01),\nSi inexistant, ne rien inscrire.'),
             const SizedBox(height: 6),
             _textField('nomSphot', 'Nom du SPHOT,\n(ex. Plage de..., Lac de...).'),
             const SizedBox(height: 6),
-            _dropdownField('typeSphot', 'Type de SPHOT', typeSphotChoices),
+            _dropdownField(
+  'typeSphot',
+  'Type de SPHOT',
+  typeSphotChoices,
+  maxMenuHeight: 158,
+),
             const SizedBox(height: 8),
-            _dropdownField('natureSphot', 'Nature du SPHOT', natureSphotChoices),
+            _dropdownField(
+  'natureSphot',
+  'Nature du SPHOT',
+  natureSphotChoices,
+  maxMenuHeight: 100,
+),
           ],
         );
 
@@ -1052,14 +1160,15 @@ _modeButton(
                       ),
                       child: Column(
                         children: [
-                          _modeButton(
-  title: '+ NOUVEAU SPHOT',
-  subtitle: 'Créer un SPHOT étape par étape',
-  icon: Icons.add_location_alt_rounded,
-  color: adminColor,
-  selected: mode == AdminSphotMode.create,
-  onTap: _newSphot,
-),
+                          if (mode == AdminSphotMode.none)
+  _modeButton(
+    title: '+ NOUVEAU SPHOT',
+    subtitle: 'Créer un SPHOT étape par étape',
+    icon: Icons.add_location_alt_rounded,
+    color: adminColor,
+    selected: mode == AdminSphotMode.create,
+    onTap: _newSphot,
+  ),
 
 if (mode == AdminSphotMode.create)
   Expanded(
