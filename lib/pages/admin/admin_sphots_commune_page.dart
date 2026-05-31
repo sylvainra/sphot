@@ -80,6 +80,45 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
   '❔ NON RENSEIGNÉ',
 ];
 
+  final List<String> equipementChoices = [
+    'AUCUN',
+    '🟡 ZONE DE BAIN DÉLIMITÉE',
+    '🟡 CHENAL EMBARCATION NON MOTORISÉE',
+    '🟡 CHENAL EMBARCATION MOTORISÉE',
+    '🏁 ZONE D’ACTIVITÉS NAUTIQUES',
+    '🎠 JEUX POUR ENFANTS',
+    '🏐 TERRAIN DE VOLLEY',
+    '🏓 TABLE DE TENNIS DE TABLE',
+    '🏋️ FITNESS AREA',
+    '🗑️ POUBELLE',
+    '🚯 SANS POUBELLE',
+    '🚻 TOILETTES',
+    '🅿️ PARKING',
+    '🚿 DOUCHE',
+    '🤿 PLONGEOIR',
+    '🛟 PLATE FORME FLOTTANTE',
+    '🎠 TOBOGAN AQUATIQUE',
+    '⚓ PONTON',
+    'AUTRE',
+  ];
+
+  final List<String> labelSphotChoices = [
+    'AUCUN',
+    '🟦 PAVILLON BLEU',
+    '♿ HANDIPLAGE',
+    '🌿 GREEN COAST AWARD',
+    '🌸 VILLES ET VILLAGES FLEURIS',
+    '🏄 VILLE DE SURF',
+    '🌱 NATURA 2000',
+    '🏞️ PARC NATUREL RÉGIONAL DU MARAIS POITEVIN',
+    '🌳 STATION VERTE',
+    '🏖️ QUALITÉ TOURISME',
+    '🌊 FRANCE STATION NAUTIQUE',
+    '🐦 RAMSAR',
+    '🌍 UNESCO',
+    'AUTRE',
+  ];
+
   final List<String> accesPmrChoices = [
     'Oui',
     'Non',
@@ -569,6 +608,230 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
   );
 }
 
+
+  Widget _multiDropdownField(
+  String key,
+  String label,
+  List<String> choices, {
+  double maxMenuHeight = 220,
+}) {
+  final selectedValues = _value(key)
+      .split(' | ')
+      .map((value) => value.trim())
+      .where((value) => value.isNotEmpty)
+      .toList();
+
+  final selectedSet = selectedValues.toSet();
+  final fieldKey = GlobalKey();
+
+  void closeMenu() {
+    _dropdownOverlay?.remove();
+    _dropdownOverlay = null;
+  }
+
+  void updateSelection(String choice) {
+    setState(() {
+      final values = _value(key)
+          .split(' | ')
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toList();
+
+      if (choice == 'AUCUN') {
+        if (values.contains('AUCUN')) {
+          values.clear();
+        } else {
+          values
+            ..clear()
+            ..add('AUCUN');
+        }
+      } else {
+        values.remove('AUCUN');
+
+        if (values.contains(choice)) {
+          values.remove(choice);
+        } else {
+          values.add(choice);
+        }
+      }
+
+      _controller(key).text = values.join(' | ');
+    });
+  }
+
+  void openMenu() {
+    closeMenu();
+
+    final renderBox =
+        fieldKey.currentContext!.findRenderObject() as RenderBox;
+    final position = renderBox.localToGlobal(Offset.zero);
+    final size = renderBox.size;
+
+    _dropdownOverlay = OverlayEntry(
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, overlaySetState) {
+            final liveSelectedSet = _value(key)
+                .split(' | ')
+                .map((value) => value.trim())
+                .where((value) => value.isNotEmpty)
+                .toSet();
+
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: closeMenu,
+                    child: Container(color: Colors.transparent),
+                  ),
+                ),
+                Positioned(
+                  left: position.dx,
+                  top: position.dy + size.height - 10,
+                  width: size.width,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxHeight: maxMenuHeight,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.92),
+                        border: const Border(
+                          left: BorderSide(color: adminColor, width: 1.4),
+                          right: BorderSide(color: adminColor, width: 1.4),
+                          bottom: BorderSide(color: adminColor, width: 1.4),
+                        ),
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(10),
+                          bottomRight: Radius.circular(10),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.18),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Scrollbar(
+                        thumbVisibility: true,
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: choices.length,
+                          itemBuilder: (context, index) {
+                            final choice = choices[index];
+                            final selected = liveSelectedSet.contains(choice);
+
+                            return InkWell(
+                              onTap: () {
+                                updateSelection(choice);
+                                overlaySetState(() {});
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      selected
+                                          ? Icons.check_box_rounded
+                                          : Icons.check_box_outline_blank_rounded,
+                                      color: selected ? adminColor : Colors.black54,
+                                      size: 22,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        choice,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    Overlay.of(context).insert(_dropdownOverlay!);
+  }
+
+  final displayText = selectedValues.isEmpty ? label : selectedValues.join(' | ');
+
+  return GestureDetector(
+    key: fieldKey,
+    onTap: openMenu,
+    child: InputDecorator(
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(fontSize: 14),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.32),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.black, width: 1.6),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.black, width: 1.6),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              displayText,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight:
+                    selectedValues.isEmpty ? FontWeight.w400 : FontWeight.w700,
+                color: selectedValues.isEmpty
+                    ? Colors.black.withOpacity(0.60)
+                    : Colors.black,
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.checklist_rounded,
+            color: adminColor,
+            size: 24,
+          ),
+          const SizedBox(width: 2),
+          const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: adminColor,
+            size: 26,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
   Widget _twoColumns(Widget left, Widget right) {
     return Row(
       children: [
@@ -576,6 +839,50 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
         const SizedBox(width: 8),
         Expanded(child: right),
       ],
+    );
+  }
+
+  String _sphotWorkLabel() {
+    final id = _value('idSphot');
+    final repere = _value('nomSecours');
+    final nom = _value('nomSphot');
+
+    if (step == 1) {
+      return id.isEmpty ? 'SPHOT' : 'SPHOT $id';
+    }
+
+    final parts = <String>[
+      if (id.isNotEmpty) id,
+      if (repere.isNotEmpty) repere,
+      if (nom.isNotEmpty) nom,
+    ];
+
+    return parts.isEmpty ? 'SPHOT' : parts.join(' ');
+  }
+
+  Widget _sphotWorkBanner() {
+    if (step < 1) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: adminColor.withOpacity(0.16),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: adminColor, width: 2),
+      ),
+      child: Text(
+        _sphotWorkLabel(),
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: adminColor,
+          fontSize: 15,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
     );
   }
 
@@ -709,7 +1016,7 @@ SizedBox(
     onPressed: _importLogoVille,
     icon: const Icon(Icons.upload_file_rounded),
     label: const Text(
-      'IMPORTER LE LOGO DE LA VILLE',
+      'IMPORTEZ LE LOGO DE LA VILLE',
       style: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w900,
@@ -760,14 +1067,14 @@ SizedBox(
   child: ElevatedButton.icon(
     onPressed: () {
   _openMapPicker(
-    title: 'POSITIONNER LA VILLE',
+    title: 'POSITIONNEZ LA VILLE',
     latKey: 'villeLat',
     lngKey: 'villeLng',
   );
 },
     icon: const Icon(Icons.map_outlined),
     label: const Text(
-      'POSITIONNER LA VILLE SUR LA CARTE',
+      'POSITIONNEZ LA VILLE SUR LA CARTE',
       style: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w900,
@@ -823,14 +1130,14 @@ const SizedBox(height: 8),
   'typeSphot',
   'Type de SPHOT',
   typeSphotChoices,
-  maxMenuHeight: 158,
+  maxMenuHeight: 105,
 ),
             const SizedBox(height: 8),
             _dropdownField(
   'natureSphot',
   'Nature du SPHOT',
   natureSphotChoices,
-  maxMenuHeight: 100,
+  maxMenuHeight: 47,
 ),
           ],
         );
@@ -849,14 +1156,14 @@ const SizedBox(height: 8),
   child: ElevatedButton.icon(
           onPressed: () {
   _openMapPicker(
-    title: 'POSITIONNER LE SPHOT',
+    title: 'POSITIONNEZ LE SPHOT',
     latKey: 'sphotLat',
     lngKey: 'sphotLng',
   );
 },
           icon: const Icon(Icons.map_outlined),
           label: const Text(
-  'POSITIONNER LE SPHOT SUR LA CARTE',
+  'POSITIONNEZ LE SPHOT SUR LA CARTE',
   style: TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.w900,
@@ -908,9 +1215,9 @@ _twoColumns(
               '4. INFORMATIONS MAIRIE',
               'Ajoutez les liens externes utiles.',
             ),
-            _textField('adresseWebcam', 'Adresse URL webcam'),
+            _textField('adresseWebcam', 'Adresse URL webcam du SPHOT'),
             const SizedBox(height: 8),
-            _textField('arretesMunicipaux', 'Adresse URL arrêté municipal'),
+            _textField('arretesMunicipaux', 'Adresse URL arrêtés municipaux du SPHOT'),
           ],
         );
 
@@ -921,9 +1228,19 @@ _twoColumns(
               '5. ÉQUIPEMENTS ET LABELS',
               'Indiquez les services disponibles.',
             ),
-            _textField('equipement', 'Équipements', maxLines: 3),
+            _multiDropdownField(
+              'equipement',
+              'Équipements du SPHOT',
+              equipementChoices,
+              maxMenuHeight: 218,
+            ),
             const SizedBox(height: 8),
-            _textField('labelSphot', 'Labels SPHOT', maxLines: 2),
+            _multiDropdownField(
+              'labelSphot',
+              'Labels du SPHOT',
+              labelSphotChoices,
+              maxMenuHeight: 160,
+            ),
           ],
         );
 
@@ -970,7 +1287,12 @@ _twoColumns(
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      child: _currentStep(),
+      child: Column(
+        children: [
+          _sphotWorkBanner(),
+          _currentStep(),
+        ],
+      ),
     );
   }
 
