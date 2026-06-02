@@ -26,6 +26,10 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
   int step = 0;
   String? selectedDocId;
 
+  String? existingSphotMessage;
+
+  String? saveSphotMessage;
+
   OverlayEntry? _dropdownOverlay;
 
   final controllers = <String, TextEditingController>{};
@@ -69,6 +73,9 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
   '🧱 BARRAGE',
   '🏝️ LAGON',
   '🏊 PISCINE NATURELLE',
+   '🎡 BASE DE LOISIRS',
+  '🌳 PARC',
+  '💧 PLAN D’EAU',
   'AUTRE',  
 ];
 
@@ -94,6 +101,7 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
     '🚯 SANS POUBELLE',
     '🚻 TOILETTES',
     '🅿️ PARKING',
+    '🚐 PARKING CAMPING-CAR',
     '🚿 DOUCHE',
     '🤿 PLONGEOIR',
     '🛟 PLATE FORME FLOTTANTE',
@@ -127,22 +135,94 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
   ];
 
   final List<String> moyenPmrChoices = [
-    'Aucun',
-    'Tiralo',
-    'Hippocampe',
-    'Rampe',
-    'Caillebotis',
-    'Stationnement PMR',
-    'Sanitaires PMR',
-    'Autre',
-  ];
+  'Aucun',
+
+  '🦽 Tiralo',
+  '🦽 Hippocampe',
+  '♿ Rampe',
+  '🟫 Caillebotis',
+  '🅿️ Stationnement PMR',
+  '🚻 Sanitaires PMR',
+
+  '🚿 Douche adaptée PMR',
+  '🛟 Handiplagiste',
+  '👕 Vestiaire adapté PMR',
+  '⛱️ Abri contre le soleil',
+  '🦯 Moyen de guidage spécifique non-voyant pour la baignade',
+  '🔊 Bornes sonores d’informations et d’orientation',
+  '🟨 Bandes podotactiles de guidage du parking à la plage',
+
+  'Autre',
+];
 
   final List<String> labelPmrChoices = [
-    'Aucun',
-    'Handiplage',
-    'Tourisme & Handicap',
-    'Autre',
-  ];
+  'Aucun',
+
+  'LABEL HANDIPLAGE 1',
+  'LABEL HANDIPLAGE 2',
+  'LABEL HANDIPLAGE 3',
+  'LABEL HANDIPLAGE 4',
+
+  '🏨 TOURISME & HANDICAP - MOTEUR',
+  '🏨 TOURISME & HANDICAP - MENTAL',
+  '🏨 TOURISME & HANDICAP - AUDITIF',
+  '🏨 TOURISME & HANDICAP - VISUEL',
+
+  'Autre',
+];
+
+final List<String> activiteChoices = [
+  '🏄 SURF',
+  '🏄 BODYBOARD',
+  '🏄 BODYSURF',
+  'STAND UP PADDLE',
+  'LONGE CÔTE',
+  '🪁 KITESURF',
+  '🪁 SURF FOIL',
+  '🪁 WINGFOIL',
+  '🪁 PLANCHE À VOILE',
+  '⛵ CATAMARAN',
+  '⛵ VOILIER',
+  'JETSKI / SCOOTER DES MERS',
+  '🚤 BATEAU À MOTEUR',
+  'BOUÉE TRACTÉE',
+  'PARACHUTE ASCENSIONNEL',
+  'FLYBOARD',
+  'KAYAK SURF',
+  'WAVESKI',
+  'SKI NAUTIQUE / WAKE BOARD',
+  'CHAR À VOILE / SPEED SAIL / KITE BUGGY',
+  '🤿 SNORKELING',
+  '🤿 PLONGÉE',
+  '🤿 CHASSE SOUS-MARINE',
+  'CLIFF DIVING',
+  '🛶 CANOË',
+  '🛶 KAYAK',
+  '🛶 PIROGUE',
+  '🛶 RAFTING',
+  'HYDROSPEED',
+  'CANYONING',
+  'PÊCHE À PIED',
+  'PÊCHE SURFCASTING',
+  'NATURISME',
+  'AUTRE',
+  '❔ NON RENSEIGNÉ',
+];
+
+final List<String> commerceChoices = [
+  'AUCUN',
+  '🛏️ HÔTELLERIE',
+  '🏕️ CAMPING',
+  '🍴 RESTAURATION',
+  '🧺 LAVERIE',
+  '🤙 LOCATIONS ÉQUIPEMENTS NAUTIQUES',
+  '🏖️ LOCATION / COMMERCE DE PLAGE',
+  '🏖️ CLUB DE PLAGE',
+  '🏄⛵ COURS ACTIVITÉS NAUTIQUES',
+  '🏄⛵ ÉCOLE / CLUB NAUTIQUE',
+  'AUTRE',
+  '❔ NON RENSEIGNÉ',
+];
 
   @override
   void dispose() {
@@ -196,7 +276,14 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
     step = 0;
 
     for (final field in fields) {
-      _controller(field).text = (data[field] ?? '').toString();
+      final value = data[field];
+
+      if (value is Iterable) {
+        _controller(field).text =
+            value.map((item) => item.toString()).join(' | ');
+      } else {
+        _controller(field).text = (value ?? '').toString();
+      }
     }
 
     setState(() {});
@@ -208,7 +295,14 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
     step = 0;
 
     for (final field in fields) {
-      _controller(field).text = (data[field] ?? '').toString();
+      final value = data[field];
+
+      if (value is Iterable) {
+        _controller(field).text =
+            value.map((item) => item.toString()).join(' | ');
+      } else {
+        _controller(field).text = (value ?? '').toString();
+      }
     }
 
     _controller('idSphot').clear();
@@ -273,28 +367,35 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
 
     if (!mounted) return;
 
-    _showMessage(
+    setState(() {
+  saveSphotMessage =
       mode == AdminSphotMode.edit
-          ? 'SPHOT modifié'
-          : 'SPHOT enregistré',
-    );
+          ? 'SPHOT MODIFIÉ'
+          : 'SPHOT ENREGISTRÉ';
+});
 
     selectedDocId = docId;
     mode = AdminSphotMode.edit;
     setState(() {});
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
-    );
-  }
+void _showMessage(String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      duration: const Duration(seconds: 2),
+    ),
+  );
+}
 
   void _nextStep() {
-    if (step < 6) {
-      setState(() => step++);
-    }
+  if (step < 6) {
+    setState(() {
+      saveSphotMessage = null;
+      step++;
+    });
   }
+}
 
   void _previousStep() {
   if (step > 0) {
@@ -311,62 +412,57 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
 }
 
   Widget _modeButton({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-    required bool selected,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.14) : Colors.transparent,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: color, width: selected ? 3 : 2),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+  required String title,
+  required String subtitle,
+  required IconData icon,
+  required Color color,
+  required VoidCallback onTap,
+  required bool selected,
+}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: double.infinity,
+      height: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: selected ? color.withOpacity(0.14) : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color, width: selected ? 3 : 2),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 26),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _sphotSelector({
     required String label,
     required void Function(String docId, Map<String, dynamic> data) onSelected,
   }) {
+    final fieldKey = GlobalKey();
+
+    void closeMenu() {
+      _dropdownOverlay?.remove();
+      _dropdownOverlay = null;
+    }
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('spots').snapshots(),
       builder: (context, snapshot) {
@@ -376,40 +472,213 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
 
         final docs = snapshot.data!.docs;
 
-        return DropdownButtonFormField<String>(
-          isExpanded: true,
-          value: null,
-          hint: Text(label),
-          items: docs.map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
+        docs.sort((a, b) {
+  final dataA = a.data() as Map<String, dynamic>;
+  final dataB = b.data() as Map<String, dynamic>;
+
+  final secoursA = (dataA['nomSecours'] ?? '').toString();
+  final secoursB = (dataB['nomSecours'] ?? '').toString();
+
+  final matchA = RegExp(r'(\d+)').firstMatch(secoursA);
+  final matchB = RegExp(r'(\d+)').firstMatch(secoursB);
+
+  final numA = int.tryParse(matchA?.group(1) ?? '9999') ?? 9999;
+  final numB = int.tryParse(matchB?.group(1) ?? '9999') ?? 9999;
+
+  return numA.compareTo(numB);
+});
+
+        String displayLabel = label;
+        if (selectedDocId != null) {
+          final selectedDocs = docs.where((doc) => doc.id == selectedDocId);
+          if (selectedDocs.isNotEmpty) {
+            final data = selectedDocs.first.data() as Map<String, dynamic>;
             final ville = (data['ville'] ?? '').toString();
             final nomSecours = (data['nomSecours'] ?? '').toString();
             final nomSphot = (data['nomSphot'] ?? '').toString();
+            displayLabel = [nomSecours, nomSphot]
+    .where((value) => value.trim().isNotEmpty)
+    .join(' - ');
+          }
+        }
 
-            return DropdownMenuItem(
-              value: doc.id,
-              child: Text(
-                '$ville - $nomSecours - $nomSphot',
-                overflow: TextOverflow.ellipsis,
+        void openMenu() {
+          closeMenu();
+
+          final renderBox =
+              fieldKey.currentContext!.findRenderObject() as RenderBox;
+          final position = renderBox.localToGlobal(Offset.zero);
+          final size = renderBox.size;
+          final scrollController = ScrollController();
+
+          _dropdownOverlay = OverlayEntry(
+            builder: (context) {
+              return Stack(
+                children: [
+                  Positioned.fill(
+                    child: GestureDetector(
+                      onTap: closeMenu,
+                      child: Container(color: Colors.transparent),
+                    ),
+                  ),
+                  Positioned(
+                    left: position.dx,
+                    top: position.dy + size.height - 10,
+                    width: size.width,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        constraints: const BoxConstraints(maxHeight: 297),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.92),
+                          border: const Border(
+                            left: BorderSide(color: adminColor, width: 1.4),
+                            right: BorderSide(color: adminColor, width: 1.4),
+                            bottom: BorderSide(color: adminColor, width: 1.4),
+                          ),
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(10),
+                            bottomRight: Radius.circular(10),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.18),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ScrollbarTheme(
+                          data: ScrollbarThemeData(
+                            thumbColor: MaterialStatePropertyAll(adminColor),
+                            trackVisibility:
+                                const MaterialStatePropertyAll(false),
+                          ),
+                          child: Scrollbar(
+                            controller: scrollController,
+                            thumbVisibility: true,
+                            thickness: 10,
+                            radius: const Radius.circular(10),
+                            child: ListView.builder(
+                              controller: scrollController,
+                              primary: false,
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              itemCount: docs.length,
+                              itemBuilder: (context, index) {
+                                final doc = docs[index];
+                                final data =
+                                    doc.data() as Map<String, dynamic>;
+                                final ville =
+                                    (data['ville'] ?? '').toString();
+                                final nomSecours =
+                                    (data['nomSecours'] ?? '').toString();
+                                final nomSphot =
+                                    (data['nomSphot'] ?? '').toString();
+                                final title = [nomSecours, nomSphot]
+    .where(
+      (value) => value.trim().isNotEmpty,
+    )
+    .join(' - ');
+                                final selected = doc.id == selectedDocId;
+
+                                return InkWell(
+                                  onTap: () {
+                                    onSelected(doc.id, data);
+                                    closeMenu();
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 8,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+  selected
+      ? Icons.check_circle_rounded
+      : Icons.place_rounded,
+  color: adminColor,
+  size: 22,
+),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            title.isEmpty ? doc.id : title,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w800,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+
+          Overlay.of(context).insert(_dropdownOverlay!);
+        }
+
+        return GestureDetector(
+          key: fieldKey,
+          onTap: openMenu,
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: label,
+              labelStyle: const TextStyle(fontSize: 14),
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.32),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
               ),
-            );
-          }).toList(),
-          onChanged: (docId) {
-            if (docId == null) return;
-            final doc = docs.firstWhere((element) => element.id == docId);
-            onSelected(doc.id, doc.data() as Map<String, dynamic>);
-          },
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.25),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Colors.black, width: 1.7),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Colors.black, width: 1.6),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Colors.black, width: 1.6),
+              ),
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Colors.black, width: 1.7),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    displayLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: selectedDocId == null
+                          ? FontWeight.w400
+                          : FontWeight.w700,
+                      color: selectedDocId == null
+                          ? Colors.black.withOpacity(0.60)
+                          : Colors.black,
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: adminColor,
+                  size: 26,
+                ),
+              ],
             ),
           ),
         );
@@ -453,7 +722,56 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
     );
   }
 
-  Widget _dropdownField(
+String _cleanChoice(String value) {
+  return value
+      .replaceAll('’', "'")
+      .replaceAll('É', 'E')
+      .replaceAll('È', 'E')
+      .replaceAll('Ê', 'E')
+      .replaceAll('Ë', 'E')
+      .replaceAll('À', 'A')
+      .replaceAll('Â', 'A')
+      .replaceAll('Ä', 'A')
+      .replaceAll('Î', 'I')
+      .replaceAll('Ï', 'I')
+      .replaceAll('Ô', 'O')
+      .replaceAll('Ö', 'O')
+      .replaceAll('Ù', 'U')
+      .replaceAll('Û', 'U')
+      .replaceAll('Ü', 'U')
+      .replaceAll('Ç', 'C')
+      .replaceAll('é', 'e')
+      .replaceAll('è', 'e')
+      .replaceAll('ê', 'e')
+      .replaceAll('ë', 'e')
+      .replaceAll('à', 'a')
+      .replaceAll('â', 'a')
+      .replaceAll('ä', 'a')
+      .replaceAll('î', 'i')
+      .replaceAll('ï', 'i')
+      .replaceAll('ô', 'o')
+      .replaceAll('ö', 'o')
+      .replaceAll('ù', 'u')
+      .replaceAll('û', 'u')
+      .replaceAll('ü', 'u')
+      .replaceAll('ç', 'c')
+      .replaceAll(RegExp(r'[^A-Za-z0-9\s]'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim()
+      .toUpperCase();
+}
+
+List<String> _readValues(String key) {
+  return _value(key)
+      .replaceAll('[', '')
+      .replaceAll(']', '')
+      .split(RegExp(r'\s*\|\s*|\s*,\s*'))
+      .map((value) => value.trim())
+      .where((value) => value.isNotEmpty)
+      .toList();
+}
+
+Widget _dropdownField(
   String key,
   String label,
   List<String> choices, {
@@ -470,10 +788,10 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
   void openMenu() {
     closeMenu();
 
-    final renderBox =
-        fieldKey.currentContext!.findRenderObject() as RenderBox;
+    final renderBox = fieldKey.currentContext!.findRenderObject() as RenderBox;
     final position = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
+    final scrollController = ScrollController();
 
     _dropdownOverlay = OverlayEntry(
       builder: (context) {
@@ -492,9 +810,7 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  constraints: BoxConstraints(
-                    maxHeight: maxMenuHeight,
-                  ),
+                  constraints: BoxConstraints(maxHeight: maxMenuHeight),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.88),
                     border: const Border(
@@ -514,38 +830,49 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
                       ),
                     ],
                   ),
-                  child: Scrollbar(
-                    thumbVisibility: true,
-                    child: ListView.builder(
-                      padding: EdgeInsets.zero,
-                      shrinkWrap: true,
-                      itemCount: choices.length,
-                      itemBuilder: (context, index) {
-                        final choice = choices[index];
+                  child: ScrollbarTheme(
+                    data: ScrollbarThemeData(
+                      thumbColor: MaterialStatePropertyAll(adminColor),
+                      trackVisibility: const MaterialStatePropertyAll(false),
+                    ),
+                    child: Scrollbar(
+                      controller: scrollController,
+                      thumbVisibility: true,
+                      thickness: 10,
+                      radius: const Radius.circular(10),
+                      child: ListView.builder(
+                        controller: scrollController,
+                        primary: false,
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        itemCount: choices.length,
+                        itemBuilder: (context, index) {
+                          final choice = choices[index];
 
-                        return InkWell(
-                          onTap: () {
-                            setState(() {
-                              _controller(key).text = choice;
-                            });
-                            closeMenu();
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-                            child: Text(
-                              choice,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.black87,
+                          return InkWell(
+                            onTap: () {
+                              setState(() {
+                                _controller(key).text = choice;
+                              });
+                              closeMenu();
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                              child: Text(
+                                choice,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.black87,
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
@@ -568,10 +895,7 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
         labelStyle: const TextStyle(fontSize: 14),
         filled: true,
         fillColor: Colors.white.withOpacity(0.32),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 12,
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: Colors.black, width: 1.6),
@@ -589,8 +913,7 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 13,
-                fontWeight:
-                    current.isEmpty ? FontWeight.w400 : FontWeight.w700,
+                fontWeight: current.isEmpty ? FontWeight.w400 : FontWeight.w700,
                 color: current.isEmpty
                     ? Colors.black.withOpacity(0.60)
                     : Colors.black,
@@ -608,20 +931,13 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
   );
 }
 
-
-  Widget _multiDropdownField(
+Widget _multiDropdownField(
   String key,
   String label,
   List<String> choices, {
   double maxMenuHeight = 220,
 }) {
-  final selectedValues = _value(key)
-      .split(' | ')
-      .map((value) => value.trim())
-      .where((value) => value.isNotEmpty)
-      .toList();
-
-  final selectedSet = selectedValues.toSet();
+  final selectedValues = _readValues(key);
   final fieldKey = GlobalKey();
 
   void closeMenu() {
@@ -631,25 +947,33 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
 
   void updateSelection(String choice) {
     setState(() {
-      final values = _value(key)
-          .split(' | ')
-          .map((value) => value.trim())
-          .where((value) => value.isNotEmpty)
-          .toList();
+      final values = _readValues(key);
 
-      if (choice == 'AUCUN') {
-        if (values.contains('AUCUN')) {
+      if (_cleanChoice(choice) == _cleanChoice('AUCUN')) {
+        final hasAucun = values.any(
+          (value) => _cleanChoice(value) == _cleanChoice('AUCUN'),
+        );
+
+        if (hasAucun) {
           values.clear();
         } else {
           values
             ..clear()
-            ..add('AUCUN');
+            ..add(choice);
         }
       } else {
-        values.remove('AUCUN');
+        values.removeWhere(
+          (value) => _cleanChoice(value) == _cleanChoice('AUCUN'),
+        );
 
-        if (values.contains(choice)) {
-          values.remove(choice);
+        final alreadySelected = values.any(
+          (value) => _cleanChoice(value) == _cleanChoice(choice),
+        );
+
+        if (alreadySelected) {
+          values.removeWhere(
+            (value) => _cleanChoice(value) == _cleanChoice(choice),
+          );
         } else {
           values.add(choice);
         }
@@ -662,20 +986,16 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
   void openMenu() {
     closeMenu();
 
-    final renderBox =
-        fieldKey.currentContext!.findRenderObject() as RenderBox;
+    final renderBox = fieldKey.currentContext!.findRenderObject() as RenderBox;
     final position = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
+    final scrollController = ScrollController();
 
     _dropdownOverlay = OverlayEntry(
       builder: (context) {
         return StatefulBuilder(
           builder: (context, overlaySetState) {
-            final liveSelectedSet = _value(key)
-                .split(' | ')
-                .map((value) => value.trim())
-                .where((value) => value.isNotEmpty)
-                .toSet();
+            final liveSelectedValues = _readValues(key);
 
             return Stack(
               children: [
@@ -692,9 +1012,7 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
                   child: Material(
                     color: Colors.transparent,
                     child: Container(
-                      constraints: BoxConstraints(
-                        maxHeight: maxMenuHeight,
-                      ),
+                      constraints: BoxConstraints(maxHeight: maxMenuHeight),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.92),
                         border: const Border(
@@ -714,51 +1032,89 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
                           ),
                         ],
                       ),
-                      child: Scrollbar(
-                        thumbVisibility: true,
-                        child: ListView.builder(
-                          padding: EdgeInsets.zero,
-                          shrinkWrap: true,
-                          itemCount: choices.length,
-                          itemBuilder: (context, index) {
-                            final choice = choices[index];
-                            final selected = liveSelectedSet.contains(choice);
+                      child: ScrollbarTheme(
+                        data: ScrollbarThemeData(
+                          thumbColor: MaterialStatePropertyAll(adminColor),
+                          trackVisibility: const MaterialStatePropertyAll(false),
+                        ),
+                        child: Scrollbar(
+                          controller: scrollController,
+                          thumbVisibility: true,
+                          thickness: 10,
+                          radius: const Radius.circular(10),
+                          child: ListView.builder(
+                            controller: scrollController,
+                            primary: false,
+                            padding: EdgeInsets.zero,
+                            shrinkWrap: true,
+                            itemCount: choices.length,
+                            itemBuilder: (context, index) {
+                              final choice = choices[index];
 
-                            return InkWell(
-                              onTap: () {
-                                updateSelection(choice);
-                                overlaySetState(() {});
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 8,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      selected
-                                          ? Icons.check_box_rounded
-                                          : Icons.check_box_outline_blank_rounded,
-                                      color: selected ? adminColor : Colors.black54,
-                                      size: 22,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        choice,
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.black87,
-                                        ),
+                              final selected = liveSelectedValues.any(
+                                (value) =>
+                                    _cleanChoice(value) == _cleanChoice(choice),
+                              );
+
+                              return InkWell(
+                                onTap: () {
+                                  updateSelection(choice);
+                                  overlaySetState(() {});
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 8,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        selected
+                                            ? Icons.check_box_rounded
+                                            : Icons
+                                                .check_box_outline_blank_rounded,
+                                        color: selected
+                                            ? adminColor
+                                            : Colors.black54,
+                                        size: 22,
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 8),
+                                      Expanded(
+  child: key == 'labelPmr' && choice.startsWith('LABEL HANDIPLAGE')
+      ? Row(
+          children: [
+            Image.asset(
+              'data/icons/handiplage${choice.replaceAll(RegExp(r'[^0-9]'), '')}.png',
+              width: 38,
+              height: 38,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              choice,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        )
+      : Text(
+          choice,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: Colors.black87,
+          ),
+        ),
+),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
@@ -774,7 +1130,8 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
     Overlay.of(context).insert(_dropdownOverlay!);
   }
 
-  final displayText = selectedValues.isEmpty ? label : selectedValues.join(' | ');
+  final displayText =
+      selectedValues.isEmpty ? label : selectedValues.join(' | ');
 
   return GestureDetector(
     key: fieldKey,
@@ -1056,7 +1413,7 @@ const SizedBox(height: 8),
 
 _textField(
   'siteInternetVille',
-  'Site internet de la ville',
+  'Adresse du site internet de la ville',
 ),
 
 const SizedBox(height: 8),
@@ -1215,9 +1572,9 @@ _twoColumns(
               '4. INFORMATIONS MAIRIE',
               'Ajoutez les liens externes utiles.',
             ),
-            _textField('adresseWebcam', 'Adresse URL webcam du SPHOT'),
+            _textField('adresseWebcam', 'Adresse internet de la webcam du SPHOT'),
             const SizedBox(height: 8),
-            _textField('arretesMunicipaux', 'Adresse URL arrêtés municipaux du SPHOT'),
+            _textField('arretesMunicipaux', 'Adresse internet des arrêtés municipaux du SPHOT'),
           ],
         );
 
@@ -1245,32 +1602,95 @@ _twoColumns(
         );
 
       case 5:
-        return Column(
-          children: [
-            _stepHeader(
-              '6. ACCESSIBILITÉ PMR',
-              'Précisez les accès et moyens disponibles.',
-            ),
-            _dropdownField('accesPmr', 'Accès PMR', accesPmrChoices),
-            const SizedBox(height: 8),
-            _dropdownField('moyenPmr', 'Moyen PMR', moyenPmrChoices),
-            const SizedBox(height: 8),
-            _dropdownField('labelPmr', 'Label PMR', labelPmrChoices),
-          ],
-        );
+  return Column(
+    children: [
+      _stepHeader(
+        '6. ACCESSIBILITÉ',
+        'Précisez les labels, accès et moyens disponibles.',
+      ),
+      _multiDropdownField(
+  'labelPmr',
+  'Labels Accessibilité',
+  labelPmrChoices,
+  maxMenuHeight: 212,
+),
+      const SizedBox(height: 8),
+      _dropdownField(
+  'accesPmr',
+  'Accès Accessibilité',
+  accesPmrChoices,
+  maxMenuHeight: 155,
+),
+
+const SizedBox(height: 8),
+
+_multiDropdownField(
+  'moyenPmr',
+  'Moyens Accessibilité',
+  moyenPmrChoices,
+  maxMenuHeight: 97,
+),
+    ],
+  );
 
       default:
-        return Column(
-          children: [
-            _stepHeader(
-              '7. ACTIVITÉS ET COMMERCES',
-              'Complétez les activités et commerces associés.',
-            ),
-            _textField('activite', 'Activités', maxLines: 3),
-            const SizedBox(height: 8),
-            _textField('commerce', 'Commerces', maxLines: 3),
-          ],
-        );
+  return Column(
+  children: [
+    _stepHeader(
+      '7. ACTIVITÉS ET COMMERCES',
+      'Sélectionnez les activités et commerces associés.',
+    ),
+
+    _multiDropdownField(
+      'activite',
+      'Activités du SPHOT',
+      activiteChoices,
+      maxMenuHeight: 213,
+    ),
+
+    const SizedBox(height: 8),
+
+    _multiDropdownField(
+      'commerce',
+      'Commerces du SPHOT',
+      commerceChoices,
+      maxMenuHeight: 155,
+    ),
+
+    if (saveSphotMessage != null) ...[
+      const SizedBox(height: 8),
+
+      Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(
+  minHeight: 46,
+),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 0,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.green,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Colors.black,
+            width: 2,
+          ),
+        ),
+        child: Text(
+          saveSphotMessage!,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    ],
+  ],
+);
     }
   }
 
@@ -1330,13 +1750,17 @@ _twoColumns(
     );
   }
 
-Widget _existingSphotsPanel() {
+Widget _existingSphotsPanel({
+  required double bandeauHeight,
+  required double gap,
+}) {
   return Container(
     width: double.infinity,
-    padding: const EdgeInsets.all(10),
+    height: double.infinity,
+    padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
     decoration: BoxDecoration(
       color: Colors.white.withOpacity(0.10),
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(16),
       border: Border.all(
         color: const Color(0xFFF97316),
         width: 2,
@@ -1349,203 +1773,253 @@ Widget _existingSphotsPanel() {
             Icon(
               Icons.folder_copy_rounded,
               color: Color(0xFFF97316),
-              size: 28,
+              size: 20,
             ),
             SizedBox(width: 8),
             Text(
               'SPHOTS EXISTANTS',
               style: TextStyle(
                 color: Color(0xFFF97316),
-                fontSize: 15,
+                fontSize: 13,
                 fontWeight: FontWeight.w900,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        _sphotSelector(
-          label: 'Choisir un SPHOT',
-          onSelected: (docId, data) {
-            selectedDocId = docId;
-            setState(() {});
-          },
+
+        const SizedBox(height: 4),
+
+        SizedBox(
+          height: bandeauHeight,
+          child: _sphotSelector(
+            label: 'Sélectionnez un SPHOT existant',
+            onSelected: (docId, data) {
+              selectedDocId = docId;
+              existingSphotMessage = null;
+              setState(() {});
+            },
+          ),
         ),
-        const SizedBox(height: 8),
-        _modeButton(
-  title: 'MODIFIER LE SPHOT',
-  subtitle: 'Corriger un SPHOT existant',
-  icon: Icons.edit_location_alt_rounded,
-  color: const Color(0xFF16A34A),
-  selected: false,
-  onTap: selectedDocId == null
-      ? () {}
-      : () async {
-          final doc = await FirebaseFirestore.instance
-              .collection('spots')
-              .doc(selectedDocId)
-              .get();
 
-          _loadForEdit(
-            doc.id,
-            doc.data() as Map<String, dynamic>,
-          );
-        },
-),
+        SizedBox(height: gap),
 
-_modeButton(
-  title: 'COPIER LE SPHOT',
-  subtitle: 'Créer un nouveau SPHOT à partir de celui-ci',
-  icon: Icons.copy_rounded,
-  color: const Color(0xFF7C3AED),
-  selected: false,
-  onTap: selectedDocId == null
-      ? () {}
-      : () async {
-          final doc = await FirebaseFirestore.instance
-              .collection('spots')
-              .doc(selectedDocId)
-              .get();
+        SizedBox(
+          height: bandeauHeight,
+          child: _modeButton(
+            title: 'MODIFIER LE SPHOT',
+            subtitle: '',
+            icon: Icons.edit_location_alt_rounded,
+            color: const Color(0xFF16A34A),
+            selected: false,
+            onTap: selectedDocId == null
+                ? () {}
+                : () async {
+                    final doc = await FirebaseFirestore.instance
+                        .collection('spots')
+                        .doc(selectedDocId)
+                        .get();
 
-          _loadForCopy(
-            doc.id,
-            doc.data() as Map<String, dynamic>,
-          );
-        },
-),
+                    _loadForEdit(
+                      doc.id,
+                      doc.data() as Map<String, dynamic>,
+                    );
+                  },
+          ),
+        ),
 
-_modeButton(
-  title: 'SUPPRIMER LE SPHOT',
-  subtitle: 'Supprimer définitivement ce SPHOT',
-  icon: Icons.delete_forever_rounded,
-  color: Colors.red,
-  selected: false,
-  onTap: selectedDocId == null
-      ? () {}
-      : () async {
-          await FirebaseFirestore.instance
-              .collection('spots')
-              .doc(selectedDocId)
-              .delete();
+        SizedBox(height: gap),
 
-          setState(() {
-            selectedDocId = null;
-            mode = AdminSphotMode.none;
-            step = 0;
-            _clearForm();
-          });
+        SizedBox(
+          height: bandeauHeight,
+          child: _modeButton(
+            title: 'COPIER LE SPHOT',
+            subtitle: '',
+            icon: Icons.copy_rounded,
+            color: const Color(0xFF7C3AED),
+            selected: false,
+            onTap: selectedDocId == null
+                ? () {}
+                : () async {
+                    final doc = await FirebaseFirestore.instance
+                        .collection('spots')
+                        .doc(selectedDocId)
+                        .get();
 
-          _showMessage('SPHOT supprimé');
-        },
-),
+                    _loadForCopy(
+                      doc.id,
+                      doc.data() as Map<String, dynamic>,
+                    );
+                  },
+          ),
+        ),
+
+        SizedBox(height: gap),
+
+        SizedBox(
+          height: bandeauHeight,
+          child: _modeButton(
+            title: 'SUPPRIMER LE SPHOT',
+            subtitle: '',
+            icon: Icons.delete_forever_rounded,
+            color: Colors.red,
+            selected: false,
+            onTap: selectedDocId == null
+                ? () {}
+                : () async {
+                    await FirebaseFirestore.instance
+                        .collection('spots')
+                        .doc(selectedDocId)
+                        .delete();
+
+                    setState(() {
+                      selectedDocId = null;
+                      mode = AdminSphotMode.none;
+                      step = 0;
+                      _clearForm();
+                      existingSphotMessage = 'SPHOT SUPPRIMÉ';
+                    });
+                  },
+          ),
+        ),
       ],
     ),
   );
 }
 
-  @override
-  Widget build(BuildContext context) {
-    final bool showSelectorCopy = mode == AdminSphotMode.copy && !_hasStarted;
-    final bool showSelectorEdit = mode == AdminSphotMode.edit && selectedDocId == null;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset('data/images/map_background.jpg', fit: BoxFit.cover),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Column(
-                children: [
-                  Image.asset('data/icons/title.png', height: 56),
-                  const Text(
-                    'GESTION DES SPHOTS',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: adminColor,
-                      letterSpacing: 0.6,
-                    ),
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.transparent,
+    body: Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset('data/images/map_background.jpg', fit: BoxFit.cover),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+            child: Column(
+              children: [
+                Image.asset('data/icons/title.png', height: 42),
+                const Text(
+                  'GESTION DES SPHOTS',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: adminColor,
+                    letterSpacing: 0.5,
                   ),
-                  const SizedBox(height: 8),
-
-                  Expanded(
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.black, width: 2),
-                      ),
-                      child: Column(
-                        children: [
-                          if (mode == AdminSphotMode.none)
-  _modeButton(
-    title: '+ NOUVEAU SPHOT',
-    subtitle: 'Créer un SPHOT étape par étape',
-    icon: Icons.add_location_alt_rounded,
-    color: adminColor,
-    selected: mode == AdminSphotMode.create,
-    onTap: _newSphot,
-  ),
-
-if (mode == AdminSphotMode.create)
-  Expanded(
-    child: _formArea(),
-  ),
-
-if (mode == AdminSphotMode.none)
-  Expanded(
-    child: _existingSphotsPanel(),
-  ),
-
-if (mode == AdminSphotMode.copy && _hasStarted)
-  Expanded(
-    child: _formArea(),
-  ),
-
-if (mode == AdminSphotMode.edit && _hasStarted)
-  Expanded(
-    child: _formArea(),
-  ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-                  _stepControls(),
-                  const SizedBox(height: 8),
-
-                  Container(
-                    width: 50,
-                    height: 50,
+                ),
+                const SizedBox(height: 4),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: Colors.transparent,
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(color: Colors.black, width: 2),
                     ),
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.black,
-                        size: 22,
-                      ),
+                    child: mode == AdminSphotMode.none
+                        ? LayoutBuilder(
+                            builder: (context, constraints) {
+                              const double gap = 8;
+                              const double panelExtraHeight =43;
+
+final double bandeauHeight =
+    ((constraints.maxHeight - (gap * 6) - panelExtraHeight) / 7) - 8;
+
+                              return Column(
+                                children: [
+                                  SizedBox(
+                                    height: bandeauHeight,
+                                    child: _modeButton(
+                                      title: '+ CRÉER UN NOUVEAU SPHOT',
+                                      subtitle: '',
+                                      icon: Icons.add_location_alt_rounded,
+                                      color: adminColor,
+                                      selected: false,
+                                      onTap: _newSphot,
+                                    ),
+                                  ),
+                                  const SizedBox(height: gap),
+                                  SizedBox(
+  height: (bandeauHeight * 4) + (gap * 3) + panelExtraHeight,
+  child: _existingSphotsPanel(
+    bandeauHeight: bandeauHeight,
+    gap: gap,
+  ),
+),
+                                  
+                                  const SizedBox(height: gap),
+                                  SizedBox(
+                                    height: bandeauHeight,
+                                    child: _modeButton(
+                                      title: 'IMPORTER LES SPHOTS',
+                                      subtitle: '',
+                                      icon: Icons.upload_file_rounded,
+                                      color: const Color(0xFFF97316),
+                                      selected: false,
+                                      onTap: () {},
+                                    ),
+                                  ),
+                                  const SizedBox(height: gap),
+                                  SizedBox(
+                                    height: bandeauHeight,
+                                    child: _modeButton(
+                                      title: 'CONTRÔLER ET VALIDER',
+                                      subtitle: '',
+                                      icon: Icons.fact_check_rounded,
+                                      color: const Color(0xFF16A34A),
+                                      selected: false,
+                                      onTap: () {},
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          )
+                        : Column(
+                            children: [
+                              if (mode == AdminSphotMode.create)
+                                Expanded(child: _formArea()),
+                              if (mode == AdminSphotMode.copy && _hasStarted)
+                                Expanded(child: _formArea()),
+                              if (mode == AdminSphotMode.edit && _hasStarted)
+                                Expanded(child: _formArea()),
+                            ],
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                _stepControls(),
+                const SizedBox(height: 4),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.black, width: 2),
+                  ),
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: Colors.black,
+                      size: 18,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+   );
+}
 }
 
 class _AdminDropdownMenuItem extends StatelessWidget {

@@ -1541,25 +1541,55 @@ Widget _buildBottomBar() {
 
                   const SizedBox(height: 2),
 
-                  Text(
-                    items[index]['label'] as String,
-                    maxLines: 1,
-                    overflow: TextOverflow.visible,
-                    style: TextStyle(
-                      fontSize: 10.4,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.2,
-                      color: index == 4
-                          ? const Color(0xFFFF0000)
-                          : index == 1
-                              ? const Color(0xFF2E7D32)
-                              : index == 2
-                                  ? const Color(0xFFFFD000)
-                                  : index == 3
-                                      ? const Color(0xFF1E3A8A)
-                                      : Colors.black87,
-                    ),
-                  ),
+                  index == 4
+    ? RichText(
+        text: const TextSpan(
+          style: TextStyle(
+            fontSize: 10.4,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.2,
+          ),
+          children: [
+            TextSpan(
+              text: 'L',
+              style: TextStyle(color: Color(0xFFFF0000)),
+            ),
+            TextSpan(
+              text: 'O',
+              style: TextStyle(color: Color(0xFF1E3A8A)),
+            ),
+            TextSpan(
+              text: 'G',
+              style: TextStyle(color: Color(0xFFFF0000)),
+            ),
+            TextSpan(
+              text: 'I',
+              style: TextStyle(color: Color(0xFF1E3A8A)),
+            ),
+            TextSpan(
+              text: 'N',
+              style: TextStyle(color: Color(0xFFFF0000)),
+            ),
+          ],
+        ),
+      )
+    : Text(
+        items[index]['label'] as String,
+        maxLines: 1,
+        overflow: TextOverflow.visible,
+        style: TextStyle(
+          fontSize: 10.4,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -0.2,
+          color: index == 1
+              ? const Color(0xFF2E7D32)
+              : index == 2
+                  ? const Color(0xFFFFD000)
+                  : index == 3
+                      ? const Color(0xFF1E3A8A)
+                      : Colors.black87,
+        ),
+      ),
                 ],
               ),
             ),
