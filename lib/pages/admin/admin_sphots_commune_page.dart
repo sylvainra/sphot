@@ -453,238 +453,226 @@ void _showMessage(String message) {
 }
 
   Widget _sphotSelector({
-    required String label,
-    required void Function(String docId, Map<String, dynamic> data) onSelected,
-  }) {
-    final fieldKey = GlobalKey();
+  required String label,
+  required void Function(String docId, Map<String, dynamic> data) onSelected,
+}) {
+  final fieldKey = GlobalKey();
 
-    void closeMenu() {
-      _dropdownOverlay?.remove();
-      _dropdownOverlay = null;
-    }
+  void closeMenu() {
+    _dropdownOverlay?.remove();
+    _dropdownOverlay = null;
+  }
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('spots').snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+  return StreamBuilder<QuerySnapshot>(
+    stream: FirebaseFirestore.instance.collection('spots').snapshots(),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
+      final docs = snapshot.data!.docs;
+
+      docs.sort((a, b) {
+        final dataA = a.data() as Map<String, dynamic>;
+        final dataB = b.data() as Map<String, dynamic>;
+
+        final secoursA = (dataA['nomSecours'] ?? '').toString();
+        final secoursB = (dataB['nomSecours'] ?? '').toString();
+
+        final matchA = RegExp(r'(\d+)').firstMatch(secoursA);
+        final matchB = RegExp(r'(\d+)').firstMatch(secoursB);
+
+        final numA = int.tryParse(matchA?.group(1) ?? '9999') ?? 9999;
+        final numB = int.tryParse(matchB?.group(1) ?? '9999') ?? 9999;
+
+        return numA.compareTo(numB);
+      });
+
+      String displayLabel = label;
+
+      if (selectedDocId != null) {
+        final selectedDocs = docs.where((doc) => doc.id == selectedDocId);
+        if (selectedDocs.isNotEmpty) {
+          final data = selectedDocs.first.data() as Map<String, dynamic>;
+          final nomSecours = (data['nomSecours'] ?? '').toString();
+          final nomSphot = (data['nomSphot'] ?? '').toString();
+
+          displayLabel = [nomSecours, nomSphot]
+              .where((value) => value.trim().isNotEmpty)
+              .join(' - ');
         }
+      }
 
-        final docs = snapshot.data!.docs;
+      void openMenu() {
+        closeMenu();
 
-        docs.sort((a, b) {
-  final dataA = a.data() as Map<String, dynamic>;
-  final dataB = b.data() as Map<String, dynamic>;
+        final renderBox =
+            fieldKey.currentContext!.findRenderObject() as RenderBox;
+        final position = renderBox.localToGlobal(Offset.zero);
+        final size = renderBox.size;
+        final scrollController = ScrollController();
 
-  final secoursA = (dataA['nomSecours'] ?? '').toString();
-  final secoursB = (dataB['nomSecours'] ?? '').toString();
-
-  final matchA = RegExp(r'(\d+)').firstMatch(secoursA);
-  final matchB = RegExp(r'(\d+)').firstMatch(secoursB);
-
-  final numA = int.tryParse(matchA?.group(1) ?? '9999') ?? 9999;
-  final numB = int.tryParse(matchB?.group(1) ?? '9999') ?? 9999;
-
-  return numA.compareTo(numB);
-});
-
-        String displayLabel = label;
-        if (selectedDocId != null) {
-          final selectedDocs = docs.where((doc) => doc.id == selectedDocId);
-          if (selectedDocs.isNotEmpty) {
-            final data = selectedDocs.first.data() as Map<String, dynamic>;
-            final ville = (data['ville'] ?? '').toString();
-            final nomSecours = (data['nomSecours'] ?? '').toString();
-            final nomSphot = (data['nomSphot'] ?? '').toString();
-            displayLabel = [nomSecours, nomSphot]
-    .where((value) => value.trim().isNotEmpty)
-    .join(' - ');
-          }
-        }
-
-        void openMenu() {
-          closeMenu();
-
-          final renderBox =
-              fieldKey.currentContext!.findRenderObject() as RenderBox;
-          final position = renderBox.localToGlobal(Offset.zero);
-          final size = renderBox.size;
-          final scrollController = ScrollController();
-
-          _dropdownOverlay = OverlayEntry(
-            builder: (context) {
-              return Stack(
-                children: [
-                  Positioned.fill(
-                    child: GestureDetector(
-                      onTap: closeMenu,
-                      child: Container(color: Colors.transparent),
-                    ),
+        _dropdownOverlay = OverlayEntry(
+          builder: (context) {
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: closeMenu,
+                    child: Container(color: Colors.transparent),
                   ),
-                  Positioned(
-                    left: position.dx,
-                    top: position.dy + size.height - 10,
-                    width: size.width,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: Container(
-                        constraints: const BoxConstraints(maxHeight: 297),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.92),
-                          border: const Border(
-                            left: BorderSide(color: adminColor, width: 1.4),
-                            right: BorderSide(color: adminColor, width: 1.4),
-                            bottom: BorderSide(color: adminColor, width: 1.4),
-                          ),
-                          borderRadius: const BorderRadius.only(
-                            bottomLeft: Radius.circular(10),
-                            bottomRight: Radius.circular(10),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.18),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                ),
+                Positioned(
+                  left: position.dx,
+                  top: position.dy + size.height - 10,
+                  width: size.width,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      constraints: const BoxConstraints(maxHeight: 368),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.92),
+                        border: const Border(
+                          left: BorderSide(color: adminColor, width: 1.4),
+                          right: BorderSide(color: adminColor, width: 1.4),
+                          bottom: BorderSide(color: adminColor, width: 1.4),
                         ),
-                        child: ScrollbarTheme(
-                          data: ScrollbarThemeData(
-                            thumbColor: MaterialStatePropertyAll(adminColor),
-                            trackVisibility:
-                                const MaterialStatePropertyAll(false),
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(10),
+                          bottomRight: Radius.circular(10),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.18),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
                           ),
-                          child: Scrollbar(
+                        ],
+                      ),
+                      child: ScrollbarTheme(
+                        data: ScrollbarThemeData(
+                          thumbColor: MaterialStatePropertyAll(adminColor),
+                          trackVisibility:
+                              const MaterialStatePropertyAll(false),
+                        ),
+                        child: Scrollbar(
+                          controller: scrollController,
+                          thumbVisibility: true,
+                          thickness: 10,
+                          radius: const Radius.circular(10),
+                          child: ListView.builder(
                             controller: scrollController,
-                            thumbVisibility: true,
-                            thickness: 10,
-                            radius: const Radius.circular(10),
-                            child: ListView.builder(
-                              controller: scrollController,
-                              primary: false,
-                              padding: EdgeInsets.zero,
-                              shrinkWrap: true,
-                              itemCount: docs.length,
-                              itemBuilder: (context, index) {
-                                final doc = docs[index];
-                                final data =
-                                    doc.data() as Map<String, dynamic>;
-                                final ville =
-                                    (data['ville'] ?? '').toString();
-                                final nomSecours =
-                                    (data['nomSecours'] ?? '').toString();
-                                final nomSphot =
-                                    (data['nomSphot'] ?? '').toString();
-                                final title = [nomSecours, nomSphot]
-    .where(
-      (value) => value.trim().isNotEmpty,
-    )
-    .join(' - ');
-                                final selected = doc.id == selectedDocId;
+                            primary: false,
+                            padding: EdgeInsets.zero,
+                            shrinkWrap: true,
+                            itemCount: docs.length,
+                            itemBuilder: (context, index) {
+                              final doc = docs[index];
+                              final data = doc.data() as Map<String, dynamic>;
 
-                                return InkWell(
-                                  onTap: () {
-                                    onSelected(doc.id, data);
-                                    closeMenu();
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 8,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-  selected
-      ? Icons.check_circle_rounded
-      : Icons.place_rounded,
-  color: adminColor,
-  size: 22,
-),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            title.isEmpty ? doc.id : title,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w800,
-                                              color: Colors.black87,
-                                            ),
+                              final nomSecours =
+                                  (data['nomSecours'] ?? '').toString();
+                              final nomSphot =
+                                  (data['nomSphot'] ?? '').toString();
+
+                              final title = [nomSecours, nomSphot]
+                                  .where((value) => value.trim().isNotEmpty)
+                                  .join(' - ');
+
+                              final selected = doc.id == selectedDocId;
+
+                              return InkWell(
+                                onTap: () {
+                                  onSelected(doc.id, data);
+                                  closeMenu();
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 8,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        selected
+                                            ? Icons.check_circle_rounded
+                                            : Icons.place_rounded,
+                                        color: adminColor,
+                                        size: 22,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          title.isEmpty ? doc.id : title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.black87,
                                           ),
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                                );
-                              },
-                            ),
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ),
                     ),
                   ),
-                ],
-              );
-            },
-          );
-
-          Overlay.of(context).insert(_dropdownOverlay!);
-        }
-
-        return GestureDetector(
-          key: fieldKey,
-          onTap: openMenu,
-          child: InputDecorator(
-            decoration: InputDecoration(
-              labelText: label,
-              labelStyle: const TextStyle(fontSize: 14),
-              filled: true,
-              fillColor: Colors.white.withOpacity(0.32),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Colors.black, width: 1.6),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Colors.black, width: 1.6),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    displayLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: selectedDocId == null
-                          ? FontWeight.w400
-                          : FontWeight.w700,
-                      color: selectedDocId == null
-                          ? Colors.black.withOpacity(0.60)
-                          : Colors.black,
-                    ),
-                  ),
-                ),
-                const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: adminColor,
-                  size: 26,
                 ),
               ],
-            ),
-          ),
+            );
+          },
         );
-      },
-    );
-  }
+
+        Overlay.of(context).insert(_dropdownOverlay!);
+      }
+
+      return GestureDetector(
+        key: fieldKey,
+        onTap: openMenu,
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.32),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.black, width: 1.6),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  displayLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight:
+                        selectedDocId == null ? FontWeight.w400 : FontWeight.w700,
+                    color: selectedDocId == null
+                        ? Colors.black.withOpacity(0.60)
+                        : Colors.black,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: adminColor,
+                size: 26,
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
 
     Widget _textField(
   String key,
@@ -1589,14 +1577,14 @@ _twoColumns(
               'equipement',
               'Équipements du SPHOT',
               equipementChoices,
-              maxMenuHeight: 218,
+              maxMenuHeight: 275,
             ),
             const SizedBox(height: 8),
             _multiDropdownField(
               'labelSphot',
               'Labels du SPHOT',
               labelSphotChoices,
-              maxMenuHeight: 160,
+              maxMenuHeight: 217,
             ),
           ],
         );
@@ -1612,7 +1600,7 @@ _twoColumns(
   'labelPmr',
   'Labels Accessibilité',
   labelPmrChoices,
-  maxMenuHeight: 212,
+  maxMenuHeight: 275,
 ),
       const SizedBox(height: 8),
       _dropdownField(
@@ -1628,7 +1616,7 @@ _multiDropdownField(
   'moyenPmr',
   'Moyens Accessibilité',
   moyenPmrChoices,
-  maxMenuHeight: 97,
+  maxMenuHeight: 159,
 ),
     ],
   );
@@ -1645,7 +1633,7 @@ _multiDropdownField(
       'activite',
       'Activités du SPHOT',
       activiteChoices,
-      maxMenuHeight: 213,
+      maxMenuHeight: 258,
     ),
 
     const SizedBox(height: 8),
@@ -1654,7 +1642,7 @@ _multiDropdownField(
       'commerce',
       'Commerces du SPHOT',
       commerceChoices,
-      maxMenuHeight: 155,
+      maxMenuHeight: 200,
     ),
 
     if (saveSphotMessage != null) ...[
@@ -1787,98 +1775,100 @@ Widget _existingSphotsPanel({
           ],
         ),
 
-        const SizedBox(height: 4),
-
-        SizedBox(
-          height: bandeauHeight,
-          child: _sphotSelector(
-            label: 'Sélectionnez un SPHOT existant',
-            onSelected: (docId, data) {
-              selectedDocId = docId;
-              existingSphotMessage = null;
-              setState(() {});
-            },
-          ),
-        ),
-
         SizedBox(height: gap),
 
-        SizedBox(
-          height: bandeauHeight,
-          child: _modeButton(
-            title: 'MODIFIER LE SPHOT',
-            subtitle: '',
-            icon: Icons.edit_location_alt_rounded,
-            color: const Color(0xFF16A34A),
-            selected: false,
-            onTap: selectedDocId == null
-                ? () {}
-                : () async {
-                    final doc = await FirebaseFirestore.instance
-                        .collection('spots')
-                        .doc(selectedDocId)
-                        .get();
-
-                    _loadForEdit(
-                      doc.id,
-                      doc.data() as Map<String, dynamic>,
-                    );
+        Expanded(
+          child: Column(
+            children: [
+              Expanded(
+                child: _sphotSelector(
+                  label: 'Sélectionnez un SPHOT existant',
+                  onSelected: (docId, data) {
+                    selectedDocId = docId;
+                    existingSphotMessage = null;
+                    setState(() {});
                   },
-          ),
-        ),
+                ),
+              ),
 
-        SizedBox(height: gap),
+              SizedBox(height: gap),
 
-        SizedBox(
-          height: bandeauHeight,
-          child: _modeButton(
-            title: 'COPIER LE SPHOT',
-            subtitle: '',
-            icon: Icons.copy_rounded,
-            color: const Color(0xFF7C3AED),
-            selected: false,
-            onTap: selectedDocId == null
-                ? () {}
-                : () async {
-                    final doc = await FirebaseFirestore.instance
-                        .collection('spots')
-                        .doc(selectedDocId)
-                        .get();
+              Expanded(
+                child: _modeButton(
+                  title: 'MODIFIER LE SPHOT',
+                  subtitle: '',
+                  icon: Icons.edit_location_alt_rounded,
+                  color: const Color(0xFF16A34A),
+                  selected: false,
+                  onTap: selectedDocId == null
+                      ? () {}
+                      : () async {
+                          final doc = await FirebaseFirestore.instance
+                              .collection('spots')
+                              .doc(selectedDocId)
+                              .get();
 
-                    _loadForCopy(
-                      doc.id,
-                      doc.data() as Map<String, dynamic>,
-                    );
-                  },
-          ),
-        ),
+                          _loadForEdit(
+                            doc.id,
+                            doc.data() as Map<String, dynamic>,
+                          );
+                        },
+                ),
+              ),
 
-        SizedBox(height: gap),
+              SizedBox(height: gap),
 
-        SizedBox(
-          height: bandeauHeight,
-          child: _modeButton(
-            title: 'SUPPRIMER LE SPHOT',
-            subtitle: '',
-            icon: Icons.delete_forever_rounded,
-            color: Colors.red,
-            selected: false,
-            onTap: selectedDocId == null
-                ? () {}
-                : () async {
-                    await FirebaseFirestore.instance
-                        .collection('spots')
-                        .doc(selectedDocId)
-                        .delete();
+              Expanded(
+                child: _modeButton(
+                  title: 'COPIER LE SPHOT',
+                  subtitle: '',
+                  icon: Icons.copy_rounded,
+                  color: const Color(0xFF7C3AED),
+                  selected: false,
+                  onTap: selectedDocId == null
+                      ? () {}
+                      : () async {
+                          final doc = await FirebaseFirestore.instance
+                              .collection('spots')
+                              .doc(selectedDocId)
+                              .get();
 
-                    setState(() {
-                      selectedDocId = null;
-                      mode = AdminSphotMode.none;
-                      step = 0;
-                      _clearForm();
-                      existingSphotMessage = 'SPHOT SUPPRIMÉ';
-                    });
-                  },
+                          _loadForCopy(
+                            doc.id,
+                            doc.data() as Map<String, dynamic>,
+                          );
+                        },
+                ),
+              ),
+
+              SizedBox(height: gap),
+
+              Expanded(
+                child: _modeButton(
+                  title: 'SUPPRIMER LE SPHOT',
+                  subtitle: '',
+                  icon: Icons.delete_forever_rounded,
+                  color: Colors.red,
+                  selected: false,
+                  onTap: selectedDocId == null
+                      ? () {}
+                      : () async {
+                          await FirebaseFirestore.instance
+                              .collection('spots')
+                              .doc(selectedDocId)
+                              .delete();
+
+                          setState(() {
+                            selectedDocId = null;
+                            mode = AdminSphotMode.none;
+                            step = 0;
+                            _clearForm();
+                            existingSphotMessage = 'SPHOT SUPPRIMÉ';
+                          });
+                        },
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -1924,10 +1914,10 @@ Widget build(BuildContext context) {
                         ? LayoutBuilder(
                             builder: (context, constraints) {
                               const double gap = 8;
-                              const double panelExtraHeight =43;
+const double panelExtraHeight = 43;
 
 final double bandeauHeight =
-    ((constraints.maxHeight - (gap * 6) - panelExtraHeight) / 7) - 8;
+    (constraints.maxHeight - (gap * 6) - panelExtraHeight) / 7;
 
                               return Column(
                                 children: [
