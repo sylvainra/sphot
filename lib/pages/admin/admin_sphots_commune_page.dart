@@ -15,7 +15,14 @@ import 'admin_validation_sphots_page.dart';
 enum AdminSphotMode { none, create, copy, edit }
 
 class AdminSphotsCommunePage extends StatefulWidget {
-  const AdminSphotsCommunePage({super.key});
+  final String? initialDocId;
+final int? initialStep;
+
+const AdminSphotsCommunePage({
+  super.key,
+  this.initialDocId,
+  this.initialStep,
+});
 
   @override
   State<AdminSphotsCommunePage> createState() => _AdminSphotsCommunePageState();
@@ -237,6 +244,26 @@ final List<String> commerceChoices = [
 void initState() {
   super.initState();
 
+  if (widget.initialDocId != null) {
+  Future.microtask(() async {
+    final doc = await FirebaseFirestore.instance
+        .collection('spots')
+        .doc(widget.initialDocId!)
+        .get();
+
+    if (!doc.exists || !mounted) return;
+
+    _loadForEdit(
+      doc.id,
+      doc.data() as Map<String, dynamic>,
+    );
+
+    setState(() {
+      step = widget.initialStep ?? 7;
+    });
+  });
+}
+
   _summaryScrollController.addListener(() {
     if (step != 7) return;
     if (!_summaryScrollController.hasClients) return;
@@ -362,9 +389,28 @@ super.dispose();
   }
 
   Future<void> _saveSphot() async {
+  setState(() {
+    _sphotJustSaved = true;
+  });
+
+  Future.delayed(const Duration(seconds: 2), () {
+    if (!mounted) return;
+
     setState(() {
-  _sphotJustSaved = true;
-});
+      mode = AdminSphotMode.none;
+      selectedDocId = null;
+      step = 0;
+
+      existingSphotMessage = null;
+      saveSphotMessage = null;
+
+      _summaryReadToEnd = false;
+      _summaryUserScrolled = false;
+      _sphotJustSaved = false;
+
+      _clearForm();
+    });
+  });
     final idSphot = _value('idSphot');
 
     if (idSphot.isEmpty) {
@@ -411,26 +457,31 @@ super.dispose();
 
     if (!mounted) return;
 
-    setState(() {
+setState(() {
+  _sphotJustSaved = true;
   existingSphotMessage =
       mode == AdminSphotMode.edit
           ? 'SPHOT MODIFIÉ'
           : 'SPHOT ENREGISTRÉ';
 });
 
-Future.delayed(const Duration(milliseconds: 800), () {
-  if (!mounted) return;
+await Future.delayed(const Duration(seconds: 2));
 
-  setState(() {
-    mode = AdminSphotMode.none;
-    selectedDocId = null;
-    step = 0;
+if (!mounted) return;
 
-    _summaryReadToEnd = false;
-    _summaryUserScrolled = false;
+setState(() {
+  mode = AdminSphotMode.none;
+  selectedDocId = null;
+  step = 0;
 
-    _clearForm();
-  });
+  existingSphotMessage = null;
+  saveSphotMessage = null;
+
+  _summaryReadToEnd = false;
+  _summaryUserScrolled = false;
+  _sphotJustSaved = false;
+
+  _clearForm();
 });
   }
 
@@ -1542,14 +1593,14 @@ const SizedBox(height: 8),
   'typeSphot',
   'Type de SPHOT',
   typeSphotChoices,
-  maxMenuHeight: 105,
+  maxMenuHeight: 160,
 ),
             const SizedBox(height: 8),
             _dropdownField(
   'natureSphot',
   'Nature du SPHOT',
   natureSphotChoices,
-  maxMenuHeight: 47,
+  maxMenuHeight: 102,
 ),
           ],
         );
@@ -2098,10 +2149,9 @@ Widget build(BuildContext context) {
                         ? LayoutBuilder(
                             builder: (context, constraints) {
                               const double gap = 8;
-const double panelExtraHeight = 43;
 
 final double bandeauHeight =
-    (constraints.maxHeight - (gap * 6) - panelExtraHeight) / 7;
+    (constraints.maxHeight - (gap * 5)) / 6;
 
                               return Column(
                                 children: [
@@ -2118,7 +2168,7 @@ final double bandeauHeight =
                                   ),
                                   const SizedBox(height: gap),
                                   SizedBox(
-  height: (bandeauHeight * 4) + (gap * 3) + panelExtraHeight,
+  height: (bandeauHeight * 4) + (gap * 3),
   child: _existingSphotsPanel(
     bandeauHeight: bandeauHeight,
     gap: gap,
@@ -2130,7 +2180,7 @@ final double bandeauHeight =
                                   SizedBox(
                                     height: bandeauHeight,
                                     child: _modeButton(
-                                      title: 'CONTRÔLER ET VALIDER',
+                                      title: 'CONTRÔLER/VALIDER LES SPHOTS',
                                       subtitle: '',
                                       icon: Icons.fact_check_rounded,
                                       color: const Color(0xFF16A34A),

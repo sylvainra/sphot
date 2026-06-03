@@ -1,6 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import 'admin_sphots_commune_page.dart';
+
+import 'admin_validation_sphots_page.dart';
+
 class AdminControleSphotPage extends StatefulWidget {
   final String docId;
   final Map<String, dynamic> data;
@@ -19,247 +23,124 @@ class _AdminControleSphotPageState extends State<AdminControleSphotPage> {
   static const Color pageColor = Color(0xFF16A34A);
 
   late Map<String, dynamic> data;
+  bool sphotValide = false;
 
   @override
-  void initState() {
-    super.initState();
-    data = Map<String, dynamic>.from(widget.data);
-  }
+void initState() {
+  super.initState();
 
-  String _title() {
-    final nomSecours = (data['nomSecours'] ?? '').toString();
-    final nomSphot = (data['nomSphot'] ?? '').toString();
+  data = Map<String, dynamic>.from(widget.data);
 
-    final title = [nomSecours, nomSphot]
-        .where((value) => value.trim().isNotEmpty)
-        .join(' - ');
+  sphotValide = data['sphotValide'] == true;
+}
 
-    return title.isEmpty ? widget.docId : title;
-  }
-
-  String _displayValue(dynamic value) {
+  String _value(String key) {
+    final value = data[key];
     if (value == null) return '';
     if (value is Iterable) {
-      return value.map((item) => item.toString()).join(' | ');
+      return value.map((e) => e.toString()).join(' | ');
     }
     return value.toString();
   }
 
-  bool _hasValue(String key) {
-    final value = data[key];
+  String _title() {
+    final id = _value('idSphot');
+    final repere = _value('nomSecours');
+    final nom = _value('nomSphot');
 
-    if (value == null) return false;
-    if (value is String && value.trim().isEmpty) return false;
-    if (value is num && value == 0) return false;
-    if (value is Iterable && value.isEmpty) return false;
+    final parts = [
+      if (id.isNotEmpty) 'SPHOT $id',
+      if (repere.isNotEmpty) repere,
+      if (nom.isNotEmpty) nom,
+    ];
 
-    return true;
+    return parts.isEmpty ? widget.docId : parts.join(' - ');
   }
 
-  Future<void> _editField(String key, String label) async {
-    final controller = TextEditingController(
-      text: _displayValue(data[key]),
-    );
+  Widget _resumeLine(String label, String value) {
+    if (value.trim().isEmpty) return const SizedBox.shrink();
 
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(
-            'Modifier $label',
-            style: const TextStyle(
-              color: pageColor,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          content: TextField(
-            controller: controller,
-            maxLines: 3,
-            decoration: InputDecoration(
-              labelText: label,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop(controller.text.trim());
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: pageColor,
-                foregroundColor: Colors.white,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: RichText(
+        text: TextSpan(
+          children: [
+            TextSpan(
+              text: '$label : ',
+              style: const TextStyle(
+                color: pageColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
               ),
-              child: const Text('Enregistrer'),
+            ),
+            TextSpan(
+              text: value,
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
-        );
-      },
+        ),
+      ),
     );
-
-    controller.dispose();
-
-    if (result == null) return;
-
-    await FirebaseFirestore.instance.collection('spots').doc(widget.docId).set(
-      {
-        key: result,
-        'sphotValide': false,
-        'updatedAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
-
-    setState(() {
-      data[key] = result;
-      data['sphotValide'] = false;
-    });
   }
 
-  Future<void> _deleteField(String key) async {
-    await FirebaseFirestore.instance.collection('spots').doc(widget.docId).set(
-      {
-        key: FieldValue.delete(),
-        'sphotValide': false,
-        'updatedAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
-
-    setState(() {
-      data.remove(key);
-      data['sphotValide'] = false;
-    });
-  }
-
-  Future<void> _validateSphot() async {
-    await FirebaseFirestore.instance.collection('spots').doc(widget.docId).set(
-      {
-        'sphotValide': true,
-        'dateValidation': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+  Future<void> _deleteSphot() async {
+    await FirebaseFirestore.instance
+        .collection('spots')
+        .doc(widget.docId)
+        .delete();
 
     if (!mounted) return;
 
-    Navigator.of(context).pop();
+    Navigator.of(context).pushReplacement(
+  MaterialPageRoute(
+    builder: (_) => AdminValidationSphotsPage(),
+  ),
+);
   }
 
-  Widget _fieldRow(String key, String label) {
-    if (!_hasValue(key)) return const SizedBox.shrink();
+  Future<void> _validateSphot() async {
+  setState(() {
+    sphotValide = true;
+    data['sphotValide'] = true;
+  });
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.86),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: pageColor,
-          width: 1.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: '$label : ',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      color: pageColor,
-                    ),
-                  ),
-                  TextSpan(
-                    text: _displayValue(data[key]),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black,
-                    ),
-                  ),
-                ],
-              ),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          IconButton(
-            onPressed: () => _editField(key, label),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(
-              minWidth: 34,
-              minHeight: 34,
-            ),
-            icon: const Icon(
-              Icons.edit_rounded,
-              color: pageColor,
-              size: 20,
-            ),
-          ),
-          IconButton(
-            onPressed: () => _deleteField(key),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(
-              minWidth: 34,
-              minHeight: 34,
-            ),
-            icon: const Icon(
-              Icons.delete_rounded,
-              color: Colors.red,
-              size: 20,
-            ),
-          ),
-        ],
+  Future.delayed(const Duration(seconds: 2), () {
+    if (!mounted) return;
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => AdminValidationSphotsPage(),
       ),
     );
-  }
+  });
 
-  List<Widget> _fields() {
-    final rows = <Widget>[
-      _fieldRow('idSphot', 'Numéro SPHOT'),
-      _fieldRow('pays', 'Pays'),
-      _fieldRow('region', 'Région'),
-      _fieldRow('departement', 'Département'),
-      _fieldRow('ville', 'Ville'),
-      _fieldRow('villeLat', 'Latitude ville'),
-      _fieldRow('villeLng', 'Longitude ville'),
-      _fieldRow('logoVille', 'Logo ville'),
-      _fieldRow('siteInternetVille', 'Site internet ville'),
-      _fieldRow('nomSecours', 'Repère secours'),
-      _fieldRow('nomSphot', 'Nom du SPHOT'),
-      _fieldRow('typeSphot', 'Type de SPHOT'),
-      _fieldRow('natureSphot', 'Nature du SPHOT'),
-      _fieldRow('sphotLat', 'Latitude SPHOT'),
-      _fieldRow('sphotLng', 'Longitude SPHOT'),
-      _fieldRow('adresseWebcam', 'Webcam'),
-      _fieldRow('arretesMunicipaux', 'Arrêtés municipaux'),
-      _fieldRow('equipement', 'Équipements'),
-      _fieldRow('labelSphot', 'Labels SPHOT'),
-      _fieldRow('accesPmr', 'Accès PMR'),
-      _fieldRow('moyenPmr', 'Moyens PMR'),
-      _fieldRow('labelPmr', 'Labels PMR'),
-      _fieldRow('activite', 'Activités'),
-      _fieldRow('commerce', 'Commerces'),
-    ];
+  FirebaseFirestore.instance.collection('spots').doc(widget.docId).set(
+    {
+      'sphotValide': true,
+      'dateValidation': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    },
+    SetOptions(merge: true),
+  );
+}
 
-    return rows
-        .where((widget) => widget is! SizedBox)
-        .toList();
+  void _editSphot() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => AdminSphotsCommunePage(
+          initialDocId: widget.docId,
+          initialStep: 7,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final validated = data['sphotValide'] == true;
-    final fields = _fields();
-
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -290,78 +171,139 @@ class _AdminControleSphotPageState extends State<AdminControleSphotPage> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: validated
-                          ? pageColor.withOpacity(0.18)
-                          : Colors.red.withOpacity(0.14),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: validated ? pageColor : Colors.red,
-                        width: 2,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          validated
-                              ? Icons.check_circle_rounded
-                              : Icons.circle_rounded,
-                          color: validated ? pageColor : Colors.red,
-                          size: 28,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _title().toUpperCase(),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: validated ? pageColor : Colors.red,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                            ),
+
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.84),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: sphotValide ? pageColor : Colors.red,
+                            width: 2,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: fields.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'Aucune caractéristique renseignée.',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _title().toUpperCase(),
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: Colors.black,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
+                                color: sphotValide ? pageColor : Colors.red,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
-                          )
-                        : ListView(
-                            children: fields,
-                          ),
+                            const SizedBox(height: 12),
+
+                            _resumeLine('Commune', _value('ville')),
+                            _resumeLine('Pays', _value('pays')),
+                            _resumeLine('Région', _value('region')),
+                            _resumeLine('Département', _value('departement')),
+                            _resumeLine('Repère secours', _value('nomSecours')),
+                            _resumeLine('Nom du SPHOT', _value('nomSphot')),
+                            _resumeLine('Type', _value('typeSphot')),
+                            _resumeLine('Nature', _value('natureSphot')),
+                            _resumeLine(
+                              'Coordonnées ville',
+                              '${_value('villeLat')} / ${_value('villeLng')}',
+                            ),
+                            _resumeLine(
+                              'Coordonnées SPHOT',
+                              '${_value('sphotLat')} / ${_value('sphotLng')}',
+                            ),
+                            _resumeLine('Webcam', _value('adresseWebcam')),
+                            _resumeLine(
+                              'Arrêtés municipaux',
+                              _value('arretesMunicipaux'),
+                            ),
+                            _resumeLine('Équipements', _value('equipement')),
+                            _resumeLine('Labels', _value('labelSphot')),
+                            _resumeLine('Accessibilité', _value('accesPmr')),
+                            _resumeLine(
+                              'Moyens accessibilité',
+                              _value('moyenPmr'),
+                            ),
+                            _resumeLine(
+                              'Labels accessibilité',
+                              _value('labelPmr'),
+                            ),
+                            _resumeLine('Activités', _value('activite')),
+                            _resumeLine('Commerces', _value('commerce')),
+
+                            const SizedBox(height: 14),
+
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: _editSphot,
+                                    icon: const Icon(Icons.edit_rounded),
+                                    label: const Text(
+                                      'MODIFIER LE SPHOT',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: pageColor,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                SizedBox(
+                                  width: 54,
+                                  height: 48,
+                                  child: ElevatedButton(
+                                    onPressed: _deleteSphot,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      foregroundColor: Colors.white,
+                                      padding: EdgeInsets.zero,
+                                    ),
+                                    child: const Icon(Icons.delete_rounded),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 8),
+
+                  const SizedBox(height: 10),
+
                   SizedBox(
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton.icon(
-                      onPressed: _validateSphot,
-                      icon: const Icon(Icons.check_circle_rounded),
-                      label: const Text(
-                        'VALIDER LE SPHOT',
-                        style: TextStyle(
+                      onPressed: sphotValide ? null : _validateSphot,
+                      icon: Icon(
+                        sphotValide
+                            ? Icons.check_circle_rounded
+                            : Icons.warning_rounded,
+                      ),
+                      label: Text(
+                        sphotValide
+                            ? 'SPHOT VALIDÉ'
+                            : 'VALIDER LE SPHOT',
+                        style: const TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 15,
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: pageColor,
+                        backgroundColor:
+                            sphotValide ? pageColor : Colors.red,
+                        disabledBackgroundColor: pageColor,
+                        disabledForegroundColor: Colors.white,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -369,7 +311,9 @@ class _AdminControleSphotPageState extends State<AdminControleSphotPage> {
                       ),
                     ),
                   ),
+
                   const SizedBox(height: 8),
+
                   Container(
                     width: 50,
                     height: 50,
