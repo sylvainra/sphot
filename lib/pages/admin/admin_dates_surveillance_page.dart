@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 
-import 'admin_sphots_commune_page.dart';
+import 'admin_attribution_sphots_page.dart';
+import 'admin_periodes_surveillance_page.dart';
 
-import 'admin_sauveteur_page.dart';
-
-import 'admin_dates_surveillance_page.dart';
-
-class AdminMenuPage extends StatelessWidget {
-  const AdminMenuPage({super.key});
+class AdminDatesSurveillancePage extends StatelessWidget {
+  const AdminDatesSurveillancePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    const Color adminColor = Color(0xFF1E3A8A);
+    const Color pageColor = Color(0xFF0891B2);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -34,12 +31,12 @@ class AdminMenuPage extends StatelessWidget {
                   ),
 
                   const Text(
-                    'ESPACE ADMIN MAIRIE',
+                    'DATES DE SURVEILLANCE',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
-                      color: adminColor,
+                      color: pageColor,
                       letterSpacing: 0.6,
                     ),
                   ),
@@ -61,63 +58,42 @@ class AdminMenuPage extends StatelessWidget {
                       child: Column(
                         children: [
                           Expanded(
-  child: _AdminButton(
-    title: 'SPHOTS',
-    subtitle:
-        'Créer, voir, copier, modifier, supprimer\nles SPHOTS',
-    imageAsset: 'data/icons/fire_blue_icon.png',
-    topSpacing: 2,
-    color: adminColor,
-    onTap: () {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => const AdminSphotsCommunePage(),
-        ),
-      );
-    },
-  ),
-),
+                            child: _SurveillanceBand(
+                              title: 'DATES/HEURES DE SURVEILLANCE',
+                              subtitle:
+                                  'Créer les périodes avec dates et horaires',
+                              icon: Icons.calendar_month_rounded,
+                              color: pageColor,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const AdminPeriodesSurveillancePage(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
 
-const SizedBox(height: 12),
+                          const SizedBox(height: 14),
 
-                          const SizedBox(height: 12),
-
-Expanded(
-  child: _AdminButton(
-    title: 'DATES/HEURES DE SURVEILLANCE',
-    subtitle:
-        'Renseigner les périodes et heures\nde surveillance pour chaque SPHOT',
-    icon: Icons.calendar_month_rounded,
-    color: const Color(0xFF0891B2),
-    onTap: () {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => const AdminDatesSurveillancePage(),
-    ),
-  );
-},
-  ),
-),
-
-const SizedBox(height: 12),
-
-Expanded(
-  child: _AdminButton(
-    title: 'SAUVETEURS',
-    subtitle:
-        'Créer, modifier et gérer\nles sauveteurs affectés aux SPHOTS',
-    icon: Icons.groups_rounded,
-    color: const Color(0xFFDC2626),
-    onTap: () {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => const AdminSauveteurPage(),
-    ),
-  );
-},
-  ),
-),
-                              
+                          Expanded(
+                            child: _SurveillanceBand(
+                              title: 'ATTRIBUTION AUX SPHOTS',
+                              subtitle:
+                                  'Attribuer les périodes créées aux SPHOTS',
+                              icon: Icons.location_on_rounded,
+                              color: const Color(0xFF1E3A8A),
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const AdminAttributionSphotsPage(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -158,23 +134,19 @@ Expanded(
   }
 }
 
-class _AdminButton extends StatelessWidget {
+class _SurveillanceBand extends StatelessWidget {
   final String title;
   final String subtitle;
-  final IconData? icon;
-  final String? imageAsset;
+  final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final double topSpacing;
 
-  const _AdminButton({
+  const _SurveillanceBand({
     required this.title,
     required this.subtitle,
-    this.icon,
-    this.imageAsset,
+    required this.icon,
     required this.color,
     required this.onTap,
-    this.topSpacing = 8,
   });
 
   @override
@@ -184,7 +156,7 @@ class _AdminButton extends StatelessWidget {
       child: Container(
         width: double.infinity,
         height: double.infinity,
-        padding: const EdgeInsets.fromLTRB(8, 1, 8, 8),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(22),
@@ -196,49 +168,39 @@ class _AdminButton extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (imageAsset != null)
-              Image.asset(
-                imageAsset!,
-                height: 42,
-                fit: BoxFit.contain,
-              )
-            else
-              Icon(
-                icon,
+            Icon(
+              icon,
+              color: color,
+              size: 54,
+            ),
+
+            const SizedBox(height: 12),
+
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: TextStyle(
                 color: color,
-                size: 48,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                height: 0.95,
               ),
+            ),
 
-            const SizedBox(height: 8),
-
-            Text(
-  title,
-  textAlign: TextAlign.center,
-  maxLines: 2,
-  style: TextStyle(
-    color: color,
-    fontSize: 16,
-    fontWeight: FontWeight.w900,
-    height: 0.95,
-  ),
-),
-
-            SizedBox(
-  height: 10,
-),
+            const SizedBox(height: 12),
 
             Text(
-  subtitle,
-  textAlign: TextAlign.center,
-  maxLines: 3,
-  overflow: TextOverflow.visible,
-  style: TextStyle(
-    color: Colors.black,
-    fontSize: 14,
-    fontWeight: FontWeight.w700,
-    height: 1.3,
-  ),
-),
+              subtitle,
+              textAlign: TextAlign.center,
+              maxLines: 3,
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                height: 1.25,
+              ),
+            ),
           ],
         ),
       ),

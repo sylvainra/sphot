@@ -10,6 +10,8 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
+import 'admin_validation_sphots_page.dart';
+
 enum AdminSphotMode { none, create, copy, edit }
 
 class AdminSphotsCommunePage extends StatefulWidget {
@@ -31,6 +33,13 @@ class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
   String? saveSphotMessage;
 
   OverlayEntry? _dropdownOverlay;
+
+  final ScrollController _summaryScrollController = ScrollController();
+bool _summaryReadToEnd = false;
+
+bool _summaryUserScrolled = false;
+
+bool _sphotJustSaved = false;
 
   final controllers = <String, TextEditingController>{};
 
@@ -224,13 +233,43 @@ final List<String> commerceChoices = [
   '❔ NON RENSEIGNÉ',
 ];
 
+@override
+void initState() {
+  super.initState();
+
+  _summaryScrollController.addListener(() {
+    if (step != 7) return;
+    if (!_summaryScrollController.hasClients) return;
+
+    final position = _summaryScrollController.position;
+
+    if (position.maxScrollExtent < 50) {
+  return;
+}
+
+    if (position.pixels > 20) {
+      _summaryUserScrolled = true;
+    }
+
+    if (_summaryUserScrolled &&
+        position.pixels >= position.maxScrollExtent - 20) {
+      if (!_summaryReadToEnd) {
+        setState(() {
+          _summaryReadToEnd = true;
+        });
+      }
+    }
+  });
+}
+
   @override
   void dispose() {
     for (final controller in controllers.values) {
       controller.dispose();
     }
     _dropdownOverlay?.remove();
-    super.dispose();
+_summaryScrollController.dispose();
+super.dispose();
   }
 
   TextEditingController _controller(String key) {
@@ -323,6 +362,9 @@ final List<String> commerceChoices = [
   }
 
   Future<void> _saveSphot() async {
+    setState(() {
+  _sphotJustSaved = true;
+});
     final idSphot = _value('idSphot');
 
     if (idSphot.isEmpty) {
@@ -356,6 +398,8 @@ final List<String> commerceChoices = [
       'activite': _value('activite'),
       'commerce': _value('commerce'),
       'source': 'admin',
+      'sphotValide': true,
+'dateValidation': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
@@ -368,15 +412,26 @@ final List<String> commerceChoices = [
     if (!mounted) return;
 
     setState(() {
-  saveSphotMessage =
+  existingSphotMessage =
       mode == AdminSphotMode.edit
           ? 'SPHOT MODIFIÉ'
           : 'SPHOT ENREGISTRÉ';
 });
 
-    selectedDocId = docId;
-    mode = AdminSphotMode.edit;
-    setState(() {});
+Future.delayed(const Duration(milliseconds: 800), () {
+  if (!mounted) return;
+
+  setState(() {
+    mode = AdminSphotMode.none;
+    selectedDocId = null;
+    step = 0;
+
+    _summaryReadToEnd = false;
+    _summaryUserScrolled = false;
+
+    _clearForm();
+  });
+});
   }
 
 void _showMessage(String message) {
@@ -389,10 +444,22 @@ void _showMessage(String message) {
 }
 
   void _nextStep() {
-  if (step < 6) {
+  if (step < 7) {
     setState(() {
       saveSphotMessage = null;
       step++;
+
+      if (step == 7) {
+  _sphotJustSaved = false;    
+  _summaryReadToEnd = false;
+  _summaryUserScrolled = false;
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (_summaryScrollController.hasClients) {
+      _summaryScrollController.jumpTo(0);
+    }
+  });
+}
     });
   }
 }
@@ -1621,122 +1688,239 @@ _multiDropdownField(
     ],
   );
 
-      default:
+      case 6:
   return Column(
-  children: [
-    _stepHeader(
-      '7. ACTIVITÉS ET COMMERCES',
-      'Sélectionnez les activités et commerces associés.',
-    ),
-
-    _multiDropdownField(
-      'activite',
-      'Activités du SPHOT',
-      activiteChoices,
-      maxMenuHeight: 258,
-    ),
-
-    const SizedBox(height: 8),
-
-    _multiDropdownField(
-      'commerce',
-      'Commerces du SPHOT',
-      commerceChoices,
-      maxMenuHeight: 200,
-    ),
-
-    if (saveSphotMessage != null) ...[
+    children: [
+      _stepHeader(
+        '7. ACTIVITÉS ET COMMERCES',
+        'Sélectionnez les activités et commerces associés.',
+      ),
+      _multiDropdownField(
+        'activite',
+        'Activités du SPHOT',
+        activiteChoices,
+        maxMenuHeight: 258,
+      ),
       const SizedBox(height: 8),
+      _multiDropdownField(
+        'commerce',
+        'Commerces du SPHOT',
+        commerceChoices,
+        maxMenuHeight: 200,
+      ),
+    ],
+  );
 
-      Container(
-        width: double.infinity,
-        constraints: const BoxConstraints(
-  minHeight: 46,
-),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 0,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.green,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Colors.black,
-            width: 2,
+default:
+  return Column(
+    children: [
+      _stepHeader(
+        '8. RÉSUMÉ DU SPHOT',
+        'Contrôlez les informations renseignées avant enregistrement.',
+      ),
+
+      _summaryLine('Numéro du SPHOT', _value('idSphot'), 0),
+      _summaryLine('Pays', _value('pays'), 0),
+      _summaryLine('Région', _value('region'), 0),
+      _summaryLine('Département', _value('departement'), 0),
+      _summaryLine('Ville', _value('ville'), 0),
+      _summaryLine('Latitude ville', _value('villeLat'), 0),
+      _summaryLine('Longitude ville', _value('villeLng'), 0),
+      _summaryLine('Site internet ville', _value('siteInternetVille'), 0),
+
+      _summaryLine('Repère secours', _value('nomSecours'), 1),
+      _summaryLine('Nom du SPHOT', _value('nomSphot'), 1),
+      _summaryLine('Type de SPHOT', _value('typeSphot'), 1),
+      _summaryLine('Nature du SPHOT', _value('natureSphot'), 1),
+
+      _summaryLine('Latitude SPHOT', _value('sphotLat'), 2),
+      _summaryLine('Longitude SPHOT', _value('sphotLng'), 2),
+
+      _summaryLine('Webcam', _value('adresseWebcam'), 3),
+      _summaryLine('Arrêtés municipaux', _value('arretesMunicipaux'), 3),
+
+      _summaryLine('Équipements', _value('equipement'), 4),
+      _summaryLine('Labels SPHOT', _value('labelSphot'), 4),
+
+      _summaryLine('Labels Accessibilité', _value('labelPmr'), 5),
+      _summaryLine('Accès Accessibilité', _value('accesPmr'), 5),
+      _summaryLine('Moyens Accessibilité', _value('moyenPmr'), 5),
+
+      _summaryLine('Activités', _value('activite'), 6),
+      _summaryLine('Commerces', _value('commerce'), 6),
+          ],
+  );
+}
+}
+
+Widget _summaryLine(
+  String label,
+  String value,
+  int targetStep,
+) {
+  if (value.trim().isEmpty) {
+    return const SizedBox.shrink();
+  }
+
+  return Container(
+    width: double.infinity,
+    margin: const EdgeInsets.only(bottom: 6),
+    padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.30),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(
+        color: adminColor,
+        width: 1.4,
+      ),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label.toUpperCase(),
+                style: const TextStyle(
+                  color: adminColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
-        child: Text(
-          saveSphotMessage!,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 15,
-            fontWeight: FontWeight.w900,
+        IconButton(
+          onPressed: () {
+            setState(() {
+              step = targetStep;
+              saveSphotMessage = null;
+            });
+          },
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(
+            minWidth: 34,
+            minHeight: 34,
+          ),
+          icon: const Icon(
+            Icons.edit_rounded,
+            color: adminColor,
+            size: 20,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+  Widget _formArea() {
+  if (!_hasStarted) {
+    return const Center(
+      child: Text(
+        'Choisissez une action pour commencer.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+      ),
+    );
+  }
+
+  return SingleChildScrollView(
+    controller: step == 7 ? _summaryScrollController : null,
+    physics: const BouncingScrollPhysics(),
+    child: Column(
+      children: [
+        _sphotWorkBanner(),
+        _currentStep(),
+      ],
+    ),
+  );
+}
+
+void _checkSummaryScroll() {
+  if (!_summaryScrollController.hasClients) return;
+
+  final position = _summaryScrollController.position;
+
+  if (position.pixels >= position.maxScrollExtent - 20) {
+    if (!_summaryReadToEnd) {
+      setState(() {
+        _summaryReadToEnd = true;
+      });
+    }
+  }
+}
+
+  Widget _stepControls() {
+  if (!_hasStarted) return const SizedBox.shrink();
+
+  final bool isSummaryStep = step == 7;
+
+  return Row(
+    children: [
+      Expanded(
+        child: OutlinedButton.icon(
+          onPressed: _previousStep,
+          icon: const Icon(Icons.arrow_back_rounded),
+          label: const Text(
+            'PRÉCÉDENT',
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: ElevatedButton(
+          onPressed: isSummaryStep
+              ? (_summaryReadToEnd ? _saveSphot : null)
+              : _nextStep,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isSummaryStep
+    ? (_sphotJustSaved
+        ? const Color(0xFF16A34A)
+        : (_summaryReadToEnd ? Colors.red : Colors.grey))
+    : adminColor,
+            disabledBackgroundColor: Colors.grey,
+            disabledForegroundColor: Colors.white,
+            foregroundColor: Colors.white,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                isSummaryStep
+    ? (_sphotJustSaved ? 'ENREGISTRÉ' : 'ENREGISTRER')
+    : 'SUIVANT',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                isSummaryStep
+                    ? (_summaryReadToEnd
+                        ? Icons.save_rounded
+                        : Icons.keyboard_double_arrow_down_rounded)
+                    : Icons.arrow_forward_rounded,
+                size: 20,
+              ),
+            ],
           ),
         ),
       ),
     ],
-  ],
-);
-    }
-  }
-
-  Widget _formArea() {
-    if (!_hasStarted) {
-      return const Center(
-        child: Text(
-          'Choisissez une action pour commencer.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-        ),
-      );
-    }
-
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Column(
-        children: [
-          _sphotWorkBanner(),
-          _currentStep(),
-        ],
-      ),
-    );
-  }
-
-  Widget _stepControls() {
-    if (!_hasStarted) return const SizedBox.shrink();
-
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _previousStep,
-            icon: const Icon(Icons.arrow_back_rounded),
-            label: const Text(
-              'PRÉCÉDENT',
-              style: TextStyle(fontWeight: FontWeight.w900),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: step == 6 ? _saveSphot : _nextStep,
-            icon: Icon(step == 6 ? Icons.save_rounded : Icons.arrow_forward_rounded),
-            label: Text(
-              step == 6 ? 'ENREGISTRER' : 'SUIVANT',
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: step == 6 ? const Color(0xFF16A34A) : adminColor,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  );
+}
 
 Widget _existingSphotsPanel({
   required double bandeauHeight,
@@ -1941,18 +2125,7 @@ final double bandeauHeight =
   ),
 ),
                                   
-                                  const SizedBox(height: gap),
-                                  SizedBox(
-                                    height: bandeauHeight,
-                                    child: _modeButton(
-                                      title: 'IMPORTER LES SPHOTS',
-                                      subtitle: '',
-                                      icon: Icons.upload_file_rounded,
-                                      color: const Color(0xFFF97316),
-                                      selected: false,
-                                      onTap: () {},
-                                    ),
-                                  ),
+                                  
                                   const SizedBox(height: gap),
                                   SizedBox(
                                     height: bandeauHeight,
@@ -1962,7 +2135,13 @@ final double bandeauHeight =
                                       icon: Icons.fact_check_rounded,
                                       color: const Color(0xFF16A34A),
                                       selected: false,
-                                      onTap: () {},
+                                      onTap: () {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => const AdminValidationSphotsPage(),
+    ),
+  );
+},
                                     ),
                                   ),
                                 ],
