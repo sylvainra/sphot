@@ -8,7 +8,7 @@ class AdminDatesSurveillancePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const Color pageColor = Color(0xFF0891B2);
+    const Color pageColor = Color(0xFF1E3A8A);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -36,7 +36,7 @@ class AdminDatesSurveillancePage extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
-                      color: pageColor,
+                      color: Color(0xFFEF4444),
                       letterSpacing: 0.6,
                     ),
                   ),
@@ -51,7 +51,7 @@ class AdminDatesSurveillancePage extends StatelessWidget {
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: Colors.black,
+                          color: pageColor,
                           width: 2,
                         ),
                       ),
@@ -59,7 +59,7 @@ class AdminDatesSurveillancePage extends StatelessWidget {
                         children: [
                           Expanded(
                             child: _SurveillanceBand(
-                              title: 'DATES/HEURES DE SURVEILLANCE',
+                              title: 'PÉRIODES DE SURVEILLANCE',
                               subtitle:
                                   'Créer les périodes avec dates et horaires',
                               icon: Icons.calendar_month_rounded,
@@ -102,28 +102,28 @@ class AdminDatesSurveillancePage extends StatelessWidget {
                   const SizedBox(height: 10),
 
                   Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.black,
-                        width: 2,
-                      ),
-                    ),
-                    child: IconButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.black,
-                        size: 22,
-                      ),
-                    ),
-                  ),
+  width: 40,
+  height: 40,
+  decoration: BoxDecoration(
+    color: Colors.transparent,
+    shape: BoxShape.circle,
+    border: Border.all(
+      color: pageColor,
+      width: 2,
+    ),
+  ),
+  child: IconButton(
+    onPressed: () {
+      Navigator.of(context).pop();
+    },
+    padding: EdgeInsets.zero,
+    icon: const Icon(
+      Icons.arrow_back_ios_new_rounded,
+      color: pageColor,
+      size: 22,
+    ),
+  ),
+),
                 ],
               ),
             ),
@@ -170,7 +170,7 @@ class _SurveillanceBand extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: color,
+              color: Color(0xFFEF4444),
               size: 54,
             ),
 
@@ -194,8 +194,8 @@ class _SurveillanceBand extends StatelessWidget {
               subtitle,
               textAlign: TextAlign.center,
               maxLines: 3,
-              style: const TextStyle(
-                color: Colors.black,
+              style: TextStyle(
+                color: color,
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
                 height: 1.25,

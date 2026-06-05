@@ -13,22 +13,15 @@ class _AdminAttributionSphotsPageState
     extends State<AdminAttributionSphotsPage> {
   static const Color pageColor = Color(0xFF1E3A8A);
 
-  String? selectedDocId;
-  String selectedSphotLabel = '';
+  final Set<String> selectedDocIds = {};
+String selectedSphotLabel = '';
   String saveMessage = '';
 
   OverlayEntry? _dropdownOverlay;
 
   final TextEditingController periodesController = TextEditingController();
 
-  final List<String> periodeChoices = [
-    'PÉRIODE 1 JUIN',
-    'PÉRIODE 2 JUILLET-AOÛT',
-    'PÉRIODE 3 SEPTEMBRE',
-    'PÉRIODE 4 VACANCES DE PRINTEMPS',
-    'PÉRIODE 5 VACANCES DE TOUSSAINT',
-    'PÉRIODE 6 PERSONNALISÉE',
-  ];
+  final List<String> periodeChoices = [];
 
   @override
   void dispose() {
@@ -45,44 +38,23 @@ class _AdminAttributionSphotsPageState
         .toList();
   }
 
-  Future<void> _loadSphot(String docId, Map<String, dynamic> data) async {
-    final nomSecours = (data['nomSecours'] ?? '').toString();
-    final nomSphot = (data['nomSphot'] ?? '').toString();
-
-    final periodes = data['periodesSurveillance'];
-
-    setState(() {
-      selectedDocId = docId;
-      selectedSphotLabel = [nomSecours, nomSphot]
-          .where((value) => value.trim().isNotEmpty)
-          .join(' - ');
-
-      if (periodes is Iterable) {
-        periodesController.text =
-            periodes.map((item) => item.toString()).join(' | ');
-      } else {
-        periodesController.clear();
-      }
-
-      saveMessage = '';
-    });
-  }
-
   Future<void> _saveAttribution() async {
-    if (selectedDocId == null) {
-      _showMessage('Sélectionnez un SPHOT.');
-      return;
-    }
+    if (selectedDocIds.isEmpty) {
+  _showMessage('Sélectionnez au moins un SPHOT.');
+  return;
+}
 
     final values = _readValues();
 
-    await FirebaseFirestore.instance.collection('spots').doc(selectedDocId).set(
-      {
-        'periodesSurveillance': values,
-        'updatedAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+    for (final docId in selectedDocIds) {
+  await FirebaseFirestore.instance.collection('spots').doc(docId).set(
+    {
+      'periodesSurveillance': values,
+      'updatedAt': FieldValue.serverTimestamp(),
+    },
+    SetOptions(merge: true),
+  );
+}
 
     setState(() {
       saveMessage = 'PÉRIODES ATTRIBUÉES AU SPHOT';
@@ -99,143 +71,432 @@ class _AdminAttributionSphotsPageState
   }
 
   Widget _sphotSelector() {
-    final fieldKey = GlobalKey();
+  final fieldKey = GlobalKey();
 
-    void closeMenu() {
-      _dropdownOverlay?.remove();
-      _dropdownOverlay = null;
-    }
+  void closeMenu() {
+    _dropdownOverlay?.remove();
+    _dropdownOverlay = null;
+  }
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('spots').snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
+  return StreamBuilder<QuerySnapshot>(
+    stream: FirebaseFirestore.instance
+        .collection('spots')
+        .where(
+          'typeSphot',
+          isEqualTo: '🚨 POSTE DE SECOURS 🚨',
+        )
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) {
+        return const Center(child: CircularProgressIndicator());
+      }
 
-        final docs = snapshot.data!.docs;
+      final docs = snapshot.data!.docs;
 
-        docs.sort((a, b) {
-          final dataA = a.data() as Map<String, dynamic>;
-          final dataB = b.data() as Map<String, dynamic>;
+      docs.sort((a, b) {
+        final dataA = a.data() as Map<String, dynamic>;
+        final dataB = b.data() as Map<String, dynamic>;
 
-          final secoursA = (dataA['nomSecours'] ?? '').toString();
-          final secoursB = (dataB['nomSecours'] ?? '').toString();
+        final secoursA = (dataA['nomSecours'] ?? '').toString();
+        final secoursB = (dataB['nomSecours'] ?? '').toString();
 
-          final matchA = RegExp(r'(\d+)').firstMatch(secoursA);
-          final matchB = RegExp(r'(\d+)').firstMatch(secoursB);
+        final matchA = RegExp(r'(\d+)').firstMatch(secoursA);
+        final matchB = RegExp(r'(\d+)').firstMatch(secoursB);
 
-          final numA = int.tryParse(matchA?.group(1) ?? '9999') ?? 9999;
-          final numB = int.tryParse(matchB?.group(1) ?? '9999') ?? 9999;
+        final numA = int.tryParse(matchA?.group(1) ?? '9999') ?? 9999;
+        final numB = int.tryParse(matchB?.group(1) ?? '9999') ?? 9999;
 
-          return numA.compareTo(numB);
-        });
+        return numA.compareTo(numB);
+      });
 
-        void openMenu() {
-          closeMenu();
+      void openMenu() {
+        closeMenu();
 
-          final renderBox =
-              fieldKey.currentContext!.findRenderObject() as RenderBox;
-          final position = renderBox.localToGlobal(Offset.zero);
-          final size = renderBox.size;
-          final scrollController = ScrollController();
+        final renderBox =
+            fieldKey.currentContext!.findRenderObject() as RenderBox;
+        final position = renderBox.localToGlobal(Offset.zero);
+        final size = renderBox.size;
+        final scrollController = ScrollController();
 
-          _dropdownOverlay = OverlayEntry(
-            builder: (context) {
-              return Stack(
-                children: [
-                  Positioned.fill(
-                    child: GestureDetector(
-                      onTap: closeMenu,
-                      child: Container(color: Colors.transparent),
+        _dropdownOverlay = OverlayEntry(
+          builder: (context) {
+            return StatefulBuilder(
+              builder: (context, overlaySetState) {
+                return Stack(
+                  children: [
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTap: closeMenu,
+                        child: Container(color: Colors.transparent),
+                      ),
                     ),
-                  ),
-                  Positioned(
-                    left: position.dx,
-                    top: position.dy + size.height - 10,
-                    width: size.width,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: Container(
-                        constraints: const BoxConstraints(maxHeight: 368),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.92),
-                          border: const Border(
-                            left: BorderSide(color: pageColor, width: 1.4),
-                            right: BorderSide(color: pageColor, width: 1.4),
-                            bottom: BorderSide(color: pageColor, width: 1.4),
+                    Positioned(
+                      left: position.dx,
+                      top: position.dy + size.height - 10,
+                      width: size.width,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: Container(
+                          constraints: BoxConstraints(
+                            maxHeight:
+                                docs.length <= 6 ? docs.length * 42.0 : 252,
                           ),
-                          borderRadius: const BorderRadius.only(
-                            bottomLeft: Radius.circular(10),
-                            bottomRight: Radius.circular(10),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.18),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.92),
+                            border: const Border(
+                              left: BorderSide(color: pageColor, width: 1.4),
+                              right: BorderSide(color: pageColor, width: 1.4),
+                              bottom: BorderSide(color: pageColor, width: 1.4),
                             ),
-                          ],
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(10),
+                              bottomRight: Radius.circular(10),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.18),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ScrollbarTheme(
+                            data: const ScrollbarThemeData(
+                              thumbColor: MaterialStatePropertyAll(pageColor),
+                            ),
+                            child: Scrollbar(
+                              controller: scrollController,
+                              thumbVisibility: true,
+                              thickness: 10,
+                              radius: const Radius.circular(10),
+                              child: ListView.builder(
+                                controller: scrollController,
+                                padding: EdgeInsets.zero,
+                                itemCount: docs.length,
+                                itemBuilder: (context, index) {
+                                  final doc = docs[index];
+                                  final data =
+                                      doc.data() as Map<String, dynamic>;
+
+                                  final nomSecours =
+                                      (data['nomSecours'] ?? '').toString();
+                                  final nomSphot =
+                                      (data['nomSphot'] ?? '').toString();
+
+                                  final title = [nomSecours, nomSphot]
+                                      .where(
+                                        (value) => value.trim().isNotEmpty,
+                                      )
+                                      .join(' - ');
+
+                                  final selected =
+                                      selectedDocIds.contains(doc.id);
+
+                                  return InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        if (selectedDocIds.contains(doc.id)) {
+                                          selectedDocIds.remove(doc.id);
+                                        } else {
+                                          selectedDocIds.add(doc.id);
+                                        }
+
+                                        final selectedLabels = docs
+                                            .where(
+                                              (d) => selectedDocIds.contains(
+                                                d.id,
+                                              ),
+                                            )
+                                            .map((d) {
+                                          final data = d.data()
+                                              as Map<String, dynamic>;
+
+                                          final nomSecours =
+                                              (data['nomSecours'] ?? '')
+                                                  .toString();
+                                          final nomSphot =
+                                              (data['nomSphot'] ?? '')
+                                                  .toString();
+
+                                          return [nomSecours, nomSphot]
+                                              .where(
+                                                (value) =>
+                                                    value.trim().isNotEmpty,
+                                              )
+                                              .join(' - ');
+                                        }).toList();
+
+                                        selectedSphotLabel =
+                                            selectedLabels.join(' | ');
+                                        saveMessage = '';
+                                      });
+
+                                      overlaySetState(() {});
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            selected
+                                                ? Icons.check_box_rounded
+                                                : Icons
+                                                    .check_box_outline_blank_rounded,
+                                            color: selected
+                                                ? pageColor
+                                                : Colors.black54,
+                                            size: 22,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              title.isEmpty ? doc.id : title,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w900,
+                                                color: pageColor,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+
+        Overlay.of(context).insert(_dropdownOverlay!);
+      }
+
+      return GestureDetector(
+        key: fieldKey,
+        onTap: openMenu,
+        child: Container(
+          width: double.infinity,
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: pageColor,
+              width: 1.6,
+            ),
+          ),
+          child: const Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Sélectionnez un SPHOT existant',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: pageColor,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.checklist_rounded,
+                color: pageColor,
+                size: 24,
+              ),
+              SizedBox(width: 2),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Color(0xFFEF4444),
+                size: 26,
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+  Widget _multiDropdownField() {
+  final selectedValues = _readValues();
+  final fieldKey = GlobalKey();
+
+  void closeMenu() {
+    _dropdownOverlay?.remove();
+    _dropdownOverlay = null;
+  }
+
+  void updateSelection(String choice) {
+    setState(() {
+      final values = _readValues();
+
+      if (values.contains(choice)) {
+        values.remove(choice);
+      } else {
+        values.add(choice);
+      }
+
+      periodesController.text = values.join(' | ');
+      saveMessage = '';
+    });
+  }
+
+  void openMenu() {
+    closeMenu();
+
+    final renderBox = fieldKey.currentContext!.findRenderObject() as RenderBox;
+    final position = renderBox.localToGlobal(Offset.zero);
+    final size = renderBox.size;
+    final scrollController = ScrollController();
+
+    _dropdownOverlay = OverlayEntry(
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, overlaySetState) {
+            final liveSelectedValues = _readValues();
+
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: closeMenu,
+                    child: Container(color: Colors.transparent),
+                  ),
+                ),
+                Positioned(
+                  left: position.dx,
+                  top: position.dy + size.height - 10,
+                  width: size.width,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      constraints: const BoxConstraints(maxHeight: 230),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.92),
+                        border: const Border(
+                          left: BorderSide(color: pageColor, width: 1.4),
+                          right: BorderSide(color: pageColor, width: 1.4),
+                          bottom: BorderSide(color: pageColor, width: 1.4),
+                        ),
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(10),
+                          bottomRight: Radius.circular(10),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.18),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ScrollbarTheme(
+                        data: const ScrollbarThemeData(
+                          thumbColor: MaterialStatePropertyAll(pageColor),
                         ),
                         child: Scrollbar(
                           controller: scrollController,
                           thumbVisibility: true,
                           thickness: 10,
                           radius: const Radius.circular(10),
-                          child: ListView.builder(
-                            controller: scrollController,
-                            padding: EdgeInsets.zero,
-                            itemCount: docs.length,
-                            itemBuilder: (context, index) {
-                              final doc = docs[index];
-                              final data = doc.data() as Map<String, dynamic>;
+                          child: StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('periodesSurveillance')
+                                .orderBy('startDate')
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
 
-                              final nomSecours =
-                                  (data['nomSecours'] ?? '').toString();
-                              final nomSphot =
-                                  (data['nomSphot'] ?? '').toString();
+                              final docs = snapshot.data!.docs;
 
-                              final title = [nomSecours, nomSphot]
-                                  .where((value) => value.trim().isNotEmpty)
-                                  .join(' - ');
-
-                              final selected = doc.id == selectedDocId;
-
-                              return InkWell(
-                                onTap: () {
-                                  _loadSphot(doc.id, data);
-                                  closeMenu();
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 8,
+                              if (docs.isEmpty) {
+                                return const Center(
+                                  child: Text(
+                                    'Aucune période créée.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: pageColor,
+                                      fontWeight: FontWeight.w900,
+                                    ),
                                   ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        selected
-                                            ? Icons.check_circle_rounded
-                                            : Icons.place_rounded,
-                                        color: pageColor,
-                                        size: 22,
+                                );
+                              }
+
+                              return ListView.builder(
+                                controller: scrollController,
+                                padding: EdgeInsets.zero,
+                                itemCount: docs.length,
+                                itemBuilder: (context, index) {
+                                  final data =
+                                      docs[index].data()
+                                          as Map<String, dynamic>;
+
+                                  final label =
+                                      (data['label'] ??
+                                              data['name'] ??
+                                              '')
+                                          .toString();
+
+                                  final selected =
+                                      liveSelectedValues.contains(label);
+
+                                  return InkWell(
+                                    onTap: () {
+                                      updateSelection(label);
+                                      overlaySetState(() {});
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          title.isEmpty ? doc.id : title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w800,
-                                            color: Colors.black87,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            selected
+                                                ? Icons.check_box_rounded
+                                                : Icons
+                                                    .check_box_outline_blank_rounded,
+                                            color: selected
+                                                ? pageColor
+                                                : Colors.black54,
+                                            size: 22,
                                           ),
-                                        ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              label,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w900,
+                                                color: pageColor,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                ),
+                                    ),
+                                  );
+                                },
                               );
                             },
                           ),
@@ -243,259 +504,71 @@ class _AdminAttributionSphotsPageState
                       ),
                     ),
                   ),
-                ],
-              );
-            },
-          );
-
-          Overlay.of(context).insert(_dropdownOverlay!);
-        }
-
-        return GestureDetector(
-          key: fieldKey,
-          onTap: openMenu,
-          child: Container(
-            width: double.infinity,
-            height: 52,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.32),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.black, width: 1.6),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    selectedSphotLabel.isEmpty
-                        ? 'Sélectionnez un SPHOT existant'
-                        : selectedSphotLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: selectedSphotLabel.isEmpty
-                          ? FontWeight.w400
-                          : FontWeight.w700,
-                      color: selectedSphotLabel.isEmpty
-                          ? Colors.black.withOpacity(0.60)
-                          : Colors.black,
-                    ),
-                  ),
-                ),
-                const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: pageColor,
-                  size: 26,
                 ),
               ],
-            ),
-          ),
+            );
+          },
         );
       },
     );
+
+    Overlay.of(context).insert(_dropdownOverlay!);
   }
 
-  Widget _multiDropdownField() {
-    final selectedValues = _readValues();
-    final fieldKey = GlobalKey();
+  final displayText =
+      selectedValues.isEmpty ? 'Périodes à attribuer' : selectedValues.join(' | ');
 
-    void closeMenu() {
-      _dropdownOverlay?.remove();
-      _dropdownOverlay = null;
-    }
-
-    void updateSelection(String choice) {
-      setState(() {
-        final values = _readValues();
-
-        final alreadySelected = values.contains(choice);
-
-        if (alreadySelected) {
-          values.remove(choice);
-        } else {
-          values.add(choice);
-        }
-
-        periodesController.text = values.join(' | ');
-        saveMessage = '';
-      });
-    }
-
-    void openMenu() {
-      closeMenu();
-
-      final renderBox = fieldKey.currentContext!.findRenderObject() as RenderBox;
-      final position = renderBox.localToGlobal(Offset.zero);
-      final size = renderBox.size;
-      final scrollController = ScrollController();
-
-      _dropdownOverlay = OverlayEntry(
-        builder: (context) {
-          return StatefulBuilder(
-            builder: (context, overlaySetState) {
-              final liveSelectedValues = _readValues();
-
-              return Stack(
-                children: [
-                  Positioned.fill(
-                    child: GestureDetector(
-                      onTap: closeMenu,
-                      child: Container(color: Colors.transparent),
-                    ),
-                  ),
-                  Positioned(
-                    left: position.dx,
-                    top: position.dy + size.height - 10,
-                    width: size.width,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: Container(
-                        constraints: const BoxConstraints(maxHeight: 260),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.92),
-                          border: const Border(
-                            left: BorderSide(color: pageColor, width: 1.4),
-                            right: BorderSide(color: pageColor, width: 1.4),
-                            bottom: BorderSide(color: pageColor, width: 1.4),
-                          ),
-                          borderRadius: const BorderRadius.only(
-                            bottomLeft: Radius.circular(10),
-                            bottomRight: Radius.circular(10),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.18),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Scrollbar(
-                          controller: scrollController,
-                          thumbVisibility: true,
-                          thickness: 10,
-                          radius: const Radius.circular(10),
-                          child: ListView.builder(
-                            controller: scrollController,
-                            padding: EdgeInsets.zero,
-                            itemCount: periodeChoices.length,
-                            itemBuilder: (context, index) {
-                              final choice = periodeChoices[index];
-                              final selected =
-                                  liveSelectedValues.contains(choice);
-
-                              return InkWell(
-                                onTap: () {
-                                  updateSelection(choice);
-                                  overlaySetState(() {});
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 8,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        selected
-                                            ? Icons.check_box_rounded
-                                            : Icons
-                                                .check_box_outline_blank_rounded,
-                                        color: selected
-                                            ? pageColor
-                                            : Colors.black54,
-                                        size: 22,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          choice,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w800,
-                                            color: Colors.black87,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      );
-
-      Overlay.of(context).insert(_dropdownOverlay!);
-    }
-
-    final displayText =
-        selectedValues.isEmpty ? 'Périodes à attribuer' : selectedValues.join(' | ');
-
-    return GestureDetector(
-      key: fieldKey,
-      onTap: openMenu,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: 'Périodes à attribuer',
-          labelStyle: const TextStyle(fontSize: 14),
-          filled: true,
-          fillColor: Colors.white.withOpacity(0.32),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 12,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.black, width: 1.6),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.black, width: 1.6),
-          ),
+  return GestureDetector(
+    key: fieldKey,
+    onTap: openMenu,
+    child: InputDecorator(
+      decoration: InputDecoration(
+        labelText: '',
+        filled: true,
+        fillColor: Colors.transparent,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                displayText,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight:
-                      selectedValues.isEmpty ? FontWeight.w400 : FontWeight.w700,
-                  color: selectedValues.isEmpty
-                      ? Colors.black.withOpacity(0.60)
-                      : Colors.black,
-                ),
-              ),
-            ),
-            const Icon(
-              Icons.checklist_rounded,
-              color: pageColor,
-              size: 24,
-            ),
-            const SizedBox(width: 2),
-            const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: pageColor,
-              size: 26,
-            ),
-          ],
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: pageColor, width: 1.6),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: pageColor, width: 1.6),
         ),
       ),
-    );
-  }
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              displayText,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                color: pageColor,
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.checklist_rounded,
+            color: pageColor,
+            size: 24,
+          ),
+          const SizedBox(width: 2),
+          const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: Color(0xFFEF4444),
+            size: 26,
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -526,7 +599,7 @@ class _AdminAttributionSphotsPageState
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
-                      color: pageColor,
+                      color: Color(0xFFEF4444),
                       letterSpacing: 0.6,
                     ),
                   ),
@@ -539,7 +612,7 @@ class _AdminAttributionSphotsPageState
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: Colors.black,
+                          color: pageColor,
                           width: 2,
                         ),
                       ),
@@ -547,12 +620,12 @@ class _AdminAttributionSphotsPageState
                         children: [
                           _sphotSelector(),
                           const SizedBox(height: 14),
-                          if (selectedDocId != null) ...[
+                          if (selectedDocIds.isNotEmpty) ...[
                             Container(
                               width: double.infinity,
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: pageColor.withOpacity(0.16),
+                                color: Colors.transparent,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
                                   color: pageColor,
@@ -572,17 +645,20 @@ class _AdminAttributionSphotsPageState
                               ),
                             ),
                             const SizedBox(height: 14),
-                            _multiDropdownField(),
+                            SizedBox(
+  height: 52,
+  child: _multiDropdownField(),
+),
                             const SizedBox(height: 14),
                             Expanded(
                               child: Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.20),
+                                  color: Colors.transparent,
                                   borderRadius: BorderRadius.circular(18),
                                   border: Border.all(
-                                    color: Colors.black,
+                                    color: pageColor,
                                     width: 1.4,
                                   ),
                                 ),
@@ -608,15 +684,13 @@ class _AdminAttributionSphotsPageState
                                               vertical: 10,
                                             ),
                                             decoration: BoxDecoration(
-                                              color:
-                                                  Colors.white.withOpacity(0.65),
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                              border: Border.all(
-                                                color: pageColor,
-                                                width: 1.4,
-                                              ),
-                                            ),
+  color: Colors.transparent,
+  borderRadius: BorderRadius.circular(14),
+  border: Border.all(
+    color: pageColor,
+    width: 1.4,
+  ),
+),
                                             child: Row(
                                               children: [
                                                 const Icon(
@@ -629,7 +703,7 @@ class _AdminAttributionSphotsPageState
                                                   child: Text(
                                                     selectedValues[index],
                                                     style: const TextStyle(
-                                                      color: Colors.black,
+                                                      color: pageColor,
                                                       fontSize: 14,
                                                       fontWeight:
                                                           FontWeight.w900,
@@ -678,7 +752,7 @@ class _AdminAttributionSphotsPageState
                                   color: Colors.green,
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: Colors.black,
+                                    color: pageColor,
                                     width: 2,
                                   ),
                                 ),
@@ -700,7 +774,7 @@ class _AdminAttributionSphotsPageState
                                   'Sélectionnez un SPHOT pour lui attribuer ses périodes de surveillance.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    color: Colors.black,
+                                    color: pageColor,
                                     fontSize: 15,
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -713,13 +787,13 @@ class _AdminAttributionSphotsPageState
                   ),
                   const SizedBox(height: 10),
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: Colors.transparent,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.black,
+                        color: pageColor,
                         width: 2,
                       ),
                     ),
@@ -730,7 +804,7 @@ class _AdminAttributionSphotsPageState
                       padding: EdgeInsets.zero,
                       icon: const Icon(
                         Icons.arrow_back_ios_new_rounded,
-                        color: Colors.black,
+                        color: pageColor,
                         size: 22,
                       ),
                     ),

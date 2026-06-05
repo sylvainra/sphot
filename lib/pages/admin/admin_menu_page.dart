@@ -39,7 +39,7 @@ class AdminMenuPage extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
-                      color: adminColor,
+                      color: const Color(0xFFFF0000),
                       letterSpacing: 0.6,
                     ),
                   ),
@@ -51,13 +51,13 @@ class AdminMenuPage extends StatelessWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: Colors.black,
-                          width: 2,
-                        ),
-                      ),
+  color: Colors.transparent,
+  borderRadius: BorderRadius.circular(24),
+  border: Border.all(
+    color: Color(0xFF1E3A8A),
+    width: 2,
+  ),
+),
                       child: Column(
                         children: [
                           Expanded(
@@ -65,9 +65,9 @@ class AdminMenuPage extends StatelessWidget {
     title: 'SPHOTS',
     subtitle:
         'Créer, voir, copier, modifier, supprimer\nles SPHOTS',
-    imageAsset: 'data/icons/fire_blue_icon.png',
+    imageAsset: 'data/icons/fire_red_icon.png',
     topSpacing: 2,
-    color: adminColor,
+    color: const Color(0xFF1E3A8A),
     onTap: () {
       Navigator.of(context).push(
         MaterialPageRoute(
@@ -88,7 +88,7 @@ Expanded(
     subtitle:
         'Renseigner les périodes et heures\nde surveillance pour chaque SPHOT',
     icon: Icons.calendar_month_rounded,
-    color: const Color(0xFF0891B2),
+    color: const Color(0xFFFF0000),
     onTap: () {
   Navigator.of(context).push(
     MaterialPageRoute(
@@ -107,7 +107,7 @@ Expanded(
     subtitle:
         'Créer, modifier et gérer\nles sauveteurs affectés aux SPHOTS',
     icon: Icons.groups_rounded,
-    color: const Color(0xFFDC2626),
+    color: const Color(0xFFFF0000),
     onTap: () {
   Navigator.of(context).push(
     MaterialPageRoute(
@@ -126,15 +126,15 @@ Expanded(
                   const SizedBox(height: 10),
 
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: Colors.transparent,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.black,
-                        width: 2,
-                      ),
+  color: const Color(0xFF1E3A8A),
+  width: 2,
+),
                     ),
                     child: IconButton(
                       onPressed: () {
@@ -142,10 +142,10 @@ Expanded(
                       },
                       padding: EdgeInsets.zero,
                       icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.black,
-                        size: 22,
-                      ),
+  Icons.arrow_back_ios_new_rounded,
+  color: Color(0xFF1E3A8A),
+  size: 18,
+),
                     ),
                   ),
                 ],
@@ -189,7 +189,7 @@ class _AdminButton extends StatelessWidget {
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: color,
+            color: const Color(0xFF1E3A8A),
             width: 2.2,
           ),
         ),
@@ -205,7 +205,7 @@ class _AdminButton extends StatelessWidget {
             else
               Icon(
                 icon,
-                color: color,
+                color: const Color(0xFFFF0000),
                 size: 48,
               ),
 
@@ -216,7 +216,7 @@ class _AdminButton extends StatelessWidget {
   textAlign: TextAlign.center,
   maxLines: 2,
   style: TextStyle(
-    color: color,
+    color: Color(0xFF1E3A8A),
     fontSize: 16,
     fontWeight: FontWeight.w900,
     height: 0.95,
@@ -233,7 +233,7 @@ class _AdminButton extends StatelessWidget {
   maxLines: 3,
   overflow: TextOverflow.visible,
   style: TextStyle(
-    color: Colors.black,
+    color: const Color(0xFF1E3A8A),
     fontSize: 14,
     fontWeight: FontWeight.w700,
     height: 1.3,

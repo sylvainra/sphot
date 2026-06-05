@@ -13,6 +13,21 @@ class AdminSauveteurPage extends StatefulWidget {
 
 class _AdminSauveteurPageState extends State<AdminSauveteurPage> {
 
+final TextEditingController nomController = TextEditingController();
+final TextEditingController prenomController = TextEditingController();
+final TextEditingController ageController = TextEditingController();
+final TextEditingController adresseController = TextEditingController();
+final TextEditingController codePostalController = TextEditingController();
+final TextEditingController villeController = TextEditingController();
+final TextEditingController telephoneController = TextEditingController();
+final TextEditingController emailController = TextEditingController();
+final TextEditingController experienceController = TextEditingController();
+final TextEditingController observationsController = TextEditingController();
+
+final TextEditingController dateNaissanceController = TextEditingController();
+final TextEditingController dateDebutAffectationController = TextEditingController();
+final TextEditingController dateFinAffectationController = TextEditingController();
+
 final stt.SpeechToText _speech = stt.SpeechToText();
 
 final List<String> fonctionChoices = [
@@ -21,13 +36,17 @@ final List<String> fonctionChoices = [
   'Sauveteur',
 ];
 
-String? fonctionSelectionnee;
+final List<String> fonctionsSelectionnees = [];
 
 final List<String> postesSelectionnes = [];
 
 OverlayEntry? _dropdownOverlay;
 
-Future<void> _startVoice(TextEditingController controller) async {
+Future<void> _startVoice(
+  TextEditingController controller, {
+  bool uppercase = false,
+  bool capitalizeWords = false,
+}) async {
   final available = await _speech.initialize();
 
   if (!available) return;
@@ -36,7 +55,16 @@ Future<void> _startVoice(TextEditingController controller) async {
     localeId: 'fr_FR',
     onResult: (result) {
       setState(() {
-        controller.text = result.recognizedWords;
+        if (uppercase) {
+  controller.text = result.recognizedWords.toUpperCase();
+} else if (capitalizeWords) {
+  final text = result.recognizedWords;
+  controller.text = text.isEmpty
+      ? text
+      : text[0].toUpperCase() + text.substring(1);
+} else {
+  controller.text = result.recognizedWords;
+}
       });
     },
   );
@@ -84,60 +112,74 @@ Future<void> _startVoice(TextEditingController controller) async {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: Colors.black,
+                          color: const Color(0xFF1E3A8A),
                           width: 2,
                         ),
                       ),
                       child: SingleChildScrollView(
+  padding: const EdgeInsets.only(top: 8),
                         child: Column(
                           children: [
 
-                            _field('Nom'),
+                            SizedBox(
+  height: 56,
+  child: _field(
+    'NOM',
+    controller: nomController,
+    uppercase: true,
+  ),
+),
                             const SizedBox(height: 8),
 
-                            _field('Prénom'),
+                            _field('Prénom', controller: prenomController),
                             const SizedBox(height: 8),
 
-                            _dateField('Date de naissance'),
+                            _dateField('Date de naissance', controller: dateNaissanceController),
                             const SizedBox(height: 8),
 
-                            _field('Âge'),
+                            _field('Âge', controller: ageController),
                             const SizedBox(height: 8),
 
-                            _field('Adresse'),
+                            _field('Adresse', controller: adresseController),
                             const SizedBox(height: 8),
 
-                            _field('Code postal'),
+                            _field('Code postal', controller: codePostalController),
                             const SizedBox(height: 8),
 
-                            _field('Ville'),
+                            _field(
+  'Ville',
+  controller: villeController,
+  uppercase: true,
+),
                             const SizedBox(height: 8),
 
-                            _field('Téléphone'),
+                            _field('Téléphone', controller: telephoneController),
                             const SizedBox(height: 8),
 
-                            _field('Email'),
+                            _field('Email', controller: emailController),
                             const SizedBox(height: 8),
 
                             _dropdownFonction(),
                             const SizedBox(height: 8),
 
-                            _field('Années d’expérience'),
+                            _field('Années d’expérience', controller: experienceController),
                             const SizedBox(height: 8),
 
                             _multiPostesSecoursField(),
                             const SizedBox(height: 8),
 
-                            _dateField('Date début affectation'),
+                            _dateField("Date de début d'affectation", controller: dateDebutAffectationController),
                             const SizedBox(height: 8),
 
-                            _dateField('Date fin affectation'),
+                            _dateField("Date de fin d'affectation", controller: dateFinAffectationController),
                             const SizedBox(height: 8),
 
                             _field(
-                              'Observations',
-                              maxLines: 4,
-                            ),
+  'Observations',
+  controller: observationsController,
+  maxLines: 4,
+  capitalizeWords: true,
+),
 
                             const SizedBox(height: 15),
 
@@ -168,23 +210,27 @@ Future<void> _startVoice(TextEditingController controller) async {
                   const SizedBox(height: 10),
 
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.black,
+                        color: const Color(0xFF1E3A8A),
                         width: 2,
                       ),
                     ),
                     child: IconButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                      ),
-                    ),
+  onPressed: () {
+    Navigator.pop(context);
+  },
+  padding: EdgeInsets.zero,
+  constraints: const BoxConstraints(),
+  icon: const Icon(
+    Icons.arrow_back_ios_new_rounded,
+    color: Color(0xFF1E3A8A),
+    size: 22,
+  ),
+),
                   ),
                 ],
               ),
@@ -213,7 +259,9 @@ Widget _dropdownFonction() {
 
     _dropdownOverlay = OverlayEntry(
       builder: (context) {
-        return Stack(
+  return StatefulBuilder(
+    builder: (context, overlaySetState) {
+      return Stack(
           children: [
             Positioned.fill(
               child: GestureDetector(
@@ -232,10 +280,10 @@ Widget _dropdownFonction() {
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.88),
                     border: const Border(
-                      left: BorderSide(color: adminColor, width: 1.4),
-                      right: BorderSide(color: adminColor, width: 1.4),
-                      bottom: BorderSide(color: adminColor, width: 1.4),
-                    ),
+  left: BorderSide(color: Color(0xFF1E3A8A), width: 1.4),
+  right: BorderSide(color: Color(0xFF1E3A8A), width: 1.4),
+  bottom: BorderSide(color: Color(0xFF1E3A8A), width: 1.4),
+),
                     borderRadius: const BorderRadius.only(
                       bottomLeft: Radius.circular(10),
                       bottomRight: Radius.circular(10),
@@ -258,14 +306,19 @@ Widget _dropdownFonction() {
     itemCount: fonctionChoices.length,
     itemBuilder: (context, index) {
       final choice = fonctionChoices[index];
+final selected = fonctionsSelectionnees.contains(choice);
 
       return InkWell(
         onTap: () {
-          setState(() {
-            fonctionSelectionnee = choice;
-          });
-          closeMenu();
-        },
+  setState(() {
+    if (selected) {
+      fonctionsSelectionnees.remove(choice);
+    } else {
+      fonctionsSelectionnees.add(choice);
+    }
+  });
+  overlaySetState(() {});
+},
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: 10,
@@ -274,12 +327,12 @@ Widget _dropdownFonction() {
           child: Row(
             children: [
               Icon(
-                fonctionSelectionnee == choice
-                    ? Icons.check_circle_rounded
-                    : Icons.person_rounded,
-                color: adminColor,
-                size: 22,
-              ),
+  selected
+      ? Icons.check_box_rounded
+      : Icons.check_box_outline_blank_rounded,
+  color: selected ? adminColor : Colors.black54,
+  size: 22,
+),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -302,9 +355,11 @@ Widget _dropdownFonction() {
               ),
             ),
           ],
-        );
+                );
       },
     );
+  },
+);
 
     Overlay.of(context).insert(_dropdownOverlay!);
   }
@@ -314,39 +369,53 @@ Widget _dropdownFonction() {
     onTap: openMenu,
     child: InputDecorator(
       decoration: InputDecoration(
-        labelText: 'Fonction',
-        labelStyle: const TextStyle(fontSize: 14),
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.32),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 12,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.black, width: 1.6),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.black, width: 1.6),
-        ),
-      ),
+  labelText: 'Fonction(s)',
+  labelStyle: const TextStyle(
+    color: Color(0xFF1E3A8A),
+    fontWeight: FontWeight.w700,
+  ),
+  filled: true,
+  fillColor: Colors.transparent,
+  contentPadding: const EdgeInsets.symmetric(
+    horizontal: 12,
+    vertical: 12,
+  ),
+  border: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: const BorderSide(
+      color: Color(0xFF1E3A8A),
+      width: 1.6,
+    ),
+  ),
+  focusedBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: const BorderSide(
+      color: Color(0xFF1E3A8A),
+      width: 2,
+    ),
+  ),
+  enabledBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: const BorderSide(
+      color: Color(0xFF1E3A8A),
+      width: 1.6,
+    ),
+  ),
+),
       child: Row(
         children: [
           Expanded(
             child: Text(
-              fonctionSelectionnee ?? 'Fonction',
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: fonctionSelectionnee == null
-                    ? FontWeight.w400
-                    : FontWeight.w700,
-                color: fonctionSelectionnee == null
-                    ? Colors.black.withOpacity(0.60)
-                    : Colors.black,
-              ),
-            ),
+  fonctionsSelectionnees.isEmpty
+      ? 'Fonction(s)'
+      : fonctionsSelectionnees.join(' | '),
+  overflow: TextOverflow.ellipsis,
+  style: const TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    color: Color(0xFF1E3A8A),
+  ),
+),
           ),
           const Icon(
             Icons.keyboard_arrow_down_rounded,
@@ -387,7 +456,7 @@ return nomSpot;
       }).where((value) => value.isNotEmpty).toList();
 
       return _multiDropdownPostes(
-        'Poste de secours affecté',
+        'SPHOT(S) affecté(s)',
         postes,
       );
     },
@@ -440,10 +509,10 @@ Widget _multiDropdownPostes(
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.92),
                         border: const Border(
-                          left: BorderSide(color: adminColor, width: 1.4),
-                          right: BorderSide(color: adminColor, width: 1.4),
-                          bottom: BorderSide(color: adminColor, width: 1.4),
-                        ),
+  left: BorderSide(color: Color(0xFF1E3A8A), width: 1.4),
+  right: BorderSide(color: Color(0xFF1E3A8A), width: 1.4),
+  bottom: BorderSide(color: Color(0xFF1E3A8A), width: 1.4),
+),
                         borderRadius: const BorderRadius.only(
                           bottomLeft: Radius.circular(10),
                           bottomRight: Radius.circular(10),
@@ -537,9 +606,12 @@ Widget _multiDropdownPostes(
     child: InputDecorator(
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(fontSize: 14),
+labelStyle: const TextStyle(
+  color: Color(0xFF1E3A8A),
+  fontWeight: FontWeight.w700,
+),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.32),
+        fillColor: Colors.transparent,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 12,
@@ -560,15 +632,11 @@ Widget _multiDropdownPostes(
               displayText,
               overflow: TextOverflow.ellipsis,
               maxLines: 2,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: postesSelectionnes.isEmpty
-                    ? FontWeight.w400
-                    : FontWeight.w700,
-                color: postesSelectionnes.isEmpty
-                    ? Colors.black.withOpacity(0.60)
-                    : Colors.black,
-              ),
+              style: const TextStyle(
+  fontSize: 16,
+  fontWeight: FontWeight.w700,
+  color: Color(0xFF1E3A8A),
+),
             ),
           ),
           const Icon(
@@ -588,28 +656,37 @@ Widget _multiDropdownPostes(
   );
 }
 
-Widget _dateField(String label) {
-  final controller = TextEditingController();
+Widget _dateField(
+  String label, {
+  required TextEditingController controller,
+}) {
 
   return TextField(
     controller: controller,
     readOnly: true,
+    style: const TextStyle(
+      color: Color(0xFF1E3A8A),
+      fontWeight: FontWeight.w700,
+    ),
     decoration: InputDecoration(
       labelText: label,
+labelStyle: const TextStyle(
+  color: Color(0xFF1E3A8A),
+  fontWeight: FontWeight.w700,
+),
       filled: true,
-      fillColor: Colors.white.withOpacity(0.25),
+      fillColor: Colors.transparent,
       suffixIcon: IconButton(
         icon: const Icon(
-          Icons.calendar_month_rounded,
-          color: adminColor,
-        ),
+  Icons.calendar_month_rounded,
+  color: Color(0xFFDC2626),
+),
         onPressed: () async {
           final pickedDate = await showDatePicker(
             context: context,
             initialDate: DateTime.now(),
-            firstDate: DateTime(2020),
+            firstDate: DateTime(1900),
             lastDate: DateTime(2100),
-           
           );
 
           if (pickedDate == null) return;
@@ -622,6 +699,24 @@ Widget _dateField(String label) {
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: Color(0xFF1E3A8A),
+          width: 1.6,
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: Color(0xFF1E3A8A),
+          width: 1.6,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: Color(0xFF1E3A8A),
+          width: 2,
+        ),
       ),
     ),
   );
@@ -629,28 +724,66 @@ Widget _dateField(String label) {
 
   Widget _field(
   String label, {
+  required TextEditingController controller,
   int maxLines = 1,
+  bool uppercase = false,
+  bool capitalizeWords = false,
 }) {
-  final controller = TextEditingController();
-
+  
   return TextField(
     controller: controller,
+    textCapitalization: uppercase
+    ? TextCapitalization.characters
+    : TextCapitalization.none,
     maxLines: maxLines,
+    style: const TextStyle(
+      color: Color(0xFF1E3A8A),
+      fontWeight: FontWeight.w700,
+    ),
     decoration: InputDecoration(
-      labelText: label,
-      filled: true,
-      fillColor: Colors.white.withOpacity(0.25),
-
+  labelText: label,
+  alignLabelWithHint: true,
+  labelStyle: const TextStyle(
+    color: Color(0xFF1E3A8A),
+    fontWeight: FontWeight.w700,
+  ),
+  floatingLabelStyle: const TextStyle(
+    color: Color(0xFF1E3A8A),
+    fontWeight: FontWeight.w700,
+  ),
+  filled: true,
+  fillColor: Colors.transparent,
       suffixIcon: IconButton(
         icon: const Icon(
           Icons.mic,
-          color: Colors.red,
+          color: adminColor,
         ),
-        onPressed: () => _startVoice(controller),
+        onPressed: () => _startVoice(
+  controller,
+  uppercase: uppercase,
+  capitalizeWords: capitalizeWords,
+),
       ),
-
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: Color(0xFF1E3A8A),
+          width: 1.6,
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: Color(0xFF1E3A8A),
+          width: 1.6,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: Color(0xFF1E3A8A),
+          width: 2,
+        ),
       ),
     ),
   );

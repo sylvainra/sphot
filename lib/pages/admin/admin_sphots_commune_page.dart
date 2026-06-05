@@ -544,24 +544,33 @@ void _showMessage(String message) {
       height: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: selected ? color.withOpacity(0.14) : Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color, width: selected ? 3 : 2),
-      ),
+  color: selected
+      ? adminColor.withOpacity(0.14)
+      : Colors.transparent,
+  borderRadius: BorderRadius.circular(16),
+  border: Border.all(
+    color: adminColor,
+    width: selected ? 3 : 2,
+  ),
+),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 26),
+          Icon(
+  icon,
+  color: const Color(0xFFFF0000),
+  size: 26,
+),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-              ),
+              style: const TextStyle(
+  color: adminColor,
+  fontSize: 14,
+  fontWeight: FontWeight.w900,
+),
             ),
           ),
         ],
@@ -647,7 +656,7 @@ void _showMessage(String message) {
                   child: Material(
                     color: Colors.transparent,
                     child: Container(
-                      constraints: const BoxConstraints(maxHeight: 368),
+                      constraints: const BoxConstraints(maxHeight: 341),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.92),
                         border: const Border(
@@ -758,32 +767,32 @@ void _showMessage(String message) {
           height: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.32),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.black, width: 1.6),
-          ),
+  color: Colors.transparent,
+  borderRadius: BorderRadius.circular(14),
+  border: Border.all(
+    color: const Color(0xFF1E3A8A),
+    width: 1.6,
+  ),
+),
           child: Row(
             children: [
               Expanded(
                 child: Text(
-                  displayLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight:
-                        selectedDocId == null ? FontWeight.w400 : FontWeight.w700,
-                    color: selectedDocId == null
-                        ? Colors.black.withOpacity(0.60)
-                        : Colors.black,
-                  ),
-                ),
+  displayLabel.toUpperCase(),
+  maxLines: 1,
+  overflow: TextOverflow.ellipsis,
+  style: const TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w900,
+    color: Color(0xFF1E3A8A),
+  ),
+),
               ),
               const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: adminColor,
-                size: 26,
-              ),
+  Icons.keyboard_arrow_down_rounded,
+  color: Color(0xFFFF0000),
+  size: 26,
+),
             ],
           ),
         ),
@@ -1593,14 +1602,14 @@ const SizedBox(height: 8),
   'typeSphot',
   'Type de SPHOT',
   typeSphotChoices,
-  maxMenuHeight: 160,
+  maxMenuHeight: 170,
 ),
             const SizedBox(height: 8),
             _dropdownField(
   'natureSphot',
   'Nature du SPHOT',
   natureSphotChoices,
-  maxMenuHeight: 102,
+  maxMenuHeight: 112,
 ),
           ],
         );
@@ -1985,7 +1994,7 @@ Widget _existingSphotsPanel({
       color: Colors.white.withOpacity(0.10),
       borderRadius: BorderRadius.circular(16),
       border: Border.all(
-        color: const Color(0xFFF97316),
+        color: const Color(0xFF1E3A8A),
         width: 2,
       ),
     ),
@@ -1995,14 +2004,14 @@ Widget _existingSphotsPanel({
           children: [
             Icon(
               Icons.folder_copy_rounded,
-              color: Color(0xFFF97316),
+              color: Color(0xFFFF0000),
               size: 20,
             ),
             SizedBox(width: 8),
             Text(
               'SPHOTS EXISTANTS',
               style: TextStyle(
-                color: Color(0xFFF97316),
+                color: Color(0xFF1E3A8A),
                 fontSize: 13,
                 fontWeight: FontWeight.w900,
               ),
@@ -2131,7 +2140,7 @@ Widget build(BuildContext context) {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
-                    color: adminColor,
+                    color: Color(0xFFFF0000),
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -2141,10 +2150,13 @@ Widget build(BuildContext context) {
                     width: double.infinity,
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: Colors.black, width: 2),
-                    ),
+  color: Colors.transparent,
+  borderRadius: BorderRadius.circular(22),
+  border: Border.all(
+    color: const Color(0xFF1E3A8A),
+    width: 2,
+  ),
+),
                     child: mode == AdminSphotMode.none
                         ? LayoutBuilder(
                             builder: (context, constraints) {
@@ -2214,23 +2226,26 @@ final double bandeauHeight =
                 _stepControls(),
                 const SizedBox(height: 4),
                 Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.transparent,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.black, width: 2),
-                  ),
-                  child: IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      color: Colors.black,
-                      size: 18,
-                    ),
-                  ),
-                ),
+  width: 40,
+  height: 40,
+  decoration: BoxDecoration(
+    color: Colors.transparent,
+    shape: BoxShape.circle,
+    border: Border.all(
+      color: const Color(0xFF1E3A8A),
+      width: 2,
+    ),
+  ),
+  child: IconButton(
+    onPressed: () => Navigator.of(context).pop(),
+    padding: EdgeInsets.zero,
+    icon: const Icon(
+      Icons.arrow_back_ios_new_rounded,
+      color: Color(0xFF1E3A8A),
+      size: 18,
+    ),
+  ),
+),
               ],
             ),
           ),

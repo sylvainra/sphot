@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class AdminPeriodesSurveillancePage extends StatefulWidget {
-  const AdminPeriodesSurveillancePage({super.key});
+  final String ville;
+
+  const AdminPeriodesSurveillancePage({
+    super.key,
+    this.ville = 'VILLE_NON_RENSEIGNEE',
+  });
 
   @override
   State<AdminPeriodesSurveillancePage> createState() =>
@@ -11,6 +18,15 @@ class AdminPeriodesSurveillancePage extends StatefulWidget {
 class _AdminPeriodesSurveillancePageState
     extends State<AdminPeriodesSurveillancePage> {
   final List<_SurveillancePeriod> _periods = [];
+
+  String _communeId() {
+  return widget.ville
+      .trim()
+      .toUpperCase()
+      .replaceAll(' ', '_')
+      .replaceAll('-', '_')
+      .replaceAll("'", '_');
+}
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/'
@@ -24,35 +40,72 @@ class _AdminPeriodesSurveillancePageState
   }
 
   Future<void> _openPeriodDialog({_SurveillancePeriod? period}) async {
-    final result = await showDialog<_SurveillancePeriod>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _PeriodDialog(period: period),
-    );
+  final result = await showDialog<_SurveillancePeriod>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => _PeriodDialog(period: period),
+  );
 
-    if (result == null) return;
+  if (result == null) return;
 
-    setState(() {
-      if (period == null) {
-        _periods.add(result);
-      } else {
-        final index = _periods.indexOf(period);
-        if (index != -1) {
-          _periods[index] = result;
-        }
+  setState(() {
+    if (period == null) {
+      _periods.add(result);
+    } else {
+      final index = _periods.indexOf(period);
+      if (index != -1) {
+        _periods[index] = result;
       }
-    });
-  }
+    }
+  });
 
-  void _deletePeriod(_SurveillancePeriod period) {
-    setState(() {
-      _periods.remove(period);
-    });
-  }
+  try {
+  await FirebaseFirestore.instance
+    .collection('communes')
+.doc(_communeId())
+.collection('periodesSurveillance')
+.doc(result.id)
+    .set({
+    'id': result.id,
+    'name': result.name.toUpperCase(),
+    'ville': widget.ville.toUpperCase(),
+    'startDate': Timestamp.fromDate(result.startDate),
+    'endDate': Timestamp.fromDate(result.endDate),
+    'startHour':
+        '${result.startHour.hour.toString().padLeft(2, '0')}:${result.startHour.minute.toString().padLeft(2, '0')}',
+    'endHour':
+        '${result.endHour.hour.toString().padLeft(2, '0')}:${result.endHour.minute.toString().padLeft(2, '0')}',
+    'label':
+        '${result.name.toUpperCase()} — DU ${_formatDate(result.startDate)} AU ${_formatDate(result.endDate)} — DE ${_formatTime(result.startHour)} À ${_formatTime(result.endHour)}',
+    'updatedAt': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
+
+  if (!mounted) return;
+
+  
+} catch (e) {
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('ERREUR FIRESTORE : $e'),
+    ),
+  );
+}
+}
+
+  Future<void> _deletePeriod(_SurveillancePeriod period) async {
+  await FirebaseFirestore.instance
+      .collection('communes')
+      .doc(_communeId())
+      .collection('periodesSurveillance')
+      .doc(period.id)
+      .delete();
+}
 
   @override
   Widget build(BuildContext context) {
-    const Color pageColor = Color(0xFF0891B2);
+    const Color pageColor = Color(0xFF1E3A8A);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -74,12 +127,12 @@ class _AdminPeriodesSurveillancePageState
                     fit: BoxFit.contain,
                   ),
                   const Text(
-                    'DATES/HEURES DE SURVEILLANCE',
+                    'PÉRIODES DE SURVEILLANCE',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 21,
                       fontWeight: FontWeight.w900,
-                      color: pageColor,
+                      color: Color(0xFFEF4444),
                       letterSpacing: 0.4,
                     ),
                   ),
@@ -92,7 +145,7 @@ class _AdminPeriodesSurveillancePageState
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: Colors.black,
+                          color: pageColor,
                           width: 2,
                         ),
                       ),
@@ -103,7 +156,11 @@ class _AdminPeriodesSurveillancePageState
                             height: 58,
                             child: ElevatedButton.icon(
                               onPressed: () => _openPeriodDialog(),
-                              icon: const Icon(Icons.add_rounded),
+                              icon: const Icon(
+  Icons.add_rounded,
+  color: Color(0xFFEF4444),
+  size: 32,
+),
                               label: const Text(
                                 'AJOUTER UNE PÉRIODE',
                                 style: TextStyle(
@@ -112,12 +169,17 @@ class _AdminPeriodesSurveillancePageState
                                 ),
                               ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: pageColor,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                              ),
+  backgroundColor: Colors.transparent,
+  shadowColor: Colors.transparent,
+  foregroundColor: const Color(0xFF1E3A8A),
+  side: const BorderSide(
+    color: Color(0xFF1E3A8A),
+    width: 2,
+  ),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(18),
+  ),
+),
                             ),
                           ),
                           const SizedBox(height: 14),
@@ -126,151 +188,172 @@ class _AdminPeriodesSurveillancePageState
                             child: Text(
                               'PÉRIODES EXISTANTES',
                               style: TextStyle(
-                                color: Colors.black,
+                                color: pageColor,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
                           ),
                           const SizedBox(height: 10),
-                          Expanded(
-                            child: _periods.isEmpty
-                                ? const Center(
-                                    child: Text(
-                                      'Aucune période de surveillance créée.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Colors.black,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  )
-                                : ListView.separated(
-                                    itemCount: _periods.length,
-                                    separatorBuilder: (_, __) =>
-                                        const SizedBox(height: 6),
-                                    itemBuilder: (context, index) {
-                                      final period = _periods[index];
+                          
+                                        Expanded(
+  child: StreamBuilder<QuerySnapshot>(
+    stream: FirebaseFirestore.instance
+        .collection('communes')
+        .doc(_communeId())
+        .collection('periodesSurveillance')
+        .orderBy('startDate')
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) {
+        return const Center(child: CircularProgressIndicator());
+      }
 
-                                      return Container(
-                                        height: 86,
-                                        padding: const EdgeInsets.fromLTRB(
-                                          10,
-                                          6,
-                                          10,
-                                          5,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.86),
-                                          borderRadius:
-                                              BorderRadius.circular(14),
-                                          border: Border.all(
-                                            color: pageColor,
-                                            width: 1.6,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                      Expanded(
-  child: Column(
-    mainAxisAlignment: MainAxisAlignment.center,
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-  Text(
-    period.name.toUpperCase(),
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-    style: const TextStyle(
-      color: pageColor,
-      fontSize: 14,
-      fontWeight: FontWeight.w900,
-    ),
+      final docs = snapshot.data!.docs;
+
+      if (docs.isEmpty) {
+        return const Center(
+          child: Text(
+            'Aucune période de surveillance créée.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: pageColor,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        );
+      }
+
+      return ListView.separated(
+        itemCount: docs.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 6),
+        itemBuilder: (context, index) {
+          final doc = docs[index];
+          final data = doc.data() as Map<String, dynamic>;
+
+          final startDate = (data['startDate'] as Timestamp).toDate();
+          final endDate = (data['endDate'] as Timestamp).toDate();
+
+          final startParts = (data['startHour'] ?? '00:00').toString().split(':');
+          final endParts = (data['endHour'] ?? '00:00').toString().split(':');
+
+          final period = _SurveillancePeriod(
+            id: doc.id,
+            name: (data['name'] ?? '').toString(),
+            startDate: startDate,
+            endDate: endDate,
+            startHour: TimeOfDay(
+              hour: int.tryParse(startParts[0]) ?? 0,
+              minute: int.tryParse(startParts.length > 1 ? startParts[1] : '0') ?? 0,
+            ),
+            endHour: TimeOfDay(
+              hour: int.tryParse(endParts[0]) ?? 0,
+              minute: int.tryParse(endParts.length > 1 ? endParts[1] : '0') ?? 0,
+            ),
+          );
+
+          return Container(
+            height: 86,
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 5),
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: pageColor, width: 1.6),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        period.name.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: pageColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'DU ${_formatDate(period.startDate)} AU ${_formatDate(period.endDate)}',
+                        style: const TextStyle(
+                          color: pageColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'DE ${_formatTime(period.startHour)} À ${_formatTime(period.endHour)}',
+                        style: const TextStyle(
+                          color: pageColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                                ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      height: 30,
+                      width: 34,
+                      child: IconButton(
+                        onPressed: () => _openPeriodDialog(period: period),
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(
+                          Icons.edit_rounded,
+                          color: pageColor,
+                          size: 21,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      height: 30,
+                      width: 34,
+                      child: IconButton(
+                        onPressed: () async {
+  await _deletePeriod(period);
+},
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(
+                          Icons.delete_rounded,
+                          color: Colors.red,
+                          size: 21,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
   ),
-
-  const SizedBox(height: 4),
-
-  Text(
-    'DU ${_formatDate(period.startDate)} AU ${_formatDate(period.endDate)}',
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-    style: const TextStyle(
-      color: Colors.black,
-      fontSize: 12,
-      fontWeight: FontWeight.w700,
-    ),
-  ),
-
-  const SizedBox(height: 2),
-
-  Text(
-    'DE ${_formatTime(period.startHour)} À ${_formatTime(period.endHour)}',
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-    style: const TextStyle(
-      color: Colors.black,
-      fontSize: 12,
-      fontWeight: FontWeight.w700,
-    ),
-  ),
-],
-  ),
-),      
-                                            Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                SizedBox(
-                                                  height: 30,
-                                                  width: 34,
-                                                  child: IconButton(
-                                                    onPressed: () =>
-                                                        _openPeriodDialog(
-                                                      period: period,
-                                                    ),
-                                                    padding: EdgeInsets.zero,
-                                                    icon: const Icon(
-                                                      Icons.edit_rounded,
-                                                      color: pageColor,
-                                                      size: 21,
-                                                    ),
-                                                  ),
-                                                ),
-                                                SizedBox(
-                                                  height: 30,
-                                                  width: 34,
-                                                  child: IconButton(
-                                                    onPressed: () =>
-                                                        _deletePeriod(period),
-                                                    padding: EdgeInsets.zero,
-                                                    icon: const Icon(
-                                                      Icons.delete_rounded,
-                                                      color: Colors.red,
-                                                      size: 21,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                          ),
+),
+                                        
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 10),
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: Colors.transparent,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.black,
+                        color: pageColor,
                         width: 2,
                       ),
                     ),
@@ -281,7 +364,7 @@ class _AdminPeriodesSurveillancePageState
                       padding: EdgeInsets.zero,
                       icon: const Icon(
                         Icons.arrow_back_ios_new_rounded,
-                        color: Colors.black,
+                        color: pageColor,
                         size: 22,
                       ),
                     ),
@@ -311,6 +394,7 @@ class _PeriodDialogState extends State<_PeriodDialog> {
   DateTime? _endDate;
   TimeOfDay? _startHour;
   TimeOfDay? _endHour;
+  String _errorMessage = '';
 
   @override
   void initState() {
@@ -399,46 +483,44 @@ class _PeriodDialogState extends State<_PeriodDialog> {
   }
 
   void _save() {
-    final name = _nameController.text.trim();
+  final name = _nameController.text.trim();
 
-    if (name.isEmpty ||
-        _startDate == null ||
-        _endDate == null ||
-        _startHour == null ||
-        _endHour == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Merci de renseigner tous les champs.'),
-        ),
-      );
-      return;
-    }
+  String missing = '';
 
-    if (_endDate!.isBefore(_startDate!)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('La date de fin doit être après la date de début.'),
-        ),
-      );
-      return;
-    }
-
-    Navigator.of(context).pop(
-      _SurveillancePeriod(
-        id: widget.period?.id ??
-            DateTime.now().millisecondsSinceEpoch.toString(),
-        name: name,
-        startDate: _startDate!,
-        endDate: _endDate!,
-        startHour: _startHour!,
-        endHour: _endHour!,
-      ),
-    );
+  if (name.isEmpty) {
+    missing = 'Nom de période manquant';
+  } else if (_startDate == null) {
+    missing = 'Date début manquante';
+  } else if (_endDate == null) {
+    missing = 'Date fin manquante';
+  } else if (_startHour == null) {
+    missing = 'Heure début manquante';
+  } else if (_endHour == null) {
+    missing = 'Heure fin manquante';
+  } else if (_endDate!.isBefore(_startDate!)) {
+    missing = 'La date de fin doit être après la date de début';
   }
+
+  if (missing.isNotEmpty) {
+    setState(() => _errorMessage = missing);
+    return;
+  }
+
+  final period = _SurveillancePeriod(
+    id: widget.period?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+    name: name,
+    startDate: _startDate!,
+    endDate: _endDate!,
+    startHour: _startHour!,
+    endHour: _endHour!,
+  );
+
+  Navigator.of(context).pop(period);
+}
 
   @override
   Widget build(BuildContext context) {
-    const Color pageColor = Color(0xFF0891B2);
+    const Color pageColor = Color(0xFF1E3A8A);
 
     return AlertDialog(
       title: Text(
@@ -488,6 +570,18 @@ class _PeriodDialogState extends State<_PeriodDialog> {
   ),
 ),
 const SizedBox(height: 14),
+if (_errorMessage.isNotEmpty) ...[
+  Text(
+    _errorMessage,
+    textAlign: TextAlign.center,
+    style: const TextStyle(
+      color: Colors.red,
+      fontSize: 14,
+      fontWeight: FontWeight.w900,
+    ),
+  ),
+  const SizedBox(height: 10),
+],
           ],
         ),
       ),
@@ -499,13 +593,19 @@ const SizedBox(height: 14),
           child: const Text('Annuler'),
         ),
         ElevatedButton(
-          onPressed: _save,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: pageColor,
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('Enregistrer'),
-        ),
+  onPressed: () {
+    setState(() {
+      _errorMessage = 'BOUTON CLIQUÉ';
+    });
+
+    _save();
+  },
+  style: ElevatedButton.styleFrom(
+    backgroundColor: pageColor,
+    foregroundColor: Colors.white,
+  ),
+  child: const Text('Enregistrer'),
+),
       ],
     );
   }
@@ -526,7 +626,7 @@ class _DialogButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const Color pageColor = Color(0xFF0891B2);
+    const Color pageColor = Color(0xFF1E3A8A);
 
     return InkWell(
       onTap: onTap,
