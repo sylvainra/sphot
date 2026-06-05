@@ -32,7 +32,7 @@ String selectedSphotLabel = '';
 
   List<String> _readValues() {
     return periodesController.text
-        .split(RegExp(r'\s*\|\s*|\s*,\s*'))
+        .split(RegExp(r'\s*\|\s*|\s*,\s*|\n'))
         .map((value) => value.trim())
         .where((value) => value.isNotEmpty)
         .toList();
@@ -227,7 +227,7 @@ String selectedSphotLabel = '';
                                         }).toList();
 
                                         selectedSphotLabel =
-                                            selectedLabels.join(' | ');
+                                            selectedSphotLabel = selectedLabels.join('\n');
                                         saveMessage = '';
                                       });
 
@@ -246,7 +246,7 @@ String selectedSphotLabel = '';
                                                 : Icons
                                                     .check_box_outline_blank_rounded,
                                             color: selected
-                                                ? pageColor
+                                                ? Color(0xFFEF4444)
                                                 : Colors.black54,
                                             size: 22,
                                           ),
@@ -254,7 +254,7 @@ String selectedSphotLabel = '';
                                           Expanded(
                                             child: Text(
                                               title.isEmpty ? doc.id : title,
-                                              maxLines: 1,
+                                              maxLines: 10,
                                               overflow: TextOverflow.ellipsis,
                                               style: const TextStyle(
                                                 fontSize: 13,
@@ -303,11 +303,11 @@ String selectedSphotLabel = '';
             children: [
               Expanded(
                 child: Text(
-                  'Sélectionnez un SPHOT existant',
-                  maxLines: 1,
+                  'Sélectionnez un SPHOT',
+                  maxLines: 10,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 16,
                     fontWeight: FontWeight.w900,
                     color: pageColor,
                   ),
@@ -315,7 +315,7 @@ String selectedSphotLabel = '';
               ),
               Icon(
                 Icons.checklist_rounded,
-                color: pageColor,
+                color: Color(0xFFEF4444),
                 size: 24,
               ),
               SizedBox(width: 2),
@@ -329,6 +329,77 @@ String selectedSphotLabel = '';
         ),
       );
     },
+  );
+}
+
+Widget _periodLabelText(String label) {
+  final parts = label.split(' — ');
+
+  final titre = parts.isNotEmpty ? parts[0] : '';
+
+  String debut = '';
+  String fin = '';
+  String horaires = '';
+
+  if (parts.length > 1) {
+    final dates = parts[1];
+
+    if (dates.contains(' AU ')) {
+      final morceaux = dates.split(' AU ');
+
+      debut = morceaux.first;
+      fin = 'AU ${morceaux.last}';
+    } else {
+      debut = dates;
+    }
+  }
+
+  if (parts.length > 2) {
+    horaires = parts[2];
+  }
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        titre,
+        style: const TextStyle(
+          color: Color(0xFFEF4444),
+          fontSize: 13,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+
+      if (debut.isNotEmpty)
+        Text(
+          debut,
+          style: const TextStyle(
+            color: pageColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+
+      if (fin.isNotEmpty)
+        Text(
+          fin,
+          style: const TextStyle(
+            color: pageColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+
+      if (horaires.isNotEmpty)
+        Text(
+          horaires,
+          style: const TextStyle(
+            color: pageColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+    ],
   );
 }
 
@@ -351,7 +422,7 @@ String selectedSphotLabel = '';
         values.add(choice);
       }
 
-      periodesController.text = values.join(' | ');
+      periodesController.text = values.join('\n');
       saveMessage = '';
     });
   }
@@ -385,7 +456,7 @@ String selectedSphotLabel = '';
                   child: Material(
                     color: Colors.transparent,
                     child: Container(
-                      constraints: const BoxConstraints(maxHeight: 230),
+                      constraints: const BoxConstraints(),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.92),
                         border: const Border(
@@ -428,6 +499,10 @@ String selectedSphotLabel = '';
 
                               final docs = snapshot.data!.docs;
 
+                              final menuHeight = docs.length <= 5
+                                  ? docs.length * 92.0
+                                  : 230.0;
+
                               if (docs.isEmpty) {
                                 return const Center(
                                   child: Text(
@@ -441,62 +516,55 @@ String selectedSphotLabel = '';
                                 );
                               }
 
-                              return ListView.builder(
-                                controller: scrollController,
-                                padding: EdgeInsets.zero,
-                                itemCount: docs.length,
-                                itemBuilder: (context, index) {
-                                  final data =
-                                      docs[index].data()
-                                          as Map<String, dynamic>;
+                              return SizedBox(
+                                height: menuHeight,
+                                child: ListView.builder(
+                                  controller: scrollController,
+                                  padding: EdgeInsets.zero,
+                                  itemCount: docs.length,
+                                  itemBuilder: (context, index) {
+                                    final data =
+                                        docs[index].data() as Map<String, dynamic>;
 
-                                  final label =
-                                      (data['label'] ??
-                                              data['name'] ??
-                                              '')
-                                          .toString();
+                                    final label =
+                                        (data['label'] ?? data['name'] ?? '')
+                                            .toString();
 
-                                  final selected =
-                                      liveSelectedValues.contains(label);
+                                    final selected =
+                                        liveSelectedValues.contains(label);
 
-                                  return InkWell(
-                                    onTap: () {
-                                      updateSelection(label);
-                                      overlaySetState(() {});
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 8,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            selected
-                                                ? Icons.check_box_rounded
-                                                : Icons
-                                                    .check_box_outline_blank_rounded,
-                                            color: selected
-                                                ? pageColor
-                                                : Colors.black54,
-                                            size: 22,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              label,
-                                              style: const TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w900,
-                                                color: pageColor,
-                                              ),
+                                    return InkWell(
+                                      onTap: () {
+                                        updateSelection(label);
+                                        overlaySetState(() {});
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 8,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              selected
+                                                  ? Icons.check_box_rounded
+                                                  : Icons
+                                                      .check_box_outline_blank_rounded,
+                                              color: selected
+                                                  ? const Color(0xFFEF4444)
+                                                  : Colors.black54,
+                                              size: 22,
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: _periodLabelText(label),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                },
+                                    );
+                                  },
+                                ),
                               );
                             },
                           ),
@@ -514,9 +582,6 @@ String selectedSphotLabel = '';
 
     Overlay.of(context).insert(_dropdownOverlay!);
   }
-
-  final displayText =
-      selectedValues.isEmpty ? 'Périodes à attribuer' : selectedValues.join(' | ');
 
   return GestureDetector(
     key: fieldKey,
@@ -542,20 +607,20 @@ String selectedSphotLabel = '';
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              displayText,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-                color: pageColor,
-              ),
-            ),
-          ),
+  child: const Text(
+    'Périodes à attribuer',
+    overflow: TextOverflow.ellipsis,
+    style: TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w900,
+      color: pageColor,
+    ),
+  ),
+),
+                  
           const Icon(
             Icons.checklist_rounded,
-            color: pageColor,
+            color: Color(0xFFEF4444),
             size: 24,
           ),
           const SizedBox(width: 2),
@@ -638,7 +703,7 @@ String selectedSphotLabel = '';
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  color: pageColor,
+                                  color: Color(0xFFEF4444),
                                   fontSize: 15,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -695,21 +760,13 @@ String selectedSphotLabel = '';
                                               children: [
                                                 const Icon(
                                                   Icons.check_circle_rounded,
-                                                  color: pageColor,
+                                                  color: Color(0xFFEF4444),
                                                   size: 22,
                                                 ),
                                                 const SizedBox(width: 8),
                                                 Expanded(
-                                                  child: Text(
-                                                    selectedValues[index],
-                                                    style: const TextStyle(
-                                                      color: pageColor,
-                                                      fontSize: 14,
-                                                      fontWeight:
-                                                          FontWeight.w900,
-                                                    ),
-                                                  ),
-                                                ),
+  child: _periodLabelText(selectedValues[index]),
+),
                                               ],
                                             ),
                                           );

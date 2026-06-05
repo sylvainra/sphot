@@ -147,7 +147,7 @@ Future<void> _startVoice(
                             const SizedBox(height: 8),
 
                             _field(
-  'Ville',
+  'VILLE',
   controller: villeController,
   uppercase: true,
 ),
@@ -369,7 +369,7 @@ final selected = fonctionsSelectionnees.contains(choice);
     onTap: openMenu,
     child: InputDecorator(
       decoration: InputDecoration(
-  labelText: 'Fonction(s)',
+  labelText: fonctionsSelectionnees.isEmpty ? null : 'Fonction(s)',
   labelStyle: const TextStyle(
     color: Color(0xFF1E3A8A),
     fontWeight: FontWeight.w700,
@@ -408,7 +408,8 @@ final selected = fonctionsSelectionnees.contains(choice);
             child: Text(
   fonctionsSelectionnees.isEmpty
       ? 'Fonction(s)'
-      : fonctionsSelectionnees.join(' | '),
+      : fonctionsSelectionnees.join('\n'),
+   maxLines: 2,   
   overflow: TextOverflow.ellipsis,
   style: const TextStyle(
     fontSize: 16,
@@ -470,7 +471,7 @@ Widget _multiDropdownPostes(
   final fieldKey = GlobalKey();
 
   final displayText =
-      postesSelectionnes.isEmpty ? label : postesSelectionnes.join(' | ');
+      postesSelectionnes.isEmpty ? label : postesSelectionnes.join('\n');
 
   void closeMenu() {
     _dropdownOverlay?.remove();
@@ -605,7 +606,7 @@ Widget _multiDropdownPostes(
     onTap: openMenu,
     child: InputDecorator(
       decoration: InputDecoration(
-        labelText: label,
+        labelText: postesSelectionnes.isEmpty ? null : label,
 labelStyle: const TextStyle(
   color: Color(0xFF1E3A8A),
   fontWeight: FontWeight.w700,

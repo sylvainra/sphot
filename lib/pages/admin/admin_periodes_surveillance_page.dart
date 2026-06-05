@@ -273,7 +273,7 @@ class _AdminPeriodesSurveillancePageState
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: pageColor,
+                          color: Color(0xFFEF4444),
                           fontSize: 14,
                           fontWeight: FontWeight.w900,
                         ),
@@ -325,7 +325,7 @@ class _AdminPeriodesSurveillancePageState
                         padding: EdgeInsets.zero,
                         icon: const Icon(
                           Icons.delete_rounded,
-                          color: Colors.red,
+                          color: Color(0xFFEF4444),
                           size: 21,
                         ),
                       ),
@@ -575,7 +575,7 @@ if (_errorMessage.isNotEmpty) ...[
     _errorMessage,
     textAlign: TextAlign.center,
     style: const TextStyle(
-      color: Colors.red,
+      color: Color(0xFFEF4444),
       fontSize: 14,
       fontWeight: FontWeight.w900,
     ),
