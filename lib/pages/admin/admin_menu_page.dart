@@ -7,7 +7,12 @@ import 'admin_sauveteur_page.dart';
 import 'admin_dates_surveillance_page.dart';
 
 class AdminMenuPage extends StatelessWidget {
-  const AdminMenuPage({super.key});
+  final String ville;
+
+  const AdminMenuPage({
+    super.key,
+    this.ville = 'VILLE_NON_RENSEIGNEE',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +97,9 @@ Expanded(
     onTap: () {
   Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (_) => const AdminDatesSurveillancePage(),
+      builder: (_) => AdminDatesSurveillancePage(
+        ville: ville,
+      ),
     ),
   );
 },

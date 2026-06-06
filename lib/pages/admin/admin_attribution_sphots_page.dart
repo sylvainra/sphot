@@ -1,8 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:flutter/material.dart';
 
 class AdminAttributionSphotsPage extends StatefulWidget {
-  const AdminAttributionSphotsPage({super.key});
+  final String ville;
+
+  const AdminAttributionSphotsPage({
+    super.key,
+    this.ville = 'VILLE_NON_RENSEIGNEE',
+  });
 
   @override
   State<AdminAttributionSphotsPage> createState() =>
@@ -13,53 +19,131 @@ class _AdminAttributionSphotsPageState
     extends State<AdminAttributionSphotsPage> {
   static const Color pageColor = Color(0xFF1E3A8A);
 
+  String _communeId() {
+  return widget.ville
+      .trim()
+      .toUpperCase()
+      .replaceAll(' ', '_')
+      .replaceAll('-', '_')
+      .replaceAll("'", '_');
+}
+
   final Set<String> selectedDocIds = {};
 String selectedSphotLabel = '';
   String saveMessage = '';
 
   OverlayEntry? _dropdownOverlay;
 
+  final ScrollController selectedSphotsScrollController = ScrollController();
+
   final TextEditingController periodesController = TextEditingController();
+
+List<String> periodesEnregistrees = [];
+
+List<String> periodesSelectionnees = [];
 
   final List<String> periodeChoices = [];
 
+@override
+void initState() {
+  super.initState();
+  _loadDraft();
+}
+
+DocumentReference<Map<String, dynamic>> _draftRef() {
+  return FirebaseFirestore.instance
+      .collection('communes')
+      .doc(_communeId())
+      .collection('adminDrafts')
+      .doc('attributionSphots');
+}
+
+Future<void> _loadDraft() async {
+  final ref = _draftRef();
+
+  final doc = await ref.get();
+
+  if (!doc.exists) {
+    return;
+  }
+
+  final data = doc.data();
+
+  if (data == null) {
+    return;
+  }
+
+  if (!mounted) {
+    return;
+  }
+
+  setState(() {
+    selectedDocIds
+      ..clear()
+      ..addAll(List<String>.from(data['selectedDocIds'] ?? []));
+
+    selectedSphotLabel = (data['selectedSphotLabel'] ?? '').toString();
+
+    periodesSelectionnees =
+        List<String>.from(data['periodesSelectionnees'] ?? []);
+
+    periodesEnregistrees =
+        List<String>.from(data['periodesEnregistrees'] ?? []);
+  });
+}
+
+Future<void> _saveDraft() async {
+  final ref = _draftRef();
+
+  try {
+    await ref.set(
+  {
+    'selectedDocIds': selectedDocIds.toList(),
+    'selectedSphotLabel': selectedSphotLabel,
+    'periodesSelectionnees': periodesSelectionnees,
+    'periodesEnregistrees': periodesEnregistrees,
+
+    'attributionValidee': true,
+    'attributionValideeAt': DateTime.now().toIso8601String(),
+
+    'updatedAt': FieldValue.serverTimestamp(),
+  },
+  SetOptions(merge: true),
+);
+  } catch (e) {
+    _showMessage('Erreur sauvegarde brouillon : $e');
+  }
+}
+
   @override
   void dispose() {
-    periodesController.dispose();
-    _dropdownOverlay?.remove();
-    super.dispose();
-  }
+  periodesController.dispose();
+  selectedSphotsScrollController.dispose();
+  _dropdownOverlay?.remove();
+  super.dispose();
+}
 
   List<String> _readValues() {
-    return periodesController.text
-        .split(RegExp(r'\s*\|\s*|\s*,\s*|\n'))
-        .map((value) => value.trim())
-        .where((value) => value.isNotEmpty)
-        .toList();
-  }
+  return List.from(periodesSelectionnees);
+}
 
   Future<void> _saveAttribution() async {
-    if (selectedDocIds.isEmpty) {
-  _showMessage('Sélectionnez au moins un SPHOT.');
-  return;
-}
+  if (selectedDocIds.isEmpty) {
+    _showMessage('Sélectionnez au moins un SPHOT.');
+    return;
+  }
 
-    final values = _readValues();
+  setState(() {
+    periodesEnregistrees = List<String>.from(periodesSelectionnees);
+    saveMessage = '';
+  });
 
-    for (final docId in selectedDocIds) {
-  await FirebaseFirestore.instance.collection('spots').doc(docId).set(
-    {
-      'periodesSurveillance': values,
-      'updatedAt': FieldValue.serverTimestamp(),
-    },
-    SetOptions(merge: true),
+  await _saveDraft();
+
+  _showMessage(
+    'Attribution enregistrée sur ${selectedDocIds.length} SPHOT(s).',
   );
 }
-
-    setState(() {
-      saveMessage = 'PÉRIODES ATTRIBUÉES AU SPHOT';
-    });
-  }
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -139,7 +223,7 @@ String selectedSphotLabel = '';
                         child: Container(
                           constraints: BoxConstraints(
                             maxHeight:
-                                docs.length <= 6 ? docs.length * 42.0 : 252,
+                                docs.length <= 6 ? docs.length * 43.0 : 254,
                           ),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.92),
@@ -228,10 +312,12 @@ String selectedSphotLabel = '';
 
                                         selectedSphotLabel =
                                             selectedSphotLabel = selectedLabels.join('\n');
-                                        saveMessage = '';
-                                      });
+  saveMessage = '';
+});
 
-                                      overlaySetState(() {});
+_saveDraft();
+
+overlaySetState(() {});
                                     },
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
@@ -303,7 +389,7 @@ String selectedSphotLabel = '';
             children: [
               Expanded(
                 child: Text(
-                  'Sélectionnez un SPHOT',
+                  'Choisir un/des SPHOT(S)',
                   maxLines: 10,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -413,19 +499,18 @@ Widget _periodLabelText(String label) {
   }
 
   void updateSelection(String choice) {
-    setState(() {
-      final values = _readValues();
+  setState(() {
+    if (periodesSelectionnees.contains(choice)) {
+      periodesSelectionnees.remove(choice);
+    } else {
+      periodesSelectionnees.add(choice);
+    }
 
-      if (values.contains(choice)) {
-        values.remove(choice);
-      } else {
-        values.add(choice);
-      }
+    saveMessage = '';
+  });
 
-      periodesController.text = values.join('\n');
-      saveMessage = '';
-    });
-  }
+  _saveDraft();
+}
 
   void openMenu() {
     closeMenu();
@@ -439,7 +524,7 @@ Widget _periodLabelText(String label) {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, overlaySetState) {
-            final liveSelectedValues = _readValues();
+            final liveSelectedValues = periodesSelectionnees;
 
             return Stack(
               children: [
@@ -456,7 +541,9 @@ Widget _periodLabelText(String label) {
                   child: Material(
                     color: Colors.transparent,
                     child: Container(
-                      constraints: const BoxConstraints(),
+                      constraints: const BoxConstraints(
+  maxHeight: 282,
+),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.92),
                         border: const Border(
@@ -487,9 +574,11 @@ Widget _periodLabelText(String label) {
                           radius: const Radius.circular(10),
                           child: StreamBuilder<QuerySnapshot>(
                             stream: FirebaseFirestore.instance
-                                .collection('periodesSurveillance')
-                                .orderBy('startDate')
-                                .snapshots(),
+    .collection('communes')
+    .doc(_communeId())
+    .collection('periodesSurveillance')
+    .orderBy('startDate')
+    .snapshots(),
                             builder: (context, snapshot) {
                               if (!snapshot.hasData) {
                                 return const Center(
@@ -499,14 +588,10 @@ Widget _periodLabelText(String label) {
 
                               final docs = snapshot.data!.docs;
 
-                              final menuHeight = docs.length <= 5
-                                  ? docs.length * 92.0
-                                  : 230.0;
-
                               if (docs.isEmpty) {
                                 return const Center(
                                   child: Text(
-                                    'Aucune période créée.',
+                                    'Aucune(s) période(s) créée(s).',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       color: pageColor,
@@ -517,11 +602,11 @@ Widget _periodLabelText(String label) {
                               }
 
                               return SizedBox(
-                                height: menuHeight,
-                                child: ListView.builder(
-                                  controller: scrollController,
-                                  padding: EdgeInsets.zero,
-                                  itemCount: docs.length,
+  height: 282,
+  child: ListView.builder(
+    controller: scrollController,
+    padding: EdgeInsets.zero,
+    itemCount: docs.length,
                                   itemBuilder: (context, index) {
                                     final data =
                                         docs[index].data() as Map<String, dynamic>;
@@ -608,7 +693,7 @@ Widget _periodLabelText(String label) {
         children: [
           Expanded(
   child: const Text(
-    'Périodes à attribuer',
+    'Période(s) à attribuer',
     overflow: TextOverflow.ellipsis,
     style: TextStyle(
       fontSize: 16,
@@ -686,37 +771,48 @@ Widget _periodLabelText(String label) {
                           _sphotSelector(),
                           const SizedBox(height: 14),
                           if (selectedDocIds.isNotEmpty) ...[
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.transparent,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: pageColor,
-                                  width: 2,
-                                ),
-                              ),
-                              child: Text(
-                                selectedSphotLabel,
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Color(0xFFEF4444),
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
                             SizedBox(
+  height: 62,
+  child: Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: pageColor,
+        width: 2,
+      ),
+    ),
+    child: RawScrollbar(
+      controller: selectedSphotsScrollController,
+      thumbVisibility: true,
+      thickness: 10,
+      radius: const Radius.circular(10),
+      thumbColor: pageColor,
+      child: SingleChildScrollView(
+        controller: selectedSphotsScrollController,
+        child: Text(
+          selectedSphotLabel,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Color(0xFFEF4444),
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    ),
+  ),
+),
+const SizedBox(height: 14),
+                               SizedBox(
   height: 52,
   child: _multiDropdownField(),
 ),
                             const SizedBox(height: 14),
                             Expanded(
-                              child: Container(
+  child: Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
@@ -729,15 +825,16 @@ Widget _periodLabelText(String label) {
                                 ),
                                 child: selectedValues.isEmpty
                                     ? const Center(
-                                        child: Text(
-                                          'Aucune période attribuée.',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
-                                      )
+    child: Text(
+      'Aucune(s) période(s) attribuée(s).',
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: pageColor,
+        fontSize: 15,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  )
                                     : ListView.separated(
                                         itemCount: selectedValues.length,
                                         separatorBuilder: (_, __) =>
@@ -745,9 +842,9 @@ Widget _periodLabelText(String label) {
                                         itemBuilder: (context, index) {
                                           return Container(
                                             padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 10,
-                                            ),
+  horizontal: 12,
+  vertical: 4,
+),
                                             decoration: BoxDecoration(
   color: Colors.transparent,
   borderRadius: BorderRadius.circular(14),
@@ -774,7 +871,7 @@ Widget _periodLabelText(String label) {
                                       ),
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 14),
                             SizedBox(
                               width: double.infinity,
                               height: 52,
@@ -797,33 +894,73 @@ Widget _periodLabelText(String label) {
                                 ),
                               ),
                             ),
-                            if (saveMessage.isNotEmpty) ...[
-                              const SizedBox(height: 10),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.green,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: pageColor,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: Text(
-                                  saveMessage,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                            ],
+                            const SizedBox(height: 14),
+Expanded(
+  child: Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(
+        color: pageColor,
+        width: 1.4,
+      ),
+    ),
+    child: periodesEnregistrees.isEmpty
+        ? const Center(
+            child: Text(
+              'Aucune(s) période(s) enregistrée(s).',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: pageColor,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          )
+        : ListView.separated(
+            itemCount: periodesEnregistrees.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              return Container(
+                padding: const EdgeInsets.symmetric(
+  horizontal: 12,
+  vertical: 4,
+),
+                decoration: BoxDecoration(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: pageColor,
+                    width: 1.4,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _periodLabelText(
+                        periodesEnregistrees[index],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_rounded,
+                        color: Color(0xFFEF4444),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          periodesEnregistrees.removeAt(index);
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+  ),
+),
                           ] else
                             const Expanded(
                               child: Center(

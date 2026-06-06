@@ -4,7 +4,12 @@ import 'admin_attribution_sphots_page.dart';
 import 'admin_periodes_surveillance_page.dart';
 
 class AdminDatesSurveillancePage extends StatelessWidget {
-  const AdminDatesSurveillancePage({super.key});
+  final String ville;
+
+  const AdminDatesSurveillancePage({
+    super.key,
+    this.ville = 'VILLE_NON_RENSEIGNEE',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -65,13 +70,14 @@ class AdminDatesSurveillancePage extends StatelessWidget {
                               icon: Icons.calendar_month_rounded,
                               color: pageColor,
                               onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const AdminPeriodesSurveillancePage(),
-                                  ),
-                                );
-                              },
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => AdminPeriodesSurveillancePage(
+        ville: ville,
+      ),
+    ),
+  );
+},
                             ),
                           ),
 
@@ -85,13 +91,14 @@ class AdminDatesSurveillancePage extends StatelessWidget {
                               icon: Icons.location_on_rounded,
                               color: const Color(0xFF1E3A8A),
                               onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const AdminAttributionSphotsPage(),
-                                  ),
-                                );
-                              },
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => AdminAttributionSphotsPage(
+        ville: ville,
+      ),
+    ),
+  );
+},
                             ),
                           ),
                         ],

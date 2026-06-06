@@ -254,7 +254,7 @@ class _AdminPeriodesSurveillancePageState
           );
 
           return Container(
-            height: 86,
+            height: 100,
             padding: const EdgeInsets.fromLTRB(10, 6, 10, 5),
             decoration: BoxDecoration(
               color: Colors.transparent,
@@ -280,22 +280,31 @@ class _AdminPeriodesSurveillancePageState
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'DU ${_formatDate(period.startDate)} AU ${_formatDate(period.endDate)}',
-                        style: const TextStyle(
-                          color: pageColor,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'DE ${_formatTime(period.startHour)} À ${_formatTime(period.endHour)}',
-                        style: const TextStyle(
-                          color: pageColor,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+  'DU ${_formatDate(period.startDate)}',
+  style: const TextStyle(
+    color: pageColor,
+    fontSize: 12,
+    fontWeight: FontWeight.w700,
+  ),
+),
+const SizedBox(height: 2),
+Text(
+  'AU ${_formatDate(period.endDate)}',
+  style: const TextStyle(
+    color: pageColor,
+    fontSize: 12,
+    fontWeight: FontWeight.w700,
+  ),
+),
+const SizedBox(height: 2),
+Text(
+  'DE ${_formatTime(period.startHour)} À ${_formatTime(period.endHour)}',
+  style: const TextStyle(
+    color: pageColor,
+    fontSize: 12,
+    fontWeight: FontWeight.w700,
+  ),
+),
                     ],
                   ),
                                 ),
