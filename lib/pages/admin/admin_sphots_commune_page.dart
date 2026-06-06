@@ -12,6 +12,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 
 import 'admin_validation_sphots_page.dart';
 
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+
 enum AdminSphotMode { none, create, copy, edit }
 
 class AdminSphotsCommunePage extends StatefulWidget {
@@ -30,6 +32,23 @@ const AdminSphotsCommunePage({
 
 class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
   static const Color adminColor = Color(0xFF1E3A8A);
+
+  final stt.SpeechToText _speech = stt.SpeechToText();
+
+  Future<void> _startVoice(TextEditingController controller) async {
+  final available = await _speech.initialize();
+
+  if (!available) return;
+
+  await _speech.listen(
+    localeId: 'fr_FR',
+    onResult: (result) {
+      setState(() {
+        controller.text = result.recognizedWords.toUpperCase();
+      });
+    },
+  );
+}
 
   AdminSphotMode mode = AdminSphotMode.none;
   int step = 0;
@@ -557,7 +576,7 @@ void _showMessage(String message) {
         children: [
           Icon(
   icon,
-  color: const Color(0xFFFF0000),
+  color: const Color(0xFFDC2626),
   size: 26,
 ),
           const SizedBox(width: 10),
@@ -656,7 +675,7 @@ void _showMessage(String message) {
                   child: Material(
                     color: Colors.transparent,
                     child: Container(
-                      constraints: const BoxConstraints(maxHeight: 341),
+                      constraints: const BoxConstraints(maxHeight: 332),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.92),
                         border: const Border(
@@ -724,7 +743,7 @@ void _showMessage(String message) {
                                         selected
                                             ? Icons.check_circle_rounded
                                             : Icons.place_rounded,
-                                        color: adminColor,
+                                        color: const Color(0xFFDC2626),
                                         size: 22,
                                       ),
                                       const SizedBox(width: 8),
@@ -736,7 +755,7 @@ void _showMessage(String message) {
                                           style: const TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w800,
-                                            color: Colors.black87,
+                                            color: Color(0xFF1E3A8A),
                                           ),
                                         ),
                                       ),
@@ -790,7 +809,7 @@ void _showMessage(String message) {
               ),
               const Icon(
   Icons.keyboard_arrow_down_rounded,
-  color: Color(0xFFFF0000),
+  color: Color(0xFFDC2626),
   size: 26,
 ),
             ],
@@ -806,20 +825,50 @@ void _showMessage(String message) {
   String label, {
   int maxLines = 1,
   double labelSize = 14,
+  bool uppercase = false,
 }) {
     return TextField(
       controller: _controller(key),
-      maxLines: maxLines,
-      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+textCapitalization: uppercase
+    ? TextCapitalization.characters
+    : TextCapitalization.none,
+maxLines: maxLines,
+onChanged: uppercase
+    ? (value) {
+        final upper = value.toUpperCase();
+        if (upper != value) {
+          _controller(key).value = TextEditingValue(
+            text: upper,
+            selection: TextSelection.collapsed(
+              offset: upper.length,
+            ),
+          );
+        }
+      }
+    : null,
+      style: const TextStyle(
+  fontWeight: FontWeight.w700,
+  fontSize: 16,
+  color: Color(0xFF1E3A8A),
+),
       decoration: InputDecoration(
         label: Text(
   label,
-  style: TextStyle(
-    fontSize: labelSize,
+  style: const TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    color: Color(0xFF1E3A8A),
   ),
 ),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.25),
+        suffixIcon: IconButton(
+  icon: const Icon(
+    Icons.mic_rounded,
+    color: Color(0xFFDC2626),
+  ),
+  onPressed: () => _startVoice(_controller(key)),
+),
+        fillColor: Colors.transparent,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -981,7 +1030,7 @@ Widget _dropdownField(
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
-                                  color: Colors.black87,
+                                  color: const Color(0xFF1E3A8A),
                                 ),
                               ),
                             ),
@@ -1009,7 +1058,7 @@ Widget _dropdownField(
         labelText: label,
         labelStyle: const TextStyle(fontSize: 14),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.32),
+        fillColor: Colors.transparent,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -1210,7 +1259,7 @@ Widget _multiDropdownField(
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: Colors.black87,
+                color: const Color(0xFF1E3A8A),
               ),
             ),
           ],
@@ -1220,7 +1269,7 @@ Widget _multiDropdownField(
           style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w800,
-            color: Colors.black87,
+            color: const Color(0xFF1E3A8A),
           ),
         ),
 ),
@@ -1256,7 +1305,7 @@ Widget _multiDropdownField(
         labelText: label,
         labelStyle: const TextStyle(fontSize: 14),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.32),
+        fillColor: Colors.transparent,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 12,
@@ -1340,7 +1389,7 @@ Widget _multiDropdownField(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: adminColor.withOpacity(0.16),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: adminColor, width: 2),
       ),
@@ -1364,7 +1413,7 @@ Widget _multiDropdownField(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.14),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: adminColor, width: 2),
       ),
@@ -1374,21 +1423,21 @@ Widget _multiDropdownField(
             title,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: adminColor,
+              color: Color(0xFFDC2626),
               fontSize: 18,
               fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.black,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+  subtitle,
+  textAlign: TextAlign.center,
+  style: const TextStyle(
+    color: Color(0xFF1E3A8A),
+    fontSize: 14,
+    fontWeight: FontWeight.w700,
+  ),
+),
         ],
       ),
     );
@@ -1465,20 +1514,37 @@ Future<void> _importLogoVille() async {
           children: [
             _stepHeader(
               '1. TERRITOIRE',
-              'Renseignez la commune concernée par ce SPHOT.',
+              'Renseignez la commune concernée par ce SPHOT',
             ),
             _textField(
   'idSphot',
-  'Numéro du SPHOT (ex.: 01, 02...)',
+  'Numéro du SPHOT (01, 02...)',
 ),
             const SizedBox(height: 8),
-            _textField('pays', 'Pays'),
+            _textField(
+  'pays',
+  'PAYS',
+  uppercase: true,
+),
             const SizedBox(height: 8),
-            _textField('region', 'Région'),
+            _textField(
+  'region',
+  'RÉGION',
+  uppercase: true,
+),
             const SizedBox(height: 8),
-            _textField('departement', 'Département'),
+            _textField(
+  'departement',
+  'DÉPARTEMENT',
+  uppercase: true,
+),
+
             const SizedBox(height: 8),
-            _textField('ville', 'Ville'),
+            _textField(
+  'ville',
+  'VILLE',
+  uppercase: true,
+),
             const SizedBox(height: 8),
 
 SizedBox(
@@ -1486,17 +1552,27 @@ SizedBox(
   height: 46,
   child: ElevatedButton.icon(
     onPressed: _importLogoVille,
-    icon: const Icon(Icons.upload_file_rounded),
-    label: const Text(
-      'IMPORTEZ LE LOGO DE LA VILLE',
+    icon: const Icon(
+  Icons.upload_file_rounded,
+  color: Color(0xFFDC2626),
+),
+    label: const Expanded(
+  child: Align(
+    alignment: Alignment.centerLeft,
+    child: Text(
+      'Importez le logo de la ville (png)',
+      textAlign: TextAlign.left,
       style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w900,
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
       ),
     ),
+  ),
+),
     style: ElevatedButton.styleFrom(
-      backgroundColor: adminColor,
-      foregroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
+foregroundColor: const Color(0xFF1E3A8A),
+elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: const BorderSide(color: Colors.black, width: 2),
@@ -1528,7 +1604,7 @@ const SizedBox(height: 8),
 
 _textField(
   'siteInternetVille',
-  'Adresse du site internet de la ville',
+  'Site internet de la ville',
 ),
 
 const SizedBox(height: 8),
@@ -1544,17 +1620,27 @@ SizedBox(
     lngKey: 'villeLng',
   );
 },
-    icon: const Icon(Icons.map_outlined),
-    label: const Text(
-      'POSITIONNEZ LA VILLE SUR LA CARTE',
+    icon: const Icon(
+  Icons.map_outlined,
+  color: Color(0xFFDC2626),
+),
+    label: const Expanded(
+  child: Align(
+    alignment: Alignment.centerLeft,
+    child: Text(
+      'Positionnez la ville sur la carte',
+      textAlign: TextAlign.left,
       style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w900,
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
       ),
     ),
+  ),
+),
     style: ElevatedButton.styleFrom(
-      backgroundColor: adminColor,
-      foregroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
+foregroundColor: const Color(0xFF1E3A8A),
+elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: const BorderSide(color: Colors.black, width: 2),
@@ -1928,15 +2014,28 @@ void _checkSummaryScroll() {
   return Row(
     children: [
       Expanded(
-        child: OutlinedButton.icon(
-          onPressed: _previousStep,
-          icon: const Icon(Icons.arrow_back_rounded),
-          label: const Text(
-            'PRÉCÉDENT',
-            style: TextStyle(fontWeight: FontWeight.w900),
-          ),
-        ),
+  child: OutlinedButton.icon(
+    onPressed: _previousStep,
+    icon: const Icon(
+      Icons.arrow_back_rounded,
+      color: Color(0xFF1E3A8A),
+    ),
+    label: const Text(
+      'PRÉCÉDENT',
+      style: TextStyle(
+        color: Color(0xFF1E3A8A),
+        fontWeight: FontWeight.w900,
       ),
+    ),
+    style: OutlinedButton.styleFrom(
+      foregroundColor: const Color(0xFF1E3A8A),
+      side: const BorderSide(
+        color: Color(0xFF1E3A8A),
+        width: 2,
+      ),
+    ),
+  ),
+),
       const SizedBox(width: 8),
       Expanded(
         child: ElevatedButton(
@@ -2004,7 +2103,7 @@ Widget _existingSphotsPanel({
           children: [
             Icon(
               Icons.folder_copy_rounded,
-              color: Color(0xFFFF0000),
+              color: Color(0xFFDC2626),
               size: 20,
             ),
             SizedBox(width: 8),
@@ -2140,7 +2239,7 @@ Widget build(BuildContext context) {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFFFF0000),
+                    color: Color(0xFFDC2626),
                     letterSpacing: 0.5,
                   ),
                 ),

@@ -25,15 +25,13 @@ final TextEditingController experienceController = TextEditingController();
 final TextEditingController observationsController = TextEditingController();
 
 final TextEditingController dateNaissanceController = TextEditingController();
-final TextEditingController dateDebutAffectationController = TextEditingController();
-final TextEditingController dateFinAffectationController = TextEditingController();
 
 final stt.SpeechToText _speech = stt.SpeechToText();
 
 final List<String> fonctionChoices = [
-  'Chef de poste',
-  'Adjoint chef de poste',
-  'Sauveteur',
+  'CHEF DE POSTE',
+  'ADJOINT CHEF DE POSTE',
+  'SAUVETEUR',
 ];
 
 final List<String> fonctionsSelectionnees = [];
@@ -166,12 +164,6 @@ Future<void> _startVoice(
                             const SizedBox(height: 8),
 
                             _multiPostesSecoursField(),
-                            const SizedBox(height: 8),
-
-                            _dateField("Date de début d'affectation", controller: dateDebutAffectationController),
-                            const SizedBox(height: 8),
-
-                            _dateField("Date de fin d'affectation", controller: dateFinAffectationController),
                             const SizedBox(height: 8),
 
                             _field(
@@ -330,7 +322,7 @@ final selected = fonctionsSelectionnees.contains(choice);
   selected
       ? Icons.check_box_rounded
       : Icons.check_box_outline_blank_rounded,
-  color: selected ? adminColor : Colors.black54,
+  color: selected ? adminColor : const Color(0xFF1E3A8A),
   size: 22,
 ),
               const SizedBox(width: 8),
@@ -340,7 +332,7 @@ final selected = fonctionsSelectionnees.contains(choice);
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: Colors.black87,
+                    color: Color(0xFF1E3A8A),
                   ),
                 ),
               ),
@@ -409,14 +401,12 @@ final selected = fonctionsSelectionnees.contains(choice);
   fonctionsSelectionnees.isEmpty
       ? 'Fonction(s)'
       : fonctionsSelectionnees.join('\n'),
-   maxLines: 2,   
-  overflow: TextOverflow.ellipsis,
   style: const TextStyle(
     fontSize: 16,
     fontWeight: FontWeight.w700,
     color: Color(0xFF1E3A8A),
   ),
-),
+)
           ),
           const Icon(
             Icons.keyboard_arrow_down_rounded,
@@ -567,7 +557,7 @@ Widget _multiDropdownPostes(
                                               .check_box_outline_blank_rounded,
                                       color: selected
                                           ? adminColor
-                                          : Colors.black54,
+                                          : const Color(0xFF1E3A8A),
                                       size: 22,
                                     ),
                                     const SizedBox(width: 8),
@@ -577,7 +567,7 @@ Widget _multiDropdownPostes(
                                         style: const TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w800,
-                                          color: Colors.black87,
+                                          color: Color(0xFF1E3A8A),
                                         ),
                                       ),
                                     ),
@@ -630,15 +620,13 @@ labelStyle: const TextStyle(
         children: [
           Expanded(
             child: Text(
-              displayText,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-              style: const TextStyle(
-  fontSize: 16,
-  fontWeight: FontWeight.w700,
-  color: Color(0xFF1E3A8A),
+  displayText,
+  style: const TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    color: Color(0xFF1E3A8A),
+  ),
 ),
-            ),
           ),
           const Icon(
             Icons.checklist_rounded,
@@ -684,11 +672,23 @@ labelStyle: const TextStyle(
 ),
         onPressed: () async {
           final pickedDate = await showDatePicker(
-            context: context,
-            initialDate: DateTime.now(),
-            firstDate: DateTime(1900),
-            lastDate: DateTime(2100),
-          );
+  context: context,
+  initialDate: DateTime.now(),
+  firstDate: DateTime(1900),
+  lastDate: DateTime(2100),
+  builder: (context, child) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF1E3A8A), // bleu ref
+          onPrimary: Colors.white,
+          onSurface: Color(0xFF1E3A8A),
+        ),
+      ),
+      child: child!,
+    );
+  },
+);
 
           if (pickedDate == null) return;
 

@@ -136,7 +136,7 @@ class _AdminMapPickerPageState extends State<AdminMapPickerPage> {
                             style: TextStyle(fontWeight: FontWeight.w900),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey.shade700,
+                            backgroundColor: const Color(0xFF1E3A8A),
                             foregroundColor: Colors.white,
                           ),
                         ),
@@ -155,7 +155,7 @@ class _AdminMapPickerPageState extends State<AdminMapPickerPage> {
                             style: TextStyle(fontWeight: FontWeight.w900),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: adminColor,
+                            backgroundColor: const Color(0xFFDC2626),
                             foregroundColor: Colors.white,
                           ),
                         ),

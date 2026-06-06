@@ -50,7 +50,7 @@ class AdminValidationSphotsPage extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
-                      color: pageColor,
+                      color: Color(0xFFDC2626),
                       letterSpacing: 0.6,
                     ),
                   ),
@@ -134,23 +134,21 @@ class AdminValidationSphotsPage extends StatelessWidget {
                                   color: Colors.white.withOpacity(0.86),
                                   borderRadius: BorderRadius.circular(18),
                                   border: Border.all(
-                                    color: validated
-                                        ? pageColor
-                                        : Colors.red,
+                                    color: const Color(0xFF1E3A8A),
                                     width: 2,
                                   ),
                                 ),
                                 child: Row(
                                   children: [
                                     Icon(
-                                      validated
-                                          ? Icons.check_circle_rounded
-                                          : Icons.circle_rounded,
-                                      color: validated
-                                          ? pageColor
-                                          : Colors.red,
-                                      size: 28,
-                                    ),
+  validated
+      ? Icons.check_circle_rounded
+      : Icons.circle_rounded,
+  color: validated
+      ? const Color(0xFFDC2626)
+      : const Color(0xFF1E3A8A),
+  size: 28,
+),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
@@ -162,9 +160,7 @@ class AdminValidationSphotsPage extends StatelessWidget {
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
-                                              color: validated
-                                                  ? pageColor
-                                                  : Colors.red,
+                                              color: Color(0xFF1E3A8A),
                                               fontSize: 14,
                                               fontWeight: FontWeight.w900,
                                             ),
@@ -214,13 +210,13 @@ class AdminValidationSphotsPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: Colors.transparent,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.black,
+                        color: const Color(0xFF1E3A8A),
                         width: 2,
                       ),
                     ),
@@ -231,7 +227,7 @@ class AdminValidationSphotsPage extends StatelessWidget {
                       padding: EdgeInsets.zero,
                       icon: const Icon(
                         Icons.arrow_back_ios_new_rounded,
-                        color: Colors.black,
+                        color: const Color(0xFF1E3A8A),
                         size: 22,
                       ),
                     ),

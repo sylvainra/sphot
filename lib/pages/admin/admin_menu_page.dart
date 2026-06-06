@@ -44,7 +44,7 @@ class AdminMenuPage extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
-                      color: const Color(0xFFFF0000),
+                      color: const Color(0xFFDC2626),
                       letterSpacing: 0.6,
                     ),
                   ),
@@ -93,7 +93,7 @@ Expanded(
     subtitle:
         'Renseigner les périodes et heures\nde surveillance pour chaque SPHOT',
     icon: Icons.calendar_month_rounded,
-    color: const Color(0xFFFF0000),
+    color: const Color(0xFFDC2626),
     onTap: () {
   Navigator.of(context).push(
     MaterialPageRoute(
@@ -114,7 +114,7 @@ Expanded(
     subtitle:
         'Créer, modifier et gérer\nles sauveteurs affectés aux SPHOTS',
     icon: Icons.groups_rounded,
-    color: const Color(0xFFFF0000),
+    color: const Color(0xFFDC2626),
     onTap: () {
   Navigator.of(context).push(
     MaterialPageRoute(
@@ -212,7 +212,7 @@ class _AdminButton extends StatelessWidget {
             else
               Icon(
                 icon,
-                color: const Color(0xFFFF0000),
+                color: const Color(0xFFDC2626),
                 size: 48,
               ),
 

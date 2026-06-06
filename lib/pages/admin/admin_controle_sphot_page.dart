@@ -20,7 +20,7 @@ class AdminControleSphotPage extends StatefulWidget {
 }
 
 class _AdminControleSphotPageState extends State<AdminControleSphotPage> {
-  static const Color pageColor = Color(0xFF16A34A);
+  static const Color pageColor = Color(0xFFDC2626);
 
   late Map<String, dynamic> data;
   bool sphotValide = false;
@@ -68,7 +68,7 @@ void initState() {
             TextSpan(
               text: '$label : ',
               style: const TextStyle(
-                color: pageColor,
+                color: Color(0xFF1E3A8A),
                 fontSize: 13,
                 fontWeight: FontWeight.w900,
               ),
@@ -166,7 +166,7 @@ void initState() {
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
-                      color: pageColor,
+                      color: Color(0xFFDC2626),
                       letterSpacing: 0.6,
                     ),
                   ),
@@ -182,7 +182,7 @@ void initState() {
                           color: Colors.white.withOpacity(0.84),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: sphotValide ? pageColor : Colors.red,
+                            color: const Color(0xFF1E3A8A),
                             width: 2,
                           ),
                         ),
@@ -193,7 +193,7 @@ void initState() {
                               _title().toUpperCase(),
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: sphotValide ? pageColor : Colors.red,
+                                color: sphotValide ? pageColor : const Color(0xFFDC2626),
                                 fontSize: 16,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -251,7 +251,7 @@ void initState() {
                                       ),
                                     ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: pageColor,
+                                      backgroundColor: const Color(0xFF1E3A8A),
                                       foregroundColor: Colors.white,
                                     ),
                                   ),
@@ -263,7 +263,7 @@ void initState() {
                                   child: ElevatedButton(
                                     onPressed: _deleteSphot,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red,
+                                      backgroundColor: const Color(0xFFDC2626),
                                       foregroundColor: Colors.white,
                                       padding: EdgeInsets.zero,
                                     ),
@@ -301,7 +301,7 @@ void initState() {
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor:
-                            sphotValide ? pageColor : Colors.red,
+                            sphotValide ? pageColor : const Color(0xFFDC2626),
                         disabledBackgroundColor: pageColor,
                         disabledForegroundColor: Colors.white,
                         foregroundColor: Colors.white,
@@ -315,13 +315,13 @@ void initState() {
                   const SizedBox(height: 8),
 
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: Colors.transparent,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.black,
+                        color: const Color(0xFF1E3A8A),
                         width: 2,
                       ),
                     ),
@@ -332,7 +332,7 @@ void initState() {
                       padding: EdgeInsets.zero,
                       icon: const Icon(
                         Icons.arrow_back_ios_new_rounded,
-                        color: Colors.black,
+                        color: const Color(0xFF1E3A8A),
                         size: 22,
                       ),
                     ),
