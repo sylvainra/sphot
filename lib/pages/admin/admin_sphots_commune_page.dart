@@ -879,12 +879,15 @@ onChanged: uppercase
           borderSide: const BorderSide(color: Colors.black, width: 1.4),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: adminColor, width: 2),
-        ),
+  borderRadius: BorderRadius.circular(14),
+  borderSide: const BorderSide(
+    color: Color(0xFF1E3A8A),
+    width: 2,
+  ),
+),
       ),
     );
-  }
+}
 
 String _cleanChoice(String value) {
   return value
@@ -1055,42 +1058,46 @@ Widget _dropdownField(
     onTap: openMenu,
     child: InputDecorator(
       decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(fontSize: 14),
+  labelText: current.isEmpty ? null : label,
+        labelStyle: const TextStyle(
+  color: Color(0xFF1E3A8A),
+  fontWeight: FontWeight.w700,
+),
         filled: true,
         fillColor: Colors.transparent,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.black, width: 1.6),
+          borderSide: const BorderSide(
+  color: Color(0xFF1E3A8A),
+  width: 1.6,
+),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.black, width: 1.6),
+          borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 1.6),
         ),
       ),
       child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              current.isEmpty ? label : current,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: current.isEmpty ? FontWeight.w400 : FontWeight.w700,
-                color: current.isEmpty
-                    ? Colors.black.withOpacity(0.60)
-                    : Colors.black,
-              ),
-            ),
-          ),
-          const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: adminColor,
-            size: 26,
-          ),
-        ],
+  children: [
+    Expanded(
+      child: Text(
+  current.isEmpty ? label : current,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF1E3A8A),
+        ),
       ),
+    ),
+    const Icon(
+      Icons.keyboard_arrow_down_rounded,
+      color: Color(0xFFDC2626),
+      size: 26,
+    ),
+  ],
+),
     ),
   );
 }
@@ -1399,7 +1406,7 @@ Widget _multiDropdownField(
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
-          color: adminColor,
+          color: Color(0xFFDC2626),
           fontSize: 15,
           fontWeight: FontWeight.w900,
         ),
@@ -1549,7 +1556,7 @@ Future<void> _importLogoVille() async {
 
 SizedBox(
   width: double.infinity,
-  height: 46,
+  height: 52,
   child: ElevatedButton.icon(
     onPressed: _importLogoVille,
     icon: const Icon(
@@ -1575,31 +1582,15 @@ foregroundColor: const Color(0xFF1E3A8A),
 elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: Colors.black, width: 2),
+        side: const BorderSide(
+  color: Color(0xFF1E3A8A),
+  width: 1.4,
+),
       ),
     ),
   ),
 ),
 
-const SizedBox(height: 8),
-
-if (_value('logoVille').isNotEmpty)
-  Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(10),
-    decoration: BoxDecoration(
-      color: Colors.green.withOpacity(0.15),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: Colors.green),
-    ),
-    child: const Text(
-      '✅ Logo de la ville importé',
-      textAlign: TextAlign.center,
-      style: TextStyle(
-        fontWeight: FontWeight.w900,
-      ),
-    ),
-  ),
 const SizedBox(height: 8),
 
 _textField(
@@ -1611,7 +1602,7 @@ const SizedBox(height: 8),
 
 SizedBox(
   width: double.infinity,
-  height: 46,
+  height: 52,
   child: ElevatedButton.icon(
     onPressed: () {
   _openMapPicker(
@@ -1643,7 +1634,10 @@ foregroundColor: const Color(0xFF1E3A8A),
 elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: Colors.black, width: 2),
+        side: const BorderSide(
+  color: Color(0xFF1E3A8A),
+  width: 1.4,
+),
       ),
     ),
   ),
@@ -1680,22 +1674,32 @@ const SizedBox(height: 8),
               '2. IDENTIFICATION',
               'Nommez le SPHOT et choisissez son type\net sa nature.',
             ),
-            _textField('nomSecours', 'Repère secours (ex.: LONGE 01),\nSi inexistant, ne rien inscrire.'),
-            const SizedBox(height: 6),
-            _textField('nomSphot', 'Nom du SPHOT,\n(ex. Plage de..., Lac de...).'),
+            _textField(
+  'nomSecours',
+  'Repère secours (ex.: LONGE 01),\nSi inexistant, ne rien inscrire.',
+  maxLines: 2,
+),
+
+const SizedBox(height: 6),
+
+_textField(
+  'nomSphot',
+  'Nom du SPHOT,\n(ex. Plage de..., Lac de...).',
+  maxLines: 2,
+),
             const SizedBox(height: 6),
             _dropdownField(
   'typeSphot',
   'Type de SPHOT',
   typeSphotChoices,
-  maxMenuHeight: 170,
+  maxMenuHeight: 125,
 ),
             const SizedBox(height: 8),
             _dropdownField(
   'natureSphot',
   'Nature du SPHOT',
   natureSphotChoices,
-  maxMenuHeight: 112,
+  maxMenuHeight: 67,
 ),
           ],
         );
@@ -1710,7 +1714,7 @@ const SizedBox(height: 8),
 
       SizedBox(
   width: double.infinity,
-  height: 46,
+  height: 54,
   child: ElevatedButton.icon(
           onPressed: () {
   _openMapPicker(

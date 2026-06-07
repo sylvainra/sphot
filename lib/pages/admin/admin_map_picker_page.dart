@@ -86,18 +86,21 @@ class _AdminMapPickerPageState extends State<AdminMapPickerPage> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.92),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: Colors.black, width: 2),
-                    ),
+  color: Colors.transparent,
+  borderRadius: BorderRadius.circular(18),
+  border: Border.all(
+    color: Color(0xFF1E3A8A),
+    width: 2,
+  ),
+),
                     child: Text(
                       widget.title,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        color: adminColor,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                      ),
+  color: Color(0xFFDC2626),
+  fontSize: 18,
+  fontWeight: FontWeight.w900,
+),
                     ),
                   ),
 
@@ -105,23 +108,27 @@ class _AdminMapPickerPageState extends State<AdminMapPickerPage> {
 
                   if (selectedPoint != null)
                     Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.92),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.black, width: 1.5),
-                      ),
-                      child: Text(
-                        'Latitude : ${selectedPoint!.latitude.toStringAsFixed(6)}\n'
-                        'Longitude : ${selectedPoint!.longitude.toStringAsFixed(6)}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
+  width: double.infinity,
+  margin: const EdgeInsets.only(bottom: 8),
+  padding: const EdgeInsets.all(10),
+  decoration: BoxDecoration(
+    color: Colors.transparent,
+    borderRadius: BorderRadius.circular(16),
+    border: Border.all(
+      color: Color(0xFF1E3A8A),
+      width: 1.5,
+    ),
+  ),
+  child: Text(
+    'Latitude : ${selectedPoint!.latitude.toStringAsFixed(6)}\n'
+    'Longitude : ${selectedPoint!.longitude.toStringAsFixed(6)}',
+    textAlign: TextAlign.center,
+    style: const TextStyle(
+      color: Color(0xFF1E3A8A),
+      fontWeight: FontWeight.w800,
+    ),
+  ),
+),
 
                   Row(
                     children: [
@@ -130,15 +137,26 @@ class _AdminMapPickerPageState extends State<AdminMapPickerPage> {
                           onPressed: () {
                             Navigator.of(context).pop();
                           },
-                          icon: const Icon(Icons.close_rounded),
+                          icon: const Icon(
+  Icons.close_rounded,
+  color: Color(0xFF1E3A8A),
+),
                           label: const Text(
-                            'ANNULER',
-                            style: TextStyle(fontWeight: FontWeight.w900),
-                          ),
+  'ANNULER',
+  style: TextStyle(
+    color: Color(0xFF1E3A8A),
+    fontWeight: FontWeight.w900,
+  ),
+),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1E3A8A),
-                            foregroundColor: Colors.white,
-                          ),
+  backgroundColor: Colors.transparent,
+  foregroundColor: const Color(0xFF1E3A8A),
+  elevation: 0,
+  side: const BorderSide(
+    color: Color(0xFF1E3A8A),
+    width: 2,
+  ),
+),
                         ),
                       ),
                       const SizedBox(width: 8),
