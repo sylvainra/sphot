@@ -30,9 +30,11 @@ class _AdminAttributionSphotsPageState
 
   final Set<String> selectedDocIds = {};
 String selectedSphotLabel = '';
-  String saveMessage = '';
+String saveMessage = '';
 
-  OverlayEntry? _dropdownOverlay;
+bool _attributionSaved = false;
+
+OverlayEntry? _dropdownOverlay;
 
   final ScrollController selectedSphotsScrollController = ScrollController();
 
@@ -138,11 +140,12 @@ Future<void> _saveDraft() async {
     saveMessage = '';
   });
 
-  await _saveDraft();
+  setState(() {
+  _attributionSaved = true;
+});
 
-  _showMessage(
-    'Attribution enregistrée sur ${selectedDocIds.length} SPHOT(s).',
-  );
+  await _saveDraft();
+  
 }
 
   void _showMessage(String message) {
@@ -877,21 +880,38 @@ const SizedBox(height: 14),
                               height: 52,
                               child: ElevatedButton.icon(
                                 onPressed: _saveAttribution,
-                                icon: const Icon(Icons.save_rounded),
-                                label: const Text(
-                                  'ENREGISTRER',
+                                icon: Icon(
+  _attributionSaved
+      ? Icons.check_rounded
+      : Icons.save_rounded,
+),
+
+label: Text(
+  _attributionSaved
+      ? 'ENREGISTRÉ'
+      : 'ENREGISTRER',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w900,
                                     fontSize: 15,
                                   ),
                                 ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF16A34A),
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
+  elevation: 0,
+  shadowColor: Colors.transparent,
+  backgroundColor: _attributionSaved
+      ? const Color(0xFFDC2626)
+      : Colors.transparent,
+  foregroundColor: _attributionSaved
+      ? Colors.white
+      : const Color(0xFFDC2626),
+  side: const BorderSide(
+    color: Color(0xFFDC2626),
+    width: 2,
+  ),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(16),
+  ),
+),
                               ),
                             ),
                             const SizedBox(height: 14),

@@ -93,15 +93,16 @@ class AdminValidationSphotsPage extends StatelessWidget {
 
                         if (docs.isEmpty) {
                           return const Center(
-                            child: Text(
-                              'Aucun SPHOT créé.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          );
+  child: Text(
+    'Aucun SPHOT créé',
+    textAlign: TextAlign.center,
+    style: TextStyle(
+      fontSize: 15,
+      fontWeight: FontWeight.w800,
+      color: Color(0xFF1E3A8A),
+    ),
+  ),
+);
                         }
 
                         return ListView.separated(
@@ -131,13 +132,13 @@ class AdminValidationSphotsPage extends StatelessWidget {
                               child: Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.86),
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(
-                                    color: const Color(0xFF1E3A8A),
-                                    width: 2,
-                                  ),
-                                ),
+  color: Colors.transparent,
+  borderRadius: BorderRadius.circular(18),
+  border: Border.all(
+    color: const Color(0xFF1E3A8A),
+    width: 2,
+  ),
+),
                                 child: Row(
                                   children: [
                                     Icon(
@@ -195,10 +196,10 @@ class AdminValidationSphotsPage extends StatelessWidget {
                                       ),
                                     ),
                                     const Icon(
-                                      Icons.arrow_forward_ios_rounded,
-                                      color: Colors.black,
-                                      size: 18,
-                                    ),
+  Icons.arrow_forward_ios_rounded,
+  color: Color(0xFFDC2626),
+  size: 18,
+),
                                   ],
                                 ),
                               ),

@@ -318,10 +318,10 @@ Text(
                         onPressed: () => _openPeriodDialog(period: period),
                         padding: EdgeInsets.zero,
                         icon: const Icon(
-                          Icons.edit_rounded,
-                          color: pageColor,
-                          size: 21,
-                        ),
+  Icons.edit_rounded,
+  color: Color(0xFFDC2626),
+  size: 21,
+),
                       ),
                     ),
                     SizedBox(
@@ -440,14 +440,26 @@ class _PeriodDialogState extends State<_PeriodDialog> {
 
   Future<void> _pickDate({required bool isStart}) async {
     final picked = await showDatePicker(
-      context: context,
-      locale: const Locale('fr', 'FR'),
-      initialDate: isStart
-          ? (_startDate ?? DateTime.now())
-          : (_endDate ?? _startDate ?? DateTime.now()),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
+  context: context,
+  locale: const Locale('fr', 'FR'),
+  builder: (context, child) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF1E3A8A),
+          onPrimary: Colors.white,
+          onSurface: Color(0xFF1E3A8A),
+        ),
+      ),
+      child: child!,
     );
+  },
+  initialDate: isStart
+      ? (_startDate ?? DateTime.now())
+      : (_endDate ?? _startDate ?? DateTime.now()),
+  firstDate: DateTime(2020),
+  lastDate: DateTime(2100),
+);
 
     if (picked == null) return;
 
@@ -471,13 +483,22 @@ class _PeriodDialogState extends State<_PeriodDialog> {
           ? (_startHour ?? const TimeOfDay(hour: 11, minute: 0))
           : (_endHour ?? const TimeOfDay(hour: 19, minute: 0)),
       builder: (context, child) {
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            alwaysUse24HourFormat: true,
-          ),
-          child: child!,
-        );
-      },
+  return Theme(
+    data: Theme.of(context).copyWith(
+      colorScheme: const ColorScheme.light(
+        primary: Color(0xFF1E3A8A),
+        onPrimary: Colors.white,
+        onSurface: Color(0xFF1E3A8A),
+      ),
+    ),
+    child: MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        alwaysUse24HourFormat: true,
+      ),
+      child: child!,
+    ),
+  );
+},
     );
 
     if (picked == null) return;

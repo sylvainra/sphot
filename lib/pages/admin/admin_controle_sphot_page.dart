@@ -129,15 +129,15 @@ void initState() {
 }
 
   void _editSphot() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => AdminSphotsCommunePage(
-          initialDocId: widget.docId,
-          initialStep: 7,
-        ),
+  Navigator.of(context).pushReplacement(
+    MaterialPageRoute(
+      builder: (_) => AdminSphotsCommunePage(
+        initialDocId: widget.docId,
+        initialStep: 0,
       ),
-    );
-  }
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -179,13 +179,13 @@ void initState() {
                         width: double.infinity,
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.84),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color(0xFF1E3A8A),
-                            width: 2,
-                          ),
-                        ),
+  color: Colors.transparent,
+  borderRadius: BorderRadius.circular(20),
+  border: Border.all(
+    color: const Color(0xFF1E3A8A),
+    width: 2,
+  ),
+),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -251,25 +251,39 @@ void initState() {
                                       ),
                                     ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF1E3A8A),
-                                      foregroundColor: Colors.white,
-                                    ),
+  backgroundColor: Colors.transparent,
+  foregroundColor: const Color(0xFF1E3A8A),
+  elevation: 0,
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
+    side: const BorderSide(
+      color: Color(0xFF1E3A8A),
+      width: 2,
+    ),
+  ),
+),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                SizedBox(
-                                  width: 54,
-                                  height: 48,
-                                  child: ElevatedButton(
-                                    onPressed: _deleteSphot,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFDC2626),
-                                      foregroundColor: Colors.white,
-                                      padding: EdgeInsets.zero,
-                                    ),
-                                    child: const Icon(Icons.delete_rounded),
-                                  ),
-                                ),
+
+SizedBox(
+  width: 54,
+  height: 48,
+  child: ElevatedButton(
+    onPressed: _deleteSphot,
+    style: ElevatedButton.styleFrom(
+      backgroundColor: Colors.transparent,
+      foregroundColor: const Color(0xFFDC2626),
+      elevation: 0,
+      padding: EdgeInsets.zero,
+    ),
+    child: const Icon(
+      Icons.delete_rounded,
+      color: Color(0xFFDC2626),
+      size: 26,
+    ),
+  ),
+),
                               ],
                             ),
                           ],
@@ -300,17 +314,21 @@ void initState() {
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            sphotValide ? pageColor : const Color(0xFFDC2626),
-                        disabledBackgroundColor: pageColor,
-                        disabledForegroundColor: Colors.white,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
-                  ),
+      backgroundColor: Colors.transparent,
+      disabledBackgroundColor: Colors.transparent,
+      foregroundColor: const Color(0xFFDC2626),
+      disabledForegroundColor: const Color(0xFFDC2626),
+      elevation: 0,
+      side: const BorderSide(
+        color: Color(0xFFDC2626),
+        width: 2,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+    ),
+  ),
+),
 
                   const SizedBox(height: 8),
 

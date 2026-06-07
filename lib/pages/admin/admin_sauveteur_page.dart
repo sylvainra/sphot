@@ -40,6 +40,8 @@ final List<String> postesSelectionnes = [];
 
 OverlayEntry? _dropdownOverlay;
 
+bool sauveteurEnregistre = false;
+
 Future<void> _startVoice(
   TextEditingController controller, {
   bool uppercase = false,
@@ -176,23 +178,46 @@ Future<void> _startVoice(
                             const SizedBox(height: 15),
 
                             SizedBox(
-                              width: double.infinity,
-                              height: 48,
-                              child: ElevatedButton.icon(
-                                onPressed: () {},
-                                icon: const Icon(Icons.save),
-                                label: const Text(
-                                  'ENREGISTRER',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ),
+  width: double.infinity,
+  height: 48,
+  child: ElevatedButton.icon(
+    onPressed: () {
+      setState(() {
+        sauveteurEnregistre = true;
+      });
+    },
+    icon: Icon(
+      Icons.save,
+      color: sauveteurEnregistre
+          ? Colors.white
+          : const Color(0xFFDC2626),
+    ),
+    label: Text(
+      sauveteurEnregistre
+          ? 'ENREGISTRÉ'
+          : 'ENREGISTRER',
+      style: TextStyle(
+        fontWeight: FontWeight.w900,
+        color: sauveteurEnregistre
+            ? Colors.white
+            : const Color(0xFFDC2626),
+      ),
+    ),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: sauveteurEnregistre
+          ? const Color(0xFFDC2626)
+          : Colors.transparent,
+      foregroundColor: sauveteurEnregistre
+          ? Colors.white
+          : const Color(0xFFDC2626),
+      elevation: 0,
+      side: const BorderSide(
+        color: Color(0xFFDC2626),
+        width: 2,
+      ),
+    ),
+  ),
+),
                           ],
                         ),
                       ),

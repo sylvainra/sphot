@@ -67,6 +67,8 @@ bool _summaryUserScrolled = false;
 
 bool _sphotJustSaved = false;
 
+bool _confirmDelete = false;
+
   final controllers = <String, TextEditingController>{};
 
   final List<String> fields = [
@@ -408,83 +410,55 @@ super.dispose();
   }
 
   Future<void> _saveSphot() async {
+  final idSphot = _value('idSphot');
+
+  if (idSphot.isEmpty) {
+    _showMessage('Renseigne le numéro du SPHOT');
+    return;
+  }
+  
   setState(() {
     _sphotJustSaved = true;
   });
 
-  Future.delayed(const Duration(seconds: 2), () {
-    if (!mounted) return;
+  final data = {
+    'idSphot': idSphot,
+    'pays': _value('pays'),
+    'region': _value('region'),
+    'departement': _value('departement'),
+    'ville': _value('ville'),
+    'villeLat': double.tryParse(_value('villeLat').replaceAll(',', '.')) ?? 0.0,
+    'villeLng': double.tryParse(_value('villeLng').replaceAll(',', '.')) ?? 0.0,
+    'logoVille': _value('logoVille'),
+    'siteInternetVille': _value('siteInternetVille'),
+    'nomSecours': _value('nomSecours'),
+    'nomSphot': _value('nomSphot'),
+    'typeSphot': _value('typeSphot'),
+    'natureSphot': _value('natureSphot'),
+    'sphotLat': double.tryParse(_value('sphotLat').replaceAll(',', '.')) ?? 0.0,
+    'sphotLng': double.tryParse(_value('sphotLng').replaceAll(',', '.')) ?? 0.0,
+    'adresseWebcam': _value('adresseWebcam'),
+    'arretesMunicipaux': _value('arretesMunicipaux'),
+    'equipement': _value('equipement'),
+    'labelSphot': _value('labelSphot'),
+    'accesPmr': _value('accesPmr'),
+    'moyenPmr': _value('moyenPmr'),
+    'labelPmr': _value('labelPmr'),
+    'activite': _value('activite'),
+    'commerce': _value('commerce'),
+    'source': 'admin',
+    'sphotValide': true,
+    'dateValidation': FieldValue.serverTimestamp(),
+    'updatedAt': FieldValue.serverTimestamp(),
+  };
 
-    setState(() {
-      mode = AdminSphotMode.none;
-      selectedDocId = null;
-      step = 0;
+  final docId = mode == AdminSphotMode.edit && selectedDocId != null
+      ? selectedDocId!
+      : idSphot;
 
-      existingSphotMessage = null;
-      saveSphotMessage = null;
+  FirebaseFirestore.instance.collection('spots').doc(docId).set(data);
 
-      _summaryReadToEnd = false;
-      _summaryUserScrolled = false;
-      _sphotJustSaved = false;
-
-      _clearForm();
-    });
-  });
-    final idSphot = _value('idSphot');
-
-    if (idSphot.isEmpty) {
-      _showMessage('Renseigne le numéro du SPHOT');
-      return;
-    }
-
-    final data = {
-      'idSphot': idSphot,
-      'pays': _value('pays'),
-      'region': _value('region'),
-      'departement': _value('departement'),
-      'ville': _value('ville'),
-      'villeLat': double.tryParse(_value('villeLat').replaceAll(',', '.')) ?? 0.0,
-      'villeLng': double.tryParse(_value('villeLng').replaceAll(',', '.')) ?? 0.0,
-      'logoVille': _value('logoVille'),
-      'siteInternetVille': _value('siteInternetVille'),
-      'nomSecours': _value('nomSecours'),
-      'nomSphot': _value('nomSphot'),
-      'typeSphot': _value('typeSphot'),
-      'natureSphot': _value('natureSphot'),
-      'sphotLat': double.tryParse(_value('sphotLat').replaceAll(',', '.')) ?? 0.0,
-      'sphotLng': double.tryParse(_value('sphotLng').replaceAll(',', '.')) ?? 0.0,
-      'adresseWebcam': _value('adresseWebcam'),
-      'arretesMunicipaux': _value('arretesMunicipaux'),
-      'equipement': _value('equipement'),
-      'labelSphot': _value('labelSphot'),
-      'accesPmr': _value('accesPmr'),
-      'moyenPmr': _value('moyenPmr'),
-      'labelPmr': _value('labelPmr'),
-      'activite': _value('activite'),
-      'commerce': _value('commerce'),
-      'source': 'admin',
-      'sphotValide': true,
-'dateValidation': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-
-    final docId = mode == AdminSphotMode.edit && selectedDocId != null
-        ? selectedDocId!
-        : idSphot;
-
-    await FirebaseFirestore.instance.collection('spots').doc(docId).set(data);
-
-    if (!mounted) return;
-
-setState(() {
-  _sphotJustSaved = true;
-  existingSphotMessage =
-      mode == AdminSphotMode.edit
-          ? 'SPHOT MODIFIÉ'
-          : 'SPHOT ENREGISTRÉ';
-});
-
-await Future.delayed(const Duration(seconds: 2));
+await Future.delayed(const Duration(seconds: 1));
 
 if (!mounted) return;
 
@@ -502,7 +476,29 @@ setState(() {
 
   _clearForm();
 });
-  }
+
+  await Future.delayed(const Duration(seconds: 1));
+
+  if (!mounted) return;
+
+  if (!mounted) return;
+
+setState(() {
+  mode = AdminSphotMode.none;
+  selectedDocId = null;
+
+  step = 0;
+
+  existingSphotMessage = null;
+  saveSphotMessage = null;
+
+  _summaryReadToEnd = false;
+  _summaryUserScrolled = false;
+  _sphotJustSaved = false;
+
+  _clearForm();
+});
+}
 
 void _showMessage(String message) {
   ScaffoldMessenger.of(context).showSnackBar(
@@ -568,9 +564,11 @@ void _showMessage(String message) {
       : Colors.transparent,
   borderRadius: BorderRadius.circular(16),
   border: Border.all(
-    color: adminColor,
-    width: selected ? 3 : 2,
-  ),
+  color: title == 'CONFIRMER LA SUPPRESSION?'
+    ? const Color(0xFFDC2626)
+    : adminColor,
+  width: selected ? 3 : 2,
+),
 ),
       child: Row(
         children: [
@@ -585,8 +583,10 @@ void _showMessage(String message) {
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-  color: adminColor,
+              style: TextStyle(
+  color: title == 'CONFIRMER LA SUPPRESSION?'
+    ? const Color(0xFFDC2626)
+    : adminColor,
   fontSize: 14,
   fontWeight: FontWeight.w900,
 ),
@@ -650,7 +650,9 @@ void _showMessage(String message) {
       }
 
       void openMenu() {
-        closeMenu();
+  if (docs.isEmpty) return;
+
+  closeMenu();
 
         final renderBox =
             fieldKey.currentContext!.findRenderObject() as RenderBox;
@@ -826,67 +828,109 @@ void _showMessage(String message) {
   int maxLines = 1,
   double labelSize = 14,
   bool uppercase = false,
+  String? hintText,
 }) {
-    return TextField(
-      controller: _controller(key),
-textCapitalization: uppercase
-    ? TextCapitalization.characters
-    : TextCapitalization.none,
-maxLines: maxLines,
-onChanged: uppercase
-    ? (value) {
-        final upper = value.toUpperCase();
-        if (upper != value) {
-          _controller(key).value = TextEditingValue(
-            text: upper,
-            selection: TextSelection.collapsed(
-              offset: upper.length,
-            ),
-          );
-        }
-      }
-    : null,
-      style: const TextStyle(
+  return Stack(
+    children: [
+      TextField(
+        controller: _controller(key),
+        textCapitalization: uppercase
+            ? TextCapitalization.characters
+            : TextCapitalization.none,
+        maxLines: maxLines,
+        onChanged: uppercase
+            ? (value) {
+                final upper = value.toUpperCase();
+                if (upper != value) {
+                  _controller(key).value = TextEditingValue(
+                    text: upper,
+                    selection: TextSelection.collapsed(
+                      offset: upper.length,
+                    ),
+                  );
+                }
+              }
+            : null,
+        style: const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 16,
+          color: Color(0xFF1E3A8A),
+        ),
+        decoration: InputDecoration(
+          label: Text(
+            label,
+            style: TextStyle(
+  fontSize: labelSize,
   fontWeight: FontWeight.w700,
-  fontSize: 16,
-  color: Color(0xFF1E3A8A),
+  color: const Color(0xFF1E3A8A),
 ),
-      decoration: InputDecoration(
-        label: Text(
-  label,
-  style: const TextStyle(
-    fontSize: 16,
-    fontWeight: FontWeight.w700,
-    color: Color(0xFF1E3A8A),
-  ),
-),
-        filled: true,
-        suffixIcon: IconButton(
-  icon: const Icon(
-    Icons.mic_rounded,
-    color: Color(0xFFDC2626),
-  ),
-  onPressed: () => _startVoice(_controller(key)),
-),
-        fillColor: Colors.transparent,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.black, width: 1.4),
+          ),
+          hintText: hintText,
+          hintStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF1E3A8A),
+          ),
+          filled: true,
+          suffixIcon: IconButton(
+            icon: const Icon(
+              Icons.mic_rounded,
+              color: Color(0xFFDC2626),
+            ),
+            onPressed: () => _startVoice(_controller(key)),
+          ),
+          fillColor: Colors.transparent,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Colors.black, width: 1.4),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Colors.black, width: 1.4),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(
+              color: Color(0xFF1E3A8A),
+              width: 2,
+            ),
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.black, width: 1.4),
-        ),
-        focusedBorder: OutlineInputBorder(
-  borderRadius: BorderRadius.circular(14),
-  borderSide: const BorderSide(
-    color: Color(0xFF1E3A8A),
-    width: 2,
-  ),
-),
       ),
-    );
+
+      if (key == 'nomSecours')
+        const Positioned(
+          right: 12,
+          bottom: 0,
+          child: Text(
+            'Si inexistant, ne rien inscrire',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1E3A8A),
+            ),
+          ),
+        ),
+
+      if (key == 'nomSphot')
+        const Positioned(
+          right: 12,
+          bottom: 0,
+          child: Text(
+            '(ex. Plage de..., Lac de..., ect)',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1E3A8A),
+            ),
+          ),
+        ),
+    ],
+  );
 }
 
 String _cleanChoice(String value) {
@@ -1245,8 +1289,8 @@ Widget _multiDropdownField(
                                             : Icons
                                                 .check_box_outline_blank_rounded,
                                         color: selected
-                                            ? adminColor
-                                            : Colors.black54,
+    ? const Color(0xFFDC2626)
+    : const Color(0xFF1E3A8A),
                                         size: 22,
                                       ),
                                       const SizedBox(width: 8),
@@ -1302,15 +1346,18 @@ Widget _multiDropdownField(
   }
 
   final displayText =
-      selectedValues.isEmpty ? label : selectedValues.join(' | ');
+    selectedValues.isEmpty ? label : selectedValues.join('\n');
 
   return GestureDetector(
     key: fieldKey,
     onTap: openMenu,
     child: InputDecorator(
       decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(fontSize: 14),
+        labelText: selectedValues.isEmpty ? null : label,
+        labelStyle: const TextStyle(
+  color: Color(0xFF1E3A8A),
+  fontWeight: FontWeight.w700,
+),
         filled: true,
         fillColor: Colors.transparent,
         contentPadding: const EdgeInsets.symmetric(
@@ -1318,44 +1365,56 @@ Widget _multiDropdownField(
           vertical: 12,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.black, width: 1.6),
-        ),
+  borderRadius: BorderRadius.circular(14),
+  borderSide: const BorderSide(
+    color: Color(0xFF1E3A8A),
+    width: 1.6,
+  ),
+),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.black, width: 1.6),
-        ),
+  borderRadius: BorderRadius.circular(14),
+  borderSide: const BorderSide(
+    color: Color(0xFF1E3A8A),
+    width: 1.6,
+  ),
+),
+focusedBorder: OutlineInputBorder(
+  borderRadius: BorderRadius.circular(14),
+  borderSide: const BorderSide(
+    color: Color(0xFF1E3A8A),
+    width: 2,
+  ),
+),
       ),
       child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              displayText,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight:
-                    selectedValues.isEmpty ? FontWeight.w400 : FontWeight.w700,
-                color: selectedValues.isEmpty
-                    ? Colors.black.withOpacity(0.60)
-                    : Colors.black,
-              ),
-            ),
-          ),
-          const Icon(
-            Icons.checklist_rounded,
-            color: adminColor,
-            size: 24,
-          ),
-          const SizedBox(width: 2),
-          const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: adminColor,
-            size: 26,
-          ),
-        ],
+  children: [
+    Expanded(
+      child: Text(
+        displayText,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF1E3A8A),
+        ),
       ),
+    ),
+
+    const Icon(
+      Icons.checklist_rounded,
+      color: Color(0xFFDC2626),
+      size: 24,
+    ),
+
+    const SizedBox(width: 2),
+
+    const Icon(
+      Icons.keyboard_arrow_down_rounded,
+      color: Color(0xFFDC2626),
+      size: 26,
+    ),
+  ],
+),
     ),
   );
 }
@@ -1672,34 +1731,37 @@ const SizedBox(height: 8),
           children: [
             _stepHeader(
               '2. IDENTIFICATION',
-              'Nommez le SPHOT et choisissez son type\net sa nature.',
+              'Nommez le SPHOT et choisissez son type\net sa nature',
             ),
             _textField(
   'nomSecours',
-  'Repère secours (ex.: LONGE 01),\nSi inexistant, ne rien inscrire.',
-  maxLines: 2,
+  'Repère secours (ex.: LONGE 01)',
+  maxLines: 1,
+  labelSize: 15,
 ),
 
 const SizedBox(height: 6),
 
 _textField(
   'nomSphot',
-  'Nom du SPHOT,\n(ex. Plage de..., Lac de...).',
-  maxLines: 2,
+  'Nom du SPHOT',
+  maxLines: 1,
+  labelSize: 16,
 ),
+
             const SizedBox(height: 6),
             _dropdownField(
   'typeSphot',
   'Type de SPHOT',
   typeSphotChoices,
-  maxMenuHeight: 125,
+  maxMenuHeight: 165,
 ),
             const SizedBox(height: 8),
             _dropdownField(
   'natureSphot',
   'Nature du SPHOT',
   natureSphotChoices,
-  maxMenuHeight: 67,
+  maxMenuHeight: 107,
 ),
           ],
         );
@@ -1709,38 +1771,51 @@ _textField(
     children: [
       _stepHeader(
         '3. LOCALISATION',
-        'Renseignez ou positionnez le SPHOT sur la carte.',
+        'Renseignez ou positionnez le SPHOT sur la carte',
       ),
 
       SizedBox(
   width: double.infinity,
-  height: 54,
+  height: 52,
   child: ElevatedButton.icon(
-          onPressed: () {
-  _openMapPicker(
-    title: 'POSITIONNEZ LE SPHOT',
-    latKey: 'sphotLat',
-    lngKey: 'sphotLng',
-  );
-},
-          icon: const Icon(Icons.map_outlined),
-          label: const Text(
-  'POSITIONNEZ LE SPHOT SUR LA CARTE',
-  style: TextStyle(
-    fontSize: 12,
-    fontWeight: FontWeight.w900,
-  ),
-),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: adminColor,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: Colors.black, width: 2),
-            ),
+    onPressed: () {
+      _openMapPicker(
+        title: 'POSITIONNEZ LE SPHOT',
+        latKey: 'sphotLat',
+        lngKey: 'sphotLng',
+      );
+    },
+    icon: const Icon(
+      Icons.map_outlined,
+      color: Color(0xFFDC2626),
+    ),
+    label: const Expanded(
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          'Positionnez le SPHOT sur la carte',
+          textAlign: TextAlign.left,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
+    ),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: Colors.transparent,
+      foregroundColor: Color(0xFF1E3A8A),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: Color(0xFF1E3A8A),
+          width: 1.4,
+        ),
+      ),
+    ),
+  ),
+),
       const SizedBox(height: 8),
 
 const Center(
@@ -1775,7 +1850,7 @@ _twoColumns(
           children: [
             _stepHeader(
               '4. INFORMATIONS MAIRIE',
-              'Ajoutez les liens externes utiles.',
+              'Ajoutez les liens externes utiles',
             ),
             _textField('adresseWebcam', 'Adresse internet de la webcam du SPHOT'),
             const SizedBox(height: 8),
@@ -1788,20 +1863,20 @@ _twoColumns(
           children: [
             _stepHeader(
               '5. ÉQUIPEMENTS ET LABELS',
-              'Indiquez les services disponibles.',
+              'Indiquez les services disponibles',
             ),
             _multiDropdownField(
               'equipement',
               'Équipements du SPHOT',
               equipementChoices,
-              maxMenuHeight: 275,
+              maxMenuHeight: 271,
             ),
             const SizedBox(height: 8),
             _multiDropdownField(
               'labelSphot',
               'Labels du SPHOT',
               labelSphotChoices,
-              maxMenuHeight: 217,
+              maxMenuHeight: 213,
             ),
           ],
         );
@@ -1811,7 +1886,7 @@ _twoColumns(
     children: [
       _stepHeader(
         '6. ACCESSIBILITÉ',
-        'Précisez les labels, accès et moyens disponibles.',
+        'Précisez les labels, accès et moyens disponibles',
       ),
       _multiDropdownField(
   'labelPmr',
@@ -1843,20 +1918,20 @@ _multiDropdownField(
     children: [
       _stepHeader(
         '7. ACTIVITÉS ET COMMERCES',
-        'Sélectionnez les activités et commerces associés.',
+        'Sélectionnez les activités et commerces associés',
       ),
       _multiDropdownField(
         'activite',
         'Activités du SPHOT',
         activiteChoices,
-        maxMenuHeight: 258,
+        maxMenuHeight: 252,
       ),
       const SizedBox(height: 8),
       _multiDropdownField(
         'commerce',
         'Commerces du SPHOT',
         commerceChoices,
-        maxMenuHeight: 200,
+        maxMenuHeight: 193,
       ),
     ],
   );
@@ -1866,7 +1941,7 @@ default:
     children: [
       _stepHeader(
         '8. RÉSUMÉ DU SPHOT',
-        'Contrôlez les informations renseignées avant enregistrement.',
+        'Contrôlez les informations renseignées avant enregistrement',
       ),
 
       _summaryLine('Numéro du SPHOT', _value('idSphot'), 0),
@@ -1917,13 +1992,13 @@ Widget _summaryLine(
     margin: const EdgeInsets.only(bottom: 6),
     padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
     decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.30),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(
-        color: adminColor,
-        width: 1.4,
-      ),
-    ),
+  color: Colors.transparent,
+  borderRadius: BorderRadius.circular(14),
+  border: Border.all(
+    color: adminColor,
+    width: 1.4,
+  ),
+),
     child: Row(
       children: [
         Expanded(
@@ -1963,10 +2038,10 @@ Widget _summaryLine(
             minHeight: 34,
           ),
           icon: const Icon(
-            Icons.edit_rounded,
-            color: adminColor,
-            size: 20,
-          ),
+  Icons.edit_rounded,
+  color: Color(0xFFDC2626),
+  size: 20,
+),
         ),
       ],
     ),
@@ -2014,71 +2089,128 @@ void _checkSummaryScroll() {
   if (!_hasStarted) return const SizedBox.shrink();
 
   final bool isSummaryStep = step == 7;
+  final bool canSave = _summaryReadToEnd;
+  final bool saved = _sphotJustSaved;
+
+  TextStyle buttonTextStyle(Color color) {
+    return TextStyle(
+      color: color,
+      fontWeight: FontWeight.w900,
+    );
+  }
+
+  ButtonStyle buttonStyle({
+    required Color borderColor,
+    required Color foregroundColor,
+    Color backgroundColor = Colors.transparent,
+    Color disabledBackgroundColor = Colors.transparent,
+    Color disabledForegroundColor = Colors.grey,
+  }) {
+    return OutlinedButton.styleFrom(
+      backgroundColor: backgroundColor,
+      disabledBackgroundColor: disabledBackgroundColor,
+      foregroundColor: foregroundColor,
+      disabledForegroundColor: disabledForegroundColor,
+      side: BorderSide(
+        color: borderColor,
+        width: 2,
+      ),
+    );
+  }
 
   return Row(
     children: [
       Expanded(
-  child: OutlinedButton.icon(
-    onPressed: _previousStep,
-    icon: const Icon(
-      Icons.arrow_back_rounded,
-      color: Color(0xFF1E3A8A),
-    ),
-    label: const Text(
-      'PRÉCÉDENT',
-      style: TextStyle(
-        color: Color(0xFF1E3A8A),
-        fontWeight: FontWeight.w900,
-      ),
-    ),
-    style: OutlinedButton.styleFrom(
-      foregroundColor: const Color(0xFF1E3A8A),
-      side: const BorderSide(
-        color: Color(0xFF1E3A8A),
-        width: 2,
-      ),
-    ),
-  ),
-),
-      const SizedBox(width: 8),
-      Expanded(
-        child: ElevatedButton(
-          onPressed: isSummaryStep
-              ? (_summaryReadToEnd ? _saveSphot : null)
-              : _nextStep,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: isSummaryStep
-    ? (_sphotJustSaved
-        ? const Color(0xFF16A34A)
-        : (_summaryReadToEnd ? Colors.red : Colors.grey))
-    : adminColor,
-            disabledBackgroundColor: Colors.grey,
-            disabledForegroundColor: Colors.white,
-            foregroundColor: Colors.white,
+        child: OutlinedButton(
+          onPressed: saved ? null : _previousStep,
+          style: buttonStyle(
+            borderColor: const Color(0xFF1E3A8A),
+            foregroundColor: const Color(0xFF1E3A8A),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                isSummaryStep
-    ? (_sphotJustSaved ? 'ENREGISTRÉ' : 'ENREGISTRER')
-    : 'SUIVANT',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 12,
-                ),
+              const Icon(
+                Icons.arrow_back_rounded,
+                color: Color(0xFF1E3A8A),
               ),
-              const SizedBox(width: 6),
-              Icon(
-                isSummaryStep
-                    ? (_summaryReadToEnd
-                        ? Icons.save_rounded
-                        : Icons.keyboard_double_arrow_down_rounded)
-                    : Icons.arrow_forward_rounded,
-                size: 20,
+              const SizedBox(width: 8),
+              Text(
+                'PRÉCÉDENT',
+                style: buttonTextStyle(const Color(0xFF1E3A8A)),
               ),
             ],
           ),
+        ),
+      ),
+
+      const SizedBox(width: 8),
+
+      Expanded(
+        child: OutlinedButton(
+          onPressed: isSummaryStep
+              ? (canSave && !saved ? _saveSphot : null)
+              : _nextStep,
+          style: buttonStyle(
+            borderColor: saved
+                ? const Color(0xFFDC2626)
+                : (isSummaryStep
+                    ? (canSave ? const Color(0xFFDC2626) : Colors.grey)
+                    : const Color(0xFF1E3A8A)),
+            foregroundColor: saved
+                ? Colors.white
+                : (isSummaryStep && canSave
+                    ? const Color(0xFFDC2626)
+                    : const Color(0xFF1E3A8A)),
+            backgroundColor:
+                saved ? const Color(0xFFDC2626) : Colors.transparent,
+            disabledBackgroundColor:
+                saved ? const Color(0xFFDC2626) : Colors.transparent,
+            disabledForegroundColor: saved ? Colors.white : Colors.grey,
+          ),
+          child: FittedBox(
+  fit: BoxFit.scaleDown,
+  child: Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+    Text(
+      isSummaryStep
+          ? (saved ? 'ENREGISTRÉ' : 'ENREGISTRER')
+          : 'SUIVANT',
+      style: buttonTextStyle(
+        saved
+            ? Colors.white
+            : (isSummaryStep
+                ? (canSave ? const Color(0xFFDC2626) : Colors.grey)
+                : const Color(0xFF1E3A8A)),
+      ),
+    ),
+
+    if (!isSummaryStep) ...[
+  const SizedBox(width: 8),
+  const Icon(
+    Icons.arrow_forward_rounded,
+    color: Color(0xFF1E3A8A),
+  ),
+],
+
+if (isSummaryStep && !canSave && !saved) ...[
+  const SizedBox(width: 4),
+  Column(
+  mainAxisSize: MainAxisSize.min,
+  children: const [
+    Icon(
+      Icons.keyboard_double_arrow_down_rounded,
+      color: Color(0xFFDC2626),
+      size: 18,
+    ),
+  ],
+),
+],
+    ],
+),
+),
         ),
       ),
     ],
@@ -2191,30 +2323,49 @@ Widget _existingSphotsPanel({
               SizedBox(height: gap),
 
               Expanded(
-                child: _modeButton(
-                  title: 'SUPPRIMER LE SPHOT',
-                  subtitle: '',
-                  icon: Icons.delete_forever_rounded,
-                  color: Colors.red,
-                  selected: false,
-                  onTap: selectedDocId == null
-                      ? () {}
-                      : () async {
-                          await FirebaseFirestore.instance
-                              .collection('spots')
-                              .doc(selectedDocId)
-                              .delete();
+  child: _modeButton(
+    title: _confirmDelete
+    ? 'CONFIRMER LA SUPPRESSION?'
+    : 'SUPPRIMER LE SPHOT',
+    subtitle: '',
+    icon: Icons.delete_forever_rounded,
+    color: Colors.red,
+    selected: false,
+    onTap: selectedDocId == null
+        ? () {}
+        : () async {
+            if (!_confirmDelete) {
+              setState(() {
+                _confirmDelete = true;
+              });
 
-                          setState(() {
-                            selectedDocId = null;
-                            mode = AdminSphotMode.none;
-                            step = 0;
-                            _clearForm();
-                            existingSphotMessage = 'SPHOT SUPPRIMÉ';
-                          });
-                        },
-                ),
-              ),
+              Future.delayed(const Duration(seconds: 1), () {
+                if (!mounted) return;
+
+                setState(() {
+                  _confirmDelete = false;
+                });
+              });
+
+              return;
+            }
+
+            await FirebaseFirestore.instance
+                .collection('spots')
+                .doc(selectedDocId)
+                .delete();
+
+            setState(() {
+              _confirmDelete = false;
+              selectedDocId = null;
+              mode = AdminSphotMode.none;
+              step = 0;
+              _clearForm();
+              existingSphotMessage = 'SPHOT SUPPRIMÉ';
+            });
+          },
+  ),
+),
             ],
           ),
         ),
@@ -2340,7 +2491,28 @@ final double bandeauHeight =
     ),
   ),
   child: IconButton(
-    onPressed: () => Navigator.of(context).pop(),
+    onPressed: () {
+  if (_hasStarted) {
+    setState(() {
+      mode = AdminSphotMode.none;
+      selectedDocId = null;
+      step = 0;
+
+      existingSphotMessage = null;
+      saveSphotMessage = null;
+
+      _summaryReadToEnd = false;
+      _summaryUserScrolled = false;
+      _sphotJustSaved = false;
+      _confirmDelete = false;
+
+      _clearForm();
+    });
+    return;
+  }
+
+  Navigator.of(context).pop();
+},
     padding: EdgeInsets.zero,
     icon: const Icon(
       Icons.arrow_back_ios_new_rounded,
