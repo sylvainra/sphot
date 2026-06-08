@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 
 import 'admin_controle_sphot_page.dart';
 
-class AdminValidationSphotsPage extends StatelessWidget {
-  const AdminValidationSphotsPage({super.key});
+class AdminGestionSphotsPage extends StatelessWidget {
+  const AdminGestionSphotsPage({super.key});
 
   static const Color pageColor = Color(0xFF16A34A);
 
@@ -45,7 +45,7 @@ class AdminValidationSphotsPage extends StatelessWidget {
                     fit: BoxFit.contain,
                   ),
                   const Text(
-                    'VALIDATION DES SPHOTS',
+                    'GESTION DES SPHOTS',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
@@ -56,7 +56,18 @@ class AdminValidationSphotsPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Expanded(
-                    child: StreamBuilder<QuerySnapshot>(
+  child: Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(
+        color: const Color(0xFF1E3A8A),
+        width: 2,
+      ),
+    ),
+    child: StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
                           .collection('spots')
                           .snapshots(),
@@ -195,10 +206,50 @@ class AdminValidationSphotsPage extends StatelessWidget {
                                         ],
                                       ),
                                     ),
-                                    const Icon(
-  Icons.arrow_forward_ios_rounded,
-  color: Color(0xFFDC2626),
-  size: 18,
+                                    Column(
+  mainAxisSize: MainAxisSize.min,
+  children: [
+    IconButton(
+      onPressed: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => AdminControleSphotPage(
+              docId: doc.id,
+              data: data,
+            ),
+          ),
+        );
+      },
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(
+        minWidth: 32,
+        minHeight: 28,
+      ),
+      icon: const Icon(
+        Icons.edit_rounded,
+        color: Color(0xFFDC2626),
+        size: 22,
+      ),
+    ),
+    IconButton(
+      onPressed: () async {
+        await FirebaseFirestore.instance
+            .collection('spots')
+            .doc(doc.id)
+            .delete();
+      },
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(
+        minWidth: 32,
+        minHeight: 28,
+      ),
+      icon: const Icon(
+        Icons.delete_rounded,
+        color: Color(0xFFDC2626),
+        size: 22,
+      ),
+    ),
+  ],
 ),
                                   ],
                                 ),
@@ -207,8 +258,9 @@ class AdminValidationSphotsPage extends StatelessWidget {
                           },
                         );
                       },
-                    ),
+                                        ),
                   ),
+                ),
                   const SizedBox(height: 10),
                   Container(
                     width: 40,

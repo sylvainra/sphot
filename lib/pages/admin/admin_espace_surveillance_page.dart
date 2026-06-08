@@ -1,0 +1,216 @@
+import 'package:flutter/material.dart';
+
+import 'admin_attribution_sphots_page.dart';
+import 'admin_periodes_surveillance_page.dart';
+
+class AdminEspaceSurveillancePage extends StatelessWidget {
+  final String ville;
+
+  const AdminEspaceSurveillancePage({
+    super.key,
+    this.ville = 'VILLE_NON_RENSEIGNEE',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const Color pageColor = Color(0xFF1E3A8A);
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'data/images/map_background.jpg',
+            fit: BoxFit.cover,
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                children: [
+                  Image.asset(
+                    'data/icons/title.png',
+                    height: 56,
+                    fit: BoxFit.contain,
+                  ),
+
+                  const Text(
+                    'ESPACE SURVEILLANCE',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFEF4444),
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: pageColor,
+                          width: 2,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: _SurveillanceBand(
+                              title: 'PÉRIODES DE SURVEILLANCE',
+                              subtitle:
+                                  'Créer les périodes avec dates et horaires',
+                              icon: Icons.calendar_month_rounded,
+                              color: pageColor,
+                              onTap: () {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => AdminPeriodesSurveillancePage(
+        ville: ville,
+      ),
+    ),
+  );
+},
+                            ),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          Expanded(
+                            child: _SurveillanceBand(
+                              title: 'ATTRIBUTION AUX SPHOTS',
+                              subtitle:
+                                  'Attribuer les périodes créées aux SPHOTS',
+                              icon: Icons.location_on_rounded,
+                              color: const Color(0xFF1E3A8A),
+                              onTap: () {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => AdminAttributionSphotsPage(
+        ville: ville,
+      ),
+    ),
+  );
+},
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  Container(
+  width: 40,
+  height: 40,
+  decoration: BoxDecoration(
+    color: Colors.transparent,
+    shape: BoxShape.circle,
+    border: Border.all(
+      color: pageColor,
+      width: 2,
+    ),
+  ),
+  child: IconButton(
+    onPressed: () {
+      Navigator.of(context).pop();
+    },
+    padding: EdgeInsets.zero,
+    icon: const Icon(
+      Icons.arrow_back_ios_new_rounded,
+      color: pageColor,
+      size: 22,
+    ),
+  ),
+),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SurveillanceBand extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _SurveillanceBand({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        height: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: color,
+            width: 2.2,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: Color(0xFFEF4444),
+              size: 54,
+            ),
+
+            const SizedBox(height: 12),
+
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: TextStyle(
+                color: color,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                height: 0.95,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              maxLines: 3,
+              style: TextStyle(
+                color: color,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                height: 1.25,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

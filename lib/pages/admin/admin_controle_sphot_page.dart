@@ -1,9 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import 'admin_sphots_commune_page.dart';
+import 'admin_espace_sphots_page.dart';
 
-import 'admin_validation_sphots_page.dart';
+import 'admin_gestion_sphots_page.dart';
 
 class AdminControleSphotPage extends StatefulWidget {
   final String docId;
@@ -97,7 +97,7 @@ void initState() {
 
     Navigator.of(context).pushReplacement(
   MaterialPageRoute(
-    builder: (_) => AdminValidationSphotsPage(),
+    builder: (_) => const AdminGestionSphotsPage(),
   ),
 );
   }
@@ -113,7 +113,7 @@ void initState() {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => AdminValidationSphotsPage(),
+        builder: (_) => const AdminGestionSphotsPage(),
       ),
     );
   });
@@ -131,7 +131,7 @@ void initState() {
   void _editSphot() {
   Navigator.of(context).pushReplacement(
     MaterialPageRoute(
-      builder: (_) => AdminSphotsCommunePage(
+      builder: (_) => AdminEspaceSphotsPage(
         initialDocId: widget.docId,
         initialStep: 0,
       ),

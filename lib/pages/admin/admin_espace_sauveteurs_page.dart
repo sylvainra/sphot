@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 
-import 'admin_attribution_sphots_page.dart';
-import 'admin_periodes_surveillance_page.dart';
+import 'admin_creation_sauveteur_page.dart';
+import 'admin_gestion_sauveteurs_page.dart';
 
-class AdminDatesSurveillancePage extends StatelessWidget {
+class AdminEspaceSauveteursPage extends StatelessWidget {
   final String ville;
 
-  const AdminDatesSurveillancePage({
+  const AdminEspaceSauveteursPage({
     super.key,
     this.ville = 'VILLE_NON_RENSEIGNEE',
   });
 
   @override
   Widget build(BuildContext context) {
-    const Color pageColor = Color(0xFF1E3A8A);
+    const Color bleuRef = Color(0xFF1E3A8A);
+    const Color rougeRef = Color(0xFFDC2626);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -36,12 +37,12 @@ class AdminDatesSurveillancePage extends StatelessWidget {
                   ),
 
                   const Text(
-                    'DATES DE SURVEILLANCE',
+                    'ESPACE SAUVETEURS',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFFEF4444),
+                      color: rougeRef,
                       letterSpacing: 0.6,
                     ),
                   ),
@@ -56,49 +57,47 @@ class AdminDatesSurveillancePage extends StatelessWidget {
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: pageColor,
+                          color: bleuRef,
                           width: 2,
                         ),
                       ),
                       child: Column(
                         children: [
                           Expanded(
-                            child: _SurveillanceBand(
-                              title: 'PÉRIODES DE SURVEILLANCE',
+                            child: _SauveteurMenuButton(
+                              title: '+ CRÉER UN SAUVETEUR',
                               subtitle:
-                                  'Créer les périodes avec dates et horaires',
-                              icon: Icons.calendar_month_rounded,
-                              color: pageColor,
+                                  'Créer une nouvelle fiche sauveteur',
+                              icon: Icons.person_add_alt_1_rounded,
                               onTap: () {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => AdminPeriodesSurveillancePage(
-        ville: ville,
-      ),
-    ),
-  );
-},
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const AdminCreationSauveteurPage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
 
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 12),
 
                           Expanded(
-                            child: _SurveillanceBand(
-                              title: 'ATTRIBUTION AUX SPHOTS',
+                            child: _SauveteurMenuButton(
+                              title: 'GÉRER LES SAUVETEURS CRÉÉS',
                               subtitle:
-                                  'Attribuer les périodes créées aux SPHOTS',
-                              icon: Icons.location_on_rounded,
-                              color: const Color(0xFF1E3A8A),
+                                  'Voir, modifier ou supprimer les profils existants',
+                              icon: Icons.manage_accounts_rounded,
                               onTap: () {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => AdminAttributionSphotsPage(
-        ville: ville,
-      ),
-    ),
-  );
-},
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        AdminGestionSauveteursPage(
+                                      ville: ville,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],
@@ -109,28 +108,28 @@ class AdminDatesSurveillancePage extends StatelessWidget {
                   const SizedBox(height: 10),
 
                   Container(
-  width: 40,
-  height: 40,
-  decoration: BoxDecoration(
-    color: Colors.transparent,
-    shape: BoxShape.circle,
-    border: Border.all(
-      color: pageColor,
-      width: 2,
-    ),
-  ),
-  child: IconButton(
-    onPressed: () {
-      Navigator.of(context).pop();
-    },
-    padding: EdgeInsets.zero,
-    icon: const Icon(
-      Icons.arrow_back_ios_new_rounded,
-      color: pageColor,
-      size: 22,
-    ),
-  ),
-),
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: bleuRef,
+                        width: 2,
+                      ),
+                    ),
+                    child: IconButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: bleuRef,
+                        size: 18,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -141,34 +140,35 @@ class AdminDatesSurveillancePage extends StatelessWidget {
   }
 }
 
-class _SurveillanceBand extends StatelessWidget {
+class _SauveteurMenuButton extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
-  final Color color;
   final VoidCallback onTap;
 
-  const _SurveillanceBand({
+  const _SauveteurMenuButton({
     required this.title,
     required this.subtitle,
     required this.icon,
-    required this.color,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    const Color bleuRef = Color(0xFF1E3A8A);
+    const Color rougeRef = Color(0xFFDC2626);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: double.infinity,
         height: double.infinity,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(8, 1, 8, 8),
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: color,
+            color: bleuRef,
             width: 2.2,
           ),
         ),
@@ -177,35 +177,31 @@ class _SurveillanceBand extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: Color(0xFFEF4444),
-              size: 54,
+              color: rougeRef,
+              size: 48,
             ),
-
-            const SizedBox(height: 12),
-
+            const SizedBox(height: 8),
             Text(
               title,
               textAlign: TextAlign.center,
               maxLines: 2,
-              style: TextStyle(
-                color: color,
-                fontSize: 18,
+              style: const TextStyle(
+                color: bleuRef,
+                fontSize: 16,
                 fontWeight: FontWeight.w900,
                 height: 0.95,
               ),
             ),
-
-            const SizedBox(height: 12),
-
+            const SizedBox(height: 10),
             Text(
               subtitle,
               textAlign: TextAlign.center,
               maxLines: 3,
-              style: TextStyle(
-                color: color,
-                fontSize: 15,
+              style: const TextStyle(
+                color: bleuRef,
+                fontSize: 14,
                 fontWeight: FontWeight.w700,
-                height: 1.25,
+                height: 1.3,
               ),
             ),
           ],

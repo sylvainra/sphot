@@ -197,9 +197,11 @@ Future<void> _saveDraft() async {
       });
 
       void openMenu() {
-        closeMenu();
+  if (docs.isEmpty) return;
 
-        final renderBox =
+  closeMenu();
+
+  final renderBox =
             fieldKey.currentContext!.findRenderObject() as RenderBox;
         final position = renderBox.localToGlobal(Offset.zero);
         final size = renderBox.size;

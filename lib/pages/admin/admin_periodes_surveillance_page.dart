@@ -631,9 +631,9 @@ if (_errorMessage.isNotEmpty) ...[
     _save();
   },
   style: ElevatedButton.styleFrom(
-    backgroundColor: pageColor,
-    foregroundColor: Colors.white,
-  ),
+  backgroundColor: const Color(0xFFDC2626),
+  foregroundColor: Colors.white,
+),
   child: const Text('Enregistrer'),
 ),
       ],

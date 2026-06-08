@@ -4,14 +4,24 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class AdminSauveteurPage extends StatefulWidget {
-  const AdminSauveteurPage({super.key});
+import 'dart:async';
+
+class AdminCreationSauveteurPage extends StatefulWidget {
+  final String? docId;
+  final Map<String, dynamic>? data;
+
+  const AdminCreationSauveteurPage({
+    super.key,
+    this.docId,
+    this.data,
+  });
 
   @override
-  State<AdminSauveteurPage> createState() => _AdminSauveteurPageState();
+  State<AdminCreationSauveteurPage> createState() =>
+    _AdminCreationSauveteurPageState();
 }
 
-class _AdminSauveteurPageState extends State<AdminSauveteurPage> {
+class _AdminCreationSauveteurPageState extends State<AdminCreationSauveteurPage> {
 
 final TextEditingController nomController = TextEditingController();
 final TextEditingController prenomController = TextEditingController();
@@ -41,6 +51,40 @@ final List<String> postesSelectionnes = [];
 OverlayEntry? _dropdownOverlay;
 
 bool sauveteurEnregistre = false;
+
+@override
+void initState() {
+  super.initState();
+
+  final data = widget.data;
+  if (data == null) return;
+
+  nomController.text = (data['nom'] ?? '').toString();
+  prenomController.text = (data['prenom'] ?? '').toString();
+  dateNaissanceController.text = (data['dateNaissance'] ?? '').toString();
+  ageController.text = (data['age'] ?? '').toString();
+  adresseController.text = (data['adresse'] ?? '').toString();
+  codePostalController.text = (data['codePostal'] ?? '').toString();
+  villeController.text = (data['ville'] ?? '').toString();
+  telephoneController.text = (data['telephone'] ?? '').toString();
+  emailController.text = (data['email'] ?? '').toString();
+  experienceController.text = (data['experience'] ?? '').toString();
+  observationsController.text = (data['observations'] ?? '').toString();
+
+  final fonctions = data['fonctions'];
+  if (fonctions is Iterable) {
+    fonctionsSelectionnees
+      ..clear()
+      ..addAll(fonctions.map((e) => e.toString()));
+  }
+
+  final postes = data['postesAffectes'];
+  if (postes is Iterable) {
+    postesSelectionnes
+      ..clear()
+      ..addAll(postes.map((e) => e.toString()));
+  }
+}
 
 Future<void> _startVoice(
   TextEditingController controller, {
@@ -72,6 +116,38 @@ Future<void> _startVoice(
 
   static const Color adminColor = Color(0xFFDC2626);
 
+Future<void> _saveSauveteur() async {
+  final nom = nomController.text.trim();
+  final prenom = prenomController.text.trim();
+
+  if (nom.isEmpty || prenom.isEmpty) return;
+
+  setState(() {
+    sauveteurEnregistre = true;
+  });
+
+  final docRef = widget.docId == null
+    ? FirebaseFirestore.instance.collection('sauveteurs').doc()
+    : FirebaseFirestore.instance.collection('sauveteurs').doc(widget.docId);
+
+docRef.set({
+    'nom': nom.toUpperCase(),
+    'prenom': prenom,
+    'dateNaissance': dateNaissanceController.text.trim(),
+    'age': ageController.text.trim(),
+    'adresse': adresseController.text.trim(),
+    'codePostal': codePostalController.text.trim(),
+    'ville': villeController.text.trim().toUpperCase(),
+    'telephone': telephoneController.text.trim(),
+    'email': emailController.text.trim(),
+    'fonctions': fonctionsSelectionnees,
+    'postesAffectes': postesSelectionnes,
+    'experience': experienceController.text.trim(),
+    'observations': observationsController.text.trim(),
+    'createdAt': DateTime.now().toIso8601String(),
+  }, SetOptions(merge: true));
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -94,7 +170,7 @@ Future<void> _startVoice(
                   ),
 
                   const Text(
-                    'GESTION DES SAUVETEURS',
+  'CRÉATION D’UN SAUVETEUR',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
@@ -181,11 +257,7 @@ Future<void> _startVoice(
   width: double.infinity,
   height: 48,
   child: ElevatedButton.icon(
-    onPressed: () {
-      setState(() {
-        sauveteurEnregistre = true;
-      });
-    },
+    onPressed: _saveSauveteur,
     icon: Icon(
       Icons.save,
       color: sauveteurEnregistre

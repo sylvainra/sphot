@@ -10,27 +10,27 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
-import 'admin_validation_sphots_page.dart';
+import 'admin_gestion_sphots_page.dart';
 
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 enum AdminSphotMode { none, create, copy, edit }
 
-class AdminSphotsCommunePage extends StatefulWidget {
+class AdminEspaceSphotsPage extends StatefulWidget {
   final String? initialDocId;
 final int? initialStep;
 
-const AdminSphotsCommunePage({
+const AdminEspaceSphotsPage({
   super.key,
   this.initialDocId,
   this.initialStep,
 });
 
   @override
-  State<AdminSphotsCommunePage> createState() => _AdminSphotsCommunePageState();
+  State<AdminEspaceSphotsPage> createState() => _AdminEspaceSphotsPageState();
 }
 
-class _AdminSphotsCommunePageState extends State<AdminSphotsCommunePage> {
+class _AdminEspaceSphotsPageState extends State<AdminEspaceSphotsPage> {
   static const Color adminColor = Color(0xFF1E3A8A);
 
   final stt.SpeechToText _speech = stt.SpeechToText();
@@ -1971,9 +1971,9 @@ default:
       _summaryLine('Accès Accessibilité', _value('accesPmr'), 5),
       _summaryLine('Moyens Accessibilité', _value('moyenPmr'), 5),
 
-      _summaryLine('Activités', _value('activite'), 6),
+            _summaryLine('Activités', _value('activite'), 6),
       _summaryLine('Commerces', _value('commerce'), 6),
-          ],
+    ],
   );
 }
 }
@@ -2381,17 +2381,25 @@ Widget build(BuildContext context) {
     body: Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset('data/images/map_background.jpg', fit: BoxFit.cover),
+        Image.asset(
+          'data/images/map_background.jpg',
+          fit: BoxFit.cover,
+        ),
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
             child: Column(
               children: [
-                Image.asset('data/icons/title.png', height: 42),
-                const Text(
-                  'GESTION DES SPHOTS',
+                Image.asset(
+                  'data/icons/title.png',
+                  height: 42,
+                ),
+                Text(
+                  _hasStarted
+                      ? 'CRÉER / MODIFIER UN SPHOT'
+                      : 'ESPACE SPHOTS',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                     color: Color(0xFFDC2626),
@@ -2404,20 +2412,19 @@ Widget build(BuildContext context) {
                     width: double.infinity,
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-  color: Colors.transparent,
-  borderRadius: BorderRadius.circular(22),
-  border: Border.all(
-    color: const Color(0xFF1E3A8A),
-    width: 2,
-  ),
-),
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: const Color(0xFF1E3A8A),
+                        width: 2,
+                      ),
+                    ),
                     child: mode == AdminSphotMode.none
                         ? LayoutBuilder(
                             builder: (context, constraints) {
                               const double gap = 8;
-
-final double bandeauHeight =
-    (constraints.maxHeight - (gap * 5)) / 6;
+                              final double bandeauHeight =
+                                  (constraints.maxHeight - (gap * 5)) / 6;
 
                               return Column(
                                 children: [
@@ -2434,30 +2441,29 @@ final double bandeauHeight =
                                   ),
                                   const SizedBox(height: gap),
                                   SizedBox(
-  height: (bandeauHeight * 4) + (gap * 3),
-  child: _existingSphotsPanel(
-    bandeauHeight: bandeauHeight,
-    gap: gap,
-  ),
-),
-                                  
-                                  
+                                    height: (bandeauHeight * 4) + (gap * 3),
+                                    child: _existingSphotsPanel(
+                                      bandeauHeight: bandeauHeight,
+                                      gap: gap,
+                                    ),
+                                  ),
                                   const SizedBox(height: gap),
                                   SizedBox(
                                     height: bandeauHeight,
                                     child: _modeButton(
-                                      title: 'CONTRÔLER/VALIDER LES SPHOTS',
+                                      title: 'GÉRER LES SPHOTS',
                                       subtitle: '',
                                       icon: Icons.fact_check_rounded,
                                       color: const Color(0xFF16A34A),
                                       selected: false,
                                       onTap: () {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => const AdminValidationSphotsPage(),
-    ),
-  );
-},
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const AdminGestionSphotsPage(),
+                                          ),
+                                        );
+                                      },
                                     ),
                                   ),
                                 ],
@@ -2480,54 +2486,51 @@ final double bandeauHeight =
                 _stepControls(),
                 const SizedBox(height: 4),
                 Container(
-  width: 40,
-  height: 40,
-  decoration: BoxDecoration(
-    color: Colors.transparent,
-    shape: BoxShape.circle,
-    border: Border.all(
-      color: const Color(0xFF1E3A8A),
-      width: 2,
-    ),
-  ),
-  child: IconButton(
-    onPressed: () {
-  if (_hasStarted) {
-    setState(() {
-      mode = AdminSphotMode.none;
-      selectedDocId = null;
-      step = 0;
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF1E3A8A),
+                      width: 2,
+                    ),
+                  ),
+                  child: IconButton(
+                    onPressed: () {
+                      if (_hasStarted) {
+                        setState(() {
+                          mode = AdminSphotMode.none;
+                          selectedDocId = null;
+                          step = 0;
+                          existingSphotMessage = null;
+                          saveSphotMessage = null;
+                          _summaryReadToEnd = false;
+                          _summaryUserScrolled = false;
+                          _sphotJustSaved = false;
+                          _confirmDelete = false;
+                          _clearForm();
+                        });
+                        return;
+                      }
 
-      existingSphotMessage = null;
-      saveSphotMessage = null;
-
-      _summaryReadToEnd = false;
-      _summaryUserScrolled = false;
-      _sphotJustSaved = false;
-      _confirmDelete = false;
-
-      _clearForm();
-    });
-    return;
-  }
-
-  Navigator.of(context).pop();
-},
-    padding: EdgeInsets.zero,
-    icon: const Icon(
-      Icons.arrow_back_ios_new_rounded,
-      color: Color(0xFF1E3A8A),
-      size: 18,
-    ),
-  ),
-),
+                      Navigator.of(context).pop();
+                    },
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: Color(0xFF1E3A8A),
+                      size: 18,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ),
       ],
     ),
-   );
+    );
 }
 }
 

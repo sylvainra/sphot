@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 
-import 'admin_sphots_commune_page.dart';
+import 'admin_espace_sphots_page.dart';
 
-import 'admin_sauveteur_page.dart';
+import 'admin_espace_sauveteurs_page.dart';
 
 import 'admin_dates_surveillance_page.dart';
 
-class AdminMenuPage extends StatelessWidget {
+import 'admin_espace_surveillance_page.dart';
+
+class AdminEspacePage extends StatelessWidget {
   final String ville;
 
-  const AdminMenuPage({
+  const AdminEspacePage({
     super.key,
     this.ville = 'VILLE_NON_RENSEIGNEE',
   });
@@ -39,7 +41,7 @@ class AdminMenuPage extends StatelessWidget {
                   ),
 
                   const Text(
-                    'ESPACE ADMIN MAIRIE',
+                    'ESPACE ADMIN',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
@@ -76,7 +78,7 @@ class AdminMenuPage extends StatelessWidget {
     onTap: () {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => const AdminSphotsCommunePage(),
+          builder: (_) => const AdminEspaceSphotsPage(),
         ),
       );
     },
@@ -97,9 +99,9 @@ Expanded(
     onTap: () {
   Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (_) => AdminDatesSurveillancePage(
-        ville: ville,
-      ),
+      builder: (_) => AdminEspaceSurveillancePage(
+  ville: ville,
+),
     ),
   );
 },
@@ -118,7 +120,9 @@ Expanded(
     onTap: () {
   Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (_) => const AdminSauveteurPage(),
+      builder: (_) => AdminEspaceSauveteursPage(
+  ville: ville,
+),
     ),
   );
 },

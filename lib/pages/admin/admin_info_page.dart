@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class AdminMenuPage extends StatelessWidget {
-  const AdminMenuPage({super.key});
+class AdminEspacePage extends StatelessWidget {
+  const AdminEspacePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +63,7 @@ class AdminMenuPage extends StatelessWidget {
                             height: 110,
                             onTap: () {
                               // Prochaine étape :
-                              // Navigator vers AdminSphotsCommunePage
+                              // Navigator vers AdminEspaceSphotsPage
                             },
                           ),
 
