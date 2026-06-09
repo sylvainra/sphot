@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'admin_attribution_sphots_page.dart';
+import 'admin_attribution_sphot_page.dart';
 import 'admin_periodes_surveillance_page.dart';
 
 class AdminEspaceSurveillancePage extends StatelessWidget {

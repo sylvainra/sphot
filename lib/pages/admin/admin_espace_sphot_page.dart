@@ -10,27 +10,27 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
-import 'admin_gestion_sphots_page.dart';
+import 'admin_gestion_sphot_page.dart';
 
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 enum AdminSphotMode { none, create, copy, edit }
 
-class AdminEspaceSphotsPage extends StatefulWidget {
+class AdminEspaceSphotPage extends StatefulWidget {
   final String? initialDocId;
 final int? initialStep;
 
-const AdminEspaceSphotsPage({
+const AdminEspaceSphotPage({
   super.key,
   this.initialDocId,
   this.initialStep,
 });
 
   @override
-  State<AdminEspaceSphotsPage> createState() => _AdminEspaceSphotsPageState();
+  State<AdminEspaceSphotPage> createState() => _AdminEspaceSphotPageState();
 }
 
-class _AdminEspaceSphotsPageState extends State<AdminEspaceSphotsPage> {
+class _AdminEspaceSphotPageState extends State<AdminEspaceSphotPage> {
   static const Color adminColor = Color(0xFF1E3A8A);
 
   final stt.SpeechToText _speech = stt.SpeechToText();
@@ -2395,9 +2395,15 @@ Widget build(BuildContext context) {
                   height: 42,
                 ),
                 Text(
-                  _hasStarted
-                      ? 'CRÉER / MODIFIER UN SPHOT'
-                      : 'ESPACE SPHOTS',
+  !_hasStarted
+      ? 'ESPACE SPHOT(S)'
+      : mode == AdminSphotMode.create
+          ? 'CRÉER UN SPHOT'
+          : mode == AdminSphotMode.edit
+              ? 'MODIFIER UN SPHOT'
+              : mode == AdminSphotMode.copy
+                  ? 'COPIER UN SPHOT'
+                  : 'ESPACE SPHOT(S)',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 18,
@@ -2451,7 +2457,7 @@ Widget build(BuildContext context) {
                                   SizedBox(
                                     height: bandeauHeight,
                                     child: _modeButton(
-                                      title: 'GÉRER LES SPHOTS',
+                                      title: 'GÉRER LE(S) SPHOT(S)',
                                       subtitle: '',
                                       icon: Icons.fact_check_rounded,
                                       color: const Color(0xFF16A34A),
@@ -2460,7 +2466,7 @@ Widget build(BuildContext context) {
                                         Navigator.of(context).push(
                                           MaterialPageRoute(
                                             builder: (_) =>
-                                                const AdminGestionSphotsPage(),
+                                                const AdminGestionSphotPage(),
                                           ),
                                         );
                                       },

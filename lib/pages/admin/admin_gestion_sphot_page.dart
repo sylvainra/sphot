@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 
 import 'admin_controle_sphot_page.dart';
 
-class AdminGestionSphotsPage extends StatelessWidget {
-  const AdminGestionSphotsPage({super.key});
+class AdminGestionSphotPage extends StatelessWidget {
+  const AdminGestionSphotPage({super.key});
 
   static const Color pageColor = Color(0xFF16A34A);
 
@@ -45,7 +45,7 @@ class AdminGestionSphotsPage extends StatelessWidget {
                     fit: BoxFit.contain,
                   ),
                   const Text(
-                    'GESTION DES SPHOTS',
+                    'GESTION DU/DES SPHOT(S)',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,

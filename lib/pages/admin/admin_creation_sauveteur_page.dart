@@ -169,15 +169,17 @@ docRef.set({
                     height: 56,
                   ),
 
-                  const Text(
-  'CRÉATION D’UN SAUVETEUR',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: adminColor,
-                    ),
-                  ),
+                  Text(
+  widget.docId != null
+      ? 'MODIFICATION D’UN SAUVETEUR'
+      : 'CRÉATION D’UN SAUVETEUR',
+  textAlign: TextAlign.center,
+  style: const TextStyle(
+    fontSize: 22,
+    fontWeight: FontWeight.w900,
+    color: adminColor,
+  ),
+),
 
                   const SizedBox(height: 10),
 

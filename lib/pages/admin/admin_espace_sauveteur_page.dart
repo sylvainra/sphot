@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'admin_creation_sauveteur_page.dart';
-import 'admin_gestion_sauveteurs_page.dart';
+import 'admin_gestion_sauveteur_page.dart';
 
-class AdminEspaceSauveteursPage extends StatelessWidget {
+class AdminEspaceSauveteurPage extends StatelessWidget {
   final String ville;
 
-  const AdminEspaceSauveteursPage({
+  const AdminEspaceSauveteurPage({
     super.key,
     this.ville = 'VILLE_NON_RENSEIGNEE',
   });
@@ -37,7 +37,7 @@ class AdminEspaceSauveteursPage extends StatelessWidget {
                   ),
 
                   const Text(
-                    'ESPACE SAUVETEURS',
+                    'ESPACE SAUVETEUR(S)',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
@@ -65,7 +65,7 @@ class AdminEspaceSauveteursPage extends StatelessWidget {
                         children: [
                           Expanded(
                             child: _SauveteurMenuButton(
-                              title: '+ CRÉER UN SAUVETEUR',
+                              title: '+ CRÉER\nUN SAUVETEUR',
                               subtitle:
                                   'Créer une nouvelle fiche sauveteur',
                               icon: Icons.person_add_alt_1_rounded,
@@ -84,15 +84,15 @@ class AdminEspaceSauveteursPage extends StatelessWidget {
 
                           Expanded(
                             child: _SauveteurMenuButton(
-                              title: 'GÉRER LES SAUVETEURS CRÉÉS',
+                              title: 'GÉRER\nLE(S) SAUVETEUR(S) CRÉÉ(S)',
                               subtitle:
-                                  'Voir, modifier ou supprimer les profils existants',
+                                  'Voir, modifier ou supprimer\nle(s) sauveteur(s) existant(s)',
                               icon: Icons.manage_accounts_rounded,
                               onTap: () {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (_) =>
-                                        AdminGestionSauveteursPage(
+                                        AdminGestionSauveteurPage(
                                       ville: ville,
                                     ),
                                   ),
@@ -189,7 +189,7 @@ class _SauveteurMenuButton extends StatelessWidget {
                 color: bleuRef,
                 fontSize: 16,
                 fontWeight: FontWeight.w900,
-                height: 0.95,
+                height: 1.35,
               ),
             ),
             const SizedBox(height: 10),

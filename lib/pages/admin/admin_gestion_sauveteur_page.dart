@@ -2,10 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'admin_controle_sauveteur_page.dart';
 
-class AdminGestionSauveteursPage extends StatelessWidget {
+class AdminGestionSauveteurPage extends StatelessWidget {
   final String ville;
 
-  const AdminGestionSauveteursPage({
+  const AdminGestionSauveteurPage({
     super.key,
     this.ville = 'VILLE_NON_RENSEIGNEE',
   });
@@ -35,7 +35,7 @@ class AdminGestionSauveteursPage extends StatelessWidget {
                     fit: BoxFit.contain,
                   ),
                   const Text(
-                    'GESTION DES SAUVETEURS',
+                    'GESTION DU/DES SAUVETEUR(S)',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 21,

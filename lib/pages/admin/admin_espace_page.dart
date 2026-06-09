@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import 'admin_espace_sphots_page.dart';
+import 'admin_espace_sphot_page.dart';
 
-import 'admin_espace_sauveteurs_page.dart';
+import 'admin_espace_sauveteur_page.dart';
 
-import 'admin_dates_surveillance_page.dart';
+import 'admin_espace_surveillance_page.dart';
 
 import 'admin_espace_surveillance_page.dart';
 
@@ -69,16 +69,16 @@ class AdminEspacePage extends StatelessWidget {
                         children: [
                           Expanded(
   child: _AdminButton(
-    title: 'SPHOTS',
+    title: 'SPHOT(S)',
     subtitle:
-        'Créer, voir, copier, modifier, supprimer\nles SPHOTS',
+        'Créer, voir, copier, modifier, supprimer\nle(s) SPHOT(S)',
     imageAsset: 'data/icons/fire_red_icon.png',
     topSpacing: 2,
     color: const Color(0xFF1E3A8A),
     onTap: () {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => const AdminEspaceSphotsPage(),
+          builder: (_) => const AdminEspaceSphotPage(),
         ),
       );
     },
@@ -112,15 +112,15 @@ const SizedBox(height: 12),
 
 Expanded(
   child: _AdminButton(
-    title: 'SAUVETEURS',
+    title: 'SAUVETEUR(S)',
     subtitle:
-        'Créer, modifier et gérer\nles sauveteurs affectés aux SPHOTS',
+        'Créer, modifier et gérer le(s) sauveteur(s)\naffecté(s) au(x) SPHOT(S)',
     icon: Icons.groups_rounded,
     color: const Color(0xFFDC2626),
     onTap: () {
   Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (_) => AdminEspaceSauveteursPage(
+      builder: (_) => AdminEspaceSauveteurPage(
   ville: ville,
 ),
     ),
