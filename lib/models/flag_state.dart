@@ -5,6 +5,9 @@ class SpotFlagState {
   final String ville;
   final String departement;
 
+  final String logoVille;
+  final String siteInternetVille;
+
   final double villeLat;
   final double villeLng;
   final double departementLat;
@@ -28,6 +31,8 @@ class SpotFlagState {
     required this.nomSphot,
     required this.ville,
     required this.departement,
+    required this.logoVille,
+    required this.siteInternetVille,
     required this.villeLat,
     required this.villeLng,
     required this.departementLat,
@@ -51,6 +56,8 @@ class SpotFlagState {
     nomSphot: _readString(data['nomSphot']),
     ville: _readString(data['ville']),
     departement: _readString(data['departement']),
+    logoVille: _readString(data['logoVille']),
+    siteInternetVille: _readString(data['siteInternetVille']),
 
     villeLat: _readDouble(data['villeLat']),
     villeLng: _readDouble(data['villeLng']),

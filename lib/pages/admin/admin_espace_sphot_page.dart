@@ -88,9 +88,11 @@ bool _confirmDelete = false;
     'sphotLat',
     'sphotLng',
     'adresseWebcam',
+    'photoSphot',
     'arretesMunicipaux',
     'equipement',
     'labelSphot',
+    'qualiteEau',
     'accesPmr',
     'moyenPmr',
     'labelPmr',
@@ -100,8 +102,7 @@ bool _confirmDelete = false;
 
   final List<String> typeSphotChoices = [
   '🚨 POSTE DE SECOURS 🚨',
-  '🏖️ ACCÈS PLAGE',
-  '🌊 PLAGE',
+  '🏖️ PLAGE',
   '🏞️ LAC',
   '🏞️ ÉTANG',
   '🌊 FLEUVE',
@@ -151,6 +152,7 @@ bool _confirmDelete = false;
     'AUCUN',
     '🟦 PAVILLON BLEU',
     '♿ HANDIPLAGE',
+    '🚭 PLAGE SANS TABAC',
     '🌿 GREEN COAST AWARD',
     '🌸 VILLES ET VILLAGES FLEURIS',
     '🏄 VILLE DE SURF',
@@ -163,6 +165,13 @@ bool _confirmDelete = false;
     '🌍 UNESCO',
     'AUTRE',
   ];
+
+final List<String> qualiteEauChoices = [
+  'QUALITÉ DE L\'EAU EXCELLENTE',
+  'QUALITÉ DE L\'EAU BONNE',
+  'QUALITÉ DE L\'EAU SUFFISANTE',
+  'QUALITÉ DE L\'EAU INSUFFISANTE',
+];
 
   final List<String> accesPmrChoices = [
     'Oui',
@@ -398,6 +407,7 @@ super.dispose();
     _controller('sphotLat').clear();
     _controller('sphotLng').clear();
     _controller('adresseWebcam').clear();
+    _controller('photoSphot').clear();
 
     setState(() {});
   }
@@ -438,9 +448,11 @@ super.dispose();
     'sphotLat': double.tryParse(_value('sphotLat').replaceAll(',', '.')) ?? 0.0,
     'sphotLng': double.tryParse(_value('sphotLng').replaceAll(',', '.')) ?? 0.0,
     'adresseWebcam': _value('adresseWebcam'),
+    'photoSphot': _value('photoSphot'),
     'arretesMunicipaux': _value('arretesMunicipaux'),
     'equipement': _value('equipement'),
     'labelSphot': _value('labelSphot'),
+    'qualiteEau': _value('qualiteEau'),
     'accesPmr': _value('accesPmr'),
     'moyenPmr': _value('moyenPmr'),
     'labelPmr': _value('labelPmr'),
@@ -1072,14 +1084,42 @@ Widget _dropdownField(
                                 horizontal: 14,
                                 vertical: 10,
                               ),
-                              child: Text(
-                                choice,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: const Color(0xFF1E3A8A),
-                                ),
-                              ),
+                              child: key == 'qualiteEau'
+    ? Row(
+        children: [
+          Image.asset(
+            choice == 'QUALITÉ DE L\'EAU EXCELLENTE'
+                ? 'data/icons/qualite_eau_excellente.png'
+                : choice == 'QUALITÉ DE L\'EAU BONNE'
+                    ? 'data/icons/qualite_eau_bonne.png'
+                    : choice == 'QUALITÉ DE L\'EAU SUFFISANTE'
+                        ? 'data/icons/qualite_eau_suffisante.png'
+                        : 'data/icons/qualite_eau_insuffisante.png',
+            width: 36,
+            height: 36,
+            fit: BoxFit.contain,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              choice,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E3A8A),
+              ),
+            ),
+          ),
+        ],
+      )
+    : Text(
+        choice,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF1E3A8A),
+        ),
+      ),
                             ),
                           );
                         },
@@ -1573,6 +1613,44 @@ Future<void> _importLogoVille() async {
   _showMessage('Logo de la ville importé');
 }
 
+Future<void> _importPhotoSphot() async {
+  final picker = ImagePicker();
+
+  final pickedFile = await picker.pickImage(
+    source: ImageSource.gallery,
+    imageQuality: 85,
+  );
+
+  if (pickedFile == null) return;
+
+  final file = File(pickedFile.path);
+
+  final idSphot = _value('idSphot').isEmpty
+      ? 'sphot_non_renseigne'
+      : _value('idSphot')
+          .toLowerCase()
+          .replaceAll(' ', '_')
+          .replaceAll('-', '_')
+          .replaceAll("'", '_');
+
+  final fileName =
+      'photo_sphot_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+  final ref = FirebaseStorage.instance.ref(
+    'photos_sphots/$idSphot/$fileName',
+  );
+
+  await ref.putFile(file);
+
+  final url = await ref.getDownloadURL();
+
+  setState(() {
+    _controller('photoSphot').text = url;
+  });
+
+  _showMessage('Photo du SPHOT importée');
+}
+
   Widget _currentStep() {
     switch (step) {
       case 0:
@@ -1849,12 +1927,65 @@ _twoColumns(
         return Column(
           children: [
             _stepHeader(
-              '4. INFORMATIONS MAIRIE',
+              '4. INFORMATIONS',
               'Ajoutez les liens externes utiles',
             ),
             _textField('adresseWebcam', 'Adresse internet de la webcam du SPHOT'),
-            const SizedBox(height: 8),
-            _textField('arretesMunicipaux', 'Adresse internet des arrêtés municipaux du SPHOT'),
+
+const SizedBox(height: 8),
+
+TextField(
+  controller: _controller('photoSphot'),
+  readOnly: true,
+  onTap: _importPhotoSphot,
+  style: const TextStyle(
+    fontWeight: FontWeight.w700,
+    fontSize: 16,
+    color: Color(0xFF1E3A8A),
+  ),
+  decoration: InputDecoration(
+    label: const Text(
+      'Importer une photo du SPHOT (jpg)',
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        color: Color(0xFF1E3A8A),
+      ),
+    ),
+    filled: true,
+    suffixIcon: IconButton(
+      icon: const Icon(
+        Icons.photo_camera_rounded,
+        color: Color(0xFFDC2626),
+      ),
+      onPressed: _importPhotoSphot,
+    ),
+    fillColor: Colors.transparent,
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: 12,
+      vertical: 10,
+    ),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: Colors.black, width: 1.4),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: Colors.black, width: 1.4),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: Color(0xFF1E3A8A),
+        width: 2,
+      ),
+    ),
+  ),
+),
+
+const SizedBox(height: 8),
+
+_textField('arretesMunicipaux', 'Adresse internet des arrêtés municipaux du SPHOT'),
           ],
         );
 
@@ -1873,11 +2004,20 @@ _twoColumns(
             ),
             const SizedBox(height: 8),
             _multiDropdownField(
-              'labelSphot',
-              'Labels du SPHOT',
-              labelSphotChoices,
-              maxMenuHeight: 213,
-            ),
+  'labelSphot',
+  'Labels du SPHOT',
+  labelSphotChoices,
+  maxMenuHeight: 213,
+),
+
+const SizedBox(height: 8),
+
+_dropdownField(
+  'qualiteEau',
+  'Qualité des eaux de baignade',
+  qualiteEauChoices,
+  maxMenuHeight: 170,
+),
           ],
         );
 
@@ -1966,6 +2106,7 @@ default:
 
       _summaryLine('Équipements', _value('equipement'), 4),
       _summaryLine('Labels SPHOT', _value('labelSphot'), 4),
+      _summaryLine('Qualité des eaux de baignade', _value('qualiteEau'), 4),
 
       _summaryLine('Labels Accessibilité', _value('labelPmr'), 5),
       _summaryLine('Accès Accessibilité', _value('accesPmr'), 5),

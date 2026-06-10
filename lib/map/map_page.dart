@@ -16,10 +16,12 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import 'app_info_page.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+
 enum SpotFilter {
   all,
   secours,
-  accesPlage,
+  plage,
   eauBleue,
   eauVerte,
   lagon,
@@ -118,47 +120,83 @@ void initState() {
     return 0.0;
   }
 
-  List<Marker> _buildTerritoryLogoMarkers(double zoom, double rotation) {
-    final markers = <Marker>[];
+  Future<void> _openCityWebsite(String rawUrl) async {
+  var url = rawUrl.trim();
 
-    if (zoom >= 9 && zoom < 12) {
-      markers.add(
-        Marker(
-          point: const LatLng(46.6706076, -1.4266839),
-          width: 80,
-          height: 80,
-          child: Transform.rotate(
-            angle: -rotation * pi / 180,
-            child: Image.asset(
-              'data/logos_departements/france/pays_de_la_loire/vendee.png',
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (zoom >= 12) {
-      markers.add(
-        Marker(
-          point: const LatLng(46.4239682, -1.4897203),
-          width: 70,
-          height: 70,
-          child: Transform.rotate(
-            angle: -rotation * pi / 180,
-            child: Image.asset(
-              'data/logos_communes/france/pays_de_la_loire/vendee/longeville_sur_mer.png',
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return markers;
+  if (url.isEmpty) {
+    _showMapMessage('Site internet de la ville non renseigné.');
+    return;
   }
+
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = 'https://$url';
+  }
+
+  final uri = Uri.tryParse(url);
+
+  if (uri == null) {
+    _showMapMessage('Adresse du site internet invalide.');
+    return;
+  }
+
+  final opened = await launchUrl(
+    uri,
+    mode: LaunchMode.externalApplication,
+  );
+
+  if (!opened) {
+    _showMapMessage('Impossible d’ouvrir le site internet.');
+  }
+}
+
+List<Marker> _buildTerritoryLogoMarkers(
+  List<SpotFlagState> spots,
+  double zoom,
+  double rotation,
+) {
+  final markers = <Marker>[];
+
+  if (zoom < 12) return markers;
+
+  final cities = <String, SpotFlagState>{};
+
+  for (final spot in spots) {
+    final ville = spot.ville.trim();
+
+    if (ville.isEmpty) continue;
+    if (spot.villeLat == 0 || spot.villeLng == 0) continue;
+
+    cities.putIfAbsent(ville, () => spot);
+  }
+
+  for (final spot in cities.values) {
+    final logoVille = spot.logoVille.trim();
+    final siteInternetVille = spot.siteInternetVille.trim();
+
+    if (logoVille.isEmpty) continue;
+
+    markers.add(
+      Marker(
+        point: LatLng(spot.villeLat, spot.villeLng),
+        width: 70,
+        height: 70,
+        child: GestureDetector(
+          onTap: () => _openCityWebsite(siteInternetVille),
+          child: Transform.rotate(
+            angle: -rotation * pi / 180,
+            child: Image.network(
+              logoVille,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  return markers;
+}
 
   String _getMarkerIconPath(SpotFlagState spot) {
     final type = spot.normalizedType;
@@ -215,7 +253,7 @@ void initState() {
         return true;
       case SpotFilter.secours:
         return spot.isPosteSecours;
-      case SpotFilter.accesPlage:
+      case SpotFilter.plage:
         return type.contains('ACCES PLAGE');
       case SpotFilter.eauBleue:
         return type.contains('LAC') ||
@@ -242,8 +280,8 @@ void initState() {
         return 'SPHOTS';
       case SpotFilter.secours:
         return 'SPHOT\nPoste de secours';
-      case SpotFilter.accesPlage:
-        return 'SPHOT\nAccès plage';
+      case SpotFilter.plage:
+        return 'SPHOT\nPlage';
       case SpotFilter.eauBleue:
         return "SPHOT\nLac\nPlan d'eau\nBarrage";
       case SpotFilter.eauVerte:
@@ -253,7 +291,7 @@ void initState() {
       case SpotFilter.naturisme:
         return 'SPHOT\nNaturisme';
       case SpotFilter.autre:
-        return 'SPHOT\nAutre\nNon renseigné';
+        return 'SPHOT\nBase de loisirs\nParc';
     }
   }
 
@@ -263,7 +301,7 @@ void initState() {
       return const Color(0xFFFF0000);
     case SpotFilter.secours:
       return const Color(0xFFFF0000);
-    case SpotFilter.accesPlage:
+    case SpotFilter.plage:
       return const Color(0xFFFFD000);
     case SpotFilter.eauBleue:
       return const Color(0xFF1E3A8A);
@@ -274,7 +312,7 @@ void initState() {
     case SpotFilter.naturisme:
       return const Color(0xFFD87A5C);
     case SpotFilter.autre:
-      return Colors.black87;
+      return const Color(0xFFFFA500);
   }
 }
 
@@ -288,7 +326,7 @@ void initState() {
         return const _SphotSpinnerIcon();
       case SpotFilter.secours:
         return const _DrawerFlagIcon();
-      case SpotFilter.accesPlage:
+      case SpotFilter.plage:
         return _drawerAssetIcon('data/icons/fire_orange_icon.png');
       case SpotFilter.eauBleue:
         return _drawerAssetIcon('data/icons/fire_blue_icon.png');
@@ -299,7 +337,7 @@ void initState() {
       case SpotFilter.naturisme:
         return _drawerAssetIcon('data/icons/fire_skin_icon.png');
       case SpotFilter.autre:
-        return _drawerAssetIcon('data/icons/fire_black_icon.png');
+        return _drawerAssetIcon('data/icons/fire_orange1_icon.png');
     }
   }
 
@@ -681,8 +719,8 @@ String _filterShortLabel(SpotFilter filter) {
       return 'Tous les SPHOTS';
     case SpotFilter.secours:
       return 'Poste de secours';
-    case SpotFilter.accesPlage:
-      return 'Accès plage';
+    case SpotFilter.plage:
+      return 'Plage';
     case SpotFilter.eauBleue:
       return "Lac\nPlan d'eau\nBarrage";
     case SpotFilter.eauVerte:
@@ -692,7 +730,7 @@ String _filterShortLabel(SpotFilter filter) {
     case SpotFilter.naturisme:
       return 'Naturisme';
     case SpotFilter.autre:
-      return 'Autre\nNon renseigné';
+      return 'Base de loisirs\nParc';
   }
 }
 
@@ -710,9 +748,9 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
       child: Padding(
         padding: const EdgeInsets.only(bottom: 4),
         child: Material(
-          color: Colors.white.withOpacity(0.94),
-          elevation: 4,
-          borderRadius: BorderRadius.circular(10),
+  color: Colors.white.withOpacity(0.95),
+  elevation: 2,
+  borderRadius: BorderRadius.circular(10),
           child: InkWell(
             borderRadius: BorderRadius.circular(10),
             onTap: () {
@@ -722,16 +760,17 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
               });
             },
             child: Container(
-              width: 190,
-              height: 52,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: selected ? color : Colors.grey.withOpacity(0.5),
-                  width: selected ? 2 : 1.2,
-                ),
-              ),
+  width: 190,
+  height: 52,
+  padding: const EdgeInsets.symmetric(horizontal: 10),
+  decoration: BoxDecoration(
+  color: Colors.white.withOpacity(0.95),
+    borderRadius: BorderRadius.circular(10),
+    border: Border.all(
+      color: selected ? color : Colors.grey.withOpacity(0.5),
+      width: selected ? 2 : 1.2,
+    ),
+  ),
               child: Row(
                 children: [
                   SizedBox(
@@ -767,6 +806,17 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
 }
 
 Widget _buildVerticalFilterMenu() {
+  final orderedFilters = [
+    SpotFilter.all,
+    SpotFilter.secours,
+    SpotFilter.eauVerte,
+    SpotFilter.lagon,
+    SpotFilter.eauBleue,
+    SpotFilter.plage,
+    SpotFilter.naturisme,
+    SpotFilter.autre,
+  ];
+
   return Positioned(
     left: 8,
     bottom: 120,
@@ -780,12 +830,10 @@ Widget _buildVerticalFilterMenu() {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: List.generate(
-              SpotFilter.values.length,
+              orderedFilters.length,
               (index) {
-                final reversedIndex = SpotFilter.values.length - 1 - index;
-
                 return _verticalFilterChoiceButton(
-                  SpotFilter.values[reversedIndex],
+                  orderedFilters[index],
                   index,
                 );
               },
@@ -1733,7 +1781,7 @@ onPositionChanged: (position, hasGesture) {
                       final rotation = MapCamera.of(context).rotation;
 
                       return MarkerLayer(
-                        markers: _buildTerritoryLogoMarkers(zoom, rotation),
+                        markers: _buildTerritoryLogoMarkers(allSpots, zoom, rotation),
                       );
                     },
                   ),
@@ -1910,7 +1958,7 @@ class _SphotSpinnerIconState extends State<_SphotSpinnerIcon> {
     'data/icons/fire_green_icon.png',
     'data/icons/fire_cyan_icon.png',
     'data/icons/fire_skin_icon.png',
-    'data/icons/fire_black_icon.png',
+    'data/icons/fire_orange1_icon.png',
   ];
 
   @override

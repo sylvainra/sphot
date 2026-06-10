@@ -145,6 +145,10 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
 Widget build(BuildContext context) {
   final isSauveteur = _selectedProfile == LoginProfile.sauveteur;
 
+final Color activeColor = isSauveteur
+    ? const Color(0xFFEF4444) // Rouge REF
+    : const Color(0xFF1E3A8A); // Bleu REF
+
   return Scaffold(
     backgroundColor: Colors.transparent,
     resizeToAvoidBottomInset: false,
@@ -204,22 +208,22 @@ Widget build(BuildContext context) {
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: Colors.black,
-                          width: 2.5,
-                        ),
+  color: activeColor,
+  width: 2.5,
+),
                       ),
                       child: Column(
                         children: [
                           Text(
                             isSauveteur
-                                ? 'Accès sauveteurs'
-                                : 'Accès administration',
+                                ? 'ACC­ÈS SAUVETEUR'
+                                : 'ACC­ÈS ADMINNISTRATION',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.black,
-                            ),
+                            style: TextStyle(
+  fontSize: 20,
+  fontWeight: FontWeight.w800,
+  color: activeColor,
+),
                           ),
 
                           const SizedBox(height: 16),
@@ -268,14 +272,16 @@ Widget build(BuildContext context) {
                               FocusScope.of(context)
                                   .requestFocus(_passwordFocusNode);
                             },
-                            style: const TextStyle(
-                              color: Colors.black,
+                            style: TextStyle(
+  color: activeColor,
                               fontWeight: FontWeight.w600,
                             ),
                             decoration: InputDecoration(
                               hintText: 'Identifiant',
-                              hintStyle:
-                                  const TextStyle(color: Colors.black54),
+                              hintStyle: TextStyle(
+  color: activeColor,
+  fontWeight: FontWeight.w700,
+),
                               filled: true,
                               fillColor: Colors.white.withOpacity(0.08),
                               contentPadding: const EdgeInsets.symmetric(
@@ -283,26 +289,26 @@ Widget build(BuildContext context) {
                                 vertical: 16,
                               ),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
-                                  width: 2,
-                                ),
-                              ),
+  borderRadius: BorderRadius.circular(16),
+  borderSide: BorderSide(
+    color: activeColor,
+    width: 2,
+  ),
+),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
-                                  width: 2,
-                                ),
-                              ),
+  borderRadius: BorderRadius.circular(16),
+  borderSide: BorderSide(
+    color: activeColor,
+    width: 2,
+  ),
+),
                               focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
-                                  width: 2.4,
-                                ),
-                              ),
+  borderRadius: BorderRadius.circular(16),
+  borderSide: BorderSide(
+    color: activeColor,
+    width: 2.4,
+  ),
+),
                             ),
                           ),
 
@@ -315,14 +321,16 @@ Widget build(BuildContext context) {
                             textInputAction: TextInputAction.done,
                             onTap: _activateEditingMode,
                             onSubmitted: (_) => _login(),
-                            style: const TextStyle(
-                              color: Colors.black,
+                            style: TextStyle(
+                             color: activeColor,
                               fontWeight: FontWeight.w600,
                             ),
                             decoration: InputDecoration(
                               hintText: 'Mot de passe',
-                              hintStyle:
-                                  const TextStyle(color: Colors.black54),
+                              hintStyle: TextStyle(
+  color: activeColor,
+  fontWeight: FontWeight.w700,
+),
                               filled: true,
                               fillColor: Colors.white.withOpacity(0.08),
                               contentPadding: const EdgeInsets.symmetric(
@@ -330,26 +338,26 @@ Widget build(BuildContext context) {
                                 vertical: 16,
                               ),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
-                                  width: 2,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
-                                  width: 2,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
-                                  width: 2.4,
-                                ),
-                              ),
+  borderRadius: BorderRadius.circular(16),
+  borderSide: BorderSide(
+    color: activeColor,
+    width: 2,
+  ),
+),
+enabledBorder: OutlineInputBorder(
+  borderRadius: BorderRadius.circular(16),
+  borderSide: BorderSide(
+    color: activeColor,
+    width: 2,
+  ),
+),
+focusedBorder: OutlineInputBorder(
+  borderRadius: BorderRadius.circular(16),
+  borderSide: BorderSide(
+    color: activeColor,
+    width: 2.4,
+  ),
+),
                             ),
                           ),
 
@@ -361,17 +369,15 @@ Widget build(BuildContext context) {
                             child: ElevatedButton(
                               onPressed: _login,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isSauveteur
-                                    ? const Color(0xFFFF0000)
-                                    : const Color(0xFF1E3A8A),
-                                foregroundColor: Colors.white,
+                                backgroundColor: Colors.transparent,
+                                foregroundColor: activeColor,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(18),
-                                  side: const BorderSide(
-                                    color: Colors.black,
-                                    width: 2,
-                                  ),
+                                  side: BorderSide(
+  color: activeColor,
+  width: 2,
+),
                                 ),
                               ),
                               child: const Text(
@@ -399,17 +405,17 @@ Widget build(BuildContext context) {
                         color: Colors.transparent,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.black,
-                          width: 2,
-                        ),
+  color: Colors.white,
+  width: 2,
+),
                       ),
                       child: IconButton(
                         onPressed: () => Navigator.of(context).pop(),
                         icon: const Icon(
-                          Icons.arrow_back,
-                          color: Colors.black,
-                          size: 30,
-                        ),
+  Icons.arrow_back,
+  color: Colors.white,
+  size: 30,
+),
                       ),
                     ),
 
@@ -436,9 +442,7 @@ Widget build(BuildContext context) {
         duration: const Duration(milliseconds: 220),
         height: 54,
         decoration: BoxDecoration(
-          color: selected
-    ? color.withOpacity(0.18)
-    : Colors.transparent,
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: color, width: 2),
         ),
@@ -446,7 +450,7 @@ Widget build(BuildContext context) {
           child: Text(
             label,
             style: TextStyle(
-              color: selected ? Colors.white : color,
+              color: selected ? color : Colors.white,
               fontSize: 15,
               fontWeight: FontWeight.w900,
             ),
