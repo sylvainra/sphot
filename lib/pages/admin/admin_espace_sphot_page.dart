@@ -1661,11 +1661,6 @@ Future<void> _importPhotoSphot() async {
               'Renseignez la commune concernée par ce SPHOT',
             ),
             _textField(
-  'idSphot',
-  'Numéro du SPHOT (01, 02...)',
-),
-            const SizedBox(height: 8),
-            _textField(
   'pays',
   'PAYS',
   uppercase: true,
@@ -1733,6 +1728,13 @@ const SizedBox(height: 8),
 _textField(
   'siteInternetVille',
   'Site internet de la ville',
+),
+
+const SizedBox(height: 8),
+
+_textField(
+  'arretesMunicipaux',
+  'Adresse internet des arrêtés municipaux',
 ),
 
 const SizedBox(height: 8),
@@ -1811,6 +1813,12 @@ const SizedBox(height: 8),
               '2. IDENTIFICATION',
               'Nommez le SPHOT et choisissez son type\net sa nature',
             ),
+            _textField(
+  'idSphot',
+  'Numéro du SPHOT (01, 02...)',
+),
+
+const SizedBox(height: 8),
             _textField(
   'nomSecours',
   'Repère secours (ex.: LONGE 01)',
@@ -1983,9 +1991,7 @@ TextField(
   ),
 ),
 
-const SizedBox(height: 8),
 
-_textField('arretesMunicipaux', 'Adresse internet des arrêtés municipaux du SPHOT'),
           ],
         );
 
@@ -2091,7 +2097,8 @@ default:
       _summaryLine('Ville', _value('ville'), 0),
       _summaryLine('Latitude ville', _value('villeLat'), 0),
       _summaryLine('Longitude ville', _value('villeLng'), 0),
-      _summaryLine('Site internet ville', _value('siteInternetVille'), 0),
+      _summaryLine('Arrêtés municipaux', _value('arretesMunicipaux'), 0),
+      
 
       _summaryLine('Repère secours', _value('nomSecours'), 1),
       _summaryLine('Nom du SPHOT', _value('nomSphot'), 1),
@@ -2102,7 +2109,7 @@ default:
       _summaryLine('Longitude SPHOT', _value('sphotLng'), 2),
 
       _summaryLine('Webcam', _value('adresseWebcam'), 3),
-      _summaryLine('Arrêtés municipaux', _value('arretesMunicipaux'), 3),
+      _summaryLine('Arrêtés municipaux', _value('arretesMunicipaux'), 0),
 
       _summaryLine('Équipements', _value('equipement'), 4),
       _summaryLine('Labels SPHOT', _value('labelSphot'), 4),
@@ -2432,6 +2439,9 @@ Widget _existingSphotsPanel({
                             doc.id,
                             doc.data() as Map<String, dynamic>,
                           );
+                          setState(() {
+  step = 1;
+});
                         },
                 ),
               ),
