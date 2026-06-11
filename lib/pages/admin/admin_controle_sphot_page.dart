@@ -89,15 +89,19 @@ void initState() {
 
   Future<void> _deleteSphot() async {
     await FirebaseFirestore.instance
-        .collection('spots')
-        .doc(widget.docId)
-        .delete();
+    .collection('territoires')
+    .doc(data['territoireId'])
+    .collection('spots')
+    .doc(widget.docId)
+    .delete();
 
     if (!mounted) return;
 
     Navigator.of(context).pushReplacement(
   MaterialPageRoute(
-    builder: (_) => const AdminGestionSphotPage(),
+    builder: (_) => AdminGestionSphotPage(
+  territoireId: data['territoireId']?.toString() ?? '',
+),
   ),
 );
   }
@@ -113,12 +117,19 @@ void initState() {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => const AdminGestionSphotPage(),
+        builder: (_) => AdminGestionSphotPage(
+  territoireId: data['territoireId']?.toString() ?? '',
+),
       ),
     );
   });
 
-  FirebaseFirestore.instance.collection('spots').doc(widget.docId).set(
+  FirebaseFirestore.instance
+    .collection('territoires')
+    .doc(data['territoireId'])
+    .collection('spots')
+    .doc(widget.docId)
+    .set(
     {
       'sphotValide': true,
       'dateValidation': FieldValue.serverTimestamp(),
@@ -132,9 +143,10 @@ void initState() {
   Navigator.of(context).pushReplacement(
     MaterialPageRoute(
       builder: (_) => AdminEspaceSphotPage(
-        initialDocId: widget.docId,
-        initialStep: 0,
-      ),
+  initialDocId: widget.docId,
+  initialStep: 0,
+  territoireId: data['territoireId']?.toString() ?? '',
+),
     ),
   );
 }

@@ -4,6 +4,10 @@ import '../pages/admin/admin_espace_page.dart';
 
 import '../pages/sauveteur/sauveteur_menu_page.dart';
 
+import '../pages/admin/admin_registration_page.dart';
+
+import 'package:firebase_auth/firebase_auth.dart';
+
 enum LoginProfile { sauveteur, admin }
 
 class ProfilLoginPage extends StatefulWidget {
@@ -83,7 +87,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
     super.dispose();
   }
 
-  void _login() {
+  Future<void> _login() async {
   final id = _idController.text.trim().toLowerCase();
   final password = _passwordController.text.trim();
 
@@ -107,18 +111,23 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
       _showLoginError();
     }
   } else {
-    if (id == 'admin' &&
-        password == 'admin2026') {
+  try {
+    await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: _idController.text.trim(),
+      password: password,
+    );
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => AdminEspacePage(),
-        ),
-      );
-    } else {
-      _showLoginError();
-    }
+    if (!mounted) return;
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => AdminEspacePage(),
+      ),
+    );
+  } catch (error) {
+    _showLoginError();
   }
+}
 }
 
   void _showLoginError() {
@@ -277,7 +286,7 @@ final Color activeColor = isSauveteur
                               fontWeight: FontWeight.w600,
                             ),
                             decoration: InputDecoration(
-                              hintText: 'Identifiant',
+                              hintText: isSauveteur ? 'Identifiant' : 'Email admin',
                               hintStyle: TextStyle(
   color: activeColor,
   fontWeight: FontWeight.w700,
@@ -390,6 +399,39 @@ focusedBorder: OutlineInputBorder(
                               ),
                             ),
                           ),
+                          const SizedBox(height: 12),
+
+if (!isSauveteur)
+  SizedBox(
+    width: double.infinity,
+    height: 48,
+    child: OutlinedButton(
+      onPressed: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const AdminRegistrationPage(),
+          ),
+        );
+      },
+      style: OutlinedButton.styleFrom(
+        foregroundColor: activeColor,
+        side: BorderSide(
+          color: activeColor,
+          width: 2,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+      ),
+      child: const Text(
+        'CRÉER UN COMPTE ADMIN',
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    ),
+  ),
                         ],
                       ),
                     ),

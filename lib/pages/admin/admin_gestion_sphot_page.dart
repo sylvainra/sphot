@@ -4,7 +4,12 @@ import 'package:flutter/material.dart';
 import 'admin_controle_sphot_page.dart';
 
 class AdminGestionSphotPage extends StatelessWidget {
-  const AdminGestionSphotPage({super.key});
+  final String territoireId;
+
+  const AdminGestionSphotPage({
+    super.key,
+    required this.territoireId,
+  });
 
   static const Color pageColor = Color(0xFF16A34A);
 
@@ -69,8 +74,10 @@ class AdminGestionSphotPage extends StatelessWidget {
     ),
     child: StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
-                          .collection('spots')
-                          .snapshots(),
+    .collection('territoires')
+    .doc(territoireId)
+    .collection('spots')
+    .snapshots(),
                       builder: (context, snapshot) {
                         if (!snapshot.hasData) {
                           return const Center(
@@ -234,9 +241,11 @@ class AdminGestionSphotPage extends StatelessWidget {
     IconButton(
       onPressed: () async {
         await FirebaseFirestore.instance
-            .collection('spots')
-            .doc(doc.id)
-            .delete();
+    .collection('territoires')
+    .doc(territoireId)
+    .collection('spots')
+    .doc(doc.id)
+    .delete();
       },
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(

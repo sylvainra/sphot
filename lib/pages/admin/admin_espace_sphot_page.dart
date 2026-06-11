@@ -18,13 +18,15 @@ enum AdminSphotMode { none, create, copy, edit }
 
 class AdminEspaceSphotPage extends StatefulWidget {
   final String? initialDocId;
-final int? initialStep;
+  final int? initialStep;
+  final String territoireId;
 
-const AdminEspaceSphotPage({
-  super.key,
-  this.initialDocId,
-  this.initialStep,
-});
+  const AdminEspaceSphotPage({
+    super.key,
+    this.initialDocId,
+    this.initialStep,
+    this.territoireId = '',
+  });
 
   @override
   State<AdminEspaceSphotPage> createState() => _AdminEspaceSphotPageState();
@@ -68,6 +70,8 @@ bool _summaryUserScrolled = false;
 bool _sphotJustSaved = false;
 
 bool _confirmDelete = false;
+
+int _deleteCountdown = 0;
 
   final controllers = <String, TextEditingController>{};
 
@@ -276,10 +280,9 @@ void initState() {
 
   if (widget.initialDocId != null) {
   Future.microtask(() async {
-    final doc = await FirebaseFirestore.instance
-        .collection('spots')
-        .doc(widget.initialDocId!)
-        .get();
+    final doc = await _territorySpotsCollection()
+    .doc(widget.initialDocId!)
+    .get();
 
     if (!doc.exists || !mounted) return;
 
@@ -336,19 +339,63 @@ super.dispose();
 
   String _value(String key) => _controller(key).text.trim();
 
+  CollectionReference<Map<String, dynamic>> _territorySpotsCollection() {
+  return FirebaseFirestore.instance
+      .collection('territoires')
+      .doc(widget.territoireId)
+      .collection('spots');
+}
+
+Future<void> _prefillTerritoryFromFirebase() async {
+  if (widget.territoireId.trim().isEmpty) {
+    _showMessage('Aucun territoire associé à cet admin');
+    return;
+  }
+
+  final doc = await FirebaseFirestore.instance
+      .collection('territoires')
+      .doc(widget.territoireId)
+      .get();
+
+  if (!doc.exists) {
+    _showMessage('Territoire introuvable : ${widget.territoireId}');
+    return;
+  }
+
+  final data = doc.data() ?? {};
+
+  _controller('pays').text = (data['pays'] ?? '').toString();
+  _controller('region').text = (data['region'] ?? '').toString();
+  _controller('departement').text = (data['departement'] ?? '').toString();
+  _controller('ville').text = (data['ville'] ?? '').toString();
+  _controller('villeLat').text = (data['villeLat'] ?? '').toString();
+  _controller('villeLng').text = (data['villeLng'] ?? '').toString();
+  _controller('logoVille').text = (data['logoVille'] ?? '').toString();
+  _controller('siteInternetVille').text =
+      (data['siteInternetVille'] ?? '').toString();
+  _controller('arretesMunicipaux').text =
+      (data['arretesMunicipaux'] ?? '').toString();
+}
+
   void _clearForm() {
     for (final field in fields) {
       _controller(field).clear();
     }
   }
 
-  void _newSphot() {
-    _clearForm();
-    selectedDocId = null;
-    mode = AdminSphotMode.create;
-    step = 0;
-    setState(() {});
-  }
+  Future<void> _newSphot() async {
+  _clearForm();
+
+  selectedDocId = null;
+  mode = AdminSphotMode.create;
+  step = 0;
+
+  await _prefillTerritoryFromFirebase();
+
+  if (!mounted) return;
+
+  setState(() {});
+}
 
   void _prepareCopy() {
     _clearForm();
@@ -413,23 +460,28 @@ super.dispose();
   }
 
   bool get _hasStarted {
-    if (mode == AdminSphotMode.create) return true;
-    if (mode == AdminSphotMode.copy && _value('pays').isNotEmpty) return true;
-    if (mode == AdminSphotMode.edit && selectedDocId != null) return true;
-    return false;
-  }
+  if (mode == AdminSphotMode.create) return true;
+  if (mode == AdminSphotMode.copy) return true;
+  if (mode == AdminSphotMode.edit && selectedDocId != null) return true;
+  return false;
+}
 
   Future<void> _saveSphot() async {
   final idSphot = _value('idSphot');
+
+  _showMessage('Début enregistrement SPHOT');
+  _showMessage('territoireId = ${widget.territoireId}');
+  _showMessage('idSphot = $idSphot');
 
   if (idSphot.isEmpty) {
     _showMessage('Renseigne le numéro du SPHOT');
     return;
   }
-  
-  setState(() {
-    _sphotJustSaved = true;
-  });
+
+  if (widget.territoireId.trim().isEmpty) {
+    _showMessage('Aucun territoire associé à cet admin');
+    return;
+  }
 
   final data = {
     'idSphot': idSphot,
@@ -458,58 +510,65 @@ super.dispose();
     'labelPmr': _value('labelPmr'),
     'activite': _value('activite'),
     'commerce': _value('commerce'),
+    'territoireId': widget.territoireId,
     'source': 'admin',
     'sphotValide': true,
     'dateValidation': FieldValue.serverTimestamp(),
     'updatedAt': FieldValue.serverTimestamp(),
   };
 
-  final docId = mode == AdminSphotMode.edit && selectedDocId != null
+  try {
+    await FirebaseFirestore.instance
+    .collection('territoires')
+    .doc(widget.territoireId)
+    .collection('spots')
+    .doc(
+  mode == AdminSphotMode.edit && selectedDocId != null
       ? selectedDocId!
-      : idSphot;
+      : idSphot,
+)
+    .set(data)
+    .timeout(
+      const Duration(seconds: 8),
+      onTimeout: () {
+        throw Exception('Timeout Firebase : écriture non terminée après 8 secondes');
+      },
+    );
 
-  FirebaseFirestore.instance.collection('spots').doc(docId).set(data);
+_showMessage('Écriture Firebase terminée');
 
-await Future.delayed(const Duration(seconds: 1));
+    _showMessage('SPHOT enregistré dans territoires/${widget.territoireId}/spots/$idSphot');
 
-if (!mounted) return;
+    if (!mounted) return;
 
-setState(() {
-  mode = AdminSphotMode.none;
-  selectedDocId = null;
-  step = 0;
-
-  existingSphotMessage = null;
-  saveSphotMessage = null;
-
-  _summaryReadToEnd = false;
-  _summaryUserScrolled = false;
-  _sphotJustSaved = false;
-
-  _clearForm();
-});
-
-  await Future.delayed(const Duration(seconds: 1));
-
+    setState(() {
+      mode = AdminSphotMode.none;
+      selectedDocId = null;
+      step = 0;
+      existingSphotMessage = null;
+      saveSphotMessage = null;
+      _summaryReadToEnd = false;
+      _summaryUserScrolled = false;
+      _sphotJustSaved = false;
+      _clearForm();
+    });
+  } catch (error) {
   if (!mounted) return;
 
-  if (!mounted) return;
-
-setState(() {
-  mode = AdminSphotMode.none;
-  selectedDocId = null;
-
-  step = 0;
-
-  existingSphotMessage = null;
-  saveSphotMessage = null;
-
-  _summaryReadToEnd = false;
-  _summaryUserScrolled = false;
-  _sphotJustSaved = false;
-
-  _clearForm();
-});
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('ERREUR FIREBASE'),
+      content: Text(error.toString()),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('OK'),
+        ),
+      ],
+    ),
+  );
+}
 }
 
 void _showMessage(String message) {
@@ -576,7 +635,7 @@ void _showMessage(String message) {
       : Colors.transparent,
   borderRadius: BorderRadius.circular(16),
   border: Border.all(
-  color: title == 'CONFIRMER LA SUPPRESSION?'
+  color: title.startsWith('CONFIRMER LA SUPPRESSION')
     ? const Color(0xFFDC2626)
     : adminColor,
   width: selected ? 3 : 2,
@@ -596,7 +655,7 @@ void _showMessage(String message) {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-  color: title == 'CONFIRMER LA SUPPRESSION?'
+  color: title.startsWith('CONFIRMER LA SUPPRESSION')
     ? const Color(0xFFDC2626)
     : adminColor,
   fontSize: 14,
@@ -621,9 +680,14 @@ void _showMessage(String message) {
     _dropdownOverlay = null;
   }
 
+
   return StreamBuilder<QuerySnapshot>(
-    stream: FirebaseFirestore.instance.collection('spots').snapshots(),
-    builder: (context, snapshot) {
+  stream: FirebaseFirestore.instance
+      .collection('territoires')
+      .doc(widget.territoireId)
+      .collection('spots')
+      .snapshots(),
+  builder: (context, snapshot) {
       if (!snapshot.hasData) {
         return const Center(child: CircularProgressIndicator());
       }
@@ -652,12 +716,15 @@ void _showMessage(String message) {
         final selectedDocs = docs.where((doc) => doc.id == selectedDocId);
         if (selectedDocs.isNotEmpty) {
           final data = selectedDocs.first.data() as Map<String, dynamic>;
-          final nomSecours = (data['nomSecours'] ?? '').toString();
-          final nomSphot = (data['nomSphot'] ?? '').toString();
+          final idSphot = (data['idSphot'] ?? selectedDocs.first.id).toString();
+final nomSecours = (data['nomSecours'] ?? '').toString();
+final nomSphot = (data['nomSphot'] ?? '').toString();
 
-          displayLabel = [nomSecours, nomSphot]
-              .where((value) => value.trim().isNotEmpty)
-              .join(' - ');
+displayLabel = [
+  'SPHOT $idSphot',
+  nomSecours,
+  nomSphot,
+].where((value) => value.trim().isNotEmpty).join(' - ');
         }
       }
 
@@ -730,14 +797,15 @@ void _showMessage(String message) {
                               final doc = docs[index];
                               final data = doc.data() as Map<String, dynamic>;
 
-                              final nomSecours =
-                                  (data['nomSecours'] ?? '').toString();
-                              final nomSphot =
-                                  (data['nomSphot'] ?? '').toString();
+                              final idSphot = (data['idSphot'] ?? doc.id).toString();
+final nomSecours = (data['nomSecours'] ?? '').toString();
+final nomSphot = (data['nomSphot'] ?? '').toString();
 
-                              final title = [nomSecours, nomSphot]
-                                  .where((value) => value.trim().isNotEmpty)
-                                  .join(' - ');
+final title = [
+  'SPHOT $idSphot',
+  nomSecours,
+  nomSphot,
+].where((value) => value.trim().isNotEmpty).join(' - ');
 
                               final selected = doc.id == selectedDocId;
 
@@ -2237,7 +2305,7 @@ void _checkSummaryScroll() {
   if (!_hasStarted) return const SizedBox.shrink();
 
   final bool isSummaryStep = step == 7;
-  final bool canSave = _summaryReadToEnd;
+  final bool canSave = true;
   final bool saved = _sphotJustSaved;
 
   TextStyle buttonTextStyle(Color color) {
@@ -2430,10 +2498,9 @@ Widget _existingSphotsPanel({
                   onTap: selectedDocId == null
                       ? () {}
                       : () async {
-                          final doc = await FirebaseFirestore.instance
-                              .collection('spots')
-                              .doc(selectedDocId)
-                              .get();
+                          final doc = await _territorySpotsCollection()
+    .doc(selectedDocId)
+    .get();
 
                           _loadForEdit(
                             doc.id,
@@ -2458,15 +2525,18 @@ Widget _existingSphotsPanel({
                   onTap: selectedDocId == null
                       ? () {}
                       : () async {
-                          final doc = await FirebaseFirestore.instance
-                              .collection('spots')
-                              .doc(selectedDocId)
-                              .get();
+                          final doc = await _territorySpotsCollection()
+    .doc(selectedDocId)
+    .get();
 
                           _loadForCopy(
-                            doc.id,
-                            doc.data() as Map<String, dynamic>,
-                          );
+  doc.id,
+  doc.data() as Map<String, dynamic>,
+);
+
+setState(() {
+  step = 1;
+});
                         },
                 ),
               ),
@@ -2476,7 +2546,7 @@ Widget _existingSphotsPanel({
               Expanded(
   child: _modeButton(
     title: _confirmDelete
-    ? 'CONFIRMER LA SUPPRESSION?'
+    ? 'CONFIRMER LA SUPPRESSION ? ($_deleteCountdown)'
     : 'SUPPRIMER LE SPHOT',
     subtitle: '',
     icon: Icons.delete_forever_rounded,
@@ -2490,21 +2560,28 @@ Widget _existingSphotsPanel({
                 _confirmDelete = true;
               });
 
-              Future.delayed(const Duration(seconds: 1), () {
-                if (!mounted) return;
+              _deleteCountdown = 5;
 
-                setState(() {
-                  _confirmDelete = false;
-                });
-              });
+for (int i = 5; i >= 0; i--) {
+  Future.delayed(Duration(seconds: 5 - i), () {
+    if (!mounted) return;
+
+    setState(() {
+      _deleteCountdown = i;
+
+      if (i == 0) {
+        _confirmDelete = false;
+      }
+    });
+  });
+}
 
               return;
             }
 
-            await FirebaseFirestore.instance
-                .collection('spots')
-                .doc(selectedDocId)
-                .delete();
+            await _territorySpotsCollection()
+    .doc(selectedDocId)
+    .delete();
 
             setState(() {
               _confirmDelete = false;
@@ -2616,8 +2693,9 @@ Widget build(BuildContext context) {
                                       onTap: () {
                                         Navigator.of(context).push(
                                           MaterialPageRoute(
-                                            builder: (_) =>
-                                                const AdminGestionSphotPage(),
+                                            builder: (_) => AdminGestionSphotPage(
+  territoireId: widget.territoireId,
+),
                                           ),
                                         );
                                       },

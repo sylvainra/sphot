@@ -20,8 +20,10 @@ class AdminMapPickerPage extends StatefulWidget {
 
 class _AdminMapPickerPageState extends State<AdminMapPickerPage> {
   static const Color adminColor = Color(0xFF1E3A8A);
+  static const Color redColor = Color(0xFFDC2626);
 
   LatLng? selectedPoint;
+  bool _saved = false;
 
   @override
   void initState() {
@@ -33,6 +35,19 @@ class _AdminMapPickerPageState extends State<AdminMapPickerPage> {
         widget.initialLng != 0.0) {
       selectedPoint = LatLng(widget.initialLat!, widget.initialLng!);
     }
+  }
+
+  void _savePosition() {
+    if (selectedPoint == null) return;
+
+    setState(() {
+      _saved = true;
+    });
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      Navigator.of(context).pop(selectedPoint);
+    });
   }
 
   @override
@@ -50,6 +65,7 @@ class _AdminMapPickerPageState extends State<AdminMapPickerPage> {
               onTap: (tapPosition, point) {
                 setState(() {
                   selectedPoint = point;
+                  _saved = false;
                 });
               },
             ),
@@ -86,21 +102,21 @@ class _AdminMapPickerPageState extends State<AdminMapPickerPage> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-  color: Colors.transparent,
-  borderRadius: BorderRadius.circular(18),
-  border: Border.all(
-    color: Color(0xFF1E3A8A),
-    width: 2,
-  ),
-),
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: adminColor,
+                        width: 2,
+                      ),
+                    ),
                     child: Text(
                       widget.title,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-  color: Color(0xFFDC2626),
-  fontSize: 18,
-  fontWeight: FontWeight.w900,
-),
+                        color: redColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
 
@@ -108,73 +124,94 @@ class _AdminMapPickerPageState extends State<AdminMapPickerPage> {
 
                   if (selectedPoint != null)
                     Container(
-  width: double.infinity,
-  margin: const EdgeInsets.only(bottom: 8),
-  padding: const EdgeInsets.all(10),
-  decoration: BoxDecoration(
-    color: Colors.transparent,
-    borderRadius: BorderRadius.circular(16),
-    border: Border.all(
-      color: Color(0xFF1E3A8A),
-      width: 1.5,
-    ),
-  ),
-  child: Text(
-    'Latitude : ${selectedPoint!.latitude.toStringAsFixed(6)}\n'
-    'Longitude : ${selectedPoint!.longitude.toStringAsFixed(6)}',
-    textAlign: TextAlign.center,
-    style: const TextStyle(
-      color: Color(0xFF1E3A8A),
-      fontWeight: FontWeight.w800,
-    ),
-  ),
-),
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: adminColor,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Text(
+                        'Latitude : ${selectedPoint!.latitude.toStringAsFixed(6)}\n'
+                        'Longitude : ${selectedPoint!.longitude.toStringAsFixed(6)}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: adminColor,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
 
                   Row(
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
+                          onPressed: _saved
+                              ? null
+                              : () {
+                                  Navigator.of(context).pop();
+                                },
                           icon: const Icon(
-  Icons.close_rounded,
-  color: Color(0xFF1E3A8A),
-),
+                            Icons.close_rounded,
+                            color: adminColor,
+                          ),
                           label: const Text(
-  'ANNULER',
-  style: TextStyle(
-    color: Color(0xFF1E3A8A),
-    fontWeight: FontWeight.w900,
-  ),
-),
+                            'ANNULER',
+                            style: TextStyle(
+                              color: adminColor,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                           style: ElevatedButton.styleFrom(
-  backgroundColor: Colors.transparent,
-  foregroundColor: const Color(0xFF1E3A8A),
-  elevation: 0,
-  side: const BorderSide(
-    color: Color(0xFF1E3A8A),
-    width: 2,
-  ),
-),
+                            backgroundColor: Colors.transparent,
+                            disabledBackgroundColor: Colors.transparent,
+                            foregroundColor: adminColor,
+                            disabledForegroundColor: adminColor,
+                            elevation: 0,
+                            side: const BorderSide(
+                              color: adminColor,
+                              width: 2,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: selectedPoint == null
-                              ? null
-                              : () {
-                                  Navigator.of(context).pop(selectedPoint);
-                                },
-                          icon: const Icon(Icons.check_rounded),
-                          label: const Text(
-                            'VALIDER',
-                            style: TextStyle(fontWeight: FontWeight.w900),
+                        child: OutlinedButton(
+                          onPressed:
+                              selectedPoint == null || _saved
+                                  ? null
+                                  : _savePosition,
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor:
+                                _saved ? redColor : Colors.transparent,
+                            disabledBackgroundColor:
+                                _saved ? redColor : Colors.transparent,
+                            foregroundColor:
+                                _saved ? Colors.white : redColor,
+                            disabledForegroundColor:
+                                _saved ? Colors.white : Colors.grey,
+                            side: BorderSide(
+                              color: selectedPoint == null
+                                  ? Colors.grey
+                                  : redColor,
+                              width: 2,
+                            ),
                           ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFDC2626),
-                            foregroundColor: Colors.white,
+                          child: Text(
+                            _saved ? 'ENREGISTRÉ' : 'ENREGISTRER',
+                            style: TextStyle(
+                              color: _saved
+                                  ? Colors.white
+                                  : selectedPoint == null
+                                      ? Colors.grey
+                                      : redColor,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
                       ),
