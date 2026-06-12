@@ -120,7 +120,7 @@ class _AdminPeriodesSurveillancePageState
                     fit: BoxFit.contain,
                   ),
                   const Text(
-                    'PÉRIODES DE SURVEILLANCE',
+                    'PÉRIODE(S) DE SURVEILLANCE',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 21,
@@ -179,7 +179,7 @@ class _AdminPeriodesSurveillancePageState
                           const Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              'PÉRIODES EXISTANTES',
+                              'PÉRIODES ENREGISTRÉES',
                               style: TextStyle(
                                 color: pageColor,
                                 fontSize: 16,
@@ -398,6 +398,8 @@ class _PeriodDialogState extends State<_PeriodDialog> {
   TimeOfDay? _endHour;
   String _errorMessage = '';
 
+  bool _periodSaved = false;
+
   @override
   void initState() {
     super.initState();
@@ -547,7 +549,7 @@ class _PeriodDialogState extends State<_PeriodDialog> {
 
     return AlertDialog(
       title: Text(
-        widget.period == null ? 'Ajouter une période' : 'Modifier la période',
+        widget.period == null ? 'AJOUTER UNE PÉRIODE' : 'MODIFIER LA PÉRIODE',
         style: const TextStyle(
           color: pageColor,
           fontWeight: FontWeight.w900,
@@ -586,10 +588,39 @@ class _PeriodDialogState extends State<_PeriodDialog> {
             ),
             TextField(
   controller: _nameController,
+
   textCapitalization: TextCapitalization.characters,
+
+  onChanged: (value) {
+    final upper = value.toUpperCase();
+
+    if (upper != value) {
+      _nameController.value = TextEditingValue(
+        text: upper,
+        selection: TextSelection.collapsed(
+          offset: upper.length,
+        ),
+      );
+    }
+  },
+
+  style: const TextStyle(
+    color: Color(0xFFDC2626),
+    fontWeight: FontWeight.w900,
+    fontSize: 16,
+  ),
+
   decoration: const InputDecoration(
-    labelText: 'Nom de la période',
-    hintText: 'Ex : JUILLET-AOÛT',
+    labelText: 'NOM de la période',
+    labelStyle: TextStyle(
+      color: Color(0xFF1E3A8A),
+      fontWeight: FontWeight.w700,
+    ),
+    hintText: 'EX : JUILLET-AOÛT',
+    hintStyle: TextStyle(
+      color: Color(0xFFDC2626),
+      fontWeight: FontWeight.w700,
+    ),
   ),
 ),
 const SizedBox(height: 14),
@@ -613,21 +644,39 @@ if (_errorMessage.isNotEmpty) ...[
           onPressed: () {
             Navigator.of(context).pop();
           },
-          child: const Text('Annuler'),
+          child: const Text('ANNULER'),
         ),
-        ElevatedButton(
-  onPressed: () {
-    setState(() {
-      _errorMessage = 'BOUTON CLIQUÉ';
-    });
+        OutlinedButton(
+  onPressed: _periodSaved
+      ? null
+      : () {
+          setState(() {
+            _periodSaved = true;
+          });
 
-    _save();
-  },
-  style: ElevatedButton.styleFrom(
-  backgroundColor: const Color(0xFFDC2626),
-  foregroundColor: Colors.white,
-),
-  child: const Text('Enregistrer'),
+          Future.delayed(const Duration(seconds: 1), () {
+            if (!mounted) return;
+            _save();
+          });
+        },
+  style: OutlinedButton.styleFrom(
+    backgroundColor:
+        _periodSaved ? const Color(0xFFDC2626) : Colors.transparent,
+    foregroundColor:
+        _periodSaved ? Colors.white : const Color(0xFFDC2626),
+    disabledBackgroundColor: const Color(0xFFDC2626),
+    disabledForegroundColor: Colors.white,
+    side: const BorderSide(
+      color: Color(0xFFDC2626),
+      width: 2,
+    ),
+  ),
+  child: Text(
+    _periodSaved ? 'ENREGISTRÉE' : 'ENREGISTRER',
+    style: const TextStyle(
+      fontWeight: FontWeight.w900,
+    ),
+  ),
 ),
       ],
     );

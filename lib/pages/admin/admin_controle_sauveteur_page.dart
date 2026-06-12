@@ -219,17 +219,17 @@ class _AdminControleSauveteurPageState
                                       ),
                                     ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.transparent,
-                                      foregroundColor: adminColor,
-                                      elevation: 0,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        side: const BorderSide(
-                                          color: adminColor,
-                                          width: 2,
-                                        ),
-                                      ),
-                                    ),
+  backgroundColor: Colors.transparent,
+  foregroundColor: actionColor,
+  elevation: 0,
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
+    side: const BorderSide(
+      color: actionColor,
+      width: 2,
+    ),
+  ),
+),
                                   ),
                                 ),
                                 const SizedBox(width: 8),

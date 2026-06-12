@@ -177,9 +177,17 @@ Future<void> _saveSauveteur() async {
 
   if (!mounted) return;
 
-  setState(() {
-    sauveteurEnregistre = true;
-  });
+setState(() {
+  sauveteurEnregistre = true;
+});
+
+await Future.delayed(const Duration(seconds: 1));
+
+if (!mounted) return;
+
+Navigator.of(context)
+  ..pop()
+  ..pop();
 }
 
   @override
@@ -243,7 +251,11 @@ Future<void> _saveSauveteur() async {
 ),
                             const SizedBox(height: 8),
 
-                            _field('Prénom', controller: prenomController),
+                            _field(
+  'Prénom',
+  controller: prenomController,
+  capitalizeWords: true,
+),
                             const SizedBox(height: 8),
 
                             _dateField('Date de naissance', controller: dateNaissanceController),
@@ -734,11 +746,42 @@ labelStyle: const TextStyle(
 }) {
   
   return TextField(
-    controller: controller,
-    textCapitalization: uppercase
-    ? TextCapitalization.characters
-    : TextCapitalization.none,
-    maxLines: maxLines,
+  controller: controller,
+
+  onChanged: (value) {
+    if (uppercase) {
+      final newValue = value.toUpperCase();
+
+      if (newValue != value) {
+        controller.value = TextEditingValue(
+          text: newValue,
+          selection: TextSelection.collapsed(
+            offset: newValue.length,
+          ),
+        );
+      }
+    }
+
+    if (capitalizeWords && value.isNotEmpty) {
+      final newValue =
+          value[0].toUpperCase() + value.substring(1);
+
+      if (newValue != value) {
+        controller.value = TextEditingValue(
+          text: newValue,
+          selection: TextSelection.collapsed(
+            offset: newValue.length,
+          ),
+        );
+      }
+    }
+  },
+
+  textCapitalization: uppercase
+      ? TextCapitalization.characters
+      : TextCapitalization.sentences,
+
+  maxLines: maxLines,
     style: const TextStyle(
       color: Color(0xFF1E3A8A),
       fontWeight: FontWeight.w700,

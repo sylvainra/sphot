@@ -128,17 +128,41 @@ Future<void> _saveDraft() async {
     return;
   }
 
+  if (periodesSelectionnees.isEmpty) {
+    _showMessage('Sélectionnez au moins une période.');
+    return;
+  }
+
+  final firestore = FirebaseFirestore.instance;
+
+  final batch = firestore.batch();
+
+  for (final spotId in selectedDocIds) {
+    final spotRef = firestore
+        .collection('territoires')
+        .doc(widget.territoireId)
+        .collection('spots')
+        .doc(spotId);
+
+    batch.set(
+      spotRef,
+      {
+        'periodesSurveillance': periodesSelectionnees,
+        'periodesSurveillanceUpdatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  await batch.commit();
+
   setState(() {
     periodesEnregistrees = List<String>.from(periodesSelectionnees);
     saveMessage = '';
+    _attributionSaved = true;
   });
 
-  setState(() {
-  _attributionSaved = true;
-});
-
   await _saveDraft();
-  
 }
 
   void _showMessage(String message) {

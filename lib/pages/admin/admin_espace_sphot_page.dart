@@ -475,10 +475,6 @@ Future<void> _prefillTerritoryFromFirebase() async {
   Future<void> _saveSphot() async {
   final idSphot = _value('idSphot');
 
-  _showMessage('Début enregistrement SPHOT');
-  _showMessage('territoireId = ${widget.territoireId}');
-  _showMessage('idSphot = $idSphot');
-
   if (idSphot.isEmpty) {
     _showMessage('Renseigne le numéro du SPHOT');
     return;
@@ -543,23 +539,27 @@ Future<void> _prefillTerritoryFromFirebase() async {
       },
     );
 
-_showMessage('Écriture Firebase terminée');
-
-    _showMessage('SPHOT enregistré dans territoires/${widget.territoireId}/spots/$idSphot');
-
     if (!mounted) return;
 
     setState(() {
-      mode = AdminSphotMode.none;
-      selectedDocId = null;
-      step = 0;
-      existingSphotMessage = null;
-      saveSphotMessage = null;
-      _summaryReadToEnd = false;
-      _summaryUserScrolled = false;
-      _sphotJustSaved = false;
-      _clearForm();
-    });
+  _sphotJustSaved = true;
+});
+
+await Future.delayed(const Duration(seconds: 1));
+
+if (!mounted) return;
+
+setState(() {
+  mode = AdminSphotMode.none;
+  selectedDocId = null;
+  step = 0;
+  existingSphotMessage = null;
+  saveSphotMessage = null;
+  _summaryReadToEnd = false;
+  _summaryUserScrolled = false;
+  _sphotJustSaved = false;
+  _clearForm();
+});
   } catch (error) {
   if (!mounted) return;
 
@@ -583,7 +583,7 @@ void _showMessage(String message) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(message),
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 1),
     ),
   );
 }
@@ -1695,8 +1695,7 @@ Future<void> _importLogoVille() async {
   setState(() {
     _controller('logoVille').text = url;
   });
-
-  _showMessage('Logo de la ville importé');
+  
 }
 
 Future<void> _importPhotoSphot() async {
@@ -1733,8 +1732,7 @@ Future<void> _importPhotoSphot() async {
   setState(() {
     _controller('photoSphot').text = url;
   });
-
-  _showMessage('Photo du SPHOT importée');
+  
 }
 
   Widget _currentStep() {
@@ -1912,6 +1910,7 @@ const SizedBox(height: 8),
   'Repère secours (ex.: LONGE 01)',
   maxLines: 1,
   labelSize: 15,
+  uppercase: true,
 ),
 
 const SizedBox(height: 6),
@@ -1921,6 +1920,7 @@ _textField(
   'Nom du SPHOT',
   maxLines: 1,
   labelSize: 16,
+  uppercase: true,
 ),
 
             const SizedBox(height: 6),
@@ -2325,7 +2325,7 @@ void _checkSummaryScroll() {
   if (!_hasStarted) return const SizedBox.shrink();
 
   final bool isSummaryStep = step == 7;
-  final bool canSave = true;
+  final bool canSave = !isSummaryStep || _summaryReadToEnd;
   final bool saved = _sphotJustSaved;
 
   TextStyle buttonTextStyle(Color color) {
@@ -2340,7 +2340,7 @@ void _checkSummaryScroll() {
     required Color foregroundColor,
     Color backgroundColor = Colors.transparent,
     Color disabledBackgroundColor = Colors.transparent,
-    Color disabledForegroundColor = Colors.grey,
+    Color disabledForegroundColor = const Color(0xFFDC2626),
   }) {
     return OutlinedButton.styleFrom(
       backgroundColor: backgroundColor,
@@ -2403,7 +2403,9 @@ void _checkSummaryScroll() {
                 saved ? const Color(0xFFDC2626) : Colors.transparent,
             disabledBackgroundColor:
                 saved ? const Color(0xFFDC2626) : Colors.transparent,
-            disabledForegroundColor: saved ? Colors.white : Colors.grey,
+            disabledForegroundColor: saved
+    ? Colors.white
+    : const Color(0xFFDC2626),
           ),
           child: FittedBox(
   fit: BoxFit.scaleDown,

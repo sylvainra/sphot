@@ -64,9 +64,9 @@ class AdminEspaceSurveillancePage extends StatelessWidget {
                         children: [
                           Expanded(
                             child: _SurveillanceBand(
-                              title: 'PÉRIODES DE SURVEILLANCE',
+                              title: 'PÉRIODE(S) DE SURVEILLANCE',
                               subtitle:
-                                  'Créer les périodes avec dates et horaires',
+                                  'Créer le(s) période(s) avec dates et horaires',
                               icon: Icons.calendar_month_rounded,
                               color: pageColor,
                               onTap: () {
@@ -85,9 +85,9 @@ class AdminEspaceSurveillancePage extends StatelessWidget {
 
                           Expanded(
                             child: _SurveillanceBand(
-                              title: 'ATTRIBUTION AUX SPHOTS',
+                              title: 'ATTRIBUTION À/AUX SPHOT(S)',
                               subtitle:
-                                  'Attribuer les périodes créées aux SPHOTS',
+                                  'Attribuer le(s) période(s) créée(s) à/aux SPHOT(S)',
                               icon: Icons.location_on_rounded,
                               color: const Color(0xFF1E3A8A),
                               onTap: () {

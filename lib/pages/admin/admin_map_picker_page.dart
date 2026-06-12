@@ -44,7 +44,7 @@ class _AdminMapPickerPageState extends State<AdminMapPickerPage> {
       _saved = true;
     });
 
-    Future.delayed(const Duration(milliseconds: 300), () {
+    Future.delayed(const Duration(seconds: 2), () {
       if (!mounted) return;
       Navigator.of(context).pop(selectedPoint);
     });
