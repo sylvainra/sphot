@@ -2626,6 +2626,17 @@ for (int i = 5; i >= 0; i--) {
 
 @override
 Widget build(BuildContext context) {
+  final titles = [
+    'TERRITOIRE',
+    'IDENTITÉ',
+    'LOCALISATION',
+    'INFORMATIONS',
+    'ÉQUIPEMENTS',
+    'ACCESSIBILITÉ',
+    'ACTIVITÉS',
+    'RÉSUMÉ',
+  ];
+
   return Scaffold(
     backgroundColor: Colors.transparent,
     body: Stack(
@@ -2662,8 +2673,56 @@ Widget build(BuildContext context) {
                     letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Expanded(
+                const SizedBox(height: 6),
+
+if (_hasStarted)
+  Row(
+    children: List.generate(titles.length, (index) {
+      final selected = index == step;
+
+      return Expanded(
+        child: GestureDetector(
+          onTap: () {
+            setState(() {
+              step = index;
+            });
+          },
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 1),
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: selected
+                    ? const Color(0xFFDC2626)
+                    : const Color(0xFF1E3A8A),
+                width: selected ? 2 : 1,
+              ),
+            ),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                titles[index],
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w900,
+                  color: selected
+                      ? const Color(0xFFDC2626)
+                      : const Color(0xFF1E3A8A),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }),
+  ),
+
+if (_hasStarted) const SizedBox(height: 8),
+
+Expanded(
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(8),

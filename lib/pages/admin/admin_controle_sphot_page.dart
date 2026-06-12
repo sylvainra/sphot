@@ -153,6 +153,18 @@ void initState() {
 
   @override
   Widget build(BuildContext context) {
+
+    final titles = [
+  'IDENTITÉ',
+  'LOCALISATION',
+  'TYPE',
+  'SÉCURITÉ',
+  'ÉQUIPEMENTS',
+  'ACCESSIBILITÉ',
+  'ACTIVITÉS',
+  'VALIDATION',
+];
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
