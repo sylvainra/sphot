@@ -5,10 +5,12 @@ import 'admin_gestion_sauveteur_page.dart';
 
 class AdminEspaceSauveteurPage extends StatelessWidget {
   final String ville;
+  final String territoireId;
 
   const AdminEspaceSauveteurPage({
     super.key,
     this.ville = 'VILLE_NON_RENSEIGNEE',
+    required this.territoireId,
   });
 
   @override
@@ -73,7 +75,9 @@ class AdminEspaceSauveteurPage extends StatelessWidget {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (_) =>
-                                        const AdminCreationSauveteurPage(),
+                                        AdminCreationSauveteurPage(
+  territoireId: territoireId,
+),
                                   ),
                                 );
                               },
@@ -93,8 +97,9 @@ class AdminEspaceSauveteurPage extends StatelessWidget {
                                   MaterialPageRoute(
                                     builder: (_) =>
                                         AdminGestionSauveteurPage(
-                                      ville: ville,
-                                    ),
+  territoireId: territoireId,
+  ville: ville,
+),
                                   ),
                                 );
                               },

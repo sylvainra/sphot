@@ -9,11 +9,13 @@ import 'dart:async';
 class AdminCreationSauveteurPage extends StatefulWidget {
   final String? docId;
   final Map<String, dynamic>? data;
+  final String territoireId;
 
   const AdminCreationSauveteurPage({
     super.key,
     this.docId,
     this.data,
+    required this.territoireId,
   });
 
   @override
@@ -122,15 +124,16 @@ Future<void> _saveSauveteur() async {
 
   if (nom.isEmpty || prenom.isEmpty) return;
 
-  setState(() {
-    sauveteurEnregistre = true;
-  });
+  final sauveteursRef = FirebaseFirestore.instance
+      .collection('territoires')
+      .doc(widget.territoireId)
+      .collection('sauveteurs');
 
   final docRef = widget.docId == null
-    ? FirebaseFirestore.instance.collection('sauveteurs').doc()
-    : FirebaseFirestore.instance.collection('sauveteurs').doc(widget.docId);
+      ? sauveteursRef.doc()
+      : sauveteursRef.doc(widget.docId);
 
-docRef.set({
+  final sauveteurData = {
     'nom': nom.toUpperCase(),
     'prenom': prenom,
     'dateNaissance': dateNaissanceController.text.trim(),
@@ -144,8 +147,39 @@ docRef.set({
     'postesAffectes': postesSelectionnes,
     'experience': experienceController.text.trim(),
     'observations': observationsController.text.trim(),
-    'createdAt': DateTime.now().toIso8601String(),
+    'territoireId': widget.territoireId,
+    'updatedAt': FieldValue.serverTimestamp(),
+  };
+
+  if (widget.docId == null) {
+    sauveteurData['createdAt'] = FieldValue.serverTimestamp();
+  }
+
+  await docRef.set(sauveteurData, SetOptions(merge: true));
+
+  for (final posteId in postesSelectionnes) {
+  await FirebaseFirestore.instance
+      .collection('territoires')
+      .doc(widget.territoireId)
+      .collection('spots')
+      .doc(posteId)
+      .collection('sauveteursAffectes')
+      .doc(docRef.id)
+      .set({
+    'sauveteurId': docRef.id,
+    'nom': nom.toUpperCase(),
+    'prenom': prenom,
+    'fonctions': fonctionsSelectionnees,
+    'territoireId': widget.territoireId,
+    'updatedAt': FieldValue.serverTimestamp(),
   }, SetOptions(merge: true));
+}
+
+  if (!mounted) return;
+
+  setState(() {
+    sauveteurEnregistre = true;
+  });
 }
 
   @override
@@ -521,6 +555,8 @@ final selected = fonctionsSelectionnees.contains(choice);
 Widget _multiPostesSecoursField() {
   return StreamBuilder<QuerySnapshot>(
     stream: FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(widget.territoireId)
         .collection('spots')
         .snapshots(),
     builder: (context, snapshot) {
@@ -530,20 +566,24 @@ Widget _multiPostesSecoursField() {
         );
       }
 
-      final docs = snapshot.data!.docs.where((doc) {
-  final data = doc.data() as Map<String, dynamic>;
-  final typeSphot = (data['typeSphot'] ?? '').toString();
+      final List<String> postes = snapshot.data!.docs
+          .map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
 
-  return typeSphot.contains('POSTE DE SECOURS');
-}).toList();
+            final typeSphot = (data['typeSphot'] ?? '').toString();
 
-      final postes = docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        final nomSpot =
-    (data['nomSpot'] ?? data['nomSphot'] ?? '').toString();
+final isPosteSecours =
+    data['isPosteSecours'] == true ||
+    typeSphot.contains('POSTE DE SECOURS');
 
-return nomSpot;
-      }).where((value) => value.isNotEmpty).toList();
+if (!isPosteSecours) {
+  return '';
+}
+
+            return (data['idSphot'] ?? doc.id).toString();
+          })
+          .where((value) => value.trim().isNotEmpty)
+          .toList();
 
       return _multiDropdownPostes(
         'SPHOT(S) affecté(s)',
@@ -557,189 +597,52 @@ Widget _multiDropdownPostes(
   String label,
   List<String> choices,
 ) {
-  final fieldKey = GlobalKey();
-
-  final displayText =
-      postesSelectionnes.isEmpty ? label : postesSelectionnes.join('\n');
-
-  void closeMenu() {
-    _dropdownOverlay?.remove();
-    _dropdownOverlay = null;
-  }
-
-  void openMenu() {
-    closeMenu();
-
-    final renderBox =
-        fieldKey.currentContext!.findRenderObject() as RenderBox;
-    final position = renderBox.localToGlobal(Offset.zero);
-    final size = renderBox.size;
-    final scrollController = ScrollController();
-
-    _dropdownOverlay = OverlayEntry(
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, overlaySetState) {
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: GestureDetector(
-                    onTap: closeMenu,
-                    child: Container(color: Colors.transparent),
-                  ),
-                ),
-                Positioned(
-                  left: position.dx,
-                  top: position.dy + size.height - 10,
-                  width: size.width,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: Container(
-                      constraints: const BoxConstraints(maxHeight: 220),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.92),
-                        border: const Border(
-  left: BorderSide(color: Color(0xFF1E3A8A), width: 1.4),
-  right: BorderSide(color: Color(0xFF1E3A8A), width: 1.4),
-  bottom: BorderSide(color: Color(0xFF1E3A8A), width: 1.4),
-),
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(10),
-                          bottomRight: Radius.circular(10),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.18),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Scrollbar(
-                        controller: scrollController,
-                        thumbVisibility: true,
-                        thickness: 10,
-                        radius: const Radius.circular(10),
-                        child: ListView.builder(
-                          controller: scrollController,
-                          primary: false,
-                          padding: EdgeInsets.zero,
-                          shrinkWrap: true,
-                          itemCount: choices.length,
-                          itemBuilder: (context, index) {
-                            final choice = choices[index];
-                            final selected =
-                                postesSelectionnes.contains(choice);
-
-                            return InkWell(
-                              onTap: () {
-                                setState(() {
-                                  if (selected) {
-                                    postesSelectionnes.remove(choice);
-                                  } else {
-                                    postesSelectionnes.add(choice);
-                                  }
-                                });
-                                overlaySetState(() {});
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 8,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      selected
-                                          ? Icons.check_box_rounded
-                                          : Icons
-                                              .check_box_outline_blank_rounded,
-                                      color: selected
-                                          ? adminColor
-                                          : const Color(0xFF1E3A8A),
-                                      size: 22,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        choice,
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w800,
-                                          color: Color(0xFF1E3A8A),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    Overlay.of(context).insert(_dropdownOverlay!);
-  }
-
-  return GestureDetector(
-    key: fieldKey,
-    onTap: openMenu,
-    child: InputDecorator(
-      decoration: InputDecoration(
-        labelText: postesSelectionnes.isEmpty ? null : label,
-labelStyle: const TextStyle(
-  color: Color(0xFF1E3A8A),
-  fontWeight: FontWeight.w700,
-),
-        filled: true,
-        fillColor: Colors.transparent,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 12,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.black, width: 1.6),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.black, width: 1.6),
-        ),
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      border: Border.all(
+        color: const Color(0xFF1E3A8A),
+        width: 1.6,
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-  displayText,
-  style: const TextStyle(
-    fontSize: 16,
-    fontWeight: FontWeight.w700,
-    color: Color(0xFF1E3A8A),
-  ),
-),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          choices.isEmpty ? 'Aucun SPHOT trouvé' : label,
+          style: const TextStyle(
+            color: Color(0xFF1E3A8A),
+            fontWeight: FontWeight.w900,
+            fontSize: 15,
           ),
-          const Icon(
-            Icons.checklist_rounded,
-            color: adminColor,
-            size: 24,
+        ),
+        const SizedBox(height: 8),
+        ...choices.map(
+          (choice) => CheckboxListTile(
+            value: postesSelectionnes.contains(choice),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              choice,
+              style: const TextStyle(
+                color: Color(0xFF1E3A8A),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            onChanged: (_) {
+              setState(() {
+                if (postesSelectionnes.contains(choice)) {
+                  postesSelectionnes.remove(choice);
+                } else {
+                  postesSelectionnes.add(choice);
+                }
+              });
+            },
           ),
-          const SizedBox(width: 2),
-          const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: adminColor,
-            size: 26,
-          ),
-        ],
-      ),
+        ),
+      ],
     ),
   );
 }

@@ -389,6 +389,7 @@ Future<void> _prefillTerritoryFromFirebase() async {
   }
 
   Future<void> _newSphot() async {
+    
   _clearForm();
 
   selectedDocId = null;
@@ -501,6 +502,8 @@ Future<void> _prefillTerritoryFromFirebase() async {
     'nomSecours': _value('nomSecours'),
     'nomSphot': _value('nomSphot'),
     'typeSphot': _value('typeSphot'),
+    'isPosteSecours':
+    _value('typeSphot') == '🚨 POSTE DE SECOURS 🚨',
     'natureSphot': _value('natureSphot'),
     'sphotLat': double.tryParse(_value('sphotLat').replaceAll(',', '.')) ?? 0.0,
     'sphotLng': double.tryParse(_value('sphotLng').replaceAll(',', '.')) ?? 0.0,

@@ -204,8 +204,9 @@ class _AdminEspacePageState extends State<AdminEspacePage> {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => AdminEspaceSauveteurPage(
-                                        ville: ville,
-                                      ),
+  territoireId: territoireId,
+  ville: ville,
+),
                                     ),
                                   );
                                 },

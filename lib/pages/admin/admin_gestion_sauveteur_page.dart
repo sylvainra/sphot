@@ -4,10 +4,12 @@ import 'admin_controle_sauveteur_page.dart';
 
 class AdminGestionSauveteurPage extends StatelessWidget {
   final String ville;
+  final String territoireId;
 
   const AdminGestionSauveteurPage({
     super.key,
     this.ville = 'VILLE_NON_RENSEIGNEE',
+    required this.territoireId,
   });
 
   static const Color adminColor = Color(0xFF1E3A8A);
@@ -58,8 +60,10 @@ class AdminGestionSauveteurPage extends StatelessWidget {
                       ),
                       child: StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance
-                            .collection('sauveteurs')
-                            .snapshots(),
+    .collection('territoires')
+    .doc(territoireId)
+    .collection('sauveteurs')
+    .snapshots(),
                         builder: (context, snapshot) {
                           if (!snapshot.hasData) {
                             return const Center(
@@ -104,9 +108,10 @@ final nom = (data['nom'] ?? '').toString();
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => AdminControleSauveteurPage(
-          docId: doc.id,
-          data: data,
-        ),
+  territoireId: territoireId,
+  docId: doc.id,
+  data: data,
+)
       ),
     );
   },
@@ -180,6 +185,7 @@ final nom = (data['nom'] ?? '').toString();
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => AdminControleSauveteurPage(
+              territoireId: territoireId,
               docId: doc.id,
               data: data,
             ),
@@ -200,9 +206,11 @@ final nom = (data['nom'] ?? '').toString();
     IconButton(
       onPressed: () async {
         await FirebaseFirestore.instance
-            .collection('sauveteurs')
-            .doc(doc.id)
-            .delete();
+    .collection('territoires')
+    .doc(territoireId)
+    .collection('sauveteurs')
+    .doc(doc.id)
+    .delete();
       },
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(

@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'admin_creation_sauveteur_page.dart';
 
 class AdminControleSauveteurPage extends StatefulWidget {
+  final String territoireId;
   final String docId;
   final Map<String, dynamic> data;
 
   const AdminControleSauveteurPage({
     super.key,
+    required this.territoireId,
     required this.docId,
     required this.data,
   });
@@ -80,22 +82,53 @@ class _AdminControleSauveteurPageState
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => AdminCreationSauveteurPage(
-          docId: widget.docId,
-          data: data,
-        ),
+  territoireId: widget.territoireId,
+  docId: widget.docId,
+  data: data,
+),
       ),
     );
   }
 
   Future<void> _deleteSauveteur() async {
-    await FirebaseFirestore.instance
-        .collection('sauveteurs')
-        .doc(widget.docId)
-        .delete();
+  final sauveteurRef = FirebaseFirestore.instance
+      .collection('territoires')
+      .doc(widget.territoireId)
+      .collection('sauveteurs')
+      .doc(widget.docId);
 
-    if (!mounted) return;
-    Navigator.of(context).pop();
+  final sauveteurSnapshot = await sauveteurRef.get();
+  final sauveteurData = sauveteurSnapshot.data() ?? {};
+
+  final postesAffectes = sauveteurData['postesAffectes'];
+
+  if (postesAffectes is Iterable) {
+    for (final poste in postesAffectes) {
+      final posteText = poste.toString();
+      final posteId = posteText
+          .replaceAll('SPHOT ', '')
+          .split(' - ')
+          .first
+          .trim();
+
+      if (posteId.isEmpty) continue;
+
+      await FirebaseFirestore.instance
+          .collection('territoires')
+          .doc(widget.territoireId)
+          .collection('spots')
+          .doc(posteId)
+          .collection('sauveteursAffectes')
+          .doc(widget.docId)
+          .delete();
+    }
   }
+
+  await sauveteurRef.delete();
+
+  if (!mounted) return;
+  Navigator.of(context).pop();
+}
 
   @override
   Widget build(BuildContext context) {
