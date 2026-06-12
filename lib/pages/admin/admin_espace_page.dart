@@ -185,8 +185,8 @@ class _AdminEspacePageState extends State<AdminEspacePage> {
                                     MaterialPageRoute(
                                       builder: (_) =>
                                           AdminEspaceSurveillancePage(
-                                        ville: ville,
-                                      ),
+  territoireId: territoireId,
+)
                                     ),
                                   );
                                 },

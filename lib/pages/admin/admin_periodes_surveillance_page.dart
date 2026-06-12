@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AdminPeriodesSurveillancePage extends StatefulWidget {
-  final String ville;
+  final String territoireId;
 
   const AdminPeriodesSurveillancePage({
     super.key,
-    this.ville = 'VILLE_NON_RENSEIGNEE',
+    required this.territoireId,
   });
 
   @override
@@ -19,14 +19,7 @@ class _AdminPeriodesSurveillancePageState
     extends State<AdminPeriodesSurveillancePage> {
   final List<_SurveillancePeriod> _periods = [];
 
-  String _communeId() {
-  return widget.ville
-      .trim()
-      .toUpperCase()
-      .replaceAll(' ', '_')
-      .replaceAll('-', '_')
-      .replaceAll("'", '_');
-}
+  
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/'
@@ -61,14 +54,14 @@ class _AdminPeriodesSurveillancePageState
 
   try {
   await FirebaseFirestore.instance
-    .collection('communes')
-.doc(_communeId())
+    .collection('territoires')
+.doc(widget.territoireId)
 .collection('periodesSurveillance')
 .doc(result.id)
     .set({
     'id': result.id,
     'name': result.name.toUpperCase(),
-    'ville': widget.ville.toUpperCase(),
+    'territoireId': widget.territoireId,
     'startDate': Timestamp.fromDate(result.startDate),
     'endDate': Timestamp.fromDate(result.endDate),
     'startHour':
@@ -96,9 +89,9 @@ class _AdminPeriodesSurveillancePageState
 
   Future<void> _deletePeriod(_SurveillancePeriod period) async {
   await FirebaseFirestore.instance
-      .collection('communes')
-      .doc(_communeId())
-      .collection('periodesSurveillance')
+      .collection('territoires')
+.doc(widget.territoireId)
+.collection('periodesSurveillance')
       .doc(period.id)
       .delete();
 }
@@ -199,9 +192,9 @@ class _AdminPeriodesSurveillancePageState
                                         Expanded(
   child: StreamBuilder<QuerySnapshot>(
     stream: FirebaseFirestore.instance
-        .collection('communes')
-        .doc(_communeId())
-        .collection('periodesSurveillance')
+        .collection('territoires')
+.doc(widget.territoireId)
+.collection('periodesSurveillance')
         .orderBy('startDate')
         .snapshots(),
     builder: (context, snapshot) {

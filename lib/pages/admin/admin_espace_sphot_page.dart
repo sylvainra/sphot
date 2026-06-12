@@ -104,6 +104,11 @@ int _deleteCountdown = 0;
     'commerce',
   ];
 
+final List<String> idSphotChoices = List.generate(
+  99,
+  (index) => (index + 1).toString().padLeft(2, '0'),
+);
+
   final List<String> typeSphotChoices = [
   '🚨 POSTE DE SECOURS 🚨',
   '🏖️ PLAGE',
@@ -1113,85 +1118,72 @@ Widget _dropdownField(
                       bottomLeft: Radius.circular(10),
                       bottomRight: Radius.circular(10),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.18),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
                   ),
-                  child: ScrollbarTheme(
-                    data: ScrollbarThemeData(
-                      thumbColor: MaterialStatePropertyAll(adminColor),
-                      trackVisibility: const MaterialStatePropertyAll(false),
-                    ),
-                    child: Scrollbar(
+                  child: Scrollbar(
+                    controller: scrollController,
+                    thumbVisibility: true,
+                    thickness: 10,
+                    radius: const Radius.circular(10),
+                    child: ListView.builder(
                       controller: scrollController,
-                      thumbVisibility: true,
-                      thickness: 10,
-                      radius: const Radius.circular(10),
-                      child: ListView.builder(
-                        controller: scrollController,
-                        primary: false,
-                        padding: EdgeInsets.zero,
-                        shrinkWrap: true,
-                        itemCount: choices.length,
-                        itemBuilder: (context, index) {
-                          final choice = choices[index];
+                      primary: false,
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      itemCount: choices.length,
+                      itemBuilder: (context, index) {
+                        final choice = choices[index];
 
-                          return InkWell(
-                            onTap: () {
-                              setState(() {
-                                _controller(key).text = choice;
-                              });
-                              closeMenu();
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
-                              ),
-                              child: key == 'qualiteEau'
-    ? Row(
-        children: [
-          Image.asset(
-            choice == 'QUALITÉ DE L\'EAU EXCELLENTE'
-                ? 'data/icons/qualite_eau_excellente.png'
-                : choice == 'QUALITÉ DE L\'EAU BONNE'
-                    ? 'data/icons/qualite_eau_bonne.png'
-                    : choice == 'QUALITÉ DE L\'EAU SUFFISANTE'
-                        ? 'data/icons/qualite_eau_suffisante.png'
-                        : 'data/icons/qualite_eau_insuffisante.png',
-            width: 36,
-            height: 36,
-            fit: BoxFit.contain,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              choice,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E3A8A),
-              ),
-            ),
-          ),
-        ],
-      )
-    : Text(
-        choice,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w800,
-          color: Color(0xFF1E3A8A),
-        ),
-      ),
+                        return InkWell(
+                          onTap: () {
+                            setState(() {
+                              _controller(key).text = choice;
+                            });
+                            closeMenu();
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
                             ),
-                          );
-                        },
-                      ),
+                            child: key == 'qualiteEau'
+                                ? Row(
+                                    children: [
+                                      Image.asset(
+                                        choice == 'QUALITÉ DE L\'EAU EXCELLENTE'
+                                            ? 'data/icons/qualite_eau_excellente.png'
+                                            : choice == 'QUALITÉ DE L\'EAU BONNE'
+                                                ? 'data/icons/qualite_eau_bonne.png'
+                                                : choice == 'QUALITÉ DE L\'EAU SUFFISANTE'
+                                                    ? 'data/icons/qualite_eau_suffisante.png'
+                                                    : 'data/icons/qualite_eau_insuffisante.png',
+                                        width: 36,
+                                        height: 36,
+                                        fit: BoxFit.contain,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          choice,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF1E3A8A),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : Text(
+                                    choice,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF1E3A8A),
+                                    ),
+                                  ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -1210,46 +1202,49 @@ Widget _dropdownField(
     onTap: openMenu,
     child: InputDecorator(
       decoration: InputDecoration(
-  labelText: current.isEmpty ? null : label,
+        labelText: current.isEmpty ? null : label,
         labelStyle: const TextStyle(
-  color: Color(0xFF1E3A8A),
-  fontWeight: FontWeight.w700,
-),
+          color: Color(0xFF1E3A8A),
+          fontWeight: FontWeight.w700,
+        ),
         filled: true,
         fillColor: Colors.transparent,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(
-  color: Color(0xFF1E3A8A),
-  width: 1.6,
-),
+            color: Color(0xFF1E3A8A),
+            width: 1.6,
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 1.6),
+          borderSide: const BorderSide(
+            color: Color(0xFF1E3A8A),
+            width: 1.6,
+          ),
         ),
       ),
       child: Row(
-  children: [
-    Expanded(
-      child: Text(
-  current.isEmpty ? label : current,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF1E3A8A),
-        ),
+        children: [
+          Expanded(
+            child: Text(
+              current.isEmpty ? label : current,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E3A8A),
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: Color(0xFFDC2626),
+            size: 26,
+          ),
+        ],
       ),
-    ),
-    const Icon(
-      Icons.keyboard_arrow_down_rounded,
-      color: Color(0xFFDC2626),
-      size: 26,
-    ),
-  ],
-),
     ),
   );
 }
@@ -1418,19 +1413,39 @@ Widget _multiDropdownField(
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: const Color(0xFF1E3A8A),
+                color: Color(0xFF1E3A8A),
               ),
             ),
           ],
         )
-      : Text(
-          choice,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF1E3A8A),
-          ),
-        ),
+      : key == 'labelSphot' && choice == '🟦 PAVILLON BLEU'
+          ? Row(
+              children: [
+                Image.asset(
+                  'data/icons/pavillon_bleu.png',
+                  width: 20,
+                  height: 20,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'PAVILLON BLEU',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1E3A8A),
+                  ),
+                ),
+              ],
+            )
+          : Text(
+              choice,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E3A8A),
+              ),
+            ),
 ),
                                     ],
                                   ),
@@ -1881,9 +1896,11 @@ const SizedBox(height: 8),
               '2. IDENTIFICATION',
               'Nommez le SPHOT et choisissez son type\net sa nature',
             ),
-            _textField(
+            _dropdownField(
   'idSphot',
-  'Numéro du SPHOT (01, 02...)',
+  'Numéro du SPHOT',
+  idSphotChoices,
+  maxMenuHeight: 250,
 ),
 
 const SizedBox(height: 8),

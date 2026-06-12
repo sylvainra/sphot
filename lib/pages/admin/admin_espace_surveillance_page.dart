@@ -4,11 +4,11 @@ import 'admin_attribution_sphot_page.dart';
 import 'admin_periodes_surveillance_page.dart';
 
 class AdminEspaceSurveillancePage extends StatelessWidget {
-  final String ville;
+  final String territoireId;
 
   const AdminEspaceSurveillancePage({
     super.key,
-    this.ville = 'VILLE_NON_RENSEIGNEE',
+    required this.territoireId,
   });
 
   @override
@@ -73,8 +73,8 @@ class AdminEspaceSurveillancePage extends StatelessWidget {
   Navigator.of(context).push(
     MaterialPageRoute(
       builder: (_) => AdminPeriodesSurveillancePage(
-        ville: ville,
-      ),
+  territoireId: territoireId,
+),
     ),
   );
 },
@@ -94,8 +94,8 @@ class AdminEspaceSurveillancePage extends StatelessWidget {
   Navigator.of(context).push(
     MaterialPageRoute(
       builder: (_) => AdminAttributionSphotsPage(
-        ville: ville,
-      ),
+  territoireId: territoireId,
+),
     ),
   );
 },

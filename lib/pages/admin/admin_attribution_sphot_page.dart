@@ -3,11 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class AdminAttributionSphotsPage extends StatefulWidget {
-  final String ville;
+  final String territoireId;
 
   const AdminAttributionSphotsPage({
     super.key,
-    this.ville = 'VILLE_NON_RENSEIGNEE',
+    required this.territoireId,
   });
 
   @override
@@ -19,14 +19,7 @@ class _AdminAttributionSphotsPageState
     extends State<AdminAttributionSphotsPage> {
   static const Color pageColor = Color(0xFF1E3A8A);
 
-  String _communeId() {
-  return widget.ville
-      .trim()
-      .toUpperCase()
-      .replaceAll(' ', '_')
-      .replaceAll('-', '_')
-      .replaceAll("'", '_');
-}
+  
 
   final Set<String> selectedDocIds = {};
 String selectedSphotLabel = '';
@@ -54,10 +47,10 @@ void initState() {
 
 DocumentReference<Map<String, dynamic>> _draftRef() {
   return FirebaseFirestore.instance
-      .collection('communes')
-      .doc(_communeId())
-      .collection('adminDrafts')
-      .doc('attributionSphots');
+    .collection('territoires')
+    .doc(widget.territoireId)
+    .collection('adminDrafts')
+    .doc('attributionSphots');
 }
 
 Future<void> _loadDraft() async {
@@ -167,7 +160,9 @@ Future<void> _saveDraft() async {
 
   return StreamBuilder<QuerySnapshot>(
     stream: FirebaseFirestore.instance
-        .collection('spots')
+        .collection('territoires')
+.doc(widget.territoireId)
+.collection('spots')
         .where(
           'typeSphot',
           isEqualTo: '🚨 POSTE DE SECOURS 🚨',
@@ -579,8 +574,8 @@ Widget _periodLabelText(String label) {
                           radius: const Radius.circular(10),
                           child: StreamBuilder<QuerySnapshot>(
                             stream: FirebaseFirestore.instance
-    .collection('communes')
-    .doc(_communeId())
+    .collection('territoires')
+    .doc(widget.territoireId)
     .collection('periodesSurveillance')
     .orderBy('startDate')
     .snapshots(),
