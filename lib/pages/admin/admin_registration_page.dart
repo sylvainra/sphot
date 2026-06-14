@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -489,11 +490,64 @@ class _AdminRegistrationPageState extends State<AdminRegistrationPage> {
   capitalizeWords: true,
 ),
             const SizedBox(height: 8),
-            _textField(
-              'telephoneResponsable',
-              'Téléphone',
-              keyboardType: TextInputType.phone,
-            ),
+            TextField(
+  controller: _controller('telephoneResponsable'),
+  keyboardType: TextInputType.phone,
+  inputFormatters: [
+    FilteringTextInputFormatter.digitsOnly,
+    PhoneNumberFormatter(),
+  ],
+  style: const TextStyle(
+    fontWeight: FontWeight.w700,
+    fontSize: 16,
+    color: adminColor,
+  ),
+  decoration: InputDecoration(
+    labelText: 'Téléphone',
+    labelStyle: const TextStyle(
+      color: adminColor,
+      fontWeight: FontWeight.w700,
+    ),
+    filled: true,
+    fillColor: Colors.transparent,
+    suffixIcon: IconButton(
+      icon: const Icon(
+        Icons.mic_rounded,
+        color: redColor,
+      ),
+      onPressed: () async {
+        await _startVoice(
+          _controller('telephoneResponsable'),
+        );
+      },
+    ),
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: 12,
+      vertical: 10,
+    ),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: adminColor,
+        width: 1.6,
+      ),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: adminColor,
+        width: 1.6,
+      ),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: adminColor,
+        width: 2,
+      ),
+    ),
+  ),
+),
             const SizedBox(height: 8),
             _textField(
               'emailResponsable',
@@ -653,6 +707,7 @@ String _territoryId() {
         .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
         .replaceAll(RegExp(r'_+'), '_')
         .replaceAll(RegExp(r'^_|_$'), '');
+  
   }
 
   return [
@@ -728,6 +783,21 @@ if (password != passwordConfirm) {
     final docRef = FirebaseFirestore.instance
         .collection('territoires')
         .doc(territoryId);
+
+final existingTerritory = await docRef.get();
+
+if (existingTerritory.exists) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text(
+        'Ce territoire existe déjà. Vérifie le pays, la région, le département et la ville.',
+      ),
+      duration: Duration(seconds: 4),
+    ),
+  );
+  return;
+}
+
         final credential = await FirebaseAuth.instance
     .createUserWithEmailAndPassword(
   email: email,
@@ -1001,6 +1071,36 @@ final uid = credential.user!.uid;
           ),
         ],
       ),
+    );
+  }
+}
+
+class PhoneNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    String digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+
+    if (digits.length > 10) {
+      digits = digits.substring(0, 10);
+    }
+
+    final buffer = StringBuffer();
+
+    for (int i = 0; i < digits.length; i++) {
+      if (i > 0 && i % 2 == 0) {
+        buffer.write(' ');
+      }
+      buffer.write(digits[i]);
+    }
+
+    final formatted = buffer.toString();
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

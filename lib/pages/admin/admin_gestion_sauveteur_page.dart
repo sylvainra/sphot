@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'admin_controle_sauveteur_page.dart';
+
 
 import 'admin_profile_button.dart';
 
@@ -239,19 +239,7 @@ final nom = (data['nom'] ?? '').toString();
         ?.cast<String>() ??
     [];
 
-                              return GestureDetector(
-  onTap: () {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => AdminControleSauveteurPage(
-  territoireId: widget.territoireId,
-  docId: doc.id,
-  data: data,
-)
-      ),
-    );
-  },
-  child: Container(
+                              return Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: Colors.transparent,
@@ -544,7 +532,7 @@ return;
                                     const SizedBox.shrink(),
                                   ],
                                 ),
-                                                            ),
+                                                            
                             );
                             },
                           );

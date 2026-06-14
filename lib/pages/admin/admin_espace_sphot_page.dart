@@ -16,6 +16,8 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import 'admin_profile_button.dart';
 
+import 'package:flutter/services.dart';
+
 enum AdminSphotMode { none, create, copy, edit }
 
 class AdminEspaceSphotPage extends StatefulWidget {
@@ -94,6 +96,7 @@ int _deleteCountdown = 0;
     'sphotLat',
     'sphotLng',
     'adresseWebcam',
+    'telephonePoste',
     'photoSphot',
     'arretesMunicipaux',
     'equipement',
@@ -505,6 +508,7 @@ Future<void> _prefillTerritoryFromFirebase() async {
     'natureSphot': _value('natureSphot'),
     'sphotLat': double.tryParse(_value('sphotLat').replaceAll(',', '.')) ?? 0.0,
     'sphotLng': double.tryParse(_value('sphotLng').replaceAll(',', '.')) ?? 0.0,
+    'telephonePoste': _value('telephonePoste'),
     'adresseWebcam': _value('adresseWebcam'),
     'photoSphot': _value('photoSphot'),
     'arretesMunicipaux': _value('arretesMunicipaux'),
@@ -975,13 +979,19 @@ final title = [
             vertical: 10,
           ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.black, width: 1.4),
-          ),
+  borderRadius: BorderRadius.circular(14),
+  borderSide: const BorderSide(
+    color: Color(0xFF1E3A8A),
+    width: 1.6,
+  ),
+),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.black, width: 1.4),
-          ),
+  borderRadius: BorderRadius.circular(14),
+  borderSide: const BorderSide(
+    color: Color(0xFF1E3A8A),
+    width: 1.6,
+  ),
+),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(
@@ -1876,10 +1886,10 @@ const Center(
     style: TextStyle(
       fontSize: 14,
       fontWeight: FontWeight.w900,
+      color: Color(0xFF1E3A8A),
     ),
   ),
 ),
-
 const SizedBox(height: 8),
 
 _twoColumns(
@@ -2000,6 +2010,7 @@ const Center(
     style: TextStyle(
       fontSize: 14,
       fontWeight: FontWeight.w900,
+      color: Color(0xFF1E3A8A),
     ),
   ),
 ),
@@ -2028,7 +2039,69 @@ _twoColumns(
               '4. INFORMATIONS',
               'Ajoutez les liens externes utiles',
             ),
-            _textField('adresseWebcam', 'Adresse internet de la webcam du SPHOT'),
+            TextField(
+  controller: _controller('telephonePoste'),
+  keyboardType: TextInputType.phone,
+  inputFormatters: [
+    FilteringTextInputFormatter.digitsOnly,
+    PhoneNumberFormatter(),
+  ],
+  style: const TextStyle(
+    fontWeight: FontWeight.w700,
+    fontSize: 16,
+    color: Color(0xFF1E3A8A),
+  ),
+  decoration: InputDecoration(
+    label: const Text(
+      'Numéro de téléphone du poste',
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        color: Color(0xFF1E3A8A),
+      ),
+    ),
+    filled: true,
+    fillColor: Colors.transparent,
+    suffixIcon: IconButton(
+  icon: const Icon(
+    Icons.mic_rounded,
+    color: Color(0xFFDC2626),
+  ),
+  onPressed: () => _startVoice(
+    _controller('telephonePoste'),
+  ),
+),
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: 12,
+      vertical: 10,
+    ),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: Color(0xFF1E3A8A),
+        width: 1.6,
+      ),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: Color(0xFF1E3A8A),
+        width: 1.6,
+      ),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: Color(0xFF1E3A8A),
+        width: 2,
+      ),
+    ),
+  ),
+),
+
+const SizedBox(height: 8),
+
+_textField('adresseWebcam', 'Adresse internet de la webcam du SPHOT'),
 
 const SizedBox(height: 8),
 
@@ -2064,13 +2137,19 @@ TextField(
       vertical: 10,
     ),
     border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: Colors.black, width: 1.4),
-    ),
+  borderRadius: BorderRadius.circular(14),
+  borderSide: const BorderSide(
+    color: Color(0xFF1E3A8A),
+    width: 1.6,
+  ),
+),
     enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: Colors.black, width: 1.4),
-    ),
+  borderRadius: BorderRadius.circular(14),
+  borderSide: const BorderSide(
+    color: Color(0xFF1E3A8A),
+    width: 1.6,
+  ),
+),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
       borderSide: const BorderSide(
@@ -2253,13 +2332,13 @@ Widget _summaryLine(
               ),
               const SizedBox(height: 3),
               Text(
-                value,
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+  value,
+  style: const TextStyle(
+    color: Color(0xFFDC2626),
+    fontSize: 13,
+    fontWeight: FontWeight.w700,
+  ),
+),
             ],
           ),
         ),
@@ -2927,6 +3006,36 @@ class _AdminDropdownMenuItem extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class PhoneNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    String digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+
+    if (digits.length > 10) {
+      digits = digits.substring(0, 10);
+    }
+
+    final buffer = StringBuffer();
+
+    for (int i = 0; i < digits.length; i++) {
+      if (i > 0 && i % 2 == 0) {
+        buffer.write(' ');
+      }
+      buffer.write(digits[i]);
+    }
+
+    final formatted = buffer.toString();
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

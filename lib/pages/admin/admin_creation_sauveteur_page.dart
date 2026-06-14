@@ -63,6 +63,9 @@ String generatedLogin = '';
 String generatedPassword = '';
 bool accesGenere = false;
 
+bool emailEnvoye = false;
+bool smsEnvoye = false;
+
 @override
 void initState() {
   super.initState();
@@ -73,7 +76,7 @@ void initState() {
   nomController.text = (data['nom'] ?? '').toString();
   prenomController.text = (data['prenom'] ?? '').toString();
   dateNaissanceController.text = (data['dateNaissance'] ?? '').toString();
-  ageController.text = (data['age'] ?? '').toString();
+  _updateAgeFromBirthDate();
   adresseController.text = (data['adresse'] ?? '').toString();
   codePostalController.text = (data['codePostal'] ?? '').toString();
   villeController.text = (data['ville'] ?? '').toString();
@@ -125,6 +128,30 @@ Future<void> _startVoice(
   );
 }
 
+Future<String> _generateUniqueLogin(String baseLogin) async {
+  final sauveteursRef = FirebaseFirestore.instance
+      .collection('territoires')
+      .doc(widget.territoireId)
+      .collection('sauveteurs');
+
+  String candidate = baseLogin;
+  int counter = 2;
+
+  while (true) {
+    final existing = await sauveteursRef
+        .where('login', isEqualTo: candidate)
+        .limit(1)
+        .get();
+
+    if (existing.docs.isEmpty) {
+      return candidate;
+    }
+
+    candidate = '$baseLogin$counter';
+    counter++;
+  }
+}
+
   static const Color adminColor = Color(0xFFDC2626);
 
  Future<void> _generateAccess() async {
@@ -133,11 +160,14 @@ Future<void> _startVoice(
 
   if (nom.isEmpty || prenom.isEmpty) return;
 
-  final login = '${prenom[0]}$nom'
-      .toLowerCase()
-      .replaceAll(' ', '')
-      .replaceAll('-', '')
-      .replaceAll("'", '');
+  final baseLogin = '${prenom[0]}$nom'
+    .toLowerCase()
+    .replaceAll(' ', '')
+    .replaceAll('-', '')
+    .replaceAll("'", '');
+
+final login =
+    await _generateUniqueLogin(baseLogin);
 
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   final now = DateTime.now().millisecondsSinceEpoch;
@@ -167,10 +197,13 @@ Future<void> _startVoice(
   }, SetOptions(merge: true));
 
   setState(() {
-    generatedLogin = login;
-    generatedPassword = password;
-    accesGenere = true;
-  });
+  generatedLogin = login;
+  generatedPassword = password;
+  accesGenere = true;
+
+  emailEnvoye = false;
+  smsEnvoye = false;
+});
 }
 
 
@@ -189,12 +222,15 @@ Future<void> _saveSauveteur() async {
       ? sauveteursRef.doc()
       : sauveteursRef.doc(widget.docId);
 
-  final generatedLogin =
+  final baseLogin =
     '${prenom.trim().isNotEmpty ? prenom.trim()[0] : ''}$nom'
         .toLowerCase()
         .replaceAll(' ', '')
         .replaceAll('-', '')
         .replaceAll("'", '');
+
+final generatedLogin =
+    await _generateUniqueLogin(baseLogin);
 
 final sauveteurData = {
   'nom': nom.toUpperCase(),
@@ -342,7 +378,45 @@ Widget build(BuildContext context) {
                             controller: dateNaissanceController,
                           ),
                           const SizedBox(height: 8),
-                          _field('Âge', controller: ageController),
+                          TextField(
+  controller: ageController,
+  readOnly: true,
+  enableInteractiveSelection: false,
+  style: const TextStyle(
+    color: Color(0xFF1E3A8A),
+    fontWeight: FontWeight.w700,
+  ),
+  decoration: InputDecoration(
+    labelText: 'Âge',
+    labelStyle: const TextStyle(
+      color: Color(0xFF1E3A8A),
+      fontWeight: FontWeight.w700,
+    ),
+    filled: true,
+    fillColor: Colors.transparent,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: Color(0xFF1E3A8A),
+        width: 1.6,
+      ),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: Color(0xFF1E3A8A),
+        width: 1.6,
+      ),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: Color(0xFF1E3A8A),
+        width: 2,
+      ),
+    ),
+  ),
+),
                           const SizedBox(height: 8),
                           _field('Adresse', controller: adresseController),
                           const SizedBox(height: 8),
@@ -455,9 +529,96 @@ if (widget.docId == null) ...[
                           ),
 
                           const SizedBox(height: 8),
+                          SizedBox(
+  width: double.infinity,
+  height: 42,
+  child: ElevatedButton(
+    onPressed: accesGenere
+        ? () {
+            setState(() {
+              emailEnvoye = true;
+            });
+          }
+        : null,
+    style: ElevatedButton.styleFrom(
+      backgroundColor: emailEnvoye
+          ? const Color(0xFF1E3A8A)
+          : Colors.transparent,
+      foregroundColor: emailEnvoye
+          ? Colors.white
+          : const Color(0xFFDC2626),
+      disabledBackgroundColor: Colors.transparent,
+      elevation: 0,
+      side: BorderSide(
+        color: emailEnvoye
+            ? const Color(0xFF1E3A8A)
+            : const Color(0xFFDC2626),
+        width: 2,
+      ),
+    ),
+    child: Text(
+      emailEnvoye
+          ? 'EMAIL ENVOYÉ'
+          : 'ENVOYER PAR EMAIL',
+      style: const TextStyle(
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  ),
+),
+
+const SizedBox(height: 8),
+
+SizedBox(
+  width: double.infinity,
+  height: 42,
+  child: ElevatedButton(
+    onPressed: accesGenere
+        ? () {
+            setState(() {
+              smsEnvoye = true;
+            });
+          }
+        : null,
+    style: ElevatedButton.styleFrom(
+      backgroundColor: smsEnvoye
+          ? const Color(0xFF1E3A8A)
+          : Colors.transparent,
+      foregroundColor: smsEnvoye
+          ? Colors.white
+          : const Color(0xFFDC2626),
+      disabledBackgroundColor: Colors.transparent,
+      elevation: 0,
+      side: BorderSide(
+        color: smsEnvoye
+            ? const Color(0xFF1E3A8A)
+            : const Color(0xFFDC2626),
+        width: 2,
+      ),
+    ),
+    child: Text(
+      smsEnvoye
+          ? 'SMS ENVOYÉ'
+          : 'ENVOYER PAR SMS',
+      style: const TextStyle(
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  ),
+),
 ],
 
-                          SizedBox(
+                    
+
+
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+SizedBox(
                             width: double.infinity,
                             height: 48,
                             child: ElevatedButton.icon(
@@ -494,12 +655,8 @@ if (widget.docId == null) ...[
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
+                          const SizedBox(height: 8),
+
                 Container(
                   width: 40,
                   height: 40,
@@ -1001,6 +1158,39 @@ Widget _multiPostesSecoursField() {
   );
 }
 
+void _updateAgeFromBirthDate() {
+  final text = dateNaissanceController.text.trim();
+
+  final parts = text.split('/');
+
+  if (parts.length != 3) {
+    ageController.clear();
+    return;
+  }
+
+  final day = int.tryParse(parts[0]);
+  final month = int.tryParse(parts[1]);
+  final year = int.tryParse(parts[2]);
+
+  if (day == null || month == null || year == null) {
+    ageController.clear();
+    return;
+  }
+
+  final birthDate = DateTime(year, month, day);
+  final today = DateTime.now();
+
+  int age = today.year - birthDate.year;
+
+  if (today.month < birthDate.month ||
+      (today.month == birthDate.month &&
+       today.day < birthDate.day)) {
+    age--;
+  }
+
+  ageController.text = age.toString();
+}
+
 Widget _dateField(
   String label, {
   required TextEditingController controller,
@@ -1052,6 +1242,7 @@ labelStyle: const TextStyle(
               '${pickedDate.day.toString().padLeft(2, '0')}/'
               '${pickedDate.month.toString().padLeft(2, '0')}/'
               '${pickedDate.year}';
+              _updateAgeFromBirthDate();
         },
       ),
       border: OutlineInputBorder(
