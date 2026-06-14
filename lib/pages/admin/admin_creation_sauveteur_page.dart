@@ -10,6 +10,10 @@ import 'dart:async';
 
 import 'admin_profile_button.dart';
 
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+
 
 class AdminCreationSauveteurPage extends StatefulWidget {
   final String? docId;
@@ -206,6 +210,35 @@ final login =
 });
 }
 
+Future<void> _sendCredentialsEmail() async {
+  final email = emailController.text.trim();
+  final prenom = prenomController.text.trim();
+
+  if (email.isEmpty || generatedLogin.isEmpty || generatedPassword.isEmpty) {
+    return;
+  }
+
+  final uri = Uri.https(
+    'us-central1-sphot-ab80b.cloudfunctions.net',
+    '/sendSauveteurCredentialsEmail',
+    {
+      'email': email,
+      'prenom': prenom,
+      'identifiant': generatedLogin,
+      'motdepasse': generatedPassword,
+    },
+  );
+
+  final response = await http.get(uri);
+
+  if (response.statusCode == 200) {
+    setState(() {
+      emailEnvoye = true;
+    });
+  } else {
+    debugPrint('Erreur email SPHOT : ${response.body}');
+  }
+}
 
 Future<void> _saveSauveteur() async {
   final nom = nomController.text.trim();
@@ -534,25 +567,25 @@ if (widget.docId == null) ...[
   height: 42,
   child: ElevatedButton(
     onPressed: accesGenere
-        ? () {
+        ? () async {
             setState(() {
               emailEnvoye = true;
             });
+
+            await _sendCredentialsEmail();
           }
         : null,
     style: ElevatedButton.styleFrom(
       backgroundColor: emailEnvoye
-          ? const Color(0xFF1E3A8A)
+          ? const Color(0xFFDC2626)
           : Colors.transparent,
       foregroundColor: emailEnvoye
           ? Colors.white
           : const Color(0xFFDC2626),
       disabledBackgroundColor: Colors.transparent,
       elevation: 0,
-      side: BorderSide(
-        color: emailEnvoye
-            ? const Color(0xFF1E3A8A)
-            : const Color(0xFFDC2626),
+      side: const BorderSide(
+        color: Color(0xFFDC2626),
         width: 2,
       ),
     ),

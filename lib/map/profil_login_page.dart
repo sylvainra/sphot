@@ -27,6 +27,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
 
   LoginProfile _selectedProfile = LoginProfile.sauveteur;
   bool _isEditing = false;
+  bool _showPassword = false;
   final Map<String, Map<String, String>> sauveteurAccounts = {
   'chef': {
     'password': '1234',
@@ -326,7 +327,7 @@ final Color activeColor = isSauveteur
                           TextField(
                             controller: _passwordController,
                             focusNode: _passwordFocusNode,
-                            obscureText: true,
+                            obscureText: !_showPassword,
                             textInputAction: TextInputAction.done,
                             onTap: _activateEditingMode,
                             onSubmitted: (_) => _login(),
@@ -339,6 +340,20 @@ final Color activeColor = isSauveteur
                               hintStyle: TextStyle(
   color: activeColor,
   fontWeight: FontWeight.w700,
+),
+
+suffixIcon: IconButton(
+  icon: Icon(
+    _showPassword
+        ? Icons.visibility_off_rounded
+        : Icons.visibility_rounded,
+    color: activeColor,
+  ),
+  onPressed: () {
+    setState(() {
+      _showPassword = !_showPassword;
+    });
+  },
 ),
                               filled: true,
                               fillColor: Colors.white.withOpacity(0.08),
