@@ -6,6 +6,8 @@ import 'admin_espace_sphot_page.dart';
 import 'admin_espace_sauveteur_page.dart';
 import 'admin_espace_surveillance_page.dart';
 
+import 'admin_profile_button.dart';
+
 class AdminEspacePage extends StatefulWidget {
   const AdminEspacePage({super.key});
 
@@ -16,7 +18,8 @@ class AdminEspacePage extends StatefulWidget {
 class _AdminEspacePageState extends State<AdminEspacePage> {
   String ville = 'VILLE_NON_RENSEIGNEE';
   String territoireId = '';
-  bool loading = true;
+  
+bool loading = true;
 
   @override
   void initState() {
@@ -25,77 +28,77 @@ class _AdminEspacePageState extends State<AdminEspacePage> {
   }
 
   Future<void> _loadAdmin() async {
-  try {
-    final user = FirebaseAuth.instance.currentUser;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
 
-    if (user == null) {
-      if (!mounted) return;
-      setState(() {
-        loading = false;
-      });
-      return;
-    }
+      if (user == null) {
+        if (!mounted) return;
+        setState(() {
+          loading = false;
+        });
+        return;
+      }
 
-    final adminDoc = await FirebaseFirestore.instance
-        .collection('admins')
-        .doc(user.uid)
-        .get()
-        .timeout(const Duration(seconds: 8));
-
-    if (!adminDoc.exists) {
-      if (!mounted) return;
-      setState(() {
-        loading = false;
-        ville = 'ADMIN_NON_TROUVÉ';
-        territoireId = '';
-      });
-      return;
-    }
-
-    final adminData = adminDoc.data() ?? {};
-    final loadedTerritoireId =
-        (adminData['territoireId'] ?? '').toString();
-
-    String loadedVille = 'VILLE_NON_RENSEIGNEE';
-
-    if (loadedTerritoireId.isNotEmpty) {
-      final territoireDoc = await FirebaseFirestore.instance
-          .collection('territoires')
-          .doc(loadedTerritoireId)
+      final adminDoc = await FirebaseFirestore.instance
+          .collection('admins')
+          .doc(user.uid)
           .get()
           .timeout(const Duration(seconds: 8));
 
-      if (territoireDoc.exists) {
-        final territoireData = territoireDoc.data() ?? {};
-        loadedVille =
-            (territoireData['ville'] ?? 'VILLE_NON_RENSEIGNEE').toString();
+      if (!adminDoc.exists) {
+        if (!mounted) return;
+        setState(() {
+          loading = false;
+          ville = 'ADMIN_NON_TROUVÉ';
+          territoireId = '';
+        });
+        return;
       }
+
+      final adminData = adminDoc.data() ?? {};
+      final loadedTerritoireId =
+          (adminData['territoireId'] ?? '').toString();
+
+      String loadedVille = 'VILLE_NON_RENSEIGNEE';
+
+      if (loadedTerritoireId.isNotEmpty) {
+        final territoireDoc = await FirebaseFirestore.instance
+            .collection('territoires')
+            .doc(loadedTerritoireId)
+            .get()
+            .timeout(const Duration(seconds: 8));
+
+        if (territoireDoc.exists) {
+          final territoireData = territoireDoc.data() ?? {};
+          loadedVille =
+              (territoireData['ville'] ?? 'VILLE_NON_RENSEIGNEE').toString();
+        }
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+  territoireId = loadedTerritoireId;
+  ville = loadedVille;
+  loading = false;
+});
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        loading = false;
+        ville = 'ERREUR_FIREBASE';
+        territoireId = '';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur chargement admin : $error'),
+          duration: const Duration(seconds: 6),
+        ),
+      );
     }
-
-    if (!mounted) return;
-
-    setState(() {
-      territoireId = loadedTerritoireId;
-      ville = loadedVille;
-      loading = false;
-    });
-  } catch (error) {
-    if (!mounted) return;
-
-    setState(() {
-      loading = false;
-      ville = 'ERREUR_FIREBASE';
-      territoireId = '';
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Erreur chargement admin : $error'),
-        duration: const Duration(seconds: 6),
-      ),
-    );
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -115,10 +118,22 @@ class _AdminEspacePageState extends State<AdminEspacePage> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 children: [
-                  Image.asset(
-                    'data/icons/title.png',
+                  SizedBox(
                     height: 56,
-                    fit: BoxFit.contain,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Center(
+                            child: Image.asset(
+                              'data/icons/title.png',
+                              height: 56,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                        const AdminProfileButton(),
+                      ],
+                    ),
                   ),
                   const Text(
                     'ESPACE ADMIN',
@@ -131,7 +146,6 @@ class _AdminEspacePageState extends State<AdminEspacePage> {
                     ),
                   ),
                   const SizedBox(height: 10),
-
                   if (loading)
                     const Expanded(
                       child: Center(
@@ -185,8 +199,8 @@ class _AdminEspacePageState extends State<AdminEspacePage> {
                                     MaterialPageRoute(
                                       builder: (_) =>
                                           AdminEspaceSurveillancePage(
-  territoireId: territoireId,
-)
+                                        territoireId: territoireId,
+                                      ),
                                     ),
                                   );
                                 },
@@ -204,9 +218,9 @@ class _AdminEspacePageState extends State<AdminEspacePage> {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => AdminEspaceSauveteurPage(
-  territoireId: territoireId,
-  ville: ville,
-),
+                                        territoireId: territoireId,
+                                        ville: ville,
+                                      ),
                                     ),
                                   );
                                 },
@@ -216,9 +230,7 @@ class _AdminEspacePageState extends State<AdminEspacePage> {
                         ),
                       ),
                     ),
-
                   const SizedBox(height: 10),
-
                   Container(
                     width: 40,
                     height: 40,
@@ -304,7 +316,6 @@ class _AdminButton extends StatelessWidget {
                 size: 48,
               ),
             const SizedBox(height: 8),
-            const SizedBox(height: 0),
             Text(
               title,
               textAlign: TextAlign.center,

@@ -14,6 +14,8 @@ import 'admin_gestion_sphot_page.dart';
 
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+import 'admin_profile_button.dart';
+
 enum AdminSphotMode { none, create, copy, edit }
 
 class AdminEspaceSphotPage extends StatefulWidget {
@@ -2651,10 +2653,24 @@ Widget build(BuildContext context) {
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
             child: Column(
               children: [
-                Image.asset(
-                  'data/icons/title.png',
-                  height: 42,
-                ),
+                SizedBox(
+  height: 56,
+  child: Row(
+    children: [
+      Expanded(
+        child: Center(
+          child: Image.asset(
+            'data/icons/title.png',
+            height: 56,
+            fit: BoxFit.contain,
+          ),
+        ),
+      ),
+
+      const AdminProfileButton(),
+    ],
+  ),
+),
                 Text(
   !_hasStarted
       ? 'ESPACE SPHOT(S)'

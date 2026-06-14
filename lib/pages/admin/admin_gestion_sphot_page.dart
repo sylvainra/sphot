@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import 'admin_controle_sphot_page.dart';
 
+import 'admin_profile_button.dart';
+
 class AdminGestionSphotPage extends StatelessWidget {
   final String territoireId;
 
@@ -44,11 +46,24 @@ class AdminGestionSphotPage extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 children: [
-                  Image.asset(
-                    'data/icons/title.png',
-                    height: 56,
-                    fit: BoxFit.contain,
-                  ),
+                  SizedBox(
+  height: 56,
+  child: Row(
+    children: [
+      Expanded(
+        child: Center(
+          child: Image.asset(
+            'data/icons/title.png',
+            height: 56,
+            fit: BoxFit.contain,
+          ),
+        ),
+      ),
+
+      const AdminProfileButton(),
+    ],
+  ),
+),
                   const Text(
                     'GESTION DU/DES SPHOT(S)',
                     textAlign: TextAlign.center,

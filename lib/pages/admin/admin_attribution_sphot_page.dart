@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:flutter/material.dart';
 
+import 'admin_profile_button.dart';
+
 class AdminAttributionSphotsPage extends StatefulWidget {
   final String territoireId;
 
@@ -73,18 +75,66 @@ Future<void> _loadDraft() async {
   }
 
   setState(() {
-    selectedDocIds
-      ..clear()
-      ..addAll(List<String>.from(data['selectedDocIds'] ?? []));
+    selectedDocIds.clear();
 
-    selectedSphotLabel = (data['selectedSphotLabel'] ?? '').toString();
+    selectedSphotLabel = '';
 
-    periodesSelectionnees =
-        List<String>.from(data['periodesSelectionnees'] ?? []);
+    periodesSelectionnees = [];
 
-    periodesEnregistrees =
-        List<String>.from(data['periodesEnregistrees'] ?? []);
+    periodesEnregistrees = [];
   });
+
+  await _refreshSelectedSphotLabel();
+
+}
+
+Future<void> _refreshSelectedSphotLabel() async {
+  if (selectedDocIds.isEmpty) {
+    setState(() {
+      selectedSphotLabel = '';
+    });
+    return;
+  }
+
+  final firestore = FirebaseFirestore.instance;
+
+  final labels = <String>[];
+
+  for (final docId in selectedDocIds) {
+    final doc = await firestore
+        .collection('territoires')
+        .doc(widget.territoireId)
+        .collection('spots')
+        .doc(docId)
+        .get();
+
+    if (!doc.exists) continue;
+
+    final data = doc.data() ?? {};
+
+    final nomSecours = (data['nomSecours'] ?? '').toString();
+    final nomSphot = (data['nomSphot'] ?? '').toString();
+
+    final idSphot = (data['idSphot'] ?? doc.id).toString();
+
+final label = [
+  'SPHOT $idSphot',
+  nomSecours,
+  nomSphot,
+].where((value) => value.trim().isNotEmpty).join(' - ');
+
+    if (label.trim().isNotEmpty) {
+      labels.add(label);
+    }
+  }
+
+  if (!mounted) return;
+
+  setState(() {
+    selectedSphotLabel = labels.join('\n');
+  });
+
+  await _saveDraft();
 }
 
 Future<void> _saveDraft() async {
@@ -94,7 +144,6 @@ Future<void> _saveDraft() async {
     await ref.set(
   {
     'selectedDocIds': selectedDocIds.toList(),
-    'selectedSphotLabel': selectedSphotLabel,
     'periodesSelectionnees': periodesSelectionnees,
     'periodesEnregistrees': periodesEnregistrees,
 
@@ -161,8 +210,7 @@ Future<void> _saveDraft() async {
     saveMessage = '';
     _attributionSaved = true;
   });
-
-  await _saveDraft();
+    
 }
 
   void _showMessage(String message) {
@@ -334,8 +382,7 @@ Future<void> _saveDraft() async {
                                               .join(' - ');
                                         }).toList();
 
-                                        selectedSphotLabel =
-                                            selectedSphotLabel = selectedLabels.join('\n');
+                                        selectedSphotLabel = selectedLabels.join('\n');
   saveMessage = '';
 });
 
@@ -762,13 +809,26 @@ Widget _periodLabelText(String label) {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 children: [
-                  Image.asset(
-                    'data/icons/title.png',
-                    height: 56,
-                    fit: BoxFit.contain,
-                  ),
+                  SizedBox(
+  height: 56,
+  width: double.infinity,
+  child: Stack(
+    alignment: Alignment.center,
+    children: [
+      Image.asset(
+        'data/icons/title.png',
+        height: 56,
+        fit: BoxFit.contain,
+      ),
+      const Positioned(
+        right: 0,
+        child: AdminProfileButton(),
+      ),
+    ],
+  ),
+),
                   const Text(
-                    'ATTRIBUTION AUX SPHOTS',
+                    'ATTRIBUTION AU(X) SPHOT(S)',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,

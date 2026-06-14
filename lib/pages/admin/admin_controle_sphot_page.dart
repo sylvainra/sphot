@@ -5,6 +5,8 @@ import 'admin_espace_sphot_page.dart';
 
 import 'admin_gestion_sphot_page.dart';
 
+import 'admin_profile_button.dart';  
+
 class AdminControleSphotPage extends StatefulWidget {
   final String docId;
   final Map<String, dynamic> data;
@@ -179,11 +181,24 @@ void initState() {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 children: [
-                  Image.asset(
-                    'data/icons/title.png',
-                    height: 56,
-                    fit: BoxFit.contain,
-                  ),
+                  SizedBox(
+  height: 56,
+  width: double.infinity,
+  child: Stack(
+    alignment: Alignment.center,
+    children: [
+      Image.asset(
+        'data/icons/title.png',
+        height: 56,
+        fit: BoxFit.contain,
+      ),
+      const Positioned(
+        right: 0,
+        child: AdminProfileButton(),
+      ),
+    ],
+  ),
+),
                   const Text(
                     'CONTRÔLE DU SPHOT',
                     textAlign: TextAlign.center,

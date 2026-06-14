@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'admin_creation_sauveteur_page.dart';
 import 'admin_gestion_sauveteur_page.dart';
+import 'admin_profile_button.dart';
+
+
+  
 
 class AdminEspaceSauveteurPage extends StatelessWidget {
   final String ville;
@@ -32,11 +36,24 @@ class AdminEspaceSauveteurPage extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 children: [
-                  Image.asset(
-                    'data/icons/title.png',
-                    height: 56,
-                    fit: BoxFit.contain,
-                  ),
+                  SizedBox(
+  height: 56,
+  width: double.infinity,
+  child: Stack(
+    alignment: Alignment.center,
+    children: [
+      Image.asset(
+        'data/icons/title.png',
+        height: 56,
+        fit: BoxFit.contain,
+      ),
+      const Positioned(
+        right: 0,
+        child: AdminProfileButton(),
+      ),
+    ],
+  ),
+),
 
                   const Text(
                     'ESPACE SAUVETEUR(S)',
@@ -49,7 +66,7 @@ class AdminEspaceSauveteurPage extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 4),
 
                   Expanded(
                     child: Container(
@@ -87,30 +104,31 @@ class AdminEspaceSauveteurPage extends StatelessWidget {
                           const SizedBox(height: 12),
 
                           Expanded(
-                            child: _SauveteurMenuButton(
-                              title: 'GÉRER\nLE(S) SAUVETEUR(S) CRÉÉ(S)',
-                              subtitle:
-                                  'Voir, modifier ou supprimer\nle(s) sauveteur(s) existant(s)',
-                              icon: Icons.manage_accounts_rounded,
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        AdminGestionSauveteurPage(
-  territoireId: territoireId,
-  ville: ville,
+  child: _SauveteurMenuButton(
+    title: 'GÉRER\nLE(S) SAUVETEUR(S) CRÉÉ(S)',
+    subtitle:
+        'Voir, modifier ou supprimer\nle(s) sauveteur(s) existant(s)',
+    icon: Icons.manage_accounts_rounded,
+    onTap: () {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AdminGestionSauveteurPage(
+            territoireId: territoireId,
+            ville: ville,
+          ),
+        ),
+      );
+    },
+  ),
 ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
+
+
                         ],
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 4),
 
                   Container(
                     width: 40,
@@ -168,7 +186,7 @@ class _SauveteurMenuButton extends StatelessWidget {
       child: Container(
         width: double.infinity,
         height: double.infinity,
-        padding: const EdgeInsets.fromLTRB(8, 1, 8, 8),
+        padding: const EdgeInsets.fromLTRB(6, 0, 6, 4),
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(22),
@@ -183,16 +201,16 @@ class _SauveteurMenuButton extends StatelessWidget {
             Icon(
               icon,
               color: rougeRef,
-              size: 48,
+              size: 38,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               title,
               textAlign: TextAlign.center,
               maxLines: 2,
               style: const TextStyle(
                 color: bleuRef,
-                fontSize: 16,
+                fontSize: 12,
                 fontWeight: FontWeight.w900,
                 height: 1.35,
               ),

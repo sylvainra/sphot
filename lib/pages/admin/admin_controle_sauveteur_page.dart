@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'admin_creation_sauveteur_page.dart';
+import 'admin_profile_button.dart';
 
 class AdminControleSauveteurPage extends StatefulWidget {
   final String territoireId;
@@ -130,6 +131,80 @@ class _AdminControleSauveteurPageState
   Navigator.of(context).pop();
 }
 
+Widget _accessSauveteurBlock() {
+  final login = _value('login').isEmpty ? 'NON GÉNÉRÉ' : _value('login');
+  final status = _value('accountStatus').isEmpty
+      ? 'ACTIVE'
+      : _value('accountStatus');
+
+  return Container(
+    width: double.infinity,
+    margin: const EdgeInsets.only(top: 14),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: adminColor,
+        width: 1.6,
+      ),
+    ),
+    child: Column(
+      children: [
+        const Text(
+          'ACCÈS SAUVETEUR',
+          style: TextStyle(
+            color: actionColor,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        _resumeLine('Identifiant', login),
+        _resumeLine('Statut', status),
+
+        const SizedBox(height: 10),
+
+        _accessButton('GÉNÉRER LES ACCÈS', Icons.key_rounded, () {}),
+        _accessButton('RÉINITIALISER LE MOT DE PASSE', Icons.password_rounded, () {}),
+        _accessButton('ENVOYER PAR EMAIL', Icons.email_rounded, () {}),
+        _accessButton('ENVOYER PAR SMS', Icons.sms_rounded, () {}),
+
+        const SizedBox(height: 8),
+
+        _accessButton('SUSPENDRE LE COMPTE', Icons.pause_circle_rounded, () {}),
+        _accessButton('SUPPRIMER LE COMPTE', Icons.delete_forever_rounded, () {}),
+      ],
+    ),
+  );
+}
+
+Widget _accessButton(String title, IconData icon, VoidCallback onTap) {
+  return Container(
+    width: double.infinity,
+    margin: const EdgeInsets.only(bottom: 8),
+    child: OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, color: actionColor),
+      label: Text(
+        title,
+        style: const TextStyle(
+          color: actionColor,
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(
+          color: actionColor,
+          width: 1.6,
+        ),
+      ),
+    ),
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -146,11 +221,24 @@ class _AdminControleSauveteurPageState
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 children: [
-                  Image.asset(
-                    'data/icons/title.png',
-                    height: 56,
-                    fit: BoxFit.contain,
-                  ),
+                  SizedBox(
+  height: 56,
+  width: double.infinity,
+  child: Stack(
+    alignment: Alignment.center,
+    children: [
+      Image.asset(
+        'data/icons/title.png',
+        height: 56,
+        fit: BoxFit.contain,
+      ),
+      const Positioned(
+        right: 0,
+        child: AdminProfileButton(),
+      ),
+    ],
+  ),
+),
                   const Text(
                     'CONTRÔLE DU SAUVETEUR',
                     textAlign: TextAlign.center,
@@ -204,6 +292,7 @@ class _AdminControleSauveteurPageState
                             _resumeLine('SPHOT(s) affecté(s)', _value('postesAffectes')),
                             _resumeLine('Années d’expérience', _value('experience')),
                             _resumeLine('Observations', _value('observations')),
+                            _accessSauveteurBlock(),
                             const SizedBox(height: 14),
                             Row(
                               children: [

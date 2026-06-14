@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 
+import 'package:flutter/services.dart';
+
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'dart:async';
+
+import 'admin_profile_button.dart';
+
 
 class AdminCreationSauveteurPage extends StatefulWidget {
   final String? docId;
@@ -53,6 +58,10 @@ final List<String> postesSelectionnes = [];
 OverlayEntry? _dropdownOverlay;
 
 bool sauveteurEnregistre = false;
+
+String generatedLogin = '';
+String generatedPassword = '';
+bool accesGenere = false;
 
 @override
 void initState() {
@@ -118,6 +127,53 @@ Future<void> _startVoice(
 
   static const Color adminColor = Color(0xFFDC2626);
 
+ Future<void> _generateAccess() async {
+  final nom = nomController.text.trim();
+  final prenom = prenomController.text.trim();
+
+  if (nom.isEmpty || prenom.isEmpty) return;
+
+  final login = '${prenom[0]}$nom'
+      .toLowerCase()
+      .replaceAll(' ', '')
+      .replaceAll('-', '')
+      .replaceAll("'", '');
+
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  final now = DateTime.now().millisecondsSinceEpoch;
+
+  String password = '';
+
+  for (int i = 0; i < 8; i++) {
+    password += chars[(now + i * 17) % chars.length];
+  }
+
+  final sauveteursRef = FirebaseFirestore.instance
+      .collection('territoires')
+      .doc(widget.territoireId)
+      .collection('sauveteurs');
+
+  final docRef = widget.docId == null
+      ? sauveteursRef.doc()
+      : sauveteursRef.doc(widget.docId);
+
+  await docRef.set({
+    'login': login,
+    'temporaryPassword': password,
+    'mustChangePassword': true,
+    'accountStatus': 'ACTIVE',
+    'accessGeneratedAt': FieldValue.serverTimestamp(),
+    'updatedAt': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
+
+  setState(() {
+    generatedLogin = login;
+    generatedPassword = password;
+    accesGenere = true;
+  });
+}
+
+
 Future<void> _saveSauveteur() async {
   final nom = nomController.text.trim();
   final prenom = prenomController.text.trim();
@@ -133,9 +189,26 @@ Future<void> _saveSauveteur() async {
       ? sauveteursRef.doc()
       : sauveteursRef.doc(widget.docId);
 
-  final sauveteurData = {
-    'nom': nom.toUpperCase(),
-    'prenom': prenom,
+  final generatedLogin =
+    '${prenom.trim().isNotEmpty ? prenom.trim()[0] : ''}$nom'
+        .toLowerCase()
+        .replaceAll(' ', '')
+        .replaceAll('-', '')
+        .replaceAll("'", '');
+
+final sauveteurData = {
+  'nom': nom.toUpperCase(),
+  'prenom': prenom,
+  'role': 'SAUVETEUR',
+  'accountStatus': 'ACTIVE',
+  'accessInheritedStatus': 'ACTIVE',
+  'authUid': '',
+  'login': widget.docId == null
+      ? generatedLogin
+      : (widget.data?['login'] ?? generatedLogin).toString(),
+  'temporaryPassword': '',
+  'mustChangePassword': true,
+  'createdByAdmin': true,
     'dateNaissance': dateNaissanceController.text.trim(),
     'age': ageController.text.trim(),
     'adresse': adresseController.text.trim(),
@@ -185,198 +258,279 @@ await Future.delayed(const Duration(seconds: 1));
 
 if (!mounted) return;
 
-Navigator.of(context)
-  ..pop()
-  ..pop();
+Navigator.of(context).pop();
 }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(
-            'data/images/map_background.jpg',
-            fit: BoxFit.cover,
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Column(
-                children: [
-                  Image.asset(
-                    'data/icons/title.png',
-                    height: 56,
-                  ),
-
-                  Text(
-  widget.docId != null
-      ? 'MODIFICATION D’UN SAUVETEUR'
-      : 'CRÉATION D’UN SAUVETEUR',
-  textAlign: TextAlign.center,
-  style: const TextStyle(
-    fontSize: 22,
-    fontWeight: FontWeight.w900,
-    color: adminColor,
-  ),
-),
-
-                  const SizedBox(height: 10),
-
-                  Expanded(
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: const Color(0xFF1E3A8A),
-                          width: 2,
-                        ),
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.transparent,
+    body: Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          'data/images/map_background.jpg',
+          fit: BoxFit.cover,
+        ),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              children: [
+                SizedBox(
+                  height: 56,
+                  width: double.infinity,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Image.asset(
+                        'data/icons/title.png',
+                        height: 56,
+                        fit: BoxFit.contain,
                       ),
-                      child: SingleChildScrollView(
-  padding: const EdgeInsets.only(top: 8),
-                        child: Column(
-                          children: [
-
-                            SizedBox(
-  height: 56,
-  child: _field(
-    'NOM',
-    controller: nomController,
-    uppercase: true,
-  ),
-),
-                            const SizedBox(height: 8),
-
-                            _field(
-  'Prénom',
-  controller: prenomController,
-  capitalizeWords: true,
-),
-                            const SizedBox(height: 8),
-
-                            _dateField('Date de naissance', controller: dateNaissanceController),
-                            const SizedBox(height: 8),
-
-                            _field('Âge', controller: ageController),
-                            const SizedBox(height: 8),
-
-                            _field('Adresse', controller: adresseController),
-                            const SizedBox(height: 8),
-
-                            _field('Code postal', controller: codePostalController),
-                            const SizedBox(height: 8),
-
-                            _field(
-  'VILLE',
-  controller: villeController,
-  uppercase: true,
-),
-                            const SizedBox(height: 8),
-
-                            _field('Téléphone', controller: telephoneController),
-                            const SizedBox(height: 8),
-
-                            _field('Email', controller: emailController),
-                            const SizedBox(height: 8),
-
-                            _dropdownFonction(),
-                            const SizedBox(height: 8),
-
-                            _field('Années d’expérience', controller: experienceController),
-                            const SizedBox(height: 8),
-
-                            _multiPostesSecoursField(),
-                            const SizedBox(height: 8),
-
-                            _field(
-  'Observations',
-  controller: observationsController,
-  maxLines: 4,
-  capitalizeWords: true,
-),
-
-                            const SizedBox(height: 15),
-
-                            SizedBox(
-  width: double.infinity,
-  height: 48,
-  child: ElevatedButton.icon(
-    onPressed: _saveSauveteur,
-    icon: Icon(
-      Icons.save,
-      color: sauveteurEnregistre
-          ? Colors.white
-          : const Color(0xFFDC2626),
-    ),
-    label: Text(
-      sauveteurEnregistre
-          ? 'ENREGISTRÉ'
-          : 'ENREGISTRER',
-      style: TextStyle(
-        fontWeight: FontWeight.w900,
-        color: sauveteurEnregistre
-            ? Colors.white
-            : const Color(0xFFDC2626),
-      ),
-    ),
-    style: ElevatedButton.styleFrom(
-      backgroundColor: sauveteurEnregistre
-          ? const Color(0xFFDC2626)
-          : Colors.transparent,
-      foregroundColor: sauveteurEnregistre
-          ? Colors.white
-          : const Color(0xFFDC2626),
-      elevation: 0,
-      side: const BorderSide(
-        color: Color(0xFFDC2626),
-        width: 2,
-      ),
-    ),
-  ),
-),
-                          ],
-                        ),
+                      const Positioned(
+                        right: 0,
+                        child: AdminProfileButton(),
                       ),
-                    ),
+                    ],
                   ),
-
-                  const SizedBox(height: 10),
-
-                  Container(
-                    width: 40,
-                    height: 40,
+                ),
+                Text(
+                  widget.docId != null
+                      ? 'MODIFICATION D’UN SAUVETEUR'
+                      : 'CRÉATION D’UN SAUVETEUR',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: adminColor,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.circular(24),
                       border: Border.all(
                         color: const Color(0xFF1E3A8A),
                         width: 2,
                       ),
                     ),
-                    child: IconButton(
-  onPressed: () {
-    Navigator.pop(context);
-  },
-  padding: EdgeInsets.zero,
-  constraints: const BoxConstraints(),
-  icon: const Icon(
-    Icons.arrow_back_ios_new_rounded,
-    color: Color(0xFF1E3A8A),
-    size: 22,
-  ),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            height: 56,
+                            child: _field(
+                              'NOM',
+                              controller: nomController,
+                              uppercase: true,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _field(
+                            'Prénom',
+                            controller: prenomController,
+                            capitalizeWords: true,
+                          ),
+                          const SizedBox(height: 8),
+                          _dateField(
+                            'Date de naissance',
+                            controller: dateNaissanceController,
+                          ),
+                          const SizedBox(height: 8),
+                          _field('Âge', controller: ageController),
+                          const SizedBox(height: 8),
+                          _field('Adresse', controller: adresseController),
+                          const SizedBox(height: 8),
+                          _field('Code postal', controller: codePostalController),
+                          const SizedBox(height: 8),
+                          _field(
+                            'VILLE',
+                            controller: villeController,
+                            uppercase: true,
+                          ),
+                          const SizedBox(height: 8),
+                          _field(
+  'Téléphone',
+  controller: telephoneController,
+  keyboardType: TextInputType.phone,
+  inputFormatters: [
+    FilteringTextInputFormatter.digitsOnly,
+    PhoneNumberFormatter(),
+  ],
 ),
+                          const SizedBox(height: 8),
+                          _field('Email', controller: emailController),
+                          const SizedBox(height: 8),
+                          _dropdownFonction(),
+                          const SizedBox(height: 8),
+                          _field(
+                            'Années d’expérience',
+                            controller: experienceController,
+                          ),
+                          const SizedBox(height: 8),
+                          _multiPostesSecoursField(),
+                          const SizedBox(height: 8),
+
+                          _field(
+                            'Observations',
+                            controller: observationsController,
+                            maxLines: 4,
+                            capitalizeWords: true,
+                          ),
+
+                          const SizedBox(height: 8),
+
+if (widget.docId == null) ...[
+
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: _generateAccess,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: accesGenere
+                                    ? const Color(0xFFDC2626)
+                                    : Colors.transparent,
+                                elevation: 0,
+                                side: const BorderSide(
+                                  color: Color(0xFFDC2626),
+                                  width: 2,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: Text(
+                                accesGenere
+                                    ? 'ACCÈS GÉNÉRÉ'
+                                    : 'GÉNÉRER L\'ACCÈS',
+                                style: TextStyle(
+                                  color: accesGenere
+                                      ? const Color(0xFFFFFFFF)
+                                      : const Color(0xFFDC2626),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: const Color(0xFF1E3A8A),
+                                width: 1.6,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Identifiant : ${generatedLogin.isEmpty ? 'non généré' : generatedLogin}',
+                                  style: const TextStyle(
+                                    color: Color(0xFF1E3A8A),
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Mot de passe : ${generatedPassword.isEmpty ? 'non généré' : generatedPassword}',
+                                  style: const TextStyle(
+                                    color: Color(0xFF1E3A8A),
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+],
+
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              onPressed: _saveSauveteur,
+                              icon: Icon(
+                                Icons.save,
+                                color: sauveteurEnregistre
+                                    ? const Color(0xFFFFFFFF)
+                                    : const Color(0xFFDC2626),
+                              ),
+                              label: Text(
+                                sauveteurEnregistre
+                                    ? 'ENREGISTRÉ'
+                                    : 'ENREGISTRER',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  color: sauveteurEnregistre
+                                      ? const Color(0xFFFFFFFF)
+                                      : const Color(0xFFDC2626),
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: sauveteurEnregistre
+                                    ? const Color(0xFFDC2626)
+                                    : Colors.transparent,
+                                foregroundColor: sauveteurEnregistre
+                                    ? const Color(0xFFFFFFFF)
+                                    : const Color(0xFFDC2626),
+                                elevation: 0,
+                                side: const BorderSide(
+                                  color: Color(0xFFDC2626),
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF1E3A8A),
+                      width: 2,
+                    ),
+                  ),
+                  child: IconButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: Color(0xFF1E3A8A),
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
 Widget _dropdownFonction() {
   final fieldKey = GlobalKey();
@@ -564,98 +718,286 @@ final selected = fonctionsSelectionnees.contains(choice);
   );
 }
 
+Widget _dropdownPostes(List<Map<String, String>> choices) {
+  final fieldKey = GlobalKey();
+
+  void closeMenu() {
+    _dropdownOverlay?.remove();
+    _dropdownOverlay = null;
+  }
+
+  void openMenu() {
+    closeMenu();
+
+    final renderBox =
+        fieldKey.currentContext!.findRenderObject()
+            as RenderBox;
+
+    final position =
+        renderBox.localToGlobal(Offset.zero);
+
+    final size = renderBox.size;
+
+    _dropdownOverlay = OverlayEntry(
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, overlaySetState) {
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: closeMenu,
+                    child: Container(
+                      color: Colors.transparent,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: position.dx,
+                  top: position.dy + size.height - 10,
+                  width: size.width,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      constraints:
+                          const BoxConstraints(
+                        maxHeight: 180,
+                      ),
+                      decoration: BoxDecoration(
+                        color:
+                            Colors.white.withOpacity(0.88),
+                        border: const Border(
+                          left: BorderSide(
+                            color: Color(0xFF1E3A8A),
+                            width: 1.4,
+                          ),
+                          right: BorderSide(
+                            color: Color(0xFF1E3A8A),
+                            width: 1.4,
+                          ),
+                          bottom: BorderSide(
+                            color: Color(0xFF1E3A8A),
+                            width: 1.4,
+                          ),
+                        ),
+                        borderRadius:
+                            const BorderRadius.only(
+                          bottomLeft:
+                              Radius.circular(10),
+                          bottomRight:
+                              Radius.circular(10),
+                        ),
+                      ),
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        itemCount: choices.length,
+                        itemBuilder:
+                            (context, index) {
+                          final choice = choices[index];
+
+final id = choice['id'] ?? '';
+final label = choice['label'] ?? '';
+
+final selected =
+    postesSelectionnes.contains(id);
+
+                          return InkWell(
+                            onTap: () {
+                              setState(() {
+                                if (selected) {
+                                  postesSelectionnes.remove(id);
+                                } else {
+                                  postesSelectionnes.add(id);
+                                }
+                              });
+
+                              overlaySetState(() {});
+                            },
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    selected
+                                        ? Icons
+                                            .check_box_rounded
+                                        : Icons
+                                            .check_box_outline_blank_rounded,
+                                    color: selected
+                                        ? adminColor
+                                        : const Color(
+                                            0xFF1E3A8A),
+                                    size: 22,
+                                  ),
+                                  const SizedBox(
+                                      width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      label,
+                                      style:
+                                          const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight:
+                                            FontWeight.w800,
+                                        color: Color(
+                                            0xFF1E3A8A),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    Overlay.of(context).insert(_dropdownOverlay!);
+  }
+
+  return GestureDetector(
+    key: fieldKey,
+    onTap: openMenu,
+    child: InputDecorator(
+      decoration: InputDecoration(
+        labelText:
+            postesSelectionnes.isEmpty
+                ? null
+                : 'SPHOT(S) affecté(s)',
+        labelStyle: const TextStyle(
+          color: Color(0xFF1E3A8A),
+          fontWeight: FontWeight.w700,
+        ),
+        filled: true,
+        fillColor: Colors.transparent,
+        contentPadding:
+            const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(
+          borderRadius:
+              BorderRadius.circular(14),
+          borderSide: const BorderSide(
+            color: Color(0xFF1E3A8A),
+            width: 1.6,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius:
+              BorderRadius.circular(14),
+          borderSide: const BorderSide(
+            color: Color(0xFF1E3A8A),
+            width: 2,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius:
+              BorderRadius.circular(14),
+          borderSide: const BorderSide(
+            color: Color(0xFF1E3A8A),
+            width: 1.6,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+  child: Text(
+    postesSelectionnes.isEmpty
+        ? 'SPHOT(S) affecté(s)'
+        : choices
+            .where((choice) =>
+                postesSelectionnes.contains(choice['id']))
+            .map((choice) => choice['label'] ?? '')
+            .where((label) => label.trim().isNotEmpty)
+            .join('\n'),
+    style: const TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w700,
+      color: Color(0xFF1E3A8A),
+    ),
+  ),
+),
+          const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: adminColor,
+            size: 26,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 Widget _multiPostesSecoursField() {
   return StreamBuilder<QuerySnapshot>(
     stream: FirebaseFirestore.instance
         .collection('territoires')
         .doc(widget.territoireId)
         .collection('spots')
+        .where(
+          'typeSphot',
+          isEqualTo: '🚨 POSTE DE SECOURS 🚨',
+        )
         .snapshots(),
     builder: (context, snapshot) {
       if (!snapshot.hasData) {
-        return const Center(
-          child: CircularProgressIndicator(),
-        );
+        return const SizedBox();
       }
 
-      final List<String> postes = snapshot.data!.docs
-          .map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
+      final docs = snapshot.data!.docs;
 
-            final typeSphot = (data['typeSphot'] ?? '').toString();
+      docs.sort((a, b) {
+        final dataA = a.data() as Map<String, dynamic>;
+        final dataB = b.data() as Map<String, dynamic>;
 
-final isPosteSecours =
-    data['isPosteSecours'] == true ||
-    typeSphot.contains('POSTE DE SECOURS');
+        final secoursA = (dataA['nomSecours'] ?? '').toString();
+        final secoursB = (dataB['nomSecours'] ?? '').toString();
 
-if (!isPosteSecours) {
-  return '';
-}
+        final matchA = RegExp(r'(\d+)').firstMatch(secoursA);
+        final matchB = RegExp(r'(\d+)').firstMatch(secoursB);
 
-            return (data['idSphot'] ?? doc.id).toString();
-          })
-          .where((value) => value.trim().isNotEmpty)
-          .toList();
+        final numA = int.tryParse(matchA?.group(1) ?? '9999') ?? 9999;
+        final numB = int.tryParse(matchB?.group(1) ?? '9999') ?? 9999;
 
-      return _multiDropdownPostes(
-        'SPHOT(S) affecté(s)',
-        postes,
-      );
+        return numA.compareTo(numB);
+      });
+
+      final postes = docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+
+        final idSphot = (data['idSphot'] ?? doc.id).toString();
+        final nomSecours = (data['nomSecours'] ?? '').toString();
+        final nomSphot = (data['nomSphot'] ?? '').toString();
+
+        final label = [
+          'SPHOT $idSphot',
+          nomSecours,
+          nomSphot,
+        ].where((value) => value.trim().isNotEmpty).join(' - ');
+
+        return {
+          'id': doc.id,
+          'label': label.isEmpty ? doc.id : label,
+        };
+      }).toList();
+
+      return _dropdownPostes(postes);
     },
-  );
-}
-
-Widget _multiDropdownPostes(
-  String label,
-  List<String> choices,
-) {
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      border: Border.all(
-        color: const Color(0xFF1E3A8A),
-        width: 1.6,
-      ),
-      borderRadius: BorderRadius.circular(14),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          choices.isEmpty ? 'Aucun SPHOT trouvé' : label,
-          style: const TextStyle(
-            color: Color(0xFF1E3A8A),
-            fontWeight: FontWeight.w900,
-            fontSize: 15,
-          ),
-        ),
-        const SizedBox(height: 8),
-        ...choices.map(
-          (choice) => CheckboxListTile(
-            value: postesSelectionnes.contains(choice),
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              choice,
-              style: const TextStyle(
-                color: Color(0xFF1E3A8A),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            onChanged: (_) {
-              setState(() {
-                if (postesSelectionnes.contains(choice)) {
-                  postesSelectionnes.remove(choice);
-                } else {
-                  postesSelectionnes.add(choice);
-                }
-              });
-            },
-          ),
-        ),
-      ],
-    ),
   );
 }
 
@@ -743,10 +1085,14 @@ labelStyle: const TextStyle(
   int maxLines = 1,
   bool uppercase = false,
   bool capitalizeWords = false,
+  TextInputType? keyboardType,
+  List<TextInputFormatter>? inputFormatters,
 }) {
   
   return TextField(
   controller: controller,
+  keyboardType: keyboardType,
+  inputFormatters: inputFormatters,
 
   onChanged: (value) {
     if (uppercase) {
@@ -834,4 +1180,35 @@ labelStyle: const TextStyle(
     ),
   );
 }
+}
+
+class PhoneNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    String digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+
+    if (digits.length > 10) {
+      digits = digits.substring(0, 10);
+    }
+
+    final buffer = StringBuffer();
+
+    for (int i = 0; i < digits.length; i++) {
+      if (i > 0 && i % 2 == 0) {
+        buffer.write(' ');
+      }
+
+      buffer.write(digits[i]);
+    }
+
+    final formatted = buffer.toString();
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
 }

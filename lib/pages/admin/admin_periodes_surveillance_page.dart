@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'admin_profile_button.dart';
+
 class AdminPeriodesSurveillancePage extends StatefulWidget {
   final String territoireId;
 
@@ -114,11 +116,24 @@ class _AdminPeriodesSurveillancePageState
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 children: [
-                  Image.asset(
-                    'data/icons/title.png',
-                    height: 56,
-                    fit: BoxFit.contain,
-                  ),
+                  SizedBox(
+  height: 56,
+  width: double.infinity,
+  child: Stack(
+    alignment: Alignment.center,
+    children: [
+      Image.asset(
+        'data/icons/title.png',
+        height: 56,
+        fit: BoxFit.contain,
+      ),
+      const Positioned(
+        right: 0,
+        child: AdminProfileButton(),
+      ),
+    ],
+  ),
+),
                   const Text(
                     'PÉRIODE(S) DE SURVEILLANCE',
                     textAlign: TextAlign.center,
