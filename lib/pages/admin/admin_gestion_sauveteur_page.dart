@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 
 import 'admin_profile_button.dart';
@@ -28,6 +29,11 @@ class _AdminGestionSauveteurPageState
   static const Color actionColor = Color(0xFFDC2626);
 
   final Set<String> passwordResetDoneIds = {};
+  final Set<String> passwordResetEmailSentIds = {};
+  final Set<String> passwordResetSmsSentIds = {};
+
+  final Map<String, String> passwordResetLoginsById = {};
+  final Map<String, String> passwordResetPasswordsById = {};
 
 String _generateTemporaryPassword() {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -41,6 +47,41 @@ String _generateTemporaryPassword() {
   }
 
   return password;
+}
+
+Future<void> _sendResetCredentialsEmail({
+  required String email,
+  required String prenom,
+  required String identifiant,
+  required String motDePasse,
+  required String sauveteurId,
+}) async {
+  if (email.isEmpty || identifiant.isEmpty || motDePasse.isEmpty) {
+    return;
+  }
+
+  final uri = Uri.https(
+    'us-central1-sphot-ab80b.cloudfunctions.net',
+    '/sendSauveteurCredentialsEmail',
+    {
+      'email': email,
+      'prenom': prenom,
+      'identifiant': identifiant,
+      'motdepasse': motDePasse,
+    },
+  );
+
+  final response = await http.get(uri);
+
+  if (response.statusCode == 200) {
+    if (!mounted) return;
+
+    setState(() {
+      passwordResetEmailSentIds.add(sauveteurId);
+    });
+  } else {
+    debugPrint('Erreur email SPHOT : ${response.body}');
+  }
 }
   
 
@@ -234,6 +275,8 @@ final nom = (data['nom'] ?? '').toString();
                                   (data['prenom'] ?? '').toString();
                               final telephone =
                                   (data['telephone'] ?? '').toString();
+                              final email =
+                                  (data['email'] ?? '').toString();
                               final postesAffectes =
     (data['postesAffectes'] as List?)
         ?.cast<String>() ??
@@ -343,67 +386,209 @@ Builder(
   builder: (context) {
     final passwordResetDone =
         passwordResetDoneIds.contains(doc.id);
+    final passwordResetEmailSent =
+        passwordResetEmailSentIds.contains(doc.id);
+    final passwordResetSmsSent =
+        passwordResetSmsSentIds.contains(doc.id);
 
-    return SizedBox(
-      width: double.infinity,
-      height: 34,
-      child: ElevatedButton(
-        onPressed: passwordResetDone
-    ? null
-    : () async {
-        final newPassword =
-            _generateTemporaryPassword();
+    final resetLogin =
+        passwordResetLoginsById[doc.id] ??
+            (data['login'] ?? '').toString();
+    final resetPassword =
+        passwordResetPasswordsById[doc.id] ?? '';
 
-        await FirebaseFirestore.instance
-            .collection('territoires')
-            .doc(widget.territoireId)
-            .collection('sauveteurs')
-            .doc(doc.id)
-            .set(
-          {
-            'temporaryPassword': newPassword,
-            'mustChangePassword': true,
-            'passwordResetAt':
-                FieldValue.serverTimestamp(),
-            'updatedAt':
-                FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        );
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 34,
+          child: ElevatedButton(
+            onPressed: passwordResetDone
+                ? null
+                : () async {
+                    final newPassword =
+                        _generateTemporaryPassword();
+                    final login =
+                        (data['login'] ?? '').toString();
 
-        if (!mounted) return;
+                    await FirebaseFirestore.instance
+                        .collection('territoires')
+                        .doc(widget.territoireId)
+                        .collection('sauveteurs')
+                        .doc(doc.id)
+                        .set(
+                      {
+                        'temporaryPassword': newPassword,
+                        'mustChangePassword': true,
+                        'passwordResetAt':
+                            FieldValue.serverTimestamp(),
+                        'updatedAt':
+                            FieldValue.serverTimestamp(),
+                      },
+                      SetOptions(merge: true),
+                    );
 
+                    if (!mounted) return;
+
+                    setState(() {
+                      passwordResetDoneIds.add(doc.id);
+                      passwordResetLoginsById[doc.id] = login;
+                      passwordResetPasswordsById[doc.id] = newPassword;
+                      passwordResetEmailSentIds.remove(doc.id);
+                      passwordResetSmsSentIds.remove(doc.id);
+                    });
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: passwordResetDone
+                  ? const Color(0xFFDC2626)
+                  : Colors.transparent,
+              foregroundColor: passwordResetDone
+                  ? Colors.white
+                  : const Color(0xFFDC2626),
+              disabledBackgroundColor: const Color(0xFFDC2626),
+              disabledForegroundColor: Colors.white,
+              elevation: 0,
+              side: BorderSide(
+                color: passwordResetDone
+                    ? const Color(0xFFDC2626)
+                    : const Color(0xFFDC2626),
+                width: 1.6,
+              ),
+            ),
+            child: Text(
+              passwordResetDone
+                  ? 'MOT DE PASSE RÉINITIALISÉ'
+                  : 'RÉINITIALISER LE MOT DE PASSE',
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ),
+
+        if (passwordResetDone) ...[
+          const SizedBox(height: 8),
+
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: const Color(0xFF1E3A8A),
+                width: 1.6,
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Identifiant : ${resetLogin.isEmpty ? 'non généré' : resetLogin}',
+                  style: const TextStyle(
+                    color: Color(0xFF1E3A8A),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Mot de passe : ${resetPassword.isEmpty ? 'non généré' : resetPassword}',
+                  style: const TextStyle(
+                    color: Color(0xFF1E3A8A),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          SizedBox(
+            width: double.infinity,
+            height: 34,
+            child: ElevatedButton(
+              onPressed: passwordResetDone
+    ? () async {
         setState(() {
-          passwordResetDoneIds.add(doc.id);
+          passwordResetEmailSentIds.add(doc.id);
         });
-      },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: passwordResetDone
-              ? const Color(0xFF1E3A8A)
-              : Colors.transparent,
-          foregroundColor: passwordResetDone
-              ? Colors.white
-              : const Color(0xFFDC2626),
-          disabledBackgroundColor: const Color(0xFF1E3A8A),
-          disabledForegroundColor: Colors.white,
-          elevation: 0,
-          side: BorderSide(
-            color: passwordResetDone
-                ? const Color(0xFF1E3A8A)
-                : const Color(0xFFDC2626),
-            width: 1.6,
+
+        await _sendResetCredentialsEmail(
+          email: email.trim(),
+          prenom: prenom.trim(),
+          identifiant: resetLogin.trim(),
+          motDePasse: resetPassword.trim(),
+          sauveteurId: doc.id,
+        );
+      }
+    : null,
+              style: ElevatedButton.styleFrom(
+  backgroundColor: passwordResetEmailSent
+      ? const Color(0xFFDC2626)
+      : Colors.transparent,
+  foregroundColor: passwordResetEmailSent
+      ? Colors.white
+      : const Color(0xFFDC2626),
+  disabledBackgroundColor: Colors.transparent,
+  elevation: 0,
+  side: const BorderSide(
+    color: Color(0xFFDC2626),
+    width: 2,
+  ),
+),
+              child: Text(
+                passwordResetEmailSent
+                    ? 'EMAIL ENVOYÉ'
+                    : 'ENVOYER PAR EMAIL',
+                style: const TextStyle(
+  fontSize: 10,
+  fontWeight: FontWeight.w900,
+),
+              ),
+            ),
           ),
-        ),
-        child: Text(
-          passwordResetDone
-              ? 'MOT DE PASSE RÉINITIALISÉ'
-              : 'RÉINITIALISER LE MOT DE PASSE',
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
+
+          const SizedBox(height: 8),
+
+          SizedBox(
+            width: double.infinity,
+            height: 34,
+            child: ElevatedButton(
+              onPressed: passwordResetDone
+    ? () {
+        setState(() {
+          passwordResetSmsSentIds.add(doc.id);
+        });
+      }
+    : null,
+              style: ElevatedButton.styleFrom(
+  backgroundColor: passwordResetSmsSent
+      ? const Color(0xFFDC2626)
+      : Colors.transparent,
+  foregroundColor: passwordResetSmsSent
+      ? Colors.white
+      : const Color(0xFFDC2626),
+  disabledBackgroundColor: Colors.transparent,
+  elevation: 0,
+  side: const BorderSide(
+    color: Color(0xFFDC2626),
+    width: 2,
+  ),
+),
+              child: Text(
+                passwordResetSmsSent
+                    ? 'SMS ENVOYÉ'
+                    : 'ENVOYER PAR SMS',
+                style: const TextStyle(
+  fontSize: 10,
+  fontWeight: FontWeight.w900,
+),
+              ),
+            ),
           ),
-        ),
-      ),
+        ],
+      ],
     );
   },
 ),

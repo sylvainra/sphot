@@ -70,6 +70,8 @@ bool accesGenere = false;
 bool emailEnvoye = false;
 bool smsEnvoye = false;
 
+String? createdSauveteurDocId;
+
 @override
 void initState() {
   super.initState();
@@ -158,17 +160,31 @@ Future<String> _generateUniqueLogin(String baseLogin) async {
 
   static const Color adminColor = Color(0xFFDC2626);
 
+String _normalizeLogin(String value) {
+  return value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[àáâäãå]'), 'a')
+      .replaceAll(RegExp(r'[ç]'), 'c')
+      .replaceAll(RegExp(r'[èéêë]'), 'e')
+      .replaceAll(RegExp(r'[ìíîï]'), 'i')
+      .replaceAll(RegExp(r'[ñ]'), 'n')
+      .replaceAll(RegExp(r'[òóôöõ]'), 'o')
+      .replaceAll(RegExp(r'[ùúûü]'), 'u')
+      .replaceAll(RegExp(r'[ýÿ]'), 'y')
+      .replaceAll('æ', 'ae')
+      .replaceAll('œ', 'oe')
+      .replaceAll(RegExp(r"[' -]"), '');
+}
+
  Future<void> _generateAccess() async {
   final nom = nomController.text.trim();
   final prenom = prenomController.text.trim();
 
   if (nom.isEmpty || prenom.isEmpty) return;
 
-  final baseLogin = '${prenom[0]}$nom'
-    .toLowerCase()
-    .replaceAll(' ', '')
-    .replaceAll('-', '')
-    .replaceAll("'", '');
+  if (!_validateContactBeforeAccess()) return;
+
+  final baseLogin = _normalizeLogin('${prenom[0]}$nom');
 
 final login =
     await _generateUniqueLogin(baseLogin);
@@ -188,8 +204,10 @@ final login =
       .collection('sauveteurs');
 
   final docRef = widget.docId == null
-      ? sauveteursRef.doc()
-      : sauveteursRef.doc(widget.docId);
+    ? sauveteursRef.doc(createdSauveteurDocId)
+    : sauveteursRef.doc(widget.docId);
+
+createdSauveteurDocId ??= docRef.id;
 
   await docRef.set({
     'login': login,
@@ -240,11 +258,60 @@ Future<void> _sendCredentialsEmail() async {
   }
 }
 
+bool _validateSauveteurBeforeSave() {
+  if (nomController.text.trim().isEmpty) {
+    _showError('Le nom du sauveteur est obligatoire.');
+    return false;
+  }
+
+  if (prenomController.text.trim().isEmpty) {
+    _showError('Le prénom du sauveteur est obligatoire.');
+    return false;
+  }
+
+  if (telephoneController.text.trim().isEmpty) {
+    _showError('Le téléphone du sauveteur est obligatoire.');
+    return false;
+  }
+
+  if (emailController.text.trim().isEmpty) {
+    _showError('L’adresse email du sauveteur est obligatoire.');
+    return false;
+  }
+
+  if (!emailController.text.trim().contains('@')) {
+    _showError('L’adresse email du sauveteur n’est pas valide.');
+    return false;
+  }
+
+  if (fonctionsSelectionnees.isEmpty) {
+    _showError('Sélectionne au moins une fonction.');
+    return false;
+  }
+
+  if (postesSelectionnes.isEmpty) {
+    _showError('Affecte au moins un SPHOT au sauveteur.');
+    return false;
+  }
+
+  if (widget.docId == null && generatedLogin.isEmpty) {
+    _showError('Génère l’accès avant d’enregistrer.');
+    return false;
+  }
+
+  if (widget.docId == null && generatedPassword.isEmpty) {
+    _showError('Le mot de passe temporaire doit être généré avant enregistrement.');
+    return false;
+  }
+
+  return true;
+}
+
 Future<void> _saveSauveteur() async {
   final nom = nomController.text.trim();
   final prenom = prenomController.text.trim();
 
-  if (nom.isEmpty || prenom.isEmpty) return;
+  if (!_validateSauveteurBeforeSave()) return;
 
   final sauveteursRef = FirebaseFirestore.instance
       .collection('territoires')
@@ -252,18 +319,20 @@ Future<void> _saveSauveteur() async {
       .collection('sauveteurs');
 
   final docRef = widget.docId == null
-      ? sauveteursRef.doc()
-      : sauveteursRef.doc(widget.docId);
+    ? sauveteursRef.doc(createdSauveteurDocId)
+    : sauveteursRef.doc(widget.docId);
 
-  final baseLogin =
-    '${prenom.trim().isNotEmpty ? prenom.trim()[0] : ''}$nom'
-        .toLowerCase()
-        .replaceAll(' ', '')
-        .replaceAll('-', '')
-        .replaceAll("'", '');
+createdSauveteurDocId ??= docRef.id;
 
-final generatedLogin =
-    await _generateUniqueLogin(baseLogin);
+  final baseLogin = _normalizeLogin(
+  '${prenom.trim().isNotEmpty ? prenom.trim()[0] : ''}$nom',
+);
+
+final loginToSave = widget.docId == null
+    ? (generatedLogin.isNotEmpty
+        ? generatedLogin
+        : await _generateUniqueLogin(baseLogin))
+    : (widget.data?['login'] ?? '').toString();
 
 final sauveteurData = {
   'nom': nom.toUpperCase(),
@@ -272,10 +341,10 @@ final sauveteurData = {
   'accountStatus': 'ACTIVE',
   'accessInheritedStatus': 'ACTIVE',
   'authUid': '',
-  'login': widget.docId == null
-      ? generatedLogin
-      : (widget.data?['login'] ?? generatedLogin).toString(),
-  'temporaryPassword': '',
+  'login': loginToSave,
+  'temporaryPassword': widget.docId == null
+    ? generatedPassword
+    : (widget.data?['temporaryPassword'] ?? '').toString(),
   'mustChangePassword': true,
   'createdByAdmin': true,
     'dateNaissance': dateNaissanceController.text.trim(),
@@ -330,8 +399,42 @@ if (!mounted) return;
 Navigator.of(context).pop();
 }
 
+void _showError(String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      duration: const Duration(seconds: 3),
+      backgroundColor: const Color(0xFFDC2626),
+    ),
+  );
+}
+
+bool _validateContactBeforeAccess() {
+  if (telephoneController.text.trim().isEmpty) {
+    _showError('Le téléphone du sauveteur est obligatoire avant de générer l’accès.');
+    return false;
+  }
+
+  if (emailController.text.trim().isEmpty) {
+    _showError('L’adresse email du sauveteur est obligatoire avant de générer l’accès.');
+    return false;
+  }
+
+  if (!emailController.text.trim().contains('@')) {
+    _showError('L’adresse email du sauveteur n’est pas valide.');
+    return false;
+  }
+
+  return true;
+}
+
 @override
 Widget build(BuildContext context) {
+
+  final contactOk = telephoneController.text.trim().isNotEmpty &&
+    emailController.text.trim().isNotEmpty &&
+    emailController.text.trim().contains('@');
+
   return Scaffold(
     backgroundColor: Colors.transparent,
     body: Stack(
@@ -484,15 +587,52 @@ Widget build(BuildContext context) {
                           const SizedBox(height: 8),
 
                           _field(
-                            'Observations',
-                            controller: observationsController,
-                            maxLines: 4,
-                            capitalizeWords: true,
-                          ),
+  'Observations',
+  controller: observationsController,
+  maxLines: 4,
+  capitalizeWords: true,
+),
 
-                          const SizedBox(height: 8),
+const SizedBox(height: 8),
+
+if (widget.docId != null)
+  Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      border: Border.all(
+        color: const Color(0xFF1E3A8A),
+        width: 1.6,
+      ),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Identifiant : ${(widget.data?['login'] ?? '').toString().isEmpty ? 'non généré' : (widget.data?['login'] ?? '').toString()}',
+          style: const TextStyle(
+            color: Color(0xFF1E3A8A),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Mot de passe : ${(widget.data?['temporaryPassword'] ?? '').toString().isEmpty ? 'non généré' : (widget.data?['temporaryPassword'] ?? '').toString()}',
+          style: const TextStyle(
+            color: Color(0xFF1E3A8A),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    ),
+  ),
+
+const SizedBox(height: 8),
 
 if (widget.docId == null) ...[
+
+                          
 
                           SizedBox(
                             width: double.infinity,
@@ -566,15 +706,15 @@ if (widget.docId == null) ...[
   width: double.infinity,
   height: 42,
   child: ElevatedButton(
-    onPressed: accesGenere
-        ? () async {
-            setState(() {
-              emailEnvoye = true;
-            });
+    onPressed: accesGenere && contactOk
+    ? () async {
+        setState(() {
+          emailEnvoye = true;
+        });
 
-            await _sendCredentialsEmail();
-          }
-        : null,
+        await _sendCredentialsEmail();
+      }
+    : null,
     style: ElevatedButton.styleFrom(
       backgroundColor: emailEnvoye
           ? const Color(0xFFDC2626)
@@ -606,16 +746,16 @@ SizedBox(
   width: double.infinity,
   height: 42,
   child: ElevatedButton(
-    onPressed: accesGenere
-        ? () {
-            setState(() {
-              smsEnvoye = true;
-            });
-          }
-        : null,
+    onPressed: accesGenere && contactOk
+    ? () {
+        setState(() {
+          smsEnvoye = true;
+        });
+      }
+    : null,
     style: ElevatedButton.styleFrom(
       backgroundColor: smsEnvoye
-          ? const Color(0xFF1E3A8A)
+          ? const Color(0xFFDC2626)
           : Colors.transparent,
       foregroundColor: smsEnvoye
           ? Colors.white
@@ -624,7 +764,7 @@ SizedBox(
       elevation: 0,
       side: BorderSide(
         color: smsEnvoye
-            ? const Color(0xFF1E3A8A)
+            ? const Color(0xFFDC2626)
             : const Color(0xFFDC2626),
         width: 2,
       ),
@@ -1345,6 +1485,7 @@ labelStyle: const TextStyle(
         );
       }
     }
+   setState(() {}); 
   },
 
   textCapitalization: uppercase
