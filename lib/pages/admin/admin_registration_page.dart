@@ -8,10 +8,27 @@ import 'admin_map_picker_page.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'admin_espace_page.dart';
+
 
 
 class AdminRegistrationPage extends StatefulWidget {
-  const AdminRegistrationPage({super.key});
+  final String? proConnectUid;
+  final String? proConnectEmail;
+  final String? proConnectNom;
+  final String? proConnectPrenom;
+  final String? proConnectOrganisation;
+  final String? proConnectSiret;
+
+  const AdminRegistrationPage({
+    super.key,
+    this.proConnectUid,
+    this.proConnectEmail,
+    this.proConnectNom,
+    this.proConnectPrenom,
+    this.proConnectOrganisation,
+    this.proConnectSiret,
+  });
 
   @override
   State<AdminRegistrationPage> createState() => _AdminRegistrationPageState();
@@ -20,6 +37,27 @@ class AdminRegistrationPage extends StatefulWidget {
 class _AdminRegistrationPageState extends State<AdminRegistrationPage> {
   static const Color adminColor = Color(0xFF1E3A8A);
   static const Color redColor = Color(0xFFDC2626);
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller('nomStructure').text =
+        widget.proConnectOrganisation ?? '';
+
+    _controller('nomResponsable').text =
+        widget.proConnectNom ?? '';
+
+    _controller('prenomResponsable').text =
+        widget.proConnectPrenom ?? '';
+
+    _controller('emailResponsable').text =
+        widget.proConnectEmail ?? '';
+
+    if (_controller('typeStructure').text.isEmpty) {
+      _controller('typeStructure').text = 'COMMUNE';
+    }
+  }
 
   final stt.SpeechToText _speech = stt.SpeechToText();
 
@@ -142,6 +180,7 @@ class _AdminRegistrationPageState extends State<AdminRegistrationPage> {
   String label, {
   bool uppercase = false,
   bool capitalizeWords = false,
+  bool readOnly = false,
   TextInputType keyboardType = TextInputType.text,
 }) {
   String formatValue(String value) {
@@ -164,6 +203,9 @@ class _AdminRegistrationPageState extends State<AdminRegistrationPage> {
 
   return TextField(
     controller: _controller(key),
+
+readOnly: readOnly,
+    
     keyboardType: keyboardType,
     textCapitalization: uppercase
         ? TextCapitalization.characters
@@ -190,7 +232,12 @@ class _AdminRegistrationPageState extends State<AdminRegistrationPage> {
         fontWeight: FontWeight.w700,
       ),
       filled: true,
-      suffixIcon: IconButton(
+      suffixIcon: readOnly
+    ? const Icon(
+        Icons.lock_outline_rounded,
+        color: adminColor,
+      )
+    : IconButton(
         icon: const Icon(
           Icons.mic_rounded,
           color: redColor,
@@ -204,7 +251,9 @@ class _AdminRegistrationPageState extends State<AdminRegistrationPage> {
             localeId: 'fr_FR',
             listenMode: stt.ListenMode.dictation,
             onResult: (result) {
-              final formatted = formatValue(result.recognizedWords);
+              final formatted = formatValue(
+                result.recognizedWords,
+              );
 
               setState(() {
                 _controller(key).text = formatted;
@@ -454,6 +503,7 @@ class _AdminRegistrationPageState extends State<AdminRegistrationPage> {
   'nomStructure',
   'Nom de la structure\nExemple : Mairie de ...',
   uppercase: true,
+  readOnly: widget.proConnectOrganisation != null,
 ),
             const SizedBox(height: 8),
             _dropdownField(
@@ -473,24 +523,31 @@ class _AdminRegistrationPageState extends State<AdminRegistrationPage> {
               'Indiquez le contact administratif référent',
             ),
             _textField(
-              'nomResponsable',
-              'NOM',
-              uppercase: true,
-            ),
+  'nomResponsable',
+  'NOM',
+  uppercase: true,
+  readOnly: widget.proConnectNom != null,
+),
+                     
             const SizedBox(height: 8),
             _textField(
   'prenomResponsable',
   'Prénom',
   capitalizeWords: true,
+  readOnly: widget.proConnectPrenom != null,
 ),
-            const SizedBox(height: 8),
-            _textField(
+
+const SizedBox(height: 8),
+
+_textField(
   'fonctionResponsable',
   'Fonction',
   capitalizeWords: true,
 ),
-            const SizedBox(height: 8),
-            TextField(
+
+const SizedBox(height: 8),
+
+TextField(
   controller: _controller('telephoneResponsable'),
   keyboardType: TextInputType.phone,
   inputFormatters: [
@@ -550,23 +607,14 @@ class _AdminRegistrationPageState extends State<AdminRegistrationPage> {
 ),
             const SizedBox(height: 8),
             _textField(
-              'emailResponsable',
-              'Email',
-              keyboardType: TextInputType.emailAddress,
-            ),
+  'emailResponsable',
+  'Email',
+  keyboardType: TextInputType.emailAddress,
+  readOnly: widget.proConnectEmail != null,
+),
             const SizedBox(height: 8),
 
-_textField(
-  'adminPassword',
-  'Mot de passe admin',
-),
 
-const SizedBox(height: 8),
-
-_textField(
-  'adminPasswordConfirm',
-  'Confirmer le mot de passe admin',
-),
           ],
         );
 
@@ -716,31 +764,10 @@ String _territoryId() {
 }
 
   Future<void> _saveRegistration() async {
+    if (_saved) return;
   try {
     final territoryId = _territoryId();
     final email = _value('emailResponsable');
-final password = _value('adminPassword');
-final passwordConfirm = _value('adminPasswordConfirm');
-
-if (email.isEmpty || password.isEmpty || passwordConfirm.isEmpty) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('Renseigne l’email et le mot de passe admin.'),
-      duration: Duration(seconds: 3),
-    ),
-  );
-  return;
-}
-
-if (password != passwordConfirm) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('Les mots de passe ne correspondent pas.'),
-      duration: Duration(seconds: 3),
-    ),
-  );
-  return;
-}
 
     if (territoryId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -778,43 +805,42 @@ if (password != passwordConfirm) {
     };
 
     final docRef = FirebaseFirestore.instance
-        .collection('territoires')
-        .doc(territoryId);
+    .collection('territoires')
+    .doc(territoryId);
 
 final existingTerritory = await docRef.get();
 
-if (existingTerritory.exists) {
+final user = FirebaseAuth.instance.currentUser;
+final uid = widget.proConnectUid ?? user?.uid;
+
+if (uid == null || uid.isEmpty) {
   ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(
-      content: Text(
-        'Ce territoire existe déjà. Vérifie le pays, la région, le département et la ville.',
-      ),
-      duration: Duration(seconds: 4),
+      content: Text('Connexion ProConnect introuvable.'),
+      duration: Duration(seconds: 3),
     ),
   );
   return;
 }
 
-        final credential = await FirebaseAuth.instance
-    .createUserWithEmailAndPassword(
-  email: email,
-  password: password,
+await docRef.set(
+  {
+    ...data,
+    if (!existingTerritory.exists)
+      'createdAt': FieldValue.serverTimestamp(),
+    'updatedAt': FieldValue.serverTimestamp(),
+  },
+  SetOptions(merge: true),
 );
 
-final uid = credential.user!.uid;
-
-    await docRef.set(
-      {
-        ...data,
-        'createdAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
-
-    await FirebaseFirestore.instance.collection('admins').doc(uid).set({
+await FirebaseFirestore.instance
+    .collection('admins')
+    .doc(uid)
+    .set({
   'uid': uid,
   'email': email,
   'territoireId': territoryId,
+  'siret': widget.proConnectSiret,
   'nomStructure': _value('nomStructure'),
   'typeStructure': _value('typeStructure'),
   'nomResponsable': _value('nomResponsable'),
@@ -824,9 +850,7 @@ final uid = credential.user!.uid;
   'subscriptionStatus': 'TRIAL',
   'createdAt': FieldValue.serverTimestamp(),
   'updatedAt': FieldValue.serverTimestamp(),
-});
-
-    if (!mounted) return;
+}, SetOptions(merge: true));
 
     setState(() {
       _saved = true;
@@ -838,6 +862,11 @@ final uid = credential.user!.uid;
         duration: const Duration(seconds: 3),
       ),
     );
+    Navigator.of(context).pushReplacement(
+  MaterialPageRoute(
+    builder: (_) => const AdminEspacePage(),
+  ),
+);
   } catch (error) {
     if (!mounted) return;
 

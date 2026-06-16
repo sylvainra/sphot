@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../pages/admin/admin_espace_page.dart';
-
 import '../pages/sauveteur/sauveteur_menu_page.dart';
 
-import '../pages/admin/admin_registration_page.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-enum LoginProfile { sauveteur, admin }
+import '../pages/admin/admin_espace_page.dart';
+import '../pages/admin/admin_registration_page.dart';
 
 class ProfilLoginPage extends StatefulWidget {
   const ProfilLoginPage({super.key});
@@ -25,30 +23,27 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
   final FocusNode _idFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
 
-  LoginProfile _selectedProfile = LoginProfile.sauveteur;
   bool _isEditing = false;
   bool _showPassword = false;
+
   final Map<String, Map<String, String>> sauveteurAccounts = {
-  'chef': {
-    'password': '1234',
-    'role': 'Chef de poste',
-  },
-
-  'adjoint': {
-    'password': '1234',
-    'role': 'Adjoint chef de poste',
-  },
-
-  'sauveteur1': {
-    'password': '1234',
-    'role': 'Sauveteur',
-  },
-
-  'sauveteur2': {
-    'password': '1234',
-    'role': 'Sauveteur',
-  },
-};
+    'chef': {
+      'password': '1234',
+      'role': 'Chef de poste',
+    },
+    'adjoint': {
+      'password': '1234',
+      'role': 'Adjoint chef de poste',
+    },
+    'sauveteur1': {
+      'password': '1234',
+      'role': 'Sauveteur',
+    },
+    'sauveteur2': {
+      'password': '1234',
+      'role': 'Sauveteur',
+    },
+  };
 
   @override
   void initState() {
@@ -88,17 +83,16 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
     super.dispose();
   }
 
-  Future<void> _login() async {
-  final id = _idController.text.trim().toLowerCase();
-  final password = _passwordController.text.trim();
+  Future<void> _loginSauveteur() async {
+    final id = _idController.text.trim().toLowerCase();
+    final password = _passwordController.text.trim();
 
-  if (_selectedProfile == LoginProfile.sauveteur) {
     final account = sauveteurAccounts[id];
 
-    if (account != null &&
-        account['password'] == password) {
-
+    if (account != null && account['password'] == password) {
       final String userRole = account['role']!;
+
+      if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
@@ -111,24 +105,54 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
     } else {
       _showLoginError();
     }
-  } else {
+  }
+
+  Future<void> _loginWithProConnect() async {
   try {
-    await FirebaseAuth.instance.signInWithEmailAndPassword(
-      email: _idController.text.trim(),
-      password: password,
-    );
+    User? user = FirebaseAuth.instance.currentUser;
+
+    user ??= (await FirebaseAuth.instance.signInAnonymously()).user;
+
+    if (user == null) {
+      _showLoginError();
+      return;
+    }
+
+    final adminDoc = await FirebaseFirestore.instance
+        .collection('admins')
+        .doc(user.uid)
+        .get();
 
     if (!mounted) return;
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => AdminEspacePage(),
+    if (adminDoc.exists) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const AdminEspacePage(),
+        ),
+      );
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AdminRegistrationPage(
+            proConnectUid: user!.uid,
+            proConnectEmail: 'admin.mairie@test-proconnect.fr',
+            proConnectNom: 'DUPONT',
+            proConnectPrenom: 'Marie',
+            proConnectOrganisation: 'MAIRIE DE TEST',
+            proConnectSiret: '00000000000000',
+          ),
+        ),
+      );
+    }
+  } catch (error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Erreur ProConnect simulation : $error'),
+        duration: const Duration(seconds: 5),
       ),
     );
-  } catch (error) {
-    _showLoginError();
   }
-}
 }
 
   void _showLoginError() {
@@ -152,366 +176,320 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
   }
 
   @override
-Widget build(BuildContext context) {
-  final isSauveteur = _selectedProfile == LoginProfile.sauveteur;
+  Widget build(BuildContext context) {
+    const Color sauveteurColor = Color(0xFFEF4444);
+    const Color adminColor = Color(0xFF1E3A8A);
 
-final Color activeColor = isSauveteur
-    ? const Color(0xFFEF4444) // Rouge REF
-    : const Color(0xFF1E3A8A); // Bleu REF
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: false,
+      body: GestureDetector(
+        onTap: _closeKeyboard,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              'data/images/map_background.jpg',
+              fit: BoxFit.cover,
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 26),
+                child: Column(
+                  children: [
+                    Image.asset(
+                      'data/icons/title.png',
+                      height: 64,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
 
-  return Scaffold(
-    backgroundColor: Colors.transparent,
-    resizeToAvoidBottomInset: false,
-    body: GestureDetector(
-      onTap: _closeKeyboard,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(
-            'data/images/map_background.jpg',
-            fit: BoxFit.cover,
-          ),
+                    const SizedBox(height: 12),
 
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 26),
-              child: Column(
-                children: [
-                  Image.asset(
-                    'data/icons/title.png',
-                    height: 64,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  Visibility(
-                    visible: !_isEditing,
-                    maintainSize: true,
-                    maintainAnimation: true,
-                    maintainState: true,
-                    child: const Text(
-                      'CONNEXION',
-                      style: TextStyle(
-                        fontSize: 34,
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFFFF0000),
-                        letterSpacing: 1,
+                    Visibility(
+                      visible: !_isEditing,
+                      maintainSize: true,
+                      maintainAnimation: true,
+                      maintainState: true,
+                      child: const Text(
+                        'CONNEXION',
+                        style: TextStyle(
+                          fontSize: 34,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFFF0000),
+                          letterSpacing: 1,
+                        ),
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 260),
-                    curve: Curves.easeOutCubic,
-                    transform: Matrix4.translationValues(
-                      0,
-                      _isEditing ? -150 : 0,
-                      0,
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
-                      decoration: BoxDecoration(
-                        color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-  color: activeColor,
-  width: 2.5,
-),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                      transform: Matrix4.translationValues(
+                        0,
+                        _isEditing ? -150 : 0,
+                        0,
                       ),
                       child: Column(
                         children: [
-                          Text(
-                            isSauveteur
-                                ? 'ACC­ÈS SAUVETEUR'
-                                : 'ACC­ÈS ADMINNISTRATION',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-  fontSize: 20,
-  fontWeight: FontWeight.w800,
-  color: activeColor,
-),
+                          Container(
+                            padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
+                            decoration: BoxDecoration(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: sauveteurColor,
+                                width: 2.5,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                const Text(
+                                  'ACCÈS SAUVETEUR',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                    color: sauveteurColor,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 18),
+
+                                TextField(
+                                  controller: _idController,
+                                  focusNode: _idFocusNode,
+                                  textInputAction: TextInputAction.next,
+                                  onTap: _activateEditingMode,
+                                  onSubmitted: (_) {
+                                    FocusScope.of(context)
+                                        .requestFocus(_passwordFocusNode);
+                                  },
+                                  style: const TextStyle(
+                                    color: sauveteurColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'Identifiant',
+                                    hintStyle: const TextStyle(
+                                      color: sauveteurColor,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.white.withOpacity(0.08),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 18,
+                                      vertical: 16,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: const BorderSide(
+                                        color: sauveteurColor,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: const BorderSide(
+                                        color: sauveteurColor,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: const BorderSide(
+                                        color: sauveteurColor,
+                                        width: 2.4,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(height: 14),
+
+                                TextField(
+                                  controller: _passwordController,
+                                  focusNode: _passwordFocusNode,
+                                  obscureText: !_showPassword,
+                                  textInputAction: TextInputAction.done,
+                                  onTap: _activateEditingMode,
+                                  onSubmitted: (_) => _loginSauveteur(),
+                                  style: const TextStyle(
+                                    color: sauveteurColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'Mot de passe',
+                                    hintStyle: const TextStyle(
+                                      color: sauveteurColor,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _showPassword
+                                            ? Icons.visibility_off_rounded
+                                            : Icons.visibility_rounded,
+                                        color: sauveteurColor,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _showPassword = !_showPassword;
+                                        });
+                                      },
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.white.withOpacity(0.08),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 18,
+                                      vertical: 16,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: const BorderSide(
+                                        color: sauveteurColor,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: const BorderSide(
+                                        color: sauveteurColor,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      borderSide: const BorderSide(
+                                        color: sauveteurColor,
+                                        width: 2.4,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(height: 22),
+
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 54,
+                                  child: ElevatedButton(
+                                    onPressed: _loginSauveteur,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      foregroundColor: sauveteurColor,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(18),
+                                        side: const BorderSide(
+                                          color: sauveteurColor,
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'SE CONNECTER',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 0.4,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
 
                           const SizedBox(height: 16),
 
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _profileButton(
-                                  label: 'SAUVETEUR',
-                                  selected: isSauveteur,
-                                  color: const Color(0xFFFF0000),
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedProfile =
-                                          LoginProfile.sauveteur;
-                                    });
-                                  },
-                                ),
+                          Container(
+                            padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
+                            decoration: BoxDecoration(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: adminColor,
+                                width: 2.5,
                               ),
-
-                              const SizedBox(width: 12),
-
-                              Expanded(
-                                child: _profileButton(
-                                  label: 'ADMIN',
-                                  selected: !isSauveteur,
-                                  color: const Color(0xFF1E3A8A),
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedProfile = LoginProfile.admin;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 18),
-
-                          TextField(
-                            controller: _idController,
-                            focusNode: _idFocusNode,
-                            textInputAction: TextInputAction.next,
-                            onTap: _activateEditingMode,
-                            onSubmitted: (_) {
-                              FocusScope.of(context)
-                                  .requestFocus(_passwordFocusNode);
-                            },
-                            style: TextStyle(
-  color: activeColor,
-                              fontWeight: FontWeight.w600,
                             ),
-                            decoration: InputDecoration(
-                              hintText: isSauveteur ? 'Identifiant' : 'Email admin',
-                              hintStyle: TextStyle(
-  color: activeColor,
-  fontWeight: FontWeight.w700,
-),
-                              filled: true,
-                              fillColor: Colors.white.withOpacity(0.08),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 16,
-                              ),
-                              border: OutlineInputBorder(
-  borderRadius: BorderRadius.circular(16),
-  borderSide: BorderSide(
-    color: activeColor,
-    width: 2,
-  ),
-),
-                              enabledBorder: OutlineInputBorder(
-  borderRadius: BorderRadius.circular(16),
-  borderSide: BorderSide(
-    color: activeColor,
-    width: 2,
-  ),
-),
-                              focusedBorder: OutlineInputBorder(
-  borderRadius: BorderRadius.circular(16),
-  borderSide: BorderSide(
-    color: activeColor,
-    width: 2.4,
-  ),
-),
+                            child: Column(
+                              children: [
+                                const Text(
+                                  'ADMIN',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                    color: adminColor,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 14),
+
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 50,
+                                  child: OutlinedButton(
+                                    onPressed: _loginWithProConnect,
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: adminColor,
+                                      side: const BorderSide(
+                                        color: adminColor,
+                                        width: 2,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(18),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'SE CONNECTER AVEC PROCONNECT',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-
-                          const SizedBox(height: 14),
-
-                          TextField(
-                            controller: _passwordController,
-                            focusNode: _passwordFocusNode,
-                            obscureText: !_showPassword,
-                            textInputAction: TextInputAction.done,
-                            onTap: _activateEditingMode,
-                            onSubmitted: (_) => _login(),
-                            style: TextStyle(
-                             color: activeColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Mot de passe',
-                              hintStyle: TextStyle(
-  color: activeColor,
-  fontWeight: FontWeight.w700,
-),
-
-suffixIcon: IconButton(
-  icon: Icon(
-    _showPassword
-        ? Icons.visibility_off_rounded
-        : Icons.visibility_rounded,
-    color: activeColor,
-  ),
-  onPressed: () {
-    setState(() {
-      _showPassword = !_showPassword;
-    });
-  },
-),
-                              filled: true,
-                              fillColor: Colors.white.withOpacity(0.08),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 16,
-                              ),
-                              border: OutlineInputBorder(
-  borderRadius: BorderRadius.circular(16),
-  borderSide: BorderSide(
-    color: activeColor,
-    width: 2,
-  ),
-),
-enabledBorder: OutlineInputBorder(
-  borderRadius: BorderRadius.circular(16),
-  borderSide: BorderSide(
-    color: activeColor,
-    width: 2,
-  ),
-),
-focusedBorder: OutlineInputBorder(
-  borderRadius: BorderRadius.circular(16),
-  borderSide: BorderSide(
-    color: activeColor,
-    width: 2.4,
-  ),
-),
-                            ),
-                          ),
-
-                          const SizedBox(height: 22),
-
-                          SizedBox(
-                            width: double.infinity,
-                            height: 54,
-                            child: ElevatedButton(
-                              onPressed: _login,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                foregroundColor: activeColor,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                  side: BorderSide(
-  color: activeColor,
-  width: 2,
-),
-                                ),
-                              ),
-                              child: const Text(
-                                'SE CONNECTER',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.4,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-
-if (!isSauveteur)
-  SizedBox(
-    width: double.infinity,
-    height: 48,
-    child: OutlinedButton(
-      onPressed: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const AdminRegistrationPage(),
-          ),
-        );
-      },
-      style: OutlinedButton.styleFrom(
-        foregroundColor: activeColor,
-        side: BorderSide(
-          color: activeColor,
-          width: 2,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
-      ),
-      child: const Text(
-        'CRÉER UN COMPTE ADMIN',
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    ),
-  ),
                         ],
                       ),
                     ),
-                  ),
 
-                  const Spacer(),
+                    const Spacer(),
 
-                  if (!_isEditing)
-                    Container(
-                      width: 62,
-                      height: 62,
-                      decoration: BoxDecoration(
-                        color: Colors.transparent,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-  color: Colors.white,
-  width: 2,
-),
+                    if (!_isEditing)
+                      Container(
+                        width: 62,
+                        height: 62,
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white,
+                            width: 2,
+                          ),
+                        ),
+                        child: IconButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                            size: 30,
+                          ),
+                        ),
                       ),
-                      child: IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(
-  Icons.arrow_back,
-  color: Colors.white,
-  size: 30,
-),
-                      ),
-                    ),
 
-                  const SizedBox(height: 18),
-                ],
+                    const SizedBox(height: 18),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-  Widget _profileButton({
-    required String label,
-    required bool selected,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        height: 54,
-        decoration: BoxDecoration(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color, width: 2),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? color : Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          ],
         ),
       ),
     );

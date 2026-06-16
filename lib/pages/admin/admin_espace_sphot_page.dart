@@ -851,7 +851,7 @@ final title = [
                                           style: const TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w800,
-                                            color: Color(0xFF1E3A8A),
+                                            color: Color(0xFFDC2626),
                                           ),
                                         ),
                                       ),
@@ -896,10 +896,12 @@ final title = [
   displayLabel.toUpperCase(),
   maxLines: 1,
   overflow: TextOverflow.ellipsis,
-  style: const TextStyle(
+  style: TextStyle(
     fontSize: 13,
     fontWeight: FontWeight.w900,
-    color: Color(0xFF1E3A8A),
+    color: selectedDocId == null
+        ? const Color(0xFF1E3A8A)
+        : const Color(0xFFDC2626),
   ),
 ),
               ),
@@ -946,10 +948,10 @@ final title = [
               }
             : null,
         style: const TextStyle(
-          fontWeight: FontWeight.w700,
-          fontSize: 16,
-          color: Color(0xFF1E3A8A),
-        ),
+  fontWeight: FontWeight.w700,
+  fontSize: 16,
+  color: Color(0xFFDC2626),
+),
         decoration: InputDecoration(
           label: Text(
             label,
@@ -1182,7 +1184,7 @@ Widget _dropdownField(
                                           style: const TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w800,
-                                            color: Color(0xFF1E3A8A),
+                                            color: Color(0xFFDC2626),
                                           ),
                                         ),
                                       ),
@@ -1193,7 +1195,7 @@ Widget _dropdownField(
                                     style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w800,
-                                      color: Color(0xFF1E3A8A),
+                                      color: Color(0xFFDC2626),
                                     ),
                                   ),
                           ),
@@ -1244,14 +1246,16 @@ Widget _dropdownField(
         children: [
           Expanded(
             child: Text(
-              current.isEmpty ? label : current,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1E3A8A),
-              ),
-            ),
+  current.isEmpty ? label : current,
+  overflow: TextOverflow.ellipsis,
+  style: TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    color: current.isEmpty
+        ? const Color(0xFF1E3A8A)
+        : const Color(0xFFDC2626),
+  ),
+),
           ),
           const Icon(
             Icons.keyboard_arrow_down_rounded,
@@ -1428,7 +1432,7 @@ Widget _multiDropdownField(
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF1E3A8A),
+                color: Color(0xFFDC2626),
               ),
             ),
           ],
@@ -1448,7 +1452,7 @@ Widget _multiDropdownField(
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF1E3A8A),
+                    color: Color(0xFFDC2626),
                   ),
                 ),
               ],
@@ -1458,7 +1462,7 @@ Widget _multiDropdownField(
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF1E3A8A),
+                color: Color(0xFFDC2626),
               ),
             ),
 ),
@@ -1496,6 +1500,12 @@ Widget _multiDropdownField(
   color: Color(0xFF1E3A8A),
   fontWeight: FontWeight.w700,
 ),
+
+floatingLabelStyle: const TextStyle(
+  color: Color(0xFF1E3A8A),
+  fontWeight: FontWeight.w700,
+),
+
         filled: true,
         fillColor: Colors.transparent,
         contentPadding: const EdgeInsets.symmetric(
@@ -1528,14 +1538,16 @@ focusedBorder: OutlineInputBorder(
   children: [
     Expanded(
       child: Text(
-        displayText,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF1E3A8A),
-        ),
-      ),
+  displayText,
+  overflow: TextOverflow.ellipsis,
+  style: TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    color: selectedValues.isEmpty
+        ? const Color(0xFF1E3A8A)
+        : const Color(0xFFDC2626),
+  ),
+),
     ),
 
     const Icon(
@@ -1637,7 +1649,7 @@ focusedBorder: OutlineInputBorder(
   subtitle,
   textAlign: TextAlign.center,
   style: const TextStyle(
-    color: Color(0xFF1E3A8A),
+    color: Color(0xFFDC2626),
     fontSize: 14,
     fontWeight: FontWeight.w700,
   ),
@@ -1750,157 +1762,164 @@ Future<void> _importPhotoSphot() async {
   Widget _currentStep() {
     switch (step) {
       case 0:
-        return Column(
-          children: [
-            _stepHeader(
-              '1. TERRITOIRE',
-              'Renseignez la commune concernée par ce SPHOT',
+  return Column(
+    children: [
+      _stepHeader(
+        '1. TERRITOIRE',
+        'Informations reprises depuis l’inscription admin',
+      ),
+
+      _textField(
+        'pays',
+        'PAYS',
+        uppercase: true,
+      ),
+
+      const SizedBox(height: 8),
+
+      _textField(
+        'region',
+        'RÉGION',
+        uppercase: true,
+      ),
+
+      const SizedBox(height: 8),
+
+      _textField(
+        'departement',
+        'DÉPARTEMENT',
+        uppercase: true,
+      ),
+
+      const SizedBox(height: 8),
+
+      _textField(
+        'ville',
+        'VILLE',
+        uppercase: true,
+      ),
+
+      const SizedBox(height: 8),
+
+      SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: ElevatedButton.icon(
+          onPressed: _importLogoVille,
+          icon: const Icon(
+            Icons.edit_rounded,
+            color: Color(0xFFDC2626),
+          ),
+          label: const Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Modifier / importer le logo de la ville',
+                textAlign: TextAlign.left,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
-            _textField(
-  'pays',
-  'PAYS',
-  uppercase: true,
-),
-            const SizedBox(height: 8),
-            _textField(
-  'region',
-  'RÉGION',
-  uppercase: true,
-),
-            const SizedBox(height: 8),
-            _textField(
-  'departement',
-  'DÉPARTEMENT',
-  uppercase: true,
-),
-
-            const SizedBox(height: 8),
-            _textField(
-  'ville',
-  'VILLE',
-  uppercase: true,
-),
-            const SizedBox(height: 8),
-
-SizedBox(
-  width: double.infinity,
-  height: 52,
-  child: ElevatedButton.icon(
-    onPressed: _importLogoVille,
-    icon: const Icon(
-  Icons.upload_file_rounded,
-  color: Color(0xFFDC2626),
-),
-    label: const Expanded(
-  child: Align(
-    alignment: Alignment.centerLeft,
-    child: Text(
-      'Importez le logo de la ville (png)',
-      textAlign: TextAlign.left,
-      style: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Color(0xFF1E3A8A),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(
+                color: Color(0xFF1E3A8A),
+                width: 1.4,
+              ),
+            ),
+          ),
+        ),
       ),
-    ),
-  ),
-),
-    style: ElevatedButton.styleFrom(
-      backgroundColor: Colors.transparent,
-foregroundColor: const Color(0xFF1E3A8A),
-elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(
-  color: Color(0xFF1E3A8A),
-  width: 1.4,
-),
+
+      const SizedBox(height: 8),
+
+      _textField(
+        'siteInternetVille',
+        'Site internet de la ville',
       ),
-    ),
-  ),
-),
 
-const SizedBox(height: 8),
+      const SizedBox(height: 8),
 
-_textField(
-  'siteInternetVille',
-  'Site internet de la ville',
-),
+      _textField(
+        'arretesMunicipaux',
+        'Adresse internet des arrêtés municipaux',
+      ),
 
-const SizedBox(height: 8),
+      const SizedBox(height: 8),
 
-_textField(
-  'arretesMunicipaux',
-  'Adresse internet des arrêtés municipaux',
-),
+      SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            _openMapPicker(
+              title: 'POSITIONNEZ LA VILLE',
+              latKey: 'villeLat',
+              lngKey: 'villeLng',
+            );
+          },
+          icon: const Icon(
+            Icons.edit_location_alt_rounded,
+            color: Color(0xFFDC2626),
+          ),
+          label: const Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Modifier la position de la ville sur la carte',
+                textAlign: TextAlign.left,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Color(0xFF1E3A8A),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(
+                color: Color(0xFF1E3A8A),
+                width: 1.4,
+              ),
+            ),
+          ),
+        ),
+      ),
 
-const SizedBox(height: 8),
+      const SizedBox(height: 8),
 
-SizedBox(
-  width: double.infinity,
-  height: 52,
-  child: ElevatedButton.icon(
-    onPressed: () {
-  _openMapPicker(
-    title: 'POSITIONNEZ LA VILLE',
-    latKey: 'villeLat',
-    lngKey: 'villeLng',
+      const Center(
+        child: Text(
+          'OU',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFFDC2626),
+          ),
+        ),
+      ),
+
+      const SizedBox(height: 8),
+
+      _twoColumns(
+        _textField('villeLat', 'Latitude ville'),
+        _textField('villeLng', 'Longitude ville'),
+      ),
+
+      const SizedBox(height: 8),
+    ],
   );
-},
-    icon: const Icon(
-  Icons.map_outlined,
-  color: Color(0xFFDC2626),
-),
-    label: const Expanded(
-  child: Align(
-    alignment: Alignment.centerLeft,
-    child: Text(
-      'Positionnez la ville sur la carte',
-      textAlign: TextAlign.left,
-      style: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-      ),
-    ),
-  ),
-),
-    style: ElevatedButton.styleFrom(
-      backgroundColor: Colors.transparent,
-foregroundColor: const Color(0xFF1E3A8A),
-elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(
-  color: Color(0xFF1E3A8A),
-  width: 1.4,
-),
-      ),
-    ),
-  ),
-),
-
-const SizedBox(height: 8),
-
-const Center(
-  child: Text(
-    'OU',
-    style: TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w900,
-      color: Color(0xFF1E3A8A),
-    ),
-  ),
-),
-const SizedBox(height: 8),
-
-_twoColumns(
-  _textField('villeLat', 'Latitude ville'),
-  _textField('villeLng', 'Longitude ville'),
-),
-
-const SizedBox(height: 8),
-
-          ],
-        );
 
       case 1:
         return Column(
@@ -2010,7 +2029,7 @@ const Center(
     style: TextStyle(
       fontSize: 14,
       fontWeight: FontWeight.w900,
-      color: Color(0xFF1E3A8A),
+      color: Color(0xFFDC2626),
     ),
   ),
 ),
@@ -2049,7 +2068,7 @@ _twoColumns(
   style: const TextStyle(
     fontWeight: FontWeight.w700,
     fontSize: 16,
-    color: Color(0xFF1E3A8A),
+    color: Color(0xFFDC2626),
   ),
   decoration: InputDecoration(
     label: const Text(
@@ -2112,7 +2131,7 @@ TextField(
   style: const TextStyle(
     fontWeight: FontWeight.w700,
     fontSize: 16,
-    color: Color(0xFF1E3A8A),
+    color: Color(0xFFDC2626),
   ),
   decoration: InputDecoration(
     label: const Text(
@@ -2450,7 +2469,7 @@ void _checkSummaryScroll() {
             children: [
               const Icon(
                 Icons.arrow_back_rounded,
-                color: Color(0xFF1E3A8A),
+                color: Color(0xFFDC2626),
               ),
               const SizedBox(width: 8),
               Text(
@@ -2510,7 +2529,7 @@ void _checkSummaryScroll() {
   const SizedBox(width: 8),
   const Icon(
     Icons.arrow_forward_rounded,
-    color: Color(0xFF1E3A8A),
+    color: Color(0xFFDC2626),
   ),
 ],
 
@@ -2563,7 +2582,7 @@ Widget _existingSphotsPanel({
             ),
             SizedBox(width: 8),
             Text(
-              'SPHOTS EXISTANTS',
+              'SPHOT(S) EXISTANT(S)',
               style: TextStyle(
                 color: Color(0xFF1E3A8A),
                 fontSize: 13,
@@ -2979,7 +2998,7 @@ class _AdminDropdownMenuItem extends StatelessWidget {
         children: [
           const Icon(
             Icons.place_rounded,
-            color: Color(0xFF1E3A8A),
+            color: Color(0xFFDC2626),
             size: 20,
           ),
           const SizedBox(width: 10),
