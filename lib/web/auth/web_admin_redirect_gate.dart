@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../services/web_proconnect_auth_service.dart';
+import '../admin/web_admin_registration_page.dart';
+import '../../pages/admin/admin_request_pending_page.dart';
 
 class WebAdminRedirectGate extends StatefulWidget {
   final Widget child;
@@ -24,14 +26,14 @@ class _WebAdminRedirectGateState extends State<WebAdminRedirectGate> {
   }
 
   Future<void> _checkRedirectResult() async {
-    print('Redirect gate désactivé pour test popup');
+  print('Redirect gate désactivé temporairement');
 
-    if (!mounted) return;
+  if (!mounted) return;
 
-    setState(() {
-      _checking = false;
-    });
-  }
+  setState(() {
+    _checking = false;
+  });
+}
 
   @override
   Widget build(BuildContext context) {

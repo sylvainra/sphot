@@ -4,6 +4,8 @@ import '../services/web_proconnect_auth_service.dart';
 import '../shared/web_colors.dart';
 import '../admin/web_admin_registration_page.dart';
 
+import '../admin/web_admin_app.dart';
+
 class WebProConnectLoginPage extends StatefulWidget {
   final String mode;
 
@@ -24,10 +26,10 @@ class _WebProConnectLoginPageState
   bool get isAdmin => widget.mode == 'admin';
 
   @override
-  void initState() {
-    super.initState();
-    // _handleRedirectResult();
-  }
+void initState() {
+  super.initState();
+  _handleRedirectResult();
+}
 
   Future<void> _handleRedirectResult() async {
     try {
@@ -267,15 +269,7 @@ SizedBox(
         : () {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder: (_) => WebAdminRegistrationPage(
-                  proConnectUid: 'test_uid_admin_001',
-                  proConnectEmail: 'admin@testville.fr',
-                  proConnectNom: 'DUPONT',
-                  proConnectPrenom: 'Marie',
-                  proConnectOrganisation: 'MAIRIE DE TESTVILLE',
-                  proConnectSiret: '12345678901234',
-                  proConnectSiren: '123456789',
-                ),
+                builder: (_) => const WebAdminApp(),
               ),
             );
           },

@@ -38,22 +38,21 @@ class WebProConnectAuthService {
     ..addScope('email');
 
   try {
-    final credential = await _auth.signInWithPopup(provider);
+    print('===== REDIRECT PROCONNECT START =====');
 
-    print('===== POPUP RESULT =====');
-    print('popup user = ${credential.user?.uid}');
-    print('currentUser = ${_auth.currentUser?.uid}');
-    print('providerId = ${credential.credential?.providerId}');
+    await _auth.signInWithRedirect(provider);
 
-    return checkAccess();
+    return const WebAdminAccessResult(
+      status: WebAdminAccessStatus.signedOut,
+    );
   } on FirebaseAuthException catch (e) {
-    print('===== POPUP FIREBASE ERROR =====');
+    print('===== REDIRECT FIREBASE ERROR =====');
     print('code: ${e.code}');
     print('message: ${e.message}');
 
     rethrow;
   } catch (e) {
-    print('===== POPUP UNKNOWN ERROR =====');
+    print('===== REDIRECT UNKNOWN ERROR =====');
     print(e.toString());
 
     rethrow;
@@ -81,9 +80,13 @@ print('message: ${e.message}');
 }
 
   Future<WebAdminAccessResult> checkAccess() async {
-    final user = _auth.currentUser;
+  final user = _auth.currentUser;
 
-    if (user == null) {
+  print('===== CHECK ACCESS =====');
+  print('uid = ${user?.uid}');
+  print('email = ${user?.email}');
+
+  if (user == null) {
       return const WebAdminAccessResult(
         status: WebAdminAccessStatus.signedOut,
       );

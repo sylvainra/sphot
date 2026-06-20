@@ -7,6 +7,8 @@ import 'pages/dashboard_page.dart';
 import 'pages/sphots_page.dart';
 import 'pages/users_page.dart';
 
+import 'pages/admin_requests_page.dart';
+
 class WebAdminApp extends StatelessWidget {
   const WebAdminApp({super.key});
 
@@ -29,6 +31,11 @@ class WebAdminApp extends StatelessWidget {
           title: 'Utilisateurs',
           icon: Icons.people_outline,
           page: UsersPage(),
+        ),
+        WebMenuItem(
+          title: 'Demandes Admin',
+          icon: Icons.request_page_outlined,
+          page: AdminRequestsPage(),
         ),
       ],
     );
