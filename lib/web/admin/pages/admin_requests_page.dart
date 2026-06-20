@@ -1,11 +1,23 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-class AdminRequestsPage extends StatelessWidget {
+class AdminRequestsPage extends StatefulWidget {
   const AdminRequestsPage({super.key});
 
+  @override
+  State<AdminRequestsPage> createState() => _AdminRequestsPageState();
+}
+
+class _AdminRequestsPageState extends State<AdminRequestsPage> {
   static const Color adminColor = Color(0xFF1E3A8A);
   static const Color redColor = Color(0xFFDC2626);
+
+  String _statusFilter = 'all';
+  String _countryFilter = 'all';
+  String _regionFilter = 'all';
+  String _departmentFilter = 'all';
+  String _cityFilter = 'all';
+  String _search = '';
 
   Future<void> _approveRequest(
     BuildContext context,
@@ -13,13 +25,11 @@ class AdminRequestsPage extends StatelessWidget {
   ) async {
     final data = doc.data();
 
-    final proConnect =
-        Map<String, dynamic>.from(data['proConnect'] ?? {});
+    final proConnect = Map<String, dynamic>.from(data['proConnect'] ?? {});
     final profile = Map<String, dynamic>.from(data['profile'] ?? {});
     final structure = Map<String, dynamic>.from(data['structure'] ?? {});
     final territoire = Map<String, dynamic>.from(data['territoire'] ?? {});
-    final facturation =
-        Map<String, dynamic>.from(data['facturation'] ?? {});
+    final facturation = Map<String, dynamic>.from(data['facturation'] ?? {});
     final subscriptionPreview =
         Map<String, dynamic>.from(data['subscriptionPreview'] ?? {});
 
@@ -27,12 +37,9 @@ class AdminRequestsPage extends StatelessWidget {
 
     final batch = FirebaseFirestore.instance.batch();
 
-    final adminRef =
-        FirebaseFirestore.instance.collection('admins').doc(uid);
-
+    final adminRef = FirebaseFirestore.instance.collection('admins').doc(uid);
     final requestRef =
         FirebaseFirestore.instance.collection('adminRequests').doc(doc.id);
-
     final subscriptionRef =
         FirebaseFirestore.instance.collection('subscriptions').doc(uid);
 
@@ -45,10 +52,14 @@ class AdminRequestsPage extends StatelessWidget {
         'siret': proConnect['siret'] ?? facturation['billingSiret'] ?? '',
         'siren': proConnect['siren'] ?? '',
         'territoireId': territoire['territoireId'] ?? '',
+        'pays': territoire['pays'] ?? '',
+        'region': territoire['region'] ?? '',
+        'departement': territoire['departement'] ?? '',
+        'ville': territoire['ville'] ?? '',
         'role': 'admin',
         'accessStatus': 'approved',
-        'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
       },
       SetOptions(merge: true),
     );
@@ -59,9 +70,8 @@ class AdminRequestsPage extends StatelessWidget {
         'organisationId': uid,
         'adminUid': uid,
         'billingOrganisation': facturation['billingOrganisation'] ?? '',
-        'billingSiret': facturation['billingSiret'] ??
-            proConnect['siret'] ??
-            '',
+        'billingSiret':
+            facturation['billingSiret'] ?? proConnect['siret'] ?? '',
         'billingAddress': facturation['billingAddress'] ?? '',
         'billingPostalCode': facturation['billingPostalCode'] ?? '',
         'billingCity': facturation['billingCity'] ?? '',
@@ -72,15 +82,14 @@ class AdminRequestsPage extends StatelessWidget {
         'chorusServiceCode': facturation['chorusServiceCode'] ?? '',
         'numberOfRescueStations':
             facturation['numberOfRescueStations'] ?? 0,
-        'trialDurationDays':
-            subscriptionPreview['trialDurationDays'] ?? 8,
+        'trialDurationDays': subscriptionPreview['trialDurationDays'] ?? 8,
         'pricePerStationExclTax':
             subscriptionPreview['pricePerStationExclTax'] ?? 500,
         'billingCycle': subscriptionPreview['billingCycle'] ?? 'annual',
         'vatRate': subscriptionPreview['vatRate'] ?? 20,
         'status': 'trial',
-        'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
       },
       SetOptions(merge: true),
     );
@@ -94,54 +103,291 @@ class AdminRequestsPage extends StatelessWidget {
       },
     );
 
-    try {
-  await batch.commit();
+    await batch.commit();
 
-  debugPrint('===== APPROVAL SUCCESS =====');
+    if (!context.mounted) return;
 
-  if (!context.mounted) return;
-
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('Demande approuvée.'),
-      backgroundColor: Colors.green,
-    ),
-  );
-} catch (e, stackTrace) {
-  debugPrint('===== APPROVAL ERROR =====');
-  debugPrint(e.toString());
-  debugPrint(stackTrace.toString());
-
-  if (!context.mounted) return;
-
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      backgroundColor: Colors.red,
-      content: Text('Erreur : $e'),
-      duration: const Duration(seconds: 8),
-    ),
-  );
-}
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Demande approuvée.'),
+        backgroundColor: Colors.green,
+      ),
+    );
   }
 
   Future<void> _rejectRequest(
     BuildContext context,
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
   ) async {
-    await FirebaseFirestore.instance
-        .collection('adminRequests')
-        .doc(doc.id)
-        .update({
-      'status': 'rejected',
-      'rejectedAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    final uid = (doc.data()['uid'] ?? doc.id).toString();
+
+    final batch = FirebaseFirestore.instance.batch();
+
+    final requestRef =
+        FirebaseFirestore.instance.collection('adminRequests').doc(doc.id);
+    final adminRef = FirebaseFirestore.instance.collection('admins').doc(uid);
+    final subscriptionRef =
+        FirebaseFirestore.instance.collection('subscriptions').doc(uid);
+
+    batch.update(
+      requestRef,
+      {
+        'status': 'rejected',
+        'rejectedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+    );
+
+    batch.set(
+      adminRef,
+      {
+        'uid': uid,
+        'accessStatus': 'rejected',
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+
+    batch.set(
+      subscriptionRef,
+      {
+        'adminUid': uid,
+        'status': 'cancelled',
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+
+    await batch.commit();
 
     if (!context.mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Demande refusée.'),
+        backgroundColor: redColor,
+      ),
+    );
+  }
+
+  Future<void> _setPending(
+    BuildContext context,
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) async {
+    final uid = (doc.data()['uid'] ?? doc.id).toString();
+
+    final batch = FirebaseFirestore.instance.batch();
+
+    final requestRef =
+        FirebaseFirestore.instance.collection('adminRequests').doc(doc.id);
+    final adminRef = FirebaseFirestore.instance.collection('admins').doc(uid);
+    final subscriptionRef =
+        FirebaseFirestore.instance.collection('subscriptions').doc(uid);
+
+    batch.set(
+      requestRef,
+      {
+        'status': 'pending',
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+
+    batch.set(
+      adminRef,
+      {
+        'uid': uid,
+        'accessStatus': 'pending',
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+
+    batch.set(
+      subscriptionRef,
+      {
+        'adminUid': uid,
+        'status': 'pending',
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+
+    await batch.commit();
+
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Demande remise en attente.'),
+      ),
+    );
+  }
+
+  String _text(dynamic value) => (value ?? '').toString();
+
+  List<String> _uniqueValues(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    String key,
+  ) {
+    final values = docs
+        .map((doc) {
+          final territoire =
+              Map<String, dynamic>.from(doc.data()['territoire'] ?? {});
+          return _text(territoire[key]).trim();
+        })
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList();
+
+    values.sort();
+    return ['all', ...values];
+  }
+
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _filteredDocs(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    final filtered = docs.where((doc) {
+      final data = doc.data();
+
+      final status = _text(data['status']);
+      final proConnect = Map<String, dynamic>.from(data['proConnect'] ?? {});
+      final profile = Map<String, dynamic>.from(data['profile'] ?? {});
+      final structure = Map<String, dynamic>.from(data['structure'] ?? {});
+      final territoire = Map<String, dynamic>.from(data['territoire'] ?? {});
+      final facturation = Map<String, dynamic>.from(data['facturation'] ?? {});
+
+      final pays = _text(territoire['pays']);
+      final region = _text(territoire['region']);
+      final departement = _text(territoire['departement']);
+      final ville = _text(territoire['ville']);
+
+      if (_statusFilter != 'all' && status != _statusFilter) return false;
+      if (_countryFilter != 'all' && pays != _countryFilter) return false;
+      if (_regionFilter != 'all' && region != _regionFilter) return false;
+      if (_departmentFilter != 'all' &&
+          departement != _departmentFilter) return false;
+      if (_cityFilter != 'all' && ville != _cityFilter) return false;
+
+      final searchable = [
+        structure['nom'],
+        proConnect['organisation'],
+        proConnect['siret'],
+        proConnect['siren'],
+        profile['email'],
+        profile['nomAffiche'],
+        profile['prenomAffiche'],
+        facturation['billingSiret'],
+        ville,
+        departement,
+        region,
+        pays,
+      ].map(_text).join(' ').toLowerCase();
+
+      return searchable.contains(_search.toLowerCase().trim());
+    }).toList();
+
+    filtered.sort((a, b) {
+      final ta = Map<String, dynamic>.from(a.data()['territoire'] ?? {});
+      final tb = Map<String, dynamic>.from(b.data()['territoire'] ?? {});
+
+      final left = [
+        _text(ta['pays']),
+        _text(ta['region']),
+        _text(ta['departement']),
+        _text(ta['ville']),
+        _text(a.data()['status']),
+      ].join('|');
+
+      final right = [
+        _text(tb['pays']),
+        _text(tb['region']),
+        _text(tb['departement']),
+        _text(tb['ville']),
+        _text(b.data()['status']),
+      ].join('|');
+
+      return left.compareTo(right);
+    });
+
+    return filtered;
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'approved':
+        return Colors.green;
+      case 'rejected':
+        return redColor;
+      default:
+        return adminColor;
+    }
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'approved':
+        return 'APPROUVÉE';
+      case 'rejected':
+        return 'REFUSÉE';
+      default:
+        return 'EN ATTENTE';
+    }
+  }
+
+  Widget _statusButton(String label, String value) {
+    final selected = _statusFilter == value;
+
+    return OutlinedButton(
+      onPressed: () {
+        setState(() {
+          _statusFilter = value;
+        });
+      },
+      style: OutlinedButton.styleFrom(
+        backgroundColor: selected ? adminColor : Colors.transparent,
+        foregroundColor: selected ? Colors.white : adminColor,
+        side: const BorderSide(color: adminColor, width: 1.4),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.w900),
+      ),
+    );
+  }
+
+  Widget _filterDropdown({
+    required String label,
+    required String value,
+    required List<String> values,
+    required ValueChanged<String> onChanged,
+  }) {
+    return Expanded(
+      child: DropdownButtonFormField<String>(
+        value: values.contains(value) ? value : 'all',
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(
+            color: adminColor,
+            fontWeight: FontWeight.w700,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        items: values.map((item) {
+          return DropdownMenuItem(
+            value: item,
+            child: Text(
+              item == 'all' ? 'Tous' : item,
+              overflow: TextOverflow.ellipsis,
+            ),
+          );
+        }).toList(),
+        onChanged: (newValue) {
+          if (newValue == null) return;
+          onChanged(newValue);
+        },
       ),
     );
   }
@@ -151,7 +397,6 @@ class AdminRequestsPage extends StatelessWidget {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('adminRequests')
-          .where('status', isEqualTo: 'pending')
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -167,163 +412,309 @@ class AdminRequestsPage extends StatelessWidget {
         }
 
         if (!snapshot.hasData) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
-        final requests = snapshot.data!.docs;
+        final allRequests = snapshot.data!.docs;
+        final requests = _filteredDocs(allRequests);
 
-        if (requests.isEmpty) {
-          return const Center(
-            child: Text(
-              'Aucune demande admin en attente.',
-              style: TextStyle(
-                color: adminColor,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          );
-        }
+        final paysValues = _uniqueValues(allRequests, 'pays');
+        final regionValues = _uniqueValues(allRequests, 'region');
+        final departmentValues = _uniqueValues(allRequests, 'departement');
+        final cityValues = _uniqueValues(allRequests, 'ville');
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(24),
-          itemCount: requests.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final doc = requests[index];
-            final data = doc.data();
-
-            final proConnect =
-                Map<String, dynamic>.from(data['proConnect'] ?? {});
-            final profile =
-                Map<String, dynamic>.from(data['profile'] ?? {});
-            final structure =
-                Map<String, dynamic>.from(data['structure'] ?? {});
-            final territoire =
-                Map<String, dynamic>.from(data['territoire'] ?? {});
-            final facturation =
-                Map<String, dynamic>.from(data['facturation'] ?? {});
-
-            return Container(
+        return Column(
+          children: [
+            Padding(
               padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.92),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: adminColor,
-                  width: 1.5,
-                ),
-              ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    structure['nom']?.toString().isNotEmpty == true
-                        ? structure['nom'].toString()
-                        : 'Structure non renseignée',
-                    style: const TextStyle(
-                      color: redColor,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${profile['prenomAffiche'] ?? ''} ${profile['nomAffiche'] ?? ''}',
-                    style: const TextStyle(
-                      color: adminColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Email : ${profile['email'] ?? proConnect['email'] ?? ''}',
-                    style: const TextStyle(
-                      color: adminColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    'Fonction : ${profile['fonction'] ?? ''}',
-                    style: const TextStyle(
-                      color: adminColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    'Territoire : ${territoire['ville'] ?? ''} - ${territoire['departement'] ?? ''}',
-                    style: const TextStyle(
-                      color: adminColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    'SIRET : ${proConnect['siret'] ?? facturation['billingSiret'] ?? ''}',
-                    style: const TextStyle(
-                      color: adminColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    'Postes de secours : ${facturation['numberOfRescueStations'] ?? 0}',
-                    style: const TextStyle(
-                      color: adminColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   Row(
                     children: [
-                      OutlinedButton.icon(
-                        onPressed: () => _approveRequest(context, doc),
-                        icon: const Icon(
-                          Icons.check_circle_outline,
-                          color: adminColor,
-                        ),
-                        label: const Text(
-                          'APPROUVER',
-                          style: TextStyle(
-                            color: adminColor,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                            color: adminColor,
-                            width: 1.6,
-                          ),
-                        ),
+                      _statusButton('TOUTES', 'all'),
+                      const SizedBox(width: 8),
+                      _statusButton('EN ATTENTE', 'pending'),
+                      const SizedBox(width: 8),
+                      _statusButton('APPROUVÉES', 'approved'),
+                      const SizedBox(width: 8),
+                      _statusButton('REFUSÉES', 'rejected'),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _filterDropdown(
+                        label: 'Pays',
+                        value: _countryFilter,
+                        values: paysValues,
+                        onChanged: (value) {
+                          setState(() {
+                            _countryFilter = value;
+                          });
+                        },
                       ),
-                      const SizedBox(width: 12),
-                      OutlinedButton.icon(
-                        onPressed: () => _rejectRequest(context, doc),
-                        icon: const Icon(
-                          Icons.cancel_outlined,
-                          color: redColor,
-                        ),
-                        label: const Text(
-                          'REFUSER',
-                          style: TextStyle(
-                            color: redColor,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                            color: redColor,
-                            width: 1.6,
-                          ),
-                        ),
+                      const SizedBox(width: 8),
+                      _filterDropdown(
+                        label: 'Région',
+                        value: _regionFilter,
+                        values: regionValues,
+                        onChanged: (value) {
+                          setState(() {
+                            _regionFilter = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _filterDropdown(
+                        label: 'Département',
+                        value: _departmentFilter,
+                        values: departmentValues,
+                        onChanged: (value) {
+                          setState(() {
+                            _departmentFilter = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _filterDropdown(
+                        label: 'Commune',
+                        value: _cityFilter,
+                        values: cityValues,
+                        onChanged: (value) {
+                          setState(() {
+                            _cityFilter = value;
+                          });
+                        },
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    onChanged: (value) {
+                      setState(() {
+                        _search = value;
+                      });
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Recherche organisation, SIRET, email, commune...',
+                      labelStyle: const TextStyle(
+                        color: adminColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: adminColor,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-            );
-          },
+            ),
+            Expanded(
+              child: requests.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'Aucune demande ne correspond aux filtres.',
+                        style: TextStyle(
+                          color: adminColor,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                      itemCount: requests.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final doc = requests[index];
+                        final data = doc.data();
+
+                        final status = _text(data['status']);
+                        final proConnect = Map<String, dynamic>.from(
+                            data['proConnect'] ?? {});
+                        final profile =
+                            Map<String, dynamic>.from(data['profile'] ?? {});
+                        final structure =
+                            Map<String, dynamic>.from(data['structure'] ?? {});
+                        final territoire =
+                            Map<String, dynamic>.from(data['territoire'] ?? {});
+                        final facturation =
+                            Map<String, dynamic>.from(data['facturation'] ?? {});
+
+                        return Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.92),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: _statusColor(status),
+                              width: 1.8,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      structure['nom']
+                                                  ?.toString()
+                                                  .isNotEmpty ==
+                                              true
+                                          ? structure['nom'].toString()
+                                          : 'Structure non renseignée',
+                                      style: const TextStyle(
+                                        color: redColor,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _statusColor(status),
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                    child: Text(
+                                      _statusLabel(status),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${profile['prenomAffiche'] ?? ''} ${profile['nomAffiche'] ?? ''}',
+                                style: const TextStyle(
+                                  color: adminColor,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Email : ${profile['email'] ?? proConnect['email'] ?? ''}',
+                                style: const TextStyle(
+                                  color: adminColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                'Fonction : ${profile['fonction'] ?? ''}',
+                                style: const TextStyle(
+                                  color: adminColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                'Territoire : ${territoire['pays'] ?? ''} / ${territoire['region'] ?? ''} / ${territoire['departement'] ?? ''} / ${territoire['ville'] ?? ''}',
+                                style: const TextStyle(
+                                  color: adminColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                'SIRET : ${proConnect['siret'] ?? facturation['billingSiret'] ?? ''}',
+                                style: const TextStyle(
+                                  color: adminColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                'Postes de secours : ${facturation['numberOfRescueStations'] ?? 0}',
+                                style: const TextStyle(
+                                  color: adminColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 8,
+                                children: [
+                                  OutlinedButton.icon(
+                                    onPressed: () =>
+                                        _approveRequest(context, doc),
+                                    icon: const Icon(
+                                      Icons.check_circle_outline,
+                                      color: adminColor,
+                                    ),
+                                    label: const Text(
+                                      'APPROUVER',
+                                      style: TextStyle(
+                                        color: adminColor,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(
+                                        color: adminColor,
+                                        width: 1.6,
+                                      ),
+                                    ),
+                                  ),
+                                  OutlinedButton.icon(
+                                    onPressed: () =>
+                                        _rejectRequest(context, doc),
+                                    icon: const Icon(
+                                      Icons.cancel_outlined,
+                                      color: redColor,
+                                    ),
+                                    label: const Text(
+                                      'REFUSER',
+                                      style: TextStyle(
+                                        color: redColor,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(
+                                        color: redColor,
+                                        width: 1.6,
+                                      ),
+                                    ),
+                                  ),
+                                  OutlinedButton.icon(
+                                    onPressed: () => _setPending(context, doc),
+                                    icon: const Icon(
+                                      Icons.pending_actions_outlined,
+                                      color: adminColor,
+                                    ),
+                                    label: const Text(
+                                      'REMETTRE EN ATTENTE',
+                                      style: TextStyle(
+                                        color: adminColor,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(
+                                        color: adminColor,
+                                        width: 1.6,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         );
       },
     );
