@@ -4,24 +4,24 @@ import 'package:latlong2/latlong.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'admin_map_picker_page.dart';
+import '../../pages/admin/admin_map_picker_page.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'admin_request_pending_page.dart';
+import '../../pages/admin/admin_request_pending_page.dart';
 
 
 
-class AdminRegistrationPage extends StatefulWidget {
+class WebAdminRegistrationPage extends StatefulWidget {
   final String? proConnectUid;
   final String? proConnectEmail;
   final String? proConnectNom;
   final String? proConnectPrenom;
   final String? proConnectOrganisation;
   final String? proConnectSiret;
-  final String? proConnectSiren;  
+  final String? proConnectSiren;
 
-  const AdminRegistrationPage({
+  const WebAdminRegistrationPage({
     super.key,
     this.proConnectUid,
     this.proConnectEmail,
@@ -33,10 +33,10 @@ class AdminRegistrationPage extends StatefulWidget {
   });
 
   @override
-  State<AdminRegistrationPage> createState() => _AdminRegistrationPageState();
+  State<WebAdminRegistrationPage> createState() => _WebAdminRegistrationPageState();
 }
 
-class _AdminRegistrationPageState extends State<AdminRegistrationPage> {
+class _WebAdminRegistrationPageState extends State<WebAdminRegistrationPage> {
   static const Color adminColor = Color(0xFF1E3A8A);
   static const Color redColor = Color(0xFFDC2626);
 
@@ -55,17 +55,6 @@ class _AdminRegistrationPageState extends State<AdminRegistrationPage> {
 
     _controller('emailResponsable').text =
         widget.proConnectEmail ?? '';
-
-        _controller('organisationFacturation').text =
-    widget.proConnectOrganisation ?? '';
-
-_controller('siretFacturation').text =
-    widget.proConnectSiret ?? '';
-
-_controller('emailFacturation').text =
-    widget.proConnectEmail ?? '';
-
-_controller('nombrePostesSecours').text = '1';
 
     if (_controller('typeStructure').text.isEmpty) {
       _controller('typeStructure').text = 'COMMUNE';
@@ -188,44 +177,6 @@ _controller('nombrePostesSecours').text = '1';
     );
   }
 
-Widget _certifiedField(
-  String label,
-  String? value,
-) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: TextField(
-      controller: TextEditingController(
-        text: value ?? '',
-      ),
-      readOnly: true,
-      style: const TextStyle(
-        fontWeight: FontWeight.w700,
-        color: adminColor,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: Colors.transparent,
-        suffixIcon: const Icon(
-          Icons.verified_user_rounded,
-          color: redColor,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(
-            color: adminColor,
-            width: 1.6,
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
   Widget _textField(
   String key,
   String label, {
@@ -277,11 +228,12 @@ readOnly: readOnly,
       color: adminColor,
     ),
     decoration: InputDecoration(
-      labelText: label,
-      labelStyle: const TextStyle(
-        color: adminColor,
-        fontWeight: FontWeight.w700,
-      ),
+  labelText: label,
+  labelStyle: const TextStyle(
+  color: adminColor,
+  fontWeight: FontWeight.w700,
+),
+
       filled: true,
       suffixIcon: readOnly
     ? const Icon(
@@ -452,58 +404,65 @@ readOnly: readOnly,
     }
 
     return GestureDetector(
-      key: fieldKey,
-      onTap: openMenu,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: current.isEmpty ? null : label,
-          labelStyle: const TextStyle(
-            color: adminColor,
-            fontWeight: FontWeight.w700,
-          ),
-          filled: true,
-          fillColor: Colors.transparent,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 12,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(
-              color: adminColor,
-              width: 1.6,
-            ),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(
-              color: adminColor,
-              width: 1.6,
-            ),
-          ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                current.isEmpty ? label : current,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: adminColor,
-                ),
-              ),
-            ),
-            const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: redColor,
-              size: 26,
-            ),
-          ],
+  key: fieldKey,
+  onTap: openMenu,
+  child: InputDecorator(
+    decoration: InputDecoration(
+      labelText: current.isEmpty ? null : label,
+      labelStyle: const TextStyle(
+        color: adminColor,
+        fontWeight: FontWeight.w700,
+      ),
+      filled: true,
+      fillColor: Colors.transparent,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 12,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: adminColor,
+          width: 1.6,
         ),
       ),
-    );
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: adminColor,
+          width: 1.6,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: adminColor,
+          width: 2,
+        ),
+      ),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            current.isEmpty ? label : current,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: adminColor,
+            ),
+          ),
+        ),
+        const Icon(
+          Icons.keyboard_arrow_down_rounded,
+          color: redColor,
+          size: 26,
+        ),
+      ],
+    ),
+  ),
+);
   }
 
   Future<void> _openCityMapPicker() async {
@@ -567,128 +526,108 @@ readOnly: readOnly,
         );
 
       case 1:
-  return Column(
-    children: [
-      _stepHeader(
-        '2. RESPONSABLE',
-        'Identité certifiée et profil SPHOT',
-      ),
-
-      const SizedBox(height: 8),
-
-      const Text(
-        'IDENTITÉ CERTIFIÉE PROCONNECT',
-        style: TextStyle(
-          color: redColor,
-          fontSize: 14,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-
-      const SizedBox(height: 12),
-
-      _certifiedField(
-        'Nom certifié',
-        widget.proConnectNom,
-      ),
-
-      _certifiedField(
-        'Prénom certifié',
-        widget.proConnectPrenom,
-      ),
-
-      _certifiedField(
-        'Email certifié',
-        widget.proConnectEmail,
-      ),
-
-      _certifiedField(
-        'Organisation',
-        widget.proConnectOrganisation,
-      ),
-
-      _certifiedField(
-        'SIRET',
-        widget.proConnectSiret,
-      ),
-
-      _certifiedField(
-        'SIREN',
-        widget.proConnectSiren,
-      ),
-
-      const SizedBox(height: 20),
-
-      const Text(
-        'PROFIL SPHOT',
-        style: TextStyle(
-          color: redColor,
-          fontSize: 14,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-
-      const SizedBox(height: 12),
-
-      _textField(
-        'nomResponsable',
-        'Nom affiché',
-        uppercase: true,
-      ),
-
-      const SizedBox(height: 8),
-
-      _textField(
-        'prenomResponsable',
-        'Prénom affiché',
-        capitalizeWords: true,
-      ),
-
-      const SizedBox(height: 8),
-
-      _textField(
-        'fonctionResponsable',
-        'Fonction',
-        capitalizeWords: true,
-      ),
-
-      const SizedBox(height: 8),
-
-      TextField(
-        controller: _controller('telephoneResponsable'),
-        keyboardType: TextInputType.phone,
-        inputFormatters: [
-          FilteringTextInputFormatter.digitsOnly,
-          PhoneNumberFormatter(),
-        ],
-        decoration: InputDecoration(
-          labelText: 'Téléphone',
-          suffixIcon: IconButton(
-            icon: const Icon(
-              Icons.mic_rounded,
-              color: redColor,
+        return Column(
+          children: [
+            _stepHeader(
+              '2. RESPONSABLE',
+              'Indiquez le contact administratif référent',
             ),
-            onPressed: () async {
-              await _startVoice(
-                _controller('telephoneResponsable'),
-              );
-            },
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-      ),
+            _textField(
+  'nomResponsable',
+  'NOM',
+  uppercase: true,
+  readOnly: widget.proConnectNom != null,
+),
+                     
+            const SizedBox(height: 8),
+            _textField(
+  'prenomResponsable',
+  'Prénom',
+  capitalizeWords: true,
+  readOnly: widget.proConnectPrenom != null,
+),
 
-      const SizedBox(height: 8),
+const SizedBox(height: 8),
 
-      _textField(
-        'emailResponsable',
-        'Email de contact',
-        keyboardType: TextInputType.emailAddress,
+_textField(
+  'fonctionResponsable',
+  'Fonction',
+  capitalizeWords: true,
+),
+
+const SizedBox(height: 8),
+
+TextField(
+  controller: _controller('telephoneResponsable'),
+  keyboardType: TextInputType.phone,
+  inputFormatters: [
+    FilteringTextInputFormatter.digitsOnly,
+    PhoneNumberFormatter(),
+  ],
+  style: const TextStyle(
+    fontWeight: FontWeight.w700,
+    fontSize: 16,
+    color: adminColor,
+  ),
+  decoration: InputDecoration(
+    labelText: 'Téléphone',
+    labelStyle: const TextStyle(
+      color: adminColor,
+      fontWeight: FontWeight.w700,
+    ),
+    filled: true,
+    fillColor: Colors.transparent,
+    suffixIcon: IconButton(
+      icon: const Icon(
+        Icons.mic_rounded,
+        color: redColor,
       ),
-    ],
-  );
+      onPressed: () async {
+        await _startVoice(
+          _controller('telephoneResponsable'),
+        );
+      },
+    ),
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: 12,
+      vertical: 10,
+    ),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: adminColor,
+        width: 1.6,
+      ),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: adminColor,
+        width: 1.6,
+      ),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: adminColor,
+        width: 2,
+      ),
+    ),
+  ),
+),
+
+            const SizedBox(height: 8),
+            _textField(
+  'emailResponsable',
+  'Email',
+  keyboardType: TextInputType.emailAddress,
+  readOnly: widget.proConnectEmail != null,
+),
+            const SizedBox(height: 8),
+
+
+          ],
+        );
 
       case 2:
         return Column(
@@ -725,149 +664,183 @@ readOnly: readOnly,
 
       case 3:
   return Column(
-    children: [
-      _stepHeader(
-        '4. INFORMATIONS VILLE',
-        'Ces informations prérempliront les futurs SPHOTS',
-      ),
-      _textField(
-        'logoVille',
-        'Adresse / lien du logo de la ville',
-      ),
-      const SizedBox(height: 8),
-      _textField(
-        'siteInternetVille',
-        'Site internet de la ville',
-      ),
-      const SizedBox(height: 8),
-      _textField(
-        'arretesMunicipaux',
-        'Adresse internet des arrêtés municipaux',
-      ),
-      const SizedBox(height: 8),
-      SizedBox(
-        width: double.infinity,
-        height: 52,
-        child: ElevatedButton.icon(
-          onPressed: _openCityMapPicker,
-          icon: const Icon(Icons.map_outlined, color: redColor),
-          label: const Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Positionnez la ville sur la carte',
-                textAlign: TextAlign.left,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+          children: [
+            _stepHeader(
+              '4. INFORMATIONS VILLE',
+              'Ces informations prérempliront les futurs SPHOTS',
+            ),
+            _textField(
+              'logoVille',
+              'Adresse / lien du logo de la ville',
+            ),
+            const SizedBox(height: 8),
+            _textField(
+              'siteInternetVille',
+              'Site internet de la ville',
+            ),
+            const SizedBox(height: 8),
+            _textField(
+              'arretesMunicipaux',
+              'Adresse internet des arrêtés municipaux',
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _openCityMapPicker,
+                icon: const Icon(Icons.map_outlined, color: redColor),
+                label: const Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Positionnez la ville sur la carte',
+                      textAlign: TextAlign.left,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: adminColor,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: adminColor, width: 1.6),
+                  ),
                 ),
               ),
             ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            foregroundColor: adminColor,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(color: adminColor, width: 1.6),
+            const SizedBox(height: 8),
+            const Text(
+              'OU',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 8),
-      const Text(
-        'OU',
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-      const SizedBox(height: 8),
-      _twoColumns(
-        _textField(
-          'villeLat',
-          'Latitude\nville',
-        ),
-        _textField(
-          'villeLng',
-          'Longitude\nville',
-        ),
-      ),
-    ],
-  );
+            const SizedBox(height: 8),
+            _twoColumns(
+  _textField(
+    'villeLat',
+    'Latitude\nville',
+  ),
+  _textField(
+    'villeLng',
+    'Longitude\nville',
+  ),
+),
+          ],
+        );
 
-default:
+        case 4:
   return Column(
     children: [
       _stepHeader(
         '5. FACTURATION',
-        'Informations nécessaires pour préparer l’abonnement SPHOT',
+        'Informations nécessaires au devis et à Chorus Pro',
       ),
+
       _textField(
-        'organisationFacturation',
+        'billingOrganisation',
         'Organisation de facturation',
         uppercase: true,
       ),
+
       const SizedBox(height: 8),
+
       _textField(
-        'siretFacturation',
-        'SIRET',
+        'billingSiret',
+        'SIRET de facturation',
         keyboardType: TextInputType.number,
       ),
+
       const SizedBox(height: 8),
+
       _textField(
-        'adresseFacturation',
+        'billingAddress',
         'Adresse de facturation',
-        capitalizeWords: true,
       ),
+
       const SizedBox(height: 8),
+
+      _twoColumns(
+        _textField(
+          'billingPostalCode',
+          'Code postal',
+          keyboardType: TextInputType.number,
+        ),
+        _textField(
+          'billingCity',
+          'Ville',
+          uppercase: true,
+        ),
+      ),
+
+      const SizedBox(height: 8),
+
       _textField(
-        'contactFacturation',
+        'billingContactName',
         'Contact facturation',
         capitalizeWords: true,
       ),
+
       const SizedBox(height: 8),
+
       _textField(
-        'emailFacturation',
+        'billingContactEmail',
         'Email facturation',
         keyboardType: TextInputType.emailAddress,
       ),
+
       const SizedBox(height: 8),
+
       _textField(
-        'telephoneFacturation',
-        'Téléphone facturation',
-        keyboardType: TextInputType.phone,
-      ),
-      const SizedBox(height: 8),
-      _textField(
-        'bonCommande',
+        'purchaseOrderNumber',
         'Numéro de bon de commande',
       ),
+
       const SizedBox(height: 8),
+
       _textField(
-        'numeroEngagement',
+        'engagementNumber',
         'Numéro d’engagement',
       ),
+
       const SizedBox(height: 8),
+
       _textField(
-        'nombrePostesSecours',
+        'chorusServiceCode',
+        'Code service Chorus Pro',
+      ),
+
+      const SizedBox(height: 8),
+
+      _textField(
+        'numberOfRescueStations',
         'Nombre de postes de secours',
         keyboardType: TextInputType.number,
       ),
     ],
   );
+
+  default:
+  return const SizedBox.shrink();
+  
     }
   }
 
   void _nextStep() {
-  if (step < 4) {
-    setState(() {
-      step++;
-      _saved = false;
-    });
+    if (step < 4) {
+      setState(() {
+        step++;
+        _saved = false;
+      });
+    }
   }
-}
 
 String _territoryId() {
   String clean(String value) {
@@ -897,133 +870,122 @@ String _territoryId() {
 }
 
   Future<void> _saveRegistration() async {
-    if (_saved) return;
+  if (_saved) return;
+
   try {
     final territoryId = _territoryId();
-    
+
     if (territoryId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
             'Renseigne au minimum le pays, la région, le département et la ville.',
           ),
-          duration: Duration(seconds: 3),
         ),
       );
       return;
     }
 
     final user = FirebaseAuth.instance.currentUser;
-final uid = widget.proConnectUid ?? user?.uid;
+    final uid = widget.proConnectUid ?? user?.uid;
 
-if (uid == null || uid.isEmpty) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('Connexion ProConnect introuvable.'),
-      duration: Duration(seconds: 3),
-    ),
-  );
-  return;
-}
+    if (uid == null || uid.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Connexion ProConnect introuvable.'),
+        ),
+      );
+      return;
+    }
 
-await FirebaseFirestore.instance
-    .collection('adminRequests')
-    .doc(uid)
-    .set({
-  'uid': uid,
+    await FirebaseFirestore.instance
+        .collection('adminRequests')
+        .doc(uid)
+        .set({
+      'uid': uid,
 
-  'proConnect': {
-  'uid': widget.proConnectUid,
-  'email': widget.proConnectEmail,
-  'nom': widget.proConnectNom,
-  'prenom': widget.proConnectPrenom,
-  'organisation': widget.proConnectOrganisation,
-  'siret': widget.proConnectSiret,
-  'siren': widget.proConnectSiren,
+      'proConnect': {
+        'uid': widget.proConnectUid,
+        'email': widget.proConnectEmail,
+        'nom': widget.proConnectNom,
+        'prenom': widget.proConnectPrenom,
+        'organisation': widget.proConnectOrganisation,
+        'siret': widget.proConnectSiret,
+        'siren': widget.proConnectSiren,
+      },
+
+      'profile': {
+        'nomAffiche': _value('nomResponsable'),
+        'prenomAffiche': _value('prenomResponsable'),
+        'fonction': _value('fonctionResponsable'),
+        'telephone': _value('telephoneResponsable'),
+        'email': _value('emailResponsable'),
+      },
+
+      'structure': {
+        'nom': _value('nomStructure'),
+        'type': _value('typeStructure'),
+      },
+
+      'territoire': {
+        'territoireId': territoryId,
+        'pays': _value('pays'),
+        'region': _value('region'),
+        'departement': _value('departement'),
+        'ville': _value('ville'),
+        'logoVille': _value('logoVille'),
+        'siteInternetVille': _value('siteInternetVille'),
+        'arretesMunicipaux': _value('arretesMunicipaux'),
+        'villeLat':
+            double.tryParse(_value('villeLat').replaceAll(',', '.')) ?? 0.0,
+        'villeLng':
+            double.tryParse(_value('villeLng').replaceAll(',', '.')) ?? 0.0,
+      },
+
+'facturation': {
+  'billingOrganisation': _value('billingOrganisation'),
+  'billingSiret': _value('billingSiret'),
+  'billingAddress': _value('billingAddress'),
+  'billingPostalCode': _value('billingPostalCode'),
+  'billingCity': _value('billingCity'),
+  'billingContactName': _value('billingContactName'),
+  'billingContactEmail': _value('billingContactEmail'),
+  'purchaseOrderNumber': _value('purchaseOrderNumber'),
+  'engagementNumber': _value('engagementNumber'),
+  'chorusServiceCode': _value('chorusServiceCode'),
+  'numberOfRescueStations':
+      int.tryParse(_value('numberOfRescueStations')) ?? 0,
 },
 
-  'profile': {
-    'nomAffiche': _value('nomResponsable'),
-    'prenomAffiche': _value('prenomResponsable'),
-    'fonction': _value('fonctionResponsable'),
-    'telephone': _value('telephoneResponsable'),
-    'email': _value('emailResponsable'),
-  },
+'subscriptionPreview': {
+  'trialDurationDays': 8,
+  'pricePerStationExclTax': 500,
+  'billingCycle': 'annual',
+  'vatRate': 20,
+  'status': 'awaiting_validation',
+},
 
-  'structure': {
-    'nom': _value('nomStructure'),
-    'type': _value('typeStructure'),
-  },
+      'status': 'pending',
 
-  'territoire': {
-    'territoireId': territoryId,
-    'pays': _value('pays'),
-    'region': _value('region'),
-    'departement': _value('departement'),
-    'ville': _value('ville'),
-    'logoVille': _value('logoVille'),
-    'siteInternetVille': _value('siteInternetVille'),
-    'arretesMunicipaux': _value('arretesMunicipaux'),
-    'villeLat': double.tryParse(
-          _value('villeLat').replaceAll(',', '.'),
-        ) ??
-        0.0,
-    'villeLng': double.tryParse(
-          _value('villeLng').replaceAll(',', '.'),
-        ) ??
-        0.0,
-  },
-
-  'billing': {
-    'organisation': _value('organisationFacturation'),
-    'siret': _value('siretFacturation'),
-    'adresse': _value('adresseFacturation'),
-    'contactNom': _value('contactFacturation'),
-    'contactEmail': _value('emailFacturation'),
-    'contactTelephone': _value('telephoneFacturation'),
-    'bonCommande': _value('bonCommande'),
-    'numeroEngagement': _value('numeroEngagement'),
-    'nombrePostesSecours':
-        int.tryParse(_value('nombrePostesSecours')) ?? 1,
-  },
-
-  'subscriptionPreview': {
-    'periodeEssaiJours': 8,
-    'prixAnnuelParPosteMin': 500,
-    'prixAnnuelParPosteMax': 1000,
-    'devise': 'EUR',
-  },
-
-  'status': 'pending',
-
-  'requestedAt': FieldValue.serverTimestamp(),
-  'updatedAt': FieldValue.serverTimestamp(),
-}, SetOptions(merge: true));
+      'requestedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
     setState(() {
       _saved = true;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-  const SnackBar(
-    content: Text(
-      'Votre demande d’accès a bien été transmise.',
-    ),
-    duration: Duration(seconds: 3),
-  ),
-);
     Navigator.of(context).pushReplacement(
-  MaterialPageRoute(
-    builder: (_) => const AdminRequestPendingPage(),
-  ),
-);
+      MaterialPageRoute(
+        builder: (_) => const AdminRequestPendingPage(),
+      ),
+    );
   } catch (error) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Erreur enregistrement : $error'),
-        duration: const Duration(seconds: 6),
       ),
     );
   }

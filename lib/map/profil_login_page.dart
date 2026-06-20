@@ -8,6 +8,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../pages/admin/admin_espace_page.dart';
 import '../pages/admin/admin_registration_page.dart';
 
+import '../services/proconnect_service.dart';
+
 class ProfilLoginPage extends StatefulWidget {
   const ProfilLoginPage({super.key});
 
@@ -109,46 +111,44 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
 
   Future<void> _loginWithProConnect() async {
   try {
-    User? user = FirebaseAuth.instance.currentUser;
+    final result = await ProConnectService().login();
 
-    user ??= (await FirebaseAuth.instance.signInAnonymously()).user;
+    if (result == null) {
+  if (!mounted) return;
 
-    if (user == null) {
-      _showLoginError();
-      return;
-    }
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Connexion ProConnect annulée ou impossible.'),
+      duration: Duration(seconds: 4),
+    ),
+  );
 
-    final adminDoc = await FirebaseFirestore.instance
-        .collection('admins')
-        .doc(user.uid)
-        .get();
+  return;
+}
+
+    debugPrint('Access token : ${result.accessToken}');
+    debugPrint('Id token : ${result.idToken}');
 
     if (!mounted) return;
 
-    if (adminDoc.exists) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => const AdminEspacePage(),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AdminRegistrationPage(
+          proConnectUid: 'temp_uid',
+          proConnectEmail: '',
+          proConnectNom: '',
+          proConnectPrenom: '',
+          proConnectOrganisation: '',
+          proConnectSiret: '',
         ),
-      );
-    } else {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => AdminRegistrationPage(
-            proConnectUid: user!.uid,
-            proConnectEmail: 'admin.mairie@test-proconnect.fr',
-            proConnectNom: 'DUPONT',
-            proConnectPrenom: 'Marie',
-            proConnectOrganisation: 'MAIRIE DE TEST',
-            proConnectSiret: '00000000000000',
-          ),
-        ),
-      );
-    }
+      ),
+    );
   } catch (error) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Erreur ProConnect simulation : $error'),
+        content: Text('Erreur ProConnect : $error'),
         duration: const Duration(seconds: 5),
       ),
     );

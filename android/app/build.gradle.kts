@@ -22,12 +22,14 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.sylvainra.sphot"
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
-    }
+    applicationId = "com.sylvainra.sphot"
+    minSdk = flutter.minSdkVersion
+    targetSdk = flutter.targetSdkVersion
+    versionCode = flutter.versionCode
+    versionName = flutter.versionName
+
+    manifestPlaceholders["appAuthRedirectScheme"] = "sphot"
+}
 
     buildTypes {
         release {
