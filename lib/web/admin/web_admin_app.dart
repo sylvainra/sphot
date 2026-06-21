@@ -6,8 +6,9 @@ import '../shared/web_menu_item.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/sphots_page.dart';
 import 'pages/users_page.dart';
-
 import 'pages/admin_requests_page.dart';
+import 'pages/subscriptions_page.dart';
+import 'pages/web_ads_page.dart';
 
 class WebAdminApp extends StatelessWidget {
   const WebAdminApp({super.key});
@@ -36,6 +37,16 @@ class WebAdminApp extends StatelessWidget {
           title: 'Demandes Admin',
           icon: Icons.request_page_outlined,
           page: AdminRequestsPage(),
+        ),
+        WebMenuItem(
+          title: 'Abonnements',
+          icon: Icons.subscriptions_outlined,
+          page: SubscriptionsPage(),
+        ),
+        WebMenuItem(
+          title: 'Ads',
+          icon: Icons.campaign_outlined,
+          page: const WebAdsPage(),
         ),
       ],
     );

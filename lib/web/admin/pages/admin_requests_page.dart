@@ -88,6 +88,24 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
         'billingCycle': subscriptionPreview['billingCycle'] ?? 'annual',
         'vatRate': subscriptionPreview['vatRate'] ?? 20,
         'status': 'trial',
+
+'dateFieldsTest': 'OK_ETAPE_1',
+'trialStartDate': Timestamp.now(),
+'trialEndDate': Timestamp.fromDate(
+  DateTime.now().add(
+    Duration(
+      days: subscriptionPreview['trialDurationDays'] ?? 8,
+    ),
+  ),
+),
+'subscriptionStartDate': null,
+'subscriptionEndDate': null,
+'lastPaymentDate': null,
+'nextInvoiceDate': null,
+        'country': territoire['pays'] ?? '',
+'region': territoire['region'] ?? '',
+'department': territoire['departement'] ?? '',
+'city': territoire['ville'] ?? '',
         'updatedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
       },
@@ -225,6 +243,18 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
   }
 
   String _text(dynamic value) => (value ?? '').toString();
+
+  String _formatTimestamp(Timestamp? timestamp) {
+  if (timestamp == null) return '';
+
+  final date = timestamp.toDate();
+
+  return '${date.day.toString().padLeft(2, '0')}/'
+      '${date.month.toString().padLeft(2, '0')}/'
+      '${date.year} '
+      '${date.hour.toString().padLeft(2, '0')}:'
+      '${date.minute.toString().padLeft(2, '0')}';
+}
 
   List<String> _uniqueValues(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
@@ -418,6 +448,20 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
         final allRequests = snapshot.data!.docs;
         final requests = _filteredDocs(allRequests);
 
+        final totalCount = allRequests.length;
+
+final pendingCount = allRequests.where((doc) {
+  return doc.data()['status'] == 'pending';
+}).length;
+
+final approvedCount = allRequests.where((doc) {
+  return doc.data()['status'] == 'approved';
+}).length;
+
+final rejectedCount = allRequests.where((doc) {
+  return doc.data()['status'] == 'rejected';
+}).length;
+
         final paysValues = _uniqueValues(allRequests, 'pays');
         final regionValues = _uniqueValues(allRequests, 'region');
         final departmentValues = _uniqueValues(allRequests, 'departement');
@@ -431,13 +475,13 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
                 children: [
                   Row(
                     children: [
-                      _statusButton('TOUTES', 'all'),
+                      _statusButton('TOUTES ($totalCount)', 'all'),
                       const SizedBox(width: 8),
-                      _statusButton('EN ATTENTE', 'pending'),
+                      _statusButton('EN ATTENTE ($pendingCount)', 'pending'),
                       const SizedBox(width: 8),
-                      _statusButton('APPROUVÉES', 'approved'),
+                      _statusButton('APPROUVÉES ($approvedCount)', 'approved'),
                       const SizedBox(width: 8),
-                      _statusButton('REFUSÉES', 'rejected'),
+                      _statusButton('REFUSÉES ($rejectedCount)', 'rejected'),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -545,6 +589,15 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
                         final facturation =
                             Map<String, dynamic>.from(data['facturation'] ?? {});
 
+                            final subscriptionPreview =
+    Map<String, dynamic>.from(
+  data['subscriptionPreview'] ?? {},
+);
+
+                            final requestedAt = data['requestedAt'] as Timestamp?;
+final approvedAt = data['approvedAt'] as Timestamp?;
+final rejectedAt = data['rejectedAt'] as Timestamp?;
+
                         return Container(
                           padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
@@ -633,12 +686,58 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
                                 ),
                               ),
                               Text(
-                                'Postes de secours : ${facturation['numberOfRescueStations'] ?? 0}',
-                                style: const TextStyle(
-                                  color: adminColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+  'Postes de secours : ${facturation['numberOfRescueStations'] ?? 0}',
+  style: const TextStyle(
+    color: adminColor,
+    fontWeight: FontWeight.w600,
+  ),
+),
+
+const SizedBox(height: 8),
+
+Text(
+  'Demandée le : ${_formatTimestamp(requestedAt)}',
+  style: const TextStyle(
+    color: adminColor,
+    fontWeight: FontWeight.w600,
+  ),
+),
+
+if (approvedAt != null)
+  Text(
+    'Approuvée le : ${_formatTimestamp(approvedAt)}',
+    style: const TextStyle(
+      color: Colors.green,
+      fontWeight: FontWeight.w700,
+    ),
+  ),
+
+if (rejectedAt != null)
+  Text(
+    'Refusée le : ${_formatTimestamp(rejectedAt)}',
+    style: const TextStyle(
+      color: redColor,
+      fontWeight: FontWeight.w700,
+    ),
+  ),
+
+const SizedBox(height: 8),
+
+Text(
+  'Essai gratuit : ${subscriptionPreview['trialDurationDays'] ?? 8} jours',
+  style: const TextStyle(
+    color: adminColor,
+    fontWeight: FontWeight.w600,
+  ),
+),
+
+Text(
+  'Tarif estimé : ${subscriptionPreview['pricePerStationExclTax'] ?? 500} € HT / poste / an',
+  style: const TextStyle(
+    color: adminColor,
+    fontWeight: FontWeight.w700,
+  ),
+),
                               const SizedBox(height: 16),
                               Wrap(
                                 spacing: 12,

@@ -18,6 +18,8 @@ import 'app_info_page.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
+import '../pages/advertiser_access_page.dart';
+
 enum SpotFilter {
   all,
   secours,
@@ -1383,102 +1385,106 @@ Widget _buildAdBanner() {
   return Positioned(
     left: 8,
     right: 8,
-    bottom: 58, // juste au-dessus de la bottom bar
-    child: Container(
-      height: 62,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.22),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.12),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+    bottom: 58,
+    child: GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const AdvertiserAccessPage(),
           ),
-        ],
-        border: Border.all(
-          color: Colors.black.withOpacity(0.08),
-          width: 1,
+        );
+      },
+      child: Container(
+        height: 62,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.22),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+          border: Border.all(
+            color: Colors.black.withOpacity(0.08),
+            width: 1,
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 12),
+        child: Row(
+          children: [
+            const SizedBox(width: 12),
 
-          /// LOGO / IMAGE PUB
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              width: 52,
-              height: 52,
-              color: Colors.blueGrey.withOpacity(0.08),
-              child: const Icon(
-                Icons.campaign,
-                size: 28,
-                color: Colors.black87,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: 52,
+                height: 52,
+                color: Colors.blueGrey.withOpacity(0.08),
+                child: const Icon(
+                  Icons.campaign,
+                  size: 28,
+                  color: Colors.black87,
+                ),
               ),
             ),
-          ),
 
-          const SizedBox(width: 12),
+            const SizedBox(width: 12),
 
-          /// TEXTE PUB
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'PUBLICITÉ LOCALE',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'PUBLICITÉ LOCALE',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black87,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Camping • Surf Shop • Restaurant',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black.withOpacity(0.65),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: const Text(
+                  'VOIR',
                   style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.black87,
-                    letterSpacing: 0.2,
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-
-                const SizedBox(height: 2),
-
-                Text(
-                  'Camping • Surf Shop • Restaurant',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black.withOpacity(0.65),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          /// CTA
-          Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 6,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.circular(99),
-              ),
-              child: const Text(
-                'VOIR',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
   );
