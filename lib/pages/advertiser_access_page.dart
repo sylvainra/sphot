@@ -25,18 +25,47 @@ class _AdvertiserAccessPageState extends State<AdvertiserAccessPage> {
   }
 
   Future<void> _handleProConnectReturn() async {
-    await AdvertiserAuthService.handleRedirectResult();
+  debugPrint('DEBUT _handleProConnectReturn');
 
-    final user = FirebaseAuth.instance.currentUser;
+  User? user;
 
-    if (!mounted) return;
+  try {
+    final credential =
+        await FirebaseAuth.instance.getRedirectResult();
 
-    if (user == null) {
-      setState(() {
-        _checking = false;
-      });
-      return;
+    debugPrint('credential.user: ${credential.user?.uid}');
+    debugPrint('credential.providerId: ${credential.credential?.providerId}');
+
+    user = credential.user;
+  } catch (e) {
+    debugPrint('ERREUR getRedirectResult direct: $e');
+  }
+
+  user ??= FirebaseAuth.instance.currentUser;
+
+  if (user == null) {
+    try {
+      user = await FirebaseAuth.instance
+          .authStateChanges()
+          .firstWhere((u) => u != null)
+          .timeout(const Duration(seconds: 5));
+
+      debugPrint('authStateChanges user: ${user?.uid}');
+    } catch (e) {
+      debugPrint('AUCUN USER via authStateChanges: $e');
     }
+  }
+
+  debugPrint('currentUser final: ${user?.uid}');
+
+  if (!mounted) return;
+
+  if (user == null) {
+    setState(() {
+      _checking = false;
+    });
+    return;
+  }
 
     final requestRef = FirebaseFirestore.instance
         .collection('advertiserRequests')
@@ -46,13 +75,21 @@ class _AdvertiserAccessPageState extends State<AdvertiserAccessPage> {
 
     if (!requestDoc.exists) {
       await requestRef.set({
-        'uid': user.uid,
-        'email': user.email ?? '',
-        'displayName': user.displayName ?? '',
-        'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+  'uid': user.uid,
+  'email': user.email ?? '',
+  'displayName': user.displayName ?? '',
+  'organisation': '',
+  'siret': '',
+  'contactName': user.displayName ?? '',
+  'contactEmail': user.email ?? '',
+  'billingAddress': '',
+  'billingPostalCode': '',
+  'billingCity': '',
+  'billingCountry': 'France',
+  'status': 'pending',
+  'createdAt': FieldValue.serverTimestamp(),
+  'updatedAt': FieldValue.serverTimestamp(),
+});
 
       if (!mounted) return;
 
@@ -111,9 +148,10 @@ class _AdvertiserAccessPageState extends State<AdvertiserAccessPage> {
             fit: BoxFit.cover,
           ),
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
+  child: SingleChildScrollView(
+    child: Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
                 children: [
                   SizedBox(
                     height: 58,
@@ -125,7 +163,7 @@ class _AdvertiserAccessPageState extends State<AdvertiserAccessPage> {
                       ),
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 40),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(18),
@@ -165,35 +203,39 @@ class _AdvertiserAccessPageState extends State<AdvertiserAccessPage> {
                           width: double.infinity,
                           height: 48,
                           child: OutlinedButton(
-                            onPressed:
-                                _checking ? null : _connectWithProConnect,
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(
-                                color: refColor,
-                                width: 2,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                _checking
-                                    ? 'VÉRIFICATION...'
-                                    : 'SE CONNECTER AVEC PROCONNECT',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: refColor,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                          ),
+  onPressed: _checking
+      ? null
+      : () {
+          debugPrint('BOUTON PROCONNECT CLIQUE');
+          _connectWithProConnect();
+        },
+  style: OutlinedButton.styleFrom(
+    side: const BorderSide(
+      color: refColor,
+      width: 2,
+    ),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+    ),
+  ),
+  child: Center(
+    child: Text(
+      _checking
+          ? 'VÉRIFICATION...'
+          : 'SE CONNECTER AVEC PROCONNECT',
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        color: refColor,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  ),
+),
                         ),
                       ],
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 40),
                   Container(
                     width: 40,
                     height: 40,
@@ -225,9 +267,10 @@ class _AdvertiserAccessPageState extends State<AdvertiserAccessPage> {
                     ),
                   ),
                 ],
-              ),
-            ),
-          ),
+                    ),
+    ),
+  ),
+),
         ],
       ),
     );

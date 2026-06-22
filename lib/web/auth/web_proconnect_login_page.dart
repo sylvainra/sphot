@@ -6,6 +6,8 @@ import '../admin/web_admin_registration_page.dart';
 
 import '../admin/web_admin_app.dart';
 
+import '../../services/web_pending_auth_storage.dart';
+
 class WebProConnectLoginPage extends StatefulWidget {
   final String mode;
 
@@ -28,7 +30,13 @@ class _WebProConnectLoginPageState
   @override
 void initState() {
   super.initState();
-  _handleRedirectResult();
+
+  final pendingAuth =
+      WebPendingAuthStorage.getPendingAuth();
+
+  if (pendingAuth == 'admin') {
+    _handleRedirectResult();
+  }
 }
 
   Future<void> _handleRedirectResult() async {

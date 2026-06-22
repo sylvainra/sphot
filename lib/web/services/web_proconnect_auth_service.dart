@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import '../../services/web_pending_auth_storage.dart';
 
 enum WebAdminAccessStatus {
   approved,
@@ -39,6 +40,8 @@ class WebProConnectAuthService {
 
   try {
     print('===== REDIRECT PROCONNECT START =====');
+
+    WebPendingAuthStorage.setPendingAuth('admin');
 
     await _auth.signInWithRedirect(provider);
 
