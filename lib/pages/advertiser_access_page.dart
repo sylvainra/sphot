@@ -61,11 +61,13 @@ class _AdvertiserAccessPageState extends State<AdvertiserAccessPage> {
   if (!mounted) return;
 
   if (user == null) {
-    setState(() {
-      _checking = false;
-    });
-    return;
-  }
+  Navigator.of(context).pushReplacement(
+    MaterialPageRoute(
+      builder: (_) => const AdvertisePage(),
+    ),
+  );
+  return;
+}
 
     final requestRef = FirebaseFirestore.instance
         .collection('advertiserRequests')

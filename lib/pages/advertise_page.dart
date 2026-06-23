@@ -1,7 +1,15 @@
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter/foundation.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' hide Path;
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
 
 class AdvertisePage extends StatefulWidget {
   const AdvertisePage({super.key});
@@ -16,25 +24,92 @@ class _AdvertisePageState extends State<AdvertisePage> {
   static const double sectionSpacing = 14;
 
   final _formKey = GlobalKey<FormState>();
-  final stt.SpeechToText _speech = stt.SpeechToText();
+final stt.SpeechToText _speech = stt.SpeechToText();
+OverlayEntry? _dropdownOverlay;
+TextEditingController? _activeVoiceController;
 
-  final _companyController = TextEditingController();
+final _companyController = TextEditingController();
   final _contactController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _websiteController = TextEditingController();
+  final _centerCityController = TextEditingController();
   final _messageController = TextEditingController();
-
-  OverlayEntry? _dropdownOverlay;
+  final _sirenController = TextEditingController();
+  final _siretController = TextEditingController();
 
   String _category = 'Protection solaire';
-  final List<String> _selectedPlacements = ['Carte SPHOT'];
-final List<String> _selectedTargets = ['Commune'];
-  String _duration = '1 mois';
-  final Set<String> _selectedOfferKeys = {
-  'Carte SPHOT|Commune|1 mois',
-};
+  String _visibility = 'pack';
+  String _broadcastType = 'local';
+  String _duration = '15 jours';
+  DateTime _campaignStartDate = DateTime.now();
+
+DateTime get _campaignEndDate {
+  switch (_duration) {
+    case '15 jours':
+      return _campaignStartDate.add(const Duration(days: 15));
+
+    case '1 mois':
+      return DateTime(
+        _campaignStartDate.year,
+        _campaignStartDate.month + 1,
+        _campaignStartDate.day,
+      );
+
+    case '3 mois':
+      return DateTime(
+        _campaignStartDate.year,
+        _campaignStartDate.month + 3,
+        _campaignStartDate.day,
+      );
+
+    case '6 mois':
+      return DateTime(
+        _campaignStartDate.year,
+        _campaignStartDate.month + 6,
+        _campaignStartDate.day,
+      );
+
+    case '12 mois':
+      return DateTime(
+        _campaignStartDate.year + 1,
+        _campaignStartDate.month,
+        _campaignStartDate.day,
+      );
+  }
+
+  return _campaignStartDate;
+}
+  double _radiusKm = 0.5;
   bool _isSubmitting = false;
+
+  LatLng _adCenter = const LatLng(46.6, 2.5);
+
+  final MapController _adMapController = MapController();
+  bool _searchingPlace = false;
+
+  LatLng get _circleCenter {
+  return LatLng(
+    _adCenter.latitude - 0.000002,
+    _adCenter.longitude,
+  );
+}
+
+  LatLng get _circleVisualCenter {
+  final zoom = _adMapController.camera.zoom;
+
+  final metersPerPixel =
+      156543.03392 *
+      cos(_adCenter.latitude * pi / 180) /
+      pow(2, zoom);
+
+  final metersNorth = 30 * metersPerPixel;
+
+  return LatLng(
+    _adCenter.latitude + (metersNorth / 111320),
+    _adCenter.longitude,
+  );
+}
 
   final List<String> _categoryChoices = [
     'Protection solaire',
@@ -49,66 +124,15 @@ final List<String> _selectedTargets = ['Commune'];
     'Autre',
   ];
 
-  final List<String> _placementChoices = [
-    'Carte SPHOT',
-    'Fiche SPHOT',
-  ];
-
-  final List<String> _targetChoices = [
-    'Commune',
-    'Département',
-    'National',
-  ];
-
   final List<String> _durationChoices = [
+    '15 jours',
     '1 mois',
     '3 mois',
     '6 mois',
     '12 mois',
   ];
 
-  final Map<String, Map<String, Map<String, int>>> _defaultPricing = {
-    'Carte SPHOT': {
-      'Commune': {
-        '1 mois': 600,
-        '3 mois': 1650,
-        '6 mois': 3000,
-        '12 mois': 5400,
-      },
-      'Département': {
-        '1 mois': 1800,
-        '3 mois': 5100,
-        '6 mois': 9600,
-        '12 mois': 18000,
-      },
-      'National': {
-        '1 mois': 0,
-        '3 mois': 0,
-        '6 mois': 0,
-        '12 mois': 0,
-      },
-    },
-    'Fiche SPHOT': {
-      'Commune': {
-        '1 mois': 800,
-        '3 mois': 2250,
-        '6 mois': 4200,
-        '12 mois': 7800,
-      },
-      'Département': {
-        '1 mois': 2400,
-        '3 mois': 6900,
-        '6 mois': 13200,
-        '12 mois': 25200,
-      },
-      'National': {
-        '1 mois': 0,
-        '3 mois': 0,
-        '6 mois': 0,
-        '12 mois': 0,
-      },
-    },
-  };
+  final List<double> _radiusChoices = [0.5, 2, 5, 10, 20, 50, 100];
 
   @override
   void dispose() {
@@ -117,39 +141,114 @@ final List<String> _selectedTargets = ['Commune'];
     _emailController.dispose();
     _phoneController.dispose();
     _websiteController.dispose();
+    _centerCityController.dispose();
     _messageController.dispose();
     _dropdownOverlay?.remove();
+    _speech.stop();
+    _speech.cancel();
+    _sirenController.dispose();
+    _siretController.dispose();
     super.dispose();
   }
 
-  Future<void> _startVoice(
-  TextEditingController controller, {
-  bool uppercase = false,
-  bool contactName = false,
-}) async {
-    final available = await _speech.initialize();
-
-    if (!available) return;
-
-    await _speech.listen(
-      localeId: 'fr_FR',
-      onResult: (result) {
-        final recognized = result.recognizedWords;
-
-final text = contactName
-    ? _formatContactName(recognized)
-    : uppercase
-        ? recognized.toUpperCase()
-        : recognized;
-
-        setState(() {
-          controller.text = text;
-          controller.selection = TextSelection.fromPosition(
-            TextPosition(offset: controller.text.length),
-          );
-        });
+  Map<String, dynamic> _defaultPricing() {
+    return {
+      'basePrices': {
+        '15 jours': 99,
+        '1 mois': 149,
+        '3 mois': 349,
+        '6 mois': 599,
+        '12 mois': 999,
       },
-    );
+      'visibilityMultipliers': {
+        'map': 1.0,
+        'premium': 2.0,
+        'pack': 2.5,
+      },
+      'radiusMultipliers': {
+  '0.5': 1.0,
+  '2': 1.5,
+  '5': 2.0,
+  '10': 2.8,
+  '20': 3.8,
+  '50': 5.5,
+  '100': 8.0,
+},
+      'nationalFlatPrices': {
+        'map': {
+          '15 jours': 490,
+          '1 mois': 790,
+          '3 mois': 1900,
+          '6 mois': 2900,
+          '12 mois': 4900,
+        },
+        'premium': {
+          '15 jours': 890,
+          '1 mois': 1490,
+          '3 mois': 3400,
+          '6 mois': 5400,
+          '12 mois': 8900,
+        },
+        'pack': {
+          '15 jours': 1190,
+          '1 mois': 1990,
+          '3 mois': 4500,
+          '6 mois': 7400,
+          '12 mois': 11900,
+        },
+      },
+    };
+  }
+
+  num _numFromMap(Map map, String key, num fallback) {
+    final value = map[key];
+    return value is num ? value : fallback;
+  }
+
+  int _campaignPrice(Map<String, dynamic>? firestorePricing) {
+    final pricing = firestorePricing ?? _defaultPricing();
+
+    if (_broadcastType == 'national') {
+      final national = pricing['nationalFlatPrices'];
+      if (national is Map &&
+          national[_visibility] is Map &&
+          national[_visibility][_duration] is num) {
+        return (national[_visibility][_duration] as num).round();
+      }
+
+      final fallback = _defaultPricing()['nationalFlatPrices'][_visibility]
+          [_duration] as int;
+      return fallback;
+    }
+
+    final basePrices = pricing['basePrices'] is Map
+        ? pricing['basePrices'] as Map
+        : _defaultPricing()['basePrices'] as Map;
+
+    final visibilityMultipliers = pricing['visibilityMultipliers'] is Map
+        ? pricing['visibilityMultipliers'] as Map
+        : _defaultPricing()['visibilityMultipliers'] as Map;
+
+    final radiusMultipliers = pricing['radiusMultipliers'] is Map
+        ? pricing['radiusMultipliers'] as Map
+        : _defaultPricing()['radiusMultipliers'] as Map;
+
+    final base = _numFromMap(basePrices, _duration, 99);
+    final visibility = _numFromMap(visibilityMultipliers, _visibility, 2.5);
+    final radius = _numFromMap(radiusMultipliers, _radiusKm.toString(), 1.0);
+
+    return (base * visibility * radius).round();
+  }
+
+  String _visibilityLabel() {
+    switch (_visibility) {
+      case 'map':
+        return 'Carte SPHOT';
+      case 'premium':
+        return 'SPHOT';
+      default:
+        return 'Pack Visibilité Totale';
+    }
   }
 
   String _storageCategory() {
@@ -177,110 +276,177 @@ final text = contactName
     }
   }
 
-  int _durationMonths() {
-    return int.tryParse(_duration.split(' ').first) ?? 1;
+Future<void> _searchReferencePlace() async {
+  final query = _centerCityController.text.trim();
+
+  if (query.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Merci de saisir une commune ou un lieu.'),
+      ),
+    );
+    return;
   }
 
-  Map<String, Map<String, Map<String, int>>> _pricingFromFirestore(
-    Map<String, dynamic>? data,
-  ) {
-    if (data == null || data['prices'] is! Map) {
-      return _defaultPricing;
+  setState(() {
+    _searchingPlace = true;
+  });
+
+  try {
+    final uri = Uri.https(
+      'nominatim.openstreetmap.org',
+      '/search',
+      {
+        'q': query,
+        'format': 'json',
+        'limit': '1',
+        'countrycodes': 'fr',
+      },
+    );
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'User-Agent': 'SPHOT advertising configurator',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Erreur géocodage');
     }
 
-    final result = <String, Map<String, Map<String, int>>>{};
+    final results = jsonDecode(response.body) as List<dynamic>;
 
-    final prices = data['prices'] as Map;
+    if (results.isEmpty) {
+      if (!mounted) return;
 
-    for (final placement in _placementChoices) {
-      result[placement] = {};
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lieu introuvable. Essayez avec une commune proche.'),
+        ),
+      );
+      return;
+    }
 
-      for (final target in _targetChoices) {
-        result[placement]![target] = {};
+    final result = results.first as Map<String, dynamic>;
 
-        for (final duration in _durationChoices) {
-          final value = prices[placement]?[target]?[duration];
+    final lat = double.tryParse(result['lat'].toString());
+    final lon = double.tryParse(result['lon'].toString());
 
-          result[placement]![target]![duration] =
-              value is num ? value.toInt() : _defaultPrice(
-            placement,
-            target,
-            duration,
-          );
-        }
+    if (lat == null || lon == null) {
+      throw Exception('Coordonnées invalides');
+    }
+
+    final newCenter = LatLng(lat, lon);
+
+    setState(() {
+      _adCenter = newCenter;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+  if (!mounted) return;
+  _adMapController.move(newCenter, 12);
+});
+  } catch (e) {
+  debugPrint('ERREUR LOCALISATION : $e');
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Impossible de localiser ce lieu pour le moment.'),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        _searchingPlace = false;
+      });
+    }
+  }
+}
+
+  Future<void> _startVoice(
+  TextEditingController controller, {
+  bool uppercase = false,
+  bool contactName = false,
+}) async {
+  try {
+    await _speech.stop();
+    await _speech.cancel();
+  } catch (_) {}
+
+  _activeVoiceController = controller;
+
+  final available = await _speech.initialize();
+
+  if (!available) return;
+
+  await _speech.listen(
+    localeId: 'fr_FR',
+    listenMode: stt.ListenMode.dictation,
+    partialResults: true,
+    onResult: (result) {
+      if (_activeVoiceController != controller) {
+        return;
+      }
+
+      final recognized = result.recognizedWords.trim();
+
+      final text = contactName
+          ? _formatContactName(recognized)
+          : uppercase
+              ? recognized.toUpperCase()
+              : recognized;
+
+      if (!mounted) return;
+
+      setState(() {
+        controller.text = text;
+        controller.selection = TextSelection.collapsed(
+          offset: text.length,
+        );
+      });
+    },
+  );
+}
+
+  String _formatContactName(String value) {
+    if (value.isEmpty) return value;
+
+    final endsWithSpace = value.endsWith(' ');
+    final words = value.trim().split(RegExp(r'\s+'));
+
+    if (words.isEmpty) return value;
+
+    final result = <String>[];
+
+    for (int i = 0; i < words.length; i++) {
+      final word = words[i];
+
+      if (i == 0) {
+        result.add(word.toUpperCase());
+      } else {
+        result.add(
+          word
+              .toLowerCase()
+              .split('-')
+              .map((part) {
+                if (part.isEmpty) return part;
+                return part[0].toUpperCase() + part.substring(1);
+              })
+              .join('-'),
+        );
       }
     }
 
-    return result;
-  }
+    var formatted = result.join(' ');
 
-  int _defaultPrice(
-    String placement,
-    String target,
-    String duration,
-  ) {
-    return _defaultPricing[placement]?[target]?[duration] ?? 0;
-  }
-
-  int _selectedPrice(
-  Map<String, Map<String, Map<String, int>>> pricing,
-) {
-  var total = 0;
-
-  for (final key in _selectedOfferKeys) {
-    final parts = key.split('|');
-
-    if (parts.length != 3) continue;
-
-    final placement = parts[0];
-    final target = parts[1];
-    final duration = parts[2];
-
-    total += pricing[placement]?[target]?[duration] ?? 0;
-  }
-
-  return total;
-}
-
-String _formatContactName(String value) {
-  if (value.isEmpty) return value;
-
-  final endsWithSpace = value.endsWith(' ');
-
-  final words = value.trim().split(RegExp(r'\s+'));
-
-  if (words.isEmpty) return value;
-
-  final result = <String>[];
-
-  for (int i = 0; i < words.length; i++) {
-    final word = words[i];
-
-    if (i == 0) {
-      result.add(word.toUpperCase());
-    } else {
-      result.add(
-        word
-            .toLowerCase()
-            .split('-')
-            .map((part) {
-              if (part.isEmpty) return part;
-
-              return part[0].toUpperCase() + part.substring(1);
-            })
-            .join('-'),
-      );
+    if (endsWithSpace) {
+      formatted += ' ';
     }
+
+    return formatted;
   }
-
-  var formatted = result.join(' ');
-
-  if (endsWithSpace) {
-    formatted += ' ';
-  }
-
-  return formatted;
-}
 
   Widget _field({
     required TextEditingController controller,
@@ -296,42 +462,37 @@ String _formatContactName(String value) {
       maxLines: maxLines,
       keyboardType: phone ? TextInputType.phone : TextInputType.text,
       inputFormatters: phone
-    ? [
-        FilteringTextInputFormatter.digitsOnly,
-        PhoneNumberFormatter(),
-      ]
-    : null,
-      textCapitalization: uppercase
-          ? TextCapitalization.characters
-          : TextCapitalization.none,
+          ? [
+              FilteringTextInputFormatter.digitsOnly,
+              PhoneNumberFormatter(),
+            ]
+          : null,
+      textCapitalization:
+          uppercase ? TextCapitalization.characters : TextCapitalization.none,
       onChanged: (value) {
-  if (contactName) {
-    final formatted = _formatContactName(value);
+        if (contactName) {
+          final formatted = _formatContactName(value);
 
-    if (formatted != value) {
-      controller.value = TextEditingValue(
-        text: formatted,
-        selection: TextSelection.collapsed(
-          offset: formatted.length,
-        ),
-      );
-    }
-    return;
-  }
+          if (formatted != value) {
+            controller.value = TextEditingValue(
+              text: formatted,
+              selection: TextSelection.collapsed(offset: formatted.length),
+            );
+          }
+          return;
+        }
 
-  if (uppercase) {
-    final upper = value.toUpperCase();
+        if (uppercase) {
+          final upper = value.toUpperCase();
 
-    if (upper != value) {
-      controller.value = TextEditingValue(
-        text: upper,
-        selection: TextSelection.collapsed(
-          offset: upper.length,
-        ),
-      );
-    }
-  }
-},
+          if (upper != value) {
+            controller.value = TextEditingValue(
+              text: upper,
+              selection: TextSelection.collapsed(offset: upper.length),
+            );
+          }
+        }
+      },
       validator: requiredField
           ? (value) {
               if (value == null || value.trim().isEmpty) {
@@ -341,233 +502,164 @@ String _formatContactName(String value) {
             }
           : null,
       style: const TextStyle(
-  color: redRefColor,
-  fontWeight: FontWeight.w700,
-  fontSize: 16,
-),
+        color: redRefColor,
+        fontWeight: FontWeight.w700,
+        fontSize: 16,
+      ),
       decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(
-          color: Color(0xFF1E3A8A),
-          fontWeight: FontWeight.w700,
-        ),
+  labelText: label,
+
+  labelStyle: const TextStyle(
+    color: refColor,
+    fontWeight: FontWeight.w700,
+  ),
+
+  errorStyle: const TextStyle(
+    color: redRefColor,
+    fontWeight: FontWeight.w700,
+  ),
         filled: true,
         fillColor: Colors.transparent,
         suffixIcon: IconButton(
-          icon: const Icon(
-            Icons.mic_rounded,
-            color: Color(0xFFDC2626),
-          ),
-          onPressed: () => _startVoice(
-  controller,
-  uppercase: uppercase,
-  contactName: contactName,
+  icon: const Icon(
+    Icons.mic_rounded,
+    color: redRefColor,
+  ),
+  onPressed: () => _startVoice(
+    controller,
+    uppercase: uppercase,
+    contactName: contactName,
+  ),
 ),
-        ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 12,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 1.6),
+          borderSide: const BorderSide(color: refColor, width: 1.6),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 1.6),
+          borderSide: const BorderSide(color: refColor, width: 1.6),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 2),
+          borderSide: const BorderSide(color: refColor, width: 2),
         ),
+        errorBorder: OutlineInputBorder(
+  borderRadius: BorderRadius.circular(14),
+  borderSide: const BorderSide(
+    color: redRefColor,
+    width: 2,
+  ),
+),
+
+focusedErrorBorder: OutlineInputBorder(
+  borderRadius: BorderRadius.circular(14),
+  borderSide: const BorderSide(
+    color: redRefColor,
+    width: 2.5,
+  ),
+),
       ),
     );
   }
 
-  Widget _dropdownField({
-    required String label,
-    required String value,
-    required List<String> choices,
-    required ValueChanged<String> onSelected,
-    double maxMenuHeight = 220,
+  Widget _sectionTitle(String text) {
+    return Text(
+      text,
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        color: refColor,
+        fontSize: 16,
+        fontWeight: FontWeight.w900,
+      ),
+    );
+  }
+
+  Widget _choiceCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+    String? badge,
   }) {
-    final fieldKey = GlobalKey();
-
-    void closeMenu() {
-      _dropdownOverlay?.remove();
-      _dropdownOverlay = null;
-    }
-
-    void openMenu() {
-      closeMenu();
-
-      final renderBox =
-          fieldKey.currentContext!.findRenderObject() as RenderBox;
-      final position = renderBox.localToGlobal(Offset.zero);
-      final size = renderBox.size;
-      final scrollController = ScrollController();
-
-      _dropdownOverlay = OverlayEntry(
-        builder: (context) {
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: GestureDetector(
-                  onTap: closeMenu,
-                  child: Container(color: Colors.transparent),
-                ),
-              ),
-              Positioned(
-                left: position.dx,
-                top: position.dy + size.height - 10,
-                width: size.width,
-                child: Material(
-                  color: Colors.transparent,
-                  child: Container(
-                    constraints: BoxConstraints(maxHeight: maxMenuHeight),
-                    decoration: BoxDecoration(
-  color: const Color(0xFFFFFFFF),
-  border: const Border(
-    left: BorderSide(color: Color(0xFF1E3A8A), width: 1.4),
-    right: BorderSide(color: Color(0xFF1E3A8A), width: 1.4),
-    bottom: BorderSide(color: Color(0xFF1E3A8A), width: 1.4),
-  ),
-  borderRadius: const BorderRadius.only(
-    bottomLeft: Radius.circular(10),
-    bottomRight: Radius.circular(10),
-  ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.18),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ScrollbarTheme(
-                      data: const ScrollbarThemeData(
-                        thumbColor: MaterialStatePropertyAll(Color(0xFF1E3A8A)),
-                        trackVisibility: MaterialStatePropertyAll(false),
-                      ),
-                      child: Scrollbar(
-                        controller: scrollController,
-                        thumbVisibility: true,
-                        thickness: 10,
-                        radius: const Radius.circular(10),
-                        child: ListView.builder(
-                          controller: scrollController,
-                          primary: false,
-                          padding: EdgeInsets.zero,
-                          shrinkWrap: true,
-                          itemCount: choices.length,
-                          itemBuilder: (context, index) {
-                            final choice = choices[index];
-                            final selected = choice == value;
-
-                            return InkWell(
-                              onTap: () {
-                                onSelected(choice);
-                                closeMenu();
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 9,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-  selected
-      ? Icons.check_circle_rounded
-      : Icons.circle_outlined,
-  color: selected
-      ? const Color(0xFFDC2626)
-      : const Color(0xFF1E3A8A),
-  size: 22,
-),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-  choice,
-  overflow: TextOverflow.ellipsis,
-  style: TextStyle(
-    color: selected
-        ? const Color(0xFFDC2626)
-        : const Color(0xFF1E3A8A),
-    fontSize: 13,
-    fontWeight: FontWeight.w800,
-  ),
-),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      );
-
-      Overlay.of(context).insert(_dropdownOverlay!);
-    }
-
     return GestureDetector(
-      key: fieldKey,
-      onTap: openMenu,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: const TextStyle(
-            color: Color(0xFF1E3A8A),
-            fontWeight: FontWeight.w700,
-          ),
-          floatingLabelStyle: const TextStyle(
-            color: Color(0xFF1E3A8A),
-            fontWeight: FontWeight.w700,
-          ),
-          filled: true,
-          fillColor: Colors.transparent,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 12,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 1.6),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 1.6),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 2),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? redRefColor : refColor,
+            width: selected ? 2.4 : 1.7,
           ),
         ),
         child: Row(
           children: [
+            Icon(
+              icon,
+              color: selected ? redRefColor : refColor,
+              size: 34,
+            ),
+            const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                value,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-  color: Color(0xFFDC2626),
-  fontSize: 16,
-  fontWeight: FontWeight.w700,
-),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (badge != null) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: redRefColor,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(
+                        badge,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: selected ? redRefColor : refColor,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: refColor,
+                      fontSize: 12,
+                      height: 1.25,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: Color(0xFFDC2626),
-              size: 26,
+            Icon(
+              selected
+                  ? Icons.check_circle_rounded
+                  : Icons.circle_outlined,
+              color: selected ? redRefColor : refColor,
             ),
           ],
         ),
@@ -575,13 +667,611 @@ String _formatContactName(String value) {
     );
   }
 
-Widget _multiChoiceDropdownField({
-  required String label,
-  required List<String> selectedValues,
-  required List<String> choices,
-  required ValueChanged<List<String>> onChanged,
-  double maxMenuHeight = 220,
+  Widget _visibilitySelector() {
+  return Column(
+    children: [
+      _sectionTitle('CHOISISSEZ VOTRE VISIBILITÉ'),
+      const SizedBox(height: 10),
+
+      Row(
+        children: [
+          Expanded(
+            child: _visualVisibilityCard(
+              title: 'Carte SPHOTS',
+              subtitle: 'Visible lors de la navigation sur la carte principale.',
+              icon: Icons.map_rounded,
+              selected: _visibility == 'map',
+              onTap: () => setState(() => _visibility = 'map'),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _visualVisibilityCard(
+  title: 'SPHOT',
+  subtitle: 'Visible directement sur la fiche détaillée d’un SPHOT.',
+  icon: Icons.location_on_rounded,
+  selected: _visibility == 'premium',
+  onTap: () => setState(() => _visibility = 'premium'),
+),
+          ),
+        ],
+      ),
+
+      const SizedBox(height: 12),
+
+      _packVisibilityCard(),
+    ],
+  );
+}
+
+Widget _visualVisibilityCard({
+  required String title,
+  required String subtitle,
+  required IconData icon,
+  required bool selected,
+  required VoidCallback onTap,
 }) {
+  return GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: selected ? redRefColor : refColor,
+          width: selected ? 2.4 : 1.7,
+        ),
+      ),
+      child: Column(
+        children: [
+          _phoneMockup(),
+          const SizedBox(height: 10),
+          Icon(
+            icon,
+            color: selected ? redRefColor : refColor,
+            size: 30,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: selected ? redRefColor : refColor,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: refColor,
+              fontSize: 12,
+              height: 1.25,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Icon(
+            selected ? Icons.radio_button_checked : Icons.radio_button_off,
+            color: selected ? redRefColor : refColor,
+            size: 28,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _packVisibilityCard() {
+  final selected = _visibility == 'pack';
+
+  return GestureDetector(
+    onTap: () => setState(() => _visibility = 'pack'),
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: redRefColor,
+          width: selected ? 2.8 : 2,
+        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: redRefColor,
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: const Text(
+              'RECOMMANDÉ',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _phoneMockup()),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.stars_rounded,
+                      color: redRefColor,
+                      size: 34,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Pack Visibilité Totale',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: selected ? redRefColor : refColor,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Présence simultanée sur la carte et les fiches SPHOTS.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: refColor,
+                        fontSize: 13,
+                        height: 1.3,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _packBullet('Maximisez votre visibilité'),
+                    _packBullet('Touchez plus d’utilisateurs'),
+                    _packBullet('Le meilleur impact'),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: _phoneMockup()),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Icon(
+            selected ? Icons.radio_button_checked : Icons.radio_button_off,
+            color: redRefColor,
+            size: 30,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _packBullet(String text) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 5),
+    child: Row(
+      children: [
+        const Icon(
+          Icons.check_circle_rounded,
+          color: redRefColor,
+          size: 18,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: refColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _phoneMockup() {
+  final screenWidth = MediaQuery.of(context).size.width;
+  final bool compactWeb = kIsWeb && screenWidth > 700;
+
+  return Center(
+    child: SizedBox(
+      width: compactWeb ? 92 : null,
+      child: AspectRatio(
+        aspectRatio: 0.58,
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.25),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  'data/images/map_background.jpg',
+                  fit: BoxFit.cover,
+                ),
+                Container(color: Colors.white.withOpacity(0.10)),
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Image.asset(
+                      'data/icons/title.png',
+                      height: compactWeb ? 16 : 22,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 8,
+                  right: 8,
+                  bottom: compactWeb ? 26 : 38,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.72),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'PUBLICITÉ LOCALE\nCamping • Surf Shop • Restaurant',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: refColor,
+                        fontSize: compactWeb ? 6 : 8,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+  Widget _broadcastSelector() {
+  return Column(
+    children: [
+      _sectionTitle('CHOISISSEZ VOTRE DIFFUSION'),
+      const SizedBox(height: 10),
+      _choiceCard(
+        title: 'Diffusion locale',
+        subtitle:
+            'Positionnez votre SPHOT publicitaire ci-dessous et définissez son rayon d’action.',
+        icon: Icons.radar_rounded,
+        selected: _broadcastType == 'local',
+        onTap: () => setState(() => _broadcastType = 'local'),
+      ),
+      _choiceCard(
+        title: 'Diffusion nationale',
+        subtitle: 'Diffusez sur l’ensemble des SPHOTS nationaux.',
+        icon: Icons.public_rounded,
+        badge: 'NATIONAL',
+        selected: _broadcastType == 'national',
+        onTap: () => setState(() => _broadcastType = 'national'),
+      ),
+    ],
+  );
+}
+
+  Widget _visualMapSimulator() {
+  return Column(
+    children: [
+      _sectionTitle('POSITIONNEZ VOTRE SPHOT PUBLICITAIRE'),
+      const SizedBox(height: 8),
+
+      Row(
+        children: [
+          Expanded(
+            child: _field(
+              controller: _centerCityController,
+              label: 'SPHOT de référence',
+              requiredField: _broadcastType == 'local',
+              uppercase: true,
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            height: 52,
+            width: 52,
+            child: OutlinedButton(
+              onPressed: _searchingPlace ? null : _searchReferencePlace,
+              style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.zero,
+                side: const BorderSide(color: refColor, width: 2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: _searchingPlace
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(
+                      Icons.search_rounded,
+                      color: redRefColor,
+                      size: 28,
+                    ),
+            ),
+          ),
+        ],
+      ),
+
+      const SizedBox(height: 12),
+
+      const Text(
+        'Déplacez la carte, zoomez, puis cliquez pour positionner votre SPHOT publicitaire.',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: refColor,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+
+      const SizedBox(height: 12),
+
+      Center(
+        child: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.82,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: refColor, width: 2),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: AspectRatio(
+                aspectRatio: 1.65,
+                child: FlutterMap(
+                  mapController: _adMapController,
+                  options: MapOptions(
+                    initialCenter: _adCenter,
+                    initialZoom: 6,
+                    minZoom: 4,
+                    maxZoom: 18,
+                    onTap: (tapPosition, point) {
+                      setState(() {
+                        _adCenter = point;
+                      });
+                    },
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.bathing_spots_app',
+                    ),
+                    CircleLayer(
+                      circles: [
+                        CircleMarker(
+  point: _circleCenter,
+  radius: _radiusKm == 0 ? 1 : _radiusKm * 1000,
+  useRadiusInMeter: true,
+  color: redRefColor.withOpacity(0.12),
+  borderColor: redRefColor,
+  borderStrokeWidth: 2,
+),
+                      ],
+                    ),
+                    MarkerLayer(
+  markers: [
+    Marker(
+  point: _adCenter,
+  width: 60,
+  height: 60,
+  alignment: Alignment.center,
+  child: Transform.translate(
+    offset: const Offset(0, -28),
+    child: Image.asset(
+      'data/icons/fire_red_icon.png',
+      fit: BoxFit.contain,
+    ),
+  ),
+),
+  ],
+),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+
+      const SizedBox(height: 12),
+
+      _radiusSelector(),
+    ],
+  );
+}
+
+  Widget _radiusSelector() {
+  return Column(
+    children: [
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        alignment: WrapAlignment.center,
+        children: _radiusChoices.map((radius) {
+          final selected = _radiusKm == radius;
+
+          return OutlinedButton(
+            onPressed: () => setState(() => _radiusKm = radius),
+            style: OutlinedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              foregroundColor: selected ? redRefColor : refColor,
+              side: BorderSide(
+                color: selected ? redRefColor : refColor,
+                width: selected ? 2.2 : 1.5,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            child: Text(
+              '$radius km',
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          );
+        }).toList(),
+      ),
+      const SizedBox(height: 16),
+     
+    ],
+  );
+}
+
+  Widget _durationSelector() {
+  String formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
+  }
+
+  return Column(
+    children: [
+      _sectionTitle('CHOISISSEZ VOTRE DURÉE'),
+      const SizedBox(height: 10),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        alignment: WrapAlignment.center,
+        children: _durationChoices.map((duration) {
+          final selected = _duration == duration;
+
+          return OutlinedButton(
+            onPressed: () => setState(() => _duration = duration),
+            style: OutlinedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              foregroundColor: selected ? redRefColor : refColor,
+              side: BorderSide(
+                color: selected ? redRefColor : refColor,
+                width: selected ? 2.2 : 1.5,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: Text(
+              duration.toUpperCase(),
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          );
+        }).toList(),
+      ),
+      const SizedBox(height: 16),
+      SizedBox(
+  width: 240,
+  height: 42,
+  child: OutlinedButton.icon(
+    onPressed: () async {
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: _campaignStartDate,
+        firstDate: DateTime.now(),
+        lastDate: DateTime.now().add(const Duration(days: 730)),
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: redRefColor,
+                onPrimary: Colors.white,
+                onSurface: refColor,
+              ),
+            ),
+            child: child!,
+          );
+        },
+      );
+
+      if (picked != null) {
+        setState(() {
+          _campaignStartDate = picked;
+        });
+      }
+    },
+    icon: const Icon(
+      Icons.calendar_month_rounded,
+      color: redRefColor,
+    ),
+    label: Text(
+      'Début : ${formatDate(_campaignStartDate)}',
+      style: const TextStyle(
+        color: redRefColor,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+    style: OutlinedButton.styleFrom(
+      side: const BorderSide(
+        color: refColor,
+        width: 2,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+    ),
+  ),
+),
+      const SizedBox(height: 10),
+      SizedBox(
+  width: 240,
+  height: 42,
+  child: OutlinedButton(
+    onPressed: null,
+    style: OutlinedButton.styleFrom(
+      disabledForegroundColor: redRefColor,
+      side: const BorderSide(
+        color: refColor,
+        width: 2,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+    ),
+    child: Text(
+      'Fin : ${formatDate(_campaignEndDate)}',
+      style: const TextStyle(
+        color: redRefColor,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  ),
+),
+    ],
+  );
+}
+
+  Widget _categorySelector() {
   final fieldKey = GlobalKey();
 
   void closeMenu() {
@@ -600,120 +1290,108 @@ Widget _multiChoiceDropdownField({
 
     _dropdownOverlay = OverlayEntry(
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, overlaySetState) {
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: GestureDetector(
-                    onTap: closeMenu,
-                    child: Container(color: Colors.transparent),
-                  ),
-                ),
-                Positioned(
-                  left: position.dx,
-                  top: position.dy + size.height - 10,
-                  width: size.width,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: Container(
-                      constraints: BoxConstraints(maxHeight: maxMenuHeight),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.92),
-                        border: const Border(
-                          left: BorderSide(color: Color(0xFFDC2626), width: 1.4),
-                          right: BorderSide(color: Color(0xFFDC2626), width: 1.4),
-                          bottom: BorderSide(color: Color(0xFFDC2626), width: 1.4),
-                        ),
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(10),
-                          bottomRight: Radius.circular(10),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.18),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: closeMenu,
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+            Positioned(
+              left: position.dx,
+              top: position.dy + size.height - 10,
+              width: size.width,
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  constraints: const BoxConstraints(maxHeight: 240),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.92),
+                    border: const Border(
+                      left: BorderSide(color: refColor, width: 1.4),
+                      right: BorderSide(color: refColor, width: 1.4),
+                      bottom: BorderSide(color: refColor, width: 1.4),
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(10),
+                      bottomRight: Radius.circular(10),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.18),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
                       ),
-                      child: ScrollbarTheme(
-                        data: const ScrollbarThemeData(
-                          thumbColor: MaterialStatePropertyAll(refColor),
-                          trackVisibility: MaterialStatePropertyAll(false),
-                        ),
-                        child: Scrollbar(
-                          controller: scrollController,
-                          thumbVisibility: true,
-                          thickness: 10,
-                          radius: const Radius.circular(10),
-                          child: ListView.builder(
-                            controller: scrollController,
-                            primary: false,
-                            padding: EdgeInsets.zero,
-                            shrinkWrap: true,
-                            itemCount: choices.length,
-                            itemBuilder: (context, index) {
-                              final choice = choices[index];
-                              final selected =
-                                  selectedValues.contains(choice);
+                    ],
+                  ),
+                  child: ScrollbarTheme(
+                    data: const ScrollbarThemeData(
+                      thumbColor: MaterialStatePropertyAll(refColor),
+                      trackVisibility: MaterialStatePropertyAll(false),
+                    ),
+                    child: Scrollbar(
+                      controller: scrollController,
+                      thumbVisibility: true,
+                      thickness: 10,
+                      radius: const Radius.circular(10),
+                      child: ListView.builder(
+                        controller: scrollController,
+                        primary: false,
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        itemCount: _categoryChoices.length,
+                        itemBuilder: (context, index) {
+                          final choice = _categoryChoices[index];
+                          final selected = choice == _category;
 
-                              return InkWell(
-                                onTap: () {
-  final updated = [...selectedValues];
-
-  if (selected) {
-    if (updated.length > 1) {
-      updated.remove(choice);
-    }
-  } else {
-    updated.add(choice);
-  }
-
-  onChanged(updated);
-  overlaySetState(() {});
-},
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 9,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        selected
-                                            ? Icons.check_box_rounded
-                                            : Icons
-                                                .check_box_outline_blank_rounded,
-                                        color: const Color(0xFFDC2626),
-                                        size: 22,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          choice,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            color: Color(0xFFDC2626),
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
+                          return InkWell(
+                            onTap: () {
+                              setState(() {
+                                _category = choice;
+                              });
+                              closeMenu();
                             },
-                          ),
-                        ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 9,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    selected
+                                        ? Icons.check_circle_rounded
+                                        : Icons.circle_outlined,
+                                    color: selected ? redRefColor : refColor,
+                                    size: 22,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      choice,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: selected
+                                            ? redRefColor
+                                            : refColor,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
                 ),
-              ],
-            );
-          },
+              ),
+            ),
+          ],
         );
       },
     );
@@ -721,20 +1399,18 @@ Widget _multiChoiceDropdownField({
     Overlay.of(context).insert(_dropdownOverlay!);
   }
 
-  final displayText = selectedValues.join(' | ');
-
   return GestureDetector(
     key: fieldKey,
     onTap: openMenu,
     child: InputDecorator(
       decoration: InputDecoration(
-        labelText: label,
+        labelText: 'Catégorie publicitaire',
         labelStyle: const TextStyle(
-          color: Color(0xFFDC2626),
+          color: refColor,
           fontWeight: FontWeight.w700,
         ),
         floatingLabelStyle: const TextStyle(
-          color: Color(0xFFDC2626),
+          color: refColor,
           fontWeight: FontWeight.w700,
         ),
         filled: true,
@@ -745,39 +1421,33 @@ Widget _multiChoiceDropdownField({
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.6),
+          borderSide: const BorderSide(color: refColor, width: 1.6),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.6),
+          borderSide: const BorderSide(color: refColor, width: 1.6),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFDC2626), width: 2),
+          borderSide: const BorderSide(color: refColor, width: 2),
         ),
       ),
       child: Row(
         children: [
           Expanded(
             child: Text(
-              displayText,
+              _category,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: Color(0xFFDC2626),
+                color: redRefColor,
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
           const Icon(
-            Icons.checklist_rounded,
-            color: Color(0xFFDC2626),
-            size: 24,
-          ),
-          const SizedBox(width: 2),
-          const Icon(
             Icons.keyboard_arrow_down_rounded,
-            color: Color(0xFFDC2626),
+            color: redRefColor,
             size: 26,
           ),
         ],
@@ -786,359 +1456,159 @@ Widget _multiChoiceDropdownField({
   );
 }
 
-String _offerKey(String placement, String target, String duration) {
-  return '$placement|$target|$duration';
-}
+  Widget _summary(Map<String, dynamic>? pricing) {
+    final price = _campaignPrice(pricing);
 
-List<String> _selectedPlacementsFromOffers() {
-  return _selectedOfferKeys
-      .map((key) => key.split('|')[0])
-      .toSet()
-      .toList();
-}
-
-List<String> _selectedTargetsFromOffers() {
-  return _selectedOfferKeys
-      .map((key) => key.split('|')[1])
-      .toSet()
-      .toList();
-}
-
-List<String> _selectedDurationsFromOffers() {
-  return _selectedOfferKeys
-      .map((key) => key.split('|')[2])
-      .toSet()
-      .toList();
-}
-
-Widget _pricingTable(
-  Map<String, Map<String, Map<String, int>>> pricing,
-) {
-  return Column(
-    children: [
-      const Text(
-        'CHOISISSEZ VOTRE TARIF',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: Color(0xFF1E3A8A),
-          fontSize: 15,
-          fontWeight: FontWeight.w900,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: redRefColor,
+          width: 2.3,
         ),
       ),
-      const SizedBox(height: 8),
-      ..._placementChoices.map((placement) {
-        final title = placement == 'Carte SPHOT'
-            ? 'CARTE DES SPHOTS'
-            : 'FICHE DE SPHOT';
-
-        return Container(
-  width: double.infinity,
-  margin: const EdgeInsets.only(bottom: sectionSpacing),
-  padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: const Color(0x00000000),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: const Color(0xFF1E3A8A),
-              width: 2,
+      child: Column(
+        children: [
+          const Text(
+            'RÉSUMÉ DE VOTRE CAMPAGNE',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: refColor,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
             ),
           ),
-          child: Column(
-            children: [
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: 'EMPLACEMENT: ',
-                      style: TextStyle(
-                        color: Color(0xFFDC2626),
-                      ),
-                    ),
-                    TextSpan(
-                      text: title,
-                      style: const TextStyle(
-                        color: Color(0xFFDC2626),
-                      ),
-                    ),
-                  ],
-                ),
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 6),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  const zoneWidth = 62.0;
-const cellSpacing = 6.0;
-
-final availableWidth = constraints.maxWidth -
-    zoneWidth -
-    (cellSpacing * 4);
-
-final priceWidth = (availableWidth / 4) - 2;
-
-                  return Table(
-  columnWidths: {
-    0: const FixedColumnWidth(zoneWidth),
-    1: FixedColumnWidth(priceWidth),
-    2: FixedColumnWidth(priceWidth),
-    3: FixedColumnWidth(priceWidth),
-    4: FixedColumnWidth(priceWidth),
-  },
-  
-                    defaultVerticalAlignment:
-                        TableCellVerticalAlignment.middle,
-                    children: [
-                      TableRow(
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.all(2),
-                            child: Text(
-                              'Zone',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Color(0xFF1E3A8A),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                          ..._durationChoices.map(
-                            (duration) => Padding(
-                              padding: const EdgeInsets.symmetric(
-  horizontal: 7,
-  vertical: 4,
-),
-                              child: Text(
-                                duration.replaceAll(' mois', 'm'),
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Color(0xFF1E3A8A),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      ..._targetChoices.map((target) {
-                        return TableRow(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-  horizontal: 7,
-  vertical: 4,
-),
-                              child: Text(
-                                target == 'Département'
-                                    ? 'Dépt.'
-                                    : target,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Color(0xFF1E3A8A),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                            ..._durationChoices.map((duration) {
-                              final price =
-                                  pricing[placement]?[target]?[duration] ?? 0;
-
-                              final key = _offerKey(placement, target, duration);
-final selected = _selectedOfferKeys.contains(key);
-
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(
-  horizontal: 7,
-  vertical: 4,
-),
-                                child: GestureDetector(
-                                  onTap: () {
-  setState(() {
-    final offerKey = _offerKey(placement, target, duration);
-
-    if (_selectedOfferKeys.contains(offerKey)) {
-      if (_selectedOfferKeys.length > 1) {
-        _selectedOfferKeys.remove(offerKey);
-      }
-    } else {
-      _selectedOfferKeys.add(offerKey);
-    }
-
-    _duration = duration;
-  });
-},
-                                  child: Container(
-                                    height: 26,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: selected
-                                          ? const Color(0xFFDC2626)
-                                              .withOpacity(0.14)
-                                          : const Color(0x00000000),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: selected
-                                            ? const Color(0xFFDC2626)
-                                            : const Color(0xFF1E3A8A),
-                                        width: selected ? 2.1 : 1.1,
-                                      ),
-                                    ),
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text(
-                                        price == 0 ? 'DEVIS' : '$price€',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: selected
-                                              ? const Color(0xFFDC2626)
-                                              : const Color(0xFF1E3A8A),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }),
-                          ],
-                        );
-                      }),
-                    ],
-                  );
-                },
-              ),
-            ],
+          const SizedBox(height: 12),
+          _summaryLine(Icons.visibility_rounded, _visibilityLabel()),
+          _summaryLine(
+            _broadcastType == 'national'
+                ? Icons.public_rounded
+                : Icons.location_on_rounded,
+            _broadcastType == 'national'
+                ? 'Diffusion nationale'
+                : '${_centerCityController.text.trim().isEmpty ? 'Épicentre à renseigner' : _centerCityController.text.trim()} • Rayon $_radiusKm km',
           ),
-        );
-      }),
-    ],
-  );
-}  
-
-  Widget _selectedPriceSummary(
-  Map<String, Map<String, Map<String, int>>> pricing,
-) {
-  final price = _selectedPrice(pricing);
-
-  final offersByPlacement = <String, List<String>>{};
-
-  for (final key in _selectedOfferKeys) {
-    final parts = key.split('|');
-
-    if (parts.length != 3) continue;
-
-    final placement = parts[0];
-    final target = parts[1];
-    final duration = parts[2];
-    final offerPrice = pricing[placement]?[target]?[duration] ?? 0;
-
-    offersByPlacement.putIfAbsent(placement, () => []);
-
-    offersByPlacement[placement]!.add(
-      offerPrice == 0
-          ? 'Zone : $target\nDurée : $duration\nTarif : sur devis'
-          : 'Zone : $target\nDurée : $duration\nTarif : $offerPrice € HT',
+          _summaryLine(Icons.calendar_month_rounded, _duration),
+          _summaryLine(Icons.category_rounded, _category),
+          const SizedBox(height: 14),
+          Text(
+            '$price € HT',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: redRefColor,
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Tarif estimatif soumis à validation SPHOT.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: refColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(
-        color: const Color(0xFF1E3A8A),
-        width: 2,
-      ),
-    ),
-    child: Column(
-      children: [
-        const Text(
-          'RÉSUMÉ DE LA DEMANDE',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Color(0xFF1E3A8A),
-            fontSize: 15,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: sectionSpacing),
-        ...offersByPlacement.entries.map((entry) {
-          return Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(bottom: sectionSpacing),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0x00000000),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: const Color(0xFF1E3A8A),
-                width: 1.4,
+  Widget _summaryLine(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        children: [
+          Icon(icon, color: redRefColor, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: refColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
               ),
             ),
-            child: Column(
-              children: [
-                Text(
-                  entry.key.toUpperCase(),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(0xFFDC2626),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ...entry.value.map((offerText) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      offerText,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Color(0xFFDC2626),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  );
-                }),
-              ],
-            ),
-          );
-        }),
-        
-const SizedBox(height: 12),
-        Text(
-          price == 0 ? 'TOTAL : sur devis' : 'TOTAL : $price € HT',
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Color(0xFFDC2626),
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
-  Future<void> _submit(
-    Map<String, Map<String, Map<String, int>>> pricing,
-  ) async {
+  Widget _adInfoTile({
+    required BuildContext context,
+    required String title,
+    required String text,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: const Color(0x00000000),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: refColor,
+          width: 2,
+        ),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+        ),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 2,
+          ),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          collapsedIconColor: redRefColor,
+          iconColor: redRefColor,
+          title: Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: refColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          children: [
+            Text(
+              text,
+              textAlign: TextAlign.justify,
+              style: const TextStyle(
+                color: refColor,
+                fontSize: 13,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit(Map<String, dynamic>? pricing) async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isSubmitting = true;
-    });
+    if (_broadcastType == 'local' &&
+        _centerCityController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Merci de renseigner votre commune de référence.'),
+        ),
+      );
+      return;
+    }
 
-    final price = _selectedPrice(pricing);
+    setState(() => _isSubmitting = true);
+
+    final price = _campaignPrice(pricing);
 
     await FirebaseFirestore.instance.collection('adRequests').add({
       'advertiserName': _companyController.text.trim(),
@@ -1149,309 +1619,317 @@ const SizedBox(height: 12),
       'message': _messageController.text.trim(),
       'category': _storageCategory(),
       'categoryLabel': _category,
-      'selectedOffers': _selectedOfferKeys.toList(),
-'placementLabels': _selectedPlacementsFromOffers(),
-'targetLabels': _selectedTargetsFromOffers(),
-'durationLabels': _selectedDurationsFromOffers(),
+      'visibilityType': _visibility,
+      'visibilityLabel': _visibilityLabel(),
+      'broadcastType': _broadcastType,
+      'centerCity': _broadcastType == 'local'
+          ? _centerCityController.text.trim()
+          : '',
+      'centerLat': _broadcastType == 'local' ? _adCenter.latitude : null,
+      'centerLng': _broadcastType == 'local' ? _adCenter.longitude : null,
+      'radiusKm': _broadcastType == 'local' ? _radiusKm : null,
+      'durationLabel': _duration,
+      'campaignStartDate': Timestamp.fromDate(
+  _campaignStartDate,
+),
+
+'campaignEndDate': Timestamp.fromDate(
+  _campaignEndDate,
+),
       'totalPriceExclTax': price,
       'status': 'pending_review',
-      'source': 'ad_banner_click',
+      'source': 'advertiser_portal',
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
+      'siren': _sirenController.text.trim(),
+      'siret': _siretController.text.trim(),
     });
 
     if (!mounted) return;
 
-setState(() {
-  _isSubmitting = true;
-});
+    setState(() => _isSubmitting = true);
 
-ScaffoldMessenger.of(context).showSnackBar(
-  const SnackBar(
-    content: Text('Demande publicitaire envoyée.'),
-  ),
-);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Demande publicitaire envoyée.'),
+      ),
+    );
   }
-
-Widget _adInfoTile({
-  required BuildContext context,
-  required String title,
-  required String text,
-}) {
-  return Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    decoration: BoxDecoration(
-      color: const Color(0x00000000),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(
-        color: const Color(0xFF1E3A8A),
-        width: 2,
-      ),
-    ),
-    child: Theme(
-      data: Theme.of(context).copyWith(
-        dividerColor: Colors.transparent,
-      ),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 2,
-        ),
-        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-        collapsedIconColor: const Color(0xFFDC2626),
-iconColor: const Color(0xFFDC2626),
-        title: Text(
-          title,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Color(0xFF1E3A8A),
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        children: [
-          Text(
-            text,
-            textAlign: TextAlign.justify,
-            style: const TextStyle(
-              color: Color(0xFF1E3A8A),
-              fontSize: 13,
-              height: 1.45,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
-          .collection('adPricing')
-          .doc('default')
+          .collection('settings')
+          .doc('advertisingPricing')
           .snapshots(),
       builder: (context, snapshot) {
-        final pricing = _pricingFromFirestore(snapshot.data?.data());
+        final pricing = snapshot.data?.data();
 
         return Scaffold(
-  backgroundColor: const Color(0x00000000),
-  body: Stack(
-    fit: StackFit.expand,
-    children: [
-      Image.asset(
-        'data/images/map_background.jpg',
-        fit: BoxFit.cover,
-      ),
-      SafeArea(
-        child: Column(
-          children: [
-            SizedBox(
-              height: 58,
-              child: Center(
-                child: Image.asset(
-                  'data/icons/title.png',
-                  height: 58,
-                  fit: BoxFit.contain,
-                ),
+          backgroundColor: const Color(0x00000000),
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                'data/images/map_background.jpg',
+                fit: BoxFit.cover,
               ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-            padding: const EdgeInsets.all(18),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  const Text(
-                    'DEMANDE PUBLICITAIRE',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Color(0xFFDC2626),
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
+              SafeArea(
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: 58,
+                      child: Center(
+                        child: Image.asset(
+                          'data/icons/title.png',
+                          height: 58,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: sectionSpacing),
-                  _field(
-                    controller: _companyController,
-                    label: 'Entreprise / marque',
-                    requiredField: true,
-                    uppercase: true,                    
-                  ),
-                  const SizedBox(height: sectionSpacing),
-                  _field(
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(18),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            children: [
+                              const Text(
+                                'FAITES RAYONNER VOTRE ACTIVITÉ !',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: redRefColor,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: sectionSpacing),
+                              _adInfoTile(
+                                context: context,
+                                title: 'COMMENT FONCTIONNE LA DIFFUSION ?',
+                                text:
+                                    'Choisissez votre visibilité : Carte SPHOT, Fiche SPHOT Premium ou Pack Visibilité Totale.\n\n'
+                                    'Pour une campagne locale, vous positionnez un épicentre et choisissez un rayon d’action. Votre publicité pourra être diffusée sur les SPHOTS situés dans ce rayon.\n\n'
+                                    'Pour une campagne nationale, aucun épicentre n’est nécessaire : votre publicité peut apparaître sur l’ensemble des SPHOTS.',
+                              ),
+                              _field(
+  controller: _companyController,
+  label: 'Entreprise / marque',
+  requiredField: true,
+  uppercase: true,
+),
+                              const SizedBox(height: sectionSpacing),
+                              _field(
   controller: _contactController,
   label: 'NOM Prénom du contact',
   requiredField: true,
   contactName: true,
 ),
-                  const SizedBox(height: sectionSpacing),
-                  _field(
-                    controller: _emailController,
-                    label: 'Email',
-                    requiredField: true,
-                  ),
-                  const SizedBox(height: sectionSpacing),
-                  _field(
-                    controller: _phoneController,
-                    label: 'Téléphone',
-                    phone: true,
-                  ),
-                  const SizedBox(height: sectionSpacing),
-                  _field(
-                    controller: _websiteController,
-                    label: 'Site internet',
-                  ),
-                  const SizedBox(height: sectionSpacing),
-                  _dropdownField(
-                    label: 'Catégorie publicitaire',
-                    value: _category,
-                    choices: _categoryChoices,
-                    onSelected: (value) {
-                      setState(() {
-                        _category = value;
-                      });
-                    },
-                  ),
-                  
-                  const SizedBox(height: sectionSpacing),
+                              const SizedBox(height: sectionSpacing),
+                              _field(
+                                controller: _emailController,
+                                label: 'Email',
+                                requiredField: true,
+                              ),
+                              const SizedBox(height: sectionSpacing),
+                              _field(
+                                controller: _phoneController,
+                                label: 'Téléphone',
+                                phone: true,
+                              ),
+                              const SizedBox(height: sectionSpacing),
+                              _field(
+                                controller: _websiteController,
+                                label: 'Site internet',
+                              ),
+                              const SizedBox(height: sectionSpacing),
 
-_adInfoTile(
-  context: context,
-  title: 'COMMENT FONCTIONNE LA DIFFUSION DES PUBLICITÉS ?',
-  text:
-      'SPHOT diffuse les publicités selon leur emplacement et leur zone géographique.\n\n'
-      'Pour la carte des SPHOTS, la publicité affichée dépend du territoire consulté et du niveau de zoom.\n\n'
-      'Pour la fiche d’un SPHOT, la publicité affichée dépend du SPHOT ouvert et de son territoire : commune, département, région ou pays.\n\n'
-      'Les publicités locales sont prioritaires sur les campagnes plus larges.\n\n'
-      'Ordre de priorité : Commune → Département → Région → National.\n\n'
-      'Ainsi, les campagnes nationales ne bloquent pas les campagnes locales : elles complètent les espaces lorsqu’aucune publicité locale prioritaire n’est disponible.',
+_field(
+  controller: _sirenController,
+  label: 'SIREN issu de ProConnect',
+  requiredField: true,
 ),
-
-_adInfoTile(
-  context: context,
-  title: 'COMMENT SONT RÉPARTIS LES AFFICHAGES ?',
-  text:
-      'Lorsqu’un seul annonceur est actif sur une zone et un emplacement, sa publicité peut être affichée prioritairement sur cette zone.\n\n'
-      'Lorsqu’il existe plusieurs annonceurs actifs sur une même zone, les affichages sont répartis automatiquement entre eux.\n\n'
-      'Cette rotation permet à plusieurs annonceurs locaux de coexister sur une même commune, un même département ou un même emplacement.\n\n'
-      'La diffusion tient compte de l’emplacement choisi, de la zone géographique, de la durée de campagne et des campagnes déjà actives.',
-),
-
-_adInfoTile(
-  context: context,
-  title: 'POURQUOI CHOISIR UNE DIFFUSION LOCALE ?',
-  text:
-      'Une campagne locale permet de toucher un public géographiquement qualifié : baigneurs, familles, touristes, pratiquants de sports nautiques ou usagers du littoral.\n\n'
-      'Les campagnes communales sont les plus ciblées.\n\n'
-      'Les campagnes départementales, régionales et nationales permettent d’élargir progressivement la visibilité.\n\n'
-      'Le tarif varie donc selon l’emplacement choisi, la zone de diffusion et la durée de la campagne.',
-),
-
-_pricingTable(pricing),
-
-_selectedPriceSummary(pricing),
 
 const SizedBox(height: sectionSpacing),
 
 _field(
-  controller: _messageController,
-  label: 'Message / précision',
-  maxLines: 4,
+  controller: _siretController,
+  label: 'SIRET issu de ProConnect',
+  requiredField: true,
+),
+                              const SizedBox(height: sectionSpacing),
+                              _categorySelector(),
+                              const SizedBox(height: sectionSpacing),
+                              _visibilitySelector(),
+                              const SizedBox(height: sectionSpacing),
+                              _broadcastSelector(),
+
+const SizedBox(height: 4),
+
+AnimatedSwitcher(
+  duration: const Duration(milliseconds: 180),
+  child: _broadcastType == 'local'
+      ? _visualMapSimulator()
+      : const SizedBox.shrink(),
 ),
 
-const SizedBox(height: sectionSpacing),
+const SizedBox(height: 2),
 
-SizedBox(
-  width: double.infinity,
-  height: 48,
-  child: ElevatedButton.icon(
-    onPressed: _isSubmitting ? null : () => _submit(pricing),
-    icon: _isSubmitting
-        ? const Icon(
-            Icons.check_circle_rounded,
-            color: Color(0xFFFFFFFF),
-          )
-        : const Icon(
-            Icons.send_rounded,
-            color: Color(0xFF1E3A8A),
-          ),
-    label: Text(
-      _isSubmitting ? 'DEMANDE ENVOYÉE' : 'ENVOYER LA DEMANDE',
-      style: TextStyle(
-        color: _isSubmitting
-            ? const Color(0xFFFFFFFF)
-            : const Color(0xFF1E3A8A),
-        fontWeight: FontWeight.w900,
-      ),
-    ),
-    style: ElevatedButton.styleFrom(
-      backgroundColor: _isSubmitting
-          ? const Color(0xFFDC2626)
-          : const Color(0x00000000),
-      disabledBackgroundColor: const Color(0xFFDC2626),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: _isSubmitting
-              ? const Color(0xFFDC2626)
-              : const Color(0xFF1E3A8A),
-          width: 2,
-        ),
-      ),
-    ),
-  ),
-),
-                ],
-              ),
-            ),
+_durationSelector(),
+                              const SizedBox(height: sectionSpacing),
+                              _summary(pricing),
+                              const SizedBox(height: sectionSpacing),
+                              _field(
+                                controller: _messageController,
+                                label: 'Message / précision',
+                                maxLines: 4,
+                              ),
+                              const SizedBox(height: sectionSpacing),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 48,
+                                child: ElevatedButton.icon(
+                                  onPressed: _isSubmitting
+                                      ? null
+                                      : () => _submit(pricing),
+                                  icon: _isSubmitting
+                                      ? const Icon(
+                                          Icons.check_circle_rounded,
+                                          color: Colors.white,
+                                        )
+                                      : const Icon(
+                                          Icons.send_rounded,
+                                          color: refColor,
+                                        ),
+                                  label: Text(
+                                    _isSubmitting
+                                        ? 'DEMANDE ENVOYÉE'
+                                        : 'ENVOYER LA DEMANDE',
+                                    style: TextStyle(
+                                      color: _isSubmitting
+                                          ? Colors.white
+                                          : refColor,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _isSubmitting
+                                        ? redRefColor
+                                        : Colors.transparent,
+                                    disabledBackgroundColor: redRefColor,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      side: BorderSide(
+                                        color: _isSubmitting
+                                            ? redRefColor
+                                            : refColor,
+                                        width: 2,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-            ),
-            const SizedBox(height: sectionSpacing),
-Container(
-  width: 40,
-  height: 40,
-  margin: const EdgeInsets.only(bottom: sectionSpacing),
-  decoration: BoxDecoration(
-    color: const Color(0x00000000),
-    shape: BoxShape.circle,
-    border: Border.all(
-      color: const Color(0xFF1E3A8A),
-      width: 2,
-    ),
-  ),
-  child: Material(
-    color: const Color(0x00000000),
-    shape: const CircleBorder(),
-    child: InkWell(
-      customBorder: const CircleBorder(),
-      onTap: () {
-        Navigator.of(context).maybePop();
-      },
-      child: const Center(
-        child: Icon(
-          Icons.arrow_back_ios_new_rounded,
-          color: Color(0xFF1E3A8A),
-          size: 22,
-        ),
-      ),
-    ),
-  ),
-),
-const SizedBox(height: sectionSpacing),
-          ],
-        ),
-      ),
-    ],
-  ),
-);
+                      ),
+                    ),
+                    const SizedBox(height: sectionSpacing),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      margin: const EdgeInsets.only(bottom: sectionSpacing),
+                      decoration: BoxDecoration(
+                        color: const Color(0x00000000),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: refColor,
+                          width: 2,
+                        ),
+                      ),
+                      child: Material(
+                        color: const Color(0x00000000),
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () {
+                            Navigator.of(context).maybePop();
+                          },
+                          child: const Center(
+                            child: Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              color: refColor,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
       },
     );
   }
+}
+
+class _MapGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = const Color(0xFF1E3A8A).withOpacity(0.28)
+      ..strokeWidth = 1;
+
+    final roadPaint = Paint()
+      ..color = const Color(0xFFDC2626).withOpacity(0.26)
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round;
+
+    for (var i = 1; i < 6; i++) {
+      final dx = size.width * i / 6;
+      canvas.drawLine(Offset(dx, 0), Offset(dx, size.height), linePaint);
+    }
+
+    for (var i = 1; i < 4; i++) {
+      final dy = size.height * i / 4;
+      canvas.drawLine(Offset(0, dy), Offset(size.width, dy), linePaint);
+    }
+
+    final path = Path()
+      ..moveTo(0, size.height * 0.75)
+      ..quadraticBezierTo(
+        size.width * 0.35,
+        size.height * 0.35,
+        size.width,
+        size.height * 0.55,
+      );
+
+    canvas.drawPath(path, roadPaint);
+
+    final coastPaint = Paint()
+      ..color = const Color(0xFF1E3A8A).withOpacity(0.34)
+      ..strokeWidth = 5
+      ..style = PaintingStyle.stroke;
+
+    final coast = Path()
+      ..moveTo(0, size.height * 0.20)
+      ..quadraticBezierTo(
+        size.width * 0.40,
+        size.height * 0.05,
+        size.width,
+        size.height * 0.18,
+      );
+
+    canvas.drawPath(coast, coastPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class PhoneNumberFormatter extends TextInputFormatter {
