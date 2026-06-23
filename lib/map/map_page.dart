@@ -1416,18 +1416,17 @@ Widget _buildAdBanner() {
             const SizedBox(width: 12),
 
             ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                width: 52,
-                height: 52,
-                color: Colors.blueGrey.withOpacity(0.08),
-                child: const Icon(
-                  Icons.campaign,
-                  size: 28,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
+  borderRadius: BorderRadius.circular(10),
+  child: Container(
+    width: 52,
+    height: 52,
+    color: Colors.transparent,
+    child: Image.asset(
+      'data/icons/fire_black_icon.png',
+      fit: BoxFit.contain,
+    ),
+  ),
+),
 
             const SizedBox(width: 12),
 
@@ -1437,7 +1436,7 @@ Widget _buildAdBanner() {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'PUBLICITÉ LOCALE',
+  'AJOUTE TON SPHOT PUBLICITAIRE ICI !',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -1447,17 +1446,7 @@ Widget _buildAdBanner() {
                       letterSpacing: 0.2,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Camping • Surf Shop • Restaurant',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black.withOpacity(0.65),
-                    ),
-                  ),
+                  
                 ],
               ),
             ),

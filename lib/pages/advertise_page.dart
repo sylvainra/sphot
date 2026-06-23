@@ -9,6 +9,9 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 
 class AdvertisePage extends StatefulWidget {
@@ -37,8 +40,15 @@ final _companyController = TextEditingController();
   final _messageController = TextEditingController();
   final _sirenController = TextEditingController();
   final _siretController = TextEditingController();
+  final ImagePicker _imagePicker = ImagePicker();
 
-  String _category = 'Protection solaire';
+Uint8List? _bannerBytes;
+String? _bannerFileName;
+String? _bannerFileExtension;
+String? _bannerMimeType;
+int? _bannerFileSizeBytes;
+
+  String _category = '';
   String _visibility = 'pack';
   String _broadcastType = 'local';
   String _duration = '15 jours';
@@ -112,17 +122,20 @@ DateTime get _campaignEndDate {
 }
 
   final List<String> _categoryChoices = [
-    'Protection solaire',
-    'Optique / lunettes',
-    'Surfwear / prêt-à-porter',
-    'Sports nautiques',
-    'Tourisme',
-    'Restauration',
-    'Hébergement',
-    'Commerce local',
-    'Institutionnel',
-    'Autre',
-  ];
+  'Cosmétique',
+  'Optique / lunettes',
+  'Surfwear / prêt-à-porter',
+  'Sports nautiques',
+  'Tourisme',
+  'Restauration',
+  'Produits alimentaires',
+  'Boissons',
+  'Hôtellerie',
+  'Hôtellerie de plein air',
+  'Commerce local',
+  'Institutionnel',
+  'Autre',
+];
 
   final List<String> _durationChoices = [
     '15 jours',
@@ -252,29 +265,80 @@ DateTime get _campaignEndDate {
   }
 
   String _storageCategory() {
-    switch (_category) {
-      case 'Protection solaire':
-        return 'sun_care';
-      case 'Optique / lunettes':
-        return 'optics';
-      case 'Surfwear / prêt-à-porter':
-        return 'surfwear';
-      case 'Sports nautiques':
-        return 'watersports';
-      case 'Tourisme':
-        return 'tourism';
-      case 'Restauration':
-        return 'food';
-      case 'Hébergement':
-        return 'accommodation';
-      case 'Commerce local':
-        return 'local_business';
-      case 'Institutionnel':
-        return 'institutional';
-      default:
-        return 'other';
-    }
+  switch (_category) {
+    case 'Cosmétique':
+      return 'cosmetics';
+
+    case 'Optique / lunettes':
+      return 'optics';
+
+    case 'Surfwear / prêt-à-porter':
+      return 'surfwear';
+
+    case 'Sports nautiques':
+      return 'watersports';
+
+    case 'Tourisme':
+      return 'tourism';
+
+    case 'Restauration':
+      return 'restaurant';
+
+    case 'Produits alimentaires':
+      return 'food_products';
+
+    case 'Boissons':
+      return 'beverages';
+
+    case 'Hôtellerie':
+      return 'hotel';
+
+    case 'Hôtellerie de plein air':
+      return 'camping';
+
+    case 'Commerce local':
+      return 'local_business';
+
+    case 'Institutionnel':
+      return 'institutional';
+
+    default:
+      return 'other';
   }
+}
+
+Future<void> _pickBannerImage() async {
+  final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+
+  if (picked == null) return;
+
+  final bytes = await picked.readAsBytes();
+
+  setState(() {
+    _bannerBytes = bytes;
+  });
+}
+
+void _openBannerPreview() {
+  if (_bannerBytes == null) return;
+
+  showDialog(
+    context: context,
+    builder: (_) {
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        child: InteractiveViewer(
+          minScale: 1,
+          maxScale: 5,
+          child: Image.memory(
+            _bannerBytes!,
+            fit: BoxFit.contain,
+          ),
+        ),
+      );
+    },
+  );
+}
 
 Future<void> _searchReferencePlace() async {
   final query = _centerCityController.text.trim();
@@ -689,7 +753,9 @@ focusedErrorBorder: OutlineInputBorder(
             child: _visualVisibilityCard(
   title: 'SPHOT',
   subtitle: 'Visible directement sur la fiche détaillée d’un SPHOT.',
-  icon: Icons.location_on_rounded,
+  iconAsset: _visibility == 'premium'
+      ? 'data/icons/fire_red_icon.png'
+      : 'data/icons/fire_blue_icon.png',
   selected: _visibility == 'premium',
   onTap: () => setState(() => _visibility = 'premium'),
 ),
@@ -707,7 +773,8 @@ focusedErrorBorder: OutlineInputBorder(
 Widget _visualVisibilityCard({
   required String title,
   required String subtitle,
-  required IconData icon,
+  IconData? icon,
+String? iconAsset,
   required bool selected,
   required VoidCallback onTap,
 }) {
@@ -728,11 +795,18 @@ Widget _visualVisibilityCard({
         children: [
           _phoneMockup(),
           const SizedBox(height: 10),
-          Icon(
-            icon,
-            color: selected ? redRefColor : refColor,
-            size: 30,
-          ),
+          iconAsset != null
+    ? Image.asset(
+        iconAsset,
+        width: 34,
+        height: 34,
+        fit: BoxFit.contain,
+      )
+    : Icon(
+        icon,
+        color: selected ? redRefColor : refColor,
+        size: 30,
+      ),
           const SizedBox(height: 6),
           Text(
             title,
@@ -887,16 +961,16 @@ Widget _phoneMockup() {
   final screenWidth = MediaQuery.of(context).size.width;
   final bool compactWeb = kIsWeb && screenWidth > 700;
 
-  return Center(
+  final phone = Center(
     child: SizedBox(
       width: compactWeb ? 92 : null,
       child: AspectRatio(
         aspectRatio: 0.58,
         child: Container(
-          padding: const EdgeInsets.all(6),
+          padding: const EdgeInsets.all(2),
           decoration: BoxDecoration(
             color: Colors.black,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.25),
@@ -930,21 +1004,9 @@ Widget _phoneMockup() {
                   left: 8,
                   right: 8,
                   bottom: compactWeb ? 26 : 38,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.72),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      'PUBLICITÉ LOCALE\nCamping • Surf Shop • Restaurant',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: refColor,
-                        fontSize: compactWeb ? 6 : 8,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                  child: _PhoneBannerPreview(
+                    bannerBytes: _bannerBytes,
+                    compactWeb: compactWeb,
                   ),
                 ),
               ],
@@ -952,6 +1014,61 @@ Widget _phoneMockup() {
           ),
         ),
       ),
+    ),
+  );
+
+  return _PhoneMockupZoom(
+    enabled: _bannerBytes != null,
+    child: phone,
+  );
+}
+
+Widget _bannerUploadSection() {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: refColor, width: 2),
+    ),
+    child: Column(
+      children: [
+        _sectionTitle('VISUEL PUBLICITAIRE'),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: _pickBannerImage,
+          icon: const Icon(
+            Icons.upload_file_rounded,
+            color: redRefColor,
+          ),
+          label: Text(
+            _bannerFileName == null
+                ? 'TÉLÉVERSER VOTRE VISUEL'
+                : _bannerFileName!,
+            style: const TextStyle(
+              color: redRefColor,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: refColor, width: 2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Format recommandé : 1200 x 600 px • PNG, JPG ou WEBP • 5 Mo max',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: refColor,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -991,16 +1108,16 @@ Widget _phoneMockup() {
         children: [
           Expanded(
             child: _field(
-              controller: _centerCityController,
-              label: 'SPHOT de référence',
-              requiredField: _broadcastType == 'local',
-              uppercase: true,
-            ),
+  controller: _centerCityController,
+  label: 'SPHOT de référence (optionnel)',
+  requiredField: false,
+  uppercase: true,
+),
           ),
           const SizedBox(width: 8),
           SizedBox(
-            height: 52,
-            width: 52,
+            height: 48,
+            width: 48,
             child: OutlinedButton(
               onPressed: _searchingPlace ? null : _searchReferencePlace,
               style: OutlinedButton.styleFrom(
@@ -1436,14 +1553,14 @@ Widget _phoneMockup() {
         children: [
           Expanded(
             child: Text(
-              _category,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: redRefColor,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+  _category.isEmpty ? 'Catégorie publicitaire' : _category,
+  overflow: TextOverflow.ellipsis,
+  style: TextStyle(
+    color: _category.isEmpty ? refColor : redRefColor,
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+  ),
+),
           ),
           const Icon(
             Icons.keyboard_arrow_down_rounded,
@@ -1596,16 +1713,6 @@ Widget _phoneMockup() {
   Future<void> _submit(Map<String, dynamic>? pricing) async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_broadcastType == 'local' &&
-        _centerCityController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Merci de renseigner votre commune de référence.'),
-        ),
-      );
-      return;
-    }
-
     setState(() => _isSubmitting = true);
 
     final price = _campaignPrice(pricing);
@@ -1740,10 +1847,15 @@ Widget _phoneMockup() {
                               ),
                               const SizedBox(height: sectionSpacing),
                               _field(
-                                controller: _websiteController,
-                                label: 'Site internet',
-                              ),
-                              const SizedBox(height: sectionSpacing),
+  controller: _websiteController,
+  label: 'Site internet',
+),
+
+const SizedBox(height: sectionSpacing),
+
+_bannerUploadSection(),
+
+const SizedBox(height: sectionSpacing),
 
 _field(
   controller: _sirenController,
@@ -1956,4 +2068,140 @@ class PhoneNumberFormatter extends TextInputFormatter {
       selection: TextSelection.collapsed(offset: text.length),
     );
   }
+}
+
+class _PhoneBannerPreview extends StatelessWidget {
+  final Uint8List? bannerBytes;
+  final bool compactWeb;
+
+  const _PhoneBannerPreview({
+    required this.bannerBytes,
+    required this.compactWeb,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (bannerBytes == null) {
+      return Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.72),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          'PUBLICITÉ LOCALE\nCamping • Surf Shop • Restaurant',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: _AdvertisePageState.refColor,
+            fontSize: compactWeb ? 6 : 8,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: AspectRatio(
+        aspectRatio: 2,
+        child: Image.memory(
+          bannerBytes!,
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+  }
+}
+
+class _PhoneMockupZoom extends StatefulWidget {
+  final Widget child;
+  final bool enabled;
+
+  const _PhoneMockupZoom({
+    required this.child,
+    required this.enabled,
+  });
+
+  @override
+  State<_PhoneMockupZoom> createState() => _PhoneMockupZoomState();
+}
+
+class _PhoneMockupZoomState extends State<_PhoneMockupZoom> {
+  OverlayEntry? _hoverOverlay;
+
+  void _showHoverZoom() {
+    if (!kIsWeb || !widget.enabled || _hoverOverlay != null) return;
+
+    _hoverOverlay = OverlayEntry(
+      builder: (context) {
+        return Positioned.fill(
+          child: IgnorePointer(
+            child: Container(
+              color: Colors.black.withOpacity(0.18),
+              child: Center(
+                child: Transform.scale(
+                  scale: 2.8,
+                  child: widget.child,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    Overlay.of(context).insert(_hoverOverlay!);
+  }
+
+  void _hideHoverZoom() {
+    _hoverOverlay?.remove();
+    _hoverOverlay = null;
+  }
+
+  void _openPhoneZoom() {
+    if (!widget.enabled) return;
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.72),
+      builder: (_) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(4),
+          child: InteractiveViewer(
+            minScale: 1,
+            maxScale: 10,
+            child: Center(
+              child: SizedBox(
+                width: 650,
+                child: widget.child,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _hideHoverZoom();
+    super.dispose();
+  }
+
+  @override
+Widget build(BuildContext context) {
+  return Center(
+    child: MouseRegion(
+      onEnter: (_) => _showHoverZoom(),
+      onExit: (_) => _hideHoverZoom(),
+      child: GestureDetector(
+        onTap: _openPhoneZoom,
+        child: IntrinsicWidth(
+          child: widget.child,
+        ),
+      ),
+    ),
+  );
+}
 }
