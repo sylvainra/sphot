@@ -37,6 +37,55 @@ class _WebAdsPageState extends State<WebAdsPage> {
     return '$day/$month/${date.year}';
   }
 
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'active':
+        return Colors.green;
+      case 'disabled':
+        return Colors.orange;
+      case 'reported':
+        return redColor;
+      case 'deleted':
+        return Colors.grey;
+      default:
+        return adminColor;
+    }
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'active':
+        return 'ACTIVE';
+      case 'disabled':
+        return 'DÉSACTIVÉE';
+      case 'reported':
+        return 'SIGNALÉE';
+      case 'deleted':
+        return 'SUPPRIMÉE';
+      default:
+        return status.isEmpty ? 'INCONNU' : status.toUpperCase();
+    }
+  }
+
+  Future<void> _updateStatus(
+    String docId,
+    String status, {
+    String? reason,
+  }) async {
+    await FirebaseFirestore.instance.collection('adRequests').doc(docId).update({
+      'status': status,
+      'disabledReason': reason,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> _deleteAd(String docId) async {
+    await FirebaseFirestore.instance.collection('adRequests').doc(docId).update({
+      'status': 'deleted',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Widget _tabButton(String label, int index) {
     final selected = _selectedTab == index;
 
@@ -58,55 +107,12 @@ class _WebAdsPageState extends State<WebAdsPage> {
     );
   }
 
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'active':
-        return Colors.green;
-      case 'pending_review':
-      case 'pending_payment':
-        return Colors.orange;
-      case 'rejected':
-      case 'cancelled':
-        return redColor;
-      case 'paused':
-        return adminColor;
-      case 'ended':
-        return Colors.grey;
-      default:
-        return adminColor;
-    }
-  }
-
-  String _statusLabel(String status) {
-    switch (status) {
-      case 'draft':
-        return 'BROUILLON';
-      case 'pending_payment':
-        return 'PAIEMENT EN ATTENTE';
-      case 'pending_review':
-        return 'À VÉRIFIER';
-      case 'active':
-        return 'ACTIVE';
-      case 'paused':
-        return 'SUSPENDUE';
-      case 'rejected':
-        return 'REJETÉE';
-      case 'ended':
-        return 'TERMINÉE';
-      case 'cancelled':
-        return 'ANNULÉE';
-      default:
-        return status.isEmpty ? 'INCONNU' : status.toUpperCase();
-    }
-  }
-
   Widget _collectionList({
-    required String collection,
     required String emptyText,
     required bool Function(Map<String, dynamic> data) filter,
   }) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection(collection).snapshots(),
+      stream: FirebaseFirestore.instance.collection('adRequests').snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return const Center(
@@ -159,7 +165,10 @@ class _WebAdsPageState extends State<WebAdsPage> {
           itemBuilder: (context, index) {
             final doc = docs[index];
             final data = doc.data();
+
             final status = _text(data['status']);
+            final bannerUrl = _text(data['bannerUrl']);
+            final broadcastType = _text(data['broadcastType']);
 
             return Container(
               padding: const EdgeInsets.all(14),
@@ -172,86 +181,181 @@ class _WebAdsPageState extends State<WebAdsPage> {
                 ),
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.campaign_outlined,
-                    color: _statusColor(status),
-                    size: 30,
+                  Container(
+                    width: 170,
+                    height: 85,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: adminColor,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: bannerUrl.isEmpty
+                          ? const Center(
+                              child: Icon(
+                                Icons.image_not_supported_outlined,
+                                color: adminColor,
+                                size: 36,
+                              ),
+                            )
+                          : Image.network(
+                              bannerUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) {
+                                return const Center(
+                                  child: Icon(
+                                    Icons.broken_image_outlined,
+                                    color: redColor,
+                                    size: 36,
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _text(data['title']).isEmpty
-                              ? 'Campagne sans titre'
-                              : _text(data['title']).toUpperCase(),
+                          _text(data['advertiserName']).isEmpty
+                              ? 'Annonceur inconnu'
+                              : _text(data['advertiserName']).toUpperCase(),
                           style: const TextStyle(
                             color: adminColor,
-                            fontSize: 16,
+                            fontSize: 17,
                             fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          'Contact : ${_text(data['contactName'])} • ${_text(data['email'])} • ${_text(data['phone'])}',
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          'Site : ${_text(data['websiteUrl']).isEmpty ? '—' : _text(data['websiteUrl'])}',
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          'SIREN : ${_text(data['siren'])} • SIRET : ${_text(data['siret'])}',
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Annonceur : ${_text(data['advertiserName'])}',
+                          'Catégorie : ${_text(data['categoryLabel'])}',
                           style: const TextStyle(
                             color: Colors.black,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         Text(
-                          'Catégorie : ${_text(data['category'])}',
+                          'Visibilité : ${_text(data['visibilityLabel'])}',
                           style: const TextStyle(
                             color: Colors.black,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         Text(
-                          'Emplacement : ${_text(data['placementType'])}',
+                          broadcastType == 'national'
+                              ? 'Zone : Diffusion nationale'
+                              : 'Zone : ${_text(data['centerCity']).isEmpty ? 'Localisation carte' : _text(data['centerCity'])} • Rayon ${_text(data['radiusKm'])} km',
                           style: const TextStyle(
                             color: Colors.black,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         Text(
-                          'Zone : ${_text(data['targetCountry'])} / '
-                          '${_text(data['targetRegion'])} / '
-                          '${_text(data['targetDepartment'])} / '
-                          '${_text(data['targetCity'])}',
+                          'Diffusion : ${_formatDate(data['campaignStartDate'])} → ${_formatDate(data['campaignEndDate'])} • ${_text(data['durationLabel'])}',
                           style: const TextStyle(
                             color: Colors.black,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         Text(
-                          'Diffusion : ${_formatDate(data['startDate'])} → '
-                          '${_formatDate(data['endDate'])}',
+                          'Montant : ${_text(data['totalPriceExclTax'])} € HT',
                           style: const TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w700,
+                            color: redColor,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
+                        if (_text(data['message']).isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Message : ${_text(data['message'])}',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _statusColor(status),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Text(
-                      _statusLabel(status),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _statusColor(status),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: Text(
+                          _statusLabel(status),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      if (status != 'active')
+                        OutlinedButton.icon(
+                          onPressed: () => _updateStatus(doc.id, 'active'),
+                          icon: const Icon(Icons.play_arrow_rounded),
+                          label: const Text('RÉACTIVER'),
+                        ),
+                      if (status == 'active')
+                        OutlinedButton.icon(
+                          onPressed: () => _updateStatus(
+                            doc.id,
+                            'disabled',
+                            reason: 'Désactivée par Super Admin',
+                          ),
+                          icon: const Icon(Icons.pause_rounded),
+                          label: const Text('DÉSACTIVER'),
+                        ),
+                      OutlinedButton.icon(
+                        onPressed: () => _updateStatus(doc.id, 'reported'),
+                        icon: const Icon(Icons.report_outlined),
+                        label: const Text('SIGNALER'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _deleteAd(doc.id),
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('SUPPRIMER'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -266,33 +370,28 @@ class _WebAdsPageState extends State<WebAdsPage> {
     switch (_selectedTab) {
       case 0:
         return _collectionList(
-          collection: 'adRequests',
-          emptyText: 'Aucune demande Ads pour le moment.',
-          filter: (_) => true,
+          emptyText: 'Aucune publicité pour le moment.',
+          filter: (data) => _text(data['status']) != 'deleted',
         );
       case 1:
         return _collectionList(
-          collection: 'campaigns',
-          emptyText: 'Aucune campagne active.',
+          emptyText: 'Aucune publicité active.',
           filter: (data) => _text(data['status']) == 'active',
         );
       case 2:
         return _collectionList(
-          collection: 'campaigns',
-          emptyText: 'Aucune campagne à vérifier.',
-          filter: (data) => _text(data['status']) == 'pending_review',
+          emptyText: 'Aucune publicité désactivée.',
+          filter: (data) => _text(data['status']) == 'disabled',
         );
       case 3:
         return _collectionList(
-          collection: 'campaigns',
-          emptyText: 'Aucune campagne rejetée.',
-          filter: (data) => _text(data['status']) == 'rejected',
+          emptyText: 'Aucune publicité signalée.',
+          filter: (data) => _text(data['status']) == 'reported',
         );
       default:
         return _collectionList(
-          collection: 'adRequests',
-          emptyText: 'Aucune demande Ads pour le moment.',
-          filter: (_) => true,
+          emptyText: 'Aucune publicité pour le moment.',
+          filter: (data) => _text(data['status']) != 'deleted',
         );
     }
   }
@@ -303,15 +402,23 @@ class _WebAdsPageState extends State<WebAdsPage> {
       padding: const EdgeInsets.all(18),
       child: Column(
         children: [
-         
+          const Text(
+            'PUBLICITÉS SPHOT',
+            style: TextStyle(
+              color: adminColor,
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 14),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              _tabButton('DEMANDES ADS', 0),
-              _tabButton('CAMPAGNES ACTIVES', 1),
-              _tabButton('À VÉRIFIER', 2),
-              _tabButton('REJETÉES', 3),
+              _tabButton('TOUTES', 0),
+              _tabButton('ACTIVES', 1),
+              _tabButton('DÉSACTIVÉES', 2),
+              _tabButton('SIGNALÉES', 3),
             ],
           ),
           const SizedBox(height: 12),

@@ -22,40 +22,42 @@ class WebLayout extends StatefulWidget {
 }
 
 class _WebLayoutState extends State<WebLayout> {
-  int selectedIndex = 0;
+  int selectedIndex = 1;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Row(
-        children: [
-          WebSidebar(
-            title: widget.title,
-            items: widget.menuItems,
-            selectedIndex: selectedIndex,
-            onSelected: (index) {
-              setState(() {
-                selectedIndex = index;
-              });
-            },
-          ),
-
-          Expanded(
-  child: Container(
-    color: WebColors.background,
-    child: Column(
-      children: [
-        const WebTopBar(),
-
-        Expanded(
-          child: widget.menuItems[selectedIndex].page,
-        ),
-      ],
-    ),
-  ),
-),
-        ],
+  children: [
+    if (selectedIndex != 1)
+      WebSidebar(
+        title: widget.title,
+        items: widget.menuItems,
+        selectedIndex: selectedIndex,
+        onSelected: (index) {
+          setState(() {
+            selectedIndex = index;
+          });
+        },
       ),
+
+    Expanded(
+      child: Container(
+        color: WebColors.background,
+        child: Column(
+          children: [
+            if (selectedIndex != 1)
+              const WebTopBar(),
+
+            Expanded(
+              child: widget.menuItems[selectedIndex].page,
+            ),
+          ],
+        ),
+      ),
+    ),
+  ],
+)
     );
   }
 }

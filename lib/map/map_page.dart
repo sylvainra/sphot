@@ -1431,47 +1431,29 @@ Widget _buildAdBanner() {
             const SizedBox(width: 12),
 
             Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-  'AJOUTE TON SPHOT PUBLICITAIRE ICI !',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black87,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  
-                ],
-              ),
-            ),
+  child: Transform.translate(
+    offset: const Offset(-10, 0),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'AJOUTE TON SPHOT PUBLICITAIRE ICI !',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+            color: Colors.black87,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
+    ),
+  ),
+),
 
-            Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black87,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: const Text(
-                  'VOIR',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
+            
           ],
         ),
       ),

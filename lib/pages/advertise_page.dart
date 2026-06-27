@@ -92,6 +92,7 @@ DateTime get _campaignEndDate {
 }
   double _radiusKm = 0.5;
   bool _isSubmitting = false;
+  bool _orderSent = false;
 
   LatLng _adCenter = const LatLng(46.6, 2.5);
 
@@ -338,6 +339,29 @@ void _openBannerPreview() {
       );
     },
   );
+}
+
+Future<String?> _uploadBanner() async {
+  if (_bannerBytes == null) return null;
+
+  final fileName =
+      'ad_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+  final storageRef = FirebaseStorage.instance
+      .ref()
+      .child('advertising_banners')
+      .child(fileName);
+
+  final metadata = SettableMetadata(
+    contentType: 'image/jpeg',
+  );
+
+  await storageRef.putData(
+    _bannerBytes!,
+    metadata,
+  );
+
+  return await storageRef.getDownloadURL();
 }
 
 Future<void> _searchReferencePlace() async {
@@ -1711,11 +1735,18 @@ Widget _bannerUploadSection() {
   }
 
   Future<void> _submit(Map<String, dynamic>? pricing) async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isSubmitting = true);
+  setState(() => _isSubmitting = true);
 
+  try {
     final price = _campaignPrice(pricing);
+
+    String? bannerUrl;
+
+    if (_bannerBytes != null) {
+      bannerUrl = await _uploadBanner();
+    }
 
     await FirebaseFirestore.instance.collection('adRequests').add({
       'advertiserName': _companyController.text.trim(),
@@ -1723,6 +1754,10 @@ Widget _bannerUploadSection() {
       'email': _emailController.text.trim(),
       'phone': _phoneController.text.trim(),
       'websiteUrl': _websiteController.text.trim(),
+      'bannerUrl': bannerUrl,
+      'bannerFileName': _bannerFileName,
+      'bannerMimeType': _bannerMimeType,
+      'bannerFileSizeBytes': _bannerFileSizeBytes,
       'message': _messageController.text.trim(),
       'category': _storageCategory(),
       'categoryLabel': _category,
@@ -1736,15 +1771,12 @@ Widget _bannerUploadSection() {
       'centerLng': _broadcastType == 'local' ? _adCenter.longitude : null,
       'radiusKm': _broadcastType == 'local' ? _radiusKm : null,
       'durationLabel': _duration,
-      'campaignStartDate': Timestamp.fromDate(
-  _campaignStartDate,
-),
-
-'campaignEndDate': Timestamp.fromDate(
-  _campaignEndDate,
-),
+      'campaignStartDate': Timestamp.fromDate(_campaignStartDate),
+      'campaignEndDate': Timestamp.fromDate(_campaignEndDate),
       'totalPriceExclTax': price,
-      'status': 'pending_review',
+      'status': 'active',
+      'disabledReason': null,
+      'reportedCount': 0,
       'source': 'advertiser_portal',
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -1754,14 +1786,29 @@ Widget _bannerUploadSection() {
 
     if (!mounted) return;
 
-    setState(() => _isSubmitting = true);
+    setState(() {
+  _orderSent = true;
+});
+
+await Future.delayed(const Duration(seconds: 1));
+
+    if (!mounted) return;
+
+    Navigator.of(context).maybePop();
+  } catch (e) {
+    debugPrint('ERREUR ENVOI COMMANDE PUB : $e');
+
+    if (!mounted) return;
+
+    setState(() => _isSubmitting = false);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Demande publicitaire envoyée.'),
+      SnackBar(
+        content: Text('Erreur lors de l’envoi : $e'),
       ),
     );
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -1900,7 +1947,7 @@ _durationSelector(),
                               const SizedBox(height: sectionSpacing),
                               SizedBox(
                                 width: double.infinity,
-                                height: 48,
+                                height: 58,
                                 child: ElevatedButton.icon(
                                   onPressed: _isSubmitting
                                       ? null
@@ -1915,16 +1962,17 @@ _durationSelector(),
                                           color: refColor,
                                         ),
                                   label: Text(
-                                    _isSubmitting
-                                        ? 'DEMANDE ENVOYÉE'
-                                        : 'ENVOYER LA DEMANDE',
-                                    style: TextStyle(
-                                      color: _isSubmitting
-                                          ? Colors.white
-                                          : refColor,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
+  _isSubmitting
+      ? 'COMMANDE ENVOYÉE\nEMAIL DE VALIDATION À VENIR'
+      : 'ENVOYER LA COMMANDE',
+  textAlign: TextAlign.center,
+  style: TextStyle(
+    color: _isSubmitting ? Colors.white : refColor,
+    fontWeight: FontWeight.w900,
+    height: 1.1,
+    fontSize: _isSubmitting ? 12 : 14,
+  ),
+),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _isSubmitting
                                         ? redRefColor
@@ -1943,6 +1991,7 @@ _durationSelector(),
                                   ),
                                 ),
                               ),
+                              
                             ],
                           ),
                         ),

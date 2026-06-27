@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
-import 'web/home/web_home_page.dart';
-import 'web/auth/web_admin_redirect_gate.dart';
+import 'web/admin/web_admin_app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,9 +26,7 @@ class SphotWebAdminApp extends StatelessWidget {
         useMaterial3: true,
         colorSchemeSeed: Colors.orange,
       ),
-      home: const WebAdminRedirectGate(
-        child: WebHomePage(),
-      ),
+      home: const WebAdminApp(),
     );
   }
 }

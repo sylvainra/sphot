@@ -4,6 +4,7 @@ import '../shared/web_layout.dart';
 import '../shared/web_menu_item.dart';
 
 import 'pages/dashboard_page.dart';
+import 'pages/dashboard_super_admin_page.dart';
 import 'pages/sphots_page.dart';
 import 'pages/users_page.dart';
 import 'pages/admin_requests_page.dart';
@@ -22,6 +23,11 @@ class WebAdminApp extends StatelessWidget {
           title: 'Dashboard',
           icon: Icons.dashboard_outlined,
           page: DashboardPage(),
+        ),
+        WebMenuItem(
+          title: 'Carte Monde',
+          icon: Icons.public,
+          page: DashboardSuperAdminPage(),
         ),
         WebMenuItem(
           title: 'SPHOTS',
@@ -46,7 +52,7 @@ class WebAdminApp extends StatelessWidget {
         WebMenuItem(
           title: 'Ads',
           icon: Icons.campaign_outlined,
-          page: const WebAdsPage(),
+          page: WebAdsPage(),
         ),
       ],
     );
