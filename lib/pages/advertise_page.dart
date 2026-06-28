@@ -47,6 +47,8 @@ String? _bannerFileName;
 String? _bannerFileExtension;
 String? _bannerMimeType;
 int? _bannerFileSizeBytes;
+int? _bannerWidth;
+int? _bannerHeight;
 
   String _category = '';
   String _visibility = 'pack';
@@ -314,10 +316,55 @@ Future<void> _pickBannerImage() async {
   if (picked == null) return;
 
   final bytes = await picked.readAsBytes();
+  final fileName = picked.name;
+  final extension = fileName.split('.').last.toLowerCase();
+  final fileSize = bytes.length;
 
+  const maxSizeBytes = 2 * 1024 * 1024;
+
+  final allowedExtensions = ['png', 'jpg', 'jpeg', 'webp'];
+
+  if (!allowedExtensions.contains(extension)) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Format refusé. Utilisez PNG, JPG, JPEG ou WEBP.'),
+      ),
+    );
+    return;
+  }
+
+  if (fileSize > maxSizeBytes) {
   setState(() {
     _bannerBytes = bytes;
+    _bannerFileName = fileName;
+    _bannerFileExtension = extension;
+    _bannerMimeType = null;
+    _bannerFileSizeBytes = fileSize;
+    _bannerWidth = null;
+    _bannerHeight = null;
   });
+  return;
+}
+
+  final mimeType = switch (extension) {
+    'png' => 'image/png',
+    'webp' => 'image/webp',
+    _ => 'image/jpeg',
+  };
+
+  final decodedImage = await decodeImageFromList(bytes);
+
+  setState(() {
+  _bannerBytes = bytes;
+  _bannerFileName = fileName;
+  _bannerFileExtension = extension;
+  _bannerMimeType = mimeType;
+  _bannerFileSizeBytes = fileSize;
+  _bannerWidth = decodedImage.width;
+  _bannerHeight = decodedImage.height;
+});
 }
 
 void _openBannerPreview() {
@@ -344,8 +391,10 @@ void _openBannerPreview() {
 Future<String?> _uploadBanner() async {
   if (_bannerBytes == null) return null;
 
+  final extension = _bannerFileExtension ?? 'jpg';
+
   final fileName =
-      'ad_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      'ad_${DateTime.now().millisecondsSinceEpoch}.$extension';
 
   final storageRef = FirebaseStorage.instance
       .ref()
@@ -353,7 +402,7 @@ Future<String?> _uploadBanner() async {
       .child(fileName);
 
   final metadata = SettableMetadata(
-    contentType: 'image/jpeg',
+    contentType: _bannerMimeType ?? 'image/jpeg',
   );
 
   await storageRef.putData(
@@ -362,6 +411,74 @@ Future<String?> _uploadBanner() async {
   );
 
   return await storageRef.getDownloadURL();
+}
+
+String _formatFileSize(int? bytes) {
+  if (bytes == null) return '';
+
+  if (bytes >= 1024 * 1024) {
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} Mo';
+  }
+
+  return '${(bytes / 1024).toStringAsFixed(1)} Ko';
+}
+
+String _bannerQualityMessage() {
+  if (_bannerFileSizeBytes != null &&
+      _bannerFileSizeBytes! > 2 * 1024 * 1024) {
+    return '❌ Visuel non conforme\nImage trop lourde (maximum 2 Mo)';
+  }
+
+  if (_bannerWidth == null || _bannerHeight == null) {
+    return '';
+  }
+
+  final ratio = _bannerWidth! / _bannerHeight!;
+
+  if (_bannerWidth! < 900 || _bannerHeight! < 450) {
+    return '❌ Visuel non conforme\nImage trop petite (minimum 900 × 450 px)';
+  }
+
+  if (_bannerWidth! > 2400 || _bannerHeight! > 1200) {
+    return '❌ Visuel non conforme\nImage trop grande (maximum 2400 × 1200 px)';
+  }
+
+  if (ratio < 1.85 || ratio > 2.15) {
+    return '❌ Visuel non conforme\nLe format doit être proche de 1200 × 600 px';
+  }
+
+  if (_bannerWidth == 1200 && _bannerHeight == 600) {
+    return '✅ Visuel conforme SPHOT';
+  }
+
+  return '🟠 Visuel compatible SPHOT\nDimensions recommandées : 1200 × 600 px';
+}
+
+bool get _isBannerValid {
+  if (_bannerWidth == null || _bannerHeight == null) {
+    return false;
+  }
+
+  final ratio = _bannerWidth! / _bannerHeight!;
+
+  if (_bannerFileSizeBytes == null ||
+      _bannerFileSizeBytes! > 2 * 1024 * 1024) {
+    return false;
+  }
+
+  if (_bannerWidth! < 900 || _bannerHeight! < 450) {
+    return false;
+  }
+
+  if (_bannerWidth! > 2400 || _bannerHeight! > 1200) {
+    return false;
+  }
+
+  if (ratio < 1.85 || ratio > 2.15) {
+    return false;
+  }
+
+  return true;
 }
 
 Future<void> _searchReferencePlace() async {
@@ -1084,7 +1201,7 @@ Widget _bannerUploadSection() {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Format recommandé : 1200 x 600 px • PNG, JPG ou WEBP • 5 Mo max',
+          'Format recommandé : 1200 x 600 px • PNG, JPG ou WEBP • 2 Mo max',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: refColor,
@@ -1092,6 +1209,75 @@ Widget _bannerUploadSection() {
             fontWeight: FontWeight.w700,
           ),
         ),
+        if (_bannerBytes != null) ...[
+  const SizedBox(height: 12),
+
+  Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.10),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: refColor.withOpacity(0.35),
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+  'Nom : ${_bannerFileName ?? "-"}',
+  style: const TextStyle(
+    color: refColor,
+    fontWeight: FontWeight.w700,
+  ),
+),
+
+const SizedBox(height: 4),
+
+Text(
+  'Format : ${(_bannerFileExtension ?? "").toUpperCase()}',
+  style: const TextStyle(
+    color: refColor,
+    fontWeight: FontWeight.w700,
+  ),
+),
+
+const SizedBox(height: 4),
+
+Text(
+  'Poids : ${_formatFileSize(_bannerFileSizeBytes)}',
+  style: const TextStyle(
+    color: refColor,
+    fontWeight: FontWeight.w700,
+  ),
+),
+
+const SizedBox(height: 4),
+
+Text(
+  'Dimensions : ${_bannerWidth ?? "-"} × ${_bannerHeight ?? "-"} px',
+  style: const TextStyle(
+    color: refColor,
+    fontWeight: FontWeight.w700,
+  ),
+),
+
+const SizedBox(height: 10),
+
+Text(
+  _bannerQualityMessage(),
+  style: TextStyle(
+    color: _bannerQualityMessage().startsWith('❌')
+        ? redRefColor
+        : Colors.green,
+    fontWeight: FontWeight.w900,
+  ),
+        ),
+      ],
+    ),
+  ),
+],
       ],
     ),
   );
@@ -1810,232 +1996,248 @@ await Future.delayed(const Duration(seconds: 1));
   }
 }
 
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('settings')
-          .doc('advertisingPricing')
-          .snapshots(),
-      builder: (context, snapshot) {
-        final pricing = snapshot.data?.data();
+@override
+Widget build(BuildContext context) {
+  return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    stream: FirebaseFirestore.instance
+        .collection('settings')
+        .doc('advertisingPricing')
+        .snapshots(),
+    builder: (context, snapshot) {
+      final pricing = snapshot.data?.data();
 
-        return Scaffold(
-          backgroundColor: const Color(0x00000000),
-          body: Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.asset(
-                'data/images/map_background.jpg',
-                fit: BoxFit.cover,
-              ),
-              SafeArea(
-                child: Column(
-                  children: [
-                    SizedBox(
-                      height: 58,
-                      child: Center(
-                        child: Image.asset(
-                          'data/icons/title.png',
-                          height: 58,
-                          fit: BoxFit.contain,
-                        ),
+      return Scaffold(
+        backgroundColor: const Color(0x00000000),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              'data/images/map_background.jpg',
+              fit: BoxFit.cover,
+            ),
+            SafeArea(
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 58,
+                    child: Center(
+                      child: Image.asset(
+                        'data/icons/title.png',
+                        height: 58,
+                        fit: BoxFit.contain,
                       ),
                     ),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(18),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            children: [
-                              const Text(
-                                'FAITES RAYONNER VOTRE ACTIVITÉ !',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: redRefColor,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(18),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          children: [
+                            const Text(
+                              'FAITES RAYONNER VOTRE ACTIVITÉ !',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: redRefColor,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
                               ),
-                              const SizedBox(height: sectionSpacing),
-                              _adInfoTile(
-                                context: context,
-                                title: 'COMMENT FONCTIONNE LA DIFFUSION ?',
-                                text:
-                                    'Choisissez votre visibilité : Carte SPHOT, Fiche SPHOT Premium ou Pack Visibilité Totale.\n\n'
-                                    'Pour une campagne locale, vous positionnez un épicentre et choisissez un rayon d’action. Votre publicité pourra être diffusée sur les SPHOTS situés dans ce rayon.\n\n'
-                                    'Pour une campagne nationale, aucun épicentre n’est nécessaire : votre publicité peut apparaître sur l’ensemble des SPHOTS.',
-                              ),
-                              _field(
-  controller: _companyController,
-  label: 'Entreprise / marque',
-  requiredField: true,
-  uppercase: true,
-),
-                              const SizedBox(height: sectionSpacing),
-                              _field(
-  controller: _contactController,
-  label: 'NOM Prénom du contact',
-  requiredField: true,
-  contactName: true,
-),
-                              const SizedBox(height: sectionSpacing),
-                              _field(
-                                controller: _emailController,
-                                label: 'Email',
-                                requiredField: true,
-                              ),
-                              const SizedBox(height: sectionSpacing),
-                              _field(
-                                controller: _phoneController,
-                                label: 'Téléphone',
-                                phone: true,
-                              ),
-                              const SizedBox(height: sectionSpacing),
-                              _field(
-  controller: _websiteController,
-  label: 'Site internet',
-),
+                            ),
+                            const SizedBox(height: sectionSpacing),
+                            _adInfoTile(
+                              context: context,
+                              title: 'COMMENT FONCTIONNE LA DIFFUSION ?',
+                              text:
+                                  'Choisissez votre visibilité : Carte SPHOT, Fiche SPHOT Premium ou Pack Visibilité Totale.\n\n'
+                                  'Pour une campagne locale, vous positionnez un épicentre et choisissez un rayon d’action. Votre publicité pourra être diffusée sur les SPHOTS situés dans ce rayon.\n\n'
+                                  'Pour une campagne nationale, aucun épicentre n’est nécessaire : votre publicité peut apparaître sur l’ensemble des SPHOTS.',
+                            ),
+                            const SizedBox(height: sectionSpacing),
 
-const SizedBox(height: sectionSpacing),
+                            _field(
+                              controller: _companyController,
+                              label: 'Entreprise / marque',
+                              requiredField: true,
+                              uppercase: true,
+                            ),
+                            const SizedBox(height: sectionSpacing),
 
-_bannerUploadSection(),
+                            _field(
+                              controller: _contactController,
+                              label: 'NOM Prénom du contact',
+                              requiredField: true,
+                              contactName: true,
+                            ),
+                            const SizedBox(height: sectionSpacing),
 
-const SizedBox(height: sectionSpacing),
+                            _field(
+                              controller: _emailController,
+                              label: 'Email',
+                              requiredField: true,
+                            ),
+                            const SizedBox(height: sectionSpacing),
 
-_field(
-  controller: _sirenController,
-  label: 'SIREN issu de ProConnect',
-  requiredField: true,
-),
+                            _field(
+                              controller: _phoneController,
+                              label: 'Téléphone',
+                              phone: true,
+                            ),
+                            const SizedBox(height: sectionSpacing),
 
-const SizedBox(height: sectionSpacing),
+                            _field(
+                              controller: _websiteController,
+                              label: 'Site internet',
+                            ),
+                            const SizedBox(height: sectionSpacing),
 
-_field(
-  controller: _siretController,
-  label: 'SIRET issu de ProConnect',
-  requiredField: true,
-),
-                              const SizedBox(height: sectionSpacing),
-                              _categorySelector(),
-                              const SizedBox(height: sectionSpacing),
-                              _visibilitySelector(),
-                              const SizedBox(height: sectionSpacing),
-                              _broadcastSelector(),
+                            _bannerUploadSection(),
+                            const SizedBox(height: sectionSpacing),
 
-const SizedBox(height: 4),
+                            _field(
+                              controller: _sirenController,
+                              label: 'SIREN issu de ProConnect',
+                              requiredField: true,
+                            ),
+                            const SizedBox(height: sectionSpacing),
 
-AnimatedSwitcher(
-  duration: const Duration(milliseconds: 180),
-  child: _broadcastType == 'local'
-      ? _visualMapSimulator()
-      : const SizedBox.shrink(),
-),
+                            _field(
+                              controller: _siretController,
+                              label: 'SIRET issu de ProConnect',
+                              requiredField: true,
+                            ),
+                            const SizedBox(height: sectionSpacing),
 
-const SizedBox(height: 2),
+                            _categorySelector(),
+                            const SizedBox(height: sectionSpacing),
 
-_durationSelector(),
-                              const SizedBox(height: sectionSpacing),
-                              _summary(pricing),
-                              const SizedBox(height: sectionSpacing),
-                              _field(
-                                controller: _messageController,
-                                label: 'Message / précision',
-                                maxLines: 4,
-                              ),
-                              const SizedBox(height: sectionSpacing),
-                              SizedBox(
-                                width: double.infinity,
-                                height: 58,
-                                child: ElevatedButton.icon(
-                                  onPressed: _isSubmitting
-                                      ? null
-                                      : () => _submit(pricing),
-                                  icon: _isSubmitting
-                                      ? const Icon(
-                                          Icons.check_circle_rounded,
-                                          color: Colors.white,
-                                        )
-                                      : const Icon(
-                                          Icons.send_rounded,
-                                          color: refColor,
-                                        ),
-                                  label: Text(
-  _isSubmitting
-      ? 'COMMANDE ENVOYÉE\nEMAIL DE VALIDATION À VENIR'
-      : 'ENVOYER LA COMMANDE',
-  textAlign: TextAlign.center,
-  style: TextStyle(
-    color: _isSubmitting ? Colors.white : refColor,
-    fontWeight: FontWeight.w900,
-    height: 1.1,
-    fontSize: _isSubmitting ? 12 : 14,
-  ),
-),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: _isSubmitting
-                                        ? redRefColor
-                                        : Colors.transparent,
-                                    disabledBackgroundColor: redRefColor,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      side: BorderSide(
-                                        color: _isSubmitting
-                                            ? redRefColor
-                                            : refColor,
-                                        width: 2,
+                            _visibilitySelector(),
+                            const SizedBox(height: sectionSpacing),
+
+                            _broadcastSelector(),
+                            const SizedBox(height: 4),
+
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 180),
+                              child: _broadcastType == 'local'
+                                  ? _visualMapSimulator()
+                                  : const SizedBox.shrink(),
+                            ),
+
+                            const SizedBox(height: 2),
+
+                            _durationSelector(),
+                            const SizedBox(height: sectionSpacing),
+
+                            _summary(pricing),
+                            const SizedBox(height: sectionSpacing),
+
+                            _field(
+                              controller: _messageController,
+                              label: 'Message / précision',
+                              maxLines: 4,
+                            ),
+                            const SizedBox(height: sectionSpacing),
+
+                            SizedBox(
+                              width: double.infinity,
+                              height: 58,
+                              child: ElevatedButton.icon(
+                                onPressed: (!_isBannerValid || _isSubmitting)
+                                    ? null
+                                    : () => _submit(pricing),
+                                icon: _isSubmitting
+                                    ? const Icon(
+                                        Icons.check_circle_rounded,
+                                        color: Colors.white,
+                                      )
+                                    : const Icon(
+                                        Icons.send_rounded,
+                                        color: refColor,
                                       ),
+                                label: Text(
+                                  !_isBannerValid
+                                      ? 'VISUEL NON CONFORME'
+                                      : _isSubmitting
+                                          ? 'COMMANDE ENVOYÉE\nEMAIL DE VALIDATION À VENIR'
+                                          : 'ENVOYER LA COMMANDE',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: _isSubmitting
+                                        ? Colors.white
+                                        : refColor,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.1,
+                                    fontSize: _isSubmitting ? 12 : 14,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: !_isBannerValid
+                                      ? Colors.grey.shade400
+                                      : (_isSubmitting
+                                          ? redRefColor
+                                          : Colors.transparent),
+                                  disabledBackgroundColor:
+                                      Colors.grey.shade400,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    side: BorderSide(
+                                      color: _isSubmitting
+                                          ? redRefColor
+                                          : refColor,
+                                      width: 2,
                                     ),
                                   ),
                                 ),
                               ),
-                              
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: sectionSpacing),
-                    Container(
-                      width: 40,
-                      height: 40,
-                      margin: const EdgeInsets.only(bottom: sectionSpacing),
-                      decoration: BoxDecoration(
-                        color: const Color(0x00000000),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: refColor,
-                          width: 2,
-                        ),
-                      ),
-                      child: Material(
-                        color: const Color(0x00000000),
-                        shape: const CircleBorder(),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: () {
-                            Navigator.of(context).maybePop();
-                          },
-                          child: const Center(
-                            child: Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              color: refColor,
-                              size: 22,
                             ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: sectionSpacing),
+
+                  Container(
+                    width: 40,
+                    height: 40,
+                    margin: const EdgeInsets.only(bottom: sectionSpacing),
+                    decoration: BoxDecoration(
+                      color: const Color(0x00000000),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: refColor,
+                        width: 2,
+                      ),
+                    ),
+                    child: Material(
+                      color: const Color(0x00000000),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () {
+                          Navigator.of(context).maybePop();
+                        },
+                        child: const Center(
+                          child: Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: refColor,
+                            size: 22,
                           ),
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        );
-      },
-    );
+            ),
+          ],
+        ),
+      );
+    },
+  );
   }
 }
 

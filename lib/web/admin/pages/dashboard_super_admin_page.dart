@@ -4,6 +4,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'dart:math' as math;
+import 'package:url_launcher/url_launcher.dart';
 
 enum DashboardSpotFilter {
   all,
@@ -155,6 +157,32 @@ Stream<DocumentSnapshot<Map<String, dynamic>>> _subscriptionStream(String uid) {
     if (value is num) return value.toDouble();
     return double.tryParse((value ?? '').toString()) ?? 0;
   }
+
+  double _distanceKm(
+  double lat1,
+  double lon1,
+  double lat2,
+  double lon2,
+) {
+  const earthRadius = 6371.0;
+
+  final dLat = (lat2 - lat1) * math.pi / 180;
+  final dLon = (lon2 - lon1) * math.pi / 180;
+
+  final a =
+      math.sin(dLat / 2) * math.sin(dLat / 2) +
+      math.cos(lat1 * math.pi / 180) *
+          math.cos(lat2 * math.pi / 180) *
+          math.sin(dLon / 2) *
+          math.sin(dLon / 2);
+
+  final c = 2 * math.atan2(
+    math.sqrt(a),
+    math.sqrt(1 - a),
+  );
+
+  return earthRadius * c;
+}
 
 String _cleanText(dynamic value) {
   return (value ?? '').toString().trim();
@@ -1560,6 +1588,34 @@ final radiusLabel = advertiser['radiusKm'] != null
         ? 'National'
         : 'Non renseigné';
 
+final radiusKm = _toDouble(advertiser['radiusKm']);
+final centerLat = _toDouble(advertiser['centerLat']);
+final centerLng = _toDouble(advertiser['centerLng']);
+
+int coveredSpots = 0;
+
+if (radiusKm > 0) {
+  for (final doc in _latestSpotDocs) {
+    final data = doc.data();
+
+    final lat = _toDouble(data['sphotLat']);
+    final lng = _toDouble(data['sphotLng']);
+
+    if (lat == 0 || lng == 0) continue;
+
+    final distance = _distanceKm(
+      centerLat,
+      centerLng,
+      lat,
+      lng,
+    );
+
+    if (distance <= radiusKm) {
+      coveredSpots++;
+    }
+  }
+}        
+
 final price = _toDouble(
   advertiser['totalPriceExclTax'] ?? advertiser['priceExclTax'],
 );
@@ -1611,54 +1667,46 @@ final bannerUrl = _cleanText(
             const SizedBox(height: 18),
 
             if (bannerUrl.isNotEmpty)
-  InkWell(
-    borderRadius: BorderRadius.circular(14),
-    onTap: () {
-      showDialog(
-        context: context,
-        builder: (_) => Dialog(
-          insetPadding: const EdgeInsets.all(24),
-          child: InteractiveViewer(
-            minScale: 1,
-            maxScale: 6,
-            child: Image.network(
-              bannerUrl,
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
-      );
-    },
-    child: Container(
-    width: double.infinity,
-    height: 58,
-    padding: const EdgeInsets.symmetric(horizontal: 12),
-    decoration: BoxDecoration(
-      color: adminColor.withOpacity(0.06),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: adminColor.withOpacity(0.25)),
-    ),
-    child: Row(
-      children: [
-        const Icon(Icons.image_rounded, color: adminColor, size: 22),
-        const SizedBox(width: 10),
-        const Expanded(
-          child: Text(
-            'Bannière publicitaire',
-            style: TextStyle(
-              color: adminColor,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        const Icon(
-  Icons.open_in_full_rounded,
-  color: adminColor,
-),
-      ],
-          ),
-    ),
-  ),
+              InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () {
+                  launchUrl(
+                    Uri.parse(bannerUrl),
+                    webOnlyWindowName: '_blank',
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  height: 58,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: adminColor.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: adminColor.withOpacity(0.25),
+                    ),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.image_rounded, color: adminColor, size: 22),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Bannière publicitaire',
+                          style: TextStyle(
+                            color: adminColor,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.open_in_full_rounded,
+                        color: adminColor,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
             const SizedBox(height: 18),
 
@@ -1672,6 +1720,7 @@ _spotInfoLine('Catégorie', categoryLabel.isEmpty ? 'Non renseignée' : category
 _spotInfoLine('Durée', durationLabel.isEmpty ? 'Non renseignée' : durationLabel),
 _spotInfoLine('Ville cible', targetCity),
 _spotInfoLine('Rayon d’action', radiusLabel),
+_spotInfoLine('SPHOTS', '$coveredSpots touchés'),
 _spotInfoLine('Offre choisie', offerLabel),
 _spotInfoLine('Statut', campaignStatus),
 _spotInfoLine('Début', _formatDate(advertiser['campaignStartDate'])),

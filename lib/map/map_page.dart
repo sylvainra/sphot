@@ -1395,7 +1395,7 @@ Widget _buildAdBanner() {
         );
       },
       child: Container(
-        height: 62,
+        height: 90,
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.22),
           borderRadius: BorderRadius.circular(14),
@@ -1448,6 +1448,19 @@ Widget _buildAdBanner() {
             letterSpacing: 0.2,
           ),
         ),
+        const SizedBox(height: 6),
+
+const Text(
+  'Visuel : PNG, JPG ou WEBP\n1200 × 600 px - 2 Mo max',
+  textAlign: TextAlign.center,
+  style: TextStyle(
+    fontSize: 11,
+    color: Colors.black54,
+    fontWeight: FontWeight.w600,
+  ),
+),
+
+const SizedBox(height: 6),
       ],
     ),
   ),
