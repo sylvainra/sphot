@@ -30,8 +30,7 @@ class _AdminGestionSauveteurPageState
 
   final Set<String> passwordResetDoneIds = {};
   final Set<String> passwordResetEmailSentIds = {};
-  final Set<String> passwordResetSmsSentIds = {};
-
+  
   final Map<String, String> passwordResetLoginsById = {};
   final Map<String, String> passwordResetPasswordsById = {};
 
@@ -388,9 +387,7 @@ Builder(
         passwordResetDoneIds.contains(doc.id);
     final passwordResetEmailSent =
         passwordResetEmailSentIds.contains(doc.id);
-    final passwordResetSmsSent =
-        passwordResetSmsSentIds.contains(doc.id);
-
+    
     final resetLogin =
         passwordResetLoginsById[doc.id] ??
             (data['login'] ?? '').toString();
@@ -435,7 +432,7 @@ Builder(
                       passwordResetLoginsById[doc.id] = login;
                       passwordResetPasswordsById[doc.id] = newPassword;
                       passwordResetEmailSentIds.remove(doc.id);
-                      passwordResetSmsSentIds.remove(doc.id);
+                      
                     });
                   },
             style: ElevatedButton.styleFrom(
@@ -549,44 +546,7 @@ Builder(
             ),
           ),
 
-          const SizedBox(height: 8),
-
-          SizedBox(
-            width: double.infinity,
-            height: 34,
-            child: ElevatedButton(
-              onPressed: passwordResetDone
-    ? () {
-        setState(() {
-          passwordResetSmsSentIds.add(doc.id);
-        });
-      }
-    : null,
-              style: ElevatedButton.styleFrom(
-  backgroundColor: passwordResetSmsSent
-      ? const Color(0xFFDC2626)
-      : Colors.transparent,
-  foregroundColor: passwordResetSmsSent
-      ? Colors.white
-      : const Color(0xFFDC2626),
-  disabledBackgroundColor: Colors.transparent,
-  elevation: 0,
-  side: const BorderSide(
-    color: Color(0xFFDC2626),
-    width: 2,
-  ),
-),
-              child: Text(
-                passwordResetSmsSent
-                    ? 'SMS ENVOYÉ'
-                    : 'ENVOYER PAR SMS',
-                style: const TextStyle(
-  fontSize: 10,
-  fontWeight: FontWeight.w900,
-),
-              ),
-            ),
-          ),
+          
         ],
       ],
     );

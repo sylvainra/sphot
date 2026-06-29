@@ -7,6 +7,11 @@ const nodemailer = require("nodemailer");
 
 admin.initializeApp();
 
+const SMTP_USER = "admin@sphot.app";
+const MAIL_FROM = "\"SPHOT\" <no-reply@sphot.app>";
+const SPHOT_LOGIN_URL = "https://sphot.app";
+
+
 setGlobalOptions({maxInstances: 10});
 
 exports.sendSubscriptionActivatedEmail = onDocumentUpdated(
@@ -48,13 +53,13 @@ exports.sendSubscriptionActivatedEmail = onDocumentUpdated(
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
-          user: "rabreau.sylvain@gmail.com",
+          user: SMTP_USER,
           pass: process.env.GMAIL_APP_PASSWORD,
         },
       });
 
       await transporter.sendMail({
-        from: "\"SPHOT\" <rabreau.sylvain@gmail.com>",
+        from: MAIL_FROM,
         to: email,
         subject: "Activation de votre abonnement SPHOT",
         text:
@@ -185,7 +190,7 @@ exports.sendTrialEndingReminderEmails = onSchedule(
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
-          user: "rabreau.sylvain@gmail.com",
+          user: SMTP_USER,
           pass: process.env.GMAIL_APP_PASSWORD,
         },
       });
@@ -209,7 +214,7 @@ exports.sendTrialEndingReminderEmails = onSchedule(
             data.billingOrganisation || "votre organisation";
 
         await transporter.sendMail({
-          from: "\"SPHOT\" <rabreau.sylvain@gmail.com>",
+          from: MAIL_FROM,
           to: email,
           subject: "Votre essai SPHOT arrive bientôt à échéance",
           text:
@@ -263,7 +268,7 @@ exports.sendOverdueSubscriptionReminderEmails = onSchedule(
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
-          user: "rabreau.sylvain@gmail.com",
+          user: SMTP_USER,
           pass: process.env.GMAIL_APP_PASSWORD,
         },
       });
@@ -287,7 +292,7 @@ exports.sendOverdueSubscriptionReminderEmails = onSchedule(
             data.billingOrganisation || "votre organisation";
 
         await transporter.sendMail({
-          from: "\"SPHOT\" <rabreau.sylvain@gmail.com>",
+          from: MAIL_FROM,
           to: email,
           subject: "Votre abonnement SPHOT nécessite une régularisation",
           text:
@@ -332,13 +337,13 @@ exports.testEmailSphot = onRequest(
         const transporter = nodemailer.createTransport({
           service: "gmail",
           auth: {
-            user: "rabreau.sylvain@gmail.com",
+            user: SMTP_USER,
             pass: process.env.GMAIL_APP_PASSWORD,
           },
         });
 
         await transporter.sendMail({
-          from: "\"SPHOT\" <rabreau.sylvain@gmail.com>",
+          from: MAIL_FROM,
           to: "rabreau.sylvain@gmail.com",
           subject: "Test email SPHOT",
           text: "Test email Firebase Functions SPHOT.",
@@ -373,27 +378,143 @@ exports.sendSauveteurCredentialsEmail = onRequest(
         const transporter = nodemailer.createTransport({
           service: "gmail",
           auth: {
-            user: "rabreau.sylvain@gmail.com",
+            user: SMTP_USER,
             pass: process.env.GMAIL_APP_PASSWORD,
           },
         });
 
         await transporter.sendMail({
-          from: "\"SPHOT\" <rabreau.sylvain@gmail.com>",
+          from: MAIL_FROM,
           to: email,
           subject: "Vos accès SPHOT",
+          html: `
+<div style="margin:0;padding:40px 20px;
+background:#eef3f8 url('https://sphot.app/assets/data/images/map_background.jpg')
+center center / cover no-repeat;
+font-family:Arial,Helvetica,sans-serif;">
+
+    <div style="max-width:620px;margin:auto;
+background:rgba(255,255,255,0.94);
+border-radius:18px;overflow:hidden;border:1px solid #d9e2ec;
+box-shadow:0 4px 12px rgba(0,0,0,.08);">
+
+    <div style="padding:30px 30px 20px 30px;text-align:center;">
+
+      <a href="${SPHOT_LOGIN_URL}">
+        <img
+          src="https://sphot.app/assets/data/icons/title.png"
+          alt="SPHOT"
+          style="max-width:320px;width:100%;height:auto;border:0;">
+      </a>
+      
+    </div>
+
+    <div style="padding:0 34px 30px 34px;color:#263238;
+font-size:16px;line-height:1.6;">
+
+      <p>Bonjour <strong>${prenom}</strong>,</p>
+
+<p>
+  Bienvenue sur SPHOT.
+</p>
+
+<p>
+  Votre compte a été créé par votre administrateur SPHOT.
+</p>
+
+<p>
+  Vous trouverez ci-dessous votre identifiant et mot de passe
+  pour vous connecter sur SPHOT.
+</p>
+
+      <div style="
+          margin:28px 0;
+          background:#f7f9fc;
+          border:1px solid #d9e2ec;
+          border-radius:14px;
+          padding:22px;">
+
+        <div style="margin-bottom:18px;">
+          <div style="font-size:13px;color:#607d8b;text-transform:uppercase;">
+            Identifiant
+          </div>
+
+          <div style="font-size:22px;font-weight:bold;color:#1e3a8a;">
+            ${identifiant}
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:13px;color:#607d8b;text-transform:uppercase;">
+            Mot de passe temporaire
+          </div>
+
+          <div style="font-size:22px;font-weight:bold;color:#d91c1c;">
+            ${motDePasse}
+          </div>
+        </div>
+
+      </div>
+
+      <div style="
+          background:#fff8e1;
+          border-left:5px solid #ff9800;
+          padding:16px;
+          border-radius:8px;
+          margin-bottom:28px;">
+
+        <strong>Important</strong><br>
+
+        Lors de votre première connexion,
+        vous devrez modifier votre mot de passe.
+
+      </div>
+
+      <div style="text-align:center;margin:35px 0;">
+
+        <a
+          href="${SPHOT_LOGIN_URL}"
+          style="
+            background:#d91c1c;
+            color:#ffffff;
+            text-decoration:none;
+            padding:16px 30px;
+            border-radius:10px;
+            display:inline-block;
+            font-size:17px;
+            font-weight:bold;">
+
+          SE CONNECTER À SPHOT
+
+        </a>
+
+      </div>
+
+      <p style="margin-top:40px;">
+        À bientôt sur SPHOT,<br>
+        <strong>L'équipe SPHOT</strong>
+      </p>
+
+    </div>
+
+  </div>
+
+</div>
+`,
           text:
 `Bonjour ${prenom},
 
-Votre compte SPHOT a été créé.
+Votre compte a été créé par votre administrateur SPHOT.
 
 Identifiant : ${identifiant}
-Mot de passe provisoire : ${motDePasse}
+Mot de passe temporaire : ${motDePasse}
 
-Nous vous recommandons de modifier votre mot de passe
-dès votre première connexion.
+Lors de votre première connexion, vous devrez modifier votre mot de passe.
 
-Cordialement,
+Se connecter à SPHOT :
+${SPHOT_LOGIN_URL}
+
+À bientôt sur SPHOT,
 L'équipe SPHOT`,
         });
 

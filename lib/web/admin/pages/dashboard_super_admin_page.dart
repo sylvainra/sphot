@@ -113,6 +113,7 @@ bool _isListening = false;
 
   int _visibleOnMapSpotCount = 0;
   int _visibleOnMapAdminCount = 0;
+  int _visibleOnMapSauveteurCount = 0;
 
   OverlayEntry? _dropdownOverlay;
 
@@ -144,6 +145,12 @@ Stream<QuerySnapshot<Map<String, dynamic>>> get _subscriptionsStream {
 
 Stream<QuerySnapshot<Map<String, dynamic>>> get _adRequestsStream {
   return FirebaseFirestore.instance.collection('adRequests').snapshots();
+}
+
+Stream<QuerySnapshot<Map<String, dynamic>>> get _sauveteursStream {
+  return FirebaseFirestore.instance
+      .collection('sauveteurs')
+      .snapshots();
 }
 
 Stream<DocumentSnapshot<Map<String, dynamic>>> _subscriptionStream(String uid) {
@@ -1199,8 +1206,7 @@ _buildAdvertiserFiltersBlock(),
 
 const SizedBox(height: 28),
 
-            if (_selectedSpot != null) _selectedSpotCard(),
-            if (_selectedAdmin != null) _selectedAdminCard(),
+            
           ],
         ),
       ),
@@ -1521,6 +1527,78 @@ bool _matchesAdvertiserSearch(Map<String, dynamic> data) {
   return fields.any((field) => field.contains(query) || query.contains(field));
 }
 
+Widget _buildSpotDetailPanel() {
+  final spot = _selectedSpot;
+  if (spot == null) return const SizedBox.shrink();
+
+  final name = _spotName(spot);
+  final type = _cleanText(spot['typeSphot'] ?? 'Non renseigné');
+  final nature = _cleanText(spot['natureSphot'] ?? 'Non renseignée');
+  final label = _cleanText(spot['labelSphot'] ?? 'Non renseigné');
+  final ville = _cleanText(spot['ville'] ?? 'Non renseignée');
+  final departement = _cleanText(spot['departement'] ?? 'Non renseigné');
+  final region = _cleanText(spot['region'] ?? 'Non renseignée');
+  final telephone = _cleanText(spot['telephonePoste'] ?? 'Non renseigné');
+  final lat = _toDouble(spot['sphotLat']);
+  final lng = _toDouble(spot['sphotLng']);
+
+  return Container(
+    width: 420,
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.98),
+      border: Border(
+        left: BorderSide(
+          color: _spotTypeColor(spot).withOpacity(0.45),
+          width: 1.5,
+        ),
+      ),
+    ),
+    child: SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    name,
+                    style: TextStyle(
+                      color: _spotTypeColor(spot),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedSpot = null;
+                    });
+                  },
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            _spotInfoLine('Type', type),
+            _spotInfoLine('Nature', nature),
+            _spotInfoLine('Label', label),
+            _spotInfoLine('Ville', ville),
+            _spotInfoLine('Département', departement),
+            _spotInfoLine('Région', region),
+            _spotInfoLine('Téléphone', telephone),
+            _spotInfoLine('Latitude', lat.toStringAsFixed(6)),
+            _spotInfoLine('Longitude', lng.toStringAsFixed(6)),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 Widget _buildAdvertiserDetailPanel() {
   final advertiser = _selectedAdvertiser;
   if (advertiser == null) return const SizedBox.shrink();
@@ -1784,6 +1862,101 @@ _spotInfoLine('Prix', '${price.toStringAsFixed(0)} € HT'),
     ),
   ],
 ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _buildAdminDetailPanel() {
+  final admin = _selectedAdmin;
+  if (admin == null) return const SizedBox.shrink();
+
+  final uid = _cleanText(admin['uid']);
+  final territoire = Map<String, dynamic>.from(admin['territoire'] ?? {});
+  final structure = Map<String, dynamic>.from(admin['structure'] ?? {});
+  final profile = Map<String, dynamic>.from(admin['profile'] ?? {});
+
+  final mairie = _cleanText(
+    structure['nom'] ?? admin['nomStructure'] ?? admin['organisation'] ?? 'ADMIN',
+  );
+
+  final email = _cleanText(profile['email'] ?? admin['email']);
+  final responsable = _cleanText(
+    profile['nomAffiche'] ??
+        admin['nomResponsable'] ??
+        '${admin['prenom'] ?? ''} ${admin['nom'] ?? ''}',
+  );
+
+  final siret = _cleanText(structure['siret'] ?? admin['siret']);
+  final ville = _cleanText(territoire['ville']);
+  final departement = _cleanText(territoire['departement']);
+  final region = _cleanText(territoire['region']);
+  final telephone = _cleanText(profile['telephone'] ?? admin['telephone']);
+
+final rawStatus = _cleanText(admin['status'] ?? '');
+
+final adminStatus = switch (rawStatus.toLowerCase()) {
+  'pending' => 'En attente de validation',
+  'approved' => 'Approuvé',
+  'rejected' => 'Refusé',
+  'active' => 'Actif',
+  'trial' => 'Période d\'essai',
+  'overdue' => 'En retard',
+  'cancelled' => 'Résilié',
+  _ => 'Non renseigné',
+};
+  return Container(
+    width: 420,
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.98),
+      border: Border(
+        left: BorderSide(
+          color: adminColor.withOpacity(0.25),
+          width: 1.5,
+        ),
+      ),
+    ),
+    child: SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    mairie,
+                    style: const TextStyle(
+                      color: adminColor,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedAdmin = null;
+                    });
+                  },
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            _spotInfoLine('Responsable', responsable),
+            _spotInfoLine('Email', email),
+            _spotInfoLine('Téléphone', telephone.isEmpty ? 'Non renseigné' : telephone),
+            _spotInfoLine('Organisation', mairie),
+            _spotInfoLine('SIRET', siret.isEmpty ? 'Non renseigné' : siret),
+            _spotInfoLine('Ville', ville),
+            _spotInfoLine('Département', departement),
+            _spotInfoLine('Région', region),
+            _spotInfoLine('Statut', adminStatus),
           ],
         ),
       ),
@@ -2545,15 +2718,14 @@ Widget build(BuildContext context) {
                   };
 
                   final validSpots = docs.where((doc) {
-                    final data = doc.data();
-                    final lat = _toDouble(data['sphotLat']);
-                    final lng = _toDouble(data['sphotLng']);
+  final data = doc.data();
+  final lat = _toDouble(data['sphotLat']);
+  final lng = _toDouble(data['sphotLng']);
 
-                    return lat != 0 &&
-                        lng != 0 &&
-                        _matchesFilter(data) &&
-                        _matchesSearch(data);
-                  }).toList();
+  return lat != 0 &&
+      lng != 0 &&
+      _matchesFilter(data);
+}).toList();
 
                   final adminDocs = adminsSnapshot.data?.docs ?? [];
                   _latestAdminDocs = adminDocs;
@@ -2567,10 +2739,9 @@ Widget build(BuildContext context) {
                     final lng = _toDouble(territoire['villeLng']);
 
                     return lat != 0 &&
-                        lng != 0 &&
-                        _matchesAdminFilter(data) &&
-                        _matchesAdminSearch(data);
-                  }).toList();
+      lng != 0 &&
+      _matchesAdminFilter(data);
+}).toList();
 
                   final adDocs = adsSnapshot.data?.docs ?? [];
 
@@ -2678,22 +2849,21 @@ Widget build(BuildContext context) {
                                               filterQuality: FilterQuality.high,
                                             ),
                                             Text(
-                                              count,
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize:
-                                                    count.length >= 3 ? 13 : 16,
-                                                fontWeight: FontWeight.w900,
-                                                color: Colors.white,
-                                                shadows: const [
-                                                  Shadow(
-                                                    color: Colors.black,
-                                                    offset: Offset(1, 1),
-                                                    blurRadius: 2,
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
+  count,
+  textAlign: TextAlign.center,
+  style: TextStyle(
+    fontSize: count.length >= 3 ? 13 : 16,
+    fontWeight: FontWeight.w900,
+    color: Colors.black87,
+    shadows: const [
+      Shadow(
+        color: Colors.white70,
+        offset: Offset(0.5, 0.5),
+        blurRadius: 1,
+      ),
+    ],
+  ),
+),
                                           ],
                                         ),
                                       );
@@ -2722,8 +2892,15 @@ Widget build(BuildContext context) {
                           ],
                         ),
                       ),
+
+                      if (_selectedSpot != null)
+  _buildSpotDetailPanel(),
+
                       if (_selectedAdvertiser != null)
                         _buildAdvertiserDetailPanel(),
+
+                        if (_selectedAdmin != null)
+  _buildAdminDetailPanel(),
                     ],
                   );
                 },

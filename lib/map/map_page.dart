@@ -1319,63 +1319,72 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   return Colors.white;
 }
 
-  Widget _buildCluster(BuildContext context, List<Marker> markers) {
-  final count = markers.length;
-  final borderColor = _clusterBorderColor(markers);
-  final rotation = MapCamera.of(context).rotation;
+String _clusterIconPath(Color color) {
+  if (color == const Color(0xFFFF0000)) {
+    return 'data/icons/fire_red_icon.png';
+  }
 
-  final outlineColor = Colors.white;
+  if (color == const Color(0xFFD87A5C)) {
+    return 'data/icons/fire_skin_icon.png';
+  }
+
+  if (color == const Color(0xFFFFD000)) {
+    return 'data/icons/fire_orange_icon.png';
+  }
+
+  if (color == const Color(0xFF1E3A8A)) {
+    return 'data/icons/fire_blue_icon.png';
+  }
+
+  if (color == const Color(0xFF2E7D32)) {
+    return 'data/icons/fire_green_icon.png';
+  }
+
+  if (color == const Color(0xFF00ACC1)) {
+    return 'data/icons/fire_cyan_icon.png';
+  }
+
+  return 'data/icons/fire_orange1_icon.png';
+}
+
+  Widget _buildCluster(BuildContext context, List<Marker> markers) {
+  final clusterColor = _clusterBorderColor(markers);
+  final iconPath = _clusterIconPath(clusterColor);
+  final count = markers.length.toString();
+  final rotation = MapCamera.of(context).rotation;
 
   return Transform.rotate(
     angle: -rotation * pi / 180,
-    child: Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.transparent,
-        border: Border.all(
-          color: outlineColor,
-          width: 2.2,
-        ),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.transparent,
-          border: Border.all(
-            color: borderColor,
-            width: 2.2,
-          ),
-        ),
+    child: SizedBox(
+      width: 54,
+      height: 54,
+      child: Stack(
         alignment: Alignment.center,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            /// CONTOUR TEXTE
-            Text(
-              count.toString(),
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                foreground: Paint()
-                  ..style = PaintingStyle.stroke
-                  ..strokeWidth = 2.2
-                  ..color = outlineColor,
-              ),
+        children: [
+          Image.asset(
+            iconPath,
+            width: 54,
+            height: 54,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
+          Text(
+            count,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: count.length >= 3 ? 13 : 16,
+              fontWeight: FontWeight.w900,
+              color: Colors.black87,
+shadows: const [
+  Shadow(
+    color: Colors.white70,
+    offset: Offset(0.5, 0.5),
+    blurRadius: 1,
+  ),
+],
             ),
-
-            /// TEXTE COULEUR
-            Text(
-              count.toString(),
-              style: TextStyle(
-                color: borderColor,
-                fontWeight: FontWeight.w900,
-                fontSize: 15,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );
@@ -1784,7 +1793,7 @@ onPositionChanged: (position, hasGesture) {
                       return MarkerClusterLayerWidget(
                         options: MarkerClusterLayerOptions(
                           markers: markers,
-                          size: const Size(42, 42),
+                          size: const Size(54, 54),
                           maxClusterRadius: 45,
                           disableClusteringAtZoom: 16,
                           builder: _buildCluster,

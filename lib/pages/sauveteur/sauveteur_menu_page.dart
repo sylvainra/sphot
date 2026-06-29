@@ -14,10 +14,12 @@ class SauveteurMenuPage extends StatelessWidget {
 
 final String userRole;
 
+
   const SauveteurMenuPage({
   super.key,
   required this.profileColor,
   required this.userRole,
+
 });
 
   @override

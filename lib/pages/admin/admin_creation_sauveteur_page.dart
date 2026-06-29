@@ -68,7 +68,7 @@ String generatedPassword = '';
 bool accesGenere = false;
 
 bool emailEnvoye = false;
-bool smsEnvoye = false;
+
 
 String? createdSauveteurDocId;
 
@@ -117,19 +117,27 @@ Future<void> _startVoice(
 
   await _speech.listen(
     localeId: 'fr_FR',
-    onResult: (result) {
+    listenFor: const Duration(seconds: 10),
+    pauseFor: const Duration(seconds: 3),
+    onResult: (result) async {
+      if (!mounted) return;
+
       setState(() {
         if (uppercase) {
-  controller.text = result.recognizedWords.toUpperCase();
-} else if (capitalizeWords) {
-  final text = result.recognizedWords;
-  controller.text = text.isEmpty
-      ? text
-      : text[0].toUpperCase() + text.substring(1);
-} else {
-  controller.text = result.recognizedWords;
-}
+          controller.text = result.recognizedWords.toUpperCase();
+        } else if (capitalizeWords) {
+          final text = result.recognizedWords;
+          controller.text = text.isEmpty
+              ? text
+              : text[0].toUpperCase() + text.substring(1);
+        } else {
+          controller.text = result.recognizedWords;
+        }
       });
+
+      if (result.finalResult) {
+        await _speech.stop();
+      }
     },
   );
 }
@@ -224,7 +232,6 @@ createdSauveteurDocId ??= docRef.id;
   accesGenere = true;
 
   emailEnvoye = false;
-  smsEnvoye = false;
 });
 }
 
@@ -740,45 +747,7 @@ if (widget.docId == null) ...[
   ),
 ),
 
-const SizedBox(height: 8),
 
-SizedBox(
-  width: double.infinity,
-  height: 42,
-  child: ElevatedButton(
-    onPressed: accesGenere && contactOk
-    ? () {
-        setState(() {
-          smsEnvoye = true;
-        });
-      }
-    : null,
-    style: ElevatedButton.styleFrom(
-      backgroundColor: smsEnvoye
-          ? const Color(0xFFDC2626)
-          : Colors.transparent,
-      foregroundColor: smsEnvoye
-          ? Colors.white
-          : const Color(0xFFDC2626),
-      disabledBackgroundColor: Colors.transparent,
-      elevation: 0,
-      side: BorderSide(
-        color: smsEnvoye
-            ? const Color(0xFFDC2626)
-            : const Color(0xFFDC2626),
-        width: 2,
-      ),
-    ),
-    child: Text(
-      smsEnvoye
-          ? 'SMS ENVOYÉ'
-          : 'ENVOYER PAR SMS',
-      style: const TextStyle(
-        fontWeight: FontWeight.w900,
-      ),
-    ),
-  ),
-),
 ],
 
                     

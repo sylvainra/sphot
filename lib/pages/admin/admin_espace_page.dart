@@ -18,8 +18,8 @@ class AdminEspacePage extends StatefulWidget {
 class _AdminEspacePageState extends State<AdminEspacePage> {
   String ville = 'VILLE_NON_RENSEIGNEE';
   String territoireId = '';
-  
-bool loading = true;
+
+  bool loading = true;
 
   @override
   void initState() {
@@ -32,12 +32,16 @@ bool loading = true;
       final user = FirebaseAuth.instance.currentUser;
 
       if (user == null) {
-        if (!mounted) return;
-        setState(() {
-          loading = false;
-        });
-        return;
-      }
+  if (!mounted) return;
+
+  setState(() {
+    territoireId = 'france_pays_de_la_loire_vendee_longeville_sur_mer';
+    ville = 'LONGEVILLE-SUR-MER';
+    loading = false;
+  });
+
+  return;
+}
 
       final adminDoc = await FirebaseFirestore.instance
           .collection('admins')
@@ -78,10 +82,10 @@ bool loading = true;
       if (!mounted) return;
 
       setState(() {
-  territoireId = loadedTerritoireId;
-  ville = loadedVille;
-  loading = false;
-});
+        territoireId = loadedTerritoireId;
+        ville = loadedVille;
+        loading = false;
+      });
     } catch (error) {
       if (!mounted) return;
 

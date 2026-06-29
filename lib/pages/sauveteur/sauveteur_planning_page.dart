@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:csv/csv.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SauveteurPlanningPage extends StatefulWidget {
   final Color profileColor;
-  final String userRole;
+final String userRole;
+
 
   const SauveteurPlanningPage({
     super.key,
     required this.profileColor,
     required this.userRole,
+    
   });
 
   @override
@@ -34,9 +37,12 @@ class _SauveteurPlanningPageState extends State<SauveteurPlanningPage> {
   final ScrollController _totalHorizontalController = ScrollController();
 
   bool _syncingScroll = false;
+  bool planningEnregistre = false;
 
-  List<String> beachList = [];
-  String? selectedBeach;
+  final List<Map<String, String>> beachList = [];
+
+String? selectedBeach;
+String? selectedSpotId;
 
   bool isBeachMenuOpen = false;
 
@@ -168,46 +174,54 @@ class _SauveteurPlanningPageState extends State<SauveteurPlanningPage> {
   }
 
   Future<void> _loadBeaches() async {
-    final rawData = await rootBundle.loadString(
-      'data/pays/france/pays_de_la_loire/vendee/longeville_sur_mer/longeville_sur_mer.csv',
+  final snapshot = await FirebaseFirestore.instance
+      .collection('territoires')
+      .doc('longeville_sur_mer')
+      .collection('spots')
+      .where('typeSphot', isEqualTo: '🚨 POSTE DE SECOURS 🚨')
+      .get();
+
+  final spots = snapshot.docs.map((doc) {
+    final data = doc.data();
+    final nomSecours = (data['nomSecours'] ?? '').toString();
+    final nomSphot = (data['nomSphot'] ?? '').toString();
+
+    final label = [
+      nomSecours,
+      nomSphot,
+    ].where((v) => v.trim().isNotEmpty).join(' - ');
+
+    return {
+      'id': doc.id,
+      'label': label.isEmpty ? doc.id : label,
+    };
+  }).toList();
+
+  spots.sort((a, b) => a['label']!.compareTo(b['label']!));
+
+  setState(() {
+  beachList
+    ..clear()
+    ..addAll(
+      spots.map(
+        (e) => {
+          'id': e['id']!,
+          'label': e['label']!,
+        },
+      ),
     );
 
-    final List<List<dynamic>> csvTable =
-        const CsvToListConverter().convert(rawData);
-
-    final headers = csvTable.first.map((e) => e.toString().trim()).toList();
-
-    final int nameIndex = headers.indexOf('nomSphot');
-    final int typeIndex = headers.indexOf('typeSphot');
-
-    if (nameIndex == -1 || typeIndex == -1) {
-      setState(() {
-        beachList = [];
-        selectedBeach = null;
-      });
-      return;
-    }
-
-    final List<String> beaches = [];
-
-    for (int i = 1; i < csvTable.length; i++) {
-      final row = csvTable[i];
-
-      if (row.length <= nameIndex || row.length <= typeIndex) continue;
-
-      final String name = row[nameIndex].toString().trim();
-      final String type = row[typeIndex].toString().toUpperCase();
-
-      if (name.isNotEmpty && type.contains('POSTE DE SECOURS')) {
-        beaches.add(name);
-      }
-    }
-
-    setState(() {
-      beachList = beaches.toSet().toList()..sort();
-      selectedBeach = beachList.isNotEmpty ? beachList.first : null;
-    });
+  if (beachList.isNotEmpty) {
+    selectedBeach = beachList.first['label'];
+    selectedSpotId = beachList.first['id'];
+  } else {
+    selectedBeach = null;
+    selectedSpotId = null;
   }
+});
+
+  await _loadPlanning();
+}
 
   @override
   void dispose() {
@@ -232,6 +246,86 @@ class _SauveteurPlanningPageState extends State<SauveteurPlanningPage> {
 
     super.dispose();
   }
+
+String get _planningMonthId {
+  final now = DateTime.now();
+  return '${now.year}-${now.month.toString().padLeft(2, '0')}';
+}
+
+Future<void> _loadPlanning() async {
+  if (selectedSpotId == null) return;
+
+  final doc = await FirebaseFirestore.instance
+      .collection('territoires')
+      .doc('longeville_sur_mer')
+      .collection('spots')
+      .doc(selectedSpotId)
+      .collection('planningSauveteurs')
+      .doc(_planningMonthId)
+      .get();
+
+  if (!doc.exists) return;
+
+  final data = doc.data() ?? {};
+  final cells = Map<String, dynamic>.from(data['cells'] ?? {});
+  final names = Map<String, dynamic>.from(data['names'] ?? {});
+
+  setState(() {
+    for (final entry in cells.entries) {
+      controllers[entry.key]?.text = entry.value.toString();
+    }
+
+    for (final entry in names.entries) {
+      nameControllers[entry.key]?.text = entry.value.toString();
+    }
+
+    hoursController.text = (data['openingHours'] ?? hoursController.text).toString();
+  });
+}
+
+Future<void> _savePlanning() async {
+  if (selectedSpotId == null) return;
+
+  final cells = <String, String>{};
+  for (final entry in controllers.entries) {
+    cells[entry.key] = entry.value.text;
+  }
+
+  final names = <String, String>{};
+  for (final entry in nameControllers.entries) {
+    names[entry.key] = entry.value.text;
+  }
+
+  await FirebaseFirestore.instance
+      .collection('territoires')
+      .doc('longeville_sur_mer')
+      .collection('spots')
+      .doc(selectedSpotId)
+      .collection('planningSauveteurs')
+      .doc(_planningMonthId)
+      .set({
+    'spotId': selectedSpotId,
+    'spotLabel': selectedBeach,
+    'monthId': _planningMonthId,
+    'openingHours': hoursController.text,
+    'cells': cells,
+    'names': names,
+    'updatedAt': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
+  if (!mounted) return;
+
+setState(() {
+  planningEnregistre = true;
+});
+
+await Future.delayed(const Duration(seconds: 1));
+
+if (!mounted) return;
+
+setState(() {
+  planningEnregistre = false;
+});
+}
 
   Future<void> _listenToCell(
     String key,
@@ -830,14 +924,24 @@ class _SauveteurPlanningPageState extends State<SauveteurPlanningPage> {
       onCanceled: () {
         setState(() => isBeachMenuOpen = false);
       },
-      onSelected: (beach) {
-        setState(() {
-          selectedBeach = beach;
-          isBeachMenuOpen = false;
-        });
-      },
+      onSelected: (beach) async {
+
+  final selected = beachList.firstWhere(
+    (e) => e['label'] == beach,
+  );
+
+  setState(() {
+    selectedBeach = selected['label'];
+    selectedSpotId = selected['id'];
+    isBeachMenuOpen = false;
+  });
+
+  await _loadPlanning();
+},
       itemBuilder: (context) {
-        return beachList.map((beach) {
+        return beachList.map((spot) {
+
+  final beach = spot['label']!;
           final bool selected = beach == selectedBeach;
 
           return PopupMenuItem<String>(
@@ -901,7 +1005,7 @@ class _SauveteurPlanningPageState extends State<SauveteurPlanningPage> {
                   ),
                   const SizedBox(height: 2),
                   SizedBox(
-                    height: 500,
+                    height: 445,
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
@@ -979,6 +1083,49 @@ class _SauveteurPlanningPageState extends State<SauveteurPlanningPage> {
                       ),
                     ),
                   ),
+
+const SizedBox(height: 8),
+
+SizedBox(
+  width: double.infinity,
+  height: 46,
+  child: ElevatedButton.icon(
+    onPressed: _savePlanning,
+    icon: Icon(
+      planningEnregistre ? Icons.check_rounded : Icons.save_rounded,
+      color: planningEnregistre ? Colors.white : const Color(0xFFFF0000),
+      size: 20,
+    ),
+    label: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        planningEnregistre ? 'PLANNING ENREGISTRÉ' : 'ENREGISTRER LE PLANNING',
+        maxLines: 1,
+        style: TextStyle(
+          fontWeight: FontWeight.w900,
+          fontSize: 14,
+          color: planningEnregistre ? Colors.white : const Color(0xFFFF0000),
+        ),
+      ),
+    ),
+    style: ElevatedButton.styleFrom(
+      backgroundColor:
+          planningEnregistre ? const Color(0xFFFF0000) : Colors.transparent,
+      foregroundColor:
+          planningEnregistre ? Colors.white : const Color(0xFFFF0000),
+      disabledBackgroundColor: Colors.transparent,
+      elevation: 0,
+      side: const BorderSide(
+        color: Color(0xFFFF0000),
+        width: 2,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+    ),
+  ),
+),
+
                   Transform.translate(
                     offset: const Offset(0, 9),
                     child: GestureDetector(

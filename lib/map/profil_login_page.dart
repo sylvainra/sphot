@@ -86,60 +86,50 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
   }
 
   Future<void> _loginSauveteur() async {
-    final id = _idController.text.trim().toLowerCase();
-    final password = _passwordController.text.trim();
+  final id = _idController.text.trim().toLowerCase();
+  final password = _passwordController.text.trim();
 
-    final account = sauveteurAccounts[id];
-
-    if (account != null && account['password'] == password) {
-      final String userRole = account['role']!;
-
-      if (!mounted) return;
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => SauveteurMenuPage(
-            profileColor: const Color(0xFFFF0000),
-            userRole: userRole,
-          ),
-        ),
-      );
-    } else {
-      _showLoginError();
-    }
+  if (id.isEmpty || password.isEmpty) {
+    _showLoginError();
+    return;
   }
 
-  Future<void> _loginWithProConnect() async {
   try {
-    final result = await ProConnectService().login();
+    const territoireId = 'longeville_sur_mer';
 
-    if (result == null) {
-  if (!mounted) return;
+    final snapshot = await FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(territoireId)
+        .collection('sauveteurs')
+        .where('login', isEqualTo: id)
+        .where('temporaryPassword', isEqualTo: password)
+        .where('accountStatus', isEqualTo: 'ACTIVE')
+        .limit(1)
+        .get();
 
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('Connexion ProConnect annulée ou impossible.'),
-      duration: Duration(seconds: 4),
-    ),
-  );
+    if (snapshot.docs.isEmpty) {
+      _showLoginError();
+      return;
+    }
 
-  return;
-}
+    final data = snapshot.docs.first.data();
 
-    debugPrint('Access token : ${result.accessToken}');
-    debugPrint('Id token : ${result.idToken}');
+    final fonctions = data['fonctions'];
+    String userRole = 'Sauveteur';
+
+    if (fonctions is Iterable && fonctions.isNotEmpty) {
+      userRole = fonctions.first.toString();
+    } else if ((data['role'] ?? '').toString().trim().isNotEmpty) {
+      userRole = data['role'].toString();
+    }
 
     if (!mounted) return;
 
-    Navigator.of(context).push(
+    Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => AdminRegistrationPage(
-          proConnectUid: 'temp_uid',
-          proConnectEmail: '',
-          proConnectNom: '',
-          proConnectPrenom: '',
-          proConnectOrganisation: '',
-          proConnectSiret: '',
+        builder: (_) => SauveteurMenuPage(
+          profileColor: const Color(0xFFFF0000),
+          userRole: userRole,
         ),
       ),
     );
@@ -148,11 +138,21 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Erreur ProConnect : $error'),
-        duration: const Duration(seconds: 5),
+        content: Text('Erreur connexion sauveteur : $error'),
+        duration: const Duration(seconds: 4),
       ),
     );
   }
+}
+
+  Future<void> _loginWithProConnect() async {
+  if (!mounted) return;
+
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => const AdminEspacePage(),
+    ),
+  );
 }
 
   void _showLoginError() {
