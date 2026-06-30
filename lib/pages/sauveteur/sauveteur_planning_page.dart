@@ -6,14 +6,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SauveteurPlanningPage extends StatefulWidget {
   final Color profileColor;
-final String userRole;
+  final String userRole;
+  final String territoireId;
 
 
   const SauveteurPlanningPage({
     super.key,
     required this.profileColor,
     required this.userRole,
-    
+    required this.territoireId,
   });
 
   @override
@@ -176,7 +177,7 @@ String? selectedSpotId;
   Future<void> _loadBeaches() async {
   final snapshot = await FirebaseFirestore.instance
       .collection('territoires')
-      .doc('longeville_sur_mer')
+      .doc(widget.territoireId)
       .collection('spots')
       .where('typeSphot', isEqualTo: '🚨 POSTE DE SECOURS 🚨')
       .get();
@@ -257,7 +258,7 @@ Future<void> _loadPlanning() async {
 
   final doc = await FirebaseFirestore.instance
       .collection('territoires')
-      .doc('longeville_sur_mer')
+      .doc(widget.territoireId)
       .collection('spots')
       .doc(selectedSpotId)
       .collection('planningSauveteurs')
@@ -298,7 +299,7 @@ Future<void> _savePlanning() async {
 
   await FirebaseFirestore.instance
       .collection('territoires')
-      .doc('longeville_sur_mer')
+      .doc(widget.territoireId)
       .collection('spots')
       .doc(selectedSpotId)
       .collection('planningSauveteurs')

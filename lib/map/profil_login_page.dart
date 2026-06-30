@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-
 import '../pages/sauveteur/sauveteur_menu_page.dart';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
 import '../pages/admin/admin_espace_page.dart';
 import '../pages/admin/admin_registration_page.dart';
-
 import '../services/proconnect_service.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class ProfilLoginPage extends StatefulWidget {
   const ProfilLoginPage({super.key});
@@ -27,6 +25,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
 
   bool _isEditing = false;
   bool _showPassword = false;
+  String? _loginErrorMessage;
 
   final Map<String, Map<String, String>> sauveteurAccounts = {
     'chef': {
@@ -89,39 +88,58 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
   final id = _idController.text.trim().toLowerCase();
   final password = _passwordController.text.trim();
 
+  setState(() {
+    _loginErrorMessage = null;
+  });
+
   if (id.isEmpty || password.isEmpty) {
-    _showLoginError();
+    setState(() {
+      _loginErrorMessage = 'Veuillez renseigner votre identifiant et votre mot de passe.';
+    });
     return;
   }
 
   try {
-    const territoireId = 'longeville_sur_mer';
+    final uri = Uri.parse(
+      'https://us-central1-sphot-ab80b.cloudfunctions.net/loginSauveteur',
+    );
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('territoires')
-        .doc(territoireId)
-        .collection('sauveteurs')
-        .where('login', isEqualTo: id)
-        .where('temporaryPassword', isEqualTo: password)
-        .where('accountStatus', isEqualTo: 'ACTIVE')
-        .limit(1)
-        .get();
+    debugPrint('Appel Cloud Function : $uri');
 
-    if (snapshot.docs.isEmpty) {
-      _showLoginError();
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'login': id,
+        'password': password,
+      }),
+    );
+
+    debugPrint('Status = ${response.statusCode}');
+debugPrint('Body = ${response.body}');
+
+    if (response.statusCode != 200) {
+      setState(() {
+        _loginErrorMessage =
+            'Identifiant ou mot de passe incorrect.';
+      });
       return;
     }
 
-    final data = snapshot.docs.first.data();
+    final result = jsonDecode(response.body) as Map<String, dynamic>;
 
-    final fonctions = data['fonctions'];
-    String userRole = 'Sauveteur';
-
-    if (fonctions is Iterable && fonctions.isNotEmpty) {
-      userRole = fonctions.first.toString();
-    } else if ((data['role'] ?? '').toString().trim().isNotEmpty) {
-      userRole = data['role'].toString();
+    if (result['success'] != true) {
+      setState(() {
+        _loginErrorMessage =
+            'Identifiant ou mot de passe incorrect.';
+      });
+      return;
     }
+
+    final userRole = (result['userRole'] ?? 'Sauveteur').toString();
+    final territoireId = (result['territoireId'] ?? '').toString();
 
     if (!mounted) return;
 
@@ -130,18 +148,17 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
         builder: (_) => SauveteurMenuPage(
           profileColor: const Color(0xFFFF0000),
           userRole: userRole,
+          territoireId: territoireId,
         ),
       ),
     );
   } catch (error) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Erreur connexion sauveteur : $error'),
-        duration: const Duration(seconds: 4),
-      ),
-    );
+    setState(() {
+      _loginErrorMessage =
+          'Connexion impossible. Vérifiez vos identifiants ou contactez votre administrateur SPHOT.';
+    });
   }
 }
 
@@ -398,6 +415,19 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
                                     ),
                                   ),
                                 ),
+                                if (_loginErrorMessage != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 12),
+                                    child: Text(
+                                      _loginErrorMessage!,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.redAccent,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
                           ),

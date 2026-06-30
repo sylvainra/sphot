@@ -11,14 +11,15 @@ import 'sauveteur_planning_page.dart';
 
 class SauveteurMenuPage extends StatelessWidget {
   final Color profileColor;
-
-final String userRole;
+  final String userRole;
+  final String territoireId;
 
 
   const SauveteurMenuPage({
   super.key,
   required this.profileColor,
   required this.userRole,
+  required this.territoireId,
 
 });
 
@@ -170,6 +171,7 @@ _MenuSquare(
       builder: (_) => SauveteurPlanningPage(
   profileColor: const Color(0xFF43A047),
   userRole: userRole,
+  territoireId: territoireId,
 ),
     ),
   );

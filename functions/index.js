@@ -528,3 +528,86 @@ L'équipe SPHOT`,
       }
     },
 );
+
+exports.loginSauveteur = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const login = (request.body.login || "")
+            .toString()
+            .trim()
+            .toLowerCase();
+
+        const password = (request.body.password || "")
+            .toString()
+            .trim();
+
+        if (!login || !password) {
+          response.status(400).json({success: false});
+          return;
+        }
+
+        const snapshot = await admin.firestore()
+            .collectionGroup("sauveteurs")
+            .where("login", "==", login)
+            .limit(1)
+            .get();
+
+        if (snapshot.empty) {
+          response.status(401).json({success: false});
+          return;
+        }
+
+        const doc = snapshot.docs[0];
+        const data = doc.data();
+
+        if (data.accountStatus !== "ACTIVE") {
+          response.status(401).json({success: false});
+          return;
+        }
+
+        if (data.temporaryPassword !== password) {
+          response.status(401).json({success: false});
+          return;
+        }
+
+        let userRole = "Sauveteur";
+
+        if (Array.isArray(data.fonctions) && data.fonctions.length > 0) {
+          userRole = data.fonctions[0].toString();
+        } else if ((data.role || "").toString().trim() !== "") {
+          userRole = data.role.toString();
+        }
+
+        await doc.ref.set(
+            {
+              lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            {merge: true},
+        );
+
+        response.status(200).json({
+          success: true,
+          sauveteurId: doc.id,
+          territoireId: (data.territoireId || "").toString(),
+          userRole: userRole,
+          mustChangePassword: data.mustChangePassword === true,
+        });
+      } catch (error) {
+        console.error("Erreur login sauveteur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
