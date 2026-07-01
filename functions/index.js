@@ -559,19 +559,17 @@ exports.loginSauveteur = onRequest(
           return;
         }
 
-        const snapshot = await admin.firestore()
-            .collectionGroup("sauveteurs")
-            .where("login", "==", login)
-            .limit(1)
+        const accountDoc = await admin.firestore()
+            .collection("sauveteurAccounts")
+            .doc(login)
             .get();
 
-        if (snapshot.empty) {
+        if (!accountDoc.exists) {
           response.status(401).json({success: false});
           return;
         }
 
-        const doc = snapshot.docs[0];
-        const data = doc.data();
+        const data = accountDoc.data();
 
         if (data.accountStatus !== "ACTIVE") {
           response.status(401).json({success: false});
@@ -582,6 +580,8 @@ exports.loginSauveteur = onRequest(
           response.status(401).json({success: false});
           return;
         }
+
+        const doc = accountDoc;
 
         let userRole = "Sauveteur";
 
@@ -607,6 +607,198 @@ exports.loginSauveteur = onRequest(
         });
       } catch (error) {
         console.error("Erreur login sauveteur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.upsertSauveteurAccount = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const data = request.body || {};
+        const login = (data.login || "").toString().trim().toLowerCase();
+
+        if (!login) {
+          response.status(400).json({success: false});
+          return;
+        }
+
+        await admin.firestore()
+            .collection("sauveteurAccounts")
+            .doc(login)
+            .set(
+                {
+                  ...data,
+                  login: login,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                {merge: true},
+            );
+
+        response.status(200).json({success: true});
+      } catch (error) {
+        console.error("Erreur upsert sauveteurAccount:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.changeSauveteurPassword = onRequest(
+    {
+      secrets: ["GMAIL_APP_PASSWORD"],
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const login = (request.body.login || "")
+            .toString()
+            .trim()
+            .toLowerCase();
+
+        const newPassword = (request.body.newPassword || "")
+            .toString()
+            .trim();
+
+        let email = "";
+        let prenom = "Sauveteur";
+
+        const accountBeforeUpdate = await admin.firestore()
+            .collection("sauveteurAccounts")
+            .doc(login)
+            .get();
+
+        if (accountBeforeUpdate.exists) {
+          const accountData = accountBeforeUpdate.data();
+
+          email = (accountData.email || "").toString().trim();
+          prenom = (accountData.prenom || "Sauveteur")
+              .toString()
+              .trim();
+        }
+
+        if (!login || !newPassword) {
+          response.status(400).json({success: false});
+          return;
+        }
+
+        await admin.firestore()
+            .collection("sauveteurAccounts")
+            .doc(login)
+            .set(
+                {
+                  temporaryPassword: newPassword,
+                  mustChangePassword: false,
+                  passwordUpdatedAt:
+                      admin.firestore.FieldValue.serverTimestamp(),
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                {merge: true},
+            );
+
+        if (email) {
+          try {
+            const transporter = nodemailer.createTransport({
+              service: "gmail",
+              auth: {
+                user: SMTP_USER,
+                pass: process.env.GMAIL_APP_PASSWORD,
+              },
+            });
+
+            await transporter.sendMail({
+              from: MAIL_FROM,
+              to: email,
+              subject: "Votre mot de passe SPHOT a été modifié",
+              html: `
+<p>Bonjour <strong>${prenom}</strong>,</p>
+
+<p>Votre mot de passe SPHOT a été modifié avec succès.</p>
+
+<p>
+Si vous êtes à l'origine de cette modification,
+aucune autre action n'est nécessaire.
+</p>
+
+<p>
+Si ce n'est pas vous, contactez immédiatement votre administrateur SPHOT.
+</p>
+
+<p>
+À bientôt sur SPHOT.<br>
+<strong>L'équipe SPHOT</strong>
+</p>
+`,
+            });
+          } catch (mailError) {
+            console.error("Erreur email confirmation mot de passe:", mailError);
+          }
+        }
+
+        response.status(200).json({success: true});
+      } catch (error) {
+        console.error("Erreur changement mot de passe sauveteur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.deleteSauveteurAccount = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const login = (request.body.login || "")
+            .toString()
+            .trim()
+            .toLowerCase();
+
+        if (!login) {
+          response.status(400).json({success: false});
+          return;
+        }
+
+        await admin.firestore()
+            .collection("sauveteurAccounts")
+            .doc(login)
+            .delete();
+
+        response.status(200).json({success: true});
+      } catch (error) {
+        console.error("Erreur suppression sauveteurAccount:", error);
         response.status(500).json({success: false});
       }
     },

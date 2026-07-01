@@ -1,11 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-
-
 import 'admin_profile_button.dart';
-
 import 'admin_creation_sauveteur_page.dart';
+import 'dart:convert';
 
 class AdminGestionSauveteurPage extends StatefulWidget {
   final String ville;
@@ -82,7 +80,26 @@ Future<void> _sendResetCredentialsEmail({
     debugPrint('Erreur email SPHOT : ${response.body}');
   }
 }
-  
+
+Future<void> _upsertSauveteurAccount({
+  required String login,
+  required String temporaryPassword,
+}) async {
+  final uri = Uri.parse(
+    'https://us-central1-sphot-ab80b.cloudfunctions.net/upsertSauveteurAccount',
+  );
+
+  await http.post(
+    uri,
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({
+      'login': login,
+      'temporaryPassword': temporaryPassword,
+      'mustChangePassword': true,
+      'accountStatus': 'ACTIVE',
+    }),
+  );
+}  
 
 Future<List<Widget>> _buildSphotLines(List<String> posteIds) async {
   final widgets = <Widget>[];
@@ -425,6 +442,15 @@ Builder(
                       SetOptions(merge: true),
                     );
 
+                 
+
+if (login.isNotEmpty) {
+  await _upsertSauveteurAccount(
+    login: login,
+    temporaryPassword: newPassword,
+  );
+}
+
                     if (!mounted) return;
 
                     setState(() {
@@ -581,6 +607,20 @@ Builder(
     },
     SetOptions(merge: true),
   );
+  final login = (data['login'] ?? '').toString();
+
+if (login.isNotEmpty) {
+  await FirebaseFirestore.instance
+      .collection('sauveteurAccounts')
+      .doc(login)
+      .set(
+    {
+      'accountStatus': newStatus,
+      'updatedAt': FieldValue.serverTimestamp(),
+    },
+    SetOptions(merge: true),
+  );
+}
 },
         style: ElevatedButton.styleFrom(
           backgroundColor: isSuspended
@@ -642,12 +682,37 @@ Future.delayed(
 return;
               }
 
-              await FirebaseFirestore.instance
-                  .collection('territoires')
-                  .doc(widget.territoireId)
-                  .collection('sauveteurs')
-                  .doc(doc.id)
-                  .delete();
+              final login = (data['login'] ?? '').toString();
+
+await FirebaseFirestore.instance
+    .collection('territoires')
+    .doc(widget.territoireId)
+    .collection('sauveteurs')
+    .doc(doc.id)
+    .delete();
+
+if (login.isNotEmpty) {
+  await http.post(
+    Uri.parse(
+      'https://us-central1-sphot-ab80b.cloudfunctions.net/deleteSauveteurAccount',
+    ),
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({
+      'login': login,
+    }),
+  );
+}
+
+for (final posteId in postesAffectes) {
+  await FirebaseFirestore.instance
+      .collection('territoires')
+      .doc(widget.territoireId)
+      .collection('spots')
+      .doc(posteId)
+      .collection('sauveteursAffectes')
+      .doc(doc.id)
+      .delete();
+}
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFDC2626),

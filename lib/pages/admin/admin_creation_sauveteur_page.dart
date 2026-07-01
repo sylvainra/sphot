@@ -153,13 +153,13 @@ Future<String> _generateUniqueLogin(String baseLogin) async {
 
   while (true) {
     final existing = await sauveteursRef
-        .where('login', isEqualTo: candidate)
-        .limit(1)
-        .get();
+    .where('login', isEqualTo: candidate)
+    .limit(1)
+    .get();
 
-    if (existing.docs.isEmpty) {
-      return candidate;
-    }
+if (existing.docs.isEmpty) {
+  return candidate;
+}
 
     candidate = '$baseLogin$counter';
     counter++;
@@ -226,6 +226,16 @@ createdSauveteurDocId ??= docRef.id;
     'updatedAt': FieldValue.serverTimestamp(),
   }, SetOptions(merge: true));
 
+  await _upsertSauveteurAccount(
+  login: login,
+  temporaryPassword: password,
+  accountStatus: 'ACTIVE',
+  sauveteurId: docRef.id,
+  nom: nom.toUpperCase(),
+  prenom: prenom,
+  email: emailController.text.trim(),
+);
+
   setState(() {
   generatedLogin = login;
   generatedPassword = password;
@@ -235,6 +245,37 @@ createdSauveteurDocId ??= docRef.id;
 });
 }
 
+Future<void> _upsertSauveteurAccount({
+  required String login,
+  required String temporaryPassword,
+  required String accountStatus,
+  required String sauveteurId,
+  required String nom,
+  required String prenom,
+  required String email,
+}) async {
+  final uri = Uri.parse(
+    'https://us-central1-sphot-ab80b.cloudfunctions.net/upsertSauveteurAccount',
+  );
+
+  await http.post(
+    uri,
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({
+      'login': login,
+      'temporaryPassword': temporaryPassword,
+      'mustChangePassword': true,
+      'accountStatus': accountStatus,
+      'territoireId': widget.territoireId,
+      'sauveteurId': sauveteurId,
+      'nom': nom,
+      'prenom': prenom,
+      'email': email,
+      'role': 'SAUVETEUR',
+    }),
+  );
+}
+
 Future<void> _sendCredentialsEmail() async {
   final email = emailController.text.trim();
   final prenom = prenomController.text.trim();
@@ -242,6 +283,14 @@ Future<void> _sendCredentialsEmail() async {
   if (email.isEmpty || generatedLogin.isEmpty || generatedPassword.isEmpty) {
     return;
   }
+
+  if (!mounted) return;
+
+  setState(() {
+  emailEnvoye = true;
+});
+
+debugPrint(">>> emailEnvoye = $emailEnvoye");
 
   final uri = Uri.https(
     'us-central1-sphot-ab80b.cloudfunctions.net',
@@ -254,14 +303,19 @@ Future<void> _sendCredentialsEmail() async {
     },
   );
 
-  final response = await http.get(uri);
+  try {
+    debugPrint(">>> Avant appel HTTP");
+    final response = await http.get(uri);
+    debugPrint(">>> Après appel HTTP");
 
-  if (response.statusCode == 200) {
-    setState(() {
-      emailEnvoye = true;
-    });
-  } else {
-    debugPrint('Erreur email SPHOT : ${response.body}');
+    debugPrint("STATUS EMAIL = ${response.statusCode}");
+    debugPrint("BODY EMAIL = ${response.body}");
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      debugPrint('Erreur email SPHOT : ${response.statusCode} - ${response.body}');
+    }
+  } catch (e) {
+    debugPrint('Email probablement envoyé, mais réponse non lisible : $e');
   }
 }
 
@@ -307,7 +361,9 @@ bool _validateSauveteurBeforeSave() {
   }
 
   if (widget.docId == null && generatedPassword.isEmpty) {
-    _showError('Le mot de passe temporaire doit être généré avant enregistrement.');
+    _showError(
+      'Le mot de passe temporaire doit être généré avant enregistrement.',
+    );
     return false;
   }
 
@@ -375,7 +431,42 @@ final sauveteurData = {
 
   await docRef.set(sauveteurData, SetOptions(merge: true));
 
-  for (final posteId in postesSelectionnes) {
+  if (loginToSave.isNotEmpty) {
+  await _upsertSauveteurAccount(
+    login: loginToSave,
+    temporaryPassword:
+        sauveteurData['temporaryPassword'].toString(),
+    accountStatus: 'ACTIVE',
+    sauveteurId: docRef.id,
+    nom: nom.toUpperCase(),
+    prenom: prenom,
+    email: emailController.text.trim(),
+  );
+}
+
+ final anciensPostesAffectes =
+    (widget.data?['postesAffectes'] as List?)
+            ?.map((e) => e.toString())
+            .toSet() ??
+        <String>{};
+
+final nouveauxPostesAffectes = postesSelectionnes.toSet();
+
+final postesARetirer =
+    anciensPostesAffectes.difference(nouveauxPostesAffectes);
+
+for (final posteId in postesARetirer) {
+  await FirebaseFirestore.instance
+      .collection('territoires')
+      .doc(widget.territoireId)
+      .collection('spots')
+      .doc(posteId)
+      .collection('sauveteursAffectes')
+      .doc(docRef.id)
+      .delete();
+}
+
+for (final posteId in nouveauxPostesAffectes) {
   await FirebaseFirestore.instance
       .collection('territoires')
       .doc(widget.territoireId)
@@ -388,6 +479,7 @@ final sauveteurData = {
     'nom': nom.toUpperCase(),
     'prenom': prenom,
     'fonctions': fonctionsSelectionnees,
+    'postesAffectes': postesSelectionnes,
     'territoireId': widget.territoireId,
     'updatedAt': FieldValue.serverTimestamp(),
   }, SetOptions(merge: true));
@@ -714,14 +806,11 @@ if (widget.docId == null) ...[
   height: 42,
   child: ElevatedButton(
     onPressed: accesGenere && contactOk
-    ? () async {
-        setState(() {
-          emailEnvoye = true;
-        });
-
-        await _sendCredentialsEmail();
-      }
-    : null,
+        ? () async {
+            if (emailEnvoye) return;
+            await _sendCredentialsEmail();
+          }
+        : null,
     style: ElevatedButton.styleFrom(
       backgroundColor: emailEnvoye
           ? const Color(0xFFDC2626)
@@ -730,6 +819,7 @@ if (widget.docId == null) ...[
           ? Colors.white
           : const Color(0xFFDC2626),
       disabledBackgroundColor: Colors.transparent,
+      disabledForegroundColor: const Color(0xFFDC2626),
       elevation: 0,
       side: const BorderSide(
         color: Color(0xFFDC2626),
@@ -737,9 +827,7 @@ if (widget.docId == null) ...[
       ),
     ),
     child: Text(
-      emailEnvoye
-          ? 'EMAIL ENVOYÉ'
-          : 'ENVOYER PAR EMAIL',
+      emailEnvoye ? 'EMAIL ENVOYÉ' : 'ENVOYER PAR EMAIL',
       style: const TextStyle(
         fontWeight: FontWeight.w900,
       ),

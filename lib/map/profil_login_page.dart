@@ -7,6 +7,7 @@ import '../pages/admin/admin_registration_page.dart';
 import '../services/proconnect_service.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../pages/sauveteur/change_password_page.dart';
 
 class ProfilLoginPage extends StatefulWidget {
   const ProfilLoginPage({super.key});
@@ -130,20 +131,34 @@ debugPrint('Body = ${response.body}');
 
     final result = jsonDecode(response.body) as Map<String, dynamic>;
 
-    if (result['success'] != true) {
-      setState(() {
-        _loginErrorMessage =
-            'Identifiant ou mot de passe incorrect.';
-      });
-      return;
-    }
+if (result['success'] != true) {
+  setState(() {
+    _loginErrorMessage = 'Identifiant ou mot de passe incorrect.';
+  });
+  return;
+}
 
-    final userRole = (result['userRole'] ?? 'Sauveteur').toString();
-    final territoireId = (result['territoireId'] ?? '').toString();
+final userRole = (result['userRole'] ?? 'Sauveteur').toString();
+final territoireId = (result['territoireId'] ?? '').toString();
+final mustChangePassword =
+    result['mustChangePassword'] == true;
 
-    if (!mounted) return;
+if (!mounted) return;
 
-    Navigator.of(context).pushReplacement(
+if (mustChangePassword) {
+  Navigator.of(context).pushReplacement(
+    MaterialPageRoute(
+      builder: (_) => ChangePasswordPage(
+        login: id,
+        territoireId: territoireId,
+        userRole: userRole,
+      ),
+    ),
+  );
+  return;
+}
+
+Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => SauveteurMenuPage(
           profileColor: const Color(0xFFFF0000),
@@ -210,9 +225,11 @@ debugPrint('Body = ${response.body}');
               fit: BoxFit.cover,
             ),
             SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 26),
-                child: Column(
+  child: SingleChildScrollView(
+    keyboardDismissBehavior:
+        ScrollViewKeyboardDismissBehavior.onDrag,
+    padding: const EdgeInsets.symmetric(horizontal: 26),
+    child: Column(
                   children: [
                     Image.asset(
                       'data/icons/title.png',
@@ -242,13 +259,8 @@ debugPrint('Body = ${response.body}');
                     const SizedBox(height: 16),
 
                     AnimatedContainer(
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      transform: Matrix4.translationValues(
-                        0,
-                        _isEditing ? -150 : 0,
-                        0,
-                      ),
+  duration: const Duration(milliseconds: 260),
+  curve: Curves.easeOutCubic,
                       child: Column(
                         children: [
                           Container(
@@ -490,7 +502,7 @@ debugPrint('Body = ${response.body}');
                       ),
                     ),
 
-                    const Spacer(),
+                    const SizedBox(height: 40),
 
                     if (!_isEditing)
                       Container(
@@ -514,7 +526,7 @@ debugPrint('Body = ${response.body}');
                         ),
                       ),
 
-                    const SizedBox(height: 18),
+                                        const SizedBox(height: 18),
                   ],
                 ),
               ),
