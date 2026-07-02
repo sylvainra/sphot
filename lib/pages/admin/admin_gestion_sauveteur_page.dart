@@ -53,31 +53,58 @@ Future<void> _sendResetCredentialsEmail({
   required String motDePasse,
   required String sauveteurId,
 }) async {
+  debugPrint('RESET EMAIL = "$email"');
+  debugPrint('RESET IDENTIFIANT = "$identifiant"');
+  debugPrint('RESET PASSWORD = "$motDePasse"');
+
   if (email.isEmpty || identifiant.isEmpty || motDePasse.isEmpty) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Email impossible : donnée manquante.'),
+      ),
+    );
     return;
   }
 
+  if (!mounted) return;
+
+setState(() {
+  passwordResetEmailSentIds.add(sauveteurId);
+});
+
   final uri = Uri.https(
-    'us-central1-sphot-ab80b.cloudfunctions.net',
-    '/sendSauveteurCredentialsEmail',
-    {
-      'email': email,
-      'prenom': prenom,
-      'identifiant': identifiant,
-      'motdepasse': motDePasse,
-    },
-  );
+  'us-central1-sphot-ab80b.cloudfunctions.net',
+  '/sendSauveteurCredentialsEmail',
+  {
+    'email': email,
+    'prenom': prenom,
+    'identifiant': identifiant,
+    'motdepasse': motDePasse,
+    'type': 'reset',
+  },
+);
 
-  final response = await http.get(uri);
+  try {
+    final response = await http.get(uri);
 
-  if (response.statusCode == 200) {
+    debugPrint('RESET EMAIL STATUS = ${response.statusCode}');
+    debugPrint('RESET EMAIL BODY = ${response.body}');
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+  debugPrint('Erreur email SPHOT : ${response.statusCode} - ${response.body}');
+}
+  } catch (e) {
+    debugPrint('ERREUR APPEL EMAIL RESET = $e');
+
     if (!mounted) return;
 
-    setState(() {
-      passwordResetEmailSentIds.add(sauveteurId);
-    });
-  } else {
-    debugPrint('Erreur email SPHOT : ${response.body}');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Erreur envoi email : $e'),
+      ),
+    );
   }
 }
 
@@ -533,10 +560,7 @@ if (login.isNotEmpty) {
             child: ElevatedButton(
               onPressed: passwordResetDone
     ? () async {
-        setState(() {
-          passwordResetEmailSentIds.add(doc.id);
-        });
-
+        
         await _sendResetCredentialsEmail(
           email: email.trim(),
           prenom: prenom.trim(),

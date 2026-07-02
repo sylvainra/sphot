@@ -364,11 +364,22 @@ exports.sendSauveteurCredentialsEmail = onRequest(
       memory: "256MiB",
     },
     async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
       try {
         const email = request.query.email;
         const prenom = request.query.prenom || "Sauveteur";
         const identifiant = request.query.identifiant || "";
         const motDePasse = request.query.motdepasse || "";
+        const type = request.query.type || "creation";
+        const isReset = type === "reset";
 
         if (!email) {
           response.status(400).send("Email manquant.");
@@ -386,7 +397,9 @@ exports.sendSauveteurCredentialsEmail = onRequest(
         await transporter.sendMail({
           from: MAIL_FROM,
           to: email,
-          subject: "Vos accès SPHOT",
+          subject: isReset ?
+    "Vos nouveaux accès SPHOT" :
+    "Vos accès SPHOT",
           html: `
 <div style="margin:0;padding:40px 20px;
 background:#eef3f8 url('https://sphot.app/assets/data/images/map_background.jpg')
@@ -414,18 +427,40 @@ font-size:16px;line-height:1.6;">
 
       <p>Bonjour <strong>${prenom}</strong>,</p>
 
+${isReset ?
+  `` :
+  `
 <p>
   Bienvenue sur SPHOT.
 </p>
+`
+}
 
+${isReset ? `
 <p>
-  Votre compte a été créé par votre administrateur SPHOT.
+  Votre administrateur SPHOT a procédé à la réinitialisation
+de votre mot de passe.
 </p>
 
 <p>
-  Vous trouverez ci-dessous votre identifiant et mot de passe
-  pour vous connecter sur SPHOT.
+  Votre identifiant reste inchangé.
 </p>
+
+<p>
+  Vous trouverez ci-dessous votre nouveau mot de passe temporaire.
+</p>
+`:
+`
+<p>
+  Votre compte SPHOT a été créé par votre administrateur.
+</p>
+
+<p>
+  Vous trouverez ci-dessous votre identifiant
+  et votre mot de passe temporaire.
+</p>
+`
+}
 
       <div style="
           margin:28px 0;
@@ -456,19 +491,37 @@ font-size:16px;line-height:1.6;">
 
       </div>
 
-      <div style="
-          background:#fff8e1;
-          border-left:5px solid #ff9800;
-          padding:16px;
-          border-radius:8px;
-          margin-bottom:28px;">
+      ${isReset ? `
+<div style="
+    background:#e3f2fd;
+    border-left:5px solid #1976d2;
+    padding:16px;
+    border-radius:8px;
+    margin-bottom:28px;">
 
-        <strong>Important</strong><br>
+<strong>Important</strong><br><br>
 
-        Lors de votre première connexion,
-        vous devrez modifier votre mot de passe.
+À votre prochaine connexion,
+vous devrez modifier votre mot de passe.
 
-      </div>
+</div>
+`:
+`
+<div style="
+    background:#fff8e1;
+    border-left:5px solid #ff9800;
+    padding:16px;
+    border-radius:8px;
+    margin-bottom:28px;">
+
+<strong>Important</strong><br>
+
+Lors de votre première connexion,
+vous devrez modifier votre mot de passe.
+
+</div>
+`
+}
 
       <div style="text-align:center;margin:35px 0;">
 
@@ -501,10 +554,27 @@ font-size:16px;line-height:1.6;">
 
 </div>
 `,
-          text:
+          text: isReset ?
 `Bonjour ${prenom},
 
-Votre compte a été créé par votre administrateur SPHOT.
+Votre administrateur SPHOT a réinitialisé votre mot de passe.
+
+Identifiant : ${identifiant}
+Mot de passe temporaire : ${motDePasse}
+
+Utilisez le mot de passe temporaire ci-dessus.
+
+À votre prochaine connexion, vous devrez le modifier.
+
+Se connecter à SPHOT :
+${SPHOT_LOGIN_URL}
+
+À bientôt sur SPHOT,
+
+L'équipe SPHOT` :
+`Bonjour ${prenom},
+
+Votre compte SPHOT a été créé par votre administrateur.
 
 Identifiant : ${identifiant}
 Mot de passe temporaire : ${motDePasse}
@@ -515,6 +585,7 @@ Se connecter à SPHOT :
 ${SPHOT_LOGIN_URL}
 
 À bientôt sur SPHOT,
+
 L'équipe SPHOT`,
         });
 
@@ -731,26 +802,89 @@ exports.changeSauveteurPassword = onRequest(
             await transporter.sendMail({
               from: MAIL_FROM,
               to: email,
-              subject: "Votre mot de passe SPHOT a été modifié",
+              subject: "Votre mot de passe SPHOT a bien été modifié",
               html: `
-<p>Bonjour <strong>${prenom}</strong>,</p>
+<div style="margin:0;padding:40px 20px;
+background:#eef3f8 url('https://sphot.app/assets/data/images/map_background.jpg')
+center center / cover no-repeat;
+font-family:Arial,Helvetica,sans-serif;">
 
-<p>Votre mot de passe SPHOT a été modifié avec succès.</p>
+  <div style="max-width:620px;margin:auto;
+background:rgba(255,255,255,0.94);
+border-radius:18px;
+overflow:hidden;
+border:1px solid #d9e2ec;
+box-shadow:0 4px 12px rgba(0,0,0,.08);">
 
-<p>
-Si vous êtes à l'origine de cette modification,
-aucune autre action n'est nécessaire.
-</p>
+    <div style="padding:30px 30px 20px;text-align:center;">
 
-<p>
-Si ce n'est pas vous, contactez immédiatement votre administrateur SPHOT.
-</p>
+      <a href="${SPHOT_LOGIN_URL}">
+        <img
+          src="https://sphot.app/assets/data/icons/title.png"
+          alt="SPHOT"
+          style="max-width:320px;width:100%;height:auto;border:0;">
+      </a>
 
-<p>
-À bientôt sur SPHOT.<br>
-<strong>L'équipe SPHOT</strong>
-</p>
+    </div>
+
+    <div
+      style="padding:0 34px 30px;color:#263238;
+      font-size:16px;line-height:1.6;">
+
+      <p>Bonjour <strong>${prenom}</strong>,</p>
+
+      <p>
+        Nous vous confirmons que votre mot de passe
+        SPHOT a été modifié avec succès.
+      </p>
+
+      <p>
+        Si vous n'êtes pas à l'origine de cette modification,
+        contactez immédiatement votre administrateur.
+      </p>
+
+      <div style="text-align:center;margin:35px 0;">
+
+        <a
+          href="${SPHOT_LOGIN_URL}"
+          style="
+            background:#d91c1c;
+            color:#ffffff;
+            text-decoration:none;
+            padding:16px 30px;
+            border-radius:10px;
+            display:inline-block;
+            font-size:17px;
+            font-weight:bold;">
+
+          SE CONNECTER À SPHOT
+
+        </a>
+
+      </div>
+
+      <p>
+        À bientôt sur SPHOT,<br>
+        <strong>L'équipe SPHOT</strong>
+      </p>
+
+    </div>
+
+  </div>
+
+</div>
 `,
+              text: `Bonjour ${prenom},
+
+Nous vous confirmons que votre mot de passe SPHOT
+a été modifié avec succès.
+
+Si vous n'êtes pas à l'origine de cette modification,
+contactez immédiatement votre administrateur.
+
+À bientôt sur SPHOT,
+
+L'équipe SPHOT`,
             });
           } catch (mailError) {
             console.error("Erreur email confirmation mot de passe:", mailError);
