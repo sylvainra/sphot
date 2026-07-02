@@ -534,6 +534,9 @@ Widget build(BuildContext context) {
     emailController.text.trim().isNotEmpty &&
     emailController.text.trim().contains('@');
 
+    final canSaveSauveteur =
+    widget.docId != null || (accesGenere && emailEnvoye);
+
   return Scaffold(
     backgroundColor: Colors.transparent,
     body: Stack(
@@ -852,7 +855,7 @@ SizedBox(
                             width: double.infinity,
                             height: 48,
                             child: ElevatedButton.icon(
-                              onPressed: _saveSauveteur,
+                              onPressed: canSaveSauveteur ? _saveSauveteur : null,
                               icon: Icon(
                                 Icons.save,
                                 color: sauveteurEnregistre

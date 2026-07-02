@@ -765,6 +765,7 @@ exports.changeSauveteurPassword = onRequest(
           const accountData = accountBeforeUpdate.data();
 
           email = (accountData.email || "").toString().trim();
+          console.log("Email confirmation mdp sauveteur:", email);
           prenom = (accountData.prenom || "Sauveteur")
               .toString()
               .trim();
@@ -802,7 +803,7 @@ exports.changeSauveteurPassword = onRequest(
             await transporter.sendMail({
               from: MAIL_FROM,
               to: email,
-              subject: "Votre mot de passe SPHOT a bien été modifié",
+              subject: "Mise à jour de votre compte SPHOT",
               html: `
 <div style="margin:0;padding:40px 20px;
 background:#eef3f8 url('https://sphot.app/assets/data/images/map_background.jpg')

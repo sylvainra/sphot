@@ -158,6 +158,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     'https://us-central1-sphot-ab80b.cloudfunctions.net/changeSauveteurPassword',
   );
 
+debugPrint(">>> APPEL changeSauveteurPassword");
+
   final response = await http.post(
     uri,
     headers: {'Content-Type': 'application/json'},
@@ -169,6 +171,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
 debugPrint('Status = ${response.statusCode}');
 debugPrint('Body = ${response.body}');
+debugPrint(">>> RETOUR changeSauveteurPassword");
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
     setState(() {
@@ -176,17 +179,6 @@ debugPrint('Body = ${response.body}');
     });
     return;
   }
-
-await http.post(
-  Uri.parse(
-    'https://us-central1-sphot-ab80b.cloudfunctions.net/sendSauveteurPasswordChangedEmail',
-  ),
-  headers: {'Content-Type': 'application/json'},
-  body: jsonEncode({
-    'login': widget.login,
-    'territoireId': widget.territoireId,
-  }),
-);
 
   if (!mounted) return;
 
