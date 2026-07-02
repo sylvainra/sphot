@@ -8,7 +8,6 @@ import 'dart:math' as math;
 import 'package:url_launcher/url_launcher.dart';
 
 enum DashboardSpotFilter {
-  none,
   all,
   secours,
   eauVerte,
@@ -20,7 +19,6 @@ enum DashboardSpotFilter {
 }
 
 enum DashboardAdminFilter {
-  none,
   all,
   trial,
   active,
@@ -29,7 +27,6 @@ enum DashboardAdminFilter {
 }
 
 enum DashboardAdvertiserFilter {
-  none,
   pending,
   all,
   active,
@@ -117,7 +114,6 @@ bool _isListening = false;
   int _visibleOnMapSpotCount = 0;
   int _visibleOnMapAdminCount = 0;
   int _visibleOnMapSauveteurCount = 0;
-  int _sauveteurCountRequestId = 0;
 
   OverlayEntry? _dropdownOverlay;
 
@@ -131,22 +127,9 @@ bool _isListening = false;
   DashboardAdminFilter _selectedAdminFilter =
       DashboardAdminFilter.all;
 
-  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> get _spotsStream async* {
-  await for (final territoiresSnapshot
-      in FirebaseFirestore.instance.collection('territoires').snapshots()) {
-    final allSpots = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-
-    for (final territoireDoc in territoiresSnapshot.docs) {
-      final spotsSnapshot = await territoireDoc.reference
-          .collection('spots')
-          .get();
-
-      allSpots.addAll(spotsSnapshot.docs);
-    }
-
-    yield allSpots;
+  Stream<QuerySnapshot<Map<String, dynamic>>> get _spotsStream {
+    return FirebaseFirestore.instance.collection('spots').snapshots();
   }
-}
 
   Stream<QuerySnapshot<Map<String, dynamic>>> get _adminRequestsStream {
   return FirebaseFirestore.instance
@@ -314,9 +297,6 @@ Color _spotTypeColor(Map<String, dynamic> data) {
 }
 
 bool _matchesFilter(Map<String, dynamic> data) {
-  if (_selectedFilters.contains(DashboardSpotFilter.none)) {
-  return false;
-}
   if (_selectedFilters.contains(DashboardSpotFilter.all)) {
     return true;
   }
@@ -324,8 +304,6 @@ bool _matchesFilter(Map<String, dynamic> data) {
   return _selectedFilters.any((filter) {
     final previous = _selectedFilters;
     switch (filter) {
-  case DashboardSpotFilter.none:
-    return false;
   case DashboardSpotFilter.all:
     return true;
   case DashboardSpotFilter.secours:
@@ -359,9 +337,6 @@ bool _matchesFilterType(
     case DashboardSpotFilter.all:
       return true;
 
-    case DashboardSpotFilter.none:
-  return false;  
-
     case DashboardSpotFilter.secours:
       return fullType.contains('POSTE DE SECOURS');
 
@@ -394,8 +369,6 @@ bool _matchesFilterType(
 
 String _filterLabel(DashboardSpotFilter filter) {
   switch (filter) {
-    case DashboardSpotFilter.none:
-  return 'Aucun';
     case DashboardSpotFilter.all:
       return 'Tous les SPHOTS';
     case DashboardSpotFilter.secours:
@@ -417,8 +390,6 @@ String _filterLabel(DashboardSpotFilter filter) {
 
 Color _filterColor(DashboardSpotFilter filter) {
   switch (filter) {
-    case DashboardSpotFilter.none:
-  return Colors.grey;
     case DashboardSpotFilter.all:
       return adminColor;
     case DashboardSpotFilter.secours:
@@ -559,12 +530,12 @@ void _openFiltersMenu() {
   _dropdownOverlay = null;
 
   final renderBox =
-      _filtersKey.currentContext!.findRenderObject() as RenderBox;
+    _filtersKey.currentContext!.findRenderObject() as RenderBox;
 
-  final position = renderBox.localToGlobal(Offset.zero);
-  final size = renderBox.size;
+final position = renderBox.localToGlobal(Offset.zero);
+final size = renderBox.size;
 
-  final scrollController = ScrollController();
+final scrollController = ScrollController();
 
   _dropdownOverlay = OverlayEntry(
     builder: (context) {
@@ -581,10 +552,11 @@ void _openFiltersMenu() {
                   child: Container(color: Colors.transparent),
                 ),
               ),
+
               Positioned(
-                left: position.dx,
-                top: position.dy + size.height - 10,
-                width: size.width,
+  left: position.dx,
+  top: position.dy + size.height - 10,
+  width: size.width,
                 child: Material(
                   color: Colors.transparent,
                   child: Container(
@@ -600,81 +572,96 @@ void _openFiltersMenu() {
                         bottomLeft: Radius.circular(10),
                         bottomRight: Radius.circular(10),
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.18),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: Scrollbar(
-                      controller: scrollController,
-                      thumbVisibility: true,
-                      thickness: 10,
-                      radius: const Radius.circular(10),
-                      child: ListView(
+                    child: ScrollbarTheme(
+                      data: ScrollbarThemeData(
+                        thumbColor: MaterialStatePropertyAll(adminColor),
+                        trackVisibility:
+                            const MaterialStatePropertyAll(false),
+                      ),
+                      child: Scrollbar(
                         controller: scrollController,
-                        padding: EdgeInsets.zero,
-                        shrinkWrap: true,
-                        children: DashboardSpotFilter.values.map((filter) {
-                          final selected = _selectedFilters.contains(filter);
+                        thumbVisibility: true,
+thickness: 10,
+radius: const Radius.circular(10),
+                        child: ListView(
+                          controller: scrollController,
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          children: DashboardSpotFilter.values.map((filter) {
+                            final selected =
+                                _selectedFilters.contains(filter);
 
-                          return InkWell(
-                            onTap: () {
-                              setState(() {
-                                if (filter == DashboardSpotFilter.none) {
-                                  _selectedFilters
-                                    ..clear()
-                                    ..add(DashboardSpotFilter.none);
-                                } else if (filter == DashboardSpotFilter.all) {
-                                  _selectedFilters
-                                    ..clear()
-                                    ..add(DashboardSpotFilter.all);
-                                } else {
-                                  _selectedFilters.remove(DashboardSpotFilter.none);
-                                  _selectedFilters.remove(DashboardSpotFilter.all);
-
-                                  if (selected) {
-                                    _selectedFilters.remove(filter);
+                            return InkWell(
+                              onTap: () {
+                                setState(() {
+                                  if (filter == DashboardSpotFilter.all) {
+                                    _selectedFilters
+                                      ..clear()
+                                      ..add(DashboardSpotFilter.all);
                                   } else {
-                                    _selectedFilters.add(filter);
+                                    _selectedFilters
+                                        .remove(DashboardSpotFilter.all);
+
+                                    if (selected) {
+                                      _selectedFilters.remove(filter);
+                                    } else {
+                                      _selectedFilters.add(filter);
+                                    }
+
+                                    if (_selectedFilters.isEmpty) {
+                                      _selectedFilters
+                                          .add(DashboardSpotFilter.all);
+                                    }
                                   }
 
-                                  if (_selectedFilters.isEmpty) {
-                                    _selectedFilters.add(DashboardSpotFilter.all);
-                                  }
-                                }
+                                  _selectedSpot = null;
+                                  _selectedAdmin = null;
+                                });
 
-                                _selectedSpot = null;
-                                _selectedAdmin = null;
-                              });
-
-                              overlaySetState(() {});
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 9,
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    selected
-                                        ? Icons.check_box_rounded
-                                        : Icons.check_box_outline_blank_rounded,
-                                    color: selected ? redColor : adminColor,
-                                    size: 22,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      _filterLabel(filter),
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w800,
-                                        color: selected ? redColor : adminColor,
+                                overlaySetState(() {});
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 9,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      selected
+                                          ? Icons.check_box_rounded
+                                          : Icons
+                                              .check_box_outline_blank_rounded,
+                                      color: selected ? redColor : adminColor,
+                                      size: 22,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        _filterLabel(filter),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: selected
+                                              ? redColor
+                                              : adminColor,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        }).toList(),
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
                   ),
@@ -1026,8 +1013,6 @@ Widget _spotInfoLine(String label, String value) {
 
 String _adminFilterLabel(DashboardAdminFilter filter) {
   switch (filter) {
-    case DashboardAdminFilter.none:
-  return 'Aucun';
     case DashboardAdminFilter.all:
       return 'Toutes';
     case DashboardAdminFilter.trial:
@@ -1042,9 +1027,6 @@ String _adminFilterLabel(DashboardAdminFilter filter) {
 }
 
 bool _matchesAdminFilter(Map<String, dynamic> data) {
-  if (_selectedAdminFilter == DashboardAdminFilter.none) {
-  return false;
-}
   if (_selectedAdminFilter == DashboardAdminFilter.all) {
     return true;
   }
@@ -1059,8 +1041,6 @@ bool _matchesAdminFilter(Map<String, dynamic> data) {
   final status = _cleanText(subscription['status']);
 
   switch (_selectedAdminFilter) {
-    case DashboardAdminFilter.none:
-      return false;
     case DashboardAdminFilter.all:
       return true;
     case DashboardAdminFilter.trial:
@@ -1324,9 +1304,6 @@ _summaryCard(
 
 String _advertiserFilterLabel(DashboardAdvertiserFilter filter) {
   switch (filter) {
-    case DashboardAdvertiserFilter.none:
-      return 'Aucun';
-
     case DashboardAdvertiserFilter.pending:
       return 'En attente';
 
@@ -1502,13 +1479,7 @@ void _openAdvertiserFiltersMenu() {
 bool _matchesAdvertiserFilter(Map<String, dynamic> data) {
   final status = _cleanText(data['status']).toLowerCase();
 
-  if (_selectedAdvertiserFilter == DashboardAdvertiserFilter.none) {
-  return false;
-}
-
   switch (_selectedAdvertiserFilter) {
-    case DashboardAdvertiserFilter.none:
-      return false;
 
     case DashboardAdvertiserFilter.pending:
       return status == 'pending';
@@ -2046,7 +2017,6 @@ void _updateVisibleCount(
 Future<void> _updateVisibleSauveteurCount(
   List<QueryDocumentSnapshot<Map<String, dynamic>>> spots,
 ) async {
-  final requestId = ++_sauveteurCountRequestId;
   final bounds = _mapController.camera.visibleBounds;
 
   int count = 0;
@@ -2061,19 +2031,33 @@ Future<void> _updateVisibleSauveteurCount(
       continue;
     }
 
-    final snap = await doc.reference
+    final territoireId = _cleanText(data['territoireId']);
+    final spotId = _cleanText(data['idSphot'] ?? doc.id);
+
+    if (territoireId.isEmpty || spotId.isEmpty) {
+      continue;
+    }
+
+    final snap = await FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(territoireId)
+        .collection('spots')
+        .doc(spotId)
         .collection('sauveteursAffectes')
         .get();
 
     count += snap.docs.length;
   }
 
-  if (!mounted || requestId != _sauveteurCountRequestId) return;
+  if (!mounted) return;
 
-  setState(() {
-    _visibleOnMapSauveteurCount = count;
-  });
+  if (count != _visibleOnMapSauveteurCount) {
+    setState(() {
+      _visibleOnMapSauveteurCount = count;
+    });
+  }
 }
+
 
 
 Widget _buildMapSearchBar() {
@@ -2753,9 +2737,9 @@ void _updateVisibleAdvertiserCount(
 
 @override
 Widget build(BuildContext context) {
-  return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-  stream: _spotsStream,
-  builder: (context, spotsSnapshot) {
+  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    stream: _spotsStream,
+    builder: (context, spotsSnapshot) {
       if (spotsSnapshot.hasError) {
         return Center(
           child: Text('Erreur Dashboard Map : ${spotsSnapshot.error}'),
@@ -2775,7 +2759,7 @@ Widget build(BuildContext context) {
               return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: _adRequestsStream,
                 builder: (context, adsSnapshot) {
-                  final docs = spotsSnapshot.data ?? [];
+                  final docs = spotsSnapshot.data!.docs;
                   _latestSpotDocs = docs;
 
                   final subscriptionsDocs =
