@@ -93,9 +93,29 @@ static const List<_SuperAdminTileStyle> _tileStyles = [
 
   Map<String, dynamic>? _selectedAdvertiser;
 
+  bool _showLegalDocumentsPanel = false;
+
+  String? _selectedLegalDocument;
+  String? _selectedLegalChapter;
+
+  final TextEditingController _legalTitleController = TextEditingController();
+  final TextEditingController _legalContentController = TextEditingController();
+  final TextEditingController _legalVersionController = TextEditingController();
+  final TextEditingController _legalPublicationDateController = TextEditingController();
+
+  String _selectedVersionDocument = 'CGU';
+  String _selectedLegalStatus = 'Publié';
+  String _legalLastUpdatedText = 'Non renseignée';
+
+  bool _legalVersionSaved = false;
+
+  bool _isSavingLegalChapter = false;
+  bool _isLoadingLegalChapter = false;
+  
 int _visibleAdvertiserCount = 0;
 
 final GlobalKey _advertiserFiltersKey = GlobalKey();
+final GlobalKey _legalStatusKey = GlobalKey();
 
 DashboardAdvertiserFilter _selectedAdvertiserFilter =
     DashboardAdvertiserFilter.pending;
@@ -1192,10 +1212,9 @@ Widget _buildRightPanel({
     child: SafeArea(
   child: Padding(
     padding: const EdgeInsets.all(22),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
             _summaryCard(
               title: 'SPHOTS',
               value: '$_visibleOnMapSpotCount',
@@ -1232,10 +1251,55 @@ _summaryCard(
   color: adminColor,
 ),
 
-            
-          ],
-        ),
+const SizedBox(height: 14),
+
+GestureDetector(
+  onTap: () {
+    setState(() {
+      _showLegalDocumentsPanel = true;
+      _selectedSpot = null;
+      _selectedAdmin = null;
+      _selectedAdvertiser = null;
+    });
+  },
+  child: Container(
+    height: 58,
+    padding: const EdgeInsets.symmetric(horizontal: 14),
+    decoration: BoxDecoration(
+      color: (_showLegalDocumentsPanel ? redColor : adminColor).withOpacity(0.08),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: _showLegalDocumentsPanel ? redColor : adminColor,
+        width: 1.5,
       ),
+    ),
+    child: Row(
+      children: [
+        Image.asset(
+          'data/icons/fire_blue_icon.png',
+          width: 30,
+          height: 30,
+          filterQuality: FilterQuality.high,
+        ),
+        const SizedBox(width: 14),
+        const Expanded(
+          child: Text(
+            'DOCUMENTS JURIDIQUES',
+            style: TextStyle(
+              color: adminColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
+    ),
+  ),
+),
+
+            
+                    ],
+        ),
           ),
     ),
   );
@@ -2003,11 +2067,746 @@ Widget _buildAdvertisersList() {
   return const SizedBox.shrink();
 }
 
+Widget _buildLegalDocumentsPanel() {
+  
+  return Container(
+    width: 420,
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.98),
+      border: Border(
+        left: BorderSide(
+          color: adminColor.withOpacity(0.25),
+          width: 1.5,
+        ),
+      ),
+    ),
+    child: SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'DOCUMENTS JURIDIQUES',
+                    style: TextStyle(
+                      color: adminColor,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _showLegalDocumentsPanel = false;
+                      _selectedLegalDocument = null;
+                      _selectedLegalChapter = null;
+                    });
+                  },
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            _legalDocumentTile(
+              title: 'CGU',
+              subtitle: 'Conditions Générales d’Utilisation',
+              chapters: const [
+                '1. Objet',
+                '2. Définitions',
+                '3. Accès au service',
+                '4. Création d’un compte administrateur',
+                '5. Obligations de l’utilisateur',
+                '6. Essai gratuit de 8 jours',
+                '7. Abonnement',
+                '8. Disponibilité du service',
+                '9. Responsabilités',
+                '10. Propriété intellectuelle',
+                '11. Protection des données personnelles',
+                '12. Modification des CGU',
+                '13. Droit applicable – Contact',
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            _legalDocumentTile(
+              title: 'POLITIQUE DE CONFIDENTIALITÉ',
+              subtitle: 'Données personnelles et confidentialité',
+              chapters: const [
+                '1. Objet',
+                '2. Données collectées',
+                '3. Finalités du traitement',
+                '4. Base légale',
+                '5. Durée de conservation',
+                '6. Destinataires des données',
+                '7. Sécurité',
+                '8. Droits des utilisateurs',
+                '9. Contact',
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            _legalDocumentTile(
+  title: 'RGPD',
+  subtitle: 'Notice d’information RGPD',
+  chapters: const [
+    '1. Responsable du traitement',
+    '2. Données concernées',
+    '3. Utilisation des données',
+    '4. Droits des personnes',
+    '5. Demande de suppression',
+    '6. Contact RGPD',
+  ],
+),
+
+const SizedBox(height: 12),
+
+_buildLegalVersionTile(),
+
+              ],
+            ),
+          
+      ),
+    ),
+  );
+}
+
+Widget _buildLegalChapterEditor() {
+  return Material(
+    color: Colors.transparent,
+    child: Container(
+      margin: const EdgeInsets.only(top: 10, bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: adminColor, width: 1.4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _legalTitleController,
+            decoration: InputDecoration(
+              labelText: 'Titre du chapitre',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          TextField(
+            controller: _legalContentController,
+            minLines: 10,
+            maxLines: 18,
+            decoration: InputDecoration(
+              labelText: 'Contenu du chapitre',
+              alignLabelWithHint: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton.icon(
+              onPressed: _isSavingLegalChapter ? null : _saveLegalChapter,
+              icon: const Icon(Icons.save_rounded),
+              label: const Text('ENREGISTRER'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: adminColor,
+                foregroundColor: Colors.white,
+              ),
+            ),
+                    ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildLegalVersionTile() {
+  return Container(
+    decoration: BoxDecoration(
+      color: adminColor.withOpacity(0.055),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: adminColor, width: 1.4),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: ExpansionTile(
+        shape: const Border(),
+        collapsedShape: const Border(),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        iconColor: redColor,
+        collapsedIconColor: redColor,
+        title: const Text(
+          'VERSION',
+          style: TextStyle(
+            color: redColor,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        subtitle: const Text(
+          'Version, publication et état du document',
+          style: TextStyle(
+            color: adminColor,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+        children: [
+          TextField(
+            controller: _legalVersionController,
+            style: const TextStyle(
+              color: redColor,
+              fontWeight: FontWeight.w800,
+            ),
+            decoration: InputDecoration(
+              labelText: 'Version',
+              labelStyle: const TextStyle(
+                color: adminColor,
+                fontWeight: FontWeight.w700,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: adminColor, width: 1.6),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: adminColor, width: 1.6),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: adminColor, width: 1.8),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _legalPublicationDateController,
+            readOnly: true,
+            onTap: () async {
+              final now = DateTime.now();
+
+              final selectedDate = await showDatePicker(
+                context: context,
+                initialDate: now,
+                firstDate: DateTime(2020),
+                lastDate: DateTime(2100),
+                builder: (context, child) {
+                  return Theme(
+                    data: Theme.of(context).copyWith(
+                      colorScheme: const ColorScheme.light(
+                        primary: adminColor,
+                        onPrimary: Colors.white,
+                        secondary: adminColor,
+                        surface: Colors.white,
+                        onSurface: Colors.black,
+                      ),
+                    ),
+                    child: child!,
+                  );
+                },
+              );
+
+              if (selectedDate == null) return;
+
+              _legalPublicationDateController.text =
+                  '${selectedDate.day.toString().padLeft(2, '0')}/'
+                  '${selectedDate.month.toString().padLeft(2, '0')}/'
+                  '${selectedDate.year}';
+            },
+            style: const TextStyle(
+              color: redColor,
+              fontWeight: FontWeight.w800,
+            ),
+            decoration: InputDecoration(
+              labelText: 'Date de publication',
+              labelStyle: const TextStyle(
+                color: adminColor,
+                fontWeight: FontWeight.w700,
+              ),
+              suffixIcon: const Icon(
+                Icons.calendar_month_rounded,
+                color: redColor,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: adminColor, width: 1.5),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: adminColor, width: 1.5),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: adminColor, width: 1.8),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            key: _legalStatusKey,
+            onTap: _openLegalStatusMenu,
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: 'État',
+                labelStyle: const TextStyle(
+                  color: adminColor,
+                  fontWeight: FontWeight.w700,
+                ),
+                filled: true,
+                fillColor: Colors.transparent,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: adminColor, width: 1.6),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: adminColor, width: 1.6),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _selectedLegalStatus,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: redColor,
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: redColor,
+                    size: 26,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: TextEditingController(text: _legalLastUpdatedText),
+            readOnly: true,
+            style: const TextStyle(
+              color: redColor,
+              fontWeight: FontWeight.w800,
+            ),
+            decoration: InputDecoration(
+              labelText: 'Dernière mise à jour',
+              labelStyle: const TextStyle(
+                color: adminColor,
+                fontWeight: FontWeight.w700,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: adminColor, width: 1.6),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: adminColor, width: 1.6),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: adminColor, width: 1.8),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton.icon(
+              onPressed: _saveLegalVersion,
+              icon: Icon(
+                _legalVersionSaved
+                    ? Icons.check_circle_rounded
+                    : Icons.save_rounded,
+              ),
+              label: Text(
+                _legalVersionSaved ? 'ENREGISTRÉE' : 'ENREGISTRER',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _legalVersionSaved ? redColor : adminColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _legalDocumentTile({
+  required String title,
+  required String subtitle,
+  required List<String> chapters,
+}) {
+  return Container(
+    decoration: BoxDecoration(
+      color: adminColor.withOpacity(0.055),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: adminColor, width: 1.4),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: ExpansionTile(
+        shape: const Border(),
+        collapsedShape: const Border(),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+        iconColor: redColor,
+        collapsedIconColor: redColor,
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: redColor,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(
+            color: adminColor,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        children: chapters.map((chapter) {
+          final isSelected =
+              _selectedLegalDocument == title &&
+              _selectedLegalChapter == chapter;
+
+          return Column(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  if (isSelected) {
+                    setState(() {
+                      _selectedLegalDocument = null;
+                      _selectedLegalChapter = null;
+                      _legalTitleController.clear();
+                      _legalContentController.clear();
+                    });
+                  } else {
+                    _loadLegalChapter(title, chapter);
+                  }
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                        color: adminColor.withOpacity(0.18),
+                      ),
+                    ),
+                  ),
+                  child: Text(
+                    chapter,
+                    style: const TextStyle(
+                      color: adminColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              if (isSelected) _buildLegalChapterEditor(),
+            ],
+          );
+        }).toList(),
+      ),
+    ),
+  );
+}
+
+String _legalDocumentId(String title) {
+  switch (title) {
+    case 'CGU':
+      return 'cgu';
+    case 'POLITIQUE DE CONFIDENTIALITÉ':
+      return 'privacyPolicy';
+    case 'RGPD':
+      return 'rgpdNotice';
+    default:
+      return 'cgu';
+  }
+}
+
+String _legalChapterId(String chapter) {
+  final match = RegExp(r'^(\d+)').firstMatch(chapter);
+  final number = match?.group(1) ?? '1';
+  return number.padLeft(2, '0');
+}
+
+String _legalChapterTitle(String chapter) {
+  return chapter.replaceFirst(RegExp(r'^\d+\.\s*'), '').trim();
+}
+
+Future<void> _loadLegalChapter(String documentTitle, String chapter) async {
+  print('LOAD : $documentTitle / $chapter');
+  final documentId = _legalDocumentId(documentTitle);
+  final chapterId = _legalChapterId(chapter);
+
+  _selectedLegalDocument = documentTitle;
+  _selectedLegalChapter = chapter;
+  _legalTitleController.text = _legalChapterTitle(chapter);
+  _legalContentController.clear();
+
+  setState(() {});
+
+  final doc = await FirebaseFirestore.instance
+      .collection('legalDocuments')
+      .doc(documentId)
+      .collection('chapters')
+      .doc(chapterId)
+      .get();
+
+  final data = doc.data();
+  print(data);
+
+  if (data != null) {
+    _legalTitleController.text =
+        (data['title'] ?? _legalChapterTitle(chapter)).toString();
+
+    _legalContentController.text =
+        (data['content'] ?? '').toString();
+
+    setState(() {});
+  }
+}
+
+Future<void> _saveLegalChapter() async {
+  if (_selectedLegalDocument == null || _selectedLegalChapter == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(
+    content: Text('Aucun chapitre sélectionné.'),
+  ),
+);
+    return;
+  }
+
+  final documentId = _legalDocumentId(_selectedLegalDocument!);
+  final chapterId = _legalChapterId(_selectedLegalChapter!);
+  final order = int.tryParse(chapterId) ?? 1;
+
+  final title = _legalTitleController.text.trim().isEmpty
+      ? _legalChapterTitle(_selectedLegalChapter!)
+      : _legalTitleController.text.trim();
+
+  final content = _legalContentController.text.trim();
+
+  setState(() {
+    _isSavingLegalChapter = true;
+    
+  });
+
+  try {
+    await FirebaseFirestore.instance
+        .collection('legalDocuments')
+        .doc(documentId)
+        .collection('chapters')
+        .doc(chapterId)
+        .set({
+      'order': order,
+      'title': title,
+      'content': content,
+      'isActive': true,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    if (!mounted) return;
+
+    setState(() {
+      
+    });
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+  SnackBar(
+    content: Text('Erreur Firebase : $e'),
+  ),
+);
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isSavingLegalChapter = false;
+      });
+    }
+  }
+}
+
+void _markLegalVersionModified() {
+  if (_legalVersionSaved) {
+    setState(() {
+      _legalVersionSaved = false;
+    });
+  }
+}
+
+Future<void> _saveLegalVersion() async {
+  final now = DateTime.now();
+
+  final formattedDate =
+      '${now.day.toString().padLeft(2, '0')}/'
+      '${now.month.toString().padLeft(2, '0')}/'
+      '${now.year}';
+
+  await FirebaseFirestore.instance
+      .collection('legalDocuments')
+      .doc('metadata')
+      .set({
+    'version': _legalVersionController.text.trim().isEmpty
+        ? '1.0'
+        : _legalVersionController.text.trim(),
+    'publicationDate': _legalPublicationDateController.text.trim(),
+    'status': _selectedLegalStatus,
+    'updatedAt': FieldValue.serverTimestamp(),
+    'updatedAtText': formattedDate,
+  }, SetOptions(merge: true));
+
+  if (!mounted) return;
+
+  setState(() {
+    _legalLastUpdatedText = formattedDate;
+    _legalVersionSaved = true;
+  });
+}
+
+void _openLegalStatusMenu() {
+  _dropdownOverlay?.remove();
+  _dropdownOverlay = null;
+
+  final renderBox =
+      _legalStatusKey.currentContext!.findRenderObject() as RenderBox;
+
+  final position = renderBox.localToGlobal(Offset.zero);
+  final size = renderBox.size;
+
+  final statuses = ['Brouillon', 'Publié', 'Archivé'];
+
+  _dropdownOverlay = OverlayEntry(
+    builder: (context) {
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () {
+                _dropdownOverlay?.remove();
+                _dropdownOverlay = null;
+              },
+              child: Container(color: Colors.transparent),
+            ),
+          ),
+          Positioned(
+            left: position.dx,
+            top: position.dy + size.height - 10,
+            width: size.width,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.94),
+                  border: const Border(
+                    left: BorderSide(color: adminColor, width: 1.4),
+                    right: BorderSide(color: adminColor, width: 1.4),
+                    bottom: BorderSide(color: adminColor, width: 1.4),
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(10),
+                    bottomRight: Radius.circular(10),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: statuses.map((status) {
+                    final selected = _selectedLegalStatus == status;
+
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          _selectedLegalStatus = status;
+                        });
+
+                        _dropdownOverlay?.remove();
+                        _dropdownOverlay = null;
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              selected
+                                  ? Icons.check_box_rounded
+                                  : Icons.check_box_outline_blank_rounded,
+                              color: selected ? redColor : adminColor,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                status,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: selected ? redColor : adminColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  Overlay.of(context).insert(_dropdownOverlay!);
+}
 
 @override
 void initState() {
   super.initState();
   _speech = stt.SpeechToText();
+  _legalVersionController.addListener(_markLegalVersionModified);
+  _legalPublicationDateController.addListener(_markLegalVersionModified);
 }
 
 @override
@@ -2015,6 +2814,12 @@ void dispose() {
   _speech.stop();
   _dropdownOverlay?.remove();
   _searchController.dispose();
+  _legalTitleController.dispose();
+  _legalContentController.dispose();
+  _legalVersionController.dispose();
+  _legalPublicationDateController.dispose();
+  _legalVersionController.removeListener(_markLegalVersionModified);
+  _legalPublicationDateController.removeListener(_markLegalVersionModified);
   super.dispose();
 }
 
@@ -2962,13 +3767,13 @@ Widget build(BuildContext context) {
                         ),
                       ),
 
-                      if (_selectedSpot != null)
-  _buildSpotDetailPanel(),
-
-                      if (_selectedAdvertiser != null)
-                        _buildAdvertiserDetailPanel(),
-
-                        if (_selectedAdmin != null)
+                      if (_showLegalDocumentsPanel)
+  _buildLegalDocumentsPanel()
+else if (_selectedSpot != null)
+  _buildSpotDetailPanel()
+else if (_selectedAdvertiser != null)
+  _buildAdvertiserDetailPanel()
+else if (_selectedAdmin != null)
   _buildAdminDetailPanel(),
                     ],
                   );

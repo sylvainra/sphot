@@ -3,11 +3,12 @@ import '../pages/sauveteur/sauveteur_menu_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../pages/admin/admin_espace_page.dart';
-import '../pages/admin/admin_registration_page.dart';
+import '../pages/admin/admin_trial_request_page.dart';
 import '../services/proconnect_service.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../pages/sauveteur/change_password_page.dart';
+import '../web/admin/pages/admin_requests_page.dart';
 
 class ProfilLoginPage extends StatefulWidget {
   const ProfilLoginPage({super.key});
@@ -182,7 +183,7 @@ Navigator.of(context).pushReplacement(
 
   Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (_) => const AdminEspacePage(),
+      builder: (_) => const AdminTrialRequestPage(),
     ),
   );
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-
 import 'firebase_options.dart';
 import 'web/admin/web_admin_app.dart';
+import 'web/admin/pages/dashboard_super_admin_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,7 +26,7 @@ class SphotWebAdminApp extends StatelessWidget {
         useMaterial3: true,
         colorSchemeSeed: Colors.orange,
       ),
-      home: const WebAdminApp(),
+      home: const DashboardSuperAdminPage(),
     );
   }
 }
