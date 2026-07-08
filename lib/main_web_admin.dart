@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'web/admin/web_admin_app.dart';
 import 'web/admin/pages/dashboard_super_admin_page.dart';
+import 'web/admin/pages/web_admin_registration_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,7 +27,15 @@ class SphotWebAdminApp extends StatelessWidget {
         useMaterial3: true,
         colorSchemeSeed: Colors.orange,
       ),
-      home: const DashboardSuperAdminPage(),
+      home: const WebAdminRegistrationPage(
+        proConnectUid: 'test-admin',
+        proConnectEmail: 'admin@sphot.app',
+        proConnectNom: 'DUPONT',
+        proConnectPrenom: 'Jean',
+        proConnectOrganisation: 'Mairie de Nice',
+        proConnectSiret: '12345678901234',
+        proConnectSiren: '123456789',
+      ),
     );
   }
 }

@@ -65,6 +65,13 @@ class _WebAdminRegistrationPageState extends State<WebAdminRegistrationPage> {
 
   int step = 0;
   bool _saved = false;
+  bool _acceptedCgu = false;
+  bool _acceptedPrivacy = false;
+  bool _acceptedRgpd = false;
+  bool _acceptedRepresentative = false;
+
+  Map<String, dynamic>? _activeLegalPack;
+  bool _isLoadingLegalPack = false;
 
   OverlayEntry? _dropdownOverlay;
 
@@ -500,6 +507,328 @@ readOnly: readOnly,
     );
   }
 
+String _versionId(String version) {
+  return version.trim().replaceAll('.', '_');
+}
+
+bool get _legalValidationComplete {
+  return _acceptedCgu &&
+      _acceptedPrivacy &&
+      _acceptedRgpd &&
+      _acceptedRepresentative &&
+      _activeLegalPack != null;
+}
+
+Future<Map<String, dynamic>?> _loadActiveLegalPack() async {
+  setState(() {
+    _isLoadingLegalPack = true;
+  });
+
+  try {
+    final metadataDoc = await FirebaseFirestore.instance
+        .collection('legalDocuments')
+        .doc('metadata')
+        .get();
+
+    final metadata = metadataDoc.data() ?? {};
+    final legalVersion = (metadata['legalVersion'] ??
+            metadata['version'] ??
+            metadata['activeVersion'] ??
+            '1.0')
+        .toString();
+
+    Future<Map<String, dynamic>> loadDocument(String documentId) async {
+      final doc = await FirebaseFirestore.instance
+          .collection('legalDocuments')
+          .doc(documentId)
+          .get();
+
+      final chaptersSnapshot = await FirebaseFirestore.instance
+          .collection('legalDocuments')
+          .doc(documentId)
+          .collection('chapters')
+          .orderBy(FieldPath.documentId)
+          .get();
+
+      return {
+        'id': documentId,
+        'document': doc.data() ?? {},
+        'chapters': chaptersSnapshot.docs
+            .map((chapter) => chapter.data())
+            .toList(),
+      };
+    }
+
+    return {
+      'version': legalVersion,
+      'versionId': _versionId(legalVersion),
+      'status': 'Publié',
+      'cgu': await loadDocument('cgu'),
+      'privacy': await loadDocument('privacyPolicy'),
+      'rgpd': await loadDocument('rgpdNotice'),
+    };
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isLoadingLegalPack = false;
+      });
+    }
+  }
+}
+
+Future<void> _ensureLegalPackLoaded() async {
+  if (_activeLegalPack != null || _isLoadingLegalPack) return;
+
+  final pack = await _loadActiveLegalPack();
+
+  if (!mounted) return;
+
+  setState(() {
+    _activeLegalPack = pack;
+  });
+}
+
+void _showLegalDocument(String key, String title) {
+  final documentData = _activeLegalPack?[key];
+
+  if (documentData == null) return;
+
+  final document = Map<String, dynamic>.from(
+    documentData['document'] ?? {},
+  );
+
+  final chapters = List<Map<String, dynamic>>.from(
+    documentData['chapters'] ?? [],
+  );
+
+  showDialog(
+    context: context,
+    builder: (_) {
+      return AlertDialog(
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: adminColor,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: SizedBox(
+          width: 620,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Version : ${_activeLegalPack?['version'] ?? '1.0'}',
+                  style: const TextStyle(
+                    color: redColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                if ((document['title'] ?? '').toString().isNotEmpty)
+                  Text(
+                    document['title'].toString(),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                    ),
+                  ),
+
+                const SizedBox(height: 12),
+
+                ...chapters.map((chapter) {
+                  final chapterTitle =
+                      (chapter['title'] ?? chapter['titre'] ?? '').toString();
+                  final content =
+                      (chapter['content'] ?? chapter['texte'] ?? '').toString();
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (chapterTitle.isNotEmpty)
+                          Text(
+                            chapterTitle,
+                            style: const TextStyle(
+                              color: adminColor,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        const SizedBox(height: 4),
+                        Text(
+                          content,
+                          style: const TextStyle(
+                            height: 1.35,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              'FERMER',
+              style: TextStyle(
+                color: redColor,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+Widget _legalCheckTile({
+  required String title,
+  required String subtitle,
+  required bool value,
+  required ValueChanged<bool> onChanged,
+}) {
+  return Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    decoration: BoxDecoration(
+  color: adminColor.withOpacity(0.055),
+  borderRadius: BorderRadius.circular(16),
+  border: Border.all(color: adminColor, width: 1.4),
+),
+    child: CheckboxListTile(
+      value: value,
+      activeColor: redColor,
+      checkColor: Colors.white,
+      onChanged: (checked) {
+        onChanged(checked ?? false);
+      },
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: redColor,
+          fontWeight: FontWeight.w900,
+          fontSize: 14,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(
+          color: adminColor,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
+      controlAffinity: ListTileControlAffinity.leading,
+    ),
+  );
+}
+
+Widget _buildLegalValidationStep() {
+  _ensureLegalPackLoaded();
+
+  final version = (_activeLegalPack?['version'] ?? 'Chargement...').toString();
+
+  return Column(
+    children: [
+      _stepHeader(
+  '6. DEMANDE D’ESSAI GRATUIT',
+  'Finalisez votre demande d’accès à SPHOT',
+),
+
+      Text(
+        'Version juridique globale : $version',
+        style: const TextStyle(
+          color: redColor,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+
+      const SizedBox(height: 12),
+
+      OutlinedButton(
+        onPressed: _activeLegalPack == null
+            ? null
+            : () => _showLegalDocument(
+                  'cgu',
+                  'Conditions Générales d’Utilisation',
+                ),
+        child: const Text('CONSULTER LES CGU'),
+      ),
+      _legalCheckTile(
+        title: 'CGU',
+        subtitle: 'J’ai lu et j’accepte les Conditions Générales d’Utilisation.',
+        value: _acceptedCgu,
+        onChanged: (value) {
+          setState(() {
+            _acceptedCgu = value;
+            _saved = false;
+          });
+        },
+      ),
+
+      OutlinedButton(
+        onPressed: _activeLegalPack == null
+            ? null
+            : () => _showLegalDocument(
+                  'privacy',
+                  'Politique de confidentialité',
+                ),
+        child: const Text('CONSULTER LA POLITIQUE DE CONFIDENTIALITÉ'),
+      ),
+      _legalCheckTile(
+        title: 'POLITIQUE DE CONFIDENTIALITÉ',
+        subtitle: 'J’ai lu et j’accepte la Politique de confidentialité.',
+        value: _acceptedPrivacy,
+        onChanged: (value) {
+          setState(() {
+            _acceptedPrivacy = value;
+            _saved = false;
+          });
+        },
+      ),
+
+      OutlinedButton(
+        onPressed: _activeLegalPack == null
+            ? null
+            : () => _showLegalDocument('rgpd', 'RGPD'),
+        child: const Text('CONSULTER LE RGPD'),
+      ),
+      _legalCheckTile(
+        title: 'RGPD',
+        subtitle: 'J’ai lu et j’accepte les dispositions relatives au RGPD.',
+        value: _acceptedRgpd,
+        onChanged: (value) {
+          setState(() {
+            _acceptedRgpd = value;
+            _saved = false;
+          });
+        },
+      ),
+
+      _legalCheckTile(
+        title: 'REPRÉSENTANT HABILITÉ',
+        subtitle:
+            'Je certifie être habilité à représenter cette organisation.',
+        value: _acceptedRepresentative,
+        onChanged: (value) {
+          setState(() {
+            _acceptedRepresentative = value;
+            _saved = false;
+          });
+        },
+      ),
+    ],
+  );
+}
+
   Widget _currentStep() {
     switch (step) {
       case 0:
@@ -827,6 +1156,9 @@ TextField(
     ],
   );
 
+case 5:
+  return _buildLegalValidationStep();
+
   default:
   return const SizedBox.shrink();
   
@@ -834,13 +1166,13 @@ TextField(
   }
 
   void _nextStep() {
-    if (step < 4) {
-      setState(() {
-        step++;
-        _saved = false;
-      });
-    }
+  if (step < 5) {
+    setState(() {
+      step++;
+      _saved = false;
+    });
   }
+}
 
 String _territoryId() {
   String clean(String value) {
@@ -887,16 +1219,23 @@ String _territoryId() {
     }
 
     final user = FirebaseAuth.instance.currentUser;
-    final uid = widget.proConnectUid ?? user?.uid;
+    final uid = widget.proConnectUid ??
+    user?.uid ??
+    FirebaseFirestore.instance.collection('adminRequests').doc().id;
 
-    if (uid == null || uid.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Connexion ProConnect introuvable.'),
-        ),
-      );
-      return;
-    }
+if (!_legalValidationComplete) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text(
+        'Tu dois accepter le pack juridique SPHOT avant d’envoyer la demande.',
+      ),
+    ),
+  );
+  return;
+}
+
+final legalVersion = (_activeLegalPack?['version'] ?? '1.0').toString();
+final legalVersionId = _versionId(legalVersion);
 
     await FirebaseFirestore.instance
         .collection('adminRequests')
@@ -965,6 +1304,20 @@ String _territoryId() {
   'status': 'awaiting_validation',
 },
 
+'legalAcceptance': {
+  'accepted': true,
+  'legalVersion': legalVersion,
+  'legalVersionId': legalVersionId,
+  'legalPackPath': 'legalPacks/versions/items/$legalVersionId',
+  'acceptedAt': FieldValue.serverTimestamp(),
+  'representativeDeclaration': true,
+  'documents': {
+    'cgu': true,
+    'privacy': true,
+    'rgpd': true,
+  },
+},
+
       'status': 'pending',
 
       'requestedAt': FieldValue.serverTimestamp(),
@@ -1003,7 +1356,8 @@ String _territoryId() {
   }
 
   Widget _stepControls() {
-    final bool isFinalStep = step == 4;
+    final bool isFinalStep = step == 5;
+    final bool canSave = !isFinalStep || _legalValidationComplete;
 
     ButtonStyle buttonStyle({
       required Color borderColor,
@@ -1061,8 +1415,8 @@ String _territoryId() {
         Expanded(
           child: OutlinedButton(
             onPressed: isFinalStep
-                ? (_saved ? null : _saveRegistration)
-                : _nextStep,
+    ? (_saved || !canSave ? null : _saveRegistration)
+    : _nextStep,
             style: buttonStyle(
               borderColor: _saved
                   ? redColor
@@ -1084,7 +1438,7 @@ String _territoryId() {
                 children: [
                   Text(
                     isFinalStep
-                        ? (_saved ? 'ENREGISTRÉ' : 'ENREGISTRER')
+                        ? (_saved ? 'DEMANDE ENVOYÉE' : 'DEMANDE D’ESSAI GRATUIT')
                         : 'SUIVANT',
                     style: buttonTextStyle(
                       _saved
@@ -1117,6 +1471,7 @@ String _territoryId() {
   'TERRITOIRE',
   'VILLE',
   'FACTURATION',
+  'JURIDIQUE',
 ];
 
     return Scaffold(

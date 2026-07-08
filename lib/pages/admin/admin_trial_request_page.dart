@@ -102,6 +102,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   bool _rgpdAccepted = false;
   bool _legalLoading = true;
 
+  String? _trialRequestMessage;
+
 Map<String, dynamic>? _cguDoc;
 Map<String, dynamic>? _privacyDoc;
 Map<String, dynamic>? _rgpdDoc;
@@ -187,6 +189,12 @@ Map<String, dynamic>? _rgpdDoc;
       _hasCityPosition;
 }
 
+bool get _cityInfoComplete {
+  return _value('logoVille').isNotEmpty &&
+      _value('siteInternetVille').isNotEmpty &&
+      _value('arretesMunicipaux').isNotEmpty;
+}
+
   bool get _canOpenTrialRequest {
     return _structureComplete &&
         _responsableComplete &&
@@ -248,18 +256,15 @@ Map<String, dynamic>? _rgpdDoc;
 
   void _selectSection(_TrialRequestSection section) {
     if (section == _TrialRequestSection.essai && !_canOpenTrialRequest) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Complétez Structure, Responsable, Territoire et Ville avant la demande d’essai.',
-          ),
-          duration: Duration(seconds: 3),
-        ),
-      );
+      setState(() {
+  _trialRequestMessage =
+      'Complétez Structure, Responsable, Territoire et Lieu avant la demande d’essai.';
+});
       return;
     }
 
     setState(() {
+      _trialRequestMessage = null;
       _selectedSection = section;
       _saved = false;
     });
@@ -337,31 +342,41 @@ Future<void> _loadLegalDocuments() async {
   try {
     final firestore = FirebaseFirestore.instance;
 
-    final cgu = await firestore.collection('legalDocuments').doc('cgu').get();
-    final privacy =
-        await firestore.collection('legalDocuments').doc('privacyPolicy').get();
-    final rgpd =
-        await firestore.collection('legalDocuments').doc('rgpdNotice').get();
+    Future<Map<String, dynamic>> loadLegalDoc(String docId) async {
+      final doc = await firestore.collection('legalDocuments').doc(docId).get();
+
+      final chapters = await firestore
+          .collection('legalDocuments')
+          .doc(docId)
+          .collection('chapters')
+          .orderBy(FieldPath.documentId)
+          .get();
+
+      return {
+        ...?doc.data(),
+        'chapters': chapters.docs.map((e) => e.data()).toList(),
+      };
+    }
+
+    final cgu = await loadLegalDoc('cgu');
+    final privacy = await loadLegalDoc('privacyPolicy');
+    final rgpd = await loadLegalDoc('rgpdNotice');
 
     if (!mounted) return;
 
     setState(() {
-      _cguDoc = cgu.data();
-      _privacyDoc = privacy.data();
-      _rgpdDoc = rgpd.data();
+      _cguDoc = cgu;
+      _privacyDoc = privacy;
+      _rgpdDoc = rgpd;
       _legalLoading = false;
     });
   } catch (error) {
     if (!mounted) return;
 
-    setState(() {
-      _legalLoading = false;
-    });
+    setState(() => _legalLoading = false);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Erreur chargement documents légaux : $error'),
-      ),
+      SnackBar(content: Text('Erreur chargement documents légaux : $error')),
     );
   }
 }
@@ -651,7 +666,7 @@ Future<void> _loadLegalDocuments() async {
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w800,
-                                color: redColor,
+                                color: adminColor,
                               ),
                             ),
                           ),
@@ -705,14 +720,14 @@ Future<void> _loadLegalDocuments() async {
         children: [
           Expanded(
             child: Text(
-              current.isEmpty ? label : current,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: current.isEmpty ? adminColor : redColor,
-              ),
-            ),
+  current.isEmpty ? label : current,
+  overflow: TextOverflow.ellipsis,
+  style: TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    color: adminColor,
+  ),
+),
           ),
           const Icon(
             Icons.keyboard_arrow_down_rounded,
@@ -912,7 +927,7 @@ const SizedBox(height: 24),
               _menuButton(
                 section: _TrialRequestSection.essai,
                 icon: Icons.rocket_launch_rounded,
-                label: 'DEMANDE D’ESSAI',
+                label: 'ESSAI GRATUIT',
                 completed: _canSubmitTrialRequest,
                 enabled: _canOpenTrialRequest,
               ),
@@ -1093,55 +1108,58 @@ const SizedBox(height: 24),
   }
 
   Widget _mapTopBanner() {
-    final isVille = _selectedSection == _TrialRequestSection.ville;
+  final isVille = _selectedSection == _TrialRequestSection.ville;
 
-    return Positioned(
-      top: 76,
-      left: 18,
-      right: 18,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.95),
-          borderRadius: BorderRadius.circular(99),
-          border: Border.all(
-            color: Colors.black.withOpacity(0.26),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+if (!isVille || !_cityInfoComplete) {
+  return const SizedBox.shrink();
+}
+
+  return Positioned(
+    top: 76,
+    left: 18,
+    right: 18,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(
+          color: Colors.black.withOpacity(0.26),
+          width: 1.2,
         ),
-        child: Row(
-          children: [
-            Icon(
-              isVille ? Icons.place_rounded : Icons.public_rounded,
-              color: isVille ? redColor : adminColor,
-              size: 23,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                isVille
-                    ? 'Cliquez sur la carte pour positionner le lieu.'
-                    : 'Carte SPHOT — utilisez l’étape Lieu pour placer le territoire.',
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: isVille ? redColor : adminColor,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Image.asset(
+            'data/icons/fire_red_icon.png',
+            width: 24,
+            height: 24,
+            filterQuality: FilterQuality.high,
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Cliquez sur la carte pour positionner le lieu.',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: redColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _mapStyleControls() {
     final style = _mapStyles[_selectedMapStyleIndex];
@@ -1349,6 +1367,18 @@ Row(
     _nextButton(_TrialRequestSection.ville), // adapter selon la page
   ],
 ),
+if (_trialRequestMessage != null) ...[
+  const SizedBox(height: 14),
+  Text(
+    _trialRequestMessage!,
+    textAlign: TextAlign.center,
+    style: const TextStyle(
+      color: redColor,
+      fontSize: 13,
+      fontWeight: FontWeight.w800,
+    ),
+  ),
+],
       ],
     );
   }
@@ -1377,24 +1407,25 @@ Row(
       ),
       const SizedBox(height: 14),
       Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: adminColor.withOpacity(0.055),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: adminColor.withOpacity(0.3),
-          ),
-        ),
-        child: const Text(
-          'Astuce : cliquez directement sur la carte pour enregistrer les coordonnées du lieu.',
-          style: TextStyle(
-            color: adminColor,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            height: 1.25,
-          ),
-        ),
-      ),
+  padding: const EdgeInsets.all(12),
+  decoration: BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(14),
+    border: Border.all(
+      color: adminColor,
+      width: 1.4,
+    ),
+  ),
+  child: const Text(
+    'Cliquez sur la carte pour positionner le lieu.\n\nAstuce : les coordonnées GPS seront enregistrées automatiquement.',
+    style: TextStyle(
+      color: adminColor,
+      fontSize: 12,
+      fontWeight: FontWeight.w700,
+      height: 1.25,
+    ),
+  ),
+),
       const SizedBox(height: 10),
       SizedBox(
         height: 48,
@@ -1445,10 +1476,112 @@ Row(
         ],
       ),
       const SizedBox(height: 22),
-      Center(
-        child: _previousButton(_TrialRequestSection.territoire),
-      ),
+      Row(
+  mainAxisAlignment: MainAxisAlignment.center,
+  children: [
+    _previousButton(_TrialRequestSection.territoire),
+
+    const SizedBox(width: 20),
+
+    _nextButton(
+      _TrialRequestSection.essai,
+      enabled: _villeComplete,
+    ),
+  ],
+),
     ],
+  );
+}
+
+Widget _legalDropdown({
+  required String title,
+  required Map<String, dynamic>? document,
+  required bool checked,
+  required String checkText,
+  required ValueChanged<bool?> onChanged,
+}) {
+  final chapters = List<Map<String, dynamic>>.from(
+    document?['chapters'] ?? [],
+  );
+
+  return Container(
+    margin: const EdgeInsets.only(bottom: 14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: adminColor, width: 1.4),
+    ),
+    child: ExpansionTile(
+      shape: const Border(),
+      collapsedShape: const Border(),
+      tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: adminColor,
+          fontSize: 14,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      iconColor: redColor,
+      collapsedIconColor: redColor,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: chapters.isEmpty
+                ? const [
+                    Text(
+                      'Aucun chapitre renseigné.',
+                      style: TextStyle(
+                        color: adminColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ]
+                : chapters.map((chapter) {
+                    final chapterTitle =
+                        (chapter['title'] ?? chapter['titre'] ?? '').toString();
+                    final content =
+                        (chapter['content'] ?? chapter['texte'] ?? '').toString();
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (chapterTitle.isNotEmpty)
+                            Text(
+                              chapterTitle,
+                              style: const TextStyle(
+                                color: redColor,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          const SizedBox(height: 4),
+                          Text(
+                            content,
+                            style: const TextStyle(
+                              color: adminColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+          ),
+        ),
+        _checkLine(
+          value: checked,
+          text: checkText,
+          onChanged: onChanged,
+        ),
+      ],
+    ),
   );
 }
 
@@ -1457,7 +1590,7 @@ Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _pageHeader(
-          'DEMANDE D’ESSAI SPHOT',
+          'ESSAI GRATUIT',
           'Découvrez gratuitement SPHOT pendant 8 jours.',
         ),
         const Text(
@@ -1494,9 +1627,8 @@ _trialFeature(
   'Diffusez la couleur du drapeau et les dangers du jour',
 ),
         
-        const SizedBox(height: 18),
+        const SizedBox(height: 8),
         _trialSummaryCard(),
-        const SizedBox(height: 16),
         _checkLine(
   value: _certifyRepresentative,
   text: 'Je certifie être habilité à représenter cette structure.',
@@ -1508,70 +1640,14 @@ _trialFeature(
   },
 ),
 
-ListTile(
-  contentPadding: EdgeInsets.zero,
-  title: const Text(
-    'Conditions Générales, confidentialité et RGPD',
-    style: TextStyle(
-      color: adminColor,
-      fontSize: 13,
-      fontWeight: FontWeight.w900,
-    ),
-  ),
-  trailing: Icon(
-    _showLegalDetails
-        ? Icons.keyboard_arrow_up_rounded
-        : Icons.keyboard_arrow_down_rounded,
-    color: redColor,
-  ),
-  onTap: () {
-    setState(() {
-      _showLegalDetails = !_showLegalDetails;
-    });
-  },
-),
-
-if (_showLegalDetails) ...[
-  Container(
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: adminColor.withOpacity(0.045),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(
-        color: adminColor.withOpacity(0.35),
-        width: 1.2,
-      ),
-    ),
-    child: _legalLoading
-    ? const Center(
-        child: CircularProgressIndicator(),
-      )
-    : Text(
-        [
-          (_cguDoc?['content'] ??
-                  'Conditions Générales d’Utilisation SPHOT à compléter.')
-              .toString(),
-          '',
-          (_privacyDoc?['content'] ??
-                  'Politique de confidentialité SPHOT à compléter.')
-              .toString(),
-          '',
-          (_rgpdDoc?['content'] ??
-                  'Notice RGPD SPHOT à compléter.')
-              .toString(),
-        ].join('\n\n'),
-        style: const TextStyle(
-          color: adminColor,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          height: 1.35,
-        ),
-      ),
-  ),
-  const SizedBox(height: 10),
-  _checkLine(
-    value: _legalReadConfirmed,
-    text: 'J’ai lu et j’accepte les Conditions Générales d’Utilisation de SPHOT.',
+if (_legalLoading)
+  const Center(child: CircularProgressIndicator())
+else ...[
+  _legalDropdown(
+    title: 'Conditions Générales d’Utilisation',
+    document: _cguDoc,
+    checked: _legalReadConfirmed,
+    checkText: 'J’ai lu et j’accepte les CGU de SPHOT.',
     onChanged: (value) {
       setState(() {
         _legalReadConfirmed = value ?? false;
@@ -1579,9 +1655,12 @@ if (_showLegalDetails) ...[
       });
     },
   ),
-  _checkLine(
-    value: _privacyReadConfirmed,
-    text: 'J’ai pris connaissance de la Politique de confidentialité de SPHOT.',
+
+  _legalDropdown(
+    title: 'Politique de confidentialité',
+    document: _privacyDoc,
+    checked: _privacyReadConfirmed,
+    checkText: 'J’ai lu et j’accepte la Politique de confidentialité de SPHOT.',
     onChanged: (value) {
       setState(() {
         _privacyReadConfirmed = value ?? false;
@@ -1589,9 +1668,12 @@ if (_showLegalDetails) ...[
       });
     },
   ),
-  _checkLine(
-    value: _rgpdAccepted,
-    text: 'J’accepte le traitement des données nécessaires conformément au RGPD.',
+
+  _legalDropdown(
+    title: 'RGPD',
+    document: _rgpdDoc,
+    checked: _rgpdAccepted,
+    checkText: 'J’accepte le traitement des données conformément au RGPD.',
     onChanged: (value) {
       setState(() {
         _rgpdAccepted = value ?? false;
@@ -1623,7 +1705,7 @@ if (_showLegalDetails) ...[
                   ? 'ENVOI EN COURS'
                   : (_saved
                       ? 'DEMANDE ENVOYÉE'
-                      : 'DEMANDER MON ESSAI GRATUIT'),
+                      : 'DEMANDE D’ESSAI GRATUIT'),
               style: const TextStyle(
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.2,
@@ -1696,7 +1778,7 @@ if (_showLegalDetails) ...[
           ),
           SizedBox(height: 5),
           Text(
-            'Sans engagement. Aucune facturation avant validation.',
+            'Sans engagement ni facturation.',
             style: TextStyle(
               color: adminColor,
               fontSize: 13,

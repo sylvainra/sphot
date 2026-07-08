@@ -907,26 +907,31 @@ String _clusterIconPath(Color color) {
 
   return Marker(
     point: LatLng(lat, lng),
-    width: 50,
-    height: 50,
+    width: 90,
+    height: 90,
+    alignment: Alignment.center,
     child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () {
-  setState(() {
-    _selectedSpot = data;
-    _selectedAdmin = null;
-    _selectedAdvertiser = null;
-  });
+        setState(() {
+          _selectedSpot = data;
+          _selectedAdmin = null;
+          _selectedAdvertiser = null;
+          _showLegalDocumentsPanel = false;
+        });
 
-  _mapController.move(
-    LatLng(lat, lng),
-    18,
-  );
-},
-      child: DashboardSpotMarker(
-        data: data,
-        name: name,
-        iconPath: iconPath,
-        typeColor: _spotTypeColor(data),
+        _mapController.move(
+          LatLng(lat, lng),
+          18,
+        );
+      },
+      child: Center(
+        child: DashboardSpotMarker(
+          data: data,
+          name: name,
+          iconPath: iconPath,
+          typeColor: _spotTypeColor(data),
+        ),
       ),
     ),
   );
@@ -3666,12 +3671,16 @@ Widget build(BuildContext context) {
                                 minZoom: 2,
                                 maxZoom: 18,
                                 onTap: (_, __) {
-                                  setState(() {
-                                    _selectedSpot = null;
-                                    _selectedAdmin = null;
-                                    _selectedAdvertiser = null;
-                                  });
-                                },
+  setState(() {
+    _selectedSpot = null;
+    _selectedAdmin = null;
+    _selectedAdvertiser = null;
+
+    _showLegalDocumentsPanel = false;
+    _selectedLegalDocument = null;
+    _selectedLegalChapter = null;
+  });
+},
                                 onPositionChanged: (_, __) {
                                   _updateVisibleCount(validSpots);
                                   _updateVisibleAdminCount(validAdmins);
@@ -3804,22 +3813,19 @@ class DashboardSpotMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: name,
-      child: Image.asset(
-        iconPath,
-        width: 46,
-        height: 46,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.high,
-        errorBuilder: (_, __, ___) {
-          return Icon(
-            Icons.place,
-            color: typeColor,
-            size: 34,
-          );
-        },
-      ),
+    return Image.asset(
+      iconPath,
+      width: 46,
+      height: 46,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+      errorBuilder: (_, __, ___) {
+        return Icon(
+          Icons.place,
+          color: typeColor,
+          size: 34,
+        );
+      },
     );
   }
 }
