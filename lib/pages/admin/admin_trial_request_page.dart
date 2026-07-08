@@ -108,6 +108,10 @@ Map<String, dynamic>? _cguDoc;
 Map<String, dynamic>? _privacyDoc;
 Map<String, dynamic>? _rgpdDoc;
 
+String _sphotVersion = '1.0';
+dynamic _sphotPublishedAt;
+String _sphotChangeLog = '';
+
   final List<String> structureTypes = const [
     'COMMUNE',
     'COMMUNAUTÉ DE COMMUNES',
@@ -342,6 +346,11 @@ Future<void> _loadLegalDocuments() async {
   try {
     final firestore = FirebaseFirestore.instance;
 
+    final metadata =
+    await firestore.collection('legalDocuments').doc('metadata').get();
+
+    final metadataData = metadata.data() ?? {};
+
     Future<Map<String, dynamic>> loadLegalDoc(String docId) async {
       final doc = await firestore.collection('legalDocuments').doc(docId).get();
 
@@ -368,6 +377,11 @@ Future<void> _loadLegalDocuments() async {
       _cguDoc = cgu;
       _privacyDoc = privacy;
       _rgpdDoc = rgpd;
+
+_sphotVersion = (metadataData['version'] ?? '1.0').toString();
+_sphotPublishedAt = metadataData['publishedAt'];
+_sphotChangeLog = (metadataData['changeLog'] ?? '').toString();
+
       _legalLoading = false;
     });
   } catch (error) {
@@ -452,12 +466,15 @@ Future<void> _loadLegalDocuments() async {
   'legalReadConfirmed': _legalReadConfirmed,
   'privacyReadConfirmed': _privacyReadConfirmed,
   'rgpdAccepted': _rgpdAccepted,
-  'acceptedLegalDocuments': {
-    'cguVersion': (_cguDoc?['version'] ?? '1.0').toString(),
-'privacyVersion': (_privacyDoc?['version'] ?? '1.0').toString(),
-'rgpdVersion': (_rgpdDoc?['version'] ?? '1.0').toString(),
-    'acceptedAt': FieldValue.serverTimestamp(),
-  },
+  'acceptedDocuments': {
+  'version': _sphotVersion,
+  'publishedAt': _sphotPublishedAt,
+  'acceptedAt': FieldValue.serverTimestamp(),
+
+  'cgu': true,
+  'privacy': true,
+  'rgpd': true,
+},
   'commercialLabel': 'Demande d’essai gratuit SPHOT',
 },
 
@@ -1575,6 +1592,34 @@ Widget _legalDropdown({
                   }).toList(),
           ),
         ),
+        Padding(
+  padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+  child: SizedBox(
+    width: double.infinity,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Version SPHOT',
+          style: TextStyle(
+            color: redColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _sphotVersion,
+          style: const TextStyle(
+            color: adminColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    ),
+  ),
+),
         _checkLine(
           value: checked,
           text: checkText,
@@ -1792,28 +1837,34 @@ else ...[
   }
 
   Widget _checkLine({
-    required bool value,
-    required String text,
-    required ValueChanged<bool?> onChanged,
-  }) {
-    return CheckboxListTile(
-      value: value,
-      onChanged: onChanged,
-      activeColor: adminColor,
-      checkColor: Colors.white,
-      controlAffinity: ListTileControlAffinity.leading,
-      contentPadding: EdgeInsets.zero,
-      title: Text(
-        text,
-        style: const TextStyle(
-          color: adminColor,
-          fontSize: 13,
-          fontWeight: FontWeight.w800,
-          height: 1.25,
-        ),
+  required bool value,
+  required String text,
+  required ValueChanged<bool?> onChanged,
+}) {
+  return CheckboxListTile(
+    value: value,
+    onChanged: onChanged,
+    activeColor: adminColor,
+    checkColor: Colors.white,
+    controlAffinity: ListTileControlAffinity.leading,
+    contentPadding: EdgeInsets.zero,
+    horizontalTitleGap: 0,
+    minLeadingWidth: 32,
+    visualDensity: const VisualDensity(
+      horizontal: -4,
+      vertical: -2,
+    ),
+    title: Text(
+      text,
+      style: const TextStyle(
+        color: adminColor,
+        fontSize: 13,
+        fontWeight: FontWeight.w800,
+        height: 1.25,
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _nextButton(
   _TrialRequestSection nextSection, {
