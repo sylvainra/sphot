@@ -102,12 +102,28 @@ static const List<_SuperAdminTileStyle> _tileStyles = [
   final TextEditingController _legalContentController = TextEditingController();
   final TextEditingController _legalVersionController = TextEditingController();
   final TextEditingController _legalPublicationDateController = TextEditingController();
+  final TextEditingController _legalChangeLogController = TextEditingController();
+  final Set<String> _modifiedDocuments = {};
+
+final Map<String, List<String>> _documentChapters = {
+  'CGU': [],
+  'Politique de confidentialité': [],
+  'RGPD': [],
+};
+
+final Map<String, Set<String>> _modifiedChapters = {
+  'CGU': {},
+  'Politique de confidentialité': {},
+  'RGPD': {},
+};
 
   String _selectedVersionDocument = 'CGU';
   String _selectedLegalStatus = 'Publié';
   String _legalLastUpdatedText = 'Non renseignée';
 
   bool _legalVersionSaved = false;
+  bool _legalVersionButtonRed = false;
+  bool _isSavingLegalVersion = false;
 
   bool _isSavingLegalChapter = false;
   bool _isLoadingLegalChapter = false;
@@ -2072,6 +2088,51 @@ Widget _buildAdvertisersList() {
   return const SizedBox.shrink();
 }
 
+String _legalDocumentIdFromTitle(String title) {
+  switch (title) {
+    case 'CGU':
+      return 'cgu';
+    case 'Politique de confidentialité':
+    case 'POLITIQUE DE CONFIDENTIALITÉ':
+      return 'privacyPolicy';
+    case 'RGPD':
+      return 'rgpdNotice';
+    default:
+      return title;
+  }
+}
+
+Future<List<String>> _loadLegalChaptersFromFirebase(String documentTitle) async {
+  final documentId = _legalDocumentIdFromTitle(documentTitle);
+
+  final snapshot = await FirebaseFirestore.instance
+      .collection('legalDocuments')
+      .doc(documentId)
+      .collection('chapters')
+      .orderBy(FieldPath.documentId)
+      .get();
+
+  return snapshot.docs.map((doc) {
+    final data = doc.data();
+    return (data['title'] ?? data['titre'] ?? doc.id).toString();
+  }).toList();
+}
+
+Future<void> _loadAllLegalChaptersFromFirebase() async {
+  final cgu = await _loadLegalChaptersFromFirebase('CGU');
+  final privacy =
+      await _loadLegalChaptersFromFirebase('Politique de confidentialité');
+  final rgpd = await _loadLegalChaptersFromFirebase('RGPD');
+
+  if (!mounted) return;
+
+  setState(() {
+    _documentChapters['CGU'] = cgu;
+    _documentChapters['Politique de confidentialité'] = privacy;
+    _documentChapters['RGPD'] = rgpd;
+  });
+}
+
 Widget _buildLegalDocumentsPanel() {
   
   return Container(
@@ -2118,56 +2179,25 @@ Widget _buildLegalDocumentsPanel() {
             const SizedBox(height: 18),
 
             _legalDocumentTile(
-              title: 'CGU',
-              subtitle: 'Conditions Générales d’Utilisation',
-              chapters: const [
-                '1. Objet',
-                '2. Définitions',
-                '3. Accès au service',
-                '4. Création d’un compte administrateur',
-                '5. Obligations de l’utilisateur',
-                '6. Essai gratuit de 8 jours',
-                '7. Abonnement',
-                '8. Disponibilité du service',
-                '9. Responsabilités',
-                '10. Propriété intellectuelle',
-                '11. Protection des données personnelles',
-                '12. Modification des CGU',
-                '13. Droit applicable – Contact',
-              ],
-            ),
+  title: 'CGU',
+  subtitle: 'Conditions Générales d’Utilisation',
+  chapters: _documentChapters['CGU'] ?? [],
+),
 
             const SizedBox(height: 12),
 
             _legalDocumentTile(
-              title: 'POLITIQUE DE CONFIDENTIALITÉ',
-              subtitle: 'Données personnelles et confidentialité',
-              chapters: const [
-                '1. Objet',
-                '2. Données collectées',
-                '3. Finalités du traitement',
-                '4. Base légale',
-                '5. Durée de conservation',
-                '6. Destinataires des données',
-                '7. Sécurité',
-                '8. Droits des utilisateurs',
-                '9. Contact',
-              ],
-            ),
+  title: 'POLITIQUE DE CONFIDENTIALITÉ',
+  subtitle: 'Données personnelles et confidentialité',
+  chapters: _documentChapters['Politique de confidentialité'] ?? [],
+),
 
             const SizedBox(height: 12),
 
             _legalDocumentTile(
   title: 'RGPD',
   subtitle: 'Notice d’information RGPD',
-  chapters: const [
-    '1. Responsable du traitement',
-    '2. Données concernées',
-    '3. Utilisation des données',
-    '4. Droits des personnes',
-    '5. Demande de suppression',
-    '6. Contact RGPD',
-  ],
+  chapters: _documentChapters['RGPD'] ?? [],
 ),
 
 const SizedBox(height: 12),
@@ -2239,6 +2269,203 @@ Widget _buildLegalChapterEditor() {
         ],
       ),
     ),
+  );
+}
+
+Widget _modifiedChaptersBlock(String documentName) {
+  if (!_modifiedDocuments.contains(documentName)) {
+    return const SizedBox.shrink();
+  }
+
+  final chapters = _documentChapters[documentName] ?? [];
+
+  if (chapters.isEmpty) {
+    return const Padding(
+      padding: EdgeInsets.only(left: 12, bottom: 10),
+      child: Text(
+        'Aucun chapitre disponible.',
+        style: TextStyle(
+          color: adminColor,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  return Padding(
+    padding: const EdgeInsets.only(left: 12, bottom: 12),
+    child: Column(
+      children: chapters.map((chapter) {
+        final selected =
+            _modifiedChapters[documentName]?.contains(chapter) ?? false;
+
+        return CheckboxListTile(
+          value: selected,
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          activeColor: adminColor,
+          title: Text(
+            chapter,
+            style: const TextStyle(
+              color: adminColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          onChanged: (value) {
+            setState(() {
+              final set = _modifiedChapters[documentName] ?? <String>{};
+
+              if (value == true) {
+  set.add(chapter);
+  _modifiedDocuments.add(documentName);
+} else {
+  set.remove(chapter);
+
+  if (set.isEmpty) {
+    _modifiedDocuments.remove(documentName);
+  }
+}
+
+_modifiedChapters[documentName] = set;
+            });
+          },
+        );
+      }).toList(),
+    ),
+  );
+}
+
+bool get _canPublishVersion {
+  if (_modifiedDocuments.isEmpty) return false;
+
+  if (_legalChangeLogController.text.trim().isEmpty) {
+    return false;
+  }
+
+  for (final document in _modifiedDocuments) {
+    final selectedChapters = _modifiedChapters[document] ?? {};
+    if (selectedChapters.isEmpty) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+Widget _buildLegalVersionsHistory() {
+  return FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    future: FirebaseFirestore.instance
+        .collection('legalVersions')
+        .get(),
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Text(
+            'Erreur historique : ${snapshot.error}',
+            style: const TextStyle(
+              color: redColor,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        );
+      }
+
+      if (!snapshot.hasData) {
+        return const Padding(
+          padding: EdgeInsets.only(top: 10),
+          child: Text(
+            'Chargement de l’historique...',
+            style: TextStyle(
+              color: adminColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        );
+      }
+
+      final versions = snapshot.data!.docs;
+
+      if (versions.isEmpty) {
+        return const Padding(
+          padding: EdgeInsets.only(top: 10),
+          child: Text(
+            'Aucune version enregistrée.',
+            style: TextStyle(
+              color: adminColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        );
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: versions.map((doc) {
+          final data = doc.data();
+
+          final version = (data['version'] ?? '').toString();
+          final publicationDate =
+              (data['publicationDate'] ?? 'Non renseignée').toString();
+          final updatedAtText =
+              (data['updatedAtText'] ?? 'Non renseignée').toString();
+          final status = (data['status'] ?? 'Non renseigné').toString();
+          final summary = (data['summary'] ??
+                  data['changeLog'] ??
+                  'Non renseigné')
+              .toString();
+
+          final documents =
+              List<String>.from(data['documentsModified'] ?? []);
+
+          final chaptersRaw =
+              Map<String, dynamic>.from(data['chaptersModified'] ?? {});
+
+          return Container(
+            margin: const EdgeInsets.only(top: 10),
+            decoration: BoxDecoration(
+              border: Border.all(color: adminColor, width: 1.2),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: ExpansionTile(
+              iconColor: redColor,
+              collapsedIconColor: redColor,
+              title: Text(
+                'Version $version',
+                style: const TextStyle(
+                  color: redColor,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              subtitle: Text(
+                'Publiée le $publicationDate • MAJ $updatedAtText',
+                style: const TextStyle(
+                  color: adminColor,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              childrenPadding: const EdgeInsets.all(12),
+              children: [
+                _spotInfoLine('État', status),
+                _spotInfoLine(
+                  'Documents',
+                  documents.isEmpty ? 'Non renseigné' : documents.join(', '),
+                ),
+                ...chaptersRaw.entries.map((entry) {
+                  final chapters = List<String>.from(entry.value ?? []);
+                  if (chapters.isEmpty) return const SizedBox.shrink();
+
+                  return _spotInfoLine(entry.key, chapters.join(', '));
+                }),
+                _spotInfoLine('Résumé', summary),
+              ],
+            ),
+          );
+        }).toList(),
+      );
+    },
   );
 }
 
@@ -2365,6 +2592,129 @@ Widget _buildLegalVersionTile() {
             ),
           ),
           const SizedBox(height: 12),
+
+const SizedBox(height: 12),
+
+const Text(
+  'Documents modifiés',
+  style: TextStyle(
+    color: redColor,
+    fontSize: 14,
+    fontWeight: FontWeight.w900,
+  ),
+),
+
+CheckboxListTile(
+  value: _modifiedDocuments.contains('CGU'),
+  onChanged: (value) {
+    setState(() {
+      if (value == true) {
+        _modifiedDocuments.add('CGU');
+      } else {
+        _modifiedDocuments.remove('CGU');
+        _modifiedChapters['CGU']?.clear();
+      }
+    });
+  },
+  title: const Text(
+    'CGU',
+    style: TextStyle(
+      color: adminColor,
+      fontWeight: FontWeight.w700,
+      fontSize: 16,
+    ),
+  ),
+  activeColor: adminColor,
+  checkColor: Colors.white,
+  side: const BorderSide(color: adminColor, width: 1.6),
+),
+
+_modifiedChaptersBlock('CGU'),
+
+CheckboxListTile(
+  value: _modifiedDocuments.contains('Politique de confidentialité'),
+  onChanged: (value) {
+    setState(() {
+      if (value == true) {
+        _modifiedDocuments.add('Politique de confidentialité');
+      } else {
+        _modifiedDocuments.remove('Politique de confidentialité');
+        _modifiedChapters['Politique de confidentialité']?.clear();
+      }
+    });
+  },
+  title: const Text(
+    'Politique de confidentialité',
+    style: TextStyle(
+      color: adminColor,
+      fontWeight: FontWeight.w700,
+      fontSize: 16,
+    ),
+  ),
+  activeColor: adminColor,
+  checkColor: Colors.white,
+  side: const BorderSide(color: adminColor, width: 1.6),
+),
+
+_modifiedChaptersBlock('Politique de confidentialité'),
+
+CheckboxListTile(
+  value: _modifiedDocuments.contains('RGPD'),
+  onChanged: (value) {
+    setState(() {
+      if (value == true) {
+        _modifiedDocuments.add('RGPD');
+      } else {
+        _modifiedDocuments.remove('RGPD');
+        _modifiedChapters['RGPD']?.clear();
+      }
+    });
+  },
+  title: const Text(
+    'RGPD',
+    style: TextStyle(
+      color: adminColor,
+      fontWeight: FontWeight.w700,
+      fontSize: 16,
+    ),
+  ),
+  activeColor: adminColor,
+  checkColor: Colors.white,
+  side: const BorderSide(color: adminColor, width: 1.6),
+),
+
+_modifiedChaptersBlock('RGPD'),
+
+TextField(
+  controller: _legalChangeLogController,
+  minLines: 4,
+  maxLines: 8,
+  style: const TextStyle(
+    color: adminColor,
+    fontWeight: FontWeight.w700,
+  ),
+  decoration: InputDecoration(
+    labelText: 'Résumé des modifications',
+    alignLabelWithHint: true,
+    labelStyle: const TextStyle(
+      color: adminColor,
+      fontWeight: FontWeight.w700,
+    ),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: adminColor, width: 1.6),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: adminColor, width: 1.6),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: adminColor, width: 1.8),
+    ),
+  ),
+),
+          const SizedBox(height: 12),
           GestureDetector(
             key: _legalStatusKey,
             onTap: _openLegalStatusMenu,
@@ -2439,28 +2789,50 @@ Widget _buildLegalVersionTile() {
           ),
           const SizedBox(height: 14),
           SizedBox(
-            width: double.infinity,
-            height: 46,
-            child: ElevatedButton.icon(
-              onPressed: _saveLegalVersion,
-              icon: Icon(
-                _legalVersionSaved
-                    ? Icons.check_circle_rounded
-                    : Icons.save_rounded,
-              ),
-              label: Text(
-                _legalVersionSaved ? 'ENREGISTRÉE' : 'ENREGISTRER',
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _legalVersionSaved ? redColor : adminColor,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(99),
-                ),
-              ),
-            ),
-          ),
+  width: double.infinity,
+  height: 46,
+  child: ElevatedButton.icon(
+    onPressed: _legalVersionButtonRed
+    ? null
+    : (_canPublishVersion ? _saveLegalVersionAndTurnButtonRed : null),
+    icon: Icon(
+      _legalVersionButtonRed
+          ? Icons.check_circle_rounded
+          : Icons.save_rounded,
+    ),
+    label: Text(
+      _legalVersionButtonRed
+          ? 'ENREGISTRÉE'
+          : 'ENREGISTRER',
+    ),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: _legalVersionButtonRed
+          ? redColor
+          : adminColor,
+      disabledBackgroundColor:
+    _legalVersionButtonRed ? redColor : Colors.grey.shade300,
+disabledForegroundColor:
+    _legalVersionButtonRed ? Colors.white : Colors.grey,
+      foregroundColor: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(99),
+      ),
+    ),
+  ),
+),
+const SizedBox(height: 16),
+
+const Text(
+  'Historique des versions',
+  style: TextStyle(
+    color: redColor,
+    fontSize: 14,
+    fontWeight: FontWeight.w900,
+  ),
+),
+
+_buildLegalVersionsHistory(),
         ],
       ),
     ),
@@ -2670,40 +3042,173 @@ Future<void> _saveLegalChapter() async {
 }
 
 void _markLegalVersionModified() {
-  if (_legalVersionSaved) {
-    setState(() {
-      _legalVersionSaved = false;
-    });
-  }
+  if (!_legalVersionButtonRed && !_legalVersionSaved) return;
+
+  setState(() {
+    _legalVersionSaved = false;
+    _legalVersionButtonRed = false;
+  });
+}
+
+Future<void> _saveLegalVersionAndTurnButtonRed() async {
+  setState(() {
+    _legalVersionButtonRed = true;
+  });
+
+  await _saveLegalVersion();
 }
 
 Future<void> _saveLegalVersion() async {
+  if (!_canPublishVersion) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Sélectionnez au moins un document, un chapitre modifié et renseignez le résumé des modifications.',
+        ),
+      ),
+    );
+    return;
+  }
+
   final now = DateTime.now();
+
+  final version = _legalVersionController.text.trim().isEmpty
+      ? '1.0'
+      : _legalVersionController.text.trim();
+
+  final versionId = version.replaceAll('.', '_');
 
   final formattedDate =
       '${now.day.toString().padLeft(2, '0')}/'
       '${now.month.toString().padLeft(2, '0')}/'
       '${now.year}';
 
-  await FirebaseFirestore.instance
-      .collection('legalDocuments')
-      .doc('metadata')
-      .set({
-    'version': _legalVersionController.text.trim().isEmpty
-        ? '1.0'
-        : _legalVersionController.text.trim(),
-    'publicationDate': _legalPublicationDateController.text.trim(),
-    'status': _selectedLegalStatus,
-    'updatedAt': FieldValue.serverTimestamp(),
-    'updatedAtText': formattedDate,
-  }, SetOptions(merge: true));
+  final publicationDate = _legalPublicationDateController.text.trim().isEmpty
+      ? formattedDate
+      : _legalPublicationDateController.text.trim();
 
-  if (!mounted) return;
+  final summary = _legalChangeLogController.text.trim();
 
-  setState(() {
-    _legalLastUpdatedText = formattedDate;
-    _legalVersionSaved = true;
-  });
+  try {
+    final firestore = FirebaseFirestore.instance;
+
+    Future<Map<String, dynamic>> loadDocumentSnapshot({
+      required String label,
+      required String documentId,
+    }) async {
+      final doc =
+          await firestore.collection('legalDocuments').doc(documentId).get();
+
+      final chaptersSnapshot = await firestore
+          .collection('legalDocuments')
+          .doc(documentId)
+          .collection('chapters')
+          .orderBy(FieldPath.documentId)
+          .get();
+
+      final selectedChapters = _modifiedChapters[label] ?? <String>{};
+
+      return {
+        'label': label,
+        'documentId': documentId,
+        'modified': _modifiedDocuments.contains(label),
+        'modifiedChapters': selectedChapters.toList(),
+        'document': doc.data() ?? {},
+        'chapters': chaptersSnapshot.docs.map((chapter) {
+          return {
+            'id': chapter.id,
+            ...chapter.data(),
+          };
+        }).toList(),
+      };
+    }
+
+    final cguSnapshot = await loadDocumentSnapshot(
+      label: 'CGU',
+      documentId: 'cgu',
+    );
+
+    final privacySnapshot = await loadDocumentSnapshot(
+      label: 'Politique de confidentialité',
+      documentId: 'privacyPolicy',
+    );
+
+    final rgpdSnapshot = await loadDocumentSnapshot(
+      label: 'RGPD',
+      documentId: 'rgpdNotice',
+    );
+
+    final chaptersModified = _modifiedChapters.map(
+      (key, value) => MapEntry(key, value.toList()),
+    );
+
+    final documentsModified = _modifiedDocuments.toList();
+
+    final versionPayload = {
+      'version': version,
+      'versionId': versionId,
+      'publicationDate': publicationDate,
+      'publishedAt': FieldValue.serverTimestamp(),
+      'status': _selectedLegalStatus,
+      'summary': summary,
+      'documentsModified': documentsModified,
+      'chaptersModified': chaptersModified,
+      'documents': {
+        'cgu': cguSnapshot,
+        'privacyPolicy': privacySnapshot,
+        'rgpdNotice': rgpdSnapshot,
+      },
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedAtText': formattedDate,
+    };
+
+    await firestore.collection('legalDocuments').doc('metadata').set({
+      'version': version,
+      'publicationDate': publicationDate,
+      'publishedAt': FieldValue.serverTimestamp(),
+      'status': _selectedLegalStatus,
+      'summary': summary,
+      'documentsModified': documentsModified,
+      'chaptersModified': chaptersModified,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedAtText': formattedDate,
+    }, SetOptions(merge: true));
+
+    await firestore
+        .collection('legalVersions')
+        .doc(versionId)
+        .set(versionPayload, SetOptions(merge: true));
+
+    if (!mounted) return;
+
+setState(() {
+  _legalLastUpdatedText = formattedDate;
+  _legalVersionSaved = true;
+  _legalVersionButtonRed = true;
+
+  _modifiedDocuments.clear();
+  _modifiedChapters['CGU'] = <String>{};
+  _modifiedChapters['Politique de confidentialité'] = <String>{};
+  _modifiedChapters['RGPD'] = <String>{};
+
+  _legalChangeLogController.clear();
+});
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Version SPHOT $version publiée et archivée.'),
+      ),
+    );
+  } catch (error) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Erreur publication version SPHOT : $error'),
+      ),
+    );
+  }
 }
 
 void _openLegalStatusMenu() {
@@ -2812,6 +3317,8 @@ void initState() {
   _speech = stt.SpeechToText();
   _legalVersionController.addListener(_markLegalVersionModified);
   _legalPublicationDateController.addListener(_markLegalVersionModified);
+  _legalChangeLogController.addListener(_markLegalVersionModified);
+  _loadAllLegalChaptersFromFirebase();
 }
 
 @override
@@ -3769,9 +4276,27 @@ Widget build(BuildContext context) {
                               ),
                             ),
                             _buildMapSearchBar(),
-                            _buildRecenterButton(),
-                            _buildNorthButton(),
-                            _buildMapStyleButton(),
+_buildRecenterButton(),
+_buildNorthButton(),
+_buildMapStyleButton(),
+
+Positioned(
+  left: 0,
+  right: 0,
+  bottom: 22,
+  child: Center(
+    child: IconButton(
+      icon: const Icon(
+        Icons.arrow_back_ios_new_rounded,
+        color: adminColor,
+        size: 34,
+      ),
+      onPressed: () {
+        Navigator.of(context).pop();
+      },
+    ),
+  ),
+),
                           ],
                         ),
                       ),
@@ -3829,3 +4354,4 @@ class DashboardSpotMarker extends StatelessWidget {
     );
   }
 }
+

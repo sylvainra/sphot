@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../pages/sauveteur/change_password_page.dart';
 import '../web/admin/pages/admin_requests_page.dart';
+import '../web/admin/pages/dashboard_super_admin_page.dart';
 
 class ProfilLoginPage extends StatefulWidget {
   const ProfilLoginPage({super.key});
@@ -159,15 +160,24 @@ if (mustChangePassword) {
   return;
 }
 
+if (userRole == 'SUPER_ADMIN') {
+  Navigator.of(context).pushReplacement(
+    MaterialPageRoute(
+      builder: (_) => const DashboardSuperAdminPage(),
+    ),
+  );
+  return;
+}
+
 Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => SauveteurMenuPage(
-          profileColor: const Color(0xFFFF0000),
-          userRole: userRole,
-          territoireId: territoireId,
-        ),
-      ),
-    );
+  MaterialPageRoute(
+    builder: (_) => SauveteurMenuPage(
+      profileColor: const Color(0xFFFF0000),
+      userRole: userRole,
+      territoireId: territoireId,
+    ),
+  ),
+);
   } catch (error) {
     if (!mounted) return;
 
