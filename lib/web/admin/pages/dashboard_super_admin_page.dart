@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'dart:math' as math;
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:async';
 
 enum DashboardSpotFilter {
   none,
@@ -64,6 +65,7 @@ class _DashboardSuperAdminPageState extends State<DashboardSuperAdminPage> {
   static const Color redColor = Color(0xFFDC2626);
 
   final MapController _mapController = MapController();
+  Timer? _mapMovementTimer;
 
   int _selectedTileStyle = 0;
 
@@ -1033,16 +1035,24 @@ if (_normalizeType(type).contains('POSTE DE SECOURS'))
   );
 }
 
-Widget _spotInfoLine(String label, String value) {
+Widget _spotInfoLine(
+  String label,
+  String value, {
+  double labelWidth = 95,
+  double bottomPadding = 4,
+}) {
   return Padding(
-    padding: const EdgeInsets.only(bottom: 6),
+    padding: EdgeInsets.only(bottom: bottomPadding),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 95,
+          width: labelWidth,
           child: Text(
             '$label :',
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.visible,
             style: const TextStyle(
               fontWeight: FontWeight.w800,
               color: Colors.black87,
@@ -1989,46 +1999,382 @@ _spotInfoLine('Prix', '${price.toStringAsFixed(0)} € HT'),
   );
 }
 
+Future<void> _approveAdminRequest(
+  Map<String, dynamic> adminData,
+) async {
+  final requestId = _cleanText(
+    adminData['requestId'] ?? adminData['uid'],
+  );
+
+  if (requestId.isEmpty) {
+    throw Exception('Identifiant de la demande introuvable.');
+  }
+
+  final profile = Map<String, dynamic>.from(
+    adminData['profile'] ?? {},
+  );
+
+  final proConnect = Map<String, dynamic>.from(
+    adminData['proConnect'] ?? {},
+  );
+
+  final recipientEmail = _cleanText(
+    profile['email'] ??
+        proConnect['email'] ??
+        adminData['email'],
+  );
+
+  if (recipientEmail.isEmpty) {
+    throw Exception('Adresse email du demandeur introuvable.');
+  }
+
+  final now = FieldValue.serverTimestamp();
+
+  await FirebaseFirestore.instance
+      .collection('adminRequests')
+      .doc(requestId)
+      .set(
+    {
+      'status': 'approved',
+      'accessPhase': 'configuration_access',
+      'updatedAt': now,
+
+      'administrativeTracking': {
+        'status': 'approved',
+        'reviewStartedAt': now,
+        'approvedAt': now,
+        'rejectedAt': null,
+        'rejectionReason': null,
+      },
+
+      'commercialTracking': {
+        'status': 'configuration_access_opened',
+        'configurationAccessOpenedAt': now,
+      },
+
+      'setupProgress': {
+        'accessGranted': true,
+        'updatedAt': now,
+      },
+
+      'approvalEmail': {
+        'status': 'pending',
+        'recipient': recipientEmail,
+        'sentAt': null,
+        'messageId': null,
+        'error': null,
+        'updatedAt': now,
+      },
+
+      'lastEvent': {
+        'type': 'admin_request_approved',
+        'category': 'administrative',
+        'label': 'Demande administrateur approuvée',
+        'createdAt': now,
+        'createdByRole': 'super_admin',
+      },
+    },
+    SetOptions(merge: true),
+  );
+
+  if (!mounted) return;
+
+  setState(() {
+    _selectedAdmin = {
+      ...adminData,
+      'status': 'approved',
+      'accessPhase': 'configuration_access',
+      'approvalEmail': {
+        'status': 'pending',
+        'recipient': recipientEmail,
+      },
+    };
+  });
+}
+
+Future<void> _rejectAdminRequest(
+  Map<String, dynamic> adminData,
+  String rejectionReason,
+) async {
+  final requestId = _cleanText(
+    adminData['requestId'] ?? adminData['uid'],
+  );
+
+  if (requestId.isEmpty) {
+    throw Exception('Identifiant de la demande introuvable.');
+  }
+
+  final profile = Map<String, dynamic>.from(
+    adminData['profile'] ?? {},
+  );
+
+  final proConnect = Map<String, dynamic>.from(
+    adminData['proConnect'] ?? {},
+  );
+
+  final recipientEmail = _cleanText(
+    profile['email'] ??
+        proConnect['email'] ??
+        adminData['email'],
+  );
+
+  if (recipientEmail.isEmpty) {
+    throw Exception('Adresse email du demandeur introuvable.');
+  }
+
+  final administrativeTracking =
+      Map<String, dynamic>.from(
+    adminData['administrativeTracking'] ?? {},
+  );
+
+  final previousRejectionReason = _cleanText(
+    administrativeTracking['rejectionReason'],
+  );
+
+  final now = FieldValue.serverTimestamp();
+
+  await FirebaseFirestore.instance
+      .collection('adminRequests')
+      .doc(requestId)
+      .set(
+    {
+      'status': 'rejected',
+      'accessPhase': 'correction_required',
+      'updatedAt': now,
+
+      'administrativeTracking': {
+        ...administrativeTracking,
+        'status': 'rejected',
+        'reviewStartedAt':
+            administrativeTracking['reviewStartedAt'] ?? now,
+        'rejectedAt': now,
+        'rejectionReason': rejectionReason,
+        'previousRejectionReason':
+            previousRejectionReason.isEmpty
+                ? null
+                : previousRejectionReason,
+        'approvedAt': null,
+      },
+
+      'commercialTracking.status': 'rejected',
+      'commercialTracking.configurationAccessOpenedAt': null,
+
+      'setupProgress.accessGranted': false,
+      'setupProgress.updatedAt': now,
+
+      'rejectionEmail': {
+        'status': 'pending',
+        'recipient': recipientEmail,
+        'sentAt': null,
+        'messageId': null,
+        'error': null,
+        'updatedAt': now,
+      },
+
+      'lastEvent': {
+        'type': 'admin_request_rejected',
+        'category': 'administrative',
+        'label': 'Demande administrateur refusée',
+        'comment': rejectionReason,
+        'createdAt': now,
+        'createdByRole': 'super_admin',
+      },
+    },
+    SetOptions(merge: true),
+  );
+
+  if (!mounted) return;
+
+  setState(() {
+    _selectedAdmin = {
+      ...adminData,
+      'status': 'rejected',
+      'accessPhase': 'correction_required',
+      'administrativeTracking': {
+        ...administrativeTracking,
+        'status': 'rejected',
+        'rejectionReason': rejectionReason,
+      },
+      'rejectionEmail': {
+        'status': 'pending',
+        'recipient': recipientEmail,
+      },
+    };
+  });
+}
+
+Future<void> _openAdminRejectionDialog(
+  Map<String, dynamic> adminData,
+) async {
+  final reason = await showDialog<String>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      String rejectionReason = '';
+
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text(
+              'REFUSER LA DEMANDE',
+              style: TextStyle(
+                color: redColor,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            content: SizedBox(
+              width: 480,
+              child: TextField(
+                minLines: 4,
+                maxLines: 8,
+                autofocus: true,
+                onChanged: (value) {
+                  rejectionReason = value.trim();
+                  setDialogState(() {});
+                },
+                decoration: InputDecoration(
+                  labelText: 'Motif du refus',
+                  hintText:
+                      'Indiquez clairement la raison du refus au demandeur.',
+                  alignLabelWithHint: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: adminColor,
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: redColor,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                },
+                child: const Text('ANNULER'),
+              ),
+              ElevatedButton(
+                onPressed: rejectionReason.isEmpty
+                    ? null
+                    : () {
+                        Navigator.of(dialogContext).pop(rejectionReason);
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: redColor,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade400,
+                ),
+                child: const Text('CONFIRMER LE REFUS'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  if (!mounted || reason == null || reason.isEmpty) {
+    return;
+  }
+
+  await _rejectAdminRequest(adminData, reason);
+}
+
 Widget _buildAdminDetailPanel() {
   final admin = _selectedAdmin;
-  if (admin == null) return const SizedBox.shrink();
 
-  final uid = _cleanText(admin['uid']);
-  final territoire = Map<String, dynamic>.from(admin['territoire'] ?? {});
-  final structure = Map<String, dynamic>.from(admin['structure'] ?? {});
-  final profile = Map<String, dynamic>.from(admin['profile'] ?? {});
+  if (admin == null) {
+    return const SizedBox.shrink();
+  }
+
+  final territoire = Map<String, dynamic>.from(
+    admin['territoire'] ?? {},
+  );
+
+  final structure = Map<String, dynamic>.from(
+    admin['structure'] ?? {},
+  );
+
+  final profile = Map<String, dynamic>.from(
+    admin['profile'] ?? {},
+  );
 
   final mairie = _cleanText(
-    structure['nom'] ?? admin['nomStructure'] ?? admin['organisation'] ?? 'ADMIN',
+    structure['nom'] ??
+        admin['nomStructure'] ??
+        admin['organisation'] ??
+        'ADMIN',
   );
 
-  final email = _cleanText(profile['email'] ?? admin['email']);
-  final responsable = _cleanText(
+  final responsableNom = _cleanText(
     profile['nomAffiche'] ??
         admin['nomResponsable'] ??
-        '${admin['prenom'] ?? ''} ${admin['nom'] ?? ''}',
+        admin['nom'],
   );
 
-  final siret = _cleanText(structure['siret'] ?? admin['siret']);
+  final responsablePrenom = _cleanText(
+    profile['prenomAffiche'] ??
+        admin['prenomResponsable'] ??
+        admin['prenom'],
+  );
+
+  final responsable = [
+    responsablePrenom,
+    responsableNom,
+  ].where((value) => value.isNotEmpty).join(' ');
+
+  final email = _cleanText(
+    profile['email'] ?? admin['email'],
+  );
+
+  final telephone = _cleanText(
+    profile['telephone'] ?? admin['telephone'],
+  );
+
+  final siret = _cleanText(
+    structure['siret'] ?? admin['siret'],
+  );
+
+  final siren = _cleanText(
+    structure['siren'] ?? admin['siren'],
+  );
+
   final ville = _cleanText(territoire['ville']);
   final departement = _cleanText(territoire['departement']);
   final region = _cleanText(territoire['region']);
-  final telephone = _cleanText(profile['telephone'] ?? admin['telephone']);
+  final pays = _cleanText(territoire['pays']);
+  final logoUrl = _cleanText(territoire['logoVille']);
 
-final rawStatus = _cleanText(admin['status'] ?? '');
+  final requestNumber = _cleanText(
+    admin['requestNumber'] ?? admin['requestId'],
+  );
 
-final adminStatus = switch (rawStatus.toLowerCase()) {
-  'pending' => 'En attente de validation',
-  'approved' => 'Approuvé',
-  'rejected' => 'Refusé',
-  'active' => 'Actif',
-  'trial' => 'Période d\'essai',
-  'overdue' => 'En retard',
-  'cancelled' => 'Résilié',
-  _ => 'Non renseigné',
-};
+  final rawStatus = _cleanText(admin['status']);
+
+  final adminStatus = switch (rawStatus.toLowerCase()) {
+    'pending' => 'En attente de validation',
+    'approved' => 'Approuvée',
+    'rejected' => 'Refusée',
+    'active' => 'Active',
+    'trial' => 'Période d’essai',
+    'overdue' => 'En retard',
+    'cancelled' => 'Résiliée',
+    _ => 'Non renseigné',
+  };
+
   return Container(
-    width: 420,
+    width: 470,
     decoration: BoxDecoration(
       color: Colors.white.withOpacity(0.98),
       border: Border(
@@ -2040,46 +2386,320 @@ final adminStatus = switch (rawStatus.toLowerCase()) {
     ),
     child: SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(22),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            mairie,
+            style: const TextStyle(
+              color: adminColor,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              height: 1.15,
+            ),
+          ),
+          if (requestNumber.isNotEmpty) ...[
+            const SizedBox(height: 7),
+            Text(
+              requestNumber,
+              style: const TextStyle(
+                color: redColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+          const SizedBox(height: 7),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 6,
+            ),
+            decoration: BoxDecoration(
+              color: rawStatus.toLowerCase() == 'pending'
+                  ? Colors.orange.withOpacity(0.12)
+                  : adminColor.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(
+                color: rawStatus.toLowerCase() == 'pending'
+                    ? Colors.orange
+                    : adminColor,
+              ),
+            ),
+            child: Text(
+              adminStatus,
+              style: TextStyle(
+                color: rawStatus.toLowerCase() == 'pending'
+                    ? Colors.deepOrange
+                    : adminColor,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+    IconButton(
+      onPressed: () {
+        setState(() {
+          _selectedAdmin = null;
+        });
+      },
+      icon: const Icon(
+        Icons.close_rounded,
+        color: adminColor,
+      ),
+    ),
+  ],
+),
+            const SizedBox(height: 10),
+            _adminDetailSection(
+  title: 'DEMANDEUR',
+  children: [
+    _spotInfoLine(
+      'Responsable',
+      responsable.isEmpty ? 'Non renseigné' : responsable,
+    ),
+    _spotInfoLine(
+      'Email',
+      email.isEmpty ? 'Non renseigné' : email,
+    ),
+    _spotInfoLine(
+      'Téléphone',
+      telephone.isEmpty ? 'Non renseigné' : telephone,
+    ),
+  ],
+),
+                const SizedBox(height: 10),
+            _adminDetailSection(
+              title: 'STRUCTURE',
               children: [
-                Expanded(
-                  child: Text(
-                    mairie,
-                    style: const TextStyle(
-                      color: adminColor,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
+                _spotInfoLine('Organisation', mairie),
+                _spotInfoLine(
+                  'Type',
+                  _cleanText(structure['type']).isEmpty
+                      ? 'Non renseigné'
+                      : _cleanText(structure['type']),
                 ),
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _selectedAdmin = null;
-                    });
-                  },
-                  icon: const Icon(Icons.close_rounded),
+                _spotInfoLine(
+                  'SIRET',
+                  siret.isEmpty
+                      ? 'Non renseigné'
+                      : siret,
+                ),
+                _spotInfoLine(
+                  'SIREN',
+                  siren.isEmpty
+                      ? 'Non renseigné'
+                      : siren,
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+            _adminDetailSection(
+              title: 'TERRITOIRE',
+              children: [
+                _spotInfoLine(
+                  'Ville',
+                  ville.isEmpty
+                      ? 'Non renseignée'
+                      : ville,
+                ),
+                _spotInfoLine(
+                  'Département',
+                  departement.isEmpty
+                      ? 'Non renseigné'
+                      : departement,
+                ),
+                _spotInfoLine(
+                  'Région',
+                  region.isEmpty
+                      ? 'Non renseignée'
+                      : region,
+                ),
+                _spotInfoLine(
+                  'Pays',
+                  pays.isEmpty
+                      ? 'Non renseigné'
+                      : pays,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _adminDetailSection(
+  title: 'INSTRUCTION',
+  children: [
+    _spotInfoLine(
+      'Référence',
+      requestNumber.isEmpty
+          ? 'Non renseignée'
+          : requestNumber,
+      labelWidth: 105,
+      bottomPadding: 3,
+    ),
+    _spotInfoLine(
+      'Statut',
+      adminStatus,
+      labelWidth: 105,
+      bottomPadding: 3,
+    ),
+    _spotInfoLine(
+      'Demande reçue',
+      _formatDate(admin['requestedAt']),
+      labelWidth: 105,
+      bottomPadding: 0,
+    ),
+  ],
+),
             const SizedBox(height: 18),
 
-            _spotInfoLine('Responsable', responsable),
-            _spotInfoLine('Email', email),
-            _spotInfoLine('Téléphone', telephone.isEmpty ? 'Non renseigné' : telephone),
-            _spotInfoLine('Organisation', mairie),
-            _spotInfoLine('SIRET', siret.isEmpty ? 'Non renseigné' : siret),
-            _spotInfoLine('Ville', ville),
-            _spotInfoLine('Département', departement),
-            _spotInfoLine('Région', region),
-            _spotInfoLine('Statut', adminStatus),
+if (rawStatus.toLowerCase() == 'pending')
+  Row(
+    children: [
+      Expanded(
+        child: ElevatedButton.icon(
+          onPressed: () async {
+            try {
+              await _approveAdminRequest(admin);
+            } catch (error) {
+              if (!mounted) return;
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Erreur lors de l’approbation : $error',
+                  ),
+                ),
+              );
+            }
+          },
+          icon: const Icon(Icons.check_circle_rounded),
+          label: const Text(
+            'APPROUVER',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: adminColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 15),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: ElevatedButton.icon(
+          onPressed: () async {
+            try {
+              await _openAdminRejectionDialog(admin);
+            } catch (error) {
+              if (!mounted) return;
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Erreur lors du refus : $error',
+                  ),
+                ),
+              );
+            }
+          },
+          icon: const Icon(Icons.cancel_rounded),
+          label: const Text(
+            'REFUSER',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: redColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 15),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+      ),
+    ],
+  ),
+
+if (rawStatus.toLowerCase() == 'rejected') ...[
+  const SizedBox(height: 14),
+  _adminDetailSection(
+    title: 'MOTIF DU REFUS',
+    children: [
+      Text(
+        _cleanText(
+          Map<String, dynamic>.from(
+            admin['administrativeTracking'] ?? {},
+          )['rejectionReason'],
+        ).isEmpty
+            ? 'Aucun commentaire renseigné.'
+            : _cleanText(
+                Map<String, dynamic>.from(
+                  admin['administrativeTracking'] ?? {},
+                )['rejectionReason'],
+              ),
+        style: const TextStyle(
+          color: adminColor,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          height: 1.35,
+        ),
+      ),
+    ],
+  ),
+],
           ],
         ),
       ),
+    ),
+  );
+}
+
+Widget _adminDetailSection({
+  required String title,
+  required List<Widget> children,
+}) {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+    decoration: BoxDecoration(
+      color: adminColor.withOpacity(0.045),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: adminColor.withOpacity(0.35),
+        width: 1.2,
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: redColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 6),
+        ...children,
+      ],
     ),
   );
 }
@@ -2148,7 +2768,7 @@ Widget _buildLegalDocumentsPanel() {
     ),
     child: SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(22),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2412,10 +3032,12 @@ Widget _buildLegalVersionsHistory() {
           final updatedAtText =
               (data['updatedAtText'] ?? 'Non renseignée').toString();
           final status = (data['status'] ?? 'Non renseigné').toString();
-          final summary = (data['summary'] ??
-                  data['changeLog'] ??
-                  'Non renseigné')
-              .toString();
+
+          final summary = (
+            data['summary'] ??
+            data['changeLog'] ??
+            'Non renseigné'
+          ).toString();
 
           final documents =
               List<String>.from(data['documentsModified'] ?? []);
@@ -2426,41 +3048,60 @@ Widget _buildLegalVersionsHistory() {
           return Container(
             margin: const EdgeInsets.only(top: 10),
             decoration: BoxDecoration(
-              border: Border.all(color: adminColor, width: 1.2),
+              border: Border.all(
+                color: adminColor,
+                width: 1.2,
+              ),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: ExpansionTile(
-              iconColor: redColor,
-              collapsedIconColor: redColor,
-              title: Text(
-                'Version $version',
-                style: const TextStyle(
-                  color: redColor,
-                  fontWeight: FontWeight.w900,
-                ),
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                dividerColor: Colors.transparent,
               ),
-              subtitle: Text(
-                'Publiée le $publicationDate • MAJ $updatedAtText',
-                style: const TextStyle(
-                  color: adminColor,
-                  fontWeight: FontWeight.w700,
+              child: ExpansionTile(
+                shape: const Border(),
+                collapsedShape: const Border(),
+                iconColor: redColor,
+                collapsedIconColor: redColor,
+                title: Text(
+                  'Version $version',
+                  style: const TextStyle(
+                    color: redColor,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-              childrenPadding: const EdgeInsets.all(12),
-              children: [
-                _spotInfoLine('État', status),
-                _spotInfoLine(
-                  'Documents',
-                  documents.isEmpty ? 'Non renseigné' : documents.join(', '),
+                subtitle: Text(
+                  'Publiée le $publicationDate • MAJ $updatedAtText',
+                  style: const TextStyle(
+                    color: adminColor,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                ...chaptersRaw.entries.map((entry) {
-                  final chapters = List<String>.from(entry.value ?? []);
-                  if (chapters.isEmpty) return const SizedBox.shrink();
+                childrenPadding: const EdgeInsets.all(12),
+                children: [
+                  _spotInfoLine('État', status),
+                  _spotInfoLine(
+                    'Documents',
+                    documents.isEmpty
+                        ? 'Non renseigné'
+                        : documents.join(', '),
+                  ),
+                  ...chaptersRaw.entries.map((entry) {
+                    final chapters =
+                        List<String>.from(entry.value ?? []);
 
-                  return _spotInfoLine(entry.key, chapters.join(', '));
-                }),
-                _spotInfoLine('Résumé', summary),
-              ],
+                    if (chapters.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return _spotInfoLine(
+                      entry.key,
+                      chapters.join(', '),
+                    );
+                  }),
+                  _spotInfoLine('Résumé', summary),
+                ],
+              ),
             ),
           );
         }).toList(),
@@ -3920,54 +4561,120 @@ void _centerOnFirstCurrentResult() {
 }
 
 Marker _buildAdminMarker(Map<String, dynamic> data) {
-  final territoire = Map<String, dynamic>.from(data['territoire'] ?? {});
+  final territoire = Map<String, dynamic>.from(
+    data['territoire'] ?? {},
+  );
+
+  final structure = Map<String, dynamic>.from(
+    data['structure'] ?? {},
+  );
+
   final lat = _toDouble(territoire['villeLat']);
   final lng = _toDouble(territoire['villeLng']);
 
   final organisation = _cleanText(
-    data['nomStructure'] ??
+    structure['nom'] ??
+        data['nomStructure'] ??
         data['organisation'] ??
         territoire['ville'] ??
-        'Admin',
+        'ADMIN',
   );
 
-  final logoUrl = _cleanText(territoire['logoVille']);
+  final logoUrl = _cleanText(
+    territoire['logoVille'],
+  );
 
   return Marker(
     point: LatLng(lat, lng),
-    width: 46,
-    height: 46,
-    child: GestureDetector(
-  onTap: () {
-    setState(() {
-      _selectedSpot = null;
-      _selectedAdmin = data;
-      _selectedAdvertiser = null;
-    });
+    width: 76,
+    height: 76,
+    alignment: Alignment.topCenter,
+    child: MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          setState(() {
+            _selectedSpot = null;
+            _selectedAdmin =
+                Map<String, dynamic>.from(data);
+            _selectedAdvertiser = null;
+            _showLegalDocumentsPanel = false;
+            _selectedLegalDocument = null;
+            _selectedLegalChapter = null;
+          });
+        },
+        child: Tooltip(
+          message: organisation,
+          child: SizedBox(
+            width: 76,
+            height: 76,
+            child: Stack(
+              alignment: Alignment.topCenter,
+              children: [
+                Image.asset(
+                  'data/icons/fire_red_icon.png',
+                  width: 76,
+                  height: 76,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                ),
 
-    _mapController.move(
-      LatLng(lat, lng),
-      18,
-    );
-  },
-  child: Tooltip(
-    message: organisation,
-    child: logoUrl.isNotEmpty
-        ? ClipOval(
-            child: Image.network(
-              logoUrl,
-              width: 42,
-              height: 42,
-              fit: BoxFit.cover,
+                Positioned(
+                  top: 8,
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white,
+                        width: 2,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: logoUrl.isEmpty
+                          ? const Icon(
+                              Icons.account_balance_rounded,
+                              color: adminColor,
+                              size: 23,
+                            )
+                          : IgnorePointer(
+                              child: Image.network(
+                                logoUrl,
+                                key: ValueKey<String>(
+                                  'admin-logo-$logoUrl',
+                                ),
+                                width: 34,
+                                height: 34,
+                                fit: BoxFit.contain,
+                                gaplessPlayback: true,
+                                webHtmlElementStrategy:
+                                    WebHtmlElementStrategy.prefer,
+                                errorBuilder: (
+                                  BuildContext context,
+                                  Object error,
+                                  StackTrace? stackTrace,
+                                ) {
+                                  return const Icon(
+                                    Icons.account_balance_rounded,
+                                    color: adminColor,
+                                    size: 23,
+                                  );
+                                },
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          )
-        : const Icon(
-            Icons.account_balance,
-            color: adminColor,
-            size: 34,
           ),
-  ),
-),
+        ),
+      ),
+    ),
   );
 }
 
@@ -4150,16 +4857,23 @@ Widget build(BuildContext context) {
   _updateVisibleSauveteurCount(validSpots);
 });
 
-                  final markers = <Marker>[
-                    ...validSpots.map((doc) => _buildSpotMarker(doc.data())),
-                    ...validAdmins.map((doc) => _buildAdminMarker(doc.data())),
-                    ...validAdvertisers.map((doc) {
-                      return _buildAdvertiserMarker({
-                        ...doc.data(),
-                        'id': doc.id,
-                      });
-                    }),
-                  ];
+                  final clusteredMarkers = <Marker>[
+  ...validSpots.map(
+    (doc) => _buildSpotMarker(doc.data()),
+  ),
+  ...validAdvertisers.map((doc) {
+    return _buildAdvertiserMarker({
+      ...doc.data(),
+      'id': doc.id,
+    });
+  }),
+];
+
+final adminMarkers = <Marker>[
+  ...validAdmins.map(
+    (doc) => _buildAdminMarker(doc.data()),
+  ),
+];
 
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -4173,28 +4887,36 @@ Widget build(BuildContext context) {
                             FlutterMap(
                               mapController: _mapController,
                               options: MapOptions(
-                                initialCenter: const LatLng(20, 0),
-                                initialZoom: 2.2,
-                                minZoom: 2,
-                                maxZoom: 18,
-                                onTap: (_, __) {
-  setState(() {
-    _selectedSpot = null;
-    _selectedAdmin = null;
-    _selectedAdvertiser = null;
+  initialCenter: const LatLng(20, 0),
+  initialZoom: 2.2,
+  minZoom: 2,
+  maxZoom: 18,
+  onTap: (_, __) {
+    setState(() {
+      _selectedSpot = null;
+      _selectedAdmin = null;
+      _selectedAdvertiser = null;
+      _showLegalDocumentsPanel = false;
+      _selectedLegalDocument = null;
+      _selectedLegalChapter = null;
+    });
+  },
+  onPositionChanged: (_, __) {
+    _mapMovementTimer?.cancel();
 
-    _showLegalDocumentsPanel = false;
-    _selectedLegalDocument = null;
-    _selectedLegalChapter = null;
-  });
-},
-                                onPositionChanged: (_, __) {
-                                  _updateVisibleCount(validSpots);
-                                  _updateVisibleAdminCount(validAdmins);
-                                  _updateVisibleAdvertiserCount(validAdvertisers);
-                                  _updateVisibleSauveteurCount(validSpots);
-                                },
-                              ),
+    _mapMovementTimer = Timer(
+      const Duration(milliseconds: 250),
+      () {
+        if (!mounted) return;
+
+        _updateVisibleCount(validSpots);
+        _updateVisibleAdminCount(validAdmins);
+        _updateVisibleAdvertiserCount(validAdvertisers);
+        _updateVisibleSauveteurCount(validSpots);
+      },
+    );
+  },
+),
                               children: [
                                 TileLayer(
                                   key: ValueKey(
@@ -4213,7 +4935,7 @@ Widget build(BuildContext context) {
                                 ),
                                 MarkerClusterLayerWidget(
                                   options: MarkerClusterLayerOptions(
-                                    markers: markers,
+                                    markers: clusteredMarkers,
                                     size: const Size(54, 54),
                                     maxClusterRadius: 45,
                                     disableClusteringAtZoom: 15,
@@ -4260,6 +4982,9 @@ Widget build(BuildContext context) {
                                     },
                                   ),
                                 ),
+                                MarkerLayer(
+  markers: adminMarkers,
+),
                               ],
                             ),
                             Positioned(
@@ -4354,4 +5079,3 @@ class DashboardSpotMarker extends StatelessWidget {
     );
   }
 }
-

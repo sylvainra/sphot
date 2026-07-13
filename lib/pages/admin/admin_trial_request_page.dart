@@ -6,7 +6,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'admin_request_pending_page.dart';
-import '../../web/admin/pages/dashboard_super_admin_page.dart';
 
 class AdminTrialRequestPage extends StatefulWidget {
   final String? proConnectUid;
@@ -17,6 +16,8 @@ class AdminTrialRequestPage extends StatefulWidget {
   final String? proConnectSiret;
   final String? proConnectSiren;
 
+  final String? correctionRequestId;
+
   const AdminTrialRequestPage({
     super.key,
     this.proConnectUid,
@@ -26,6 +27,7 @@ class AdminTrialRequestPage extends StatefulWidget {
     this.proConnectOrganisation,
     this.proConnectSiret,
     this.proConnectSiren,
+    this.correctionRequestId,
   });
 
   @override
@@ -88,6 +90,12 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   final MapController _mapController = MapController();
   final stt.SpeechToText _speech = stt.SpeechToText();
   final Map<String, TextEditingController> _controllers = {};
+  final ExpansionTileController _cguExpansionController =
+        ExpansionTileController();
+  final ExpansionTileController _privacyExpansionController =
+        ExpansionTileController();
+  final ExpansionTileController _rgpdExpansionController =
+        ExpansionTileController();
 
   _TrialRequestSection _selectedSection = _TrialRequestSection.structure;
   int _selectedMapStyleIndex = 0;
@@ -103,6 +111,15 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   bool _legalLoading = true;
 
   String? _trialRequestMessage;
+  String? _createdRequestId;
+
+  bool _isLoadingCorrection = false;
+bool _isCorrectionMode = false;
+
+String? _correctionRequestNumber;
+String? _correctionReason;
+
+Map<String, dynamic> _originalRequestData = {};
 
 Map<String, dynamic>? _cguDoc;
 Map<String, dynamic>? _privacyDoc;
@@ -127,19 +144,39 @@ String _sphotChangeLog = '';
   ];
 
   @override
-  void initState() {
-    super.initState();
+void initState() {
+  super.initState();
 
-    _controller('nomStructure').text = widget.proConnectOrganisation ?? '';
+  _isCorrectionMode =
+      widget.correctionRequestId != null &&
+      widget.correctionRequestId!.trim().isNotEmpty;
+
+  if (_isCorrectionMode) {
+    _loadExistingRequest();
+  } else {
+    _controller('nomStructure').text =
+        widget.proConnectOrganisation ?? '';
+
     _controller('typeStructure').text = 'COMMUNE';
-    _controller('siretStructure').text = widget.proConnectSiret ?? '';
-    _controller('sirenStructure').text = widget.proConnectSiren ?? '';
 
-    _controller('nomResponsable').text = widget.proConnectNom ?? '';
-    _controller('prenomResponsable').text = widget.proConnectPrenom ?? '';
-    _controller('emailResponsable').text = widget.proConnectEmail ?? '';
-    _loadLegalDocuments();
+    _controller('siretStructure').text =
+        widget.proConnectSiret ?? '';
+
+    _controller('sirenStructure').text =
+        widget.proConnectSiren ?? '';
+
+    _controller('nomResponsable').text =
+        widget.proConnectNom ?? '';
+
+    _controller('prenomResponsable').text =
+        widget.proConnectPrenom ?? '';
+
+    _controller('emailResponsable').text =
+        widget.proConnectEmail ?? '';
   }
+
+  _loadLegalDocuments();
+}
 
   @override
   void dispose() {
@@ -157,6 +194,168 @@ String _sphotChangeLog = '';
   }
 
   String _value(String key) => _controller(key).text.trim();
+
+Future<void> _loadExistingRequest() async {
+  final requestId = widget.correctionRequestId?.trim() ?? '';
+
+  if (requestId.isEmpty) {
+    return;
+  }
+
+  setState(() {
+    _isLoadingCorrection = true;
+  });
+
+  try {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('adminRequests')
+        .doc(requestId)
+        .get();
+
+    if (!snapshot.exists) {
+      throw Exception('La demande à corriger est introuvable.');
+    }
+
+    final data = snapshot.data() ?? {};
+
+    final profile = Map<String, dynamic>.from(
+      data['profile'] ?? {},
+    );
+
+    final structure = Map<String, dynamic>.from(
+      data['structure'] ?? {},
+    );
+
+    final territoire = Map<String, dynamic>.from(
+      data['territoire'] ?? {},
+    );
+
+    final trialRequest = Map<String, dynamic>.from(
+      data['trialRequest'] ?? {},
+    );
+
+    final acceptedDocuments = Map<String, dynamic>.from(
+      trialRequest['acceptedDocuments'] ?? {},
+    );
+
+    final administrativeTracking = Map<String, dynamic>.from(
+      data['administrativeTracking'] ?? {},
+    );
+
+    _controller('nomStructure').text =
+        (structure['nom'] ?? '').toString();
+
+    _controller('typeStructure').text =
+        (structure['type'] ?? 'COMMUNE').toString();
+
+    _controller('siretStructure').text =
+        (structure['siret'] ?? '').toString();
+
+    _controller('sirenStructure').text =
+        (structure['siren'] ?? '').toString();
+
+    _controller('nomResponsable').text =
+        (profile['nomAffiche'] ?? '').toString();
+
+    _controller('prenomResponsable').text =
+        (profile['prenomAffiche'] ?? '').toString();
+
+    _controller('fonctionResponsable').text =
+        (profile['fonction'] ?? '').toString();
+
+    _controller('telephoneResponsable').text =
+        (profile['telephone'] ?? '').toString();
+
+    _controller('emailResponsable').text =
+        (profile['email'] ?? '').toString();
+
+    _controller('pays').text =
+        (territoire['pays'] ?? '').toString();
+
+    _controller('region').text =
+        (territoire['region'] ?? '').toString();
+
+    _controller('departement').text =
+        (territoire['departement'] ?? '').toString();
+
+    _controller('ville').text =
+        (territoire['ville'] ?? '').toString();
+
+    _controller('logoVille').text =
+        (territoire['logoVille'] ?? '').toString();
+
+    _controller('siteInternetVille').text =
+        (territoire['siteInternetVille'] ?? '').toString();
+
+    _controller('arretesMunicipaux').text =
+        (territoire['arretesMunicipaux'] ?? '').toString();
+
+    _controller('villeLat').text =
+        (territoire['villeLat'] ?? '').toString();
+
+    _controller('villeLng').text =
+        (territoire['villeLng'] ?? '').toString();
+
+    _certifyRepresentative =
+        trialRequest['certifyRepresentative'] == true;
+
+    _legalReadConfirmed =
+        trialRequest['legalReadConfirmed'] == true ||
+        acceptedDocuments['cgu'] == true;
+
+    _privacyReadConfirmed =
+        trialRequest['privacyReadConfirmed'] == true ||
+        acceptedDocuments['privacy'] == true;
+
+    _rgpdAccepted =
+        trialRequest['rgpdAccepted'] == true ||
+        acceptedDocuments['rgpd'] == true;
+        _acceptTerms = true;
+
+    if (!mounted) return;
+
+    setState(() {
+      _originalRequestData = data;
+
+      _correctionRequestNumber =
+          (data['requestNumber'] ?? requestId).toString();
+
+      _correctionReason =
+          (administrativeTracking['rejectionReason'] ??
+                  'Des informations doivent être corrigées.')
+              .toString();
+
+      _isLoadingCorrection = false;
+      _saved = false;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_hasCityPosition) return;
+
+      _mapController.move(
+        LatLng(
+          _toDouble(_value('villeLat')),
+          _toDouble(_value('villeLng')),
+        ),
+        12,
+      );
+    });
+  } catch (error) {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingCorrection = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Erreur lors du chargement de la demande : $error',
+        ),
+      ),
+    );
+  }
+}
 
   double _toDouble(String value) {
     return double.tryParse(value.replaceAll(',', '.')) ?? 0.0;
@@ -268,10 +467,8 @@ bool get _cityInfoComplete {
     }
 
     setState(() {
-      _trialRequestMessage = null;
-      _selectedSection = section;
-      _saved = false;
-    });
+  _selectedSection = section;
+});
   }
 
   Future<void> _startVoice(
@@ -396,126 +593,299 @@ _sphotChangeLog = (metadataData['changeLog'] ?? '').toString();
 }
 
   Future<void> _saveRegistration() async {
-    if (_isSaving || _saved || !_canSubmitTrialRequest) return;
+  if (_isSaving || _saved || !_canSubmitTrialRequest) {
+    return;
+  }
 
-    setState(() => _isSaving = true);
+  setState(() {
+    _isSaving = true;
+  });
 
-    try {
-      final territoryId = _territoryId();
-      final user = FirebaseAuth.instance.currentUser;
-      final uid = widget.proConnectUid ?? user?.uid;
+  try {
+    final territoryId = _territoryId();
+    final user = FirebaseAuth.instance.currentUser;
 
-      if (uid == null || uid.isEmpty) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Connexion ProConnect introuvable.'),
-            duration: Duration(seconds: 3),
-          ),
-        );
-        return;
-      }
+    final adminRequestsCollection =
+    FirebaseFirestore.instance.collection('adminRequests');
 
-      await FirebaseFirestore.instance
-          .collection('adminRequests')
-          .doc(uid)
-          .set({
-        'uid': uid,
+late final DocumentReference<Map<String, dynamic>>
+    requestReference;
 
-        'proConnect': {
-          'uid': widget.proConnectUid,
-          'email': widget.proConnectEmail,
-          'nom': widget.proConnectNom,
-          'prenom': widget.proConnectPrenom,
-          'organisation': widget.proConnectOrganisation,
-          'siret': widget.proConnectSiret,
-          'siren': widget.proConnectSiren,
-        },
+late final String requestId;
 
-        'profile': {
-          'nomAffiche': _value('nomResponsable'),
-          'prenomAffiche': _value('prenomResponsable'),
-          'fonction': _value('fonctionResponsable'),
-          'telephone': _value('telephoneResponsable'),
-          'email': _value('emailResponsable'),
-        },
+if (_isCorrectionMode) {
+  requestId = widget.correctionRequestId!.trim();
 
-        'structure': {
-          'nom': _value('nomStructure'),
-          'type': _value('typeStructure'),
-          'siret': _value('siretStructure'),
-          'siren': _value('sirenStructure'),
-        },
+  if (requestId.isEmpty) {
+    throw Exception(
+      'Identifiant de la demande à corriger introuvable.',
+    );
+  }
 
-        'territoire': {
-          'territoireId': territoryId,
-          'pays': _value('pays'),
-          'region': _value('region'),
-          'departement': _value('departement'),
-          'ville': _value('ville'),
-          'logoVille': _value('logoVille'),
-          'siteInternetVille': _value('siteInternetVille'),
-          'arretesMunicipaux': _value('arretesMunicipaux'),
-          'villeLat': _toDouble(_value('villeLat')),
-          'villeLng': _toDouble(_value('villeLng')),
-        },
+  requestReference =
+      adminRequestsCollection.doc(requestId);
+} else {
+  if (_createdRequestId != null &&
+      _createdRequestId!.trim().isNotEmpty) {
+    requestId = _createdRequestId!;
+    requestReference =
+        adminRequestsCollection.doc(requestId);
+  } else {
+    requestReference = adminRequestsCollection.doc();
+    requestId = requestReference.id;
+    _createdRequestId = requestId;
+  }
+}
 
-        'trialRequest': {
-  'trialDurationDays': 8,
-  'certifyRepresentative': _certifyRepresentative,
-  'legalReadConfirmed': _legalReadConfirmed,
-  'privacyReadConfirmed': _privacyReadConfirmed,
-  'rgpdAccepted': _rgpdAccepted,
-  'acceptedDocuments': {
-  'version': _sphotVersion,
-  'publishedAt': _sphotPublishedAt,
-  'acceptedAt': FieldValue.serverTimestamp(),
+    if (_isCorrectionMode) {
+      final administrativeTracking =
+          Map<String, dynamic>.from(
+        _originalRequestData['administrativeTracking'] ?? {},
+      );
 
-  'cgu': true,
-  'privacy': true,
-  'rgpd': true,
+      final previousCount =
+          (_originalRequestData['resubmissionCount'] is num)
+              ? (_originalRequestData['resubmissionCount'] as num)
+                  .toInt()
+              : 0;
+
+      final currentReason =
+          (administrativeTracking['rejectionReason'] ?? '')
+              .toString();
+
+      await requestReference.set(
+        {
+          'profile': {
+            'nomAffiche': _value('nomResponsable'),
+            'prenomAffiche': _value('prenomResponsable'),
+            'fonction': _value('fonctionResponsable'),
+            'telephone': _value('telephoneResponsable'),
+            'email': _value('emailResponsable'),
+          },
+
+          'structure': {
+            'nom': _value('nomStructure'),
+            'type': _value('typeStructure'),
+            'siret': _value('siretStructure'),
+            'siren': _value('sirenStructure'),
+          },
+
+          'territoire': {
+            'territoireId': territoryId,
+            'pays': _value('pays'),
+            'region': _value('region'),
+            'departement': _value('departement'),
+            'ville': _value('ville'),
+            'logoVille': _value('logoVille'),
+            'siteInternetVille': _value('siteInternetVille'),
+            'arretesMunicipaux':
+                _value('arretesMunicipaux'),
+            'villeLat':
+                _toDouble(_value('villeLat')),
+            'villeLng':
+                _toDouble(_value('villeLng')),
+          },
+
+          'trialRequest.certifyRepresentative':
+              _certifyRepresentative,
+
+          'trialRequest.legalReadConfirmed':
+              _legalReadConfirmed,
+
+          'trialRequest.privacyReadConfirmed':
+              _privacyReadConfirmed,
+
+          'trialRequest.rgpdAccepted':
+              _rgpdAccepted,
+
+          'status': 'pending',
+          'accessPhase': 'awaiting_approval',
+
+          'resubmittedAt':
+              FieldValue.serverTimestamp(),
+
+          'resubmissionCount':
+              previousCount + 1,
+
+          'previousRejectionReason':
+              currentReason.isEmpty
+                  ? null
+                  : currentReason,
+
+          'administrativeTracking.status':
+              'pending',
+
+          'administrativeTracking.previousRejectionReason':
+              currentReason.isEmpty
+                  ? null
+                  : currentReason,
+
+          'administrativeTracking.rejectionReason':
+              null,
+
+          'administrativeTracking.rejectedAt':
+              null,
+
+          'administrativeTracking.reviewStartedAt':
+              null,
+
+          'commercialTracking.status':
+              'awaiting_validation',
+
+          'setupProgress.accessGranted': false,
+'setupProgress.updatedAt':
+    FieldValue.serverTimestamp(),
+
+'rejectionEmail': {
+  'status': 'corrected',
+  'recipient': _value('emailResponsable'),
+  'correctedAt': FieldValue.serverTimestamp(),
+  'updatedAt': FieldValue.serverTimestamp(),
 },
-  'commercialLabel': 'Demande d’essai gratuit SPHOT',
+
+'lastUpdatedBy': 'applicant',
+
+'lastEvent': {
+  'type': 'admin_request_resubmitted',
+  'category': 'administrative',
+  'label':
+      'Demande corrigée et renvoyée par le demandeur',
+  'createdAt': FieldValue.serverTimestamp(),
+  'createdByRole': 'applicant',
+  'createdByUid': user?.uid,
 },
 
-        'subscriptionPreview': {
-          'trialDurationDays': 8,
-          'pricePerStationExclTax': 500,
-          'billingCycle': 'annual',
-          'vatRate': 20,
-          'status': 'awaiting_validation',
+'updatedAt': FieldValue.serverTimestamp(),
         },
+        SetOptions(merge: true),
+      );
+    } else {
+      await requestReference.set(
+        {
+          'uid': requestId,
 
-        'status': 'pending',
-        'requestedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+          'proConnect': {
+            'uid': widget.proConnectUid,
+            'email': widget.proConnectEmail,
+            'nom': widget.proConnectNom,
+            'prenom': widget.proConnectPrenom,
+            'organisation':
+                widget.proConnectOrganisation,
+            'siret': widget.proConnectSiret,
+            'siren': widget.proConnectSiren,
+          },
 
-      if (!mounted) return;
+          'profile': {
+            'nomAffiche': _value('nomResponsable'),
+            'prenomAffiche':
+                _value('prenomResponsable'),
+            'fonction':
+                _value('fonctionResponsable'),
+            'telephone':
+                _value('telephoneResponsable'),
+            'email':
+                _value('emailResponsable'),
+          },
 
-      setState(() {
-        _saved = true;
-        _isSaving = false;
-      });
+          'structure': {
+            'nom': _value('nomStructure'),
+            'type': _value('typeStructure'),
+            'siret': _value('siretStructure'),
+            'siren': _value('sirenStructure'),
+          },
 
-      Navigator.of(context).pushReplacement(
-  MaterialPageRoute(
-    builder: (_) => const DashboardSuperAdminPage(),
-  ),
-);
-    } catch (error) {
-      if (!mounted) return;
+          'territoire': {
+            'territoireId': territoryId,
+            'pays': _value('pays'),
+            'region': _value('region'),
+            'departement': _value('departement'),
+            'ville': _value('ville'),
+            'logoVille': _value('logoVille'),
+            'siteInternetVille':
+                _value('siteInternetVille'),
+            'arretesMunicipaux':
+                _value('arretesMunicipaux'),
+            'villeLat':
+                _toDouble(_value('villeLat')),
+            'villeLng':
+                _toDouble(_value('villeLng')),
+          },
 
-      setState(() => _isSaving = false);
+          'trialRequest': {
+            'trialDurationDays': 8,
+            'certifyRepresentative':
+                _certifyRepresentative,
+            'legalReadConfirmed':
+                _legalReadConfirmed,
+            'privacyReadConfirmed':
+                _privacyReadConfirmed,
+            'rgpdAccepted':
+                _rgpdAccepted,
+            'acceptedDocuments': {
+              'version': _sphotVersion,
+              'publishedAt':
+                  _sphotPublishedAt,
+              'acceptedAt':
+                  FieldValue.serverTimestamp(),
+              'cgu': true,
+              'privacy': true,
+              'rgpd': true,
+            },
+            'commercialLabel':
+                'Demande d’essai gratuit SPHOT',
+          },
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur enregistrement : $error'),
-          duration: const Duration(seconds: 6),
-        ),
+          'subscriptionPreview': {
+            'trialDurationDays': 8,
+            'pricePerStationExclTax': 500,
+            'billingCycle': 'annual',
+            'vatRate': 20,
+            'status': 'awaiting_validation',
+          },
+
+          'status': 'pending',
+          'requestedAt':
+              FieldValue.serverTimestamp(),
+          'updatedAt':
+              FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
       );
     }
+
+    if (!mounted) return;
+
+_cguExpansionController.collapse();
+_privacyExpansionController.collapse();
+_rgpdExpansionController.collapse();
+
+    setState(() {
+      _saved = true;
+      _isSaving = false;
+
+      _trialRequestMessage = _isCorrectionMode
+    ? 'Votre demande corrigée a bien été renvoyée.\n\n'
+      'Un email de confirmation vous a été envoyé.'
+    : 'Votre demande a bien été enregistrée.\n\n'
+      'Un email de confirmation vous a été envoyé.';
+    });
+  } catch (error) {
+    if (!mounted) return;
+
+    setState(() {
+      _isSaving = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Erreur enregistrement : $error',
+        ),
+        duration: const Duration(seconds: 6),
+      ),
+    );
   }
+}
 
   Widget _textField(
     String key,
@@ -1217,6 +1587,83 @@ if (!isVille || !_cityInfoComplete) {
     );
   }
 
+Widget _correctionNotice() {
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: redColor.withOpacity(0.06),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(
+        color: redColor,
+        width: 1.5,
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(
+              Icons.edit_document,
+              color: redColor,
+              size: 22,
+            ),
+            SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                'CORRECTION DE VOTRE DEMANDE',
+                style: TextStyle(
+                  color: redColor,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          _correctionRequestNumber ?? '',
+          style: const TextStyle(
+            color: adminColor,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Motif communiqué par SPHOT :',
+          style: TextStyle(
+            color: adminColor,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _correctionReason ??
+              'Des informations doivent être corrigées.',
+          style: const TextStyle(
+            color: adminColor,
+            fontWeight: FontWeight.w700,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Corrigez uniquement les informations concernées, '
+          'puis renvoyez votre demande. Votre référence '
+          'administrative sera conservée.',
+          style: TextStyle(
+            color: adminColor,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            height: 1.35,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
   Widget _rightPanel() {
     return Container(
       width: 450,
@@ -1234,7 +1681,16 @@ if (!isVille || !_cityInfoComplete) {
     alignment: Alignment.topCenter,
     child: SingleChildScrollView(
       padding: const EdgeInsets.all(22),
-      child: _selectedPanel(),
+      child: Column(
+  crossAxisAlignment: CrossAxisAlignment.stretch,
+  children: [
+    if (_isCorrectionMode) ...[
+      _correctionNotice(),
+      const SizedBox(height: 14),
+    ],
+    _selectedPanel(),
+  ],
+),
     ),
   ),
 ),
@@ -1384,18 +1840,7 @@ Row(
     _nextButton(_TrialRequestSection.ville), // adapter selon la page
   ],
 ),
-if (_trialRequestMessage != null) ...[
-  const SizedBox(height: 14),
-  Text(
-    _trialRequestMessage!,
-    textAlign: TextAlign.center,
-    style: const TextStyle(
-      color: redColor,
-      fontSize: 13,
-      fontWeight: FontWeight.w800,
-    ),
-  ),
-],
+
       ],
     );
   }
@@ -1516,6 +1961,7 @@ Widget _legalDropdown({
   required bool checked,
   required String checkText,
   required ValueChanged<bool?> onChanged,
+  required ExpansionTileController controller,
 }) {
   final chapters = List<Map<String, dynamic>>.from(
     document?['chapters'] ?? [],
@@ -1529,6 +1975,7 @@ Widget _legalDropdown({
       border: Border.all(color: adminColor, width: 1.4),
     ),
     child: ExpansionTile(
+      controller: controller,
       shape: const Border(),
       collapsedShape: const Border(),
       tilePadding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1689,52 +2136,58 @@ if (_legalLoading)
   const Center(child: CircularProgressIndicator())
 else ...[
   _legalDropdown(
-    title: 'Conditions Générales d’Utilisation',
-    document: _cguDoc,
-    checked: _legalReadConfirmed,
-    checkText: 'J’ai lu et j’accepte les CGU de SPHOT.',
-    onChanged: (value) {
-      setState(() {
-        _legalReadConfirmed = value ?? false;
-        _saved = false;
-      });
-    },
-  ),
+  title: 'Conditions Générales d’Utilisation',
+  document: _cguDoc,
+  checked: _legalReadConfirmed,
+  checkText: 'J’ai lu et j’accepte les CGU de SPHOT.',
+  controller: _cguExpansionController,
+  onChanged: (value) {
+    setState(() {
+      _legalReadConfirmed = value ?? false;
+      _saved = false;
+    });
+  },
+),
 
   _legalDropdown(
-    title: 'Politique de confidentialité',
-    document: _privacyDoc,
-    checked: _privacyReadConfirmed,
-    checkText: 'J’ai lu et j’accepte la Politique de confidentialité de SPHOT.',
-    onChanged: (value) {
-      setState(() {
-        _privacyReadConfirmed = value ?? false;
-        _saved = false;
-      });
-    },
-  ),
+  title: 'Politique de confidentialité',
+  document: _privacyDoc,
+  checked: _privacyReadConfirmed,
+  checkText:
+      'J’ai lu et j’accepte la Politique de confidentialité de SPHOT.',
+  controller: _privacyExpansionController,
+  onChanged: (value) {
+    setState(() {
+      _privacyReadConfirmed = value ?? false;
+      _saved = false;
+    });
+  },
+),
 
   _legalDropdown(
-    title: 'RGPD',
-    document: _rgpdDoc,
-    checked: _rgpdAccepted,
-    checkText: 'J’accepte le traitement des données conformément au RGPD.',
-    onChanged: (value) {
-      setState(() {
-        _rgpdAccepted = value ?? false;
-        _saved = false;
-      });
-    },
-  ),
+  title: 'RGPD',
+  document: _rgpdDoc,
+  checked: _rgpdAccepted,
+  checkText:
+      'J’accepte le traitement des données conformément au RGPD.',
+  controller: _rgpdExpansionController,
+  onChanged: (value) {
+    setState(() {
+      _rgpdAccepted = value ?? false;
+      _saved = false;
+    });
+  },
+),
 ],
         const SizedBox(height: 18),
         
         SizedBox(
           height: 56,
           child: ElevatedButton.icon(
-            onPressed: _canSubmitTrialRequest && !_isSaving
-                ? _saveRegistration
-                : null,
+            onPressed:
+    _canSubmitTrialRequest && !_isSaving && !_saved
+        ? _saveRegistration
+        : null,
             icon: _isSaving
                 ? const SizedBox(
                     width: 18,
@@ -1767,6 +2220,71 @@ else ...[
             ),
           ),
         ),
+        if (_trialRequestMessage != null) ...[
+  const SizedBox(height: 16),
+  Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: adminColor.withOpacity(0.07),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: adminColor,
+        width: 1.4,
+      ),
+    ),
+    child: Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    const Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.check_circle_rounded,
+          color: redColor,
+          size: 24,
+        ),
+        SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            'Votre demande a bien été enregistrée.',
+            style: TextStyle(
+              color: adminColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
+    ),
+    const SizedBox(height: 14),
+    const Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.mark_email_read_rounded,
+          color: redColor,
+          size: 24,
+        ),
+        SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            'Un email de confirmation vous a été envoyé.',
+            style: TextStyle(
+              color: adminColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
+    ),
+  ],
+),
+  ),
+],
       ],
     );
   }
@@ -1962,14 +2480,47 @@ Widget _previousButton(_TrialRequestSection previousSection) {
 }
 
   @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
+Widget build(BuildContext context) {
+  final width = MediaQuery.of(context).size.width;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: width < 1000 ? _mobileLayout() : _desktopLayout(),
-    );
-  }
+if (_isLoadingCorrection) {
+  return const Scaffold(
+    backgroundColor: Colors.white,
+    body: Center(
+      child: CircularProgressIndicator(
+        color: adminColor,
+      ),
+    ),
+  );
+}
+
+  return Scaffold(
+    backgroundColor: Colors.white,
+    body: Stack(
+      children: [
+        width < 1000 ? _mobileLayout() : _desktopLayout(),
+
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 22,
+          child: Center(
+            child: IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: adminColor,
+                size: 34,
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 }
 
 class PhoneNumberFormatter extends TextInputFormatter {

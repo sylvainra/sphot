@@ -20,118 +20,217 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
   String _search = '';
 
   Future<void> _approveRequest(
-    BuildContext context,
-    QueryDocumentSnapshot<Map<String, dynamic>> doc,
-  ) async {
-    final data = doc.data();
+  BuildContext context,
+  QueryDocumentSnapshot<Map<String, dynamic>> doc,
+) async {
+  final data = doc.data();
 
-    final proConnect = Map<String, dynamic>.from(data['proConnect'] ?? {});
-    final profile = Map<String, dynamic>.from(data['profile'] ?? {});
-    final structure = Map<String, dynamic>.from(data['structure'] ?? {});
-    final territoire = Map<String, dynamic>.from(data['territoire'] ?? {});
-    final facturation = Map<String, dynamic>.from(data['facturation'] ?? {});
-    final subscriptionPreview =
-        Map<String, dynamic>.from(data['subscriptionPreview'] ?? {});
+  final proConnect =
+      Map<String, dynamic>.from(data['proConnect'] ?? {});
 
-    final uid = (data['uid'] ?? doc.id).toString();
+  final profile =
+      Map<String, dynamic>.from(data['profile'] ?? {});
 
-    final batch = FirebaseFirestore.instance.batch();
+  final structure =
+      Map<String, dynamic>.from(data['structure'] ?? {});
 
-    final adminRef = FirebaseFirestore.instance.collection('admins').doc(uid);
-    final requestRef =
-        FirebaseFirestore.instance.collection('adminRequests').doc(doc.id);
-    final subscriptionRef =
-        FirebaseFirestore.instance.collection('subscriptions').doc(uid);
+  final territoire =
+      Map<String, dynamic>.from(data['territoire'] ?? {});
 
-    batch.set(
-      adminRef,
-      {
-        'uid': uid,
-        'email': profile['email'] ?? proConnect['email'] ?? '',
-        'organisation': structure['nom'] ?? proConnect['organisation'] ?? '',
-        'siret': proConnect['siret'] ?? facturation['billingSiret'] ?? '',
-        'siren': proConnect['siren'] ?? '',
-        'territoireId': territoire['territoireId'] ?? '',
-        'pays': territoire['pays'] ?? '',
-        'region': territoire['region'] ?? '',
-        'departement': territoire['departement'] ?? '',
-        'ville': territoire['ville'] ?? '',
-        'role': 'admin',
-        'accessStatus': 'approved',
+  final facturation =
+      Map<String, dynamic>.from(data['facturation'] ?? {});
+
+  final subscriptionPreview =
+      Map<String, dynamic>.from(data['subscriptionPreview'] ?? {});
+
+  final uid = (data['uid'] ?? doc.id).toString();
+
+  final email = (
+    profile['email'] ??
+    proConnect['email'] ??
+    ''
+  ).toString().trim();
+
+  final batch = FirebaseFirestore.instance.batch();
+
+  final adminRef =
+      FirebaseFirestore.instance.collection('admins').doc(uid);
+
+  final requestRef = FirebaseFirestore.instance
+      .collection('adminRequests')
+      .doc(doc.id);
+
+  final subscriptionRef = FirebaseFirestore.instance
+      .collection('subscriptions')
+      .doc(uid);
+
+  batch.set(
+    adminRef,
+    {
+      'uid': uid,
+      'email': email,
+      'organisation':
+          structure['nom'] ?? proConnect['organisation'] ?? '',
+      'siret':
+          structure['siret'] ??
+          proConnect['siret'] ??
+          facturation['billingSiret'] ??
+          '',
+      'siren':
+          structure['siren'] ??
+          proConnect['siren'] ??
+          '',
+      'territoireId': territoire['territoireId'] ?? '',
+      'pays': territoire['pays'] ?? '',
+      'region': territoire['region'] ?? '',
+      'departement': territoire['departement'] ?? '',
+      'ville': territoire['ville'] ?? '',
+      'role': 'admin',
+      'accessStatus': 'approved',
+      'configurationAccessGranted': true,
+      'configurationAccessOpenedAt':
+          FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
+    },
+    SetOptions(merge: true),
+  );
+
+  batch.set(
+    subscriptionRef,
+    {
+      'organisationId': uid,
+      'adminUid': uid,
+
+      'billingOrganisation':
+          facturation['billingOrganisation'] ??
+          structure['nom'] ??
+          '',
+
+      'billingSiret':
+          facturation['billingSiret'] ??
+          structure['siret'] ??
+          proConnect['siret'] ??
+          '',
+
+      'billingAddress':
+          facturation['billingAddress'] ?? '',
+
+      'billingPostalCode':
+          facturation['billingPostalCode'] ?? '',
+
+      'billingCity':
+          facturation['billingCity'] ??
+          territoire['ville'] ??
+          '',
+
+      'billingContactName':
+          facturation['billingContactName'] ?? '',
+
+      'billingContactEmail':
+          facturation['billingContactEmail'] ?? email,
+
+      'purchaseOrderNumber':
+          facturation['purchaseOrderNumber'] ?? '',
+
+      'engagementNumber':
+          facturation['engagementNumber'] ?? '',
+
+      'chorusServiceCode':
+          facturation['chorusServiceCode'] ?? '',
+
+      'numberOfRescueStations': 0,
+
+      'trialDurationDays':
+          subscriptionPreview['trialDurationDays'] ?? 8,
+
+      'pricePerStationExclTax':
+          subscriptionPreview['pricePerStationExclTax'] ?? 500,
+
+      'billingCycle':
+          subscriptionPreview['billingCycle'] ?? 'annual',
+
+      'vatRate':
+          subscriptionPreview['vatRate'] ?? 20,
+
+      // L’essai ne commence pas à l’approbation.
+      'status': 'awaiting_configuration',
+      'trialStartDate': null,
+      'trialEndDate': null,
+      'trialReadyAt': null,
+
+      'subscriptionStartDate': null,
+      'subscriptionEndDate': null,
+      'lastPaymentDate': null,
+      'nextInvoiceDate': null,
+
+      'country': territoire['pays'] ?? '',
+      'region': territoire['region'] ?? '',
+      'department': territoire['departement'] ?? '',
+      'city': territoire['ville'] ?? '',
+
+      'updatedAt': FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
+    },
+    SetOptions(merge: true),
+  );
+
+  batch.set(
+    requestRef,
+    {
+      'status': 'approved',
+      'accessPhase': 'configuration_access',
+      'approvedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+
+      'administrativeTracking.status': 'approved',
+      'administrativeTracking.approvedAt':
+          FieldValue.serverTimestamp(),
+
+      'commercialTracking.status':
+          'configuration_access_opened',
+
+      'commercialTracking.configurationAccessOpenedAt':
+          FieldValue.serverTimestamp(),
+
+      'setupProgress.accessGranted': true,
+      'setupProgress.updatedAt':
+          FieldValue.serverTimestamp(),
+
+      // La Cloud Function enverra le mail.
+      'approvalEmail': {
+        'status': 'pending',
+        'recipient': email,
+        'sentAt': null,
+        'messageId': null,
+        'error': null,
         'updatedAt': FieldValue.serverTimestamp(),
+      },
+
+      'lastEvent': {
+        'type': 'admin_request_approved',
+        'category': 'administrative',
+        'label': 'Demande administrateur approuvée',
         'createdAt': FieldValue.serverTimestamp(),
+        'createdByRole': 'super_admin',
       },
-      SetOptions(merge: true),
-    );
+    },
+    SetOptions(merge: true),
+  );
 
-    batch.set(
-      subscriptionRef,
-      {
-        'organisationId': uid,
-        'adminUid': uid,
-        'billingOrganisation': facturation['billingOrganisation'] ?? '',
-        'billingSiret':
-            facturation['billingSiret'] ?? proConnect['siret'] ?? '',
-        'billingAddress': facturation['billingAddress'] ?? '',
-        'billingPostalCode': facturation['billingPostalCode'] ?? '',
-        'billingCity': facturation['billingCity'] ?? '',
-        'billingContactName': facturation['billingContactName'] ?? '',
-        'billingContactEmail': facturation['billingContactEmail'] ?? '',
-        'purchaseOrderNumber': facturation['purchaseOrderNumber'] ?? '',
-        'engagementNumber': facturation['engagementNumber'] ?? '',
-        'chorusServiceCode': facturation['chorusServiceCode'] ?? '',
-        'numberOfRescueStations':
-            facturation['numberOfRescueStations'] ?? 0,
-        'trialDurationDays': subscriptionPreview['trialDurationDays'] ?? 8,
-        'pricePerStationExclTax':
-            subscriptionPreview['pricePerStationExclTax'] ?? 500,
-        'billingCycle': subscriptionPreview['billingCycle'] ?? 'annual',
-        'vatRate': subscriptionPreview['vatRate'] ?? 20,
-        'status': 'trial',
+  await batch.commit();
 
-'dateFieldsTest': 'OK_ETAPE_1',
-'trialStartDate': Timestamp.now(),
-'trialEndDate': Timestamp.fromDate(
-  DateTime.now().add(
-    Duration(
-      days: subscriptionPreview['trialDurationDays'] ?? 8,
-    ),
-  ),
-),
-'subscriptionStartDate': null,
-'subscriptionEndDate': null,
-'lastPaymentDate': null,
-'nextInvoiceDate': null,
-        'country': territoire['pays'] ?? '',
-'region': territoire['region'] ?? '',
-'department': territoire['departement'] ?? '',
-'city': territoire['ville'] ?? '',
-        'updatedAt': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+  if (!context.mounted) return;
 
-    batch.update(
-      requestRef,
-      {
-        'status': 'approved',
-        'approvedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      },
-    );
-
-    await batch.commit();
-
-    if (!context.mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Demande approuvée.'),
-        backgroundColor: Colors.green,
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text(
+        'Demande approuvée. Le mail d’accès va être envoyé.',
       ),
-    );
-  }
+      backgroundColor: Colors.green,
+    ),
+  );
+}
 
   Future<void> _rejectRequest(
     BuildContext context,
