@@ -32,6 +32,75 @@ function cleanValue(value, fallback = "Non renseigné") {
 }
 
 /**
+ * Échappe une valeur avant son insertion dans un e-mail HTML.
+ *
+ * @param {*} value Valeur à sécuriser.
+ * @return {string} Valeur échappée.
+ */
+function escapeHtml(value) {
+  return (value || "")
+      .toString()
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll("\"", "&quot;")
+      .replaceAll("'", "&#039;");
+}
+
+/**
+ * Construit la salutation administrative du demandeur.
+ *
+ * @param {Object} data Données de la demande.
+ * @return {string} Salutation complète.
+ */
+function buildAdminGreeting(data) {
+  const profile = data.profile || {};
+  const proConnect = data.proConnect || {};
+
+  const civilite = cleanValue(
+      profile.civilite || data.civilite,
+      "",
+  );
+
+  const nom = cleanValue(
+      profile.nomAffiche ||
+      data.nomResponsable ||
+      proConnect.nom,
+      "",
+  ).toUpperCase();
+
+  if (civilite && nom) {
+    return `Bonjour ${civilite} ${nom},`;
+  }
+
+  if (nom) {
+    return `Bonjour ${nom},`;
+  }
+
+  return "Bonjour,";
+}
+
+/**
+ * Retourne la désignation complète de la structure.
+ *
+ * @param {Object} data Données de la demande.
+ * @return {string} Désignation prête à être intégrée dans une phrase.
+ */
+function buildOrganisationDisplay(data) {
+  const structure = data.structure || {};
+  const proConnect = data.proConnect || {};
+
+  return cleanValue(
+      structure.organisationDisplay ||
+      data.organisationDisplay ||
+      structure.nom ||
+      data.organisation ||
+      proConnect.organisation,
+      "votre structure",
+  );
+}
+
+/**
  * Formate une date selon le format français.
  *
  * @param {Date} date Date à formater.
@@ -223,64 +292,64 @@ function createAdminRequestPdf({
        * @param {string} title Titre à afficher.
        */
       const sectionTitle = (title) => {
-  const left = doc.page.margins.left;
-  const iconSize = 18;
-  const titleY = doc.y + 8;
-  const titleX = left + iconSize + 10;
+        const left = doc.page.margins.left;
+        const iconSize = 18;
+        const titleY = doc.y + 8;
+        const titleX = left + iconSize + 10;
 
-  doc
-      .circle(
-          left + (iconSize / 2),
-          titleY + (iconSize / 2),
-          iconSize / 2,
-      )
-      .lineWidth(1)
-      .strokeColor(red)
-      .stroke();
+        doc
+            .circle(
+                left + (iconSize / 2),
+                titleY + (iconSize / 2),
+                iconSize / 2,
+            )
+            .lineWidth(1)
+            .strokeColor(red)
+            .stroke();
 
-  doc
-      .font("Helvetica-Bold")
-      .fontSize(9)
-      .fillColor(red)
-      .text(
-          "S",
-          left,
-          titleY + 1,
-          {
-            width: iconSize,
-            align: "center",
-          },
-      );
+        doc
+            .font("Helvetica-Bold")
+            .fontSize(9)
+            .fillColor(red)
+            .text(
+                "S",
+                left,
+                titleY + 1,
+                {
+                  width: iconSize,
+                  align: "center",
+                },
+            );
 
-  doc
-      .font("Helvetica-Bold")
-      .fontSize(10)
-      .fillColor(red)
-      .text(
-          title.toUpperCase(),
-          titleX,
-          titleY + 1,
-          {
-            width: contentWidth - iconSize - 10,
-            align: "left",
-          },
-      );
+        doc
+            .font("Helvetica-Bold")
+            .fontSize(10)
+            .fillColor(red)
+            .text(
+                title.toUpperCase(),
+                titleX,
+                titleY + 1,
+                {
+                  width: contentWidth - iconSize - 10,
+                  align: "left",
+                },
+            );
 
-  const lineY = titleY + iconSize + 4;
+        const lineY = titleY + iconSize + 4;
 
-  doc
-      .strokeColor(blue)
-      .lineWidth(0.8)
-      .moveTo(titleX, lineY)
-      .lineTo(
-          doc.page.width - doc.page.margins.right,
-          lineY,
-      )
-      .stroke();
+        doc
+            .strokeColor(blue)
+            .lineWidth(0.8)
+            .moveTo(titleX, lineY)
+            .lineTo(
+                doc.page.width - doc.page.margins.right,
+                lineY,
+            )
+            .stroke();
 
-  doc.x = left;
-  doc.y = lineY + 8;
-};
+        doc.x = left;
+        doc.y = lineY + 8;
+      };
 
       /**
        * Affiche une ligne d'information compacte.
@@ -393,17 +462,17 @@ function createAdminRequestPdf({
       doc.y = summaryTop + 100;
 
       doc
-    .font("Helvetica")
-    .fontSize(8.5)
-    .fillColor(blue)
-    .text(
-        "Votre demande d'accès au portail d'administration SPHOT " +
+          .font("Helvetica")
+          .fontSize(8.5)
+          .fillColor(blue)
+          .text(
+              "Votre demande d'accès au portail d'administration SPHOT " +
         "a bien été enregistrée.",
-        {
-          align: "center",
-          lineGap: 0,
-        },
-    );
+              {
+                align: "center",
+                lineGap: 0,
+              },
+          );
 
       sectionTitle("Demandeur");
 
@@ -726,15 +795,10 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
 
         const downloadUrl = await getDownloadURL(file);
 
-        const firstName = cleanValue(
-            profile.prenomAffiche || proConnect.prenom,
-            "",
-        );
+        const greeting = buildAdminGreeting(data);
 
-        const organisation = cleanValue(
-            structure.nom || proConnect.organisation,
-            "votre structure",
-        );
+        const organisation =
+            buildOrganisationDisplay(data);
 
         const transporter = nodemailer.createTransport({
           service: "gmail",
@@ -748,7 +812,7 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
           from: MAIL_FROM,
           to: recipientEmail,
           subject:
-              "SPHOT – Confirmation de votre demande d'accès administrateur",
+              "SPHOT - Confirmation de votre demande d'accès administrateur",
 
           html: `
 <div style="
@@ -783,8 +847,8 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
       line-height:1.6;
     ">
       <p>
-        Bonjour${firstName ? ` <strong>${firstName}</strong>` : ""},
-      </p>
+  ${escapeHtml(greeting)}
+</p>
 
       <p>
         Votre demande d'accès au portail d'administration SPHOT
@@ -867,7 +931,7 @@ aura été activé.
 `,
 
           text:
-`Bonjour${firstName ? ` ${firstName}` : ""},
+`${greeting}
 
 Votre demande d'accès au portail d'administration SPHOT
 pour ${organisation} a bien été enregistrée.
@@ -1115,33 +1179,11 @@ exports.sendAdminRequestApprovalEmail = onDocumentUpdated(
         return;
       }
 
-      const profile =
-          afterData.profile || {};
+      const greeting =
+    buildAdminGreeting(afterData);
 
-      const structure =
-          afterData.structure || {};
-
-      const territoire =
-          afterData.territoire || {};
-
-      const firstName = cleanValue(
-          profile.prenomAffiche ||
-          afterData.prenomResponsable ||
-          (afterData.proConnect && afterData.proConnect.prenom),
-          "",
-      );
-
-      const organisation = cleanValue(
-          structure.nom ||
-          afterData.organisation ||
-          (afterData.proConnect && afterData.proConnect.organisation),
-          "votre structure",
-      );
-
-      const city = cleanValue(
-          territoire.ville,
-          "",
-      );
+      const organisation =
+    buildOrganisationDisplay(afterData);
 
       const requestNumber = cleanValue(
           afterData.requestNumber ||
@@ -1149,11 +1191,9 @@ exports.sendAdminRequestApprovalEmail = onDocumentUpdated(
           event.params.requestId,
       );
 
-      const dashboardUrl = SPHOT_LOGIN_URL;
-
-      const greeting = firstName ?
-        `Bonjour ${firstName},` :
-        "Bonjour,";
+      const dashboardUrl =
+        `${SPHOT_LOGIN_URL}/#/web-admin` +
+        `?requestId=${encodeURIComponent(event.params.requestId)}`;
 
       const transporter = nodemailer.createTransport({
         service: "gmail",
@@ -1168,7 +1208,7 @@ exports.sendAdminRequestApprovalEmail = onDocumentUpdated(
           from: MAIL_FROM,
           to: email,
           subject:
-              "Votre demande d'accès administrateur SPHOT est acceptée",
+              "SPHOT - Votre demande d'accès administrateur a été acceptée",
           text:
 `${greeting}
 
@@ -1188,7 +1228,7 @@ Essai gratuit, sans engagement ni facturation.
 La période d'essai de 8 jours ne commencera qu'une fois la
 configuration complète et l'essai activé.
 
-${city ? `Territoire : ${city}\n\n` : ""}À bientôt sur SPHOT,
+À bientôt sur SPHOT,
 L'équipe SPHOT`,
 
           html: `
@@ -1207,16 +1247,26 @@ L'équipe SPHOT`,
     padding:34px;
     box-shadow:0 8px 26px rgba(30,58,138,0.12);
   ">
-    <div style="
-      text-align:center;
-      color:#1e3a8a;
-      font-size:32px;
-      font-weight:900;
-      letter-spacing:8px;
-      margin-bottom:28px;
-    ">
-      SPHOT
-    </div>
+    <div style="padding:0 0 18px;text-align:center;">
+  <a href="${SPHOT_LOGIN_URL}">
+    <img
+      src="https://sphot.app/assets/data/icons/title.png"
+      alt="SPHOT"
+      style="max-width:320px;width:100%;height:auto;border:0;"
+    >
+  </a>
+
+  <div style="
+    margin-top:18px;
+    color:#1e3a8a;
+    font-size:18px;
+    font-weight:900;
+    line-height:1.35;
+    text-transform:uppercase;
+  ">
+    DEMANDE D’ACCÈS AU PORTAIL SPHOT
+  </div>
+</div>
 
     <p style="font-size:16px;line-height:1.6;">
       ${greeting}
@@ -1299,12 +1349,6 @@ L'équipe SPHOT`,
       vos SPHOTS, vos sauveteurs et vos périodes de surveillance
       renseignés, puis l'essai activé.
     </div>
-
-    ${city ? `
-      <p style="margin-top:20px;font-size:14px;">
-        <strong>Territoire :</strong> ${city}
-      </p>
-    ` : ""}
 
     <p style="margin-top:28px;font-size:15px;line-height:1.6;">
       À bientôt sur SPHOT,<br>
@@ -1525,26 +1569,14 @@ exports.sendAdminRequestRejectionEmail = onDocumentUpdated(
         return;
       }
 
-      const profile = afterData.profile || {};
-      const structure = afterData.structure || {};
       const administrativeTracking =
-          afterData.administrativeTracking || {};
+    afterData.administrativeTracking || {};
 
-      const firstName = cleanValue(
-          profile.prenomAffiche ||
-          afterData.prenomResponsable ||
-          (afterData.proConnect &&
-           afterData.proConnect.prenom),
-          "",
-      );
+      const greeting =
+    buildAdminGreeting(afterData);
 
-      const organisation = cleanValue(
-          structure.nom ||
-          afterData.organisation ||
-          (afterData.proConnect &&
-           afterData.proConnect.organisation),
-          "votre structure",
-      );
+      const organisation =
+    buildOrganisationDisplay(afterData);
 
       const requestNumber = cleanValue(
           afterData.requestNumber ||
@@ -1561,10 +1593,6 @@ exports.sendAdminRequestRejectionEmail = onDocumentUpdated(
           `${SPHOT_LOGIN_URL}/#/admin-request-correction` +
           `?requestId=${encodeURIComponent(event.params.requestId)}`;
 
-      const greeting = firstName ?
-        `Bonjour ${firstName},` :
-        "Bonjour,";
-
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
@@ -1578,7 +1606,7 @@ exports.sendAdminRequestRejectionEmail = onDocumentUpdated(
           from: MAIL_FROM,
           to: email,
           subject:
-              "Votre demande administrateur SPHOT doit être corrigée",
+              "SPHOT - Votre demande d'accès administrateur doit être corrigée",
 
           text:
 `${greeting}

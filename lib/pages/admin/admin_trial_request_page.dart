@@ -129,19 +129,24 @@ String _sphotVersion = '1.0';
 dynamic _sphotPublishedAt;
 String _sphotChangeLog = '';
 
-  final List<String> structureTypes = const [
-    'COMMUNE',
-    'COMMUNAUTÉ DE COMMUNES',
-    'MÉTROPOLE',
-    'DÉPARTEMENT',
-    'RÉGION',
-    'OFFICE DE TOURISME',
-    'ASSOCIATION',
-    'BASE DE LOISIRS',
-    'PARC',
-    'GESTIONNAIRE PRIVÉ',
-    'AUTRE',
-  ];
+  final List<String> civiliteChoices = const [
+  'Monsieur',
+  'Madame',
+];
+
+final List<String> structureTypes = const [
+  'COMMUNE',
+  'COMMUNAUTÉ DE COMMUNES',
+  'MÉTROPOLE',
+  'DÉPARTEMENT',
+  'RÉGION',
+  'OFFICE DE TOURISME',
+  'ASSOCIATION',
+  'BASE DE LOISIRS',
+  'PARC',
+  'GESTIONNAIRE PRIVÉ',
+  'AUTRE',
+];
 
   @override
 void initState() {
@@ -255,13 +260,16 @@ Future<void> _loadExistingRequest() async {
         (structure['siren'] ?? '').toString();
 
     _controller('nomResponsable').text =
-        (profile['nomAffiche'] ?? '').toString();
+    (profile['nomAffiche'] ?? '').toString();
 
     _controller('prenomResponsable').text =
-        (profile['prenomAffiche'] ?? '').toString();
+    (profile['prenomAffiche'] ?? '').toString();
+
+    _controller('civiliteResponsable').text =
+    (profile['civilite'] ?? '').toString();
 
     _controller('fonctionResponsable').text =
-        (profile['fonction'] ?? '').toString();
+    (profile['fonction'] ?? '').toString();
 
     _controller('telephoneResponsable').text =
         (profile['telephone'] ?? '').toString();
@@ -372,11 +380,12 @@ Future<void> _loadExistingRequest() async {
   }
 
   bool get _responsableComplete {
-    return _value('nomResponsable').isNotEmpty &&
-        _value('prenomResponsable').isNotEmpty &&
-        _value('fonctionResponsable').isNotEmpty &&
-        _value('emailResponsable').isNotEmpty;
-  }
+  return _value('civiliteResponsable').isNotEmpty &&
+      _value('nomResponsable').isNotEmpty &&
+      _value('prenomResponsable').isNotEmpty &&
+      _value('fonctionResponsable').isNotEmpty &&
+      _value('emailResponsable').isNotEmpty;
+}
 
   bool get _territoireComplete {
     return _value('pays').isNotEmpty &&
@@ -446,6 +455,164 @@ bool get _cityInfoComplete {
       return word[0].toUpperCase() + word.substring(1).toLowerCase();
     }).join(' ');
   }
+
+String _buildOrganisationDisplay() {
+  final type = _value('typeStructure').trim().toUpperCase();
+  final nomBrut = _value('nomStructure').trim();
+
+  String retirerPrefixe(
+    String valeur,
+    List<String> prefixes,
+  ) {
+    var resultat = valeur.trim();
+
+    for (final prefixe in prefixes) {
+      final expression = RegExp(
+        '^${RegExp.escape(prefixe)}\\s*',
+        caseSensitive: false,
+      );
+
+      if (expression.hasMatch(resultat)) {
+        resultat = resultat.replaceFirst(expression, '').trim();
+        break;
+      }
+    }
+
+    return resultat;
+  }
+
+  switch (type) {
+    case 'COMMUNE':
+      final nom = retirerPrefixe(
+        nomBrut,
+        [
+          'MAIRIE DE ',
+          'MAIRIE DU ',
+          'MAIRIE DE LA ',
+          "MAIRIE DE L'",
+          'MAIRIE ',
+          'COMMUNE DE ',
+          'COMMUNE DU ',
+          'COMMUNE DE LA ',
+          "COMMUNE DE L'",
+          'COMMUNE ',
+        ],
+      );
+
+      return 'la Mairie de $nom';
+
+    case 'COMMUNAUTÉ DE COMMUNES':
+      final nom = retirerPrefixe(
+        nomBrut,
+        [
+          'COMMUNAUTÉ DE COMMUNES DE ',
+          'COMMUNAUTÉ DE COMMUNES DU ',
+          'COMMUNAUTÉ DE COMMUNES ',
+        ],
+      );
+
+      return 'la Communauté de communes $nom';
+
+    case 'MÉTROPOLE':
+      final nom = retirerPrefixe(
+        nomBrut,
+        [
+          'MÉTROPOLE DE ',
+          'MÉTROPOLE DU ',
+          'MÉTROPOLE ',
+        ],
+      );
+
+      return 'la Métropole $nom';
+
+    case 'DÉPARTEMENT':
+      final nom = retirerPrefixe(
+        nomBrut,
+        [
+          'DÉPARTEMENT DE ',
+          'DÉPARTEMENT DU ',
+          'DÉPARTEMENT DE LA ',
+          "DÉPARTEMENT DE L'",
+          'DÉPARTEMENT ',
+        ],
+      );
+
+      return 'le Département $nom';
+
+    case 'RÉGION':
+      final nom = retirerPrefixe(
+        nomBrut,
+        [
+          'RÉGION DE ',
+          'RÉGION DU ',
+          'RÉGION DE LA ',
+          "RÉGION DE L'",
+          'RÉGION ',
+        ],
+      );
+
+      return 'la Région $nom';
+
+    case 'OFFICE DE TOURISME':
+      final nom = retirerPrefixe(
+        nomBrut,
+        [
+          'OFFICE DE TOURISME DE ',
+          'OFFICE DE TOURISME DU ',
+          'OFFICE DE TOURISME ',
+        ],
+      );
+
+      return "l'Office de tourisme $nom";
+
+    case 'ASSOCIATION':
+      final nom = retirerPrefixe(
+        nomBrut,
+        [
+          'ASSOCIATION ',
+        ],
+      );
+
+      return "l'association $nom";
+
+    case 'BASE DE LOISIRS':
+      final nom = retirerPrefixe(
+        nomBrut,
+        [
+          'BASE DE LOISIRS DE ',
+          'BASE DE LOISIRS DU ',
+          'BASE DE LOISIRS ',
+        ],
+      );
+
+      return 'la Base de loisirs $nom';
+
+    case 'PARC':
+      final nom = retirerPrefixe(
+        nomBrut,
+        [
+          'PARC DE ',
+          'PARC DU ',
+          'PARC ',
+        ],
+      );
+
+      return 'le Parc $nom';
+
+    case 'GESTIONNAIRE PRIVÉ':
+      final nom = retirerPrefixe(
+        nomBrut,
+        [
+          'GESTIONNAIRE PRIVÉ ',
+        ],
+      );
+
+      return 'le gestionnaire privé $nom';
+
+    default:
+      return nomBrut;
+  }
+}
 
   String _formatText(
     String value, {
@@ -656,19 +823,28 @@ if (_isCorrectionMode) {
       await requestReference.set(
         {
           'profile': {
-            'nomAffiche': _value('nomResponsable'),
-            'prenomAffiche': _value('prenomResponsable'),
-            'fonction': _value('fonctionResponsable'),
-            'telephone': _value('telephoneResponsable'),
-            'email': _value('emailResponsable'),
-          },
+  'civilite':
+      _value('civiliteResponsable'),
+  'nomAffiche':
+      _value('nomResponsable'),
+  'prenomAffiche':
+      _value('prenomResponsable'),
+  'fonction':
+      _value('fonctionResponsable'),
+  'telephone':
+      _value('telephoneResponsable'),
+  'email':
+      _value('emailResponsable'),
+},
 
           'structure': {
-            'nom': _value('nomStructure'),
-            'type': _value('typeStructure'),
-            'siret': _value('siretStructure'),
-            'siren': _value('sirenStructure'),
-          },
+  'nom': _value('nomStructure'),
+  'type': _value('typeStructure'),
+  'organisationDisplay':
+      _buildOrganisationDisplay(),
+  'siret': _value('siretStructure'),
+  'siren': _value('sirenStructure'),
+},
 
           'territoire': {
             'territoireId': territoryId,
@@ -776,23 +952,22 @@ if (_isCorrectionMode) {
           },
 
           'profile': {
-            'nomAffiche': _value('nomResponsable'),
-            'prenomAffiche':
-                _value('prenomResponsable'),
-            'fonction':
-                _value('fonctionResponsable'),
-            'telephone':
-                _value('telephoneResponsable'),
-            'email':
-                _value('emailResponsable'),
-          },
+  'civilite': _value('civiliteResponsable'),
+  'nomAffiche': _value('nomResponsable'),
+  'prenomAffiche': _value('prenomResponsable'),
+  'fonction': _value('fonctionResponsable'),
+  'telephone': _value('telephoneResponsable'),
+  'email': _value('emailResponsable'),
+},
 
           'structure': {
-            'nom': _value('nomStructure'),
-            'type': _value('typeStructure'),
-            'siret': _value('siretStructure'),
-            'siren': _value('sirenStructure'),
-          },
+  'nom': _value('nomStructure'),
+  'type': _value('typeStructure'),
+  'organisationDisplay':
+      _buildOrganisationDisplay(),
+  'siret': _value('siretStructure'),
+  'siren': _value('sirenStructure'),
+},
 
           'territoire': {
             'territoireId': territoryId,
@@ -996,14 +1171,14 @@ _rgpdExpansionController.collapse();
             ),
             Positioned(
               left: position.dx,
-              top: position.dy + size.height - 10,
+              top: position.dy + size.height - 12,
               width: size.width,
               child: Material(
                 color: Colors.transparent,
                 child: Container(
                   constraints: BoxConstraints(maxHeight: maxMenuHeight),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.88),
+                    color: Colors.white.withOpacity(0.97),
                     border: const Border(
                       left: BorderSide(color: adminColor, width: 1.4),
                       right: BorderSide(color: adminColor, width: 1.4),
@@ -1021,12 +1196,23 @@ _rgpdExpansionController.collapse();
                       ),
                     ],
                   ),
-                  child: Scrollbar(
-                    controller: scrollController,
-                    thumbVisibility: true,
-                    thickness: 10,
-                    radius: const Radius.circular(10),
-                    child: ListView.builder(
+                  child: ScrollbarTheme(
+  data: ScrollbarThemeData(
+    thumbColor: WidgetStateProperty.all(adminColor),
+    trackColor: WidgetStateProperty.all(
+      adminColor.withOpacity(0.12),
+    ),
+    trackBorderColor: WidgetStateProperty.all(
+      adminColor.withOpacity(0.20),
+    ),
+    thickness: WidgetStateProperty.all(10),
+    radius: const Radius.circular(10),
+  ),
+  child: Scrollbar(
+    controller: scrollController,
+    thumbVisibility: true,
+    trackVisibility: true,
+    child: ListView.builder(
                       controller: scrollController,
                       primary: false,
                       padding: EdgeInsets.zero,
@@ -1058,12 +1244,13 @@ _rgpdExpansionController.collapse();
                             ),
                           ),
                         );
-                      },
+                                            },
                     ),
                   ),
                 ),
               ),
             ),
+          ),
           ],
         );
       },
@@ -1631,7 +1818,7 @@ Widget _correctionNotice() {
         ),
         const SizedBox(height: 12),
         const Text(
-          'Motif communiqué par SPHOT :',
+  "Motif communiqué par l'équipe SPHOT :",
           style: TextStyle(
             color: adminColor,
             fontWeight: FontWeight.w900,
@@ -1761,6 +1948,15 @@ _textField(
           'Identité du référent admin SPHOT.',
         ),
         _certifiedBlock(),
+
+_dropdownField(
+  'civiliteResponsable',
+  'Civilité',
+  civiliteChoices,
+),
+
+const SizedBox(height: 11),
+
         _textField(
           'nomResponsable',
           'Nom',
