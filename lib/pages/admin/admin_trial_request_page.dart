@@ -1818,7 +1818,7 @@ Widget _correctionNotice() {
         ),
         const SizedBox(height: 12),
         const Text(
-  "Motif communiqué par l'équipe SPHOT :",
+          "Motif communiqué par l'équipe SPHOT :",
           style: TextStyle(
             color: adminColor,
             fontWeight: FontWeight.w900,

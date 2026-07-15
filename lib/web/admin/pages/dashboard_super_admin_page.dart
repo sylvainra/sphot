@@ -23,6 +23,7 @@ enum DashboardSpotFilter {
 enum DashboardAdminFilter {
   none,
   all,
+  trialRequest,
   trial,
   active,
   overdue,
@@ -621,7 +622,7 @@ void _openFiltersMenu() {
               ),
               Positioned(
                 left: position.dx,
-                top: position.dy + size.height - 10,
+                top: position.dy + size.height - 12,
                 width: size.width,
                 child: Material(
                   color: Colors.transparent,
@@ -639,12 +640,17 @@ void _openFiltersMenu() {
                         bottomRight: Radius.circular(10),
                       ),
                     ),
-                    child: Scrollbar(
-                      controller: scrollController,
-                      thumbVisibility: true,
-                      thickness: 10,
-                      radius: const Radius.circular(10),
-                      child: ListView(
+                    child: ScrollbarTheme(
+  data: const ScrollbarThemeData(
+    thumbColor: WidgetStatePropertyAll(adminColor),
+    trackVisibility: WidgetStatePropertyAll(false),
+  ),
+  child: Scrollbar(
+    controller: scrollController,
+    thumbVisibility: true,
+    thickness: 10,
+    radius: const Radius.circular(10),
+    child: ListView(
                         controller: scrollController,
                         padding: EdgeInsets.zero,
                         shrinkWrap: true,
@@ -713,10 +719,11 @@ void _openFiltersMenu() {
                             ),
                           );
                         }).toList(),
-                      ),
+                                            ),
                     ),
                   ),
                 ),
+              ),
               ),
             ],
           );
@@ -754,7 +761,7 @@ void _openAdminFiltersMenu() {
           ),
           Positioned(
             left: position.dx,
-            top: position.dy + size.height - 10,
+            top: position.dy + size.height - 12,
             width: size.width,
             child: Material(
               color: Colors.transparent,
@@ -1078,15 +1085,23 @@ Widget _spotInfoLine(
 String _adminFilterLabel(DashboardAdminFilter filter) {
   switch (filter) {
     case DashboardAdminFilter.none:
-  return 'Aucun';
+      return 'Aucun';
+
     case DashboardAdminFilter.all:
       return 'Toutes';
+
+    case DashboardAdminFilter.trialRequest:
+      return "En demande d'essai";
+
     case DashboardAdminFilter.trial:
       return 'En essai';
+
     case DashboardAdminFilter.active:
       return 'Actives';
+
     case DashboardAdminFilter.overdue:
       return 'En retard';
+
     case DashboardAdminFilter.cancelled:
       return 'Résiliées';
   }
@@ -1094,8 +1109,9 @@ String _adminFilterLabel(DashboardAdminFilter filter) {
 
 bool _matchesAdminFilter(Map<String, dynamic> data) {
   if (_selectedAdminFilter == DashboardAdminFilter.none) {
-  return false;
-}
+    return false;
+  }
+
   if (_selectedAdminFilter == DashboardAdminFilter.all) {
     return true;
   }
@@ -1103,25 +1119,32 @@ bool _matchesAdminFilter(Map<String, dynamic> data) {
   final uid = _cleanText(data['uid']);
   final subscription = _subscriptionsByUid[uid];
 
-  if (subscription == null) {
-    return false;
-  }
-
-  final status = _cleanText(subscription['status']);
-
   switch (_selectedAdminFilter) {
     case DashboardAdminFilter.none:
       return false;
+
     case DashboardAdminFilter.all:
       return true;
+
+    case DashboardAdminFilter.trialRequest:
+  final status = _cleanText(data['status']).toLowerCase();
+  return status == 'pending';
+
     case DashboardAdminFilter.trial:
-      return status == 'trial';
+      if (subscription == null) return false;
+      return _cleanText(subscription['status']) == 'trial';
+
     case DashboardAdminFilter.active:
-      return status == 'active';
+      if (subscription == null) return false;
+      return _cleanText(subscription['status']) == 'active';
+
     case DashboardAdminFilter.overdue:
-      return status == 'overdue';
+      if (subscription == null) return false;
+      return _cleanText(subscription['status']) == 'overdue';
+
     case DashboardAdminFilter.cancelled:
-      return status == 'cancelled';
+      if (subscription == null) return false;
+      return _cleanText(subscription['status']) == 'cancelled';
   }
 }
 
@@ -1498,6 +1521,7 @@ void _openAdvertiserFiltersMenu() {
 
   final position = renderBox.localToGlobal(Offset.zero);
   final size = renderBox.size;
+  final scrollController = ScrollController();
 
   _dropdownOverlay = OverlayEntry(
     builder: (context) {
@@ -1514,12 +1538,15 @@ void _openAdvertiserFiltersMenu() {
           ),
           Positioned(
             left: position.dx,
-            top: position.dy + size.height - 10,
+            top: position.dy + size.height - 12,
             width: size.width,
             child: Material(
               color: Colors.transparent,
               child: Container(
-                decoration: BoxDecoration(
+  constraints: const BoxConstraints(
+    maxHeight: 190,
+  ),
+  decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.94),
                   border: const Border(
                     left: BorderSide(color: adminColor, width: 1.4),
@@ -1538,51 +1565,71 @@ void _openAdvertiserFiltersMenu() {
                     ),
                   ],
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: DashboardAdvertiserFilter.values.map((filter) {
-                    final selected = _selectedAdvertiserFilter == filter;
+                child: ScrollbarTheme(
+  data: const ScrollbarThemeData(
+    thumbColor: WidgetStatePropertyAll(adminColor),
+    trackVisibility: WidgetStatePropertyAll(false),
+  ),
+  child: Scrollbar(
+    controller: scrollController,
+    thumbVisibility: true,
+    thickness: 10,
+    radius: const Radius.circular(10),
+    child: ListView(
+      controller: scrollController,
+      padding: EdgeInsets.zero,
+      shrinkWrap: true,
+      children: DashboardAdvertiserFilter.values.map((filter) {
+        final selected =
+            _selectedAdvertiserFilter == filter;
 
-                    return InkWell(
-                      onTap: () {
-                        setState(() {
-                          _selectedAdvertiserFilter = filter;
-                          _selectedSpot = null;
-                          _selectedAdmin = null;
-                          _selectedAdvertiser = null;
-                        });
+        return InkWell(
+          onTap: () {
+            setState(() {
+              _selectedAdvertiserFilter = filter;
+              _selectedSpot = null;
+              _selectedAdmin = null;
+              _selectedAdvertiser = null;
+            });
 
-                        _dropdownOverlay?.remove();
-                        _dropdownOverlay = null;
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        child: Row(
-                          children: [
-                            Icon(
-                              selected
-                                  ? Icons.check_box_rounded
-                                  : Icons.check_box_outline_blank_rounded,
-                              color: selected ? redColor : adminColor,
-                              size: 22,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                _advertiserFilterLabel(filter),
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: selected ? redColor : adminColor,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
+            _dropdownOverlay?.remove();
+            _dropdownOverlay = null;
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 10,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  selected
+                      ? Icons.check_box_rounded
+                      : Icons.check_box_outline_blank_rounded,
+                  color:
+                      selected ? redColor : adminColor,
+                  size: 22,
                 ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _advertiserFilterLabel(filter),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color:
+                          selected ? redColor : adminColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    ),
+  ),
+),
               ),
             ),
           ),
