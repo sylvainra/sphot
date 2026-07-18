@@ -1,15 +1,12 @@
-import 'package:flutter/material.dart';
-import '../pages/sauveteur/sauveteur_menu_page.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../pages/admin/admin_espace_page.dart';
-import '../pages/admin/admin_trial_request_page.dart';
-import '../services/proconnect_service.dart';
 import 'dart:convert';
+
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+
+import '../pages/admin/admin_trial_request_page.dart';
 import '../pages/sauveteur/change_password_page.dart';
-import '../web/admin/pages/admin_requests_page.dart';
-import '../web/admin/pages/dashboard_super_admin_page.dart';
+import '../pages/sauveteur/sauveteur_menu_page.dart';
+import '../web/super_admin/web_super_admin_app.dart';
 
 class ProfilLoginPage extends StatefulWidget {
   const ProfilLoginPage({super.key});
@@ -29,25 +26,6 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
   bool _isEditing = false;
   bool _showPassword = false;
   String? _loginErrorMessage;
-
-  final Map<String, Map<String, String>> sauveteurAccounts = {
-    'chef': {
-      'password': '1234',
-      'role': 'Chef de poste',
-    },
-    'adjoint': {
-      'password': '1234',
-      'role': 'Adjoint chef de poste',
-    },
-    'sauveteur1': {
-      'password': '1234',
-      'role': 'Sauveteur',
-    },
-    'sauveteur2': {
-      'password': '1234',
-      'role': 'Sauveteur',
-    },
-  };
 
   @override
   void initState() {
@@ -88,134 +66,136 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
   }
 
   Future<void> _loginSauveteur() async {
-  final id = _idController.text.trim().toLowerCase();
-  final password = _passwordController.text.trim();
+    final id = _idController.text.trim().toLowerCase();
+    final password = _passwordController.text.trim();
 
-  setState(() {
-    _loginErrorMessage = null;
-  });
-
-  if (id.isEmpty || password.isEmpty) {
     setState(() {
-      _loginErrorMessage = 'Veuillez renseigner votre identifiant et votre mot de passe.';
+      _loginErrorMessage = null;
     });
-    return;
-  }
 
-  try {
-    final uri = Uri.parse(
-      'https://us-central1-sphot-ab80b.cloudfunctions.net/loginSauveteur',
-    );
-
-    debugPrint('Appel Cloud Function : $uri');
-
-    final response = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'login': id,
-        'password': password,
-      }),
-    );
-
-    debugPrint('Status = ${response.statusCode}');
-debugPrint('Body = ${response.body}');
-
-    if (response.statusCode != 200) {
+    if (id.isEmpty || password.isEmpty) {
       setState(() {
         _loginErrorMessage =
-            'Identifiant ou mot de passe incorrect.';
+            'Veuillez renseigner votre identifiant et votre mot de passe.';
       });
       return;
     }
 
-    final result = jsonDecode(response.body) as Map<String, dynamic>;
+    try {
+      final uri = Uri.parse(
+        'https://us-central1-sphot-ab80b.cloudfunctions.net/loginSauveteur',
+      );
 
-if (result['success'] != true) {
-  setState(() {
-    _loginErrorMessage = 'Identifiant ou mot de passe incorrect.';
-  });
-  return;
-}
+      debugPrint('Appel Cloud Function : $uri');
 
-final userRole = (result['userRole'] ?? 'Sauveteur').toString();
-final territoireId = (result['territoireId'] ?? '').toString();
-final mustChangePassword =
-    result['mustChangePassword'] == true;
+      final response = await http.post(
+        uri,
+        headers: const {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'login': id,
+          'password': password,
+        }),
+      );
 
-if (!mounted) return;
+      debugPrint('Status = ${response.statusCode}');
+      debugPrint('Body = ${response.body}');
 
-if (mustChangePassword) {
-  Navigator.of(context).pushReplacement(
-    MaterialPageRoute(
-      builder: (_) => ChangePasswordPage(
-        login: id,
-        territoireId: territoireId,
-        userRole: userRole,
-      ),
-    ),
-  );
-  return;
-}
+      if (response.statusCode != 200) {
+        if (!mounted) return;
 
-if (userRole == 'SUPER_ADMIN') {
-  Navigator.of(context).pushReplacement(
-    MaterialPageRoute(
-      builder: (_) => const DashboardSuperAdminPage(),
-    ),
-  );
-  return;
-}
+        setState(() {
+          _loginErrorMessage = 'Identifiant ou mot de passe incorrect.';
+        });
+        return;
+      }
 
-Navigator.of(context).pushReplacement(
-  MaterialPageRoute(
-    builder: (_) => SauveteurMenuPage(
-      profileColor: const Color(0xFFFF0000),
-      userRole: userRole,
-      territoireId: territoireId,
-    ),
-  ),
-);
-  } catch (error) {
-    if (!mounted) return;
+      final result = jsonDecode(response.body) as Map<String, dynamic>;
 
-    setState(() {
-      _loginErrorMessage =
-          'Connexion impossible. Vérifiez vos identifiants ou contactez votre administrateur SPHOT.';
-    });
+      if (result['success'] != true) {
+        if (!mounted) return;
+
+        setState(() {
+          _loginErrorMessage = 'Identifiant ou mot de passe incorrect.';
+        });
+        return;
+      }
+
+      final userRole = (result['userRole'] ?? 'Sauveteur').toString();
+      final territoireId = (result['territoireId'] ?? '').toString();
+      final mustChangePassword = result['mustChangePassword'] == true;
+
+      if (!mounted) return;
+
+      if (mustChangePassword) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ChangePasswordPage(
+              login: id,
+              territoireId: territoireId,
+              userRole: userRole,
+            ),
+          ),
+        );
+        return;
+      }
+
+      if (userRole == 'SUPER_ADMIN') {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const WebSuperAdminApp(),
+          ),
+        );
+        return;
+      }
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => SauveteurMenuPage(
+            profileColor: const Color(0xFFFF0000),
+            userRole: userRole,
+            territoireId: territoireId,
+          ),
+        ),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Erreur de connexion sauveteur : $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      setState(() {
+        _loginErrorMessage =
+            'Connexion impossible. Vérifiez vos identifiants ou contactez votre administrateur SPHOT.';
+      });
+    }
   }
-}
 
-  Future<void> _loginWithProConnect() async {
-  if (!mounted) return;
-
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => const AdminTrialRequestPage(),
-    ),
-  );
-}
-
-  void _showLoginError() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Identifiant ou mot de passe incorrect'),
-        duration: Duration(seconds: 2),
+  void _loginWithProConnect() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const AdminTrialRequestPage(),
       ),
     );
   }
 
   void _activateEditingMode() {
     if (!_isEditing) {
-      setState(() => _isEditing = true);
+      setState(() {
+        _isEditing = true;
+      });
     }
   }
 
   void _closeKeyboard() {
     FocusScope.of(context).unfocus();
-    setState(() => _isEditing = false);
+
+    if (_isEditing) {
+      setState(() {
+        _isEditing = false;
+      });
+    }
   }
 
   @override
@@ -236,11 +216,11 @@ Navigator.of(context).pushReplacement(
               fit: BoxFit.cover,
             ),
             SafeArea(
-  child: SingleChildScrollView(
-    keyboardDismissBehavior:
-        ScrollViewKeyboardDismissBehavior.onDrag,
-    padding: const EdgeInsets.symmetric(horizontal: 26),
-    child: Column(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.symmetric(horizontal: 26),
+                child: Column(
                   children: [
                     Image.asset(
                       'data/icons/title.png',
@@ -248,9 +228,7 @@ Navigator.of(context).pushReplacement(
                       fit: BoxFit.contain,
                       filterQuality: FilterQuality.high,
                     ),
-
                     const SizedBox(height: 12),
-
                     Visibility(
                       visible: !_isEditing,
                       maintainSize: true,
@@ -266,12 +244,10 @@ Navigator.of(context).pushReplacement(
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 16),
-
                     AnimatedContainer(
-  duration: const Duration(milliseconds: 260),
-  curve: Curves.easeOutCubic,
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
                       child: Column(
                         children: [
                           Container(
@@ -295,9 +271,7 @@ Navigator.of(context).pushReplacement(
                                     color: sauveteurColor,
                                   ),
                                 ),
-
                                 const SizedBox(height: 18),
-
                                 TextField(
                                   controller: _idController,
                                   focusNode: _idFocusNode,
@@ -346,9 +320,7 @@ Navigator.of(context).pushReplacement(
                                     ),
                                   ),
                                 ),
-
                                 const SizedBox(height: 14),
-
                                 TextField(
                                   controller: _passwordController,
                                   focusNode: _passwordFocusNode,
@@ -408,9 +380,7 @@ Navigator.of(context).pushReplacement(
                                     ),
                                   ),
                                 ),
-
                                 const SizedBox(height: 22),
-
                                 SizedBox(
                                   width: double.infinity,
                                   height: 54,
@@ -454,9 +424,7 @@ Navigator.of(context).pushReplacement(
                               ],
                             ),
                           ),
-
                           const SizedBox(height: 16),
-
                           Container(
                             padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
                             decoration: BoxDecoration(
@@ -478,9 +446,7 @@ Navigator.of(context).pushReplacement(
                                     color: adminColor,
                                   ),
                                 ),
-
                                 const SizedBox(height: 14),
-
                                 SizedBox(
                                   width: double.infinity,
                                   height: 50,
@@ -512,9 +478,7 @@ Navigator.of(context).pushReplacement(
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 40),
-
                     if (!_isEditing)
                       Container(
                         width: 62,
@@ -536,8 +500,7 @@ Navigator.of(context).pushReplacement(
                           ),
                         ),
                       ),
-
-                                        const SizedBox(height: 18),
+                    const SizedBox(height: 18),
                   ],
                 ),
               ),

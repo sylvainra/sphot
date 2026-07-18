@@ -135,7 +135,7 @@ String _sphotChangeLog = '';
 ];
 
 final List<String> structureTypes = const [
-  'COMMUNE',
+  'MAIRIE',
   'COMMUNAUTÉ DE COMMUNES',
   'MÉTROPOLE',
   'DÉPARTEMENT',
@@ -162,7 +162,7 @@ void initState() {
     _controller('nomStructure').text =
         widget.proConnectOrganisation ?? '';
 
-    _controller('typeStructure').text = 'COMMUNE';
+    _controller('typeStructure').text = 'MAIRIE';
 
     _controller('siretStructure').text =
         widget.proConnectSiret ?? '';
@@ -247,11 +247,24 @@ Future<void> _loadExistingRequest() async {
       data['administrativeTracking'] ?? {},
     );
 
-    _controller('nomStructure').text =
-        (structure['nom'] ?? '').toString();
+    final loadedStructureType =
+    (structure['type'] ?? 'MAIRIE')
+        .toString()
+        .trim()
+        .toUpperCase();
 
-    _controller('typeStructure').text =
-        (structure['type'] ?? 'COMMUNE').toString();
+final normalizedStructureType =
+    loadedStructureType == 'COMMUNE'
+        ? 'MAIRIE'
+        : loadedStructureType;
+
+_controller('typeStructure').text =
+    normalizedStructureType;
+
+_controller('nomStructure').text =
+    normalizedStructureType == 'MAIRIE'
+        ? ''
+        : (structure['nom'] ?? '').toString();
 
     _controller('siretStructure').text =
         (structure['siret'] ?? '').toString();
@@ -375,9 +388,18 @@ Future<void> _loadExistingRequest() async {
   }
 
   bool get _structureComplete {
-    return _value('nomStructure').isNotEmpty &&
-        _value('typeStructure').isNotEmpty;
+  final type = _value('typeStructure');
+
+  if (type.isEmpty) {
+    return false;
   }
+
+  if (type == 'MAIRIE') {
+    return true;
+  }
+
+  return _value('nomStructure').isNotEmpty;
+}
 
   bool get _responsableComplete {
   return _value('civiliteResponsable').isNotEmpty &&
@@ -456,6 +478,17 @@ bool get _cityInfoComplete {
     }).join(' ');
   }
 
+String _structureNameForStorage() {
+  final type =
+      _value('typeStructure').trim().toUpperCase();
+
+  if (type == 'MAIRIE') {
+    return _value('ville').trim();
+  }
+
+  return _value('nomStructure').trim();
+}
+
 String _buildOrganisationDisplay() {
   final type = _value('typeStructure').trim().toUpperCase();
   final nomBrut = _value('nomStructure').trim();
@@ -481,25 +514,16 @@ String _buildOrganisationDisplay() {
     return resultat;
   }
 
-  switch (type) {
-    case 'COMMUNE':
-      final nom = retirerPrefixe(
-        nomBrut,
-        [
-          'MAIRIE DE ',
-          'MAIRIE DU ',
-          'MAIRIE DE LA ',
-          "MAIRIE DE L'",
-          'MAIRIE ',
-          'COMMUNE DE ',
-          'COMMUNE DU ',
-          'COMMUNE DE LA ',
-          "COMMUNE DE L'",
-          'COMMUNE ',
-        ],
-      );
+switch (type) {
 
-      return 'la Mairie de $nom';
+  case 'MAIRIE':
+  final ville = _value('ville').trim();
+
+  if (ville.isEmpty) {
+    return 'la Mairie';
+  }
+
+  return 'la Mairie de $ville';
 
     case 'COMMUNAUTÉ DE COMMUNES':
       final nom = retirerPrefixe(
@@ -838,7 +862,7 @@ if (_isCorrectionMode) {
 },
 
           'structure': {
-  'nom': _value('nomStructure'),
+  'nom': _structureNameForStorage(),
   'type': _value('typeStructure'),
   'organisationDisplay':
       _buildOrganisationDisplay(),
@@ -961,7 +985,7 @@ if (_isCorrectionMode) {
 },
 
           'structure': {
-  'nom': _value('nomStructure'),
+  'nom': _structureNameForStorage(),
   'type': _value('typeStructure'),
   'organisationDisplay':
       _buildOrganisationDisplay(),
@@ -1171,7 +1195,7 @@ _rgpdExpansionController.collapse();
             ),
             Positioned(
               left: position.dx,
-              top: position.dy + size.height - 12,
+              top: position.dy + size.height - 14,
               width: size.width,
               child: Material(
                 color: Colors.transparent,
@@ -1900,25 +1924,32 @@ Widget _correctionNotice() {
   }
 
   Widget _structurePanel() {
-    return Column(
+  final typeStructure =
+      _value('typeStructure').trim().toUpperCase();
+
+  return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _pageHeader(
           'STRUCTURE',
           'Renseignez l’organisme qui utilisera SPHOT.',
         ),
-        _textField(
-          'nomStructure',
-          'Nom de la structure',
-          uppercase: true,
-          readOnly: widget.proConnectOrganisation != null,
-        ),
-        const SizedBox(height: 11),
         _dropdownField(
-          'typeStructure',
-          'Type de structure',
-          structureTypes,
-        ),
+  'typeStructure',
+  'Type de structure',
+  structureTypes,
+),
+
+if (typeStructure != 'MAIRIE') ...[
+  const SizedBox(height: 11),
+
+  _textField(
+    'nomStructure',
+    'Nom de la structure',
+    uppercase: true,
+    readOnly: widget.proConnectOrganisation != null,
+  ),
+],
         const SizedBox(height: 11),
         _textField(
           'siretStructure',
@@ -2050,18 +2081,20 @@ Row(
         'Positionnez le lieu sur la carte centrale.',
       ),
       _textField(
-        'logoVille',
-        'Adresse / lien du logo du lieu',
-      ),
-      const SizedBox(height: 11),
-      _textField(
-        'siteInternetVille',
-        'Site internet du lieu',
-      ),
+  'siteInternetVille',
+  'Adresse internet du lieu',
+),
+
+const SizedBox(height: 11),
+
+_textField(
+  'logoVille',
+  'Adresse internet du logo',
+),
       const SizedBox(height: 11),
       _textField(
         'arretesMunicipaux',
-        'Adresse internet des arrêtés municipaux',
+        'Adresse internet des règlements de baignade',
       ),
       const SizedBox(height: 14),
       Container(

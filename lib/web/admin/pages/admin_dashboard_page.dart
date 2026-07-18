@@ -53,15 +53,15 @@ class _SuperAdminTileStyle {
   });
 }
 
-class DashboardSuperAdminPage extends StatefulWidget {
-  const DashboardSuperAdminPage({super.key});
+class AdminDashboardPage extends StatefulWidget {
+  const AdminDashboardPage({super.key});
 
   @override
-  State<DashboardSuperAdminPage> createState() =>
-      _DashboardSuperAdminPageState();
+  State<AdminDashboardPage> createState() =>
+      _AdminDashboardPageState();
 }
 
-class _DashboardSuperAdminPageState extends State<DashboardSuperAdminPage> {
+class _AdminDashboardPageState extends State<AdminDashboardPage> {
   static const Color adminColor = Color(0xFF1E3A8A);
   static const Color redColor = Color(0xFFDC2626);
 
@@ -1264,97 +1264,31 @@ Widget _buildRightPanel({
       ),
     ),
     child: SafeArea(
-  child: Padding(
-    padding: const EdgeInsets.all(22),
-      child: Column(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
+      child: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             _summaryCard(
               title: 'SPHOTS',
               value: '$_visibleOnMapSpotCount',
               color: adminColor,
             ),
+
             const SizedBox(height: 18),
+
             _buildFiltersBlock(),
 
             const SizedBox(height: 24),
 
             _summaryCard(
-  title: 'ADMINS',
-  value: '$_visibleOnMapAdminCount',
-  color: adminColor,
-),
-const SizedBox(height: 18),
-_buildAdminFiltersBlock(),
-
-const SizedBox(height: 24),
-
-_summaryCard(
-  title: 'ANNONCEURS',
-  value: '$_visibleAdvertiserCount',
-  color: adminColor,
-),
-const SizedBox(height: 18),
-_buildAdvertiserFiltersBlock(),
-
-const SizedBox(height: 24),
-
-_summaryCard(
-  title: 'SAUVETEURS',
-  value: '$_visibleOnMapSauveteurCount',
-  color: adminColor,
-),
-
-const SizedBox(height: 14),
-
-GestureDetector(
-  onTap: () {
-    setState(() {
-      _showLegalDocumentsPanel = true;
-      _selectedSpot = null;
-      _selectedAdmin = null;
-      _selectedAdvertiser = null;
-    });
-  },
-  child: Container(
-    height: 58,
-    padding: const EdgeInsets.symmetric(horizontal: 14),
-    decoration: BoxDecoration(
-      color: (_showLegalDocumentsPanel ? redColor : adminColor).withOpacity(0.08),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(
-        color: _showLegalDocumentsPanel ? redColor : adminColor,
-        width: 1.5,
-      ),
-    ),
-    child: Row(
-      children: [
-        Image.asset(
-          'data/icons/fire_blue_icon.png',
-          width: 30,
-          height: 30,
-          filterQuality: FilterQuality.high,
-        ),
-        const SizedBox(width: 14),
-        const Expanded(
-          child: Text(
-            'DOCUMENTS JURIDIQUES',
-            style: TextStyle(
+              title: 'SAUVETEURS',
+              value: '$_visibleOnMapSauveteurCount',
               color: adminColor,
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
             ),
-          ),
+          ],
         ),
-      ],
-    ),
-  ),
-),
-
-            
-                    ],
-        ),
-          ),
+      ),
     ),
   );
 }
@@ -4908,18 +4842,6 @@ Widget build(BuildContext context) {
   ...validSpots.map(
     (doc) => _buildSpotMarker(doc.data()),
   ),
-  ...validAdvertisers.map((doc) {
-    return _buildAdvertiserMarker({
-      ...doc.data(),
-      'id': doc.id,
-    });
-  }),
-];
-
-final adminMarkers = <Marker>[
-  ...validAdmins.map(
-    (doc) => _buildAdminMarker(doc.data()),
-  ),
 ];
 
                   return Row(
@@ -5029,9 +4951,7 @@ final adminMarkers = <Marker>[
                                     },
                                   ),
                                 ),
-                                MarkerLayer(
-  markers: adminMarkers,
-),
+                                
                               ],
                             ),
                             Positioned(
@@ -5073,14 +4993,8 @@ Positioned(
                         ),
                       ),
 
-                      if (_showLegalDocumentsPanel)
-  _buildLegalDocumentsPanel()
-else if (_selectedSpot != null)
-  _buildSpotDetailPanel()
-else if (_selectedAdvertiser != null)
-  _buildAdvertiserDetailPanel()
-else if (_selectedAdmin != null)
-  _buildAdminDetailPanel(),
+                      if (_selectedSpot != null)
+  _buildSpotDetailPanel(),
                     ],
                   );
                 },

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'web/admin/web_admin_app.dart';
-import 'web/admin/pages/dashboard_super_admin_page.dart';
+import 'web/super_admin/web_super_admin_app.dart';
 import 'web/admin/pages/web_admin_registration_page.dart';
 
 Future<void> main() async {
@@ -12,11 +11,11 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  runApp(const SphotWebAdminApp());
+  runApp(const SphotWebSuperAdminApp());
 }
 
-class SphotWebAdminApp extends StatelessWidget {
-  const SphotWebAdminApp({super.key});
+class SphotWebSuperAdminApp extends StatelessWidget {
+  const SphotWebSuperAdminApp({super.key});
 
   @override
   Widget build(BuildContext context) {

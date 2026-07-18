@@ -1,14 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-class AdminRequestsPage extends StatefulWidget {
-  const AdminRequestsPage({super.key});
+class SuperAdminAdminRequestsPage extends StatefulWidget {
+  const SuperAdminAdminRequestsPage({super.key});
 
   @override
-  State<AdminRequestsPage> createState() => _AdminRequestsPageState();
+  State<SuperAdminAdminRequestsPage> createState() =>
+      _SuperAdminAdminRequestsPageState();
 }
 
-class _AdminRequestsPageState extends State<AdminRequestsPage> {
+class _SuperAdminAdminRequestsPageState
+    extends State<SuperAdminAdminRequestsPage> {
   static const Color adminColor = Color(0xFF1E3A8A);
   static const Color redColor = Color(0xFFDC2626);
 

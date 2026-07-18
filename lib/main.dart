@@ -6,9 +6,9 @@ import 'firebase_options.dart';
 import 'map/map_page.dart';
 import 'pages/advertiser_access_page.dart';
 import 'pages/admin/admin_trial_request_page.dart';
+import 'web/admin/pages/admin_dashboard_page.dart';
 import 'services/advertiser_auth_service.dart';
 import 'services/web_pending_auth_storage.dart';
-import 'web/admin/web_admin_app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,8 +17,8 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-print('Uri.base = ${Uri.base}');
-print('fragment = ${Uri.base.fragment}');
+  print('Uri.base = ${Uri.base}');
+  print('fragment = ${Uri.base.fragment}');
 
   final pendingAuth = WebPendingAuthStorage.getPendingAuth();
 
@@ -46,16 +46,16 @@ class SphotApp extends StatelessWidget {
     final uri = Uri.parse(routeName);
 
     if (uri.path == '/web-admin') {
-  final requestId =
-      uri.queryParameters['requestId']?.trim() ?? '';
+      final requestId =
+          uri.queryParameters['requestId']?.trim() ?? '';
 
-  if (requestId.isNotEmpty) {
-    return MaterialPageRoute(
-      settings: settings,
-      builder: (_) => const WebAdminApp(),
-    );
-  }
-}
+      if (requestId.isNotEmpty) {
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const AdminDashboardPage(),
+        );
+      }
+    }
 
     if (uri.path == '/admin-request-correction') {
       final requestId =

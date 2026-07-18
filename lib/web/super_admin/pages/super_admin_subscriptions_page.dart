@@ -1,14 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-class SubscriptionsPage extends StatefulWidget {
-  const SubscriptionsPage({super.key});
+class SuperAdminSubscriptionsPage extends StatefulWidget {
+  const SuperAdminSubscriptionsPage({super.key});
 
   @override
-  State<SubscriptionsPage> createState() => _SubscriptionsPageState();
+  State<SuperAdminSubscriptionsPage> createState() =>
+      _SuperAdminSubscriptionsPageState();
 }
 
-class _SubscriptionsPageState extends State<SubscriptionsPage> {
+class _SuperAdminSubscriptionsPageState extends State<SuperAdminSubscriptionsPage> {
   static const Color adminColor = Color(0xFF1E3A8A);
   static const Color redColor = Color(0xFFDC2626);
 

@@ -4,7 +4,7 @@ import '../services/web_proconnect_auth_service.dart';
 import '../shared/web_colors.dart';
 import '../admin/web_admin_registration_page.dart';
 
-import '../admin/web_admin_app.dart';
+import '../super_admin/web_super_admin_app.dart';
 
 import '../../services/web_pending_auth_storage.dart';
 
@@ -277,7 +277,7 @@ SizedBox(
         : () {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder: (_) => const WebAdminApp(),
+                builder: (_) => const WebSuperAdminApp(),
               ),
             );
           },
