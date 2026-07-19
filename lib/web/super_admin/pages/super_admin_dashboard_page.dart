@@ -169,7 +169,7 @@ bool _isListening = false;
   };
 
   DashboardAdminFilter _selectedAdminFilter =
-      DashboardAdminFilter.all;
+    DashboardAdminFilter.trialRequest;
 
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> get _spotsStream async* {
   await for (final territoiresSnapshot
@@ -4642,16 +4642,21 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
-          setState(() {
-            _selectedSpot = null;
-            _selectedAdmin =
-                Map<String, dynamic>.from(data);
-            _selectedAdvertiser = null;
-            _showLegalDocumentsPanel = false;
-            _selectedLegalDocument = null;
-            _selectedLegalChapter = null;
-          });
-        },
+  setState(() {
+    _selectedSpot = null;
+    _selectedAdmin =
+        Map<String, dynamic>.from(data);
+    _selectedAdvertiser = null;
+    _showLegalDocumentsPanel = false;
+    _selectedLegalDocument = null;
+    _selectedLegalChapter = null;
+  });
+
+  _mapController.move(
+    LatLng(lat, lng),
+    14,
+  );
+},
         child: Tooltip(
           message: organisation,
           child: SizedBox(

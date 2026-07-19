@@ -120,6 +120,8 @@ String? _correctionRequestNumber;
 String? _correctionReason;
 
 Map<String, dynamic> _originalRequestData = {};
+final Map<String, String> _correctionBaseline = {};
+final Set<String> _fieldsToCorrect = <String>{};
 
 Map<String, dynamic>? _cguDoc;
 Map<String, dynamic>? _privacyDoc;
@@ -189,6 +191,9 @@ void initState() {
     for (final controller in _controllers.values) {
       controller.dispose();
     }
+
+    _mapController.dispose();
+
     _dropdownOverlay?.remove();
     super.dispose();
   }
@@ -199,6 +204,40 @@ void initState() {
   }
 
   String _value(String key) => _controller(key).text.trim();
+
+  void _captureCorrectionBaseline() {
+    const keys = <String>[
+      'typeStructure',
+      'nomStructure',
+      'siretStructure',
+      'sirenStructure',
+      'civiliteResponsable',
+      'nomResponsable',
+      'prenomResponsable',
+      'fonctionResponsable',
+      'telephoneResponsable',
+      'emailResponsable',
+      'pays',
+      'region',
+      'departement',
+      'ville',
+      'logoVille',
+      'siteInternetVille',
+      'arretesMunicipaux',
+      'villeLat',
+      'villeLng',
+    ];
+
+    _correctionBaseline
+      ..clear()
+      ..addEntries(
+        keys.map((key) => MapEntry(key, _value(key))),
+      );
+  }
+
+  bool _fieldChangedSinceLoad(String key) {
+    return _value(key) != (_correctionBaseline[key] ?? '');
+  }
 
 Future<void> _loadExistingRequest() async {
   final requestId = widget.correctionRequestId?.trim() ?? '';
@@ -334,33 +373,48 @@ _controller('nomStructure').text =
         _acceptTerms = true;
 
     if (!mounted) return;
+    
+setState(() {
+  _originalRequestData = data;
 
-    setState(() {
-      _originalRequestData = data;
+  _correctionRequestNumber =
+      (data['requestNumber'] ?? requestId).toString();
 
-      _correctionRequestNumber =
-          (data['requestNumber'] ?? requestId).toString();
+  _correctionReason =
+      (administrativeTracking['rejectionReason'] ??
+              'Des informations doivent être corrigées.')
+          .toString();
 
-      _correctionReason =
-          (administrativeTracking['rejectionReason'] ??
-                  'Des informations doivent être corrigées.')
-              .toString();
+  _fieldsToCorrect
+    ..clear()
+    ..addAll(
+      _fieldsToCorrectFromReason(_correctionReason ?? ''),
+    );
 
-      _isLoadingCorrection = false;
-      _saved = false;
-    });
+  // La comparaison des corrections part exactement des valeurs affichées,
+  // après leur normalisation pour l'interface.
+  _captureCorrectionBaseline();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_hasCityPosition) return;
+  // En correction, on ouvre directement la section refusée.
+  _selectedSection =
+      _firstCorrectionSection ?? _TrialRequestSection.structure;
 
-      _mapController.move(
-        LatLng(
-          _toDouble(_value('villeLat')),
-          _toDouble(_value('villeLng')),
-        ),
-        12,
-      );
-    });
+  // La carte se monte d'abord sur Satellite.
+  _selectedMapStyleIndex = 1;
+
+  _isLoadingCorrection = false;
+  _saved = false;
+});
+
+WidgetsBinding.instance.addPostFrameCallback((_) {
+  if (!mounted) return;
+
+  setState(() {
+    // Retour immédiat sur le style Plan.
+    _selectedMapStyleIndex = 0;
+  });
+});
+    
   } catch (error) {
     if (!mounted) return;
 
@@ -437,11 +491,327 @@ bool get _cityInfoComplete {
   }
 
   bool get _canSubmitTrialRequest {
-  return _canOpenTrialRequest &&
+  final formValid =
+      _canOpenTrialRequest &&
       _certifyRepresentative &&
       _legalReadConfirmed &&
       _privacyReadConfirmed &&
       _rgpdAccepted;
+
+  if (!formValid) {
+    return false;
+  }
+
+  if (_isCorrectionMode && !_allRequestedCorrectionsCompleted) {
+    return false;
+  }
+
+  return true;
+}
+
+String _normalizeCorrectionReason(String value) {
+  return value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[àáâäãå]'), 'a')
+      .replaceAll(RegExp(r'[ç]'), 'c')
+      .replaceAll(RegExp(r'[èéêë]'), 'e')
+      .replaceAll(RegExp(r'[ìíîï]'), 'i')
+      .replaceAll(RegExp(r'[ñ]'), 'n')
+      .replaceAll(RegExp(r'[òóôöõ]'), 'o')
+      .replaceAll(RegExp(r'[ùúûü]'), 'u')
+      .replaceAll(RegExp(r'[ýÿ]'), 'y')
+      .replaceAll('æ', 'ae')
+      .replaceAll('œ', 'oe')
+      .replaceAll(RegExp(r'[^a-z0-9.]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
+Set<String> _fieldsToCorrectFromReason(String reason) {
+  final normalized = _normalizeCorrectionReason(reason);
+  final result = <String>{};
+
+  bool containsAny(Iterable<String> aliases) {
+    return aliases.any(
+      (alias) => normalized.contains(_normalizeCorrectionReason(alias)),
+    );
+  }
+
+  void add(String controllerKey, List<String> aliases) {
+    if (containsAny(aliases)) {
+      result.add(controllerKey);
+    }
+  }
+
+  // STRUCTURE
+  add('typeStructure', [
+    'type de structure',
+    'type structure',
+    'structure.type',
+    'typeStructure',
+  ]);
+  add('nomStructure', [
+    'nom de la structure',
+    'nom structure',
+    'structure.nom',
+    'nomStructure',
+    'organisation',
+  ]);
+  add('siretStructure', [
+    'siret',
+    'structure.siret',
+    'siretStructure',
+  ]);
+  add('sirenStructure', [
+    'siren',
+    'structure.siren',
+    'sirenStructure',
+  ]);
+
+  // RESPONSABLE
+  add('civiliteResponsable', [
+    'civilite du responsable',
+    'civilite responsable',
+    'profile.civilite',
+    'civiliteResponsable',
+    'civilite',
+  ]);
+  add('nomResponsable', [
+    'nom du responsable',
+    'nom responsable',
+    'profile.nomAffiche',
+    'nomResponsable',
+  ]);
+  add('prenomResponsable', [
+    'prenom du responsable',
+    'prenom responsable',
+    'profile.prenomAffiche',
+    'prenomResponsable',
+    'prenom',
+  ]);
+  add('fonctionResponsable', [
+    'fonction du responsable',
+    'fonction responsable',
+    'profile.fonction',
+    'fonctionResponsable',
+    'fonction',
+  ]);
+  add('telephoneResponsable', [
+    'telephone du responsable',
+    'telephone responsable',
+    'profile.telephone',
+    'telephoneResponsable',
+    'telephone',
+  ]);
+  add('emailResponsable', [
+    'email du responsable',
+    'e mail du responsable',
+    'email responsable',
+    'profile.email',
+    'emailResponsable',
+    'courriel',
+    'email',
+  ]);
+
+  // TERRITOIRE
+  add('pays', ['territoire.pays', 'pays']);
+  add('region', ['territoire.region', 'region']);
+  add('departement', ['territoire.departement', 'departement']);
+  add('ville', [
+    'territoire.ville',
+    'commune',
+    'nom de la ville',
+    'ville',
+  ]);
+
+  // LIEU
+  add('logoVille', [
+    'adresse internet du logo',
+    'url du logo',
+    'logo de la ville',
+    'territoire.logoVille',
+    'logoVille',
+    'logo',
+  ]);
+  add('siteInternetVille', [
+    'site internet de la ville',
+    'site internet',
+    'territoire.siteInternetVille',
+    'siteInternetVille',
+  ]);
+  add('arretesMunicipaux', [
+    'arretes municipaux',
+    'arrete municipal',
+    'territoire.arretesMunicipaux',
+    'arretesMunicipaux',
+    'arrete',
+  ]);
+  add('villeLat', [
+    'latitude',
+    'territoire.villeLat',
+    'villeLat',
+  ]);
+  add('villeLng', [
+    'longitude',
+    'territoire.villeLng',
+    'villeLng',
+  ]);
+
+  // Une demande de correction de position concerne les deux coordonnées.
+  if (containsAny(['position sur la carte', 'position de la ville', 'coordonnees'])) {
+    result
+      ..add('villeLat')
+      ..add('villeLng');
+  }
+
+  return result;
+}
+
+String? _controllerKeyForFirestoreField(String rawField) {
+  final field = rawField.trim();
+
+  const mapping = <String, String>{
+    'structure.type': 'typeStructure',
+    'structure.nom': 'nomStructure',
+    'structure.siret': 'siretStructure',
+    'structure.siren': 'sirenStructure',
+    'profile.civilite': 'civiliteResponsable',
+    'profile.nomAffiche': 'nomResponsable',
+    'profile.prenomAffiche': 'prenomResponsable',
+    'profile.fonction': 'fonctionResponsable',
+    'profile.telephone': 'telephoneResponsable',
+    'profile.email': 'emailResponsable',
+    'territoire.pays': 'pays',
+    'territoire.region': 'region',
+    'territoire.departement': 'departement',
+    'territoire.ville': 'ville',
+    'territoire.logoVille': 'logoVille',
+    'territoire.siteInternetVille': 'siteInternetVille',
+    'territoire.arretesMunicipaux': 'arretesMunicipaux',
+    'territoire.villeLat': 'villeLat',
+    'territoire.villeLng': 'villeLng',
+  };
+
+  if (mapping.containsKey(field)) {
+    return mapping[field];
+  }
+
+  if (_controllers.containsKey(field) || const <String>{
+    'typeStructure',
+    'nomStructure',
+    'siretStructure',
+    'sirenStructure',
+    'civiliteResponsable',
+    'nomResponsable',
+    'prenomResponsable',
+    'fonctionResponsable',
+    'telephoneResponsable',
+    'emailResponsable',
+    'pays',
+    'region',
+    'departement',
+    'ville',
+    'logoVille',
+    'siteInternetVille',
+    'arretesMunicipaux',
+    'villeLat',
+    'villeLng',
+  }.contains(field)) {
+    return field;
+  }
+
+  return null;
+}
+
+Set<String> _fieldsForSection(_TrialRequestSection section) {
+  switch (section) {
+    case _TrialRequestSection.structure:
+      return const {
+        'typeStructure', 'nomStructure', 'siretStructure', 'sirenStructure',
+      };
+    case _TrialRequestSection.responsable:
+      return const {
+        'civiliteResponsable', 'nomResponsable', 'prenomResponsable',
+        'fonctionResponsable', 'telephoneResponsable', 'emailResponsable',
+      };
+    case _TrialRequestSection.territoire:
+      return const {'pays', 'region', 'departement', 'ville'};
+    case _TrialRequestSection.ville:
+      return const {
+        'logoVille', 'siteInternetVille', 'arretesMunicipaux',
+        'villeLat', 'villeLng',
+      };
+    case _TrialRequestSection.essai:
+      return const {};
+  }
+}
+
+bool _sectionHasFieldsToCorrect(_TrialRequestSection section) {
+  return _fieldsForSection(section).any(_fieldsToCorrect.contains);
+}
+
+bool _isFieldEditable(String key) {
+  return !_isCorrectionMode || _fieldsToCorrect.contains(key);
+}
+
+bool _correctedFieldIsValid(String key) {
+  final value = _value(key);
+  if (value.isEmpty) return false;
+
+  switch (key) {
+    case 'siretStructure':
+      return RegExp(r'^\d{14}$').hasMatch(value.replaceAll(RegExp(r'\D'), ''));
+    case 'sirenStructure':
+      return RegExp(r'^\d{9}$').hasMatch(value.replaceAll(RegExp(r'\D'), ''));
+    case 'emailResponsable':
+      return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value);
+    case 'telephoneResponsable':
+      return value.replaceAll(RegExp(r'\D'), '').length >= 10;
+    case 'villeLat':
+      final latitude = double.tryParse(value.replaceAll(',', '.'));
+      return latitude != null && latitude >= -90 && latitude <= 90;
+    case 'villeLng':
+      final longitude = double.tryParse(value.replaceAll(',', '.'));
+      return longitude != null && longitude >= -180 && longitude <= 180;
+    case 'nomStructure':
+      return _value('typeStructure') == 'MAIRIE' || value.isNotEmpty;
+    default:
+      return true;
+  }
+}
+
+bool get _allRequestedCorrectionsCompleted {
+  if (!_isCorrectionMode || _fieldsToCorrect.isEmpty) return false;
+
+  return _fieldsToCorrect.every(
+    (key) => _fieldChangedSinceLoad(key) && _correctedFieldIsValid(key),
+  );
+}
+
+bool get _hasCorrectionChanges => _allRequestedCorrectionsCompleted;
+
+_TrialRequestSection? get _firstCorrectionSection {
+  for (final section in const [
+    _TrialRequestSection.structure,
+    _TrialRequestSection.responsable,
+    _TrialRequestSection.territoire,
+    _TrialRequestSection.ville,
+  ]) {
+    if (_sectionHasFieldsToCorrect(section)) return section;
+  }
+  return null;
+}
+
+bool _correctionSectionEnabled(_TrialRequestSection section) {
+  if (!_isCorrectionMode) {
+    return section != _TrialRequestSection.essai || _canOpenTrialRequest;
+  }
+
+  if (section == _TrialRequestSection.essai) {
+    return _allRequestedCorrectionsCompleted;
+  }
+
+  return _sectionHasFieldsToCorrect(section);
 }
 
   String _normalizeIdPart(String value) {
@@ -472,11 +842,21 @@ bool get _cityInfoComplete {
   }
 
   String _capitalizeWords(String value) {
-    return value.split(' ').map((word) {
-      if (word.isEmpty) return word;
-      return word[0].toUpperCase() + word.substring(1).toLowerCase();
-    }).join(' ');
-  }
+  return value.replaceAllMapped(
+    RegExp(
+      r"(^|[\s\-'])([A-Za-zÀ-ÖØ-öø-ÿ])([A-Za-zÀ-ÖØ-öø-ÿ]*)",
+    ),
+    (match) {
+      final separator = match.group(1) ?? '';
+      final firstLetter = match.group(2) ?? '';
+      final remainingLetters = match.group(3) ?? '';
+
+      return separator +
+          firstLetter.toUpperCase() +
+          remainingLetters.toLowerCase();
+    },
+  );
+}
 
 String _structureNameForStorage() {
   final type =
@@ -649,17 +1029,19 @@ switch (type) {
   }
 
   void _selectSection(_TrialRequestSection section) {
-    if (section == _TrialRequestSection.essai && !_canOpenTrialRequest) {
+    if (!_correctionSectionEnabled(section)) {
       setState(() {
-  _trialRequestMessage =
-      'Complétez Structure, Responsable, Territoire et Lieu avant la demande d’essai.';
-});
+        _trialRequestMessage = _isCorrectionMode
+            ? 'Corrigez d’abord la rubrique refusée avant d’accéder à la demande d’essai.'
+            : 'Complétez Structure, Responsable, Territoire et Lieu avant la demande d’essai.';
+      });
       return;
     }
 
     setState(() {
-  _selectedSection = section;
-});
+      _selectedSection = section;
+      _trialRequestMessage = null;
+    });
   }
 
   Future<void> _startVoice(
@@ -715,20 +1097,20 @@ switch (type) {
       _saved = false;
     });
 
-    _mapController.move(point, 12);
+    _mapController.move(point, 14);
   }
 
   void _centerOnCity() {
-    if (!_hasCityPosition) return;
+  if (!_hasCityPosition) return;
 
-    _mapController.move(
-      LatLng(
-        _toDouble(_value('villeLat')),
-        _toDouble(_value('villeLng')),
-      ),
-      12,
-    );
-  }
+  _mapController.move(
+    LatLng(
+      _toDouble(_value('villeLat')),
+      _toDouble(_value('villeLng')),
+    ),
+    14,
+  );
+}
 
 Future<void> _loadLegalDocuments() async {
   try {
@@ -922,6 +1304,9 @@ if (_isCorrectionMode) {
 
           'administrativeTracking.rejectionReason':
               null,
+
+          'administrativeTracking.fieldsToCorrect':
+              FieldValue.delete(),
 
           'administrativeTracking.rejectedAt':
               null,
@@ -1165,6 +1550,7 @@ _rgpdExpansionController.collapse();
   String label,
   List<String> choices, {
   double maxMenuHeight = 220,
+  bool enabled = true,
 }) {
   final current = _value(key);
   final fieldKey = GlobalKey();
@@ -1175,6 +1561,7 @@ _rgpdExpansionController.collapse();
   }
 
   void openMenu() {
+    if (!enabled) return;
     closeMenu();
 
     final renderBox =
@@ -1285,7 +1672,7 @@ _rgpdExpansionController.collapse();
 
   return GestureDetector(
     key: fieldKey,
-    onTap: openMenu,
+    onTap: enabled ? openMenu : null,
     child: InputDecorator(
       decoration: InputDecoration(
         labelText: current.isEmpty ? null : label,
@@ -1492,29 +1879,61 @@ const Text(
 ),
 const SizedBox(height: 24),
               _menuButton(
-                section: _TrialRequestSection.structure,
-                icon: Icons.account_balance_rounded,
-                label: 'STRUCTURE',
-                completed: _structureComplete,
-              ),
+  section: _TrialRequestSection.structure,
+  icon: Icons.account_balance_rounded,
+  label: 'STRUCTURE',
+  completed: _isCorrectionMode
+      ? (_sectionHasFieldsToCorrect(_TrialRequestSection.structure) &&
+          _fieldsForSection(_TrialRequestSection.structure)
+              .where(_fieldsToCorrect.contains)
+              .every((key) => _fieldChangedSinceLoad(key) && _correctedFieldIsValid(key)))
+      : _structureComplete,
+  enabled: _correctionSectionEnabled(
+    _TrialRequestSection.structure,
+  ),
+),
               _menuButton(
-                section: _TrialRequestSection.responsable,
-                icon: Icons.person_rounded,
-                label: 'RESPONSABLE',
-                completed: _responsableComplete,
-              ),
+  section: _TrialRequestSection.responsable,
+  icon: Icons.person_rounded,
+  label: 'RESPONSABLE',
+  completed: _isCorrectionMode
+      ? (_sectionHasFieldsToCorrect(_TrialRequestSection.responsable) &&
+          _fieldsForSection(_TrialRequestSection.responsable)
+              .where(_fieldsToCorrect.contains)
+              .every((key) => _fieldChangedSinceLoad(key) && _correctedFieldIsValid(key)))
+      : _responsableComplete,
+  enabled: _correctionSectionEnabled(
+    _TrialRequestSection.responsable,
+  ),
+),
               _menuButton(
-                section: _TrialRequestSection.territoire,
-                icon: Icons.public_rounded,
-                label: 'TERRITOIRE',
-                completed: _territoireComplete,
-              ),
+  section: _TrialRequestSection.territoire,
+  icon: Icons.public_rounded,
+  label: 'TERRITOIRE',
+  completed: _isCorrectionMode
+      ? (_sectionHasFieldsToCorrect(_TrialRequestSection.territoire) &&
+          _fieldsForSection(_TrialRequestSection.territoire)
+              .where(_fieldsToCorrect.contains)
+              .every((key) => _fieldChangedSinceLoad(key) && _correctedFieldIsValid(key)))
+      : _territoireComplete,
+  enabled: _correctionSectionEnabled(
+    _TrialRequestSection.territoire,
+  ),
+),
               _menuButton(
-                section: _TrialRequestSection.ville,
-                icon: Icons.place_rounded,
-                label: 'LIEU',
-                completed: _villeComplete,
-              ),
+  section: _TrialRequestSection.ville,
+  icon: Icons.place_rounded,
+  label: 'LIEU',
+  completed: _isCorrectionMode
+      ? (_sectionHasFieldsToCorrect(_TrialRequestSection.ville) &&
+          _fieldsForSection(_TrialRequestSection.ville)
+              .where(_fieldsToCorrect.contains)
+              .every((key) => _fieldChangedSinceLoad(key) && _correctedFieldIsValid(key)))
+      : _villeComplete,
+  enabled: _correctionSectionEnabled(
+    _TrialRequestSection.ville,
+  ),
+),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Divider(
@@ -1523,12 +1942,14 @@ const SizedBox(height: 24),
                 ),
               ),
               _menuButton(
-                section: _TrialRequestSection.essai,
-                icon: Icons.rocket_launch_rounded,
-                label: 'ESSAI GRATUIT',
-                completed: _canSubmitTrialRequest,
-                enabled: _canOpenTrialRequest,
-              ),
+  section: _TrialRequestSection.essai,
+  icon: Icons.rocket_launch_rounded,
+  label: 'ESSAI GRATUIT',
+  completed: _canSubmitTrialRequest,
+  enabled: _correctionSectionEnabled(
+    _TrialRequestSection.essai,
+  ),
+),
               const Spacer(),
               _statusCard(),
             ],
@@ -1597,27 +2018,41 @@ const SizedBox(height: 24),
   }
 
   Widget _statusCard() {
-    final text = _canOpenTrialRequest
-        ? 'Dossier complet.\nVous pouvez demander votre essai gratuit.'
-        : 'Complétez les étapes pour débloquer la demande d’essai.';
+    final correctionReady = _allRequestedCorrectionsCompleted;
+    final normalReady = _canOpenTrialRequest;
+
+    final bool ready = _isCorrectionMode ? correctionReady : normalReady;
+    final String text;
+
+    if (_isCorrectionMode) {
+      if (_fieldsToCorrect.isEmpty) {
+        text = 'Correction bloquée.\nAucun nom de champ n’a été reconnu dans le motif du refus.';
+      } else if (correctionReady) {
+        text = 'Corrections terminées.\nVous pouvez renvoyer votre demande.';
+      } else {
+        text = 'Modifiez tous les champs signalés\npour débloquer le renvoi.';
+      }
+    } else {
+      text = normalReady
+          ? 'Dossier complet.\nVous pouvez demander votre essai gratuit.'
+          : 'Complétez les étapes pour débloquer la demande d’essai.';
+    }
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: (_canOpenTrialRequest ? adminColor : Colors.grey).withOpacity(0.08),
+        color: (ready ? adminColor : Colors.grey).withOpacity(0.08),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: _canOpenTrialRequest ? adminColor : Colors.grey,
+          color: ready ? adminColor : Colors.grey,
           width: 1.4,
         ),
       ),
       child: Column(
         children: [
           Icon(
-            _canOpenTrialRequest
-                ? Icons.lock_open_rounded
-                : Icons.lock_outline_rounded,
-            color: _canOpenTrialRequest ? adminColor : Colors.grey.shade700,
+            ready ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
+            color: ready ? adminColor : Colors.grey.shade700,
             size: 26,
           ),
           const SizedBox(height: 8),
@@ -1625,7 +2060,7 @@ const SizedBox(height: 24),
             text,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: _canOpenTrialRequest ? adminColor : Colors.grey.shade700,
+              color: ready ? adminColor : Colors.grey.shade700,
               fontSize: 12,
               fontWeight: FontWeight.w800,
               height: 1.25,
@@ -1637,74 +2072,97 @@ const SizedBox(height: 24),
   }
 
   Widget _mapCenter() {
-    final style = _mapStyles[_selectedMapStyleIndex];
+  
+  final style = _mapStyles[_selectedMapStyleIndex];
 
-    final cityLat = _toDouble(_value('villeLat'));
-    final cityLng = _toDouble(_value('villeLng'));
+  final cityLat = _toDouble(_value('villeLat'));
+  final cityLng = _toDouble(_value('villeLng'));
 
-    final cityPoint = _hasCityPosition
-        ? LatLng(cityLat, cityLng)
-        : const LatLng(20, 0);
+  final cityPoint = _hasCityPosition
+      ? LatLng(cityLat, cityLng)
+      : const LatLng(20, 0);
 
-    return Expanded(
-      child: Stack(
-        children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: cityPoint,
-              initialZoom: _hasCityPosition ? 11 : 2.2,
-              minZoom: 2,
-              maxZoom: style.maxZoom.toDouble(),
-              onTap: (tapPosition, point) {
-                if (_selectedSection != _TrialRequestSection.ville) return;
-                _setCityPosition(point);
-              },
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: style.url,
-                subdomains: style.subdomains,
-                maxZoom: style.maxZoom.toDouble(),
-                userAgentPackageName: 'com.sphot.app',
-              ),
-              if (_hasCityPosition)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-  point: cityPoint,
-  width: 62,
-  height: 62,
-  alignment: Alignment.topCenter,
-  child: Image.asset(
-    'data/icons/fire_red_icon.png',
-    filterQuality: FilterQuality.high,
-  ),
-),
-                  ],
-                ),
-            ],
+  return Expanded(
+    child: Stack(
+      children: [
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: cityPoint,
+            initialZoom: _hasCityPosition ? 14.0 : 2.2,
+            minZoom: 2,
+            maxZoom: style.maxZoom.toDouble(),
+            onTap: (tapPosition, point) {
+              if (_selectedSection != _TrialRequestSection.ville ||
+                  (_isCorrectionMode &&
+                      !_isFieldEditable('villeLat') &&
+                      !_isFieldEditable('villeLng'))) {
+                return;
+              }
+
+              _setCityPosition(point);
+            },
           ),
-          Positioned(
-  top: 14,
-  left: 0,
-  right: 0,
-  child: Center(
-    child: Image.asset(
-      'data/icons/title.png',
-      height: 48,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-    ),
-  ),
-),
-          _mapTopBanner(),
-          _mapStyleControls(),
-        ],
-      ),
-    );
-  }
+          children: [
+            TileLayer(
+              key: ValueKey<String>(
+                'admin_trial_tile_$_selectedMapStyleIndex',
+              ),
+              urlTemplate: style.url,
+              subdomains: style.subdomains,
+              maxZoom: style.maxZoom.toDouble(),
+              maxNativeZoom: style.maxZoom,
+              userAgentPackageName: 'com.sylvainra.sphot',
+            ),
+            if (_hasCityPosition)
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: cityPoint,
+                    width: 62,
+                    height: 62,
+                    alignment: Alignment.topCenter,
+                    child: Image.asset(
+                      'data/icons/fire_red_icon.png',
+                      filterQuality: FilterQuality.high,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+        Positioned(
+          top: 14,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Image.asset(
+              'data/icons/title.png',
+              height: 48,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+            ),
+          ),
+        ),
+         _mapTopBanner(),
+      _mapStyleControls(),
 
+      if (_isCorrectionMode && _isLoadingCorrection)
+        const Positioned.fill(
+          child: ColoredBox(
+            color: Color(0xFFF2F4F8),
+            child: Center(
+              child: CircularProgressIndicator(
+                color: adminColor,
+              ),
+            ),
+          ),
+        ),
+    ],
+  ),
+);
+}
+  
   Widget _mapTopBanner() {
   final isVille = _selectedSection == _TrialRequestSection.ville;
 
@@ -1938,6 +2396,7 @@ Widget _correctionNotice() {
   'typeStructure',
   'Type de structure',
   structureTypes,
+  enabled: _isFieldEditable('typeStructure'),
 ),
 
 if (typeStructure != 'MAIRIE') ...[
@@ -1947,7 +2406,8 @@ if (typeStructure != 'MAIRIE') ...[
     'nomStructure',
     'Nom de la structure',
     uppercase: true,
-    readOnly: widget.proConnectOrganisation != null,
+    readOnly: !_isFieldEditable('nomStructure') ||
+        (!_isCorrectionMode && widget.proConnectOrganisation != null),
   ),
 ],
         const SizedBox(height: 11),
@@ -1955,14 +2415,16 @@ if (typeStructure != 'MAIRIE') ...[
           'siretStructure',
           'SIRET',
           keyboardType: TextInputType.number,
-          readOnly: widget.proConnectSiret != null,
+          readOnly: !_isFieldEditable('siretStructure') ||
+          (!_isCorrectionMode && widget.proConnectSiret != null),
         ),
         const SizedBox(height: 11),
 _textField(
   'sirenStructure',
   'SIREN',
   keyboardType: TextInputType.number,
-  readOnly: widget.proConnectSiren != null,
+  readOnly: !_isFieldEditable('sirenStructure') ||
+      (!_isCorrectionMode && widget.proConnectSiren != null),
 ),
         const SizedBox(height: 22),
         _nextButton(_TrialRequestSection.responsable),
@@ -1984,6 +2446,7 @@ _dropdownField(
   'civiliteResponsable',
   'Civilité',
   civiliteChoices,
+  enabled: _isFieldEditable('civiliteResponsable'),
 ),
 
 const SizedBox(height: 11),
@@ -1992,18 +2455,21 @@ const SizedBox(height: 11),
           'nomResponsable',
           'Nom',
           uppercase: true,
+          readOnly: !_isFieldEditable('nomResponsable'),
         ),
         const SizedBox(height: 11),
         _textField(
           'prenomResponsable',
           'Prénom',
           capitalizeWords: true,
+          readOnly: !_isFieldEditable('prenomResponsable'),
         ),
         const SizedBox(height: 11),
         _textField(
           'fonctionResponsable',
           'Fonction',
           capitalizeWords: true,
+          readOnly: !_isFieldEditable('fonctionResponsable'),
         ),
         const SizedBox(height: 11),
         _textField(
@@ -2014,12 +2480,14 @@ const SizedBox(height: 11),
             FilteringTextInputFormatter.digitsOnly,
             PhoneNumberFormatter(),
           ],
+          readOnly: !_isFieldEditable('telephoneResponsable'),
         ),
         const SizedBox(height: 11),
         _textField(
           'emailResponsable',
           'Email de contact',
           keyboardType: TextInputType.emailAddress,
+          readOnly: !_isFieldEditable('emailResponsable'),
         ),
         const SizedBox(height: 22),
 
@@ -2047,13 +2515,13 @@ Row(
           'TERRITOIRE',
           'Un accès admin SPHOT est rattaché à une ville.',
         ),
-        _textField('pays', 'Pays', uppercase: true),
+        _textField('pays', 'Pays', uppercase: true, readOnly: !_isFieldEditable('pays')),
         const SizedBox(height: 11),
-        _textField('region', 'Région', uppercase: true),
+        _textField('region', 'Région', uppercase: true, readOnly: !_isFieldEditable('region')),
         const SizedBox(height: 11),
-        _textField('departement', 'Département', uppercase: true),
+        _textField('departement', 'Département', uppercase: true, readOnly: !_isFieldEditable('departement')),
         const SizedBox(height: 11),
-        _textField('ville', 'Ville', uppercase: true),
+        _textField('ville', 'Ville', uppercase: true, readOnly: !_isFieldEditable('ville')),
         const SizedBox(height: 22),
 const SizedBox(height: 22),
 
@@ -2081,20 +2549,23 @@ Row(
         'Positionnez le lieu sur la carte centrale.',
       ),
       _textField(
-  'siteInternetVille',
-  'Adresse internet du lieu',
-),
+        'siteInternetVille',
+        'Adresse internet du lieu',
+        readOnly: !_isFieldEditable('siteInternetVille'),
+      ),
 
 const SizedBox(height: 11),
 
 _textField(
-  'logoVille',
-  'Adresse internet du logo',
-),
+        'logoVille',
+        'Adresse internet du logo',
+        readOnly: !_isFieldEditable('logoVille'),
+      ),
       const SizedBox(height: 11),
       _textField(
         'arretesMunicipaux',
         'Adresse internet des règlements de baignade',
+        readOnly: !_isFieldEditable('arretesMunicipaux'),
       ),
       const SizedBox(height: 14),
       Container(
@@ -2151,6 +2622,7 @@ _textField(
                 decimal: true,
                 signed: true,
               ),
+              readOnly: !_isFieldEditable('villeLat'),
             ),
           ),
           const SizedBox(width: 10),
@@ -2162,6 +2634,7 @@ _textField(
                 decimal: true,
                 signed: true,
               ),
+              readOnly: !_isFieldEditable('villeLng'),
             ),
           ),
         ],
@@ -2730,22 +3203,35 @@ if (_isLoadingCorrection) {
         width < 1000 ? _mobileLayout() : _desktopLayout(),
 
         Positioned(
-          left: 0,
-          right: 0,
-          bottom: 22,
-          child: Center(
-            child: IconButton(
-              icon: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: adminColor,
-                size: 34,
-              ),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ),
+  left: 0,
+  right: 0,
+  bottom: 22,
+  child: Center(
+    child: Container(
+      width: 62,
+      height: 62,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.transparent,
+        border: Border.all(
+          color: adminColor,
+          width: 2,
         ),
+      ),
+      child: IconButton(
+        tooltip: 'Retour',
+        onPressed: () {
+          Navigator.of(context).pop();
+        },
+        icon: const Icon(
+          Icons.arrow_back,
+          color: adminColor,
+          size: 30,
+        ),
+      ),
+    ),
+  ),
+),
       ],
     ),
   );

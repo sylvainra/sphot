@@ -1053,7 +1053,54 @@ L'équipe SPHOT`,
 );
 
 /**
- * Envoie le mail d'acceptation d'une demande administrateur SPHOT.
+ * Génère un mot de passe provisoire conforme aux règles SPHOT :
+ * - au moins une majuscule ;
+ * - au moins un chiffre ;
+ * - au moins un caractère spécial autorisé.
+ *
+ * @return {string} Mot de passe provisoire.
+ */
+function generateAdminTemporaryPassword() {
+  const upperCharacters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lowerCharacters = "abcdefghijkmnopqrstuvwxyz";
+  const numberCharacters = "23456789";
+  const specialCharacters = "!@#?*-";
+
+  const allCharacters =
+      upperCharacters +
+      lowerCharacters +
+      numberCharacters +
+      specialCharacters;
+
+  const randomCharacter = (characters) => {
+    const index = Math.floor(Math.random() * characters.length);
+    return characters[index];
+  };
+
+  const passwordCharacters = [
+    randomCharacter(upperCharacters),
+    randomCharacter(lowerCharacters),
+    randomCharacter(numberCharacters),
+    randomCharacter(specialCharacters),
+  ];
+
+  while (passwordCharacters.length < 12) {
+    passwordCharacters.push(randomCharacter(allCharacters));
+  }
+
+  for (let index = passwordCharacters.length - 1; index > 0; index--) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+
+    const temporaryValue = passwordCharacters[index];
+    passwordCharacters[index] = passwordCharacters[randomIndex];
+    passwordCharacters[randomIndex] = temporaryValue;
+  }
+
+  return passwordCharacters.join("");
+}
+
+/**
+ * Crée le compte administrateur et envoie le mail d'acceptation.
  *
  * Le mail est envoyé une seule fois lorsque approvalEmail.status
  * passe à "pending" sur une demande approuvée.
@@ -1083,14 +1130,20 @@ exports.sendAdminRequestApprovalEmail = onDocumentUpdated(
       const afterApprovalEmail =
           afterData.approvalEmail || {};
 
-      const requestStatus =
-          cleanValue(afterData.status, "").toLowerCase();
+      const requestStatus = cleanValue(
+          afterData.status,
+          "",
+      ).toLowerCase();
 
-      const previousEmailStatus =
-          cleanValue(beforeApprovalEmail.status, "").toLowerCase();
+      const previousEmailStatus = cleanValue(
+          beforeApprovalEmail.status,
+          "",
+      ).toLowerCase();
 
-      const currentEmailStatus =
-          cleanValue(afterApprovalEmail.status, "").toLowerCase();
+      const currentEmailStatus = cleanValue(
+          afterApprovalEmail.status,
+          "",
+      ).toLowerCase();
 
       if (requestStatus !== "approved") {
         return;
@@ -1100,19 +1153,25 @@ exports.sendAdminRequestApprovalEmail = onDocumentUpdated(
         return;
       }
 
-      if (previousEmailStatus === "sending" ||
-          previousEmailStatus === "sent") {
+      if (
+        previousEmailStatus === "sending" ||
+        previousEmailStatus === "sent"
+      ) {
         return;
       }
 
       const requestReference = afterSnapshot.ref;
 
+      const profile = afterData.profile || {};
+      const proConnect = afterData.proConnect || {};
+      const territoire = afterData.territoire || {};
+
       const email = cleanValue(
           afterApprovalEmail.recipient ||
-          (afterData.profile && afterData.profile.email) ||
-          (afterData.proConnect && afterData.proConnect.email),
+          profile.email ||
+          proConnect.email,
           "",
-      );
+      ).toLowerCase();
 
       if (!email) {
         await requestReference.set(
@@ -1133,7 +1192,7 @@ exports.sendAdminRequestApprovalEmail = onDocumentUpdated(
         return;
       }
 
-      const transactionResult =
+      const transactionStarted =
           await admin.firestore().runTransaction(
               async (transaction) => {
                 const freshSnapshot =
@@ -1175,15 +1234,12 @@ exports.sendAdminRequestApprovalEmail = onDocumentUpdated(
               },
           );
 
-      if (!transactionResult) {
+      if (!transactionStarted) {
         return;
       }
 
-      const greeting =
-    buildAdminGreeting(afterData);
-
-      const organisation =
-    buildOrganisationDisplay(afterData);
+      const greeting = buildAdminGreeting(afterData);
+      const organisation = buildOrganisationDisplay(afterData);
 
       const requestNumber = cleanValue(
           afterData.requestNumber ||
@@ -1191,9 +1247,98 @@ exports.sendAdminRequestApprovalEmail = onDocumentUpdated(
           event.params.requestId,
       );
 
-      const dashboardUrl =
-        `${SPHOT_LOGIN_URL}/#/web-admin` +
-        `?requestId=${encodeURIComponent(event.params.requestId)}`;
+      /*
+       * L'adresse email devient l'identifiant de connexion.
+       * ProfessionalLoginPage affiche déjà "Adresse email".
+       */
+      const login = email;
+
+      /*
+       * On conserve les identifiants déjà créés si la fonction
+       * est relancée, afin de ne pas modifier le mot de passe
+       * après un premier envoi réussi ou partiel.
+       */
+      const accountReference = admin.firestore()
+          .collection("adminAccounts")
+          .doc(login);
+
+      const existingAccountSnapshot =
+          await accountReference.get();
+
+      const existingAccountData =
+          existingAccountSnapshot.data() || {};
+
+      const existingPassword = cleanValue(
+          existingAccountData.temporaryPassword,
+          "",
+      );
+
+      const temporaryPassword = existingPassword ?
+    existingPassword :
+    generateAdminTemporaryPassword();
+
+      const nom = cleanValue(
+          profile.nomAffiche ||
+          afterData.nomResponsable ||
+          proConnect.nom,
+          "",
+      ).toUpperCase();
+
+      const prenom = cleanValue(
+          profile.prenomAffiche ||
+          afterData.prenomResponsable ||
+          proConnect.prenom,
+          "",
+      );
+
+      const territoireId = cleanValue(
+          afterData.territoireId ||
+          territoire.territoireId ||
+          territoire.id,
+          "",
+      );
+
+      const adminUid = cleanValue(
+          afterData.uid ||
+          afterData.adminUid ||
+          event.params.requestId,
+          event.params.requestId,
+      );
+
+      await accountReference.set(
+          {
+            login: login,
+            email: email,
+            temporaryPassword: temporaryPassword,
+            mustChangePassword:
+                existingAccountData.mustChangePassword == false ?
+                    false :
+                    true,
+            accountStatus: "ACTIVE",
+            role: "ADMIN",
+            adminUid: adminUid,
+            territoireId: territoireId,
+            nom: nom,
+            prenom: prenom,
+            organisation: organisation,
+            requestId: event.params.requestId,
+            requestNumber: requestNumber,
+            createdAt:
+                existingAccountSnapshot.exists ?
+                    existingAccountData.createdAt :
+                    admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt:
+                admin.firestore.FieldValue.serverTimestamp(),
+          },
+          {merge: true},
+      );
+
+      /*
+       * Le lien ne doit plus ouvrir directement le dashboard.
+       * Il ouvre désormais la page de connexion professionnelle.
+       */
+      const loginUrl =
+          `${SPHOT_LOGIN_URL}/#/professional-login`;
 
       const transporter = nodemailer.createTransport({
         service: "gmail",
@@ -1209,6 +1354,7 @@ exports.sendAdminRequestApprovalEmail = onDocumentUpdated(
           to: email,
           subject:
               "SPHOT - Votre demande d'accès administrateur a été acceptée",
+
           text:
 `${greeting}
 
@@ -1217,11 +1363,22 @@ pour ${organisation} a été acceptée.
 
 Référence administrative : ${requestNumber}
 
-Vous pouvez désormais accéder à votre tableau de bord afin de
-renseigner vos SPHOTS, vos sauveteurs et vos périodes de surveillance.
+VOS IDENTIFIANTS DE CONNEXION
 
-Accéder à mon tableau de bord :
-${dashboardUrl}
+Identifiant :
+${login}
+
+Mot de passe provisoire :
+${temporaryPassword}
+
+Lors de votre première connexion, vous devrez obligatoirement
+choisir un nouveau mot de passe.
+
+Accéder à la page de connexion :
+${loginUrl}
+
+Vous pourrez ensuite renseigner vos SPHOTS, vos sauveteurs
+et vos périodes de surveillance.
 
 Essai gratuit, sans engagement ni facturation.
 
@@ -1229,6 +1386,7 @@ La période d'essai de 8 jours ne commencera qu'une fois la
 configuration complète et l'essai activé.
 
 À bientôt sur SPHOT,
+
 L'équipe SPHOT`,
 
           html: `
@@ -1248,33 +1406,34 @@ L'équipe SPHOT`,
     box-shadow:0 8px 26px rgba(30,58,138,0.12);
   ">
     <div style="padding:0 0 18px;text-align:center;">
-  <a href="${SPHOT_LOGIN_URL}">
-    <img
-      src="https://sphot.app/assets/data/icons/title.png"
-      alt="SPHOT"
-      style="max-width:320px;width:100%;height:auto;border:0;"
-    >
-  </a>
+      <a href="${SPHOT_LOGIN_URL}">
+        <img
+          src="https://sphot.app/assets/data/icons/title.png"
+          alt="SPHOT"
+          style="max-width:320px;width:100%;height:auto;border:0;"
+        >
+      </a>
 
-  <div style="
-    margin-top:18px;
-    color:#1e3a8a;
-    font-size:18px;
-    font-weight:900;
-    line-height:1.35;
-    text-transform:uppercase;
-  ">
-    DEMANDE D’ACCÈS AU PORTAIL SPHOT
-  </div>
-</div>
+      <div style="
+        margin-top:18px;
+        color:#1e3a8a;
+        font-size:18px;
+        font-weight:900;
+        line-height:1.35;
+        text-transform:uppercase;
+      ">
+        DEMANDE D’ACCÈS AU PORTAIL SPHOT
+      </div>
+    </div>
 
     <p style="font-size:16px;line-height:1.6;">
-      ${greeting}
+      ${escapeHtml(greeting)}
     </p>
 
     <p style="font-size:16px;line-height:1.6;">
       Votre demande d'accès au portail d'administration SPHOT
-      pour <strong>${organisation}</strong> a été acceptée.
+      pour <strong>${escapeHtml(organisation)}</strong>
+      a été acceptée.
     </p>
 
     <div style="
@@ -1299,19 +1458,93 @@ L'équipe SPHOT`,
         font-size:19px;
         font-weight:900;
       ">
-        ${requestNumber}
+        ${escapeHtml(requestNumber)}
       </div>
     </div>
 
-    <p style="font-size:16px;line-height:1.6;">
-      Vous pouvez désormais accéder à votre tableau de bord afin
-      de renseigner vos SPHOTS, vos sauveteurs et vos périodes
-      de surveillance.
-    </p>
+    <div style="
+      margin:26px 0;
+      padding:22px;
+      border:2px solid #1e3a8a;
+      border-radius:14px;
+      background:#f3f6fb;
+    ">
+      <div style="
+        margin-bottom:18px;
+        color:#1e3a8a;
+        font-size:17px;
+        font-weight:900;
+        text-align:center;
+        text-transform:uppercase;
+      ">
+        Vos identifiants de connexion
+      </div>
+
+      <div style="
+        margin-bottom:8px;
+        color:#60758a;
+        font-size:12px;
+        font-weight:700;
+        text-transform:uppercase;
+      ">
+        Identifiant
+      </div>
+
+      <div style="
+        padding:12px 14px;
+        background:#ffffff;
+        border:1px solid #c8d3e3;
+        border-radius:9px;
+        color:#1e3a8a;
+        font-size:16px;
+        font-weight:900;
+        word-break:break-all;
+      ">
+        ${escapeHtml(login)}
+      </div>
+
+      <div style="
+        margin-top:18px;
+        margin-bottom:8px;
+        color:#60758a;
+        font-size:12px;
+        font-weight:700;
+        text-transform:uppercase;
+      ">
+        Mot de passe provisoire
+      </div>
+
+      <div style="
+        padding:12px 14px;
+        background:#ffffff;
+        border:1px solid #c8d3e3;
+        border-radius:9px;
+        color:#dc2626;
+        font-size:18px;
+        font-weight:900;
+        letter-spacing:1px;
+        word-break:break-all;
+      ">
+        ${escapeHtml(temporaryPassword)}
+      </div>
+    </div>
+
+    <div style="
+      margin:20px 0;
+      padding:16px;
+      border-left:4px solid #f59e0b;
+      border-radius:8px;
+      background:#fff7df;
+      font-size:14px;
+      line-height:1.6;
+    ">
+      Lors de votre première connexion, vous devrez obligatoirement
+      choisir un nouveau mot de passe.
+    </div>
 
     <div style="text-align:center;margin:30px 0;">
       <a
-        href="${dashboardUrl}"
+        href="${loginUrl}"
         style="
           display:inline-block;
           padding:15px 28px;
@@ -1323,9 +1556,14 @@ L'équipe SPHOT`,
           font-weight:900;
         "
       >
-        ACCÉDER À MON TABLEAU DE BORD
+        SE CONNECTER À SPHOT
       </a>
     </div>
+
+    <p style="font-size:16px;line-height:1.6;">
+      Vous pourrez ensuite renseigner vos SPHOTS, vos sauveteurs
+      et vos périodes de surveillance.
+    </p>
 
     <p style="
       color:#dc2626;
@@ -1361,6 +1599,17 @@ L'équipe SPHOT`,
 
         await requestReference.set(
             {
+              adminAccount: {
+                login: login,
+                accountStatus: "ACTIVE",
+                mustChangePassword:
+                    existingAccountData.mustChangePassword == false ?
+                        false :
+                        true,
+                createdAt:
+                    admin.firestore.FieldValue.serverTimestamp(),
+              },
+
               approvalEmail: {
                 ...afterApprovalEmail,
                 status: "sent",
@@ -1377,7 +1626,7 @@ L'équipe SPHOT`,
                 type: "admin_approval_email_sent",
                 category: "administrative",
                 label:
-                    "Email d'acceptation envoyé au demandeur",
+                    "Compte administrateur créé et identifiants envoyés",
                 createdAt:
                     admin.firestore.FieldValue.serverTimestamp(),
                 createdByRole: "system",
@@ -1391,13 +1640,13 @@ L'équipe SPHOT`,
         );
 
         console.log(
-            "Email d'acceptation administrateur envoyé :",
-            email,
+            "Compte administrateur créé et identifiants envoyés :",
+            login,
             requestNumber,
         );
       } catch (error) {
         console.error(
-            "Erreur envoi email acceptation administrateur :",
+            "Erreur création compte ou envoi email administrateur :",
             error,
         );
 
@@ -1418,7 +1667,7 @@ L'équipe SPHOT`,
                 type: "admin_approval_email_failed",
                 category: "administrative",
                 label:
-                    "Échec de l'envoi de l'email d'acceptation",
+                    "Échec de création du compte ou d'envoi des identifiants",
                 createdAt:
                     admin.firestore.FieldValue.serverTimestamp(),
                 createdByRole: "system",
@@ -2492,6 +2741,81 @@ exports.loginSauveteur = onRequest(
     },
 );
 
+exports.loginAdmin = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const login = (request.body.login || "")
+            .toString()
+            .trim()
+            .toLowerCase();
+
+        const password = (request.body.password || "")
+            .toString()
+            .trim();
+
+        if (!login || !password) {
+          response.status(400).json({success: false});
+          return;
+        }
+
+        const accountDoc = await admin.firestore()
+            .collection("adminAccounts")
+            .doc(login)
+            .get();
+
+        if (!accountDoc.exists) {
+          response.status(401).json({success: false});
+          return;
+        }
+
+        const data = accountDoc.data();
+
+        if (data.accountStatus !== "ACTIVE") {
+          response.status(401).json({success: false});
+          return;
+        }
+
+        if (data.temporaryPassword !== password) {
+          response.status(401).json({success: false});
+          return;
+        }
+
+        await accountDoc.ref.set(
+            {
+              lastLoginAt:
+                  admin.firestore.FieldValue.serverTimestamp(),
+            },
+            {merge: true},
+        );
+
+        response.status(200).json({
+          success: true,
+          adminId: accountDoc.id,
+          adminUid: (data.adminUid || "").toString(),
+          territoireId: (data.territoireId || "").toString(),
+          userRole: (data.role || "ADMIN").toString(),
+          mustChangePassword: data.mustChangePassword === true,
+        });
+      } catch (error) {
+        console.error("Erreur login admin:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
 exports.upsertSauveteurAccount = onRequest(
     {
       cpu: 1,
@@ -2704,6 +3028,190 @@ L'équipe SPHOT`,
         response.status(200).json({success: true});
       } catch (error) {
         console.error("Erreur changement mot de passe sauveteur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.changeAdminPassword = onRequest(
+    {
+      secrets: ["GMAIL_APP_PASSWORD"],
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const login = (request.body.login || "")
+            .toString()
+            .trim()
+            .toLowerCase();
+
+        const newPassword = (request.body.newPassword || "")
+            .toString()
+            .trim();
+
+        let email = "";
+        let prenom = "Administrateur";
+
+        const accountBeforeUpdate = await admin.firestore()
+            .collection("adminAccounts")
+            .doc(login)
+            .get();
+
+        if (accountBeforeUpdate.exists) {
+          const accountData = accountBeforeUpdate.data();
+
+          email = (accountData.email || "")
+              .toString()
+              .trim();
+
+          prenom = (accountData.prenom || "Administrateur")
+              .toString()
+              .trim();
+        }
+
+        if (!login || !newPassword) {
+          response.status(400).json({success: false});
+          return;
+        }
+
+        await admin.firestore()
+            .collection("adminAccounts")
+            .doc(login)
+            .set(
+                {
+                  temporaryPassword: newPassword,
+                  mustChangePassword: false,
+                  passwordUpdatedAt:
+                      admin.firestore.FieldValue.serverTimestamp(),
+                  updatedAt:
+                      admin.firestore.FieldValue.serverTimestamp(),
+                },
+                {merge: true},
+            );
+
+        if (email) {
+          try {
+            const transporter = nodemailer.createTransport({
+              service: "gmail",
+              auth: {
+                user: SMTP_USER,
+                pass: process.env.GMAIL_APP_PASSWORD,
+              },
+            });
+
+            await transporter.sendMail({
+              from: MAIL_FROM,
+              to: email,
+              subject: "Mise à jour de votre compte administrateur SPHOT",
+              html: `
+<div style="
+  margin:0;
+  padding:40px 20px;
+  background:#eef3f8 url(
+    'https://sphot.app/assets/data/images/map_background.jpg'
+  ) center center / cover no-repeat;
+  font-family:Arial,Helvetica,sans-serif;
+">
+  <div style="
+    max-width:620px;
+    margin:auto;
+    background:rgba(255,255,255,0.94);
+    border-radius:18px;
+    overflow:hidden;
+    border:1px solid #d9e2ec;
+    box-shadow:0 4px 12px rgba(0,0,0,.08);
+  ">
+    <div style="padding:30px 30px 20px;text-align:center;">
+      <a href="${SPHOT_LOGIN_URL}">
+        <img
+          src="https://sphot.app/assets/data/icons/title.png"
+          alt="SPHOT"
+          style="max-width:320px;width:100%;height:auto;border:0;"
+        >
+      </a>
+    </div>
+
+    <div style="
+      padding:0 34px 30px;
+      color:#263238;
+      font-size:16px;
+      line-height:1.6;
+    ">
+      <p>Bonjour <strong>${prenom}</strong>,</p>
+
+      <p>
+        Nous vous confirmons que votre mot de passe
+        administrateur SPHOT a été modifié avec succès.
+      </p>
+
+      <p>
+        Si vous n'êtes pas à l'origine de cette modification,
+        contactez immédiatement l'équipe SPHOT.
+      </p>
+
+      <div style="text-align:center;margin:35px 0;">
+        <a
+          href="${SPHOT_LOGIN_URL}"
+          style="
+            background:#1e3a8a;
+            color:#ffffff;
+            text-decoration:none;
+            padding:16px 30px;
+            border-radius:10px;
+            display:inline-block;
+            font-size:17px;
+            font-weight:bold;
+          "
+        >
+          SE CONNECTER À SPHOT
+        </a>
+      </div>
+
+      <p>
+        À bientôt sur SPHOT,<br>
+        <strong>L'équipe SPHOT</strong>
+      </p>
+    </div>
+  </div>
+</div>
+`,
+              text: `Bonjour ${prenom},
+
+Nous vous confirmons que votre mot de passe administrateur SPHOT
+a été modifié avec succès.
+
+Si vous n'êtes pas à l'origine de cette modification,
+contactez immédiatement l'équipe SPHOT.
+
+À bientôt sur SPHOT,
+
+L'équipe SPHOT`,
+            });
+          } catch (mailError) {
+            console.error(
+                "Erreur email confirmation mot de passe admin:",
+                mailError,
+            );
+          }
+        }
+
+        response.status(200).json({success: true});
+      } catch (error) {
+        console.error(
+            "Erreur changement mot de passe admin:",
+            error,
+        );
+
         response.status(500).json({success: false});
       }
     },

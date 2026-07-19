@@ -6,19 +6,16 @@ import 'firebase_options.dart';
 import 'map/map_page.dart';
 import 'pages/advertiser_access_page.dart';
 import 'pages/admin/admin_trial_request_page.dart';
+import 'pages/professional/professional_login_page.dart';
 import 'web/admin/pages/admin_dashboard_page.dart';
-import 'services/advertiser_auth_service.dart';
 import 'services/web_pending_auth_storage.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
-  print('Uri.base = ${Uri.base}');
-  print('fragment = ${Uri.base.fragment}');
 
   final pendingAuth = WebPendingAuthStorage.getPendingAuth();
 
@@ -35,15 +32,62 @@ void main() async {
     return;
   }
 
-  runApp(const SphotApp());
+  /*
+   * Avec une adresse comme :
+   *
+   * https://sphot.app/#/professional-login
+   *
+   * Uri.base.fragment contient :
+   *
+   * /professional-login
+   */
+  final fragment = Uri.base.fragment.trim();
+
+  final initialRoute = fragment.isEmpty
+      ? '/'
+      : fragment.startsWith('/')
+          ? fragment
+          : '/$fragment';
+
+  runApp(
+    SphotApp(
+      initialRoute: initialRoute,
+    ),
+  );
 }
 
 class SphotApp extends StatelessWidget {
-  const SphotApp({super.key});
+  final String initialRoute;
+
+  const SphotApp({
+    super.key,
+    required this.initialRoute,
+  });
 
   Route<dynamic> _generateRoute(RouteSettings settings) {
-    final routeName = settings.name ?? '/';
+    String routeName = settings.name?.trim() ?? '/';
+
+    /*
+     * Sécurité supplémentaire :
+     * certains navigateurs peuvent transmettre "/" à Flutter alors que
+     * la véritable route se trouve encore dans le fragment de l'URL.
+     */
+    if (routeName == '/' && Uri.base.fragment.trim().isNotEmpty) {
+      final fragment = Uri.base.fragment.trim();
+
+      routeName = fragment.startsWith('/')
+          ? fragment
+          : '/$fragment';
+    }
+
     final uri = Uri.parse(routeName);
+
+    if (uri.path == '/professional-login') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => const ProfessionalLoginPage(),
+      );
+    }
 
     if (uri.path == '/web-admin') {
       final requestId =
@@ -82,6 +126,7 @@ class SphotApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'SPHOT',
+      initialRoute: initialRoute,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
