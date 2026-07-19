@@ -2722,7 +2722,8 @@ exports.loginSauveteur = onRequest(
 
         await doc.ref.set(
             {
-              lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+              lastLoginAt:
+                  admin.firestore.FieldValue.serverTimestamp(),
             },
             {merge: true},
         );
@@ -2808,6 +2809,9 @@ exports.loginAdmin = onRequest(
           territoireId: (data.territoireId || "").toString(),
           userRole: (data.role || "ADMIN").toString(),
           mustChangePassword: data.mustChangePassword === true,
+          civilite: (data.civilite || "").toString(),
+          prenom: (data.prenom || "").toString(),
+          nom: (data.nom || "").toString(),
         });
       } catch (error) {
         console.error("Erreur login admin:", error);

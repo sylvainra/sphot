@@ -7,6 +7,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'dart:math' as math;
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
+import '../../../pages/professional/professional_login_page.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -54,7 +55,14 @@ class _SuperAdminTileStyle {
 }
 
 class AdminDashboardPage extends StatefulWidget {
-  const AdminDashboardPage({super.key});
+  final String adminUid;
+  final String territoireId;
+
+  const AdminDashboardPage({
+    super.key,
+    this.adminUid = '',
+    this.territoireId = '',
+  });
 
   @override
   State<AdminDashboardPage> createState() =>
@@ -66,7 +74,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   static const Color redColor = Color(0xFFDC2626);
 
   final MapController _mapController = MapController();
-  Timer? _mapMovementTimer;
+Timer? _mapMovementTimer;
+
+LatLng _territoryCenter = const LatLng(20, 0);
+double _territoryZoom = 2.2;
+
+bool _mapIsReady = false;
+bool _territoryCenterLoaded = false;
 
   int _selectedTileStyle = 0;
 
@@ -3933,14 +3947,162 @@ void _openLegalStatusMenu() {
   Overlay.of(context).insert(_dropdownOverlay!);
 }
 
+Future<void> _loadAdministratorTerritoryCenter() async {
+  final territoireId = widget.territoireId.trim();
+
+  if (territoireId.isEmpty) {
+    debugPrint(
+      'Zoom territoire impossible : territoireId vide pour '
+      '${widget.adminUid}',
+    );
+    return;
+  }
+
+  try {
+    final territoireReference = FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(territoireId);
+
+    final spotsSnapshot = await territoireReference
+        .collection('spots')
+        .get();
+
+    final positions = <LatLng>[];
+
+    for (final spotDocument in spotsSnapshot.docs) {
+      final data = spotDocument.data();
+
+      final latitude = _toDouble(
+        data['sphotLat'] ??
+            data['latitude'] ??
+            data['lat'],
+      );
+
+      final longitude = _toDouble(
+        data['sphotLng'] ??
+            data['longitude'] ??
+            data['lng'],
+      );
+
+      if (latitude == 0 || longitude == 0) {
+        continue;
+      }
+
+      positions.add(
+        LatLng(latitude, longitude),
+      );
+    }
+
+    LatLng? calculatedCenter;
+    double calculatedZoom = 11.5;
+
+    if (positions.isNotEmpty) {
+      final averageLatitude = positions
+              .map((position) => position.latitude)
+              .reduce((first, second) => first + second) /
+          positions.length;
+
+      final averageLongitude = positions
+              .map((position) => position.longitude)
+              .reduce((first, second) => first + second) /
+          positions.length;
+
+      calculatedCenter = LatLng(
+        averageLatitude,
+        averageLongitude,
+      );
+
+      calculatedZoom = positions.length == 1 ? 14.0 : 11.5;
+    } else {
+      final territoireSnapshot = await territoireReference.get();
+      final territoireData = territoireSnapshot.data();
+
+      if (territoireData != null) {
+        final latitude = _toDouble(
+          territoireData['villeLat'] ??
+              territoireData['latitude'] ??
+              territoireData['lat'],
+        );
+
+        final longitude = _toDouble(
+          territoireData['villeLng'] ??
+              territoireData['longitude'] ??
+              territoireData['lng'],
+        );
+
+        if (latitude != 0 && longitude != 0) {
+          calculatedCenter = LatLng(
+            latitude,
+            longitude,
+          );
+
+          calculatedZoom = 11.5;
+        }
+      }
+    }
+
+    if (!mounted || calculatedCenter == null) {
+      debugPrint(
+        'Aucune coordonnée trouvée pour le territoire $territoireId',
+      );
+      return;
+    }
+
+    setState(() {
+      _territoryCenter = calculatedCenter!;
+      _territoryZoom = calculatedZoom;
+      _territoryCenterLoaded = true;
+    });
+
+    _moveMapToAdministratorTerritory();
+  } catch (error, stackTrace) {
+    debugPrint(
+      'Erreur chargement du territoire $territoireId : $error',
+    );
+
+    debugPrintStack(
+      stackTrace: stackTrace,
+    );
+  }
+}
+
+void _moveMapToAdministratorTerritory() {
+  if (!_mapIsReady || !_territoryCenterLoaded) {
+    return;
+  }
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!mounted) {
+      return;
+    }
+
+    _mapController.move(
+      _territoryCenter,
+      _territoryZoom,
+    );
+  });
+}
+
 @override
 void initState() {
   super.initState();
+
   _speech = stt.SpeechToText();
-  _legalVersionController.addListener(_markLegalVersionModified);
-  _legalPublicationDateController.addListener(_markLegalVersionModified);
-  _legalChangeLogController.addListener(_markLegalVersionModified);
+
+  _legalVersionController.addListener(
+    _markLegalVersionModified,
+  );
+
+  _legalPublicationDateController.addListener(
+    _markLegalVersionModified,
+  );
+
+  _legalChangeLogController.addListener(
+    _markLegalVersionModified,
+  );
+
   _loadAllLegalChaptersFromFirebase();
+  _loadAdministratorTerritoryCenter();
 }
 
 @override
@@ -4101,17 +4263,16 @@ Widget _buildRecenterButton() {
     right: 12,
     bottom: 20,
     child: FloatingActionButton(
-      heroTag: 'superAdminRecenter',
+      heroTag: 'adminRecenter',
       mini: true,
       backgroundColor: Colors.white,
       foregroundColor: adminColor,
-      onPressed: () {
-        _mapController.move(
-          const LatLng(20, 0),
-          2.2,
-        );
-      },
-      child: const Icon(Icons.my_location),
+      onPressed: _territoryCenterLoaded
+          ? _moveMapToAdministratorTerritory
+          : null,
+      child: const Icon(
+        Icons.my_location,
+      ),
     ),
   );
 }
@@ -4856,10 +5017,14 @@ Widget build(BuildContext context) {
                             FlutterMap(
                               mapController: _mapController,
                               options: MapOptions(
-  initialCenter: const LatLng(20, 0),
-  initialZoom: 2.2,
+  initialCenter: _territoryCenter,
+  initialZoom: _territoryZoom,
   minZoom: 2,
   maxZoom: 18,
+  onMapReady: () {
+    _mapIsReady = true;
+    _moveMapToAdministratorTerritory();
+  },
   onTap: (_, __) {
     setState(() {
       _selectedSpot = null;
@@ -4977,15 +5142,32 @@ Positioned(
   right: 0,
   bottom: 22,
   child: Center(
-    child: IconButton(
-      icon: const Icon(
-        Icons.arrow_back_ios_new_rounded,
-        color: adminColor,
-        size: 34,
+    child: Container(
+      width: 62,
+      height: 62,
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: adminColor,
+          width: 2,
+        ),
       ),
-      onPressed: () {
-        Navigator.of(context).pop();
-      },
+      child: IconButton(
+        onPressed: () {
+  Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute(
+      builder: (_) => const ProfessionalLoginPage(),
+    ),
+    (route) => false,
+  );
+},
+        icon: const Icon(
+          Icons.arrow_back_ios_new_rounded,
+          color: adminColor,
+          size: 30,
+        ),
+      ),
     ),
   ),
 ),

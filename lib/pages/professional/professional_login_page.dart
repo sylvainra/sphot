@@ -1,4 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+import '../../web/admin/pages/admin_change_password_page.dart';
+import '../../web/admin/pages/admin_dashboard_page.dart';
 
 class ProfessionalLoginPage extends StatefulWidget {
   const ProfessionalLoginPage({super.key});
@@ -84,19 +90,20 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
   Future<void> _loginProfessional() async {
     if (_isLoggingIn) return;
 
-    final email = _emailController.text.trim().toLowerCase();
+    final login = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text.trim();
+
+    FocusScope.of(context).unfocus();
 
     setState(() {
       _errorMessage = null;
     });
 
-    if (email.isEmpty || password.isEmpty) {
+    if (login.isEmpty || password.isEmpty) {
       setState(() {
         _errorMessage =
             'Veuillez renseigner votre adresse email et votre mot de passe.';
       });
-
       return;
     }
 
@@ -105,40 +112,72 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
     });
 
     try {
-      /*
-       * CONNEXION PROFESSIONNELLE À RACCORDER
-       *
-       * Cette méthode accueillera ensuite :
-       *
-       * 1. Firebase Authentication
-       * 2. La lecture du profil Firestore
-       * 3. La détection automatique du rôle
-       * 4. La redirection vers le portail correspondant :
-       *
-       *    - SUPER_ADMIN
-       *    - ADMIN
-       *    - ADVERTISER
-       *
-       * Le rôle SAUVETEUR restera volontairement associé
-       * à l'espace Sauveteur de la page précédente.
-       */
+      final uri = Uri.parse(
+        'https://us-central1-sphot-ab80b.cloudfunctions.net/loginAdmin',
+      );
 
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      final response = await http.post(
+        uri,
+        headers: const {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'login': login,
+          'password': password,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        if (!mounted) return;
+        setState(() {
+          _errorMessage = 'Identifiant ou mot de passe incorrect.';
+        });
+        return;
+      }
+
+      final decoded = jsonDecode(response.body);
+
+      if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
+        if (!mounted) return;
+        setState(() {
+          _errorMessage = 'Identifiant ou mot de passe incorrect.';
+        });
+        return;
+      }
+
+      final mustChangePassword = decoded['mustChangePassword'] == true;
+      final adminUid = (decoded['adminUid'] ?? '').toString();
+      final territoireId = (decoded['territoireId'] ?? '').toString();
+      final userRole = (decoded['userRole'] ?? 'ADMIN').toString();
+      final civilite = (decoded['civilite'] ?? '').toString();
+      final prenom = (decoded['prenom'] ?? '').toString();
+      final nom = (decoded['nom'] ?? '').toString();
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'La connexion professionnelle sera raccordée à Firebase à l’étape suivante.',
-              textAlign: TextAlign.center,
-            ),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 3),
+      if (mustChangePassword) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => AdminChangePasswordPage(
+  login: login,
+  adminUid: adminUid,
+  territoireId: territoireId,
+  userRole: userRole,
+  civilite: civilite,
+  prenom: prenom,
+  nom: nom,
+),
           ),
         );
+        return;
+      }
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const AdminDashboardPage(),
+        ),
+        (route) => false,
+      );
     } catch (error, stackTrace) {
       debugPrint('Erreur de connexion professionnelle : $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -147,7 +186,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
 
       setState(() {
         _errorMessage =
-            'Connexion impossible. Vérifiez vos identifiants et réessayez.';
+            'Connexion impossible. Vérifiez votre connexion internet et réessayez.';
       });
     } finally {
       if (mounted) {
@@ -500,16 +539,19 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
                                     ),
                                   ),
                                   child: IconButton(
-                                    tooltip: 'Retour',
-                                    onPressed: () {
-                                      Navigator.of(context).pop();
-                                    },
-                                    icon: const Icon(
-                                      Icons.arrow_back,
-                                      color: _proColor,
-                                      size: 30,
-                                    ),
-                                  ),
+  tooltip: '',
+  onPressed: () {
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      '/',
+      (route) => false,
+    );
+  },
+  icon: const Icon(
+    Icons.arrow_back,
+    color: _proColor,
+    size: 30,
+  ),
+),
                                 ),
                               const SizedBox(height: 12),
                             ],
