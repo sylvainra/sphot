@@ -2969,17 +2969,25 @@ box-shadow:0 4px 12px rgba(0,0,0,.08);">
       style="padding:0 34px 30px;color:#263238;
       font-size:16px;line-height:1.6;">
 
-      <p>Bonjour <strong>${prenom}</strong>,</p>
+      <p>
+  ${escapeHtml(greeting)}
+</p>
 
       <p>
-        Nous vous confirmons que votre mot de passe
-        SPHOT a été modifié avec succès.
-      </p>
+  Nous vous confirmons que le mot de passe de votre compte SPHOT
+  pour <strong>${organisation}</strong> a été modifié avec succès.
+</p>
 
-      <p>
-        Si vous n'êtes pas à l'origine de cette modification,
-        contactez immédiatement votre administrateur.
-      </p>
+<p>
+  Vous pouvez désormais créer et gérer les SPHOTS, les sauveteurs
+  et les périodes de surveillance de <strong>${organisation}</strong>
+  pour démarrer votre période d'essai gratuite de 8 jours.
+</p>
+
+<p>
+  Si vous n'êtes pas à l'origine de cette modification,
+  contactez immédiatement l'équipe SPHOT.
+</p>
 
       <div style="text-align:center;margin:35px 0;">
 
@@ -3063,45 +3071,95 @@ exports.changeAdminPassword = onRequest(
             .toString()
             .trim();
 
-        let email = "";
-        let prenom = "Administrateur";
-
-        const accountBeforeUpdate = await admin.firestore()
-            .collection("adminAccounts")
-            .doc(login)
-            .get();
-
-        if (accountBeforeUpdate.exists) {
-          const accountData = accountBeforeUpdate.data();
-
-          email = (accountData.email || "")
-              .toString()
-              .trim();
-
-          prenom = (accountData.prenom || "Administrateur")
-              .toString()
-              .trim();
-        }
-
         if (!login || !newPassword) {
           response.status(400).json({success: false});
           return;
         }
 
-        await admin.firestore()
+        const accountReference = admin.firestore()
             .collection("adminAccounts")
-            .doc(login)
-            .set(
-                {
-                  temporaryPassword: newPassword,
-                  mustChangePassword: false,
-                  passwordUpdatedAt:
-                      admin.firestore.FieldValue.serverTimestamp(),
-                  updatedAt:
-                      admin.firestore.FieldValue.serverTimestamp(),
-                },
-                {merge: true},
-            );
+            .doc(login);
+
+        const accountSnapshot = await accountReference.get();
+
+        let email = "";
+        let requestId = "";
+        let accountData = {};
+
+        if (accountSnapshot.exists) {
+          accountData = accountSnapshot.data() || {};
+
+          email = cleanValue(
+              accountData.email || login,
+              "",
+          ).toLowerCase();
+
+          requestId = cleanValue(
+              accountData.requestId,
+              "",
+          );
+        }
+
+        /*
+         * Données utilisées par défaut si la demande administrateur
+         * d'origine n'est pas retrouvée.
+         */
+        let adminData = {
+          profile: {
+            civilite: accountData.civilite || "",
+            nomAffiche: accountData.nom || "",
+            prenomAffiche: accountData.prenom || "",
+          },
+          structure: {
+            organisationDisplay:
+                accountData.organisation || "",
+            nom:
+                accountData.organisation || "",
+          },
+          organisation:
+              accountData.organisation || "",
+          civilite:
+              accountData.civilite || "",
+          nomResponsable:
+              accountData.nom || "",
+          prenomResponsable:
+              accountData.prenom || "",
+        };
+
+        /*
+         * La demande administrateur contient les données complètes :
+         * civilité, nom et organisme.
+         */
+        if (requestId) {
+          const requestSnapshot = await admin.firestore()
+              .collection("adminRequests")
+              .doc(requestId)
+              .get();
+
+          if (requestSnapshot.exists) {
+            adminData = requestSnapshot.data() || adminData;
+          }
+        }
+
+        const greeting = buildAdminGreeting(adminData);
+
+        const organisation =
+            buildOrganisationDisplay(adminData);
+
+        const loginUrl =
+            `${SPHOT_LOGIN_URL}/#/professional-login`;
+
+        await accountReference.set(
+            {
+              temporaryPassword: newPassword,
+              mustChangePassword: false,
+              passwordUpdatedAt:
+                  admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt:
+                  admin.firestore.FieldValue.serverTimestamp(),
+            },
+            {merge: true},
+        );
 
         if (email) {
           try {
@@ -3116,90 +3174,159 @@ exports.changeAdminPassword = onRequest(
             await transporter.sendMail({
               from: MAIL_FROM,
               to: email,
-              subject: "Mise à jour de votre compte administrateur SPHOT",
-              html: `
-<div style="
-  margin:0;
-  padding:40px 20px;
-  background:#eef3f8 url(
-    'https://sphot.app/assets/data/images/map_background.jpg'
-  ) center center / cover no-repeat;
-  font-family:Arial,Helvetica,sans-serif;
-">
-  <div style="
-    max-width:620px;
-    margin:auto;
-    background:rgba(255,255,255,0.94);
-    border-radius:18px;
-    overflow:hidden;
-    border:1px solid #d9e2ec;
-    box-shadow:0 4px 12px rgba(0,0,0,.08);
-  ">
-    <div style="padding:30px 30px 20px;text-align:center;">
-      <a href="${SPHOT_LOGIN_URL}">
-        <img
-          src="https://sphot.app/assets/data/icons/title.png"
-          alt="SPHOT"
-          style="max-width:320px;width:100%;height:auto;border:0;"
-        >
-      </a>
-    </div>
+              subject:
+                  "Mise à jour de votre compte administrateur SPHOT",
 
-    <div style="
-      padding:0 34px 30px;
-      color:#263238;
-      font-size:16px;
-      line-height:1.6;
-    ">
-      <p>Bonjour <strong>${prenom}</strong>,</p>
+              text:
+`${greeting}
 
-      <p>
-        Nous vous confirmons que votre mot de passe
-        administrateur SPHOT a été modifié avec succès.
-      </p>
+Nous vous confirmons que le mot de passe de votre compte
+administrateur SPHOT pour ${organisation} a été modifié avec succès.
 
-      <p>
-        Si vous n'êtes pas à l'origine de cette modification,
-        contactez immédiatement l'équipe SPHOT.
-      </p>
+Vous pouvez désormais accéder au portail d'administration SPHOT
+afin de renseigner vos SPHOTS, vos sauveteurs et vos périodes
+de surveillance.
 
-      <div style="text-align:center;margin:35px 0;">
-        <a
-          href="${SPHOT_LOGIN_URL}"
-          style="
-            background:#1e3a8a;
-            color:#ffffff;
-            text-decoration:none;
-            padding:16px 30px;
-            border-radius:10px;
-            display:inline-block;
-            font-size:17px;
-            font-weight:bold;
-          "
-        >
-          SE CONNECTER À SPHOT
-        </a>
-      </div>
+Essai gratuit, sans engagement ni facturation.
 
-      <p>
-        À bientôt sur SPHOT,<br>
-        <strong>L'équipe SPHOT</strong>
-      </p>
-    </div>
-  </div>
-</div>
-`,
-              text: `Bonjour ${prenom},
-
-Nous vous confirmons que votre mot de passe administrateur SPHOT
-a été modifié avec succès.
+La période d'essai gratuite de 8 jours ne commencera qu'une fois
+vos SPHOTS, vos sauveteurs et vos périodes de surveillance
+renseignés, puis l'essai activé.
 
 Si vous n'êtes pas à l'origine de cette modification,
 contactez immédiatement l'équipe SPHOT.
 
+Accéder à la page de connexion :
+${loginUrl}
+
 À bientôt sur SPHOT,
 
 L'équipe SPHOT`,
+
+              html: `
+<div style="
+  margin:0;
+  padding:40px 20px;
+  background:#eef3f8;
+  font-family:Arial,Helvetica,sans-serif;
+  color:#172033;
+">
+  <div style="
+    max-width:640px;
+    margin:0 auto;
+    background:#ffffff;
+    border-radius:18px;
+    padding:34px;
+    box-shadow:0 8px 26px rgba(30,58,138,0.12);
+  ">
+    <div style="padding:0 0 18px;text-align:center;">
+      <a href="${SPHOT_LOGIN_URL}">
+        <img
+          src="https://sphot.app/assets/data/icons/title.png"
+          alt="SPHOT"
+          style="
+            max-width:320px;
+            width:100%;
+            height:auto;
+            border:0;
+          "
+        >
+      </a>
+
+      <div style="
+        margin-top:18px;
+        color:#1e3a8a;
+        font-size:18px;
+        font-weight:900;
+        line-height:1.35;
+        text-transform:uppercase;
+      ">
+        MOT DE PASSE MODIFIÉ
+      </div>
+    </div>
+
+    <p style="font-size:16px;line-height:1.6;">
+      ${escapeHtml(greeting)}
+    </p>
+
+    <p style="font-size:16px;line-height:1.6;">
+      Nous vous confirmons que le mot de passe de votre compte
+      administrateur SPHOT pour
+      <strong>${escapeHtml(organisation)}</strong>
+      a été modifié avec succès.
+    </p>
+
+    <p style="font-size:16px;line-height:1.6;">
+      Vous pouvez désormais accéder au portail d'administration
+      SPHOT afin de renseigner vos SPHOTS, vos sauveteurs et vos
+      périodes de surveillance.
+    </p>
+
+    <p style="
+      color:#dc2626;
+      font-size:16px;
+      line-height:1.6;
+      font-weight:900;
+    ">
+      Essai gratuit, sans engagement ni facturation.
+    </p>
+
+    <div style="
+      margin-top:20px;
+      padding:16px;
+      border-left:4px solid #f59e0b;
+      border-radius:8px;
+      background:#fff7df;
+      font-size:14px;
+      line-height:1.6;
+    ">
+      La période d'essai gratuite de 8 jours ne commencera
+      qu'une fois vos SPHOTS, vos sauveteurs et vos périodes
+      de surveillance renseignés, puis l'essai activé.
+    </div>
+
+    <div style="
+      margin:20px 0;
+      padding:16px;
+      border-left:4px solid #dc2626;
+      border-radius:8px;
+      background:#fff1f1;
+      font-size:14px;
+      line-height:1.6;
+    ">
+      Si vous n'êtes pas à l'origine de cette modification,
+      contactez immédiatement l'équipe SPHOT.
+    </div>
+
+    <div style="text-align:center;margin:30px 0;">
+      <a
+        href="${loginUrl}"
+        style="
+          display:inline-block;
+          padding:15px 28px;
+          border-radius:14px;
+          background:#1e3a8a;
+          color:#ffffff;
+          text-decoration:none;
+          font-size:16px;
+          font-weight:900;
+        "
+      >
+        SE CONNECTER À SPHOT
+      </a>
+    </div>
+
+    <p style="
+      margin-top:28px;
+      font-size:15px;
+      line-height:1.6;
+    ">
+      À bientôt sur SPHOT,<br>
+      <strong>L'équipe SPHOT</strong>
+    </p>
+  </div>
+</div>
+`,
             });
           } catch (mailError) {
             console.error(

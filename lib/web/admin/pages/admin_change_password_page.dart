@@ -277,7 +277,7 @@ Widget build(BuildContext context) {
                   return Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 26,
-                      vertical: 18,
+                      vertical: 10,
                     ),
                     child: Center(
                       child: ConstrainedBox(
@@ -291,7 +291,7 @@ Widget build(BuildContext context) {
                               fit: BoxFit.contain,
                               filterQuality: FilterQuality.high,
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 6),
                             const Text(
                               'PREMIÈRE CONNEXION',
                               textAlign: TextAlign.center,
@@ -309,9 +309,9 @@ Widget build(BuildContext context) {
                               width: double.infinity,
                               padding: const EdgeInsets.fromLTRB(
                                 20,
-                                22,
+                                18,
                                 20,
-                                22,
+                                18,
                               ),
                               decoration: BoxDecoration(
                                 color: Colors.transparent,
@@ -328,7 +328,7 @@ Widget build(BuildContext context) {
                                     color: _adminColor,
                                     size: 48,
                                   ),
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 6),
                                   const Text(
                                     'CRÉEZ VOTRE MOT DE PASSE',
                                     textAlign: TextAlign.center,
@@ -338,7 +338,7 @@ Widget build(BuildContext context) {
                                       fontWeight: FontWeight.w900,
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 4),
                                   Text(
                                     _greeting,
                                     textAlign: TextAlign.center,
@@ -348,7 +348,7 @@ Widget build(BuildContext context) {
                                       fontWeight: FontWeight.w900,
                                     ),
                                   ),
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 8),
                                   const Text(
                                     'Pour sécuriser votre compte administrateur, vous devez remplacer le mot de passe provisoire avant d’accéder au portail SPHOT.',
                                     textAlign: TextAlign.center,

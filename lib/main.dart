@@ -5,7 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'map/map_page.dart';
 import 'pages/advertiser_access_page.dart';
-import 'pages/admin/admin_trial_request_page.dart';
+import 'web/admin/pages/admin_trial_request_page.dart';
 import 'pages/professional/professional_login_page.dart';
 import 'web/admin/pages/admin_dashboard_page.dart';
 import 'services/web_pending_auth_storage.dart';

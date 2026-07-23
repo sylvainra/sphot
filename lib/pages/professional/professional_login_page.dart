@@ -173,11 +173,14 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
       }
 
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => const AdminDashboardPage(),
-        ),
-        (route) => false,
-      );
+  MaterialPageRoute(
+    builder: (_) => AdminDashboardPage(
+      adminUid: adminUid,
+      territoireId: territoireId,
+    ),
+  ),
+  (route) => false,
+);
     } catch (error, stackTrace) {
       debugPrint('Erreur de connexion professionnelle : $error');
       debugPrintStack(stackTrace: stackTrace);

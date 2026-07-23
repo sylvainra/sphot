@@ -8,7 +8,7 @@ import '../../pages/admin/admin_map_picker_page.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../pages/admin/admin_request_pending_page.dart';
+import 'pages/admin_request_pending_page.dart';
 
 
 

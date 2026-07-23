@@ -79,7 +79,8 @@ Timer? _mapMovementTimer;
 LatLng _territoryCenter = const LatLng(20, 0);
 double _territoryZoom = 2.2;
 
-bool _mapIsReady = false;
+Map<String, dynamic>? _administratorTerritoryMarkerData;
+
 bool _territoryCenterLoaded = false;
 
   int _selectedTileStyle = 0;
@@ -184,21 +185,74 @@ bool _isListening = false;
   DashboardAdminFilter _selectedAdminFilter =
       DashboardAdminFilter.all;
 
-  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> get _spotsStream async* {
-  await for (final territoiresSnapshot
-      in FirebaseFirestore.instance.collection('territoires').snapshots()) {
-    final allSpots = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+    get _spotsStream async* {
+  final uid = widget.adminUid.trim();
 
-    for (final territoireDoc in territoiresSnapshot.docs) {
-      final spotsSnapshot = await territoireDoc.reference
-          .collection('spots')
-          .get();
-
-      allSpots.addAll(spotsSnapshot.docs);
-    }
-
-    yield allSpots;
+  if (uid.isEmpty) {
+    yield <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    return;
   }
+
+  final firestore = FirebaseFirestore.instance;
+
+  Map<String, dynamic>? administratorData;
+
+  /*
+   * Priorité au document adminRequests,
+   * car il contient le territoire saisi par cet admin.
+   */
+  final requestSnapshot = await firestore
+      .collection('adminRequests')
+      .doc(uid)
+      .get();
+
+  if (requestSnapshot.exists) {
+    administratorData = requestSnapshot.data();
+  }
+
+  /*
+   * Sécurité pour un Admin approuvé.
+   */
+  if (administratorData == null) {
+    final approvedAdminSnapshot = await firestore
+        .collection('admins')
+        .doc(uid)
+        .get();
+
+    if (approvedAdminSnapshot.exists) {
+      administratorData = approvedAdminSnapshot.data();
+    }
+  }
+
+  if (administratorData == null) {
+    yield <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    return;
+  }
+
+  final territoire = Map<String, dynamic>.from(
+    administratorData['territoire'] ??
+        <String, dynamic>{},
+  );
+
+  final territoireId = _cleanText(
+    territoire['territoireId'] ??
+        administratorData['territoireId'] ??
+        administratorData['organisationId'] ??
+        widget.territoireId,
+  );
+
+  if (territoireId.isEmpty) {
+    yield <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    return;
+  }
+
+  yield* firestore
+      .collection('territoires')
+      .doc(territoireId)
+      .collection('spots')
+      .snapshots()
+      .map((snapshot) => snapshot.docs);
 }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> get _adminRequestsStream {
@@ -1263,6 +1317,1200 @@ _spotInfoLine('Statut', status),
   );
 }
 
+Future<void> _editAdminTerritoryLink({
+  required String fieldName,
+  required String dialogTitle,
+  required String currentValue,
+}) async {
+  final controller = TextEditingController(
+    text: currentValue,
+  );
+
+  final newValue = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: Text(
+          dialogTitle,
+          style: const TextStyle(
+            color: redColor,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: SizedBox(
+          width: 520,
+          child: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: 'Adresse internet',
+              hintText: 'https://www.exemple.fr',
+              prefixIcon: const Icon(
+                Icons.link_rounded,
+                color: adminColor,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+            },
+            child: const Text(
+              'ANNULER',
+              style: TextStyle(
+                color: Colors.grey,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: adminColor,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.of(dialogContext).pop(
+                controller.text.trim(),
+              );
+            },
+            icon: const Icon(
+              Icons.save_rounded,
+            ),
+            label: const Text(
+              'ENREGISTRER',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  controller.dispose();
+
+  if (newValue == null) {
+    return;
+  }
+
+  final uid = widget.adminUid.trim();
+
+  if (uid.isEmpty) {
+    return;
+  }
+
+  try {
+    final firestore = FirebaseFirestore.instance;
+
+    final requestReference = firestore
+        .collection('adminRequests')
+        .doc(uid);
+
+    final adminReference = firestore
+        .collection('admins')
+        .doc(uid);
+
+    final requestSnapshot =
+        await requestReference.get();
+
+    final adminSnapshot =
+        await adminReference.get();
+
+    final updateData = <String, dynamic>{
+      'territoire.$fieldName': newValue,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    if (requestSnapshot.exists) {
+      await requestReference.update(updateData);
+    }
+
+    if (adminSnapshot.exists) {
+      await adminReference.update(updateData);
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      if (_selectedAdmin != null) {
+        final updatedAdmin =
+            Map<String, dynamic>.from(
+          _selectedAdmin!,
+        );
+
+        final updatedTerritory =
+            Map<String, dynamic>.from(
+          updatedAdmin['territoire'] ??
+              <String, dynamic>{},
+        );
+
+        updatedTerritory[fieldName] = newValue;
+        updatedAdmin['territoire'] =
+            updatedTerritory;
+
+        _selectedAdmin = updatedAdmin;
+      }
+
+      if (_administratorTerritoryMarkerData !=
+          null) {
+        final updatedMarkerData =
+            Map<String, dynamic>.from(
+          _administratorTerritoryMarkerData!,
+        );
+
+        final updatedMarkerTerritory =
+            Map<String, dynamic>.from(
+          updatedMarkerData['territoire'] ??
+              <String, dynamic>{},
+        );
+
+        updatedMarkerTerritory[fieldName] =
+            newValue;
+
+        updatedMarkerData['territoire'] =
+            updatedMarkerTerritory;
+
+        _administratorTerritoryMarkerData =
+            updatedMarkerData;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Modification enregistrée.',
+        ),
+      ),
+    );
+  } catch (error) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Impossible d’enregistrer : $error',
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _editAdminReferent({
+  required String currentFirstName,
+  required String currentLastName,
+  required String currentFunction,
+  required String currentEmail,
+  required String currentPhone,
+}) async {
+  final firstNameController = TextEditingController(
+    text: currentFirstName,
+  );
+
+  final lastNameController = TextEditingController(
+    text: currentLastName,
+  );
+
+  final functionController = TextEditingController(
+    text: currentFunction,
+  );
+
+  final emailController = TextEditingController(
+    text: currentEmail,
+  );
+
+  final phoneController = TextEditingController(
+    text: currentPhone,
+  );
+
+  final result = await showDialog<Map<String, String>>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text(
+          "MODIFIER L'ADMINISTRATEUR",
+          style: TextStyle(
+            color: redColor,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: firstNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Prénom',
+                          prefixIcon: Icon(
+                            Icons.person_outline_rounded,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: lastNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nom',
+                          prefixIcon: Icon(
+                            Icons.person_outline_rounded,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: functionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Fonction',
+                    prefixIcon: Icon(
+                      Icons.work_outline_rounded,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    prefixIcon: Icon(
+                      Icons.email_outlined,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Téléphone',
+                    prefixIcon: Icon(
+                      Icons.phone_outlined,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+            },
+            child: const Text('ANNULER'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: adminColor,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.of(dialogContext).pop({
+                'prenom': firstNameController.text.trim(),
+                'nom': lastNameController.text.trim(),
+                'fonction': functionController.text.trim(),
+                'email': emailController.text.trim(),
+                'telephone': phoneController.text.trim(),
+              });
+            },
+            icon: const Icon(Icons.save_rounded),
+            label: const Text(
+              'ENREGISTRER',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  firstNameController.dispose();
+  lastNameController.dispose();
+  functionController.dispose();
+  emailController.dispose();
+  phoneController.dispose();
+
+  if (result == null) {
+    return;
+  }
+
+  final uid = widget.adminUid.trim();
+
+  if (uid.isEmpty) {
+    return;
+  }
+
+  final updateData = <String, dynamic>{
+    'profile.prenom': result['prenom'],
+    'profile.prenomAffiche': result['prenom'],
+    'profile.nom': result['nom'],
+    'profile.nomAffiche': result['nom'],
+    'profile.fonction': result['fonction'],
+    'profile.email': result['email'],
+    'profile.telephone': result['telephone'],
+    'prenomResponsable': result['prenom'],
+    'nomResponsable': result['nom'],
+    'fonction': result['fonction'],
+    'email': result['email'],
+    'telephone': result['telephone'],
+    'updatedAt': FieldValue.serverTimestamp(),
+  };
+
+  try {
+    final firestore = FirebaseFirestore.instance;
+
+    final requestReference = firestore
+        .collection('adminRequests')
+        .doc(uid);
+
+    final adminReference = firestore
+        .collection('admins')
+        .doc(uid);
+
+    final requestSnapshot =
+        await requestReference.get();
+
+    final adminSnapshot =
+        await adminReference.get();
+
+    if (requestSnapshot.exists) {
+      await requestReference.update(updateData);
+    }
+
+    if (adminSnapshot.exists) {
+      await adminReference.update(updateData);
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      void updateAdminMap(
+        Map<String, dynamic> source,
+      ) {
+        final updatedProfile =
+            Map<String, dynamic>.from(
+          source['profile'] ??
+              <String, dynamic>{},
+        );
+
+        updatedProfile['prenom'] =
+            result['prenom'];
+        updatedProfile['prenomAffiche'] =
+            result['prenom'];
+        updatedProfile['nom'] =
+            result['nom'];
+        updatedProfile['nomAffiche'] =
+            result['nom'];
+        updatedProfile['fonction'] =
+            result['fonction'];
+        updatedProfile['email'] =
+            result['email'];
+        updatedProfile['telephone'] =
+            result['telephone'];
+
+        source['profile'] = updatedProfile;
+        source['prenomResponsable'] =
+            result['prenom'];
+        source['nomResponsable'] =
+            result['nom'];
+        source['fonction'] =
+            result['fonction'];
+        source['email'] =
+            result['email'];
+        source['telephone'] =
+            result['telephone'];
+      }
+
+      if (_selectedAdmin != null) {
+        final updatedAdmin =
+            Map<String, dynamic>.from(
+          _selectedAdmin!,
+        );
+
+        updateAdminMap(updatedAdmin);
+        _selectedAdmin = updatedAdmin;
+      }
+
+      if (_administratorTerritoryMarkerData !=
+          null) {
+        final updatedMarker =
+            Map<String, dynamic>.from(
+          _administratorTerritoryMarkerData!,
+        );
+
+        updateAdminMap(updatedMarker);
+
+        _administratorTerritoryMarkerData =
+            updatedMarker;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Référent administratif modifié.',
+        ),
+      ),
+    );
+  } catch (error) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Impossible d’enregistrer : $error',
+        ),
+      ),
+    );
+  }
+}
+
+Widget _buildAdminDetailPanel() {
+  final admin = _selectedAdmin;
+
+  if (admin == null) {
+    return const SizedBox.shrink();
+  }
+
+  final territoire = Map<String, dynamic>.from(
+    admin['territoire'] ?? <String, dynamic>{},
+  );
+
+  final structure = Map<String, dynamic>.from(
+    admin['structure'] ?? <String, dynamic>{},
+  );
+
+  final profile = Map<String, dynamic>.from(
+    admin['profile'] ?? <String, dynamic>{},
+  );
+
+  final organisationName = _cleanText(
+    structure['nom'] ??
+        admin['nomStructure'] ??
+        admin['organisation'] ??
+        territoire['ville'] ??
+        'COLLECTIVITÉ',
+  );
+
+  final structureType = _cleanText(
+    structure['type'] ??
+        structure['typeStructure'] ??
+        admin['typeStructure'] ??
+        admin['organisationType'],
+  );
+
+  final siret = _cleanText(
+    structure['siret'] ??
+        admin['siret'],
+  );
+
+  String siren = _cleanText(
+    structure['siren'] ??
+        admin['siren'],
+  );
+
+  if (siren.isEmpty && siret.isNotEmpty) {
+    final digitsOnly = siret.replaceAll(
+      RegExp(r'[^0-9]'),
+      '',
+    );
+
+    if (digitsOnly.length >= 9) {
+      siren = digitsOnly.substring(0, 9);
+    }
+  }
+
+  String firstValidIdentityValue(
+    List<dynamic> values,
+  ) {
+    const forbiddenValues = {
+      'monsieur',
+      'madame',
+      'm.',
+      'mme',
+      'mr',
+      'mrs',
+    };
+
+    for (final rawValue in values) {
+      final value = _cleanText(rawValue);
+
+      if (value.isEmpty) {
+        continue;
+      }
+
+      if (forbiddenValues.contains(
+        value.toLowerCase(),
+      )) {
+        continue;
+      }
+
+      return value;
+    }
+
+    return '';
+  }
+
+  final prenom = firstValidIdentityValue([
+    profile['prenomAffiche'],
+    profile['prenom'],
+    admin['prenomResponsable'],
+    admin['prenom'],
+    admin['firstName'],
+  ]);
+
+  final nom = firstValidIdentityValue([
+    profile['nomAffiche'],
+    profile['nom'],
+    admin['nomResponsable'],
+    admin['nom'],
+    admin['lastName'],
+  ]);
+
+  final identiteAdministrateur = [
+    prenom,
+    nom,
+  ].where((value) {
+    return value.trim().isNotEmpty;
+  }).join(' ');
+
+  final fonction = _cleanText(
+    profile['fonction'] ??
+        profile['role'] ??
+        admin['fonction'],
+  );
+
+  final email = _cleanText(
+    profile['email'] ??
+        admin['email'],
+  );
+
+  final telephone = _cleanText(
+    profile['telephone'] ??
+        profile['phone'] ??
+        admin['telephone'],
+  );
+
+  final logoUrl = _cleanText(
+    territoire['logoVille'] ??
+        admin['logoVille'],
+  );
+
+  final siteInternetVille = _cleanText(
+    territoire['siteInternetVille'] ??
+        territoire['siteInternet'] ??
+        structure['siteInternet'],
+  );
+
+  final regulatoryDocumentUrl = _cleanText(
+    territoire['reglementsBaignade'] ??
+        territoire['reglementBaignade'] ??
+        territoire['arretesMunicipaux'] ??
+        territoire['siteReglements'],
+  );
+
+  Widget buildInternetTile({
+    required IconData icon,
+    required String label,
+    required String url,
+    required VoidCallback onEdit,
+  }) {
+    final hasUrl = url.trim().isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(
+        14,
+        11,
+        8,
+        11,
+      ),
+      decoration: BoxDecoration(
+        color: adminColor.withOpacity(0.055),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: adminColor.withOpacity(0.30),
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 39,
+            height: 39,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: adminColor.withOpacity(0.25),
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: adminColor,
+              size: 21,
+            ),
+          ),
+
+          const SizedBox(width: 11),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: adminColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    height: 1.15,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                Text(
+                  hasUrl
+                      ? url
+                      : 'Non renseigné',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: adminColor,
+                    decoration: TextDecoration.none,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          IconButton(
+            tooltip: 'Modifier',
+            onPressed: onEdit,
+            icon: const Icon(
+              Icons.edit_rounded,
+              color: redColor,
+              size: 19,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  return Container(
+    width: 420,
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.98),
+      border: Border(
+        left: BorderSide(
+          color: adminColor.withOpacity(0.40),
+          width: 1.5,
+        ),
+      ),
+    ),
+    child: SafeArea(
+      child: Column(
+        children: [
+          // ============================================================
+          // EN-TÊTE
+          // ============================================================
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(
+              20,
+              18,
+              12,
+              18,
+            ),
+            decoration: BoxDecoration(
+              color: adminColor.withOpacity(0.07),
+              border: Border(
+                bottom: BorderSide(
+                  color: adminColor.withOpacity(0.20),
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 62,
+                  height: 62,
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: adminColor,
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.10),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: logoUrl.isEmpty
+                        ? const Icon(
+                            Icons.account_balance_rounded,
+                            color: adminColor,
+                            size: 34,
+                          )
+                        : Image.network(
+                            logoUrl,
+                            key: ValueKey<String>(
+                              'admin-detail-logo-$logoUrl',
+                            ),
+                            width: 52,
+                            height: 52,
+                            fit: BoxFit.contain,
+                            gaplessPlayback: true,
+                            webHtmlElementStrategy:
+                                WebHtmlElementStrategy.prefer,
+                            errorBuilder: (
+                              BuildContext context,
+                              Object error,
+                              StackTrace? stackTrace,
+                            ) {
+                              return const Icon(
+                                Icons.account_balance_rounded,
+                                color: adminColor,
+                                size: 34,
+                              );
+                            },
+                          ),
+                  ),
+                ),
+
+                const SizedBox(width: 14),
+
+                Expanded(
+                  child: Text(
+                    organisationName.toUpperCase(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: redColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      height: 1.10,
+                    ),
+                  ),
+                ),
+
+                IconButton(
+                  tooltip: 'Fermer',
+                  onPressed: () {
+                    setState(() {
+                      _selectedAdmin = null;
+                    });
+                  },
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: adminColor,
+                    size: 27,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ============================================================
+          // CONTENU
+          // ============================================================
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                20,
+                16,
+                20,
+                14,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ====================================================
+                  // ADMINISTRATION
+                  // ====================================================
+                  _adminPanelSectionTitle(
+  icon: Icons.account_balance_rounded,
+  title: 'ADMINISTRATION',
+),
+
+Container(
+  width: double.infinity,
+  padding: const EdgeInsets.fromLTRB(
+    16,
+    17,
+    16,
+    17,
+  ),
+  decoration: BoxDecoration(
+    color: adminColor.withOpacity(0.055),
+    borderRadius: BorderRadius.circular(14),
+    border: Border.all(
+      color: adminColor.withOpacity(0.24),
+      width: 1.2,
+    ),
+  ),
+  child: Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      Container(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: adminColor.withOpacity(0.30),
+          ),
+        ),
+        child: const Icon(
+          Icons.account_balance_rounded,
+          color: adminColor,
+          size: 25,
+        ),
+      ),
+
+      const SizedBox(width: 16),
+
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (structureType.isNotEmpty) ...[
+              Text(
+                structureType.toUpperCase(),
+                style: const TextStyle(
+                  color: adminColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+
+            Text(
+              organisationName.toUpperCase(),
+              style: const TextStyle(
+                color: adminColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                height: 1.15,
+              ),
+            ),
+
+            if (siren.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 58,
+                    child: Text(
+                      'SIREN',
+                      style: TextStyle(
+                        color: adminColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      siren,
+                      style: const TextStyle(
+                        color: adminColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            if (siret.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 58,
+                    child: Text(
+                      'SIRET',
+                      style: TextStyle(
+                        color: adminColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      siret,
+                      style: const TextStyle(
+                        color: adminColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    ],
+  ),
+),
+
+const SizedBox(height: 18),
+
+                  // ====================================================
+                  // ADMINISTRATEUR
+                  // ====================================================
+                  _adminPanelSectionTitle(
+                    icon: Icons.person_outline_rounded,
+                    title: 'ADMINISTRATEUR',
+                  ),
+
+                  Container(
+  width: double.infinity,
+  padding: const EdgeInsets.all(14),
+  decoration: BoxDecoration(
+    color: adminColor.withOpacity(0.055),
+    borderRadius: BorderRadius.circular(14),
+    border: Border.all(
+      color: adminColor.withOpacity(0.20),
+    ),
+  ),
+  child: Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: adminColor.withOpacity(0.35),
+          ),
+        ),
+        child: const Icon(
+          Icons.person_rounded,
+          color: adminColor,
+          size: 24,
+        ),
+      ),
+
+      const SizedBox(width: 12),
+
+      Expanded(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      identiteAdministrateur.isNotEmpty
+                                          ? identiteAdministrateur
+                                          : 'Nom et prénom non renseignés',
+                                      style: const TextStyle(
+                                        color: adminColor,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w900,
+                                        height: 1.15,
+                                      ),
+                                    ),
+                                  ),
+
+                                  IconButton(
+                                    tooltip:
+                                        'Modifier l’administrateur',
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () {
+                                      _editAdminReferent(
+                                        currentFirstName: prenom,
+                                        currentLastName: nom,
+                                        currentFunction: fonction,
+                                        currentEmail: email,
+                                        currentPhone: telephone,
+                                      );
+                                    },
+                                    icon: const Icon(
+                                      Icons.edit_rounded,
+                                      color: redColor,
+                                      size: 19,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              if (fonction.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  fonction,
+                                  style: const TextStyle(
+                                    color: adminColor,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ],
+
+                              if (email.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.email_outlined,
+                                      color: adminColor,
+                                      size: 17,
+                                    ),
+                                    const SizedBox(width: 7),
+                                    Expanded(
+                                      child: Text(
+                                        email,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: adminColor,
+                                          decoration: TextDecoration.none,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          height: 1.2,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+
+                              if (telephone.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.phone_outlined,
+                                      color: adminColor,
+                                      size: 17,
+                                    ),
+                                    const SizedBox(width: 7),
+                                    Expanded(
+                                      child: Text(
+                                        telephone,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: adminColor,
+                                          decoration: TextDecoration.none,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          height: 1.2,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ====================================================
+                  // ADRESSES INTERNET
+                  // ====================================================
+                  _adminPanelSectionTitle(
+                    icon: Icons.public_rounded,
+                    title: 'ADRESSES INTERNET',
+                  ),
+
+                  buildInternetTile(
+                    icon: Icons.language_rounded,
+                    label: 'SITE OFFICIEL',
+                    url: siteInternetVille,
+                    onEdit: () {
+                      _editAdminTerritoryLink(
+                        fieldName: 'siteInternetVille',
+                        dialogTitle:
+                            "Modifier l'adresse internet du site officiel",
+                        currentValue: siteInternetVille,
+                      );
+                    },
+                  ),
+
+                  buildInternetTile(
+                    icon: Icons.menu_book_rounded,
+                    label: 'RÈGLEMENT DE BAIGNADE',
+                    url: regulatoryDocumentUrl,
+                    onEdit: () {
+                      _editAdminTerritoryLink(
+                        fieldName: 'reglementsBaignade',
+                        dialogTitle:
+                            "Modifier l'adresse internet du règlement de baignade",
+                        currentValue: regulatoryDocumentUrl,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 Widget _buildRightPanel({
   required int visibleSpots,
 }) {
@@ -1346,7 +2594,7 @@ Widget _buildRightPanel({
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   value,
                   style: TextStyle(
@@ -2286,382 +3534,245 @@ Future<void> _openAdminRejectionDialog(
   await _rejectAdminRequest(adminData, reason);
 }
 
-Widget _buildAdminDetailPanel() {
-  final admin = _selectedAdmin;
+Future<void> _openAdminExternalLink(String rawUrl) async {
+  final value = rawUrl.trim();
 
-  if (admin == null) {
-    return const SizedBox.shrink();
+  if (value.isEmpty) {
+    return;
   }
 
-  final territoire = Map<String, dynamic>.from(
-    admin['territoire'] ?? {},
+  final normalizedUrl = value.startsWith('http://') ||
+          value.startsWith('https://')
+      ? value
+      : 'https://$value';
+
+  final uri = Uri.tryParse(normalizedUrl);
+
+  if (uri == null) {
+    return;
+  }
+
+  final opened = await launchUrl(
+    uri,
+    mode: LaunchMode.externalApplication,
   );
 
-  final structure = Map<String, dynamic>.from(
-    admin['structure'] ?? {},
-  );
-
-  final profile = Map<String, dynamic>.from(
-    admin['profile'] ?? {},
-  );
-
-  final mairie = _cleanText(
-    structure['nom'] ??
-        admin['nomStructure'] ??
-        admin['organisation'] ??
-        'ADMIN',
-  );
-
-  final responsableNom = _cleanText(
-    profile['nomAffiche'] ??
-        admin['nomResponsable'] ??
-        admin['nom'],
-  );
-
-  final responsablePrenom = _cleanText(
-    profile['prenomAffiche'] ??
-        admin['prenomResponsable'] ??
-        admin['prenom'],
-  );
-
-  final responsable = [
-    responsablePrenom,
-    responsableNom,
-  ].where((value) => value.isNotEmpty).join(' ');
-
-  final email = _cleanText(
-    profile['email'] ?? admin['email'],
-  );
-
-  final telephone = _cleanText(
-    profile['telephone'] ?? admin['telephone'],
-  );
-
-  final siret = _cleanText(
-    structure['siret'] ?? admin['siret'],
-  );
-
-  final siren = _cleanText(
-    structure['siren'] ?? admin['siren'],
-  );
-
-  final ville = _cleanText(territoire['ville']);
-  final departement = _cleanText(territoire['departement']);
-  final region = _cleanText(territoire['region']);
-  final pays = _cleanText(territoire['pays']);
-  final logoUrl = _cleanText(territoire['logoVille']);
-
-  final requestNumber = _cleanText(
-    admin['requestNumber'] ?? admin['requestId'],
-  );
-
-  final rawStatus = _cleanText(admin['status']);
-
-  final adminStatus = switch (rawStatus.toLowerCase()) {
-    'pending' => 'En attente de validation',
-    'approved' => 'Approuvée',
-    'rejected' => 'Refusée',
-    'active' => 'Active',
-    'trial' => 'Période d’essai',
-    'overdue' => 'En retard',
-    'cancelled' => 'Résiliée',
-    _ => 'Non renseigné',
-  };
-
-  return Container(
-    width: 470,
-    decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.98),
-      border: Border(
-        left: BorderSide(
-          color: adminColor.withOpacity(0.25),
-          width: 1.5,
+  if (!opened && mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Impossible d’ouvrir ce lien.',
         ),
       ),
+    );
+  }
+}
+
+Widget _adminDetailLine({
+  required IconData icon,
+  required String label,
+  required String value,
+}) {
+  final displayedValue = value.trim().isEmpty
+      ? 'Non renseigné'
+      : value.trim();
+
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: adminColor.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            color: adminColor,
+            size: 19,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label.toUpperCase(),
+                style: TextStyle(
+                  color: adminColor.withOpacity(0.72),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.7,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                displayedValue,
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     ),
-    child: SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-    Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  );
+}
+
+Widget _adminLinkTile({
+  required IconData icon,
+  required String label,
+  required String url,
+  VoidCallback? onEdit,
+}) {
+  final hasUrl = url.trim().isNotEmpty;
+
+  return Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    decoration: BoxDecoration(
+      color: hasUrl
+          ? adminColor.withOpacity(0.055)
+          : Colors.grey.withOpacity(0.055),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(
+        color: hasUrl
+            ? adminColor.withOpacity(0.30)
+            : Colors.grey.withOpacity(0.24),
+        width: 1.2,
+      ),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(
+        14,
+        11,
+        8,
+        11,
+      ),
+      child: Row(
         children: [
-          Text(
-            mairie,
-            style: const TextStyle(
-              color: adminColor,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              height: 1.15,
-            ),
-          ),
-          if (requestNumber.isNotEmpty) ...[
-            const SizedBox(height: 7),
-            Text(
-              requestNumber,
-              style: const TextStyle(
-                color: redColor,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-          const SizedBox(height: 7),
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 6,
-            ),
+            width: 39,
+            height: 39,
             decoration: BoxDecoration(
-              color: rawStatus.toLowerCase() == 'pending'
-                  ? Colors.orange.withOpacity(0.12)
-                  : adminColor.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(99),
+              color: hasUrl
+                  ? Colors.white
+                  : Colors.grey.withOpacity(0.08),
+              shape: BoxShape.circle,
               border: Border.all(
-                color: rawStatus.toLowerCase() == 'pending'
-                    ? Colors.orange
-                    : adminColor,
+                color: hasUrl
+                    ? adminColor.withOpacity(0.25)
+                    : Colors.grey.withOpacity(0.20),
               ),
             ),
-            child: Text(
-              adminStatus,
-              style: TextStyle(
-                color: rawStatus.toLowerCase() == 'pending'
-                    ? Colors.deepOrange
-                    : adminColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
+            child: Icon(
+              icon,
+              color: hasUrl ? adminColor : Colors.grey,
+              size: 21,
+            ),
+          ),
+
+          const SizedBox(width: 11),
+
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                vertical: 3,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: hasUrl
+                          ? adminColor
+                          : Colors.grey,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      height: 1.15,
+                    ),
+                  ),
+
+                  const SizedBox(height: 3),
+
+                  Text(
+                    hasUrl
+                        ? url
+                        : 'Non renseigné',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: hasUrl
+                          ? adminColor
+                          : Colors.grey,
+                      decoration: TextDecoration.none,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+
+          if (onEdit != null)
+            IconButton(
+              tooltip: 'Modifier',
+              onPressed: onEdit,
+              icon: const Icon(
+                Icons.edit_rounded,
+                color: redColor,
+                size: 19,
+              ),
+            ),
         ],
       ),
     ),
-    IconButton(
-      onPressed: () {
-        setState(() {
-          _selectedAdmin = null;
-        });
-      },
-      icon: const Icon(
-        Icons.close_rounded,
-        color: adminColor,
-      ),
-    ),
-  ],
-),
-            const SizedBox(height: 10),
-            _adminDetailSection(
-  title: 'DEMANDEUR',
-  children: [
-    _spotInfoLine(
-      'Responsable',
-      responsable.isEmpty ? 'Non renseigné' : responsable,
-    ),
-    _spotInfoLine(
-      'Email',
-      email.isEmpty ? 'Non renseigné' : email,
-    ),
-    _spotInfoLine(
-      'Téléphone',
-      telephone.isEmpty ? 'Non renseigné' : telephone,
-    ),
-  ],
-),
-                const SizedBox(height: 10),
-            _adminDetailSection(
-              title: 'STRUCTURE',
-              children: [
-                _spotInfoLine('Organisation', mairie),
-                _spotInfoLine(
-                  'Type',
-                  _cleanText(structure['type']).isEmpty
-                      ? 'Non renseigné'
-                      : _cleanText(structure['type']),
-                ),
-                _spotInfoLine(
-                  'SIRET',
-                  siret.isEmpty
-                      ? 'Non renseigné'
-                      : siret,
-                ),
-                _spotInfoLine(
-                  'SIREN',
-                  siren.isEmpty
-                      ? 'Non renseigné'
-                      : siren,
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            _adminDetailSection(
-              title: 'TERRITOIRE',
-              children: [
-                _spotInfoLine(
-                  'Ville',
-                  ville.isEmpty
-                      ? 'Non renseignée'
-                      : ville,
-                ),
-                _spotInfoLine(
-                  'Département',
-                  departement.isEmpty
-                      ? 'Non renseigné'
-                      : departement,
-                ),
-                _spotInfoLine(
-                  'Région',
-                  region.isEmpty
-                      ? 'Non renseignée'
-                      : region,
-                ),
-                _spotInfoLine(
-                  'Pays',
-                  pays.isEmpty
-                      ? 'Non renseigné'
-                      : pays,
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            _adminDetailSection(
-  title: 'INSTRUCTION',
-  children: [
-    _spotInfoLine(
-      'Référence',
-      requestNumber.isEmpty
-          ? 'Non renseignée'
-          : requestNumber,
-      labelWidth: 105,
-      bottomPadding: 3,
-    ),
-    _spotInfoLine(
-      'Statut',
-      adminStatus,
-      labelWidth: 105,
-      bottomPadding: 3,
-    ),
-    _spotInfoLine(
-      'Demande reçue',
-      _formatDate(admin['requestedAt']),
-      labelWidth: 105,
-      bottomPadding: 0,
-    ),
-  ],
-),
-            const SizedBox(height: 18),
+  );
+}
 
-if (rawStatus.toLowerCase() == 'pending')
-  Row(
-    children: [
-      Expanded(
-        child: ElevatedButton.icon(
-          onPressed: () async {
-            try {
-              await _approveAdminRequest(admin);
-            } catch (error) {
-              if (!mounted) return;
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Erreur lors de l’approbation : $error',
-                  ),
-                ),
-              );
-            }
-          },
-          icon: const Icon(Icons.check_circle_rounded),
-          label: const Text(
-            'APPROUVER',
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: adminColor,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 15),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: ElevatedButton.icon(
-          onPressed: () async {
-            try {
-              await _openAdminRejectionDialog(admin);
-            } catch (error) {
-              if (!mounted) return;
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Erreur lors du refus : $error',
-                  ),
-                ),
-              );
-            }
-          },
-          icon: const Icon(Icons.cancel_rounded),
-          label: const Text(
-            'REFUSER',
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: redColor,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 15),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        ),
-      ),
-    ],
-  ),
-
-if (rawStatus.toLowerCase() == 'rejected') ...[
-  const SizedBox(height: 14),
-  _adminDetailSection(
-    title: 'MOTIF DU REFUS',
-    children: [
-      Text(
-        _cleanText(
-          Map<String, dynamic>.from(
-            admin['administrativeTracking'] ?? {},
-          )['rejectionReason'],
-        ).isEmpty
-            ? 'Aucun commentaire renseigné.'
-            : _cleanText(
-                Map<String, dynamic>.from(
-                  admin['administrativeTracking'] ?? {},
-                )['rejectionReason'],
-              ),
-        style: const TextStyle(
+Widget _adminPanelSectionTitle({
+  required IconData icon,
+  required String title,
+}) {
+  return Padding(
+    padding: const EdgeInsets.only(
+      bottom: 14,
+    ),
+    child: Row(
+      children: [
+        Icon(
+          icon,
           color: adminColor,
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          height: 1.35,
+          size: 21,
         ),
-      ),
-    ],
-  ),
-],
-          ],
+        const SizedBox(width: 9),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: adminColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.5,
+            ),
+          ),
         ),
-      ),
+        Container(
+          width: 42,
+          height: 2,
+          color: const Color(0xFFFFE500),
+        ),
+      ],
     ),
   );
 }
@@ -3948,139 +5059,138 @@ void _openLegalStatusMenu() {
 }
 
 Future<void> _loadAdministratorTerritoryCenter() async {
-  final territoireId = widget.territoireId.trim();
-
-  if (territoireId.isEmpty) {
-    debugPrint(
-      'Zoom territoire impossible : territoireId vide pour '
-      '${widget.adminUid}',
-    );
-    return;
-  }
-
   try {
-    final territoireReference = FirebaseFirestore.instance
-        .collection('territoires')
-        .doc(territoireId);
+    final uid = widget.adminUid.trim();
 
-    final spotsSnapshot = await territoireReference
-        .collection('spots')
+    if (uid.isEmpty) {
+      return;
+    }
+
+    final firestore = FirebaseFirestore.instance;
+
+    Map<String, dynamic>? administratorData;
+
+    /*
+     * Priorité à adminRequests/{uid}.
+     * C'est là que sont enregistrés villeLat, villeLng
+     * et logoVille pour cet Admin.
+     */
+    final requestSnapshot = await firestore
+        .collection('adminRequests')
+        .doc(uid)
         .get();
 
-    final positions = <LatLng>[];
-
-    for (final spotDocument in spotsSnapshot.docs) {
-      final data = spotDocument.data();
-
-      final latitude = _toDouble(
-        data['sphotLat'] ??
-            data['latitude'] ??
-            data['lat'],
-      );
-
-      final longitude = _toDouble(
-        data['sphotLng'] ??
-            data['longitude'] ??
-            data['lng'],
-      );
-
-      if (latitude == 0 || longitude == 0) {
-        continue;
-      }
-
-      positions.add(
-        LatLng(latitude, longitude),
-      );
+    if (requestSnapshot.exists) {
+      administratorData = requestSnapshot.data();
     }
 
-    LatLng? calculatedCenter;
-    double calculatedZoom = 11.5;
+    /*
+     * Sécurité pour les Admins dont la demande
+     * n'est plus disponible.
+     */
+    if (administratorData == null) {
+      final approvedAdminSnapshot = await firestore
+          .collection('admins')
+          .doc(uid)
+          .get();
 
-    if (positions.isNotEmpty) {
-      final averageLatitude = positions
-              .map((position) => position.latitude)
-              .reduce((first, second) => first + second) /
-          positions.length;
-
-      final averageLongitude = positions
-              .map((position) => position.longitude)
-              .reduce((first, second) => first + second) /
-          positions.length;
-
-      calculatedCenter = LatLng(
-        averageLatitude,
-        averageLongitude,
-      );
-
-      calculatedZoom = positions.length == 1 ? 14.0 : 11.5;
-    } else {
-      final territoireSnapshot = await territoireReference.get();
-      final territoireData = territoireSnapshot.data();
-
-      if (territoireData != null) {
-        final latitude = _toDouble(
-          territoireData['villeLat'] ??
-              territoireData['latitude'] ??
-              territoireData['lat'],
-        );
-
-        final longitude = _toDouble(
-          territoireData['villeLng'] ??
-              territoireData['longitude'] ??
-              territoireData['lng'],
-        );
-
-        if (latitude != 0 && longitude != 0) {
-          calculatedCenter = LatLng(
-            latitude,
-            longitude,
-          );
-
-          calculatedZoom = 11.5;
-        }
+      if (approvedAdminSnapshot.exists) {
+        administratorData = approvedAdminSnapshot.data();
       }
     }
 
-    if (!mounted || calculatedCenter == null) {
-      debugPrint(
-        'Aucune coordonnée trouvée pour le territoire $territoireId',
-      );
+    if (administratorData == null) {
+      return;
+    }
+
+    final territoire = Map<String, dynamic>.from(
+      administratorData['territoire'] ??
+          <String, dynamic>{},
+    );
+
+    /*
+     * Le centre est exclusivement celui enregistré
+     * dans le document de cet Admin.
+     */
+    final latitude = _toDouble(
+      territoire['villeLat'],
+    );
+
+    final longitude = _toDouble(
+      territoire['villeLng'],
+    );
+
+    if (latitude == 0 || longitude == 0) {
+      return;
+    }
+
+    final territoireId = _cleanText(
+      territoire['territoireId'] ??
+          administratorData['territoireId'] ??
+          administratorData['organisationId'] ??
+          widget.territoireId,
+    );
+
+    final structure = Map<String, dynamic>.from(
+      administratorData['structure'] ??
+          <String, dynamic>{},
+    );
+
+    final organisationName = _cleanText(
+      structure['nom'] ??
+          administratorData['nomStructure'] ??
+          administratorData['organisation'] ??
+          territoire['ville'] ??
+          'ADMIN',
+    );
+
+    final logoVille = _cleanText(
+      territoire['logoVille'] ??
+          administratorData['logoVille'],
+    );
+
+    final center = LatLng(
+      latitude,
+      longitude,
+    );
+
+    final markerData = <String, dynamic>{
+      ...administratorData,
+      'uid': uid,
+      'territoireId': territoireId,
+      'territoire': <String, dynamic>{
+        ...territoire,
+        'territoireId': territoireId,
+        'villeLat': latitude,
+        'villeLng': longitude,
+        'logoVille': logoVille,
+      },
+      'structure': <String, dynamic>{
+        ...structure,
+        'nom': organisationName,
+      },
+      'organisation': organisationName,
+    };
+
+    if (!mounted) {
       return;
     }
 
     setState(() {
-      _territoryCenter = calculatedCenter!;
-      _territoryZoom = calculatedZoom;
+      _territoryCenter = center;
+      _territoryZoom = 14.0;
       _territoryCenterLoaded = true;
+      _administratorTerritoryMarkerData = markerData;
     });
-
-    _moveMapToAdministratorTerritory();
   } catch (error, stackTrace) {
     debugPrint(
-      'Erreur chargement du territoire $territoireId : $error',
+      'Erreur chargement position Admin : $error',
     );
 
     debugPrintStack(
       stackTrace: stackTrace,
     );
   }
-}
-
-void _moveMapToAdministratorTerritory() {
-  if (!_mapIsReady || !_territoryCenterLoaded) {
-    return;
-  }
-
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!mounted) {
-      return;
-    }
-
-    _mapController.move(
-      _territoryCenter,
-      _territoryZoom,
-    );
-  });
 }
 
 @override
@@ -4102,20 +5212,36 @@ void initState() {
   );
 
   _loadAllLegalChaptersFromFirebase();
+
   _loadAdministratorTerritoryCenter();
 }
 
 @override
 void dispose() {
+  _mapMovementTimer?.cancel();
+
   _speech.stop();
   _dropdownOverlay?.remove();
+
+  _legalVersionController.removeListener(
+    _markLegalVersionModified,
+  );
+
+  _legalPublicationDateController.removeListener(
+    _markLegalVersionModified,
+  );
+
+  _legalChangeLogController.removeListener(
+    _markLegalVersionModified,
+  );
+
   _searchController.dispose();
   _legalTitleController.dispose();
   _legalContentController.dispose();
   _legalVersionController.dispose();
   _legalPublicationDateController.dispose();
-  _legalVersionController.removeListener(_markLegalVersionModified);
-  _legalPublicationDateController.removeListener(_markLegalVersionModified);
+  _legalChangeLogController.dispose();
+
   super.dispose();
 }
 
@@ -4268,8 +5394,13 @@ Widget _buildRecenterButton() {
       backgroundColor: Colors.white,
       foregroundColor: adminColor,
       onPressed: _territoryCenterLoaded
-          ? _moveMapToAdministratorTerritory
-          : null,
+    ? () {
+        _mapController.move(
+          _territoryCenter,
+          14.0,
+        );
+      }
+    : null,
       child: const Icon(
         Icons.my_location,
       ),
@@ -4723,14 +5854,19 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
   );
 
   final logoUrl = _cleanText(
-    territoire['logoVille'],
-  );
+  territoire['logoVille'] ??
+      territoire['logoUrl'] ??
+      structure['logoVille'] ??
+      structure['logoUrl'] ??
+      data['logoVille'] ??
+      data['logoUrl'],
+);
 
   return Marker(
-    point: LatLng(lat, lng),
-    width: 76,
-    height: 76,
-    alignment: Alignment.topCenter,
+  point: LatLng(lat, lng),
+  width: 82,
+  height: 92,
+  alignment: Alignment.topCenter,
     child: MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -4749,15 +5885,15 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
         child: Tooltip(
           message: organisation,
           child: SizedBox(
-            width: 76,
-            height: 76,
+            width: 82,
+            height: 92,
             child: Stack(
               alignment: Alignment.topCenter,
               children: [
                 Image.asset(
-                  'data/icons/fire_red_icon.png',
-                  width: 76,
-                  height: 76,
+  'data/icons/fire_red_icon.png',
+  width: 82,
+  height: 82,
                   fit: BoxFit.contain,
                   filterQuality: FilterQuality.high,
                 ),
@@ -5012,170 +6148,201 @@ Widget build(BuildContext context) {
                         visibleSpots: validSpots.length,
                       ),
                       Expanded(
-                        child: Stack(
-                          children: [
-                            FlutterMap(
-                              mapController: _mapController,
-                              options: MapOptions(
-  initialCenter: _territoryCenter,
-  initialZoom: _territoryZoom,
-  minZoom: 2,
-  maxZoom: 18,
-  onMapReady: () {
-    _mapIsReady = true;
-    _moveMapToAdministratorTerritory();
-  },
-  onTap: (_, __) {
-    setState(() {
-      _selectedSpot = null;
-      _selectedAdmin = null;
-      _selectedAdvertiser = null;
-      _showLegalDocumentsPanel = false;
-      _selectedLegalDocument = null;
-      _selectedLegalChapter = null;
-    });
-  },
-  onPositionChanged: (_, __) {
-    _mapMovementTimer?.cancel();
+  child: Stack(
+    children: [
+      FlutterMap(
+          key: ValueKey<String>(
+            'admin-map-'
+            '${_territoryCenter.latitude}-'
+            '${_territoryCenter.longitude}',
+          ),
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: _territoryCenter,
+            initialZoom: 14.0,
+            minZoom: 2,
+            maxZoom: 18,
+            onTap: (_, __) {
+              setState(() {
+                _selectedSpot = null;
+                _selectedAdmin = null;
+                _selectedAdvertiser = null;
+                _showLegalDocumentsPanel = false;
+                _selectedLegalDocument = null;
+                _selectedLegalChapter = null;
+              });
+            },
+            onPositionChanged: (_, __) {
+              _mapMovementTimer?.cancel();
 
-    _mapMovementTimer = Timer(
-      const Duration(milliseconds: 250),
-      () {
-        if (!mounted) return;
+              _mapMovementTimer = Timer(
+                const Duration(milliseconds: 250),
+                () {
+                  if (!mounted) {
+                    return;
+                  }
 
-        _updateVisibleCount(validSpots);
-        _updateVisibleAdminCount(validAdmins);
-        _updateVisibleAdvertiserCount(validAdvertisers);
-        _updateVisibleSauveteurCount(validSpots);
-      },
-    );
-  },
-),
-                              children: [
-                                TileLayer(
-                                  key: ValueKey(
-                                    'super_admin_tile_$_selectedTileStyle',
-                                  ),
-                                  urlTemplate:
-                                      _tileStyles[_selectedTileStyle].url,
-                                  subdomains:
-                                      _tileStyles[_selectedTileStyle].subdomains,
-                                  maxZoom: _tileStyles[_selectedTileStyle]
-                                      .maxZoom
-                                      .toDouble(),
-                                  maxNativeZoom:
-                                      _tileStyles[_selectedTileStyle].maxZoom,
-                                  userAgentPackageName: 'com.sylvainra.sphot',
-                                ),
-                                MarkerClusterLayerWidget(
-                                  options: MarkerClusterLayerOptions(
-                                    markers: clusteredMarkers,
-                                    size: const Size(54, 54),
-                                    maxClusterRadius: 45,
-                                    disableClusteringAtZoom: 15,
-                                    builder: (context, clusterMarkers) {
-                                      final clusterColor =
-                                          _clusterBorderColor(clusterMarkers);
-                                      final iconPath =
-                                          _clusterIconPath(clusterColor);
-                                      final count =
-                                          clusterMarkers.length.toString();
+                  _updateVisibleCount(validSpots);
+                  _updateVisibleAdminCount(validAdmins);
+                  _updateVisibleAdvertiserCount(
+                    validAdvertisers,
+                  );
+                  _updateVisibleSauveteurCount(validSpots);
+                },
+              );
+            },
+          ),
+          children: [
+            TileLayer(
+              key: ValueKey<String>(
+                'admin_tile_$_selectedTileStyle',
+              ),
+              urlTemplate:
+                  _tileStyles[_selectedTileStyle].url,
+              subdomains:
+                  _tileStyles[_selectedTileStyle].subdomains,
+              maxZoom: _tileStyles[_selectedTileStyle]
+                  .maxZoom
+                  .toDouble(),
+              maxNativeZoom:
+                  _tileStyles[_selectedTileStyle].maxZoom,
+              userAgentPackageName: 'com.sylvainra.sphot',
+            ),
 
-                                      return SizedBox(
-                                        width: 54,
-                                        height: 54,
-                                        child: Stack(
-                                          alignment: Alignment.center,
-                                          children: [
-                                            Image.asset(
-                                              iconPath,
-                                              width: 54,
-                                              height: 54,
-                                              fit: BoxFit.contain,
-                                              filterQuality: FilterQuality.high,
-                                            ),
-                                            Text(
-  count,
-  textAlign: TextAlign.center,
-  style: TextStyle(
-    fontSize: count.length >= 3 ? 13 : 16,
-    fontWeight: FontWeight.w900,
-    color: Colors.black87,
-    shadows: const [
-      Shadow(
-        color: Colors.white70,
-        offset: Offset(0.5, 0.5),
-        blurRadius: 1,
+            MarkerClusterLayerWidget(
+              options: MarkerClusterLayerOptions(
+                markers: clusteredMarkers,
+                size: const Size(54, 54),
+                maxClusterRadius: 45,
+                disableClusteringAtZoom: 15,
+                builder: (context, clusterMarkers) {
+                  final clusterColor =
+                      _clusterBorderColor(
+                    clusterMarkers,
+                  );
+
+                  final iconPath =
+                      _clusterIconPath(clusterColor);
+
+                  final count =
+                      clusterMarkers.length.toString();
+
+                  return SizedBox(
+                    width: 54,
+                    height: 54,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Image.asset(
+                          iconPath,
+                          width: 54,
+                          height: 54,
+                          fit: BoxFit.contain,
+                          filterQuality:
+                              FilterQuality.high,
+                        ),
+                        Text(
+                          count,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: count.length >= 3
+                                ? 13
+                                : 16,
+                            fontWeight:
+                                FontWeight.w900,
+                            color: Colors.black87,
+                            shadows: const [
+                              Shadow(
+                                color: Colors.white70,
+                                offset:
+                                    Offset(0.5, 0.5),
+                                blurRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            if (_administratorTerritoryMarkerData !=
+                null)
+              MarkerLayer(
+                markers: [
+                  _buildAdminMarker(
+                    _administratorTerritoryMarkerData!,
+                  ),
+                ],
+              ),
+          ],
+        ),
+
+      Positioned(
+        top: 8,
+        left: 0,
+        right: 0,
+        child: Center(
+          child: Image.asset(
+            'data/icons/title.png',
+            height: 68,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
+        ),
+      ),
+
+      _buildMapSearchBar(),
+      _buildRecenterButton(),
+      _buildNorthButton(),
+      _buildMapStyleButton(),
+
+      Positioned(
+        left: 0,
+        right: 0,
+        bottom: 22,
+        child: Center(
+          child: Container(
+            width: 62,
+            height: 62,
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: adminColor,
+                width: 2,
+              ),
+            ),
+            child: IconButton(
+              onPressed: () {
+                Navigator.of(context)
+                    .pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const ProfessionalLoginPage(),
+                  ),
+                  (route) => false,
+                );
+              },
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: adminColor,
+                size: 30,
+              ),
+            ),
+          ),
+        ),
       ),
     ],
   ),
 ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                
-                              ],
-                            ),
-                            Positioned(
-                              top: 8,
-                              left: 0,
-                              right: 0,
-                              child: Center(
-                                child: Image.asset(
-                                  'data/icons/title.png',
-                                  height: 68,
-                                  fit: BoxFit.contain,
-                                  filterQuality: FilterQuality.high,
-                                ),
-                              ),
-                            ),
-                            _buildMapSearchBar(),
-_buildRecenterButton(),
-_buildNorthButton(),
-_buildMapStyleButton(),
 
-Positioned(
-  left: 0,
-  right: 0,
-  bottom: 22,
-  child: Center(
-    child: Container(
-      width: 62,
-      height: 62,
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: adminColor,
-          width: 2,
-        ),
-      ),
-      child: IconButton(
-        onPressed: () {
-  Navigator.of(context).pushAndRemoveUntil(
-    MaterialPageRoute(
-      builder: (_) => const ProfessionalLoginPage(),
-    ),
-    (route) => false,
-  );
-},
-        icon: const Icon(
-          Icons.arrow_back_ios_new_rounded,
-          color: adminColor,
-          size: 30,
-        ),
-      ),
-    ),
-  ),
-),
-                          ],
-                        ),
-                      ),
+                      if (_selectedAdmin != null)
+  _buildAdminDetailPanel(),
 
-                      if (_selectedSpot != null)
+if (_selectedSpot != null)
   _buildSpotDetailPanel(),
                     ],
                   );

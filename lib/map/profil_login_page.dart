@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import '../pages/admin/admin_trial_request_page.dart';
+import '../web/admin/pages/admin_trial_request_page.dart';
 import '../pages/sauveteur/change_password_page.dart';
 import '../pages/sauveteur/sauveteur_menu_page.dart';
 import '../web/super_admin/web_super_admin_app.dart';
