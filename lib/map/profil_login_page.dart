@@ -539,98 +539,114 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
   }
 
   @override
-  Widget build(BuildContext context) {
-    const Color sauveteurColor = Color(0xFFEF4444);
-    const Color proColor = Color(0xFF1E3A8A);
+Widget build(BuildContext context) {
+  const Color sauveteurColor = Color(0xFFEF4444);
+  const Color proColor = Color(0xFF1E3A8A);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false,
-      body: GestureDetector(
-        onTap: _closeKeyboard,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.asset(
-              'data/images/map_background.jpg',
-              fit: BoxFit.cover,
-            ),
-            SafeArea(
-              child: SingleChildScrollView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.symmetric(horizontal: 26),
-                child: Column(
-                  children: [
-                    Image.asset(
-                      'data/icons/title.png',
-                      height: 64,
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.high,
-                    ),
-                    const SizedBox(height: 12),
-                    Visibility(
-                      visible: !_isEditing,
-                      maintainSize: true,
-                      maintainAnimation: true,
-                      maintainState: true,
-                      child: const Text(
-  'CONNEXION',
-  style: TextStyle(
-    fontSize: 32,
-    fontWeight: FontWeight.w900,
-    color: Color(0xFFEF4444),
-    letterSpacing: 0.5,
-  ),
-),
-                    ),
-                    const SizedBox(height: 16),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      child: Column(
-                        children: [
-                          _buildSauveteurSpace(
-                            sauveteurColor: sauveteurColor,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildProSpace(
-                            proColor: proColor,
-                          ),
-                        ],
+  return Scaffold(
+    backgroundColor: Colors.transparent,
+    resizeToAvoidBottomInset: false,
+    body: GestureDetector(
+      onTap: _closeKeyboard,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'data/images/map_background.jpg',
+            fit: BoxFit.cover,
+          ),
+
+          SafeArea(
+            child: SingleChildScrollView(
+              keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.symmetric(horizontal: 26),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 520,
+                  ),
+                  child: Column(
+                    children: [
+                      Image.asset(
+                        'data/icons/title.png',
+                        height: 64,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    if (!_isEditing)
-                      Container(
-                        width: 62,
-                        height: 62,
-                        decoration: BoxDecoration(
-                          color: Colors.transparent,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 2,
-                          ),
-                        ),
-                        child: IconButton(
-                          tooltip: 'Retour',
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.white,
-                            size: 30,
+
+                      const SizedBox(height: 12),
+
+                      Visibility(
+                        visible: !_isEditing,
+                        maintainSize: true,
+                        maintainAnimation: true,
+                        maintainState: true,
+                        child: const Text(
+                          'CONNEXION',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFEF4444),
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
-                    const SizedBox(height: 18),
-                  ],
+
+                      const SizedBox(height: 16),
+
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 260),
+                        curve: Curves.easeOutCubic,
+                        child: Column(
+                          children: [
+                            _buildSauveteurSpace(
+                              sauveteurColor: sauveteurColor,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildProSpace(
+                              proColor: proColor,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      if (!_isEditing)
+                        Container(
+                          width: 62,
+                          height: 62,
+                          decoration: BoxDecoration(
+                            color: Colors.transparent,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white,
+                              width: 2,
+                            ),
+                          ),
+                          child: IconButton(
+                            tooltip: 'Retour',
+                            onPressed: () =>
+                                Navigator.of(context).pop(),
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                              size: 30,
+                            ),
+                          ),
+                        ),
+
+                      const SizedBox(height: 18),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

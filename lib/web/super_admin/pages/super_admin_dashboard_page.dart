@@ -4634,8 +4634,8 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
 
   return Marker(
     point: LatLng(lat, lng),
-    width: 76,
-    height: 76,
+    width: 85,
+    height: 85,
     alignment: Alignment.topCenter,
     child: MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -4660,21 +4660,21 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
         child: Tooltip(
           message: organisation,
           child: SizedBox(
-            width: 76,
-            height: 76,
+            width: 85,
+            height: 85,
             child: Stack(
               alignment: Alignment.topCenter,
               children: [
                 Image.asset(
                   'data/icons/fire_red_icon.png',
-                  width: 76,
-                  height: 76,
+                  width: 85,
+                  height: 85,
                   fit: BoxFit.contain,
                   filterQuality: FilterQuality.high,
                 ),
 
                 Positioned(
-                  top: 8,
+                  top: 23,
                   child: Container(
                     width: 38,
                     height: 38,
@@ -5063,15 +5063,27 @@ Positioned(
   right: 0,
   bottom: 22,
   child: Center(
-    child: IconButton(
-      icon: const Icon(
-        Icons.arrow_back_ios_new_rounded,
-        color: adminColor,
-        size: 34,
+    child: Container(
+      width: 62,
+      height: 62,
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: adminColor,
+          width: 2,
+        ),
       ),
-      onPressed: () {
-        Navigator.of(context).pop();
-      },
+      child: IconButton(
+        onPressed: () {
+          Navigator.of(context).pop();
+        },
+        icon: const Icon(
+          Icons.arrow_back_ios_new_rounded,
+          color: adminColor,
+          size: 30,
+        ),
+      ),
     ),
   ),
 ),

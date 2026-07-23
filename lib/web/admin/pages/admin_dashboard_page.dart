@@ -7,7 +7,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'dart:math' as math;
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
-import '../../../pages/professional/professional_login_page.dart';
+import '../../../map/map_page.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -3767,11 +3767,7 @@ Widget _adminPanelSectionTitle({
             ),
           ),
         ),
-        Container(
-          width: 42,
-          height: 2,
-          color: const Color(0xFFFFE500),
-        ),
+        
       ],
     ),
   );
@@ -5864,8 +5860,8 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
 
   return Marker(
   point: LatLng(lat, lng),
-  width: 82,
-  height: 92,
+  width: 85,
+  height: 85,
   alignment: Alignment.topCenter,
     child: MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -5882,24 +5878,22 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
             _selectedLegalChapter = null;
           });
         },
-        child: Tooltip(
-          message: organisation,
           child: SizedBox(
-            width: 82,
-            height: 92,
+            width: 85,
+            height: 85,
             child: Stack(
               alignment: Alignment.topCenter,
               children: [
                 Image.asset(
   'data/icons/fire_red_icon.png',
-  width: 82,
-  height: 82,
+  width: 85,
+  height: 85,
                   fit: BoxFit.contain,
                   filterQuality: FilterQuality.high,
                 ),
 
                 Positioned(
-                  top: 8,
+                  top: 23,
                   child: Container(
                     width: 38,
                     height: 38,
@@ -5947,10 +5941,9 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
                     ),
                   ),
                 ),
-              ],
+                            ],
             ),
           ),
-        ),
       ),
     ),
   );
@@ -6317,15 +6310,13 @@ Widget build(BuildContext context) {
             ),
             child: IconButton(
               onPressed: () {
-                Navigator.of(context)
-                    .pushAndRemoveUntil(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        const ProfessionalLoginPage(),
-                  ),
-                  (route) => false,
-                );
-              },
+  Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute(
+      builder: (_) => const MapPage(),
+    ),
+    (route) => false,
+  );
+},
               icon: const Icon(
                 Icons.arrow_back_ios_new_rounded,
                 color: adminColor,
