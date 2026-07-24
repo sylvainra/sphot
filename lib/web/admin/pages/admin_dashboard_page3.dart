@@ -79,7 +79,6 @@ Timer? _mapMovementTimer;
   bool _showSphotEditorPanel = false;
   bool _placingSphotOnMap = false;
   bool _isSavingSphot = false;
-  String? _expandedSphotDropdown;
   String? _editingSphotDocId;
   String _activeTerritoireId = '';
   String _selectedSphotType = '';
@@ -133,10 +132,7 @@ Timer? _mapMovementTimer;
   static const List<String> _sphotLabelChoices = [
     'AUCUN',
     '🟦 PAVILLON BLEU',
-    '♿ HANDIPLAGE NIVEAU I',
-    '♿ HANDIPLAGE NIVEAU II',
-    '♿ HANDIPLAGE NIVEAU III',
-    '♿ HANDIPLAGE NIVEAU IV',
+    '♿ HANDIPLAGE',
     '🚭 PLAGE SANS TABAC',
     '🌿 GREEN COAST AWARD',
     '🌸 VILLES ET VILLAGES FLEURIS',
@@ -251,9 +247,6 @@ bool _isListening = false;
   OverlayEntry? _dropdownOverlay;
 
   final GlobalKey _filtersKey = GlobalKey();
-  final GlobalKey _sphotTypeKey = GlobalKey();
-  final GlobalKey _sphotEquipmentKey = GlobalKey();
-  final GlobalKey _sphotLabelKey = GlobalKey();
   final GlobalKey _adminFiltersKey = GlobalKey();
 
   final Set<DashboardSpotFilter> _selectedFilters = {
@@ -880,10 +873,7 @@ void _openFiltersMenu() {
     },
   );
 
-  Overlay.of(
-  context,
-  rootOverlay: true,
-).insert(_dropdownOverlay!);
+  Overlay.of(context).insert(_dropdownOverlay!);
 }
 
 void _openAdminFiltersMenu() {
@@ -1006,10 +996,7 @@ void _openAdminFiltersMenu() {
     },
   );
 
-  Overlay.of(
-  context,
-  rootOverlay: true,
-).insert(_dropdownOverlay!);
+  Overlay.of(context).insert(_dropdownOverlay!);
 }
 
 Color _clusterBorderColor(List<Marker> markers) {
@@ -2623,16 +2610,11 @@ Widget _buildRightPanel({
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _summaryCard(
-  title: 'CRÉER UN SPHOT',
-  value: '$_visibleOnMapSpotCount',
-  color: adminColor,
-  iconPath: 'data/icons/fire_red_icon.png',
-  iconScale: 1.6,
-  titleFontSize: 20,
-  titleLetterSpacing: 1.2,
-  showValue: false,
-  onTap: _openNewSphotEditor,
-),
+              title: 'SPHOTS',
+              value: '$_visibleOnMapSpotCount',
+              color: adminColor,
+              onTap: _openNewSphotEditor,
+            ),
 
             const SizedBox(height: 18),
 
@@ -2653,16 +2635,11 @@ Widget _buildRightPanel({
 }
 
   Widget _summaryCard({
-  required String title,
-  required String value,
-  required Color color,
-  String iconPath = 'data/icons/fire_blue_icon.png',
-  double iconScale = 1.0,
-  double titleFontSize = 13,
-  double titleLetterSpacing = 0,
-  bool showValue = true,
-  VoidCallback? onTap,
-}) {
+    required String title,
+    required String value,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
     final card = Container(
   height: 80,
   padding: const EdgeInsets.symmetric(
@@ -2676,20 +2653,11 @@ Widget _buildRightPanel({
       ),
       child: Row(
         children: [
-          SizedBox(
+          Image.asset(
+  'data/icons/fire_blue_icon.png',
   width: 34,
   height: 34,
-  child: Transform.scale(
-    scale: iconScale,
-    alignment: Alignment.center,
-    child: Image.asset(
-      iconPath,
-      width: 34,
-      height: 34,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-    ),
-  ),
+  filterQuality: FilterQuality.high,
 ),
           const SizedBox(width: 14),
           Expanded(
@@ -2702,22 +2670,19 @@ Widget _buildRightPanel({
                   title,
                   style: TextStyle(
                     color: color,
-                    fontSize: titleFontSize,
+                    fontSize: 13,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: titleLetterSpacing,
                   ),
                 ),
-                if (showValue) ...[
-  const SizedBox(height: 4),
-  Text(
-    value,
-    style: TextStyle(
-      color: color,
-      fontSize: 28,
-      fontWeight: FontWeight.w900,
-    ),
-  ),
-],
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ],
             ),
           ),
@@ -3049,7 +3014,6 @@ Set<String> _readSphotMultiValue(dynamic value) {
 
 void _clearSphotEditor() {
   _editingSphotDocId = null;
-  _expandedSphotDropdown = null;
   _selectedSphotType = '';
   _selectedSphotEquipments.clear();
   _selectedSphotLabels.clear();
@@ -3284,13 +3248,6 @@ Widget _sphotEditorField({
     controller: controller,
     keyboardType: keyboardType,
     readOnly: readOnly,
-
-style: const TextStyle(
-    color: adminColor,
-    fontSize: 16,
-    fontWeight: FontWeight.w700,
-  ),
-
     decoration: InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(
@@ -3321,429 +3278,75 @@ style: const TextStyle(
 }
 
 Widget _sphotMultiDropdown({
-  required GlobalKey fieldKey,
   required String label,
   required List<String> choices,
   required Set<String> selectedValues,
-  double maxMenuHeight = 245,
 }) {
   final displayText = selectedValues.isEmpty
-      ? label
-      : selectedValues.join(' | ');
+      ? 'Aucune sélection'
+      : selectedValues.join(', ');
 
-  return GestureDetector(
-    key: fieldKey,
-    behavior: HitTestBehavior.opaque,
-    onTap: () {
-      _openSphotMultiChoiceMenu(
-  fieldKey: fieldKey,
-  choices: choices,
-  selectedValues: selectedValues,
-  maxMenuHeight: maxMenuHeight,
-);
-    },
-    child: InputDecorator(
-      decoration: InputDecoration(
-        labelText: selectedValues.isEmpty ? null : label,
-        labelStyle: const TextStyle(
-          color: adminColor,
-          fontWeight: FontWeight.w700,
-        ),
-        filled: true,
-        fillColor: Colors.transparent,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 12,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(
-            color: adminColor,
-            width: 1.6,
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(
-            color: adminColor,
-            width: 1.6,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              displayText,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: adminColor,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          const Icon(
-            Icons.checklist_rounded,
-            color: adminColor,
-            size: 22,
-          ),
-          const SizedBox(width: 2),
-          const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: adminColor,
-            size: 26,
-          ),
-        ],
+  return ExpansionTile(
+    tilePadding: const EdgeInsets.symmetric(horizontal: 13),
+    childrenPadding: const EdgeInsets.only(bottom: 8),
+    collapsedShape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+      side: BorderSide(color: adminColor.withOpacity(0.55)),
+    ),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+      side: const BorderSide(color: adminColor, width: 1.5),
+    ),
+    title: Text(
+      label,
+      style: const TextStyle(
+        color: adminColor,
+        fontSize: 14,
+        fontWeight: FontWeight.w800,
       ),
     ),
-  );
-}
+    subtitle: Text(
+      displayText,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: selectedValues.isEmpty ? Colors.black54 : redColor,
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+    children: [
+      ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 230),
+        child: ListView(
+          shrinkWrap: true,
+          children: choices.map((choice) {
+            final isSelected = selectedValues.contains(choice);
 
-void _openSphotTypeMenu() {
-  _dropdownOverlay?.remove();
-  _dropdownOverlay = null;
-
-  final renderBox =
-      _sphotTypeKey.currentContext!.findRenderObject() as RenderBox;
-
-  final position = renderBox.localToGlobal(Offset.zero);
-  final size = renderBox.size;
-  final scrollController = ScrollController();
-
-  _dropdownOverlay = OverlayEntry(
-    builder: (context) {
-      return Stack(
-        children: [
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                _dropdownOverlay?.remove();
-                _dropdownOverlay = null;
+            return CheckboxListTile(
+              dense: true,
+              value: isSelected,
+              activeColor: redColor,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: Text(
+                choice,
+                style: TextStyle(
+                  color: isSelected ? redColor : adminColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              onChanged: (_) {
+                _toggleSphotMultiChoice(
+                  selectedValues: selectedValues,
+                  choice: choice,
+                );
               },
-              child: Container(color: Colors.transparent),
-            ),
-          ),
-
-          Positioned(
-            left: position.dx,
-            top: position.dy + size.height - 12,
-            width: size.width,
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                constraints: const BoxConstraints(
-                  maxHeight: 245,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.94),
-                  border: const Border(
-                    left: BorderSide(
-                      color: adminColor,
-                      width: 1.4,
-                    ),
-                    right: BorderSide(
-                      color: adminColor,
-                      width: 1.4,
-                    ),
-                    bottom: BorderSide(
-                      color: adminColor,
-                      width: 1.4,
-                    ),
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(10),
-                    bottomRight: Radius.circular(10),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 8,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-
-                child: ScrollbarTheme(
-                  data: const ScrollbarThemeData(
-                    thumbColor:
-                        MaterialStatePropertyAll<Color>(
-                      adminColor,
-                    ),
-                    trackVisibility:
-                        MaterialStatePropertyAll<bool>(
-                      false,
-                    ),
-                  ),
-                  child: Scrollbar(
-                    controller: scrollController,
-                    thumbVisibility: true,
-                    thickness: 10,
-                    radius: const Radius.circular(10),
-
-                    child: ListView.builder(
-                      controller: scrollController,
-                      primary: false,
-                      padding: EdgeInsets.zero,
-                      shrinkWrap: true,
-                      itemCount: _sphotTypeChoices.length,
-
-                      itemBuilder: (context, index) {
-                        final choice =
-                            _sphotTypeChoices[index];
-
-                        return InkWell(
-                          onTap: () {
-                            setState(() {
-                              _selectedSphotType = choice;
-                            });
-
-                            _dropdownOverlay?.remove();
-                            _dropdownOverlay = null;
-                          },
-
-                          child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-
-                            child: Text(
-                              choice,
-                              style: const TextStyle(
-                                color: adminColor,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    },
-  );
-
-  Overlay.of(context).insert(_dropdownOverlay!);
-}
-
-void _openSphotMultiChoiceMenu({
-  required GlobalKey fieldKey,
-  required List<String> choices,
-  required Set<String> selectedValues,
-  required double maxMenuHeight,
-}) {
-  _dropdownOverlay?.remove();
-  _dropdownOverlay = null;
-
-  final renderBox =
-      fieldKey.currentContext!.findRenderObject() as RenderBox;
-
-  final position = renderBox.localToGlobal(Offset.zero);
-  final size = renderBox.size;
-  final scrollController = ScrollController();
-
-  void closeMenu() {
-    _dropdownOverlay?.remove();
-    _dropdownOverlay = null;
-  }
-
-  _dropdownOverlay = OverlayEntry(
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, overlaySetState) {
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: closeMenu,
-                  child: Container(
-                    color: Colors.transparent,
-                  ),
-                ),
-              ),
-
-              Positioned(
-                left: position.dx,
-                top: position.dy + size.height - 12,
-                width: size.width,
-                child: Material(
-                  color: Colors.transparent,
-                  child: Container(
-                    constraints: BoxConstraints(
-  maxHeight: maxMenuHeight,
-),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.94),
-                      border: const Border(
-                        left: BorderSide(
-                          color: adminColor,
-                          width: 1.4,
-                        ),
-                        right: BorderSide(
-                          color: adminColor,
-                          width: 1.4,
-                        ),
-                        bottom: BorderSide(
-                          color: adminColor,
-                          width: 1.4,
-                        ),
-                      ),
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(10),
-                        bottomRight: Radius.circular(10),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 8,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-
-                    child: ScrollbarTheme(
-                      data: const ScrollbarThemeData(
-                        thumbColor:
-                            MaterialStatePropertyAll<Color>(
-                          adminColor,
-                        ),
-                        trackVisibility:
-                            MaterialStatePropertyAll<bool>(
-                          false,
-                        ),
-                      ),
-                      child: Scrollbar(
-                        controller: scrollController,
-                        thumbVisibility: true,
-                        thickness: 10,
-                        radius: const Radius.circular(10),
-
-                        child: ListView.builder(
-                          controller: scrollController,
-                          primary: false,
-                          padding: EdgeInsets.zero,
-                          shrinkWrap: true,
-                          itemCount: choices.length,
-
-                          itemBuilder: (context, index) {
-                            final choice = choices[index];
-                            final selected =
-                                selectedValues.contains(choice);
-
-                            return InkWell(
-                              onTap: () {
-                                setState(() {
-                                  if (choice == 'AUCUN') {
-                                    if (selected) {
-                                      selectedValues.clear();
-                                    } else {
-                                      selectedValues
-                                        ..clear()
-                                        ..add(choice);
-                                    }
-                                  } else {
-                                    selectedValues.remove('AUCUN');
-
-                                    if (selected) {
-                                      selectedValues.remove(choice);
-                                    } else {
-                                      selectedValues.add(choice);
-                                    }
-                                  }
-                                });
-
-                                overlaySetState(() {});
-                              },
-
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 9,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      selected
-                                          ? Icons.check_box_rounded
-                                          : Icons
-                                              .check_box_outline_blank_rounded,
-                                      color: selected
-                                          ? redColor
-                                          : adminColor,
-                                      size: 22,
-                                    ),
-
-                                    const SizedBox(width: 10),
-
-                                    Expanded(
-                                      child: Text(
-                                        choice,
-                                        style: const TextStyle(
-                                          color: adminColor,
-                                          fontSize: 13,
-                                          fontWeight:
-                                              FontWeight.w800,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
-
-  Overlay.of(context).insert(_dropdownOverlay!);
-}
-
-Widget _sphotSectionTitle(
-  int number,
-  String title,
-) {
-  return Text.rich(
-    TextSpan(
-      children: [
-        TextSpan(
-          text: '$number',
-          style: const TextStyle(
-            color: redColor,
-          ),
+            );
+          }).toList(),
         ),
-        TextSpan(
-          text: '. $title',
-          style: const TextStyle(
-            color: adminColor,
-          ),
-        ),
-      ],
-    ),
-    style: const TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w900,
-    ),
+      ),
+    ],
   );
 }
 
@@ -3764,31 +3367,20 @@ Widget _buildSphotEditorPanel() {
         ),
       ),
     ),
-    child: Material(
-      color: Colors.transparent,
-      child: SafeArea(
-  child: Padding(
-    padding: const EdgeInsets.all(20),
-    child: Column(
+    child: SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Transform.translate(
-  offset: const Offset(-12, 0),
-  child: Transform.scale(
-    scale: 1.8,
-    alignment: Alignment.center,
-    child: Image.asset(
-      'data/icons/fire_red_icon.png',
-      width: 30,
-      height: 30,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-    ),
-  ),
-),
-                const SizedBox(width: 0),
+                const Icon(
+                  Icons.add_location_alt_rounded,
+                  color: redColor,
+                  size: 28,
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     isEditing
@@ -3798,7 +3390,6 @@ Widget _buildSphotEditorPanel() {
                       color: adminColor,
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 1.2,
                     ),
                   ),
                 ),
@@ -3816,11 +3407,25 @@ Widget _buildSphotEditorPanel() {
                 ),
               ],
             ),
+            const SizedBox(height: 6),
+            Text(
+              isEditing
+                  ? 'Le repère sélectionné est chargé dans le formulaire.'
+                  : 'Commencez par placer le nouveau SPHOT sur la carte.',
+              style: const TextStyle(
+                color: Colors.black54,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 18),
-            _sphotSectionTitle(
-  1,
-  'EMPLACEMENT',
-),
+            const Text(
+              '1. PLACEMENT SUR LA CARTE',
+              style: TextStyle(
+                color: adminColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
             const SizedBox(height: 9),
             SizedBox(
               width: double.infinity,
@@ -3831,50 +3436,30 @@ Widget _buildSphotEditorPanel() {
                     _placingSphotOnMap = true;
                   });
                 },
-                icon: Image.asset(
-  'data/icons/fire_red_icon.png',
-  width: 26,
-  height: 26,
-  fit: BoxFit.contain,
-  filterQuality: FilterQuality.high,
-),
-                label: Align(
-  alignment: Alignment.centerLeft,
-  child: FittedBox(
-    fit: BoxFit.scaleDown,
-    alignment: Alignment.centerLeft,
-    child: Text(
-      hasPosition
-          ? 'CLIQUEZ ICI PUIS SUR LA CARTE POUR MODIFIER L’EMPLACEMENT'
-          : 'CLIQUEZ SUR LA CARTE POUR L’EMPLACEMENT',
-      textAlign: TextAlign.left,
-      style: const TextStyle(
-        color: adminColor,
-        fontSize: 14,
-        fontWeight: FontWeight.w900,
-      ),
-    ),
-  ),
-),
-
-style: OutlinedButton.styleFrom(
-  foregroundColor: adminColor,
-
-  alignment: Alignment.centerLeft,
-
-  padding: const EdgeInsets.symmetric(
-    horizontal: 18,
-  ),
-
-  side: const BorderSide(
-    color: adminColor,
-    width: 1.6,
-  ),
-
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(12),
-  ),
-),
+                icon: Icon(
+                  hasPosition
+                      ? Icons.edit_location_alt_rounded
+                      : Icons.location_searching_rounded,
+                  color: redColor,
+                ),
+                label: Text(
+                  _placingSphotOnMap
+                      ? 'CLIQUEZ MAINTENANT SUR LA CARTE'
+                      : hasPosition
+                          ? 'MODIFIER LE PLACEMENT'
+                          : 'POSITIONNER LE SPHOT',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: adminColor,
+                  side: BorderSide(
+                    color: _placingSphotOnMap ? redColor : adminColor,
+                    width: _placingSphotOnMap ? 2 : 1.5,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -3900,10 +3485,14 @@ style: OutlinedButton.styleFrom(
               ],
             ),
             const SizedBox(height: 20),
-            _sphotSectionTitle(
-  2,
-  'IDENTIFICATION',
-),
+            const Text(
+              '2. IDENTIFICATION ET TYPE',
+              style: TextStyle(
+                color: adminColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
             const SizedBox(height: 9),
             Row(
               children: [
@@ -3923,128 +3512,75 @@ style: OutlinedButton.styleFrom(
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-
-_sphotSectionTitle(
-  3,
-  'TYPE',
-),
-
-const SizedBox(height: 9),
-            Theme(
-  data: Theme.of(context).copyWith(
-    scrollbarTheme: const ScrollbarThemeData(
-      thumbColor: MaterialStatePropertyAll<Color>(
-        adminColor,
-      ),
-      thumbVisibility: MaterialStatePropertyAll<bool>(
-        true,
-      ),
-      thickness: MaterialStatePropertyAll<double>(
-        9,
-      ),
-      radius: Radius.circular(10),
-    ),
-  ),
-  child: GestureDetector(
-    key: _sphotTypeKey,
-  behavior: HitTestBehavior.opaque,
-  onTap: _openSphotTypeMenu,
-
-  child: InputDecorator(
-    decoration: InputDecoration(
-      labelText: _selectedSphotType.isEmpty
-          ? null
-          : 'Type de SPHOT',
-
-      labelStyle: const TextStyle(
-        color: adminColor,
-        fontWeight: FontWeight.w700,
-      ),
-
-      filled: true,
-      fillColor: Colors.transparent,
-
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 12,
-      ),
-
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(
-          color: adminColor,
-          width: 1.6,
-        ),
-      ),
-
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(
-          color: adminColor,
-          width: 1.6,
-        ),
-      ),
-    ),
-
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(
-            _selectedSphotType.isEmpty
-                ? 'Type de SPHOT'
-                : _selectedSphotType,
-
-            overflow: TextOverflow.ellipsis,
-
-            style: const TextStyle(
-              color: adminColor,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-
-        const Icon(
-          Icons.keyboard_arrow_down_rounded,
-          color: adminColor,
-          size: 26,
-        ),
-      ],
-    ),
-  ),
-),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              value: _sphotTypeChoices.contains(_selectedSphotType)
+                  ? _selectedSphotType
+                  : null,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: 'Type de SPHOT',
+                labelStyle: const TextStyle(
+                  color: adminColor,
+                  fontWeight: FontWeight.w700,
+                ),
+                filled: true,
+                fillColor: adminColor.withOpacity(0.035),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: adminColor.withOpacity(0.55),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: adminColor,
+                    width: 1.8,
+                  ),
+                ),
+              ),
+              items: _sphotTypeChoices.map((choice) {
+                return DropdownMenuItem<String>(
+                  value: choice,
+                  child: Text(
+                    choice,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: redColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedSphotType = value ?? '';
+                });
+              },
             ),
             const SizedBox(height: 20),
-            _sphotSectionTitle(
-  4,
-  'ÉQUIPEMENTS',
-),
+            const Text(
+              '3. ÉQUIPEMENTS ET LABELS',
+              style: TextStyle(
+                color: adminColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
             const SizedBox(height: 9),
-           _sphotMultiDropdown(
-  fieldKey: _sphotEquipmentKey,
-  label: 'Équipements du SPHOT',
-  choices: _sphotEquipmentChoices,
-  selectedValues: _selectedSphotEquipments,
-  maxMenuHeight: 220,
-),
-
-const SizedBox(height: 14),
-
-_sphotSectionTitle(
-  5,
-  'LABELS',
-),
-
-const SizedBox(height: 9),
-
-_sphotMultiDropdown(
-  fieldKey: _sphotLabelKey,
-  label: 'Labels du SPHOT',
-  choices: _sphotLabelChoices,
-  selectedValues: _selectedSphotLabels,
-  maxMenuHeight: 140,
-),
+            _sphotMultiDropdown(
+              label: 'Équipements du SPHOT',
+              choices: _sphotEquipmentChoices,
+              selectedValues: _selectedSphotEquipments,
+            ),
+            const SizedBox(height: 10),
+            _sphotMultiDropdown(
+              label: 'Labels du SPHOT',
+              choices: _sphotLabelChoices,
+              selectedValues: _selectedSphotLabels,
+            ),
             const SizedBox(height: 22),
             SizedBox(
               width: double.infinity,
@@ -4079,9 +3615,18 @@ _sphotMultiDropdown(
                 ),
               ),
             ),
-            
+            if (!isEditing) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Pour modifier un SPHOT existant, laissez ce panneau ouvert puis cliquez sur son repère dans la carte.',
+                style: TextStyle(
+                  color: Colors.black54,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
-          ),
+          ],
         ),
       ),
     ),
