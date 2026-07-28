@@ -75,6 +75,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   final MapController _mapController = MapController();
 Timer? _mapMovementTimer;
+OverlayEntry? _sphotHoverOverlayEntry;
+Timer? _sphotHoverExitTimer;
+
+String? _sphotHoveredMarkerKey;
+String _sphotHoverText = '';
+Offset _sphotHoverAnchor = Offset.zero;
+Color _sphotHoverColor = adminColor;
 
   bool _showSphotEditorPanel = false;
   bool _placingSphotOnMap = false;
@@ -91,21 +98,22 @@ Timer? _mapMovementTimer;
   final TextEditingController _sphotLngController = TextEditingController();
 
   static const List<String> _sphotTypeChoices = [
-    '🚨 POSTE DE SECOURS 🚨',
-    '🏖️ PLAGE',
-    '🏞️ LAC',
-    '🏞️ ÉTANG',
-    '🌊 FLEUVE',
-    '🏞️ RIVIÈRE',
-    '💧 CASCADE',
-    '🧱 BARRAGE',
-    '🏝️ LAGON',
-    '🏊 PISCINE NATURELLE',
-    '🎡 BASE DE LOISIRS',
-    '🌳 PARC',
-    '💧 PLAN D’EAU',
-    'AUTRE',
-  ];
+  '🚨 POSTE DE SECOURS 🚨',
+  '🏖️ PLAGE',
+  '🏞️ LAC',
+  '🏞️ ÉTANG',
+  '🌊 FLEUVE',
+  '🏞️ RIVIÈRE',
+  '💧 CASCADE',
+  '🧱 BARRAGE',
+  '🏝️ LAGON',
+  '🏊 PISCINE NATURELLE',
+  '🎡 BASE DE LOISIRS',
+  '🌳 PARC',
+  '💧 PLAN D’EAU',
+  '🏖️ NATURISME',
+  'AUTRE',
+];
 
   static const List<String> _sphotEquipmentChoices = [
     'AUCUN',
@@ -427,39 +435,43 @@ String _normalizeType(String value) {
 }
 
 String _getMarkerIconPath(Map<String, dynamic> data) {
-  final type = _normalizeType((data['typeSphot'] ?? '').toString());
-  final nature = _normalizeType((data['natureSphot'] ?? '').toString());
-  final label = _normalizeType((data['labelSphot'] ?? '').toString());
+  final type = _normalizeType(
+    (data['typeSphot'] ?? '').toString(),
+  );
 
-  final fullType = '$type $nature $label';
-
-  if (fullType.contains('NATURISME')) {
-    return 'data/icons/fire_skin_icon.png';
-  }
-
-  if (fullType.contains('POSTE DE SECOURS')) {
+  if (type.contains('POSTE DE SECOURS')) {
     return 'data/icons/fire_red_icon.png';
   }
 
-  if (fullType.contains('ACCES PLAGE')) {
+  if (type.contains('NATURISME') ||
+      type.contains('NATURISTE')) {
+    return 'data/icons/fire_skin_icon.png';
+  }
+
+  if (type.contains('PLAGE')) {
     return 'data/icons/fire_orange_icon.png';
   }
 
-  if (fullType.contains('LAC') ||
-      fullType.contains("PLAN D'EAU") ||
-      fullType.contains('PLAN D EAU') ||
-      fullType.contains('BARRAGE')) {
+  if (type.contains('LAC') ||
+      type.contains('ETANG') ||
+      type.contains("PLAN D'EAU") ||
+      type.contains('PLAN D EAU') ||
+      type.contains('BARRAGE')) {
     return 'data/icons/fire_blue_icon.png';
   }
 
-  if (fullType.contains('FLEUVE') || fullType.contains('RIVIERE')) {
+  if (type.contains('FLEUVE') ||
+      type.contains('RIVIERE') ||
+      type.contains('CASCADE')) {
     return 'data/icons/fire_green_icon.png';
   }
 
-  if (fullType.contains('LAGON') || fullType.contains('PISCINE NATURELLE')) {
+  if (type.contains('LAGON') ||
+      type.contains('PISCINE NATURELLE')) {
     return 'data/icons/fire_cyan_icon.png';
   }
 
+  // Base de loisirs, parc et autre.
   return 'data/icons/fire_orange1_icon.png';
 }
 
@@ -1078,45 +1090,206 @@ String _clusterIconPath(Color color) {
   return 'data/icons/fire_orange1_icon.png';
 }
 
+void _showSphotHoverLabel({
+  required String markerKey,
+  required String label,
+  required Color color,
+  required BuildContext markerContext,
+}) {
+  _sphotHoverExitTimer?.cancel();
+  _sphotHoverExitTimer = null;
+
+  final renderObject = markerContext.findRenderObject();
+
+  if (renderObject is! RenderBox || !renderObject.hasSize) {
+    return;
+  }
+
+  final markerTopLeft = renderObject.localToGlobal(
+    Offset.zero,
+  );
+
+  _sphotHoveredMarkerKey = markerKey;
+  _sphotHoverText = label;
+  _sphotHoverColor = color;
+
+  // Position sous la pointe du marker.
+  _sphotHoverAnchor = Offset(
+    markerTopLeft.dx + (renderObject.size.width / 2),
+    markerTopLeft.dy + renderObject.size.height - 6,
+  );
+
+  if (_sphotHoverOverlayEntry != null) {
+    _sphotHoverOverlayEntry!.markNeedsBuild();
+    return;
+  }
+
+  _sphotHoverOverlayEntry = OverlayEntry(
+    builder: (overlayContext) {
+      final viewportSize = MediaQuery.sizeOf(
+        overlayContext,
+      );
+
+      const labelWidth = 320.0;
+
+      final maximumLeft = math.max(
+        8.0,
+        viewportSize.width - labelWidth - 8,
+      );
+
+      final labelLeft = math.min(
+        math.max(
+          _sphotHoverAnchor.dx - (labelWidth / 2),
+          8.0,
+        ),
+        maximumLeft,
+      ).toDouble();
+
+      return Positioned(
+        left: labelLeft,
+        top: _sphotHoverAnchor.dy,
+        width: labelWidth,
+        child: IgnorePointer(
+          child: Center(
+            child: Material(
+  color: Colors.transparent,
+  child: Container(
+    constraints: const BoxConstraints(
+      maxWidth: 300,
+    ),
+    padding: const EdgeInsets.symmetric(
+      horizontal: 4,
+      vertical: 2,
+    ),
+    child: Text(
+      _sphotHoverText,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: _sphotHoverColor,
+        fontSize: 13,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  ),
+),
+          ),
+        ),
+      );
+    },
+  );
+
+  Overlay.of(
+    context,
+    rootOverlay: true,
+  ).insert(_sphotHoverOverlayEntry!);
+}
+
+void _keepSphotHoverLabel(String markerKey) {
+  if (_sphotHoveredMarkerKey != markerKey) {
+    return;
+  }
+
+  _sphotHoverExitTimer?.cancel();
+  _sphotHoverExitTimer = null;
+}
+
+void _scheduleSphotHoverLabelRemoval(
+  String markerKey,
+) {
+  if (_sphotHoveredMarkerKey != markerKey) {
+    return;
+  }
+
+  _sphotHoverExitTimer?.cancel();
+
+  _sphotHoverExitTimer = Timer(
+    const Duration(milliseconds: 700),
+    () {
+      if (mounted &&
+          _sphotHoveredMarkerKey == markerKey) {
+        _removeSphotHoverLabel();
+      }
+    },
+  );
+}
+
+void _removeSphotHoverLabel() {
+  _sphotHoverExitTimer?.cancel();
+  _sphotHoverExitTimer = null;
+  _sphotHoveredMarkerKey = null;
+
+  final entry = _sphotHoverOverlayEntry;
+
+  if (entry == null) {
+    return;
+  }
+
+  _sphotHoverOverlayEntry = null;
+  entry.remove();
+  entry.dispose();
+}
+
   Marker _buildSpotMarker(Map<String, dynamic> data) {
   final lat = _toDouble(data['sphotLat']);
   final lng = _toDouble(data['sphotLng']);
   final name = _spotName(data);
+
+  final idSphot = _cleanText(
+    data['idSphot'] ?? data['_docId'],
+  );
+
+  final tooltipText = idSphot.isEmpty
+      ? name
+      : 'N° $idSphot - $name';
+
   final iconPath = _getMarkerIconPath(data);
+
+  final markerKey =
+      'sphot-${data['_docId'] ?? idSphot}-$lat-$lng';
 
   return Marker(
     point: LatLng(lat, lng),
-    width: 90,
-    height: 90,
-    alignment: Alignment.center,
-    child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        if (_showSphotEditorPanel) {
-          _loadSphotInEditor(data);
-          return;
-        }
-
-        setState(() {
-          _selectedSpot = data;
-          _selectedAdmin = null;
-          _selectedAdvertiser = null;
-          _showLegalDocumentsPanel = false;
-        });
-
-        _mapController.move(
-          LatLng(lat, lng),
-          18,
+    width: 46,
+    height: 46,
+    alignment: const Alignment(0, -0.9),
+    child: Builder(
+      builder: (markerContext) {
+        return MouseRegion(
+          opaque: true,
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) {
+            _showSphotHoverLabel(
+  markerKey: markerKey,
+  label: tooltipText,
+  color: _spotTypeColor(data),
+  markerContext: markerContext,
+);
+          },
+          onHover: (_) {
+            _keepSphotHoverLabel(markerKey);
+          },
+          onExit: (_) {
+            _scheduleSphotHoverLabelRemoval(
+              markerKey,
+            );
+          },
+          child: Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: (_) {
+              _removeSphotHoverLabel();
+              _loadSphotInEditor(data);
+            },
+            child: DashboardSpotMarker(
+              data: data,
+              name: name,
+              iconPath: iconPath,
+              typeColor: _spotTypeColor(data),
+            ),
+          ),
         );
       },
-      child: Center(
-        child: DashboardSpotMarker(
-          data: data,
-          name: name,
-          iconPath: iconPath,
-          typeColor: _spotTypeColor(data),
-        ),
-      ),
     ),
   );
 }
@@ -3274,6 +3447,118 @@ Future<void> _saveSphotFromDashboard() async {
   }
 }
 
+Future<void> _deleteSphotFromDashboard() async {
+  final documentId = _editingSphotDocId?.trim() ?? '';
+
+  final territoireId = _activeTerritoireId.trim().isNotEmpty
+      ? _activeTerritoireId.trim()
+      : widget.territoireId.trim();
+
+  if (documentId.isEmpty || territoireId.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Impossible d’identifier le SPHOT à supprimer.',
+        ),
+        backgroundColor: redColor,
+      ),
+    );
+    return;
+  }
+
+  final sphotName = _sphotNameController.text.trim().isNotEmpty
+      ? _sphotNameController.text.trim()
+      : _sphotIdController.text.trim();
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text(
+          'SUPPRIMER CE SPHOT',
+          style: TextStyle(
+            color: redColor,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: Text(
+          'Voulez-vous vraiment supprimer le SPHOT '
+          '« $sphotName » ?\n\n'
+          'Cette action est définitive.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop(false);
+            },
+            child: const Text('ANNULER'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(dialogContext).pop(true);
+            },
+            icon: const Icon(
+              Icons.delete_forever_rounded,
+            ),
+            label: const Text('SUPPRIMER'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: redColor,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (confirmed != true || !mounted) return;
+
+  setState(() {
+    _isSavingSphot = true;
+  });
+
+  try {
+    await FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(territoireId)
+        .collection('spots')
+        .doc(documentId)
+        .delete();
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSavingSphot = false;
+      _showSphotEditorPanel = false;
+      _placingSphotOnMap = false;
+      _selectedSpot = null;
+      _clearSphotEditor();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('SPHOT supprimé avec succès.'),
+        backgroundColor: adminColor,
+      ),
+    );
+  } catch (error) {
+    if (!mounted) return;
+
+    setState(() {
+      _isSavingSphot = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Suppression impossible : $error',
+        ),
+        backgroundColor: redColor,
+      ),
+    );
+  }
+}
+
 Widget _sphotEditorField({
   required TextEditingController controller,
   required String label,
@@ -4045,42 +4330,77 @@ _sphotMultiDropdown(
   selectedValues: _selectedSphotLabels,
   maxMenuHeight: 140,
 ),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed:
-                    _isSavingSphot ? null : _saveSphotFromDashboard,
-                icon: _isSavingSphot
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.save_rounded),
-                label: Text(
-                  _isSavingSphot
-                      ? 'ENREGISTREMENT...'
-                      : isEditing
-                          ? 'ENREGISTRER LES MODIFICATIONS'
-                          : 'CRÉER LE SPHOT',
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: adminColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
+            const SizedBox(height: 8),
+
+SizedBox(
+  width: double.infinity,
+  height: 46,
+  child: ElevatedButton.icon(
+    onPressed:
+        _isSavingSphot ? null : _saveSphotFromDashboard,
+    icon: _isSavingSphot
+        ? const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white,
             ),
-            
-            ],
+          )
+        : const Icon(Icons.save_rounded),
+    label: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        _isSavingSphot
+            ? 'ENREGISTREMENT...'
+            : isEditing
+                ? 'ENREGISTRER LA MODIFICATION DU SPHOT'
+                : 'CRÉER LE SPHOT',
+        style: const TextStyle(
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    ),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: adminColor,
+      foregroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+    ),
+  ),
+),
+
+if (isEditing) ...[
+  const SizedBox(height: 6),
+  SizedBox(
+    width: double.infinity,
+    height: 40,
+    child: ElevatedButton.icon(
+      onPressed:
+          _isSavingSphot ? null : _deleteSphotFromDashboard,
+      icon: const Icon(
+        Icons.delete_forever_rounded,
+        size: 21,
+      ),
+      label: const Text(
+        'SUPPRIMER CE SPHOT',
+        style: TextStyle(
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: redColor,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    ),
+  ),
+],
+           ],
           ),
         ),
       ),
@@ -6423,6 +6743,9 @@ void initState() {
 void dispose() {
   _mapMovementTimer?.cancel();
 
+  _sphotHoverExitTimer?.cancel();
+  _removeSphotHoverLabel();
+
   _speech.stop();
   _dropdownOverlay?.remove();
 
@@ -7344,14 +7667,38 @@ Widget build(BuildContext context) {
   _updateVisibleSauveteurCount(validSpots);
 });
 
-                  final clusteredMarkers = <Marker>[
-  ...validSpots.map(
-    (doc) => _buildSpotMarker({
-      ...doc.data(),
-      '_docId': doc.id,
-    }),
-  ),
-];
+                  final editedLat = double.tryParse(
+  _sphotLatController.text.trim().replaceAll(',', '.'),
+);
+
+final editedLng = double.tryParse(
+  _sphotLngController.text.trim().replaceAll(',', '.'),
+);
+
+final creationMarkerIconPath = _selectedSphotType.isEmpty
+    ? 'data/icons/fire_red_icon.png'
+    : _getMarkerIconPath({
+        'typeSphot': _selectedSphotType,
+      });
+
+final clusteredMarkers = validSpots.map((doc) {
+  final markerData = <String, dynamic>{
+    ...doc.data(),
+    '_docId': doc.id,
+  };
+
+  final isCurrentlyEditing =
+      _editingSphotDocId?.trim() == doc.id;
+
+  if (isCurrentlyEditing &&
+      editedLat != null &&
+      editedLng != null) {
+    markerData['sphotLat'] = editedLat;
+    markerData['sphotLng'] = editedLng;
+  }
+
+  return _buildSpotMarker(markerData);
+}).toList();
 
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -7485,40 +7832,33 @@ Widget build(BuildContext context) {
               ),
             ),
 
-            if (_administratorTerritoryMarkerData !=
-                null)
-              MarkerLayer(
-                markers: [
-                  _buildAdminMarker(
-                    _administratorTerritoryMarkerData!,
-                  ),
-                ],
-              ),
-
             if (_showSphotEditorPanel &&
-                double.tryParse(_sphotLatController.text.trim()) != null &&
-                double.tryParse(_sphotLngController.text.trim()) != null)
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: LatLng(
-                      double.parse(_sphotLatController.text.trim()),
-                      double.parse(_sphotLngController.text.trim()),
-                    ),
-                    width: 54,
-                    height: 54,
-                    alignment: Alignment.bottomCenter,
-                    child: const Icon(
-                      Icons.location_on_rounded,
-                      color: redColor,
-                      size: 52,
-                    ),
-                  ),
-                ],
-              ),
-          ],
+    _editingSphotDocId?.trim().isNotEmpty != true &&
+    editedLat != null &&
+    editedLng != null)
+  MarkerLayer(
+    markers: [
+      Marker(
+        point: LatLng(
+          editedLat,
+          editedLng,
         ),
-
+        width: 46,
+        height: 46,
+        alignment: const Alignment(0, -0.9),
+        child: Image.asset(
+          creationMarkerIconPath,
+          width: 46,
+          height: 46,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+        ),
+      ),
+    ],
+  ),
+               ],
+        ),       
+        
       Positioned(
         top: 8,
         left: 0,
@@ -7596,6 +7936,7 @@ else if (_selectedSpot != null)
 }
 
 }
+
 class DashboardSpotMarker extends StatelessWidget {
   final Map<String, dynamic> data;
   final String name;
