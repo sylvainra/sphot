@@ -7,7 +7,10 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'dart:math' as math;
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../../../map/map_page.dart';
+import 'package:flutter/services.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -84,6 +87,8 @@ Offset _sphotHoverAnchor = Offset.zero;
 Color _sphotHoverColor = adminColor;
 
   bool _showSphotEditorPanel = false;
+  bool _showSauveteurEditorPanel = false;
+  bool _showSurveillancePeriodsPanel = false;
   bool _placingSphotOnMap = false;
   bool _isSavingSphot = false;
   String? _expandedSphotDropdown;
@@ -96,6 +101,46 @@ Color _sphotHoverColor = adminColor;
   final TextEditingController _sphotNameController = TextEditingController();
   final TextEditingController _sphotLatController = TextEditingController();
   final TextEditingController _sphotLngController = TextEditingController();
+
+  final TextEditingController _sauveteurNomController =
+      TextEditingController();
+  final TextEditingController _sauveteurPrenomController =
+      TextEditingController();
+  final TextEditingController _sauveteurDateNaissanceController =
+      TextEditingController();
+  final TextEditingController _sauveteurAgeController =
+      TextEditingController();
+  final TextEditingController _sauveteurAdresseController =
+      TextEditingController();
+  final TextEditingController _sauveteurCodePostalController =
+      TextEditingController();
+  final TextEditingController _sauveteurVilleController =
+      TextEditingController();
+  final TextEditingController _sauveteurTelephoneController =
+      TextEditingController();
+  final TextEditingController _sauveteurEmailController =
+      TextEditingController();
+  final TextEditingController _sauveteurExperienceController =
+      TextEditingController();
+  final TextEditingController _sauveteurObservationsController =
+      TextEditingController();
+
+  final Set<String> _sauveteurFonctions = <String>{};
+  final Set<String> _sauveteurPostes = <String>{};
+  final Set<String> _sauveteurPeriodesSurveillance = <String>{};
+  
+  bool _isSavingSauveteur = false;
+  bool _sauveteurAccessGenerated = false;
+  bool _sauveteurEmailSent = false;
+  String _sauveteurGeneratedLogin = '';
+  String _sauveteurGeneratedPassword = '';
+  String? _createdSauveteurDocId;
+
+  static const List<String> _sauveteurFonctionChoices = <String>[
+    'CHEF DE POSTE',
+    'ADJOINT CHEF DE POSTE',
+    'SAUVETEUR',
+  ];
 
   static const List<String> _sphotTypeChoices = [
   '🚨 POSTE DE SECOURS 🚨',
@@ -2795,30 +2840,46 @@ Widget _buildRightPanel({
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _summaryCard(
-  title: 'CRÉER UN SPHOT',
-  value: '$_visibleOnMapSpotCount',
-  color: adminColor,
-  iconPath: 'data/icons/fire_red_icon.png',
-  iconScale: 1.6,
-  titleFontSize: 20,
-  titleLetterSpacing: 1.2,
-  showValue: false,
-  onTap: _openNewSphotEditor,
-),
+  _summaryCard(
+    title: 'CRÉER UN SPHOT',
+    value: '',
+    color: adminColor,
+    iconPath: 'data/icons/fire_red_icon.png',
+    iconScale: 1.6,
+    titleFontSize: 20,
+    titleLetterSpacing: 1.2,
+    showValue: false,
+    onTap: _openNewSphotEditor,
+  ),
 
-            const SizedBox(height: 18),
+  const SizedBox(height: 12),
 
-            _buildFiltersBlock(),
+  _summaryCard(
+    title: 'CRÉER UNE PÉRIODE',
+    value: '',
+    color: adminColor,
+    iconPath: 'data/icons/fire_red_icon.png',
+    iconScale: 1.6,
+    titleFontSize: 20,
+    titleLetterSpacing: 1.2,
+    showValue: false,
+    onTap: _openSurveillancePeriodsPanel,
+  ),
 
-            const SizedBox(height: 24),
+  const SizedBox(height: 12),
 
-            _summaryCard(
-              title: 'SAUVETEURS',
-              value: '$_visibleOnMapSauveteurCount',
-              color: adminColor,
-            ),
-          ],
+  _summaryCard(
+    title: 'CRÉER UN SAUVETEUR',
+    value: '',
+    color: adminColor,
+    iconPath: 'data/icons/fire_red_icon.png',
+    iconScale: 1.6,
+    titleFontSize: 20,
+    titleLetterSpacing: 1.2,
+    showValue: false,
+    onTap: _openNewSauveteurEditor,
+  ),
+],
         ),
       ),
     ),
@@ -3220,6 +3281,618 @@ Set<String> _readSphotMultiValue(dynamic value) {
       .toSet();
 }
 
+String get _resolvedTerritoireId {
+  return _activeTerritoireId.trim().isNotEmpty
+      ? _activeTerritoireId.trim()
+      : widget.territoireId.trim();
+}
+
+String _formatSurveillanceDate(DateTime date) {
+  return '${date.day.toString().padLeft(2, '0')}/'
+      '${date.month.toString().padLeft(2, '0')}/'
+      '${date.year}';
+}
+
+String _formatSurveillanceTime(TimeOfDay time) {
+  return '${time.hour.toString().padLeft(2, '0')}h'
+      '${time.minute.toString().padLeft(2, '0')}';
+}
+
+void _openSurveillancePeriodsPanel() {
+  if (_resolvedTerritoireId.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Le territoire doit être chargé avant de gérer les périodes.',
+        ),
+        backgroundColor: redColor,
+      ),
+    );
+    return;
+  }
+
+  setState(() {
+    _showSurveillancePeriodsPanel = true;
+    _showSauveteurEditorPanel = false;
+    _showSphotEditorPanel = false;
+    _placingSphotOnMap = false;
+    _selectedSpot = null;
+    _selectedAdmin = null;
+    _selectedAdvertiser = null;
+    _showLegalDocumentsPanel = false;
+  });
+}
+
+Future<void> _openSurveillancePeriodDialog({
+  _DashboardSurveillancePeriod? period,
+}) async {
+  final result = await showDialog<_DashboardSurveillancePeriod>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => _DashboardSurveillancePeriodDialog(
+      period: period,
+    ),
+  );
+
+  if (result == null) {
+    return;
+  }
+
+  try {
+    await FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(_resolvedTerritoireId)
+        .collection('periodesSurveillance')
+        .doc(result.id)
+        .set({
+      'id': result.id,
+      'name': result.name.toUpperCase(),
+      'territoireId': _resolvedTerritoireId,
+      'startDate': Timestamp.fromDate(result.startDate),
+      'endDate': Timestamp.fromDate(result.endDate),
+      'startHour':
+          '${result.startHour.hour.toString().padLeft(2, '0')}:'
+          '${result.startHour.minute.toString().padLeft(2, '0')}',
+      'endHour':
+          '${result.endHour.hour.toString().padLeft(2, '0')}:'
+          '${result.endHour.minute.toString().padLeft(2, '0')}',
+      'label':
+          '${result.name.toUpperCase()} — '
+          'DU ${_formatSurveillanceDate(result.startDate)} '
+          'AU ${_formatSurveillanceDate(result.endDate)} — '
+          'DE ${_formatSurveillanceTime(result.startHour)} '
+          'À ${_formatSurveillanceTime(result.endHour)}',
+      'updatedAt': FieldValue.serverTimestamp(),
+      if (period == null) 'createdAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          period == null
+              ? 'Période enregistrée avec succès.'
+              : 'Période modifiée avec succès.',
+        ),
+        backgroundColor: adminColor,
+      ),
+    );
+  } catch (error) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Enregistrement impossible : $error'),
+        backgroundColor: redColor,
+      ),
+    );
+  }
+}
+
+Future<void> _deleteSurveillancePeriod(
+  _DashboardSurveillancePeriod period,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text(
+          'SUPPRIMER LA PÉRIODE',
+          style: TextStyle(
+            color: adminColor,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: Text(
+          'Confirmer la suppression de « ${period.name} » ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('ANNULER'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: redColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('SUPPRIMER'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (confirmed != true) {
+    return;
+  }
+
+  try {
+    await FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(_resolvedTerritoireId)
+        .collection('periodesSurveillance')
+        .doc(period.id)
+        .delete();
+  } catch (error) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Suppression impossible : $error'),
+        backgroundColor: redColor,
+      ),
+    );
+  }
+}
+
+void _clearSauveteurEditor() {
+  _sauveteurNomController.clear();
+  _sauveteurPrenomController.clear();
+  _sauveteurDateNaissanceController.clear();
+  _sauveteurAgeController.clear();
+  _sauveteurAdresseController.clear();
+  _sauveteurCodePostalController.clear();
+  _sauveteurVilleController.clear();
+  _sauveteurTelephoneController.clear();
+  _sauveteurEmailController.clear();
+  _sauveteurExperienceController.clear();
+  _sauveteurObservationsController.clear();
+  _sauveteurFonctions.clear();
+  _sauveteurPostes.clear();
+  _sauveteurPeriodesSurveillance.clear();
+  _isSavingSauveteur = false;
+  _sauveteurAccessGenerated = false;
+  _sauveteurEmailSent = false;
+  _sauveteurGeneratedLogin = '';
+  _sauveteurGeneratedPassword = '';
+  _createdSauveteurDocId = null;
+}
+
+String _normalizeSauveteurLogin(String value) {
+  return value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[àáâäãå]'), 'a')
+      .replaceAll(RegExp(r'[ç]'), 'c')
+      .replaceAll(RegExp(r'[èéêë]'), 'e')
+      .replaceAll(RegExp(r'[ìíîï]'), 'i')
+      .replaceAll(RegExp(r'[ñ]'), 'n')
+      .replaceAll(RegExp(r'[òóôöõ]'), 'o')
+      .replaceAll(RegExp(r'[ùúûü]'), 'u')
+      .replaceAll(RegExp(r'[ýÿ]'), 'y')
+      .replaceAll('æ', 'ae')
+      .replaceAll('œ', 'oe')
+      .replaceAll(RegExp(r"[' -]"), '');
+}
+
+Future<String> _generateUniqueSauveteurLogin(
+  String baseLogin,
+) async {
+  final sauveteursRef = FirebaseFirestore.instance
+      .collection('territoires')
+      .doc(_resolvedTerritoireId)
+      .collection('sauveteurs');
+
+  var candidate = baseLogin;
+  var counter = 2;
+
+  while (true) {
+    final existing = await sauveteursRef
+        .where('login', isEqualTo: candidate)
+        .limit(1)
+        .get();
+
+    if (existing.docs.isEmpty) {
+      return candidate;
+    }
+
+    candidate = '$baseLogin$counter';
+    counter++;
+  }
+}
+
+void _showSauveteurError(String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: redColor,
+    ),
+  );
+}
+
+bool _validateSauveteurContact() {
+  if (_sauveteurNomController.text.trim().isEmpty) {
+    _showSauveteurError('Le nom du sauveteur est obligatoire.');
+    return false;
+  }
+
+  if (_sauveteurPrenomController.text.trim().isEmpty) {
+    _showSauveteurError('Le prénom du sauveteur est obligatoire.');
+    return false;
+  }
+
+  if (_sauveteurTelephoneController.text.trim().isEmpty) {
+    _showSauveteurError('Le téléphone du sauveteur est obligatoire.');
+    return false;
+  }
+
+  final email = _sauveteurEmailController.text.trim();
+  if (email.isEmpty || !email.contains('@')) {
+    _showSauveteurError(
+      'L’adresse email du sauveteur n’est pas valide.',
+    );
+    return false;
+  }
+
+  return true;
+}
+
+Future<void> _upsertSauveteurAccount({
+  required String login,
+  required String temporaryPassword,
+  required String sauveteurId,
+}) async {
+  final uri = Uri.parse(
+    'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+    'upsertSauveteurAccount',
+  );
+
+  final response = await http.post(
+    uri,
+    headers: const {'Content-Type': 'application/json'},
+    body: jsonEncode({
+      'login': login,
+      'temporaryPassword': temporaryPassword,
+      'mustChangePassword': true,
+      'accountStatus': 'ACTIVE',
+      'territoireId': _resolvedTerritoireId,
+      'sauveteurId': sauveteurId,
+      'nom': _sauveteurNomController.text.trim().toUpperCase(),
+      'prenom': _sauveteurPrenomController.text.trim(),
+      'email': _sauveteurEmailController.text.trim(),
+      'role': 'SAUVETEUR',
+    }),
+  );
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw Exception(
+      'Création du compte impossible (${response.statusCode}).',
+    );
+  }
+}
+
+Future<void> _generateSauveteurAccess() async {
+  if (!_validateSauveteurContact()) {
+    return;
+  }
+
+  final nom = _sauveteurNomController.text.trim();
+  final prenom = _sauveteurPrenomController.text.trim();
+  final baseLogin = _normalizeSauveteurLogin(
+    '${prenom.substring(0, 1)}$nom',
+  );
+
+  setState(() {
+    _isSavingSauveteur = true;
+  });
+
+  try {
+    final login = await _generateUniqueSauveteurLogin(baseLogin);
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    final random = math.Random.secure();
+    final password = List<String>.generate(
+      8,
+      (_) => chars[random.nextInt(chars.length)],
+    ).join();
+
+    final sauveteursRef = FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(_resolvedTerritoireId)
+        .collection('sauveteurs');
+
+    final docRef = _createdSauveteurDocId == null
+        ? sauveteursRef.doc()
+        : sauveteursRef.doc(_createdSauveteurDocId);
+
+    _createdSauveteurDocId = docRef.id;
+
+    await docRef.set({
+      'login': login,
+      'temporaryPassword': password,
+      'mustChangePassword': true,
+      'accountStatus': 'ACTIVE',
+      'accessGeneratedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    await _upsertSauveteurAccount(
+      login: login,
+      temporaryPassword: password,
+      sauveteurId: docRef.id,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSavingSauveteur = false;
+      _sauveteurGeneratedLogin = login;
+      _sauveteurGeneratedPassword = password;
+      _sauveteurAccessGenerated = true;
+      _sauveteurEmailSent = false;
+    });
+  } catch (error) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSavingSauveteur = false;
+    });
+    _showSauveteurError('Génération impossible : $error');
+  }
+}
+
+Future<void> _sendSauveteurCredentialsEmail() async {
+  if (!_sauveteurAccessGenerated || _sauveteurEmailSent) {
+    return;
+  }
+
+  final uri = Uri.https(
+    'us-central1-sphot-ab80b.cloudfunctions.net',
+    '/sendSauveteurCredentialsEmail',
+    {
+      'email': _sauveteurEmailController.text.trim(),
+      'prenom': _sauveteurPrenomController.text.trim(),
+      'identifiant': _sauveteurGeneratedLogin,
+      'motdepasse': _sauveteurGeneratedPassword,
+    },
+  );
+
+  setState(() {
+    _isSavingSauveteur = true;
+  });
+
+  try {
+    final response = await http.get(uri);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Erreur email ${response.statusCode}.');
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSavingSauveteur = false;
+      _sauveteurEmailSent = true;
+    });
+  } catch (error) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSavingSauveteur = false;
+    });
+    _showSauveteurError('Envoi de l’email impossible : $error');
+  }
+}
+
+Future<void> _selectSauveteurBirthDate() async {
+  final now = DateTime.now();
+  final selectedDate = await showDatePicker(
+    context: context,
+    initialDate: DateTime(now.year - 20),
+    firstDate: DateTime(now.year - 100),
+    lastDate: now,
+    builder: (context, child) {
+  return Theme(
+    data: Theme.of(context).copyWith(
+      colorScheme: const ColorScheme.light(
+        primary: adminColor,
+        onPrimary: Colors.white,
+        onSurface: adminColor,
+      ),
+    ),
+    child: child!,
+  );
+},
+  );
+
+  if (selectedDate == null || !mounted) {
+    return;
+  }
+
+  var age = now.year - selectedDate.year;
+  if (now.month < selectedDate.month ||
+      (now.month == selectedDate.month &&
+          now.day < selectedDate.day)) {
+    age--;
+  }
+
+  setState(() {
+    _sauveteurDateNaissanceController.text =
+        '${selectedDate.day.toString().padLeft(2, '0')}/'
+        '${selectedDate.month.toString().padLeft(2, '0')}/'
+        '${selectedDate.year}';
+    _sauveteurAgeController.text = age.toString();
+  });
+}
+
+bool _validateSauveteurBeforeSave() {
+  if (!_validateSauveteurContact()) {
+    return false;
+  }
+
+  if (_sauveteurFonctions.isEmpty) {
+    _showSauveteurError('Sélectionnez au moins une fonction.');
+    return false;
+  }
+
+  if (_sauveteurPostes.isEmpty) {
+    _showSauveteurError(
+      'Affectez au moins un poste de secours au sauveteur.',
+    );
+    return false;
+  }
+
+if (_sauveteurPeriodesSurveillance.isEmpty) {
+  _showSauveteurError(
+    'Sélectionnez au moins une période de surveillance.',
+  );
+  return false;
+}
+
+  if (!_sauveteurAccessGenerated) {
+    _showSauveteurError(
+      'Générez l’accès avant d’enregistrer.',
+    );
+    return false;
+  }
+
+  if (!_sauveteurEmailSent) {
+    _showSauveteurError(
+      'Envoyez les identifiants avant d’enregistrer.',
+    );
+    return false;
+  }
+
+  return true;
+}
+
+Future<void> _saveSauveteur() async {
+  if (!_validateSauveteurBeforeSave()) {
+    return;
+  }
+
+  final sauveteurId = _createdSauveteurDocId;
+  if (sauveteurId == null) {
+    _showSauveteurError('Identifiant du sauveteur introuvable.');
+    return;
+  }
+
+  setState(() {
+    _isSavingSauveteur = true;
+  });
+
+  try {
+    final data = <String, dynamic>{
+      'nom': _sauveteurNomController.text.trim().toUpperCase(),
+      'prenom': _sauveteurPrenomController.text.trim(),
+      'role': 'SAUVETEUR',
+      'accountStatus': 'ACTIVE',
+      'accessInheritedStatus': 'ACTIVE',
+      'authUid': '',
+      'login': _sauveteurGeneratedLogin,
+      'temporaryPassword': _sauveteurGeneratedPassword,
+      'mustChangePassword': true,
+      'createdByAdmin': true,
+      'dateNaissance':
+          _sauveteurDateNaissanceController.text.trim(),
+      'age': _sauveteurAgeController.text.trim(),
+      'adresse': _sauveteurAdresseController.text.trim(),
+      'codePostal': _sauveteurCodePostalController.text.trim(),
+      'ville': _sauveteurVilleController.text.trim().toUpperCase(),
+      'telephone': _sauveteurTelephoneController.text.trim(),
+      'email': _sauveteurEmailController.text.trim(),
+      'fonctions': _sauveteurFonctions.toList(),
+      'postesAffectes': _sauveteurPostes.toList(),
+      'periodesSurveillance':
+    _sauveteurPeriodesSurveillance.toList(),
+      'experience': _sauveteurExperienceController.text.trim(),
+      'observations': _sauveteurObservationsController.text.trim(),
+      'territoireId': _resolvedTerritoireId,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    final sauveteurRef = FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(_resolvedTerritoireId)
+        .collection('sauveteurs')
+        .doc(sauveteurId);
+
+    await sauveteurRef.set(data, SetOptions(merge: true));
+
+    for (final posteId in _sauveteurPostes) {
+      await FirebaseFirestore.instance
+          .collection('territoires')
+          .doc(_resolvedTerritoireId)
+          .collection('spots')
+          .doc(posteId)
+          .collection('sauveteursAffectes')
+          .doc(sauveteurId)
+          .set({
+        'sauveteurId': sauveteurId,
+        'nom': data['nom'],
+        'prenom': data['prenom'],
+        'fonctions': data['fonctions'],
+        'postesAffectes': data['postesAffectes'],
+        'periodesSurveillance':
+    data['periodesSurveillance'],
+        'territoireId': _resolvedTerritoireId,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSavingSauveteur = false;
+      _showSauveteurEditorPanel = false;
+      _clearSauveteurEditor();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Sauveteur enregistré avec succès.'),
+        backgroundColor: adminColor,
+      ),
+    );
+  } catch (error) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSavingSauveteur = false;
+    });
+    _showSauveteurError('Enregistrement impossible : $error');
+  }
+}
+
 void _clearSphotEditor() {
   _editingSphotDocId = null;
   _expandedSphotDropdown = null;
@@ -3235,8 +3908,40 @@ void _clearSphotEditor() {
 void _openNewSphotEditor() {
   setState(() {
     _clearSphotEditor();
+    _showSauveteurEditorPanel = false;
+    _showSurveillancePeriodsPanel = false;
     _showSphotEditorPanel = true;
     _placingSphotOnMap = true;
+    _selectedSpot = null;
+    _selectedAdmin = null;
+    _selectedAdvertiser = null;
+    _showLegalDocumentsPanel = false;
+  });
+}
+
+void _openNewSauveteurEditor() {
+  final territoireId = _activeTerritoireId.trim().isNotEmpty
+      ? _activeTerritoireId.trim()
+      : widget.territoireId.trim();
+
+  if (territoireId.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Le territoire doit être chargé avant de créer un sauveteur.',
+        ),
+        backgroundColor: redColor,
+      ),
+    );
+    return;
+  }
+
+  setState(() {
+    _clearSauveteurEditor();
+    _showSauveteurEditorPanel = true;
+    _showSurveillancePeriodsPanel = false;
+    _showSphotEditorPanel = false;
+    _placingSphotOnMap = false;
     _selectedSpot = null;
     _selectedAdmin = null;
     _selectedAdvertiser = null;
@@ -3265,6 +3970,8 @@ void _loadSphotInEditor(Map<String, dynamic> data) {
     _selectedSphotLabels
       ..clear()
       ..addAll(_readSphotMultiValue(data['labelSphot']));
+    _showSauveteurEditorPanel = false;
+    _showSurveillancePeriodsPanel = false;
     _showSphotEditorPanel = true;
     _placingSphotOnMap = false;
     _selectedSpot = data;
@@ -4028,6 +4735,1063 @@ Widget _sphotSectionTitle(
     style: const TextStyle(
       fontSize: 14,
       fontWeight: FontWeight.w900,
+    ),
+  );
+}
+
+Widget _sauveteurSectionTitle(
+  int number,
+  String title,
+) {
+  return Text.rich(
+    TextSpan(
+      children: [
+        TextSpan(
+          text: '$number. ',
+          style: const TextStyle(color: redColor),
+        ),
+        TextSpan(
+          text: title,
+          style: const TextStyle(color: adminColor),
+        ),
+      ],
+    ),
+    style: const TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w900,
+      letterSpacing: 0.4,
+    ),
+  );
+}
+
+Widget _sauveteurEditorField({
+  required TextEditingController controller,
+  required String label,
+  TextInputType? keyboardType,
+  List<TextInputFormatter>? inputFormatters,
+  int maxLines = 1,
+  bool readOnly = false,
+  VoidCallback? onTap,
+  bool forceUppercase = false,
+  bool capitalizeFirstLetter = false,
+}) {
+  return TextField(
+    controller: controller,
+    keyboardType: keyboardType,
+    maxLines: maxLines,
+    readOnly: readOnly,
+    onTap: onTap,
+    textCapitalization: forceUppercase
+        ? TextCapitalization.characters
+        : TextCapitalization.sentences,
+    onChanged: (value) {
+      var normalizedValue = value;
+
+      if (forceUppercase) {
+        normalizedValue = value.toUpperCase();
+      } else if (capitalizeFirstLetter && value.isNotEmpty) {
+        normalizedValue =
+            value.substring(0, 1).toUpperCase() + value.substring(1);
+      }
+
+      if (normalizedValue != value) {
+        controller.value = TextEditingValue(
+          text: normalizedValue,
+          selection: TextSelection.collapsed(
+            offset: normalizedValue.length,
+          ),
+        );
+      }
+
+      if (mounted) {
+        setState(() {});
+      }
+    },
+    style: const TextStyle(
+      color: adminColor,
+      fontSize: 15,
+      fontWeight: FontWeight.w700,
+    ),
+    decoration: InputDecoration(
+      labelText: label,
+      alignLabelWithHint: maxLines > 1,
+      labelStyle: const TextStyle(
+        color: adminColor,
+        fontWeight: FontWeight.w700,
+      ),
+      filled: true,
+      fillColor: adminColor.withOpacity(0.035),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 13,
+        vertical: 13,
+      ),
+      suffixIcon: onTap == null
+          ? null
+          : const Icon(
+              Icons.calendar_month_rounded,
+              color: adminColor,
+            ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: adminColor.withOpacity(0.55),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(
+          color: adminColor,
+          width: 1.8,
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _buildSauveteurFunctionsField() {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: adminColor.withOpacity(0.025),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: adminColor.withOpacity(0.55),
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Fonction(s)',
+          style: TextStyle(
+            color: adminColor,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Column(
+          children: _sauveteurFonctionChoices.map((fonction) {
+            final selected = _sauveteurFonctions.contains(fonction);
+            return CheckboxListTile(
+              dense: true,
+              visualDensity: const VisualDensity(
+                horizontal: -4,
+                vertical: -4,
+              ),
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              activeColor: adminColor,
+              value: selected,
+              title: Text(
+                fonction,
+                style: const TextStyle(
+                  color: adminColor,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  if (value == true) {
+                    _sauveteurFonctions.add(fonction);
+                  } else {
+                    _sauveteurFonctions.remove(fonction);
+                  }
+                });
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildSauveteurPostesField() {
+  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    stream: FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(_resolvedTerritoireId)
+        .collection('spots')
+        .where(
+          'typeSphot',
+          isEqualTo: '🚨 POSTE DE SECOURS 🚨',
+        )
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return Text(
+          'Chargement des postes impossible : ${snapshot.error}',
+          style: const TextStyle(color: redColor),
+        );
+      }
+
+      if (!snapshot.hasData) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      }
+
+      final docs = snapshot.data!.docs.toList()
+        ..sort((a, b) {
+          final aData = a.data();
+          final bData = b.data();
+          final aName = _cleanText(
+            aData['nomSecours'] ??
+                aData['nomSphot'] ??
+                aData['sphotName'],
+          );
+          final bName = _cleanText(
+            bData['nomSecours'] ??
+                bData['nomSphot'] ??
+                bData['sphotName'],
+          );
+          return aName.compareTo(bName);
+        });
+
+      if (docs.isEmpty) {
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: adminColor.withOpacity(0.45),
+            ),
+          ),
+          child: const Text(
+            'Aucun poste de secours disponible.',
+            style: TextStyle(
+              color: adminColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        );
+      }
+
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: adminColor.withOpacity(0.025),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: adminColor.withOpacity(0.55),
+          ),
+        ),
+        child: Column(
+          children: docs.map((doc) {
+            final data = doc.data();
+            final label = _cleanText(
+              data['nomSecours'] ??
+                  data['nomSphot'] ??
+                  data['sphotName'] ??
+                  data['idSphot'] ??
+                  doc.id,
+            );
+            final selected = _sauveteurPostes.contains(doc.id);
+
+            return CheckboxListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              value: selected,
+              activeColor: adminColor,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: Text(
+                label.isEmpty ? doc.id : label,
+                style: const TextStyle(
+                  color: adminColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  if (value == true) {
+                    _sauveteurPostes.add(doc.id);
+                  } else {
+                    _sauveteurPostes.remove(doc.id);
+                  }
+                });
+              },
+            );
+          }).toList(),
+        ),
+      );
+    },
+  );
+}
+
+Widget _buildSauveteurPeriodesField() {
+  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    stream: FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(_resolvedTerritoireId)
+        .collection('periodesSurveillance')
+        .orderBy('startDate')
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return Text(
+          'Chargement des périodes impossible : ${snapshot.error}',
+          style: const TextStyle(
+            color: redColor,
+            fontWeight: FontWeight.w700,
+          ),
+        );
+      }
+
+      if (!snapshot.hasData) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      }
+
+      final periods = snapshot.data!.docs;
+
+      if (periods.isEmpty) {
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: adminColor,
+              width: 1.4,
+            ),
+          ),
+          child: const Text(
+            'Aucune période de surveillance enregistrée.',
+            style: TextStyle(
+              color: adminColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        );
+      }
+
+      return Column(
+  children: periods.map((periodDocument) {
+    final data = periodDocument.data();
+    final periodId = periodDocument.id;
+
+    final periodName = (data['name'] ?? 'PÉRIODE SANS NOM')
+        .toString()
+        .toUpperCase();
+
+    final startDateValue = data['startDate'];
+    final endDateValue = data['endDate'];
+
+    final startDate = startDateValue is Timestamp
+        ? _formatSurveillanceDate(startDateValue.toDate())
+        : '--/--/----';
+
+    final endDate = endDateValue is Timestamp
+        ? _formatSurveillanceDate(endDateValue.toDate())
+        : '--/--/----';
+
+    final rawStartHour =
+        (data['startHour'] ?? '--:--').toString();
+
+    final rawEndHour =
+        (data['endHour'] ?? '--:--').toString();
+
+    final startHour = rawStartHour.replaceFirst(':', 'h');
+    final endHour = rawEndHour.replaceFirst(':', 'h');
+
+    final selected =
+        _sauveteurPeriodesSurveillance.contains(periodId);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: adminColor.withOpacity(0.025),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: adminColor,
+            width: 1.4,
+          ),
+        ),
+        child: CheckboxListTile(
+          value: selected,
+          activeColor: adminColor,
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 6,
+          ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                periodName,
+                style: const TextStyle(
+                  color: redColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                'DU $startDate AU $endDate',
+                style: const TextStyle(
+                  color: adminColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                'DE $startHour À $endHour',
+                style: const TextStyle(
+                  color: adminColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          onChanged: (value) {
+            setState(() {
+              if (value == true) {
+                _sauveteurPeriodesSurveillance.add(periodId);
+              } else {
+                _sauveteurPeriodesSurveillance.remove(periodId);
+              }
+            });
+          },
+        ),
+      ),
+    );
+  }).toList(),
+);
+    },
+  );
+}
+
+Widget _buildSurveillancePeriodsPanel() {
+  return Container(
+    width: 430,
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.98),
+      border: Border(
+        left: BorderSide(
+          color: adminColor.withOpacity(0.45),
+          width: 1.5,
+        ),
+      ),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Transform.translate(
+                    offset: const Offset(-12, 0),
+                    child: Transform.scale(
+                      scale: 1.8,
+                      alignment: Alignment.center,
+                      child: Image.asset(
+                        'data/icons/fire_red_icon.png',
+                        width: 30,
+                        height: 30,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                      ),
+                    ),
+                  ),
+                  const Expanded(
+                    child: Text(
+                      'CRÉER UNE PÉRIODE',
+                      style: TextStyle(
+                        color: adminColor,
+                        fontSize: 20,
+fontWeight: FontWeight.w900,
+letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Fermer',
+                    onPressed: () {
+                      setState(() {
+                        _showSurveillancePeriodsPanel = false;
+                      });
+                    },
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    _openSurveillancePeriodDialog();
+                  },
+                  icon: const Icon(
+                    Icons.add_rounded,
+                    color: redColor,
+                    size: 28,
+                  ),
+                  label: const Text(
+                    'CRÉER UNE PÉRIODE DE SURVEILLANCE',
+                    style: TextStyle(
+                      color: adminColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(
+                      color: adminColor,
+                      width: 1.7,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'PÉRIODES DE SURVEILLANCE ENREGISTRÉES',
+                style: TextStyle(
+                  color: adminColor,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.4,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: StreamBuilder<
+                    QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('territoires')
+                      .doc(_resolvedTerritoireId)
+                      .collection('periodesSurveillance')
+                      .orderBy('startDate')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Chargement impossible : ${snapshot.error}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: redColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      );
+                    }
+
+                    if (!snapshot.hasData) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+
+                    final docs = snapshot.data!.docs;
+
+                    if (docs.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'Aucune période de surveillance créée.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: adminColor,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      );
+                    }
+
+                    return ListView.separated(
+                      itemCount: docs.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final doc = docs[index];
+                        final data = doc.data();
+                        final startDateValue = data['startDate'];
+                        final endDateValue = data['endDate'];
+
+                        if (startDateValue is! Timestamp ||
+                            endDateValue is! Timestamp) {
+                          return const SizedBox.shrink();
+                        }
+
+                        final startParts =
+                            (data['startHour'] ?? '00:00')
+                                .toString()
+                                .split(':');
+                        final endParts =
+                            (data['endHour'] ?? '00:00')
+                                .toString()
+                                .split(':');
+
+                        final period = _DashboardSurveillancePeriod(
+                          id: doc.id,
+                          name: _cleanText(data['name']),
+                          startDate: startDateValue.toDate(),
+                          endDate: endDateValue.toDate(),
+                          startHour: TimeOfDay(
+                            hour: int.tryParse(startParts.first) ?? 0,
+                            minute: int.tryParse(
+                                  startParts.length > 1
+                                      ? startParts[1]
+                                      : '0',
+                                ) ??
+                                0,
+                          ),
+                          endHour: TimeOfDay(
+                            hour: int.tryParse(endParts.first) ?? 0,
+                            minute: int.tryParse(
+                                  endParts.length > 1
+                                      ? endParts[1]
+                                      : '0',
+                                ) ??
+                                0,
+                          ),
+                        );
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: adminColor.withOpacity(0.035),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: adminColor,
+                              width: 1.4,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      period.name.toUpperCase(),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: redColor,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      'DU ${_formatSurveillanceDate(period.startDate)} '
+                                      'AU ${_formatSurveillanceDate(period.endDate)}',
+                                      style: const TextStyle(
+                                        color: adminColor,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      'DE ${_formatSurveillanceTime(period.startHour)} '
+                                      'À ${_formatSurveillanceTime(period.endHour)}',
+                                      style: const TextStyle(
+                                        color: adminColor,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Modifier',
+                                onPressed: () {
+                                  _openSurveillancePeriodDialog(
+                                    period: period,
+                                  );
+                                },
+                                icon: const Icon(
+                                  Icons.edit_rounded,
+                                  color: adminColor,
+                                  size: 21,
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Supprimer',
+                                onPressed: () {
+                                  _deleteSurveillancePeriod(period);
+                                },
+                                icon: const Icon(
+                                  Icons.delete_rounded,
+                                  color: redColor,
+                                  size: 21,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _buildSauveteurEditorPanel() {
+  final contactOk =
+      _sauveteurTelephoneController.text.trim().isNotEmpty &&
+      _sauveteurEmailController.text.trim().contains('@');
+
+  return Container(
+    width: 430,
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.98),
+      border: Border(
+        left: BorderSide(
+          color: adminColor.withOpacity(0.45),
+          width: 1.5,
+        ),
+      ),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Transform.translate(
+                    offset: const Offset(-12, 0),
+                    child: Transform.scale(
+                      scale: 1.8,
+                      alignment: Alignment.center,
+                      child: Image.asset(
+                        'data/icons/fire_red_icon.png',
+                        width: 30,
+                        height: 30,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                      ),
+                    ),
+                  ),
+                  const Expanded(
+                    child: Text(
+                      'CRÉER UN SAUVETEUR',
+                      style: TextStyle(
+                        color: adminColor,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Fermer',
+                    onPressed: () {
+                      setState(() {
+                        _showSauveteurEditorPanel = false;
+                        _clearSauveteurEditor();
+                      });
+                    },
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _sauveteurSectionTitle(1, 'IDENTITÉ'),
+                      const SizedBox(height: 9),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _sauveteurEditorField(
+                              controller: _sauveteurNomController,
+                              label: 'NOM',
+                              forceUppercase: true,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _sauveteurEditorField(
+                              controller: _sauveteurPrenomController,
+                              label: 'Prénom',
+                              capitalizeFirstLetter: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _sauveteurEditorField(
+                              controller:
+                                  _sauveteurDateNaissanceController,
+                              label: 'Date de naissance',
+                              readOnly: true,
+                              onTap: _selectSauveteurBirthDate,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 92,
+                            child: _sauveteurEditorField(
+                              controller: _sauveteurAgeController,
+                              label: 'Âge',
+                              readOnly: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      _sauveteurSectionTitle(2, 'COORDONNÉES'),
+                      const SizedBox(height: 9),
+                      _sauveteurEditorField(
+                        controller: _sauveteurAdresseController,
+                        label: 'Adresse',
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 125,
+                            child: _sauveteurEditorField(
+                              controller:
+                                  _sauveteurCodePostalController,
+                              label: 'Code postal',
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _sauveteurEditorField(
+                              controller: _sauveteurVilleController,
+                              label: 'VILLE',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _sauveteurEditorField(
+  controller: _sauveteurTelephoneController,
+  label: 'Téléphone',
+  keyboardType: TextInputType.phone,
+  inputFormatters: [
+    FilteringTextInputFormatter.digitsOnly,
+    FrenchPhoneNumberFormatter(),
+  ],
+),
+                      const SizedBox(height: 18),
+                      _sauveteurSectionTitle(
+                        3,
+                        'FONCTION ET EXPÉRIENCE',
+                      ),
+                      const SizedBox(height: 9),
+                      _buildSauveteurFunctionsField(),
+                      const SizedBox(height: 8),
+                      _sauveteurEditorField(
+                        controller: _sauveteurExperienceController,
+                        label: 'Années d’expérience',
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 18),
+                      _sauveteurSectionTitle(
+                        4,
+                        'POSTE(S) DE SECOURS',
+                      ),
+                      const SizedBox(height: 9),
+                      _buildSauveteurPostesField(),
+                      const SizedBox(height: 18),
+
+_sauveteurSectionTitle(
+  5,
+  'PÉRIODE(S) DE SURVEILLANCE',
+),
+
+const SizedBox(height: 9),
+
+_buildSauveteurPeriodesField(),
+                      const SizedBox(height: 18),
+                      _sauveteurSectionTitle(6, 'OBSERVATIONS'),
+                      const SizedBox(height: 9),
+                      _sauveteurEditorField(
+                        controller: _sauveteurObservationsController,
+                        label: 'Observations',
+                        maxLines: 4,
+                      ),
+                      const SizedBox(height: 18),
+                      _sauveteurSectionTitle(7, 'ACCÈS SAUVETEUR'),
+                      const SizedBox(height: 9),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 46,
+                        child: OutlinedButton(
+                          onPressed: _isSavingSauveteur
+                              ? null
+                              : _generateSauveteurAccess,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _sauveteurAccessGenerated
+                                ? Colors.white
+                                : redColor,
+                            backgroundColor:
+                                _sauveteurAccessGenerated
+                                    ? redColor
+                                    : Colors.transparent,
+                            side: const BorderSide(
+                              color: redColor,
+                              width: 1.8,
+                            ),
+                          ),
+                          child: Text(
+                            _sauveteurAccessGenerated
+                                ? 'ACCÈS GÉNÉRÉ'
+                                : 'GÉNÉRER L’ACCÈS',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: adminColor.withOpacity(0.55),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Identifiant : '
+                              '${_sauveteurGeneratedLogin.isEmpty ? 'non généré' : _sauveteurGeneratedLogin}',
+                              style: const TextStyle(
+                                color: adminColor,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Mot de passe : '
+                              '${_sauveteurGeneratedPassword.isEmpty ? 'non généré' : _sauveteurGeneratedPassword}',
+                              style: const TextStyle(
+                                color: adminColor,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: OutlinedButton(
+                          onPressed: _sauveteurAccessGenerated &&
+                                  contactOk &&
+                                  !_sauveteurEmailSent &&
+                                  !_isSavingSauveteur
+                              ? _sendSauveteurCredentialsEmail
+                              : null,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _sauveteurEmailSent
+                                ? Colors.white
+                                : redColor,
+                            backgroundColor: _sauveteurEmailSent
+                                ? redColor
+                                : Colors.transparent,
+                            side: const BorderSide(
+                              color: redColor,
+                              width: 1.8,
+                            ),
+                          ),
+                          child: Text(
+                            _sauveteurEmailSent
+                                ? 'EMAIL ENVOYÉ'
+                                : 'ENVOYER PAR EMAIL',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _isSavingSauveteur
+                      ? null
+                      : _saveSauveteur,
+                  icon: _isSavingSauveteur
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.save_rounded),
+                  label: Text(
+                    _isSavingSauveteur
+                        ? 'ENREGISTREMENT...'
+                        : 'ENREGISTRER',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: redColor,
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
+                    side: const BorderSide(
+                      color: redColor,
+                      width: 1.8,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     ),
   );
 }
@@ -6771,6 +8535,17 @@ void dispose() {
   _sphotNameController.dispose();
   _sphotLatController.dispose();
   _sphotLngController.dispose();
+  _sauveteurNomController.dispose();
+  _sauveteurPrenomController.dispose();
+  _sauveteurDateNaissanceController.dispose();
+  _sauveteurAgeController.dispose();
+  _sauveteurAdresseController.dispose();
+  _sauveteurCodePostalController.dispose();
+  _sauveteurVilleController.dispose();
+  _sauveteurTelephoneController.dispose();
+  _sauveteurEmailController.dispose();
+  _sauveteurExperienceController.dispose();
+  _sauveteurObservationsController.dispose();
 
   super.dispose();
 }
@@ -7919,7 +9694,11 @@ final clusteredMarkers = validSpots.map((doc) {
                       if (_selectedAdmin != null)
   _buildAdminDetailPanel(),
 
-if (_showSphotEditorPanel)
+if (_showSurveillancePeriodsPanel)
+  _buildSurveillancePeriodsPanel()
+else if (_showSauveteurEditorPanel)
+  _buildSauveteurEditorPanel()
+else if (_showSphotEditorPanel)
   _buildSphotEditorPanel()
 else if (_selectedSpot != null)
   _buildSpotDetailPanel(),
@@ -7966,6 +9745,420 @@ class DashboardSpotMarker extends StatelessWidget {
           size: 34,
         );
       },
+    );
+  }
+}
+
+class FrenchPhoneNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+
+    if (digits.length > 10) {
+      digits = digits.substring(0, 10);
+    }
+
+    final buffer = StringBuffer();
+
+    for (var index = 0; index < digits.length; index++) {
+      if (index > 0 && index.isEven) {
+        buffer.write(' ');
+      }
+
+      buffer.write(digits[index]);
+    }
+
+    final formattedNumber = buffer.toString();
+
+    return TextEditingValue(
+      text: formattedNumber,
+      selection: TextSelection.collapsed(
+        offset: formattedNumber.length,
+      ),
+    );
+  }
+}
+
+class _DashboardSurveillancePeriod {
+  final String id;
+  final String name;
+  final DateTime startDate;
+  final DateTime endDate;
+  final TimeOfDay startHour;
+  final TimeOfDay endHour;
+
+  const _DashboardSurveillancePeriod({
+    required this.id,
+    required this.name,
+    required this.startDate,
+    required this.endDate,
+    required this.startHour,
+    required this.endHour,
+  });
+}
+
+class _DashboardSurveillancePeriodDialog extends StatefulWidget {
+  final _DashboardSurveillancePeriod? period;
+
+  const _DashboardSurveillancePeriodDialog({
+    this.period,
+  });
+
+  @override
+  State<_DashboardSurveillancePeriodDialog> createState() =>
+      _DashboardSurveillancePeriodDialogState();
+}
+
+class _DashboardSurveillancePeriodDialogState
+    extends State<_DashboardSurveillancePeriodDialog> {
+  static const Color _blue = Color(0xFF1E3A8A);
+  static const Color _red = Color(0xFFDC2626);
+
+  late final TextEditingController _nameController;
+  DateTime? _startDate;
+  DateTime? _endDate;
+  TimeOfDay? _startHour;
+  TimeOfDay? _endHour;
+  String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(
+      text: widget.period?.name ?? '',
+    );
+    _startDate = widget.period?.startDate;
+    _endDate = widget.period?.endDate;
+    _startHour = widget.period?.startHour;
+    _endHour = widget.period?.endHour;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) {
+      return 'Choisir';
+    }
+
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
+  }
+
+  String _formatTime(TimeOfDay? time) {
+    if (time == null) {
+      return 'Choisir';
+    }
+
+    return '${time.hour.toString().padLeft(2, '0')}h'
+        '${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _pickDate({
+    required bool isStart,
+  }) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: isStart
+          ? (_startDate ?? DateTime.now())
+          : (_endDate ?? _startDate ?? DateTime.now()),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: _blue,
+              onPrimary: Colors.white,
+              onSurface: _blue,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      if (isStart) {
+        _startDate = picked;
+        if (_endDate != null && _endDate!.isBefore(picked)) {
+          _endDate = picked;
+        }
+      } else {
+        _endDate = picked;
+      }
+      _errorMessage = '';
+    });
+  }
+
+  Future<void> _pickTime({
+    required bool isStart,
+  }) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: isStart
+          ? (_startHour ?? const TimeOfDay(hour: 11, minute: 0))
+          : (_endHour ?? const TimeOfDay(hour: 19, minute: 0)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: _blue,
+              onPrimary: Colors.white,
+              onSurface: _blue,
+            ),
+          ),
+          child: MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              alwaysUse24HourFormat: true,
+            ),
+            child: child!,
+          ),
+        );
+      },
+    );
+
+    if (picked == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      if (isStart) {
+        _startHour = picked;
+      } else {
+        _endHour = picked;
+      }
+      _errorMessage = '';
+    });
+  }
+
+  Widget _pickerTile({
+    required String label,
+    required String value,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+        decoration: BoxDecoration(
+          color: _blue.withOpacity(0.025),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: _blue,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: _blue),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: _blue,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Text(
+              value,
+              style: const TextStyle(
+                color: _blue,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _save() {
+    final name = _nameController.text.trim();
+    String error = '';
+
+    if (name.isEmpty) {
+      error = 'Nom de période manquant';
+    } else if (_startDate == null) {
+      error = 'Date de début manquante';
+    } else if (_endDate == null) {
+      error = 'Date de fin manquante';
+    } else if (_startHour == null) {
+      error = 'Heure de début manquante';
+    } else if (_endHour == null) {
+      error = 'Heure de fin manquante';
+    } else if (_endDate!.isBefore(_startDate!)) {
+      error =
+          'La date de fin doit être postérieure à la date de début';
+    }
+
+    if (error.isNotEmpty) {
+      setState(() {
+        _errorMessage = error;
+      });
+      return;
+    }
+
+    Navigator.of(context).pop(
+      _DashboardSurveillancePeriod(
+        id: widget.period?.id ??
+            DateTime.now().millisecondsSinceEpoch.toString(),
+        name: name.toUpperCase(),
+        startDate: _startDate!,
+        endDate: _endDate!,
+        startHour: _startHour!,
+        endHour: _endHour!,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(
+          color: _blue,
+          width: 1.5,
+        ),
+      ),
+      title: Text(
+        widget.period == null
+    ? 'CRÉER UNE PÉRIODE DE SURVEILLANCE'
+    : 'MODIFIER LA PÉRIODE DE SURVEILLANCE',
+        style: const TextStyle(
+          color: _blue,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      content: SizedBox(
+        width: 390,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _nameController,
+                textCapitalization: TextCapitalization.characters,
+                onChanged: (value) {
+                  final upperValue = value.toUpperCase();
+                  if (upperValue != value) {
+                    _nameController.value = TextEditingValue(
+                      text: upperValue,
+                      selection: TextSelection.collapsed(
+                        offset: upperValue.length,
+                      ),
+                    );
+                  }
+                },
+                style: const TextStyle(
+                  color: _red,
+                  fontWeight: FontWeight.w900,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'NOM de la période de surveillance',
+                  hintText: 'EX : JUILLET - AOÛT 20..',
+                  labelStyle: const TextStyle(
+                    color: _blue,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: _blue),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: _blue,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _pickerTile(
+                label: 'Date début',
+                value: _formatDate(_startDate),
+                icon: Icons.calendar_month_rounded,
+                onTap: () => _pickDate(isStart: true),
+              ),
+              const SizedBox(height: 9),
+              _pickerTile(
+                label: 'Date fin',
+                value: _formatDate(_endDate),
+                icon: Icons.calendar_month_rounded,
+                onTap: () => _pickDate(isStart: false),
+              ),
+              const SizedBox(height: 9),
+              _pickerTile(
+                label: 'Heure début',
+                value: _formatTime(_startHour),
+                icon: Icons.access_time_rounded,
+                onTap: () => _pickTime(isStart: true),
+              ),
+              const SizedBox(height: 9),
+              _pickerTile(
+                label: 'Heure fin',
+                value: _formatTime(_endHour),
+                icon: Icons.access_time_rounded,
+                onTap: () => _pickTime(isStart: false),
+              ),
+              if (_errorMessage.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _errorMessage,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: _red,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('ANNULER'),
+        ),
+        OutlinedButton(
+          onPressed: _save,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _red,
+            side: const BorderSide(
+              color: _red,
+              width: 1.8,
+            ),
+          ),
+          child: const Text(
+            'ENREGISTRER',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
