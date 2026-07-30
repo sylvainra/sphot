@@ -88,6 +88,7 @@ Color _sphotHoverColor = adminColor;
 
   bool _showSphotEditorPanel = false;
   bool _showSauveteurEditorPanel = false;
+  bool _showSauveteursManagementPanel = false;
   bool _showSurveillancePeriodsPanel = false;
   bool _placingSphotOnMap = false;
   bool _isSavingSphot = false;
@@ -135,6 +136,8 @@ Color _sphotHoverColor = adminColor;
   String _sauveteurGeneratedLogin = '';
   String _sauveteurGeneratedPassword = '';
   String? _createdSauveteurDocId;
+  String? _editingSauveteurDocId;
+  final Set<String> _originalSauveteurPostes = <String>{};
 
   static const List<String> _sauveteurFonctionChoices = <String>[
     'CHEF DE POSTE',
@@ -1287,7 +1290,7 @@ void _removeSphotHoverLabel() {
 
   final tooltipText = idSphot.isEmpty
       ? name
-      : 'N° $idSphot - $name';
+      : '$idSphot - $name';
 
   final iconPath = _getMarkerIconPath(data);
 
@@ -1864,8 +1867,17 @@ Future<void> _editAdminReferent({
                     Expanded(
                       child: TextField(
                         controller: firstNameController,
+                        style: const TextStyle(
+                          color: adminColor,
+                        ),
                         decoration: const InputDecoration(
                           labelText: 'Prénom',
+                          labelStyle: TextStyle(
+                            color: adminColor,
+                          ),
+                          floatingLabelStyle: TextStyle(
+                            color: adminColor,
+                          ),
                           prefixIcon: Icon(
                             Icons.person_outline_rounded,
                           ),
@@ -1876,8 +1888,17 @@ Future<void> _editAdminReferent({
                     Expanded(
                       child: TextField(
                         controller: lastNameController,
+                        style: const TextStyle(
+                          color: adminColor,
+                        ),
                         decoration: const InputDecoration(
                           labelText: 'Nom',
+                          labelStyle: TextStyle(
+                            color: adminColor,
+                          ),
+                          floatingLabelStyle: TextStyle(
+                            color: adminColor,
+                          ),
                           prefixIcon: Icon(
                             Icons.person_outline_rounded,
                           ),
@@ -1889,8 +1910,17 @@ Future<void> _editAdminReferent({
                 const SizedBox(height: 12),
                 TextField(
                   controller: functionController,
+                  style: const TextStyle(
+                    color: adminColor,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Fonction',
+                    labelStyle: TextStyle(
+                      color: adminColor,
+                    ),
+                    floatingLabelStyle: TextStyle(
+                      color: adminColor,
+                    ),
                     prefixIcon: Icon(
                       Icons.work_outline_rounded,
                     ),
@@ -1899,8 +1929,17 @@ Future<void> _editAdminReferent({
                 const SizedBox(height: 12),
                 TextField(
                   controller: emailController,
+                  style: const TextStyle(
+                    color: adminColor,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Email',
+                    labelStyle: TextStyle(
+                      color: adminColor,
+                    ),
+                    floatingLabelStyle: TextStyle(
+                      color: adminColor,
+                    ),
                     prefixIcon: Icon(
                       Icons.email_outlined,
                     ),
@@ -1909,8 +1948,17 @@ Future<void> _editAdminReferent({
                 const SizedBox(height: 12),
                 TextField(
                   controller: phoneController,
+                  style: const TextStyle(
+                    color: adminColor,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Téléphone',
+                    labelStyle: TextStyle(
+                      color: adminColor,
+                    ),
+                    floatingLabelStyle: TextStyle(
+                      color: adminColor,
+                    ),
                     prefixIcon: Icon(
                       Icons.phone_outlined,
                     ),
@@ -2820,6 +2868,1008 @@ const SizedBox(height: 18),
   );
 }
 
+Future<Map<String, dynamic>> _loadTrialSummaryData() async {
+  final territoireId = _resolvedTerritoireId;
+
+  if (territoireId.isEmpty) {
+    throw StateError(
+      'Aucun territoire associé à cet espace administrateur.',
+    );
+  }
+
+  final territoryReference = FirebaseFirestore.instance
+      .collection('territoires')
+      .doc(territoireId);
+
+  final spotsSnapshot = await territoryReference
+      .collection('spots')
+      .get();
+
+  final periodsSnapshot = await territoryReference
+      .collection('periodesSurveillance')
+      .get();
+
+  final sauveteursSnapshot = await territoryReference
+      .collection('sauveteurs')
+      .get();
+
+  final periodsById = <String, Map<String, dynamic>>{
+    for (final document in periodsSnapshot.docs)
+      document.id: <String, dynamic>{
+        ...document.data(),
+        '_docId': document.id,
+      },
+  };
+
+  final monitoredSpots = <Map<String, dynamic>>[];
+  final otherSpots = <Map<String, dynamic>>[];
+
+  for (final spotDocument in spotsSnapshot.docs) {
+    final spot = <String, dynamic>{
+      ...spotDocument.data(),
+      '_docId': spotDocument.id,
+    };
+
+    final isRescueStation =
+        spot['isPosteSecours'] == true ||
+        _cleanText(spot['typeSphot']) ==
+            '🚨 POSTE DE SECOURS 🚨';
+
+    if (!isRescueStation) {
+      otherSpots.add(spot);
+      continue;
+    }
+
+    final assignedSnapshot = await spotDocument.reference
+        .collection('sauveteursAffectes')
+        .get();
+
+    final assignedSauveteurs =
+        assignedSnapshot.docs.map((document) {
+      return <String, dynamic>{
+        ...document.data(),
+        '_docId': document.id,
+      };
+    }).toList();
+
+    final periodIds = <String>{};
+
+    for (final sauveteur in assignedSauveteurs) {
+      final rawPeriods =
+          sauveteur['periodesSurveillance'];
+
+      if (rawPeriods is Iterable) {
+        periodIds.addAll(
+          rawPeriods
+              .map((value) => _cleanText(value))
+              .where((value) => value.isNotEmpty),
+        );
+      }
+    }
+
+    final spotPeriods = periodIds
+        .map((periodId) => periodsById[periodId])
+        .whereType<Map<String, dynamic>>()
+        .toList()
+      ..sort((first, second) {
+        final firstDate = first['startDate'];
+        final secondDate = second['startDate'];
+
+        if (firstDate is Timestamp &&
+            secondDate is Timestamp) {
+          return firstDate.compareTo(secondDate);
+        }
+
+        return 0;
+      });
+
+    monitoredSpots.add({
+      'spot': spot,
+      'periods': spotPeriods,
+      'sauveteurs': assignedSauveteurs,
+    });
+  }
+
+  monitoredSpots.sort((first, second) {
+    final firstSpot =
+        Map<String, dynamic>.from(first['spot'] ?? {});
+    final secondSpot =
+        Map<String, dynamic>.from(second['spot'] ?? {});
+
+    return _spotName(firstSpot).compareTo(
+      _spotName(secondSpot),
+    );
+  });
+
+  otherSpots.sort((first, second) {
+    return _spotName(first).compareTo(
+      _spotName(second),
+    );
+  });
+
+  return {
+    'territoireId': territoireId,
+    'monitoredSpots': monitoredSpots,
+    'otherSpots': otherSpots,
+    'periodCount': periodsSnapshot.docs.length,
+    'sauveteurCount': sauveteursSnapshot.docs.length,
+  };
+}
+
+String _trialSeasonStatus(
+  List<Map<String, dynamic>> periods,
+) {
+  final now = DateTime.now();
+  final today = DateTime(
+    now.year,
+    now.month,
+    now.day,
+  );
+
+  bool hasCurrentPeriod = false;
+  bool hasFuturePeriod = false;
+  bool hasPastPeriod = false;
+
+  for (final period in periods) {
+    final startValue = period['startDate'];
+    final endValue = period['endDate'];
+
+    if (startValue is! Timestamp ||
+        endValue is! Timestamp) {
+      continue;
+    }
+
+    final rawStart = startValue.toDate();
+    final rawEnd = endValue.toDate();
+
+    final start = DateTime(
+      rawStart.year,
+      rawStart.month,
+      rawStart.day,
+    );
+
+    final end = DateTime(
+      rawEnd.year,
+      rawEnd.month,
+      rawEnd.day,
+    );
+
+    if (!today.isBefore(start) &&
+        !today.isAfter(end)) {
+      hasCurrentPeriod = true;
+    } else if (start.isAfter(today)) {
+      hasFuturePeriod = true;
+    } else if (end.isBefore(today)) {
+      hasPastPeriod = true;
+    }
+  }
+
+  if (hasCurrentPeriod) {
+    return 'SURVEILLANCE EN COURS';
+  }
+
+  if (hasFuturePeriod) {
+    return 'OUVERTURE PROGRAMMÉE';
+  }
+
+  if (hasPastPeriod) {
+    return 'HORS SAISON';
+  }
+
+  return 'AUCUNE OUVERTURE PROGRAMMÉE';
+}
+
+Color _trialSeasonStatusColor(String status) {
+  switch (status) {
+    case 'SURVEILLANCE EN COURS':
+      return const Color(0xFF16A34A);
+    case 'OUVERTURE PROGRAMMÉE':
+      return const Color(0xFFF59E0B);
+    case 'HORS SAISON':
+      return const Color(0xFF64748B);
+    default:
+      return redColor;
+  }
+}
+
+String _trialPeriodDescription(
+  Map<String, dynamic> period,
+) {
+  final name = _cleanText(
+    period['name'] ?? 'PÉRIODE',
+  ).toUpperCase();
+
+  final startValue = period['startDate'];
+  final endValue = period['endDate'];
+
+  final startDate = startValue is Timestamp
+      ? _formatSurveillanceDate(
+          startValue.toDate(),
+        )
+      : '--/--/----';
+
+  final endDate = endValue is Timestamp
+      ? _formatSurveillanceDate(
+          endValue.toDate(),
+        )
+      : '--/--/----';
+
+  final startHour = _cleanText(
+    period['startHour'] ?? '--:--',
+  ).replaceFirst(':', 'h');
+
+  final endHour = _cleanText(
+    period['endHour'] ?? '--:--',
+  ).replaceFirst(':', 'h');
+
+  final secondStartHour = _cleanText(
+    period['secondStartHour'],
+  ).replaceFirst(':', 'h');
+
+  final secondEndHour = _cleanText(
+    period['secondEndHour'],
+  ).replaceFirst(':', 'h');
+
+  final hasSecondSlot =
+      secondStartHour.isNotEmpty &&
+      secondEndHour.isNotEmpty;
+
+  final hoursDescription = hasSecondSlot
+      ? 'de $startHour à $endHour et de '
+          '$secondStartHour à $secondEndHour'
+      : 'de $startHour à $endHour';
+
+  return '$name — du $startDate au $endDate, '
+      '$hoursDescription';
+}
+
+String _trialSauveteurDescription(
+  Map<String, dynamic> sauveteur,
+) {
+  final prenom = _cleanText(
+    sauveteur['prenom'],
+  );
+
+  final nom = _cleanText(
+    sauveteur['nom'],
+  ).toUpperCase();
+
+  final rawFunctions = sauveteur['fonctions'];
+
+  final functions = rawFunctions is Iterable
+      ? rawFunctions
+          .map((value) => _cleanText(value))
+          .where((value) => value.isNotEmpty)
+          .join(', ')
+      : _cleanText(rawFunctions);
+
+  final identity = [prenom, nom]
+      .where((value) => value.isNotEmpty)
+      .join(' ');
+
+  if (functions.isEmpty) {
+    return identity.isEmpty
+        ? 'Sauveteur non renseigné'
+        : identity;
+  }
+
+  return '${identity.isEmpty ? 'Sauveteur' : identity} — '
+      '$functions';
+}
+
+Widget _trialCounter({
+  required IconData icon,
+  required String value,
+  required String label,
+}) {
+  return Container(
+    padding: const EdgeInsets.symmetric(
+      horizontal: 12,
+      vertical: 8,
+    ),
+    decoration: BoxDecoration(
+      color: adminColor.withOpacity(0.06),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: adminColor.withOpacity(0.35),
+      ),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          color: adminColor,
+          size: 19,
+        ),
+        const SizedBox(width: 7),
+        Text(
+          '$value $label',
+          style: const TextStyle(
+            color: adminColor,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildTrialMonitoredSpotCard(
+  Map<String, dynamic> entry,
+) {
+  final spot = Map<String, dynamic>.from(
+    entry['spot'] ?? {},
+  );
+
+  final periods = List<Map<String, dynamic>>.from(
+    entry['periods'] ?? const [],
+  );
+
+  final sauveteurs =
+      List<Map<String, dynamic>>.from(
+    entry['sauveteurs'] ?? const [],
+  );
+
+  final idSphot = _cleanText(
+    spot['idSphot'] ?? spot['_docId'],
+  );
+
+  final name = _spotName(spot);
+  final status = _trialSeasonStatus(periods);
+  final statusColor =
+      _trialSeasonStatusColor(status);
+
+  return Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: adminColor.withOpacity(0.35),
+        width: 1.3,
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Image.asset(
+              _getMarkerIconPath(spot),
+              width: 42,
+              height: 42,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    idSphot.isEmpty
+                        ? name
+                        : '$idSphot - $name',
+                    style: const TextStyle(
+                      color: adminColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.10),
+                      borderRadius:
+                          BorderRadius.circular(20),
+                      border: Border.all(
+                        color: statusColor,
+                      ),
+                    ),
+                    child: Text(
+                      status,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 13),
+        const Text(
+          'PÉRIODES',
+          style: TextStyle(
+            color: redColor,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 5),
+        if (periods.isEmpty)
+          const Text(
+            'Aucune ouverture programmée. '
+            'Cette situation ne bloque pas la demande.',
+            style: TextStyle(
+              color: adminColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          )
+        else
+          ...periods.map(
+            (period) => Padding(
+              padding: const EdgeInsets.only(
+                bottom: 4,
+              ),
+              child: Text(
+                '• ${_trialPeriodDescription(period)}',
+                style: const TextStyle(
+                  color: adminColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        const SizedBox(height: 10),
+        const Text(
+          'SAUVETEURS AFFECTÉS',
+          style: TextStyle(
+            color: redColor,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 5),
+        if (sauveteurs.isEmpty)
+          const Text(
+            'Aucun sauveteur actuellement affecté.',
+            style: TextStyle(
+              color: adminColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          )
+        else
+          ...sauveteurs.map(
+            (sauveteur) => Padding(
+              padding: const EdgeInsets.only(
+                bottom: 4,
+              ),
+              child: Text(
+                '• ${_trialSauveteurDescription(sauveteur)}',
+                style: const TextStyle(
+                  color: adminColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+Widget _buildTrialOtherSpotTile(
+  Map<String, dynamic> spot,
+) {
+  final idSphot = _cleanText(
+    spot['idSphot'] ?? spot['_docId'],
+  );
+
+  final name = _spotName(spot);
+  final type = _cleanText(
+    spot['typeSphot'] ?? 'TYPE NON RENSEIGNÉ',
+  );
+
+  return Container(
+    padding: const EdgeInsets.symmetric(
+      horizontal: 12,
+      vertical: 9,
+    ),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(
+        color: adminColor.withOpacity(0.25),
+      ),
+    ),
+    child: Row(
+      children: [
+        Image.asset(
+          _getMarkerIconPath(spot),
+          width: 34,
+          height: 34,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                idSphot.isEmpty
+                    ? name
+                    : '$idSphot - $name',
+                style: const TextStyle(
+                  color: adminColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                type,
+                style: TextStyle(
+                  color: adminColor.withOpacity(0.72),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _submitTrialRequest(
+  Map<String, dynamic> summary,
+  BuildContext dialogContext,
+) async {
+  final uid = widget.adminUid.trim();
+
+  if (uid.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Administrateur non identifié.',
+        ),
+        backgroundColor: redColor,
+      ),
+    );
+    return;
+  }
+
+  final monitoredSpots =
+      List<Map<String, dynamic>>.from(
+    summary['monitoredSpots'] ?? const [],
+  );
+
+  final otherSpots = List<Map<String, dynamic>>.from(
+    summary['otherSpots'] ?? const [],
+  );
+
+  try {
+    await FirebaseFirestore.instance
+        .collection('adminRequests')
+        .doc(uid)
+        .set({
+      'trialRequestStatus': 'pending',
+      'trialRequestedAt':
+          FieldValue.serverTimestamp(),
+      'trialRequest': {
+        'status': 'pending',
+        'trialDurationDays': 8,
+        'territoireId': summary['territoireId'],
+        'numberOfRescueStations':
+            monitoredSpots.length,
+        'numberOfOtherSpots': otherSpots.length,
+        'numberOfSurveillancePeriods':
+            summary['periodCount'] ?? 0,
+        'numberOfLifeguards':
+            summary['sauveteurCount'] ?? 0,
+        'requestedAt':
+            FieldValue.serverTimestamp(),
+      },
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(dialogContext).pop();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Votre demande d’essai gratuit a été envoyée.',
+        ),
+        backgroundColor: adminColor,
+      ),
+    );
+  } catch (error) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Envoi de la demande impossible : $error',
+        ),
+        backgroundColor: redColor,
+      ),
+    );
+  }
+}
+
+Widget _buildTrialSummaryDialog(
+  BuildContext dialogContext,
+  Future<Map<String, dynamic>> summaryFuture,
+) {
+  final screenSize =
+      MediaQuery.sizeOf(dialogContext);
+
+  return Dialog(
+    insetPadding: const EdgeInsets.all(24),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(22),
+      side: const BorderSide(
+        color: adminColor,
+        width: 1.5,
+      ),
+    ),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: 1040,
+        maxHeight: screenSize.height * 0.88,
+      ),
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: summaryFuture,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Padding(
+              padding: const EdgeInsets.all(30),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: redColor,
+                    size: 42,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Chargement du récapitulatif impossible : '
+                    '${snapshot.error}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: adminColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                    },
+                    child: const Text('FERMER'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (!snapshot.hasData) {
+            return const SizedBox(
+              width: 520,
+              height: 260,
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: adminColor,
+                ),
+              ),
+            );
+          }
+
+          final summary = snapshot.data!;
+
+          final monitoredSpots =
+              List<Map<String, dynamic>>.from(
+            summary['monitoredSpots'] ?? const [],
+          );
+
+          final otherSpots =
+              List<Map<String, dynamic>>.from(
+            summary['otherSpots'] ?? const [],
+          );
+
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  24,
+                  18,
+                  14,
+                  14,
+                ),
+                child: Row(
+                  children: [
+                    Image.asset(
+                      'data/icons/fire_red_icon.png',
+                      width: 42,
+                      height: 42,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'RÉCAPITULATIF DE VOTRE ESPACE ADMIN SPHOT',
+                            style: TextStyle(
+                              color: adminColor,
+                              fontSize: 21,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'Vérifiez votre organisation avant '
+                            'd’envoyer la demande d’essai gratuit.',
+                            style: TextStyle(
+                              color: adminColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Fermer',
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                      },
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: adminColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(
+                height: 1,
+                color: adminColor.withOpacity(0.20),
+              ),
+              Expanded(
+                child: Container(
+                  color: const Color(0xFFF8FAFC),
+                  child: ListView(
+                    padding: const EdgeInsets.all(22),
+                    children: [
+                      const Text(
+                        'SPHOTS SURVEILLÉS',
+                        style: TextStyle(
+                          color: redColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (monitoredSpots.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius:
+                                BorderRadius.circular(14),
+                            border: Border.all(
+                              color: adminColor
+                                  .withOpacity(0.25),
+                            ),
+                          ),
+                          child: const Text(
+                            'Aucun poste de secours enregistré.',
+                            style: TextStyle(
+                              color: adminColor,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        )
+                      else
+                        ...monitoredSpots.map(
+                          (entry) => Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: 10,
+                            ),
+                            child:
+                                _buildTrialMonitoredSpotCard(
+                              entry,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 18),
+                      const Text(
+                        'AUTRES SPHOTS',
+                        style: TextStyle(
+                          color: redColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (otherSpots.isEmpty)
+                        const Text(
+                          'Aucun autre SPHOT enregistré.',
+                          style: TextStyle(
+                            color: adminColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        )
+                      else
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: otherSpots.map((spot) {
+                            return SizedBox(
+                              width: 300,
+                              child:
+                                  _buildTrialOtherSpotTile(
+                                spot,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              Divider(
+                height: 1,
+                color: adminColor.withOpacity(0.20),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  children: [
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _trialCounter(
+                          icon: Icons.health_and_safety_outlined,
+                          value: '${monitoredSpots.length}',
+                          label: 'SPHOTS surveillés',
+                        ),
+                        _trialCounter(
+                          icon: Icons.place_outlined,
+                          value: '${otherSpots.length}',
+                          label: 'autres SPHOTS',
+                        ),
+                        _trialCounter(
+                          icon: Icons.date_range_outlined,
+                          value: '${summary['periodCount'] ?? 0}',
+                          label: 'périodes',
+                        ),
+                        _trialCounter(
+                          icon: Icons.groups_outlined,
+                          value: '${summary['sauveteurCount'] ?? 0}',
+                          label: 'sauveteurs',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Les postes fermés, hors saison ou sans '
+                      'ouverture programmée ne bloquent pas '
+                      'la demande.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: adminColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 13),
+                    Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(dialogContext).pop();
+                          },
+                          child: const Text('RETOUR'),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            _submitTrialRequest(
+                              summary,
+                              dialogContext,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: adminColor,
+                            foregroundColor: Colors.white,
+                            padding:
+                                const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 15,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(14),
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.send_rounded,
+                          ),
+                          label: const Text(
+                            'ENVOYER MA DEMANDE '
+                            'D’ESSAI GRATUIT',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
+}
+
+Future<void> _openTrialSummaryDialog() async {
+  if (_resolvedTerritoireId.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Le territoire doit être chargé avant '
+          'd’ouvrir le récapitulatif.',
+        ),
+        backgroundColor: redColor,
+      ),
+    );
+    return;
+  }
+
+  final summaryFuture = _loadTrialSummaryData();
+
+  await showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return _buildTrialSummaryDialog(
+        dialogContext,
+        summaryFuture,
+      );
+    },
+  );
+}
+
 Widget _buildRightPanel({
   required int visibleSpots,
 }) {
@@ -2840,11 +3890,48 @@ Widget _buildRightPanel({
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+  const SizedBox(
+    width: double.infinity,
+    child: Text(
+      'BIENVENUE SUR SPHOT',
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: redColor,
+        decoration: TextDecoration.none,
+        decorationColor: Colors.transparent,
+        fontSize: 23,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 0.6,
+      ),
+    ),
+  ),
+
+  const SizedBox(height: 8),
+
+  SizedBox(
+    width: double.infinity,
+    child: Text(
+      'Configurez votre espace admin SPHOT en suivant les étapes ci-dessous.',
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: adminColor.withOpacity(0.82),
+        decoration: TextDecoration.none,
+        decorationColor: Colors.transparent,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        height: 1.35,
+      ),
+    ),
+  ),
+
+  const SizedBox(height: 20),
+
   _summaryCard(
     title: 'CRÉER UN SPHOT',
     value: '',
     color: adminColor,
     iconPath: 'data/icons/fire_red_icon.png',
+    stepNumber: 1,
     iconScale: 1.6,
     titleFontSize: 20,
     titleLetterSpacing: 1.2,
@@ -2859,6 +3946,7 @@ Widget _buildRightPanel({
     value: '',
     color: adminColor,
     iconPath: 'data/icons/fire_red_icon.png',
+    stepNumber: 2,
     iconScale: 1.6,
     titleFontSize: 20,
     titleLetterSpacing: 1.2,
@@ -2873,11 +3961,78 @@ Widget _buildRightPanel({
     value: '',
     color: adminColor,
     iconPath: 'data/icons/fire_red_icon.png',
+    stepNumber: 3,
     iconScale: 1.6,
     titleFontSize: 20,
     titleLetterSpacing: 1.2,
     showValue: false,
     onTap: _openNewSauveteurEditor,
+  ),
+
+  const SizedBox(height: 18),
+
+  SizedBox(
+    width: double.infinity,
+    height: 56,
+    child: ElevatedButton.icon(
+      onPressed: _openTrialSummaryDialog,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: adminColor,
+        foregroundColor: Colors.white,
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      icon: const Icon(
+        Icons.fact_check_outlined,
+        size: 24,
+      ),
+      label: const Text(
+        'DEMANDE D’ESSAI GRATUIT\n8 JOURS',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.4,
+        ),
+      ),
+    ),
+  ),
+
+  const Spacer(),
+
+  SizedBox(
+    width: double.infinity,
+    height: 54,
+    child: ElevatedButton.icon(
+      onPressed: _openSauveteursManagementPanel,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: adminColor,
+        elevation: 1,
+        side: const BorderSide(
+          color: adminColor,
+          width: 1.6,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      icon: const Icon(
+  Icons.groups_rounded,
+  color: redColor,
+  size: 25,
+),
+label: const Text(
+  'GESTION DES SAUVETEURS',
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.7,
+        ),
+      ),
+    ),
   ),
 ],
         ),
@@ -2891,6 +4046,7 @@ Widget _buildRightPanel({
   required String value,
   required Color color,
   String iconPath = 'data/icons/fire_blue_icon.png',
+  int? stepNumber,
   double iconScale = 1.0,
   double titleFontSize = 13,
   double titleLetterSpacing = 0,
@@ -2904,7 +4060,7 @@ Widget _buildRightPanel({
     vertical: 8,
   ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color, width: 1.5),
       ),
@@ -2913,16 +4069,43 @@ Widget _buildRightPanel({
           SizedBox(
   width: 34,
   height: 34,
-  child: Transform.scale(
-    scale: iconScale,
+  child: Stack(
     alignment: Alignment.center,
-    child: Image.asset(
-      iconPath,
-      width: 34,
-      height: 34,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-    ),
+    clipBehavior: Clip.none,
+    children: [
+      Transform.scale(
+        scale: iconScale,
+        alignment: Alignment.center,
+        child: Image.asset(
+          iconPath,
+          width: 34,
+          height: 34,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+        ),
+      ),
+      if (stepNumber != null)
+        Transform.translate(
+          offset: const Offset(0, -2),
+          child: Container(
+            width: 16,
+            height: 16,
+            alignment: const Alignment(0, 0.5),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '$stepNumber',
+              style: const TextStyle(
+                color: redColor,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ),
+    ],
   ),
 ),
           const SizedBox(width: 14),
@@ -2936,6 +4119,8 @@ Widget _buildRightPanel({
                   title,
                   style: TextStyle(
                     color: color,
+                    decoration: TextDecoration.none,
+                    decorationColor: Colors.transparent,
                     fontSize: titleFontSize,
                     fontWeight: FontWeight.w900,
                     letterSpacing: titleLetterSpacing,
@@ -3298,6 +4483,57 @@ String _formatSurveillanceTime(TimeOfDay time) {
       '${time.minute.toString().padLeft(2, '0')}';
 }
 
+TimeOfDay? _parseSurveillanceTime(
+  dynamic value,
+) {
+  final rawValue = _cleanText(value);
+
+  if (rawValue.isEmpty) {
+    return null;
+  }
+
+  final parts = rawValue.split(':');
+
+  if (parts.isEmpty) {
+    return null;
+  }
+
+  final hour = int.tryParse(parts.first);
+  final minute = int.tryParse(
+    parts.length > 1 ? parts[1] : '0',
+  );
+
+  if (hour == null ||
+      minute == null ||
+      hour < 0 ||
+      hour > 23 ||
+      minute < 0 ||
+      minute > 59) {
+    return null;
+  }
+
+  return TimeOfDay(
+    hour: hour,
+    minute: minute,
+  );
+}
+
+String _formatSurveillancePeriodHours(
+  _DashboardSurveillancePeriod period,
+) {
+  final firstSlot =
+      'DE ${_formatSurveillanceTime(period.startHour)} '
+      'À ${_formatSurveillanceTime(period.endHour)}';
+
+  if (!period.hasMiddayBreak) {
+    return firstSlot;
+  }
+
+  return '$firstSlot — DE '
+      '${_formatSurveillanceTime(period.secondStartHour!)} '
+      'À ${_formatSurveillanceTime(period.secondEndHour!)}';
+}
+
 void _openSurveillancePeriodsPanel() {
   if (_resolvedTerritoireId.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -3314,6 +4550,7 @@ void _openSurveillancePeriodsPanel() {
   setState(() {
     _showSurveillancePeriodsPanel = true;
     _showSauveteurEditorPanel = false;
+    _showSauveteursManagementPanel = false;
     _showSphotEditorPanel = false;
     _placingSphotOnMap = false;
     _selectedSpot = null;
@@ -3356,12 +4593,20 @@ Future<void> _openSurveillancePeriodDialog({
       'endHour':
           '${result.endHour.hour.toString().padLeft(2, '0')}:'
           '${result.endHour.minute.toString().padLeft(2, '0')}',
+      'hasMiddayBreak': result.hasMiddayBreak,
+      'secondStartHour': result.hasMiddayBreak
+          ? '${result.secondStartHour!.hour.toString().padLeft(2, '0')}:'
+              '${result.secondStartHour!.minute.toString().padLeft(2, '0')}'
+          : FieldValue.delete(),
+      'secondEndHour': result.hasMiddayBreak
+          ? '${result.secondEndHour!.hour.toString().padLeft(2, '0')}:'
+              '${result.secondEndHour!.minute.toString().padLeft(2, '0')}'
+          : FieldValue.delete(),
       'label':
           '${result.name.toUpperCase()} — '
           'DU ${_formatSurveillanceDate(result.startDate)} '
           'AU ${_formatSurveillanceDate(result.endDate)} — '
-          'DE ${_formatSurveillanceTime(result.startHour)} '
-          'À ${_formatSurveillanceTime(result.endHour)}',
+          '${_formatSurveillancePeriodHours(result)}',
       'updatedAt': FieldValue.serverTimestamp(),
       if (period == null) 'createdAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
@@ -3475,6 +4720,8 @@ void _clearSauveteurEditor() {
   _sauveteurGeneratedLogin = '';
   _sauveteurGeneratedPassword = '';
   _createdSauveteurDocId = null;
+  _editingSauveteurDocId = null;
+  _originalSauveteurPostes.clear();
 }
 
 String _normalizeSauveteurLogin(String value) {
@@ -3773,18 +5020,20 @@ if (_sauveteurPeriodesSurveillance.isEmpty) {
   return false;
 }
 
-  if (!_sauveteurAccessGenerated) {
-    _showSauveteurError(
-      'Générez l’accès avant d’enregistrer.',
-    );
-    return false;
-  }
+  if (_editingSauveteurDocId == null) {
+    if (!_sauveteurAccessGenerated) {
+      _showSauveteurError(
+        'Générez l’accès avant d’enregistrer.',
+      );
+      return false;
+    }
 
-  if (!_sauveteurEmailSent) {
-    _showSauveteurError(
-      'Envoyez les identifiants avant d’enregistrer.',
-    );
-    return false;
+    if (!_sauveteurEmailSent) {
+      _showSauveteurError(
+        'Envoyez les identifiants avant d’enregistrer.',
+      );
+      return false;
+    }
   }
 
   return true;
@@ -3795,6 +5044,7 @@ Future<void> _saveSauveteur() async {
     return;
   }
 
+  final isEditing = _editingSauveteurDocId != null;
   final sauveteurId = _createdSauveteurDocId;
   if (sauveteurId == null) {
     _showSauveteurError('Identifiant du sauveteur introuvable.');
@@ -3810,12 +5060,6 @@ Future<void> _saveSauveteur() async {
       'nom': _sauveteurNomController.text.trim().toUpperCase(),
       'prenom': _sauveteurPrenomController.text.trim(),
       'role': 'SAUVETEUR',
-      'accountStatus': 'ACTIVE',
-      'accessInheritedStatus': 'ACTIVE',
-      'authUid': '',
-      'login': _sauveteurGeneratedLogin,
-      'temporaryPassword': _sauveteurGeneratedPassword,
-      'mustChangePassword': true,
       'createdByAdmin': true,
       'dateNaissance':
           _sauveteurDateNaissanceController.text.trim(),
@@ -3832,9 +5076,20 @@ Future<void> _saveSauveteur() async {
       'experience': _sauveteurExperienceController.text.trim(),
       'observations': _sauveteurObservationsController.text.trim(),
       'territoireId': _resolvedTerritoireId,
-      'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
+
+    if (!isEditing) {
+      data.addAll({
+        'accountStatus': 'ACTIVE',
+        'accessInheritedStatus': 'ACTIVE',
+        'authUid': '',
+        'login': _sauveteurGeneratedLogin,
+        'temporaryPassword': _sauveteurGeneratedPassword,
+        'mustChangePassword': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
 
     final sauveteurRef = FirebaseFirestore.instance
         .collection('territoires')
@@ -3843,6 +5098,20 @@ Future<void> _saveSauveteur() async {
         .doc(sauveteurId);
 
     await sauveteurRef.set(data, SetOptions(merge: true));
+
+    final removedPostes =
+        _originalSauveteurPostes.difference(_sauveteurPostes);
+
+    for (final posteId in removedPostes) {
+      await FirebaseFirestore.instance
+          .collection('territoires')
+          .doc(_resolvedTerritoireId)
+          .collection('spots')
+          .doc(posteId)
+          .collection('sauveteursAffectes')
+          .doc(sauveteurId)
+          .delete();
+    }
 
     for (final posteId in _sauveteurPostes) {
       await FirebaseFirestore.instance
@@ -3865,6 +5134,21 @@ Future<void> _saveSauveteur() async {
       }, SetOptions(merge: true));
     }
 
+    final existingLogin = _sauveteurGeneratedLogin.trim();
+    if (isEditing && existingLogin.isNotEmpty) {
+      await FirebaseFirestore.instance
+          .collection('sauveteurAccounts')
+          .doc(existingLogin)
+          .set({
+        'nom': data['nom'],
+        'prenom': data['prenom'],
+        'email': data['email'],
+        'territoireId': _resolvedTerritoireId,
+        'sauveteurId': sauveteurId,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+
     if (!mounted) {
       return;
     }
@@ -3872,6 +5156,7 @@ Future<void> _saveSauveteur() async {
     setState(() {
       _isSavingSauveteur = false;
       _showSauveteurEditorPanel = false;
+      _showSauveteursManagementPanel = isEditing;
       _clearSauveteurEditor();
     });
 
@@ -3909,6 +5194,7 @@ void _openNewSphotEditor() {
   setState(() {
     _clearSphotEditor();
     _showSauveteurEditorPanel = false;
+    _showSauveteursManagementPanel = false;
     _showSurveillancePeriodsPanel = false;
     _showSphotEditorPanel = true;
     _placingSphotOnMap = true;
@@ -3939,6 +5225,7 @@ void _openNewSauveteurEditor() {
   setState(() {
     _clearSauveteurEditor();
     _showSauveteurEditorPanel = true;
+    _showSauveteursManagementPanel = false;
     _showSurveillancePeriodsPanel = false;
     _showSphotEditorPanel = false;
     _placingSphotOnMap = false;
@@ -3947,6 +5234,215 @@ void _openNewSauveteurEditor() {
     _selectedAdvertiser = null;
     _showLegalDocumentsPanel = false;
   });
+}
+
+void _openSauveteursManagementPanel() {
+  if (_resolvedTerritoireId.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Le territoire doit être chargé avant de gérer les sauveteurs.',
+        ),
+        backgroundColor: redColor,
+      ),
+    );
+    return;
+  }
+
+  setState(() {
+    _clearSauveteurEditor();
+    _showSauveteursManagementPanel = true;
+    _showSauveteurEditorPanel = false;
+    _showSurveillancePeriodsPanel = false;
+    _showSphotEditorPanel = false;
+    _placingSphotOnMap = false;
+    _selectedSpot = null;
+    _selectedAdmin = null;
+    _selectedAdvertiser = null;
+    _showLegalDocumentsPanel = false;
+  });
+}
+
+void _openSauveteurForEditing(
+  String sauveteurId,
+  Map<String, dynamic> data,
+) {
+  final fonctions = (data['fonctions'] as List? ?? const [])
+      .map((value) => value.toString())
+      .where((value) => value.isNotEmpty)
+      .toSet();
+
+  final postes = (data['postesAffectes'] as List? ?? const [])
+      .map((value) => value.toString())
+      .where((value) => value.isNotEmpty)
+      .toSet();
+
+  final periodes =
+      (data['periodesSurveillance'] as List? ?? const [])
+          .map((value) => value.toString())
+          .where((value) => value.isNotEmpty)
+          .toSet();
+
+  setState(() {
+    _clearSauveteurEditor();
+
+    _editingSauveteurDocId = sauveteurId;
+    _createdSauveteurDocId = sauveteurId;
+    _originalSauveteurPostes.addAll(postes);
+
+    _sauveteurNomController.text =
+        _cleanText(data['nom']).toUpperCase();
+    _sauveteurPrenomController.text =
+        _cleanText(data['prenom']);
+    _sauveteurDateNaissanceController.text =
+        _cleanText(data['dateNaissance']);
+    _sauveteurAgeController.text = _cleanText(data['age']);
+    _sauveteurAdresseController.text =
+        _cleanText(data['adresse']);
+    _sauveteurCodePostalController.text =
+        _cleanText(data['codePostal']);
+    _sauveteurVilleController.text =
+        _cleanText(data['ville']).toUpperCase();
+    _sauveteurTelephoneController.text =
+        _cleanText(data['telephone']);
+    _sauveteurEmailController.text =
+        _cleanText(data['email']);
+    _sauveteurExperienceController.text =
+        _cleanText(data['experience']);
+    _sauveteurObservationsController.text =
+        _cleanText(data['observations']);
+
+    _sauveteurFonctions.addAll(fonctions);
+    _sauveteurPostes.addAll(postes);
+    _sauveteurPeriodesSurveillance.addAll(periodes);
+
+    _sauveteurGeneratedLogin = _cleanText(data['login']);
+    _sauveteurGeneratedPassword =
+        _cleanText(data['temporaryPassword']);
+    _sauveteurAccessGenerated =
+        _sauveteurGeneratedLogin.isNotEmpty;
+    _sauveteurEmailSent = true;
+
+    _showSauveteursManagementPanel = false;
+    _showSauveteurEditorPanel = true;
+    _showSurveillancePeriodsPanel = false;
+    _showSphotEditorPanel = false;
+  });
+}
+
+Future<void> _deleteSauveteur(
+  String sauveteurId,
+  Map<String, dynamic> data,
+) async {
+  final nom = [
+    _cleanText(data['prenom']),
+    _cleanText(data['nom']).toUpperCase(),
+  ].where((value) => value.isNotEmpty).join(' ');
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text(
+          'SUPPRIMER LE SAUVETEUR',
+          style: TextStyle(
+            color: redColor,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: Text(
+          'Confirmer la suppression de '
+          '${nom.isEmpty ? 'ce sauveteur' : '« $nom »'} ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(false),
+            child: const Text('ANNULER'),
+          ),
+          ElevatedButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: redColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('SUPPRIMER'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (confirmed != true) {
+    return;
+  }
+
+  try {
+    final firestore = FirebaseFirestore.instance;
+    final spotsSnapshot = await firestore
+        .collection('territoires')
+        .doc(_resolvedTerritoireId)
+        .collection('spots')
+        .get();
+
+    final batch = firestore.batch();
+
+    batch.delete(
+      firestore
+          .collection('territoires')
+          .doc(_resolvedTerritoireId)
+          .collection('sauveteurs')
+          .doc(sauveteurId),
+    );
+
+    for (final spotDocument in spotsSnapshot.docs) {
+      batch.delete(
+        spotDocument.reference
+            .collection('sauveteursAffectes')
+            .doc(sauveteurId),
+      );
+    }
+
+    await batch.commit();
+
+    final login = _cleanText(data['login']);
+    if (login.isNotEmpty) {
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+          'deleteSauveteurAccount',
+        ),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({'login': login}),
+      );
+
+      if (response.statusCode < 200 ||
+          response.statusCode >= 300) {
+        throw Exception(
+          'suppression du compte impossible '
+          '(${response.statusCode})',
+        );
+      }
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Sauveteur supprimé.'),
+        backgroundColor: adminColor,
+      ),
+    );
+  } catch (error) {
+    if (!mounted) {
+      return;
+    }
+
+    _showSauveteurError('Suppression impossible : $error');
+  }
 }
 
 void _loadSphotInEditor(Map<String, dynamic> data) {
@@ -3971,6 +5467,7 @@ void _loadSphotInEditor(Map<String, dynamic> data) {
       ..clear()
       ..addAll(_readSphotMultiValue(data['labelSphot']));
     _showSauveteurEditorPanel = false;
+    _showSauveteursManagementPanel = false;
     _showSurveillancePeriodsPanel = false;
     _showSphotEditorPanel = true;
     _placingSphotOnMap = false;
@@ -4778,12 +6275,16 @@ Widget _sauveteurEditorField({
   return TextField(
     controller: controller,
     keyboardType: keyboardType,
+    inputFormatters: inputFormatters,
     maxLines: maxLines,
     readOnly: readOnly,
     onTap: onTap,
-    textCapitalization: forceUppercase
-        ? TextCapitalization.characters
-        : TextCapitalization.sentences,
+    textCapitalization:
+        keyboardType == TextInputType.emailAddress
+            ? TextCapitalization.none
+            : forceUppercase
+                ? TextCapitalization.characters
+                : TextCapitalization.sentences,
     onChanged: (value) {
       var normalizedValue = value;
 
@@ -4983,13 +6484,18 @@ Widget _buildSauveteurPostesField() {
         child: Column(
           children: docs.map((doc) {
             final data = doc.data();
-            final label = _cleanText(
+            final numeroSphot = _cleanText(
+              data['idSphot'] ?? doc.id,
+            );
+            final nomPoste = _cleanText(
               data['nomSecours'] ??
                   data['nomSphot'] ??
-                  data['sphotName'] ??
-                  data['idSphot'] ??
-                  doc.id,
+                  data['sphotName'],
             );
+            final label = <String>[
+              numeroSphot,
+              nomPoste,
+            ].where((value) => value.isNotEmpty).join(' - ');
             final selected = _sauveteurPostes.contains(doc.id);
 
             return CheckboxListTile(
@@ -5071,103 +6577,143 @@ Widget _buildSauveteurPeriodesField() {
         );
       }
 
-      return Column(
-  children: periods.map((periodDocument) {
-    final data = periodDocument.data();
-    final periodId = periodDocument.id;
-
-    final periodName = (data['name'] ?? 'PÉRIODE SANS NOM')
-        .toString()
-        .toUpperCase();
-
-    final startDateValue = data['startDate'];
-    final endDateValue = data['endDate'];
-
-    final startDate = startDateValue is Timestamp
-        ? _formatSurveillanceDate(startDateValue.toDate())
-        : '--/--/----';
-
-    final endDate = endDateValue is Timestamp
-        ? _formatSurveillanceDate(endDateValue.toDate())
-        : '--/--/----';
-
-    final rawStartHour =
-        (data['startHour'] ?? '--:--').toString();
-
-    final rawEndHour =
-        (data['endHour'] ?? '--:--').toString();
-
-    final startHour = rawStartHour.replaceFirst(':', 'h');
-    final endHour = rawEndHour.replaceFirst(':', 'h');
-
-    final selected =
-        _sauveteurPeriodesSurveillance.contains(periodId);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
+      return Container(
         width: double.infinity,
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: adminColor.withOpacity(0.025),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: adminColor,
-            width: 1.4,
+            color: adminColor.withOpacity(0.55),
           ),
         ),
-        child: CheckboxListTile(
-          value: selected,
-          activeColor: adminColor,
-          controlAffinity: ListTileControlAffinity.leading,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 6,
-          ),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                periodName,
-                style: const TextStyle(
-                  color: redColor,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
+        child: Column(
+          children: periods.map((periodDocument) {
+            final data = periodDocument.data();
+            final periodId = periodDocument.id;
+
+            final periodName =
+                (data['name'] ?? 'PÉRIODE SANS NOM')
+                    .toString()
+                    .toUpperCase();
+
+            final startDateValue = data['startDate'];
+            final endDateValue = data['endDate'];
+
+            final startDate = startDateValue is Timestamp
+                ? _formatSurveillanceDate(
+                    startDateValue.toDate(),
+                  )
+                : '--/--/----';
+
+            final endDate = endDateValue is Timestamp
+                ? _formatSurveillanceDate(
+                    endDateValue.toDate(),
+                  )
+                : '--/--/----';
+
+            final rawStartHour =
+                (data['startHour'] ?? '--:--').toString();
+
+            final rawEndHour =
+                (data['endHour'] ?? '--:--').toString();
+
+            final rawSecondStartHour =
+                (data['secondStartHour'] ?? '').toString();
+
+            final rawSecondEndHour =
+                (data['secondEndHour'] ?? '').toString();
+
+            final startHour =
+                rawStartHour.replaceFirst(':', 'h');
+            final endHour =
+                rawEndHour.replaceFirst(':', 'h');
+            final secondStartHour =
+                rawSecondStartHour.replaceFirst(':', 'h');
+            final secondEndHour =
+                rawSecondEndHour.replaceFirst(':', 'h');
+
+            final hasSecondSlot =
+                secondStartHour.isNotEmpty &&
+                secondEndHour.isNotEmpty;
+
+            final selected =
+                _sauveteurPeriodesSurveillance.contains(
+              periodId,
+            );
+
+            return Column(
+              children: [
+                CheckboxListTile(
+                  dense: true,
+                  value: selected,
+                  activeColor: adminColor,
+                  controlAffinity:
+                      ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  title: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        periodName,
+                        style: const TextStyle(
+                          color: redColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        'DU $startDate AU $endDate',
+                        style: const TextStyle(
+                          color: adminColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'DE $startHour À $endHour',
+                        style: const TextStyle(
+                          color: adminColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (hasSecondSlot) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          'DE $secondStartHour À '
+                          '$secondEndHour',
+                          style: const TextStyle(
+                            color: adminColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        _sauveteurPeriodesSurveillance.add(
+                          periodId,
+                        );
+                      } else {
+                        _sauveteurPeriodesSurveillance.remove(
+                          periodId,
+                        );
+                      }
+                    });
+                  },
                 ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                'DU $startDate AU $endDate',
-                style: const TextStyle(
-                  color: adminColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                'DE $startHour À $endHour',
-                style: const TextStyle(
-                  color: adminColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          onChanged: (value) {
-            setState(() {
-              if (value == true) {
-                _sauveteurPeriodesSurveillance.add(periodId);
-              } else {
-                _sauveteurPeriodesSurveillance.remove(periodId);
-              }
-            });
-          },
+              ],
+            );
+          }).toList(),
         ),
-      ),
-    );
-  }).toList(),
-);
+      );
     },
   );
 }
@@ -5333,37 +6879,34 @@ letterSpacing: 1.2,
                           return const SizedBox.shrink();
                         }
 
-                        final startParts =
-                            (data['startHour'] ?? '00:00')
-                                .toString()
-                                .split(':');
-                        final endParts =
-                            (data['endHour'] ?? '00:00')
-                                .toString()
-                                .split(':');
-
                         final period = _DashboardSurveillancePeriod(
                           id: doc.id,
                           name: _cleanText(data['name']),
                           startDate: startDateValue.toDate(),
                           endDate: endDateValue.toDate(),
-                          startHour: TimeOfDay(
-                            hour: int.tryParse(startParts.first) ?? 0,
-                            minute: int.tryParse(
-                                  startParts.length > 1
-                                      ? startParts[1]
-                                      : '0',
-                                ) ??
-                                0,
+                          startHour:
+                              _parseSurveillanceTime(
+                                    data['startHour'],
+                                  ) ??
+                                  const TimeOfDay(
+                                    hour: 0,
+                                    minute: 0,
+                                  ),
+                          endHour:
+                              _parseSurveillanceTime(
+                                    data['endHour'],
+                                  ) ??
+                                  const TimeOfDay(
+                                    hour: 0,
+                                    minute: 0,
+                                  ),
+                          secondStartHour:
+                              _parseSurveillanceTime(
+                            data['secondStartHour'],
                           ),
-                          endHour: TimeOfDay(
-                            hour: int.tryParse(endParts.first) ?? 0,
-                            minute: int.tryParse(
-                                  endParts.length > 1
-                                      ? endParts[1]
-                                      : '0',
-                                ) ??
-                                0,
+                          secondEndHour:
+                              _parseSurveillanceTime(
+                            data['secondEndHour'],
                           ),
                         );
 
@@ -5409,8 +6952,9 @@ letterSpacing: 1.2,
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
-                                      'DE ${_formatSurveillanceTime(period.startHour)} '
-                                      'À ${_formatSurveillanceTime(period.endHour)}',
+                                      _formatSurveillancePeriodHours(
+                                        period,
+                                      ),
                                       style: const TextStyle(
                                         color: adminColor,
                                         fontSize: 12,
@@ -5443,6 +6987,525 @@ letterSpacing: 1.2,
                                   color: redColor,
                                   size: 21,
                                 ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Future<List<String>> _loadSauveteurPostLabels(
+  List<String> posteIds,
+) async {
+  final labels = await Future.wait(
+    posteIds.map((posteId) async {
+      try {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('territoires')
+            .doc(_resolvedTerritoireId)
+            .collection('spots')
+            .doc(posteId)
+            .get();
+
+        final data = snapshot.data() ?? <String, dynamic>{};
+        final numero = _cleanText(data['idSphot'] ?? posteId);
+        final nom = _cleanText(
+          data['nomSecours'] ??
+              data['nomSphot'] ??
+              data['sphotName'],
+        );
+
+        return <String>[
+          numero,
+          nom,
+        ].where((value) => value.isNotEmpty).join(' - ');
+      } catch (_) {
+        return posteId;
+      }
+    }),
+  );
+
+  return labels.where((label) => label.isNotEmpty).toList();
+}
+
+Future<List<String>> _loadSauveteurPeriodeLabels(
+  List<String> periodeIds,
+) async {
+  final labels = await Future.wait(
+    periodeIds.map((periodeId) async {
+      try {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('territoires')
+            .doc(_resolvedTerritoireId)
+            .collection('periodesSurveillance')
+            .doc(periodeId)
+            .get();
+
+        final data = snapshot.data() ?? <String, dynamic>{};
+
+        final label = _cleanText(data['label']);
+        if (label.isNotEmpty) {
+          return label;
+        }
+
+        final name = _cleanText(data['name']);
+        return name.isNotEmpty ? name : periodeId;
+      } catch (_) {
+        return periodeId;
+      }
+    }),
+  );
+
+  return labels.where((label) => label.isNotEmpty).toList();
+}
+
+Widget _buildSauveteursManagementPanel() {
+  return Container(
+    width: 430,
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.98),
+      border: Border(
+        left: BorderSide(
+          color: adminColor.withOpacity(0.45),
+          width: 1.5,
+        ),
+      ),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.groups_rounded,
+                    color: redColor,
+                    size: 30,
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'GESTION DES SAUVETEURS',
+                      style: TextStyle(
+                        color: adminColor,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Fermer',
+                    onPressed: () {
+                      setState(() {
+                        _showSauveteursManagementPanel = false;
+                      });
+                    },
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Modifiez ou supprimez les sauveteurs enregistrés',
+                style: TextStyle(
+                  color: adminColor.withOpacity(0.75),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Expanded(
+                child: StreamBuilder<
+                    QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('territoires')
+                      .doc(_resolvedTerritoireId)
+                      .collection('sauveteurs')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Chargement impossible : '
+                          '${snapshot.error}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: redColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      );
+                    }
+
+                    if (!snapshot.hasData) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+
+                    final documents = [
+                      ...snapshot.data!.docs,
+                    ];
+
+                    documents.sort((a, b) {
+                      final dataA = a.data();
+                      final dataB = b.data();
+                      final nomA =
+                          _cleanText(dataA['nom']).toUpperCase();
+                      final nomB =
+                          _cleanText(dataB['nom']).toUpperCase();
+                      final nomComparison = nomA.compareTo(nomB);
+
+                      if (nomComparison != 0) {
+                        return nomComparison;
+                      }
+
+                      return _cleanText(dataA['prenom'])
+                          .toUpperCase()
+                          .compareTo(
+                            _cleanText(dataB['prenom'])
+                                .toUpperCase(),
+                          );
+                    });
+
+                    if (documents.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'Aucun sauveteur enregistré.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: adminColor,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      );
+                    }
+
+                    return ListView.separated(
+                      itemCount: documents.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final document = documents[index];
+                        final data = document.data();
+                        final nom =
+                            _cleanText(data['nom']).toUpperCase();
+                        final prenom =
+                            _cleanText(data['prenom']);
+                        final telephone =
+                            _cleanText(data['telephone']);
+                        final email = _cleanText(data['email']);
+                        final fonctions =
+                            (data['fonctions'] as List? ??
+                                    const [])
+                                .map((value) => value.toString())
+                                .where(
+                                  (value) => value.isNotEmpty,
+                                )
+                                .join(' • ');
+                        final posteIds =
+                            (data['postesAffectes'] as List? ??
+                                    const [])
+                                .map((value) => value.toString())
+                                .where(
+                                  (value) => value.isNotEmpty,
+                                )
+                                .toList();
+
+                           final periodeIds =
+    (data['periodesSurveillance'] as List? ??
+            const [])
+        .map((value) => value.toString())
+        .where(
+          (value) => value.isNotEmpty,
+        )
+        .toList();     
+
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: adminColor.withOpacity(0.025),
+                            borderRadius:
+                                BorderRadius.circular(16),
+                            border: Border.all(
+                              color: adminColor.withOpacity(0.65),
+                              width: 1.4,
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: redColor.withOpacity(0.10),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.person_rounded,
+                                  color: redColor,
+                                  size: 25,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '$nom $prenom'.trim(),
+                                      style: const TextStyle(
+                                        color: redColor,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    if (telephone.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        telephone,
+                                        style: const TextStyle(
+                                          color: adminColor,
+                                          fontSize: 12,
+                                          fontWeight:
+                                              FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                    if (email.isNotEmpty) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        email,
+                                        overflow:
+                                            TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: adminColor,
+                                          fontSize: 12,
+                                          fontWeight:
+                                              FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                    if (fonctions.isNotEmpty) ...[
+                                      const SizedBox(height: 5),
+                                      Text(
+                                        fonctions,
+                                        style: TextStyle(
+                                          color: adminColor
+                                              .withOpacity(0.72),
+                                          fontSize: 11,
+                                          fontWeight:
+                                              FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 5),
+                                    FutureBuilder<List<String>>(
+                                      future:
+                                          _loadSauveteurPostLabels(
+                                        posteIds,
+                                      ),
+                                      builder: (
+                                        context,
+                                        postSnapshot,
+                                      ) {
+                                        if (!postSnapshot.hasData) {
+                                          return const Text(
+                                            'Chargement des postes...',
+                                            style: TextStyle(
+                                              color: adminColor,
+                                              fontSize: 11,
+                                              fontWeight:
+                                                  FontWeight.w600,
+                                            ),
+                                          );
+                                        }
+
+                                        final labels =
+                                            postSnapshot.data!;
+
+                                        return Text(
+                                          labels.isEmpty
+                                              ? 'Aucun poste affecté'
+                                              : labels.join('\n'),
+                                          style: const TextStyle(
+                                            color: adminColor,
+                                            fontSize: 11,
+                                            fontWeight:
+                                                FontWeight.w700,
+                                            height: 1.35,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(height: 6),
+FutureBuilder<List<String>>(
+  future: _loadSauveteurPeriodeLabels(
+    periodeIds,
+  ),
+  builder: (
+    context,
+    periodeSnapshot,
+  ) {
+    if (!periodeSnapshot.hasData) {
+      return const Text(
+        'Chargement des périodes...',
+        style: TextStyle(
+          color: adminColor,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+    }
+
+    final labels = periodeSnapshot.data!;
+
+if (labels.isEmpty) {
+  return const Text(
+    'Aucune période affectée',
+    style: TextStyle(
+      color: adminColor,
+      decoration: TextDecoration.none,
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+    ),
+  );
+}
+
+return Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    
+    ...labels.asMap().entries.map((entry) {
+      final parts = entry.value.split(' — ');
+
+      final periodTitle =
+          parts.isNotEmpty ? parts.first : '';
+
+      final periodDates =
+          parts.length >= 2 ? parts[1] : '';
+
+      final periodHours = parts.length >= 3
+          ? parts.sublist(2)
+          : <String>[];
+
+      return Padding(
+        padding: EdgeInsets.only(
+  top: entry.key == 0 ? 0 : 9,
+),
+        child: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+          children: [
+            if (periodTitle.isNotEmpty)
+              Text(
+                periodTitle,
+                style: const TextStyle(
+                  color: adminColor,
+                  decoration:
+                      TextDecoration.none,
+                  fontSize: 11,
+                  fontWeight:
+                      FontWeight.w900,
+                  height: 1.25,
+                ),
+              ),
+
+            if (periodDates.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                periodDates,
+                style: const TextStyle(
+                  color: adminColor,
+                  decoration:
+                      TextDecoration.none,
+                  fontSize: 11,
+                  fontWeight:
+                      FontWeight.w700,
+                  height: 1.25,
+                ),
+              ),
+            ],
+
+            ...periodHours.map(
+              (hours) => Padding(
+                padding:
+                    const EdgeInsets.only(top: 2),
+                child: Text(
+                  hours,
+                  style: const TextStyle(
+                    color: adminColor,
+                    decoration:
+                        TextDecoration.none,
+                    fontSize: 11,
+                    fontWeight:
+                        FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }),
+  ],
+);
+  },
+),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Column(
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Modifier',
+                                    onPressed: () {
+                                      _openSauveteurForEditing(
+                                        document.id,
+                                        data,
+                                      );
+                                    },
+                                    icon: const Icon(
+                                      Icons.edit_rounded,
+                                      color: adminColor,
+                                      size: 21,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Supprimer',
+                                    onPressed: () {
+                                      _deleteSauveteur(
+                                        document.id,
+                                        data,
+                                      );
+                                    },
+                                    icon: const Icon(
+                                      Icons.delete_rounded,
+                                      color: redColor,
+                                      size: 21,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -5500,10 +7563,12 @@ Widget _buildSauveteurEditorPanel() {
                       ),
                     ),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'CRÉER UN SAUVETEUR',
-                      style: TextStyle(
+                      _editingSauveteurDocId == null
+                          ? 'CRÉER UN SAUVETEUR'
+                          : 'MODIFIER LE SAUVETEUR',
+                      style: const TextStyle(
                         color: adminColor,
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
@@ -5514,9 +7579,13 @@ Widget _buildSauveteurEditorPanel() {
                   IconButton(
                     tooltip: 'Fermer',
                     onPressed: () {
+                      final returnToManagement =
+                          _editingSauveteurDocId != null;
                       setState(() {
                         _showSauveteurEditorPanel = false;
                         _clearSauveteurEditor();
+                        _showSauveteursManagementPanel =
+                            returnToManagement;
                       });
                     },
                     icon: const Icon(Icons.close_rounded),
@@ -5597,12 +7666,13 @@ Widget _buildSauveteurEditorPanel() {
                             child: _sauveteurEditorField(
                               controller: _sauveteurVilleController,
                               label: 'VILLE',
+                              forceUppercase: true,
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      _sauveteurEditorField(
+_sauveteurEditorField(
   controller: _sauveteurTelephoneController,
   label: 'Téléphone',
   keyboardType: TextInputType.phone,
@@ -5611,6 +7681,13 @@ Widget _buildSauveteurEditorPanel() {
     FrenchPhoneNumberFormatter(),
   ],
 ),
+                      const SizedBox(height: 8),
+                      _sauveteurEditorField(
+                        controller: _sauveteurEmailController,
+                        label: 'Email',
+                        keyboardType:
+                            TextInputType.emailAddress,
+                      ),
                       const SizedBox(height: 18),
                       _sauveteurSectionTitle(
                         3,
@@ -5657,6 +7734,7 @@ _buildSauveteurPeriodesField(),
                         height: 46,
                         child: OutlinedButton(
                           onPressed: _isSavingSauveteur
+                                  || _editingSauveteurDocId != null
                               ? null
                               : _generateSauveteurAccess,
                           style: OutlinedButton.styleFrom(
@@ -5730,9 +7808,17 @@ _buildSauveteurPeriodesField(),
                             foregroundColor: _sauveteurEmailSent
                                 ? Colors.white
                                 : redColor,
+                            disabledForegroundColor:
+                                _sauveteurEmailSent
+                                    ? Colors.white
+                                    : redColor.withOpacity(0.45),
                             backgroundColor: _sauveteurEmailSent
                                 ? redColor
                                 : Colors.transparent,
+                            disabledBackgroundColor:
+                                _sauveteurEmailSent
+                                    ? redColor
+                                    : Colors.transparent,
                             side: const BorderSide(
                               color: redColor,
                               width: 1.8,
@@ -5772,7 +7858,9 @@ _buildSauveteurPeriodesField(),
                   label: Text(
                     _isSavingSauveteur
                         ? 'ENREGISTREMENT...'
-                        : 'ENREGISTRER',
+                        : _editingSauveteurDocId == null
+                            ? 'ENREGISTRER'
+                            : 'ENREGISTRER LES MODIFICATIONS',
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
                     ),
@@ -9607,6 +11695,15 @@ final clusteredMarkers = validSpots.map((doc) {
               ),
             ),
 
+            if (_administratorTerritoryMarkerData != null)
+              MarkerLayer(
+                markers: [
+                  _buildAdminMarker(
+                    _administratorTerritoryMarkerData!,
+                  ),
+                ],
+              ),
+
             if (_showSphotEditorPanel &&
     _editingSphotDocId?.trim().isNotEmpty != true &&
     editedLat != null &&
@@ -9694,7 +11791,9 @@ final clusteredMarkers = validSpots.map((doc) {
                       if (_selectedAdmin != null)
   _buildAdminDetailPanel(),
 
-if (_showSurveillancePeriodsPanel)
+if (_showSauveteursManagementPanel)
+  _buildSauveteursManagementPanel()
+else if (_showSurveillancePeriodsPanel)
   _buildSurveillancePeriodsPanel()
 else if (_showSauveteurEditorPanel)
   _buildSauveteurEditorPanel()
@@ -9789,6 +11888,8 @@ class _DashboardSurveillancePeriod {
   final DateTime endDate;
   final TimeOfDay startHour;
   final TimeOfDay endHour;
+  final TimeOfDay? secondStartHour;
+  final TimeOfDay? secondEndHour;
 
   const _DashboardSurveillancePeriod({
     required this.id,
@@ -9797,7 +11898,13 @@ class _DashboardSurveillancePeriod {
     required this.endDate,
     required this.startHour,
     required this.endHour,
+    this.secondStartHour,
+    this.secondEndHour,
   });
+
+  bool get hasMiddayBreak =>
+      secondStartHour != null &&
+      secondEndHour != null;
 }
 
 class _DashboardSurveillancePeriodDialog extends StatefulWidget {
@@ -9822,6 +11929,9 @@ class _DashboardSurveillancePeriodDialogState
   DateTime? _endDate;
   TimeOfDay? _startHour;
   TimeOfDay? _endHour;
+  TimeOfDay? _secondStartHour;
+  TimeOfDay? _secondEndHour;
+  bool _hasMiddayBreak = false;
   String _errorMessage = '';
 
   @override
@@ -9834,6 +11944,12 @@ class _DashboardSurveillancePeriodDialogState
     _endDate = widget.period?.endDate;
     _startHour = widget.period?.startHour;
     _endHour = widget.period?.endHour;
+    _secondStartHour =
+        widget.period?.secondStartHour;
+    _secondEndHour =
+        widget.period?.secondEndHour;
+    _hasMiddayBreak =
+        widget.period?.hasMiddayBreak ?? false;
   }
 
   @override
@@ -9904,12 +12020,36 @@ class _DashboardSurveillancePeriodDialogState
 
   Future<void> _pickTime({
     required bool isStart,
+    bool secondSlot = false,
   }) async {
+    final currentTime = secondSlot
+        ? (isStart
+            ? _secondStartHour
+            : _secondEndHour)
+        : (isStart ? _startHour : _endHour);
+
     final picked = await showTimePicker(
       context: context,
-      initialTime: isStart
-          ? (_startHour ?? const TimeOfDay(hour: 11, minute: 0))
-          : (_endHour ?? const TimeOfDay(hour: 19, minute: 0)),
+      initialTime: currentTime ??
+          (secondSlot
+              ? (isStart
+                  ? const TimeOfDay(
+                      hour: 14,
+                      minute: 0,
+                    )
+                  : const TimeOfDay(
+                      hour: 19,
+                      minute: 0,
+                    ))
+              : (isStart
+                  ? const TimeOfDay(
+                      hour: 11,
+                      minute: 0,
+                    )
+                  : const TimeOfDay(
+                      hour: 13,
+                      minute: 0,
+                    ))),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -9934,7 +12074,11 @@ class _DashboardSurveillancePeriodDialogState
     }
 
     setState(() {
-      if (isStart) {
+      if (secondSlot && isStart) {
+        _secondStartHour = picked;
+      } else if (secondSlot) {
+        _secondEndHour = picked;
+      } else if (isStart) {
         _startHour = picked;
       } else {
         _endHour = picked;
@@ -9996,6 +12140,10 @@ class _DashboardSurveillancePeriodDialogState
     final name = _nameController.text.trim();
     String error = '';
 
+    int minutesOf(TimeOfDay time) {
+      return time.hour * 60 + time.minute;
+    }
+
     if (name.isEmpty) {
       error = 'Nom de période manquant';
     } else if (_startDate == null) {
@@ -10009,6 +12157,28 @@ class _DashboardSurveillancePeriodDialogState
     } else if (_endDate!.isBefore(_startDate!)) {
       error =
           'La date de fin doit être postérieure à la date de début';
+    } else if (minutesOf(_endHour!) <=
+        minutesOf(_startHour!)) {
+      error =
+          'L’heure de fin doit être postérieure à l’heure de début';
+    } else if (_hasMiddayBreak &&
+        _secondStartHour == null) {
+      error =
+          'Heure de début du second créneau manquante';
+    } else if (_hasMiddayBreak &&
+        _secondEndHour == null) {
+      error =
+          'Heure de fin du second créneau manquante';
+    } else if (_hasMiddayBreak &&
+        minutesOf(_secondEndHour!) <=
+            minutesOf(_secondStartHour!)) {
+      error =
+          'L’heure de fin du second créneau doit être postérieure à son heure de début';
+    } else if (_hasMiddayBreak &&
+        minutesOf(_secondStartHour!) <=
+            minutesOf(_endHour!)) {
+      error =
+          'Le second créneau doit commencer après la fin du premier';
     }
 
     if (error.isNotEmpty) {
@@ -10027,6 +12197,12 @@ class _DashboardSurveillancePeriodDialogState
         endDate: _endDate!,
         startHour: _startHour!,
         endHour: _endHour!,
+        secondStartHour: _hasMiddayBreak
+            ? _secondStartHour
+            : null,
+        secondEndHour: _hasMiddayBreak
+            ? _secondEndHour
+            : null,
       ),
     );
   }
@@ -10110,18 +12286,99 @@ class _DashboardSurveillancePeriodDialogState
               ),
               const SizedBox(height: 9),
               _pickerTile(
-                label: 'Heure début',
+                label: _hasMiddayBreak
+                    ? 'Heure début — créneau 1'
+                    : 'Heure début',
                 value: _formatTime(_startHour),
                 icon: Icons.access_time_rounded,
                 onTap: () => _pickTime(isStart: true),
               ),
               const SizedBox(height: 9),
               _pickerTile(
-                label: 'Heure fin',
+                label: _hasMiddayBreak
+                    ? 'Heure fin — créneau 1'
+                    : 'Heure fin',
                 value: _formatTime(_endHour),
                 icon: Icons.access_time_rounded,
                 onTap: () => _pickTime(isStart: false),
               ),
+              const SizedBox(height: 9),
+              Container(
+                decoration: BoxDecoration(
+                  color: _blue.withOpacity(0.025),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: _blue,
+                    width: 1.5,
+                  ),
+                ),
+                child: CheckboxListTile(
+                  value: _hasMiddayBreak,
+                  activeColor: _blue,
+                  controlAffinity:
+                      ListTileControlAffinity.leading,
+                  contentPadding:
+                      const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 2,
+                  ),
+                  title: const Text(
+                    'PAUSE MÉRIDIENNE — '
+                    'AJOUTER UN SECOND CRÉNEAU',
+                    style: TextStyle(
+                      color: _blue,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _hasMiddayBreak = value == true;
+
+                      if (_hasMiddayBreak) {
+                        _secondStartHour ??=
+                            const TimeOfDay(
+                          hour: 14,
+                          minute: 0,
+                        );
+                        _secondEndHour ??=
+                            const TimeOfDay(
+                          hour: 19,
+                          minute: 0,
+                        );
+                      }
+
+                      _errorMessage = '';
+                    });
+                  },
+                ),
+              ),
+              if (_hasMiddayBreak) ...[
+                const SizedBox(height: 9),
+                _pickerTile(
+                  label: 'Heure début — créneau 2',
+                  value: _formatTime(
+                    _secondStartHour,
+                  ),
+                  icon: Icons.access_time_rounded,
+                  onTap: () => _pickTime(
+                    isStart: true,
+                    secondSlot: true,
+                  ),
+                ),
+                const SizedBox(height: 9),
+                _pickerTile(
+                  label: 'Heure fin — créneau 2',
+                  value: _formatTime(
+                    _secondEndHour,
+                  ),
+                  icon: Icons.access_time_rounded,
+                  onTap: () => _pickTime(
+                    isStart: false,
+                    secondSlot: true,
+                  ),
+                ),
+              ],
               if (_errorMessage.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text(
