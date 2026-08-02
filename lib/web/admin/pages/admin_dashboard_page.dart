@@ -90,6 +90,9 @@ Color _sphotHoverColor = adminColor;
   bool _showSauveteurEditorPanel = false;
   bool _showSauveteursManagementPanel = false;
   bool _showSurveillancePeriodsPanel = false;
+  bool _showTrialSummaryPanel = false;
+  bool _trialSummaryDialogOpen = false;
+  Future<Map<String, dynamic>>? _trialSummaryPanelFuture;
   bool _placingSphotOnMap = false;
   bool _isSavingSphot = false;
   String? _expandedSphotDropdown;
@@ -2892,6 +2895,14 @@ Future<Map<String, dynamic>> _loadTrialSummaryData() async {
   final sauveteursSnapshot = await territoryReference
       .collection('sauveteurs')
       .get();
+      final sauveteursById =
+    <String, Map<String, dynamic>>{
+  for (final document in sauveteursSnapshot.docs)
+    document.id: <String, dynamic>{
+      ...document.data(),
+      '_docId': document.id,
+    },
+};
 
   final periodsById = <String, Map<String, dynamic>>{
     for (final document in periodsSnapshot.docs)
@@ -2925,12 +2936,23 @@ Future<Map<String, dynamic>> _loadTrialSummaryData() async {
         .get();
 
     final assignedSauveteurs =
-        assignedSnapshot.docs.map((document) {
-      return <String, dynamic>{
-        ...document.data(),
-        '_docId': document.id,
-      };
-    }).toList();
+    assignedSnapshot.docs.map((document) {
+  final assignedData = document.data();
+
+  final sauveteurId = _cleanText(
+    assignedData['sauveteurId'] ?? document.id,
+  );
+
+  final fullData =
+      sauveteursById[sauveteurId] ??
+      <String, dynamic>{};
+
+  return <String, dynamic>{
+    ...fullData,
+    ...assignedData,
+    '_docId': sauveteurId,
+  };
+}).toList();
 
     final periodIds = <String>{};
 
@@ -3072,9 +3094,13 @@ Color _trialSeasonStatusColor(String status) {
   }
 }
 
-String _trialPeriodDescription(
+Widget _buildTrialPeriodCard(
   Map<String, dynamic> period,
 ) {
+  final periodId = _cleanText(
+    period['_docId'] ?? period['id'],
+  );
+
   final name = _cleanText(
     period['name'] ?? 'PÉRIODE',
   ).toUpperCase();
@@ -3093,6 +3119,34 @@ String _trialPeriodDescription(
           endValue.toDate(),
         )
       : '--/--/----';
+
+  final startTime =
+      _parseSurveillanceTime(
+        period['startHour'],
+      ) ??
+      const TimeOfDay(
+        hour: 0,
+        minute: 0,
+      );
+
+  final endTime =
+      _parseSurveillanceTime(
+        period['endHour'],
+      ) ??
+      const TimeOfDay(
+        hour: 0,
+        minute: 0,
+      );
+
+  final secondStartTime =
+      _parseSurveillanceTime(
+        period['secondStartHour'],
+      );
+
+  final secondEndTime =
+      _parseSurveillanceTime(
+        period['secondEndHour'],
+      );
 
   final startHour = _cleanText(
     period['startHour'] ?? '--:--',
@@ -3115,17 +3169,155 @@ String _trialPeriodDescription(
       secondEndHour.isNotEmpty;
 
   final hoursDescription = hasSecondSlot
-      ? 'de $startHour à $endHour et de '
-          '$secondStartHour à $secondEndHour'
-      : 'de $startHour à $endHour';
+      ? 'DE $startHour À $endHour — '
+          'DE $secondStartHour À $secondEndHour'
+      : 'DE $startHour À $endHour';
 
-  return '$name — du $startDate au $endDate, '
-      '$hoursDescription';
+  final editablePeriod =
+      periodId.isNotEmpty &&
+              startValue is Timestamp &&
+              endValue is Timestamp
+          ? _DashboardSurveillancePeriod(
+              id: periodId,
+              name: name,
+              startDate: startValue.toDate(),
+              endDate: endValue.toDate(),
+              startHour: startTime,
+              endHour: endTime,
+              secondStartHour: secondStartTime,
+              secondEndHour: secondEndTime,
+            )
+          : null;
+
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.fromLTRB(
+      12,
+      2,
+      4,
+      3,
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+  child: Row(
+    crossAxisAlignment:
+        CrossAxisAlignment.baseline,
+    textBaseline: TextBaseline.alphabetic,
+    children: [
+      Transform.translate(
+  offset: const Offset(0, -1.5),
+  child: const Text(
+    '•',
+    style: TextStyle(
+      color: adminColor,
+      fontSize: 12,
+      fontWeight: FontWeight.w800,
+    ),
+  ),
+),
+      const SizedBox(width: 4),
+      Expanded(
+        child: Text(
+          name,
+          style: const TextStyle(
+            color: adminColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    ],
+  ),
+),
+            IconButton(
+              tooltip: 'Modifier la période',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(
+                minWidth: 30,
+                minHeight: 30,
+              ),
+              onPressed: editablePeriod == null
+                  ? null
+                  : () {
+                      _openSurveillancePeriodDialog(
+                        period: editablePeriod,
+                      );
+                    },
+              icon: const Icon(
+                Icons.edit_rounded,
+                color: adminColor,
+                size: 18,
+              ),
+            ),
+            IconButton(
+              tooltip: 'Supprimer la période',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(
+                minWidth: 30,
+                minHeight: 30,
+              ),
+              onPressed: editablePeriod == null
+                  ? null
+                  : () {
+                      _deleteSurveillancePeriod(
+                        editablePeriod,
+                      );
+                    },
+              icon: const Icon(
+                Icons.delete_rounded,
+                color: redColor,
+                size: 18,
+              ),
+            ),
+          ],
+        ),
+        Padding(
+  padding: const EdgeInsets.only(
+    left: 12,
+  ),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'DU $startDate AU $endDate',
+        style: const TextStyle(
+          color: adminColor,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      const SizedBox(height: 2),
+      Text(
+        hoursDescription,
+        style: const TextStyle(
+          color: adminColor,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    ],
+  ),
+),
+      ],
+    ),
+  );
 }
 
-String _trialSauveteurDescription(
-  Map<String, dynamic> sauveteur,
-) {
+Widget _buildTrialSauveteurManagementRow({
+  required Map<String, dynamic> sauveteur,
+  required List<Map<String, dynamic>> periods,
+}) {
+  final sauveteurId = _cleanText(
+    sauveteur['_docId'] ??
+        sauveteur['sauveteurId'],
+  );
+
   final prenom = _cleanText(
     sauveteur['prenom'],
   );
@@ -3133,6 +3325,10 @@ String _trialSauveteurDescription(
   final nom = _cleanText(
     sauveteur['nom'],
   ).toUpperCase();
+
+  final identity = [prenom, nom]
+      .where((value) => value.isNotEmpty)
+      .join(' ');
 
   final rawFunctions = sauveteur['fonctions'];
 
@@ -3143,18 +3339,144 @@ String _trialSauveteurDescription(
           .join(', ')
       : _cleanText(rawFunctions);
 
-  final identity = [prenom, nom]
-      .where((value) => value.isNotEmpty)
-      .join(' ');
+  final rawPeriodIds =
+      sauveteur['periodesSurveillance'];
 
-  if (functions.isEmpty) {
-    return identity.isEmpty
-        ? 'Sauveteur non renseigné'
-        : identity;
-  }
+  final periodIds = rawPeriodIds is Iterable
+      ? rawPeriodIds
+          .map((value) => _cleanText(value))
+          .where((value) => value.isNotEmpty)
+          .toSet()
+      : <String>{};
 
-  return '${identity.isEmpty ? 'Sauveteur' : identity} — '
-      '$functions';
+  final periodTitles = periods
+      .where(
+        (period) => periodIds.contains(
+          _cleanText(period['_docId']),
+        ),
+      )
+      .map(
+        (period) => _cleanText(
+          period['name'] ?? 'PÉRIODE',
+        ).toUpperCase(),
+      )
+      .where((title) => title.isNotEmpty)
+      .toList();
+
+  return Padding(
+    padding: const EdgeInsets.only(
+      left: 12,
+      bottom: 8,
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '• ${identity.isEmpty ? 'Sauveteur' : identity}',
+                style: const TextStyle(
+                  color: adminColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Modifier le sauveteur',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(
+                minWidth: 30,
+                minHeight: 30,
+              ),
+              onPressed: sauveteurId.isEmpty
+                  ? null
+                  : () {
+                      _openSauveteurForEditing(
+                        sauveteurId,
+                        sauveteur,
+                      );
+                    },
+              icon: const Icon(
+                Icons.edit_rounded,
+                color: adminColor,
+                size: 18,
+              ),
+            ),
+            IconButton(
+              tooltip: 'Supprimer le sauveteur',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(
+                minWidth: 30,
+                minHeight: 30,
+              ),
+              onPressed: sauveteurId.isEmpty
+                  ? null
+                  : () async {
+                      await _deleteSauveteur(
+                        sauveteurId,
+                        sauveteur,
+                      );
+
+                      if (!mounted) {
+                        return;
+                      }
+
+                      setState(() {
+                        _showTrialSummaryPanel = true;
+                        _trialSummaryPanelFuture =
+                            _loadTrialSummaryData();
+                      });
+                    },
+              icon: const Icon(
+                Icons.delete_rounded,
+                color: redColor,
+                size: 18,
+              ),
+            ),
+          ],
+        ),
+        if (functions.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(
+              left: 12,
+            ),
+            child: Text(
+              functions,
+              style: const TextStyle(
+                color: adminColor,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                height: 1.30,
+              ),
+            ),
+          ),
+        if (periodTitles.isNotEmpty) ...[
+          const SizedBox(height: 3),
+          ...periodTitles.map(
+            (title) => Padding(
+              padding: const EdgeInsets.only(
+                left: 12,
+                top: 1,
+              ),
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: adminColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  height: 1.25,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
 }
 
 Widget _trialCounter({
@@ -3235,59 +3557,93 @@ Widget _buildTrialMonitoredSpotCard(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Image.asset(
-              _getMarkerIconPath(spot),
-              width: 42,
-              height: 42,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Image.asset(
+      _getMarkerIconPath(spot),
+      width: 42,
+      height: 42,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+    ),
+    const SizedBox(width: 10),
+    Expanded(
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Text(
+            idSphot.isEmpty
+                ? name
+                : '$idSphot - $name',
+            style: const TextStyle(
+              color: adminColor,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    idSphot.isEmpty
-                        ? name
-                        : '$idSphot - $name',
-                    style: const TextStyle(
-                      color: adminColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.10),
-                      borderRadius:
-                          BorderRadius.circular(20),
-                      border: Border.all(
-                        color: statusColor,
-                      ),
-                    ),
-                    child: Text(
-                      status,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ],
+          ),
+          const SizedBox(height: 7),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 9,
+              vertical: 5,
+            ),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.10),
+              borderRadius:
+                  BorderRadius.circular(20),
+              border: Border.all(
+                color: statusColor,
               ),
             ),
-          ],
-        ),
+            child: Text(
+              status,
+              style: TextStyle(
+                color: statusColor,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+    IconButton(
+      tooltip: 'Modifier le SPHOT',
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(
+        minWidth: 30,
+        minHeight: 30,
+      ),
+      onPressed: () {
+        _loadSphotInEditor(spot);
+      },
+      icon: const Icon(
+        Icons.edit_rounded,
+        color: adminColor,
+        size: 18,
+      ),
+    ),
+    IconButton(
+      tooltip: 'Supprimer le SPHOT',
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(
+        minWidth: 30,
+        minHeight: 30,
+      ),
+      onPressed: () {
+        _deleteSphotFromSummary(spot);
+      },
+      icon: const Icon(
+        Icons.delete_rounded,
+        color: redColor,
+        size: 18,
+      ),
+    ),
+  ],
+),
         const SizedBox(height: 13),
         const Text(
           'PÉRIODES',
@@ -3297,11 +3653,10 @@ Widget _buildTrialMonitoredSpotCard(
             fontWeight: FontWeight.w900,
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 1),
         if (periods.isEmpty)
           const Text(
-            'Aucune ouverture programmée. '
-            'Cette situation ne bloque pas la demande.',
+            'Aucune période de surveillance programmée.',
             style: TextStyle(
               color: adminColor,
               fontSize: 12,
@@ -3309,22 +3664,17 @@ Widget _buildTrialMonitoredSpotCard(
             ),
           )
         else
-          ...periods.map(
-            (period) => Padding(
-              padding: const EdgeInsets.only(
-                bottom: 4,
-              ),
-              child: Text(
-                '• ${_trialPeriodDescription(period)}',
-                style: const TextStyle(
-                  color: adminColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        const SizedBox(height: 10),
+  ...periods.map(
+    (period) => Padding(
+      padding: const EdgeInsets.only(
+        bottom: 3,
+      ),
+      child: _buildTrialPeriodCard(
+        period,
+      ),
+    ),
+  ),
+        const SizedBox(height: 6),
         const Text(
           'SAUVETEURS AFFECTÉS',
           style: TextStyle(
@@ -3344,34 +3694,28 @@ Widget _buildTrialMonitoredSpotCard(
             ),
           )
         else
-          ...sauveteurs.map(
-            (sauveteur) => Padding(
-              padding: const EdgeInsets.only(
-                bottom: 4,
-              ),
-              child: Text(
-                '• ${_trialSauveteurDescription(sauveteur)}',
-                style: const TextStyle(
-                  color: adminColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
+  ...sauveteurs.map(
+    (sauveteur) =>
+        _buildTrialSauveteurManagementRow(
+      sauveteur: sauveteur,
+      periods: periods,
+    ),
+  ),
       ],
     ),
   );
 }
 
 Widget _buildTrialOtherSpotTile(
-  Map<String, dynamic> spot,
-) {
+  Map<String, dynamic> spot, {
+  required bool showActions,
+}) {
   final idSphot = _cleanText(
     spot['idSphot'] ?? spot['_docId'],
   );
 
   final name = _spotName(spot);
+
   final type = _cleanText(
     spot['typeSphot'] ?? 'TYPE NON RENSEIGNÉ',
   );
@@ -3424,6 +3768,43 @@ Widget _buildTrialOtherSpotTile(
             ],
           ),
         ),
+
+        if (showActions) ...[
+          IconButton(
+            tooltip: 'Modifier le SPHOT',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(
+              minWidth: 30,
+              minHeight: 30,
+            ),
+            onPressed: () {
+              _loadSphotInEditor(spot);
+            },
+            icon: const Icon(
+              Icons.edit_rounded,
+              color: adminColor,
+              size: 18,
+            ),
+          ),
+          IconButton(
+            tooltip: 'Supprimer le SPHOT',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(
+              minWidth: 30,
+              minHeight: 30,
+            ),
+            onPressed: () {
+              _deleteSphotFromSummary(spot);
+            },
+            icon: const Icon(
+              Icons.delete_rounded,
+              color: redColor,
+              size: 18,
+            ),
+          ),
+        ],
       ],
     ),
   );
@@ -3431,7 +3812,7 @@ Widget _buildTrialOtherSpotTile(
 
 Future<void> _submitTrialRequest(
   Map<String, dynamic> summary,
-  BuildContext dialogContext,
+  VoidCallback onCompleted,
 ) async {
   final uid = widget.adminUid.trim();
 
@@ -3485,7 +3866,7 @@ Future<void> _submitTrialRequest(
       return;
     }
 
-    Navigator.of(dialogContext).pop();
+    onCompleted();
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -3511,28 +3892,12 @@ Future<void> _submitTrialRequest(
   }
 }
 
-Widget _buildTrialSummaryDialog(
-  BuildContext dialogContext,
-  Future<Map<String, dynamic>> summaryFuture,
-) {
-  final screenSize =
-      MediaQuery.sizeOf(dialogContext);
-
-  return Dialog(
-    insetPadding: const EdgeInsets.all(24),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(22),
-      side: const BorderSide(
-        color: adminColor,
-        width: 1.5,
-      ),
-    ),
-    child: ConstrainedBox(
-      constraints: BoxConstraints(
-        maxWidth: 1040,
-        maxHeight: screenSize.height * 0.88,
-      ),
-      child: FutureBuilder<Map<String, dynamic>>(
+Widget _buildTrialSummaryContent({
+  required Future<Map<String, dynamic>> summaryFuture,
+  required VoidCallback onClose,
+  required bool isSidePanel,
+}) {
+  return FutureBuilder<Map<String, dynamic>>(
         future: summaryFuture,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
@@ -3559,7 +3924,7 @@ Widget _buildTrialSummaryDialog(
                   const SizedBox(height: 18),
                   TextButton(
                     onPressed: () {
-                      Navigator.of(dialogContext).pop();
+                      onClose();
                     },
                     child: const Text('FERMER'),
                   ),
@@ -3595,61 +3960,62 @@ Widget _buildTrialSummaryDialog(
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  24,
-                  18,
-                  14,
-                  14,
-                ),
-                child: Row(
-                  children: [
-                    Image.asset(
-                      'data/icons/fire_red_icon.png',
-                      width: 42,
-                      height: 42,
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.high,
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'RÉCAPITULATIF DE VOTRE ESPACE ADMIN SPHOT',
-                            style: TextStyle(
-                              color: adminColor,
-                              fontSize: 21,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          SizedBox(height: 3),
-                          Text(
-                            'Vérifiez votre organisation avant '
-                            'd’envoyer la demande d’essai gratuit.',
-                            style: TextStyle(
-                              color: adminColor,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Fermer',
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                      },
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: adminColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+  padding: const EdgeInsets.all(20),
+  child: Row(
+    children: [
+      Transform.translate(
+        offset: const Offset(-12, 0),
+        child: Transform.scale(
+          scale: 1.8,
+          alignment: Alignment.center,
+          child: Image.asset(
+            'data/icons/fire_red_icon.png',
+            width: 30,
+            height: 30,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
+        ),
+      ),
+      Expanded(
+  child: Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        isSidePanel
+            ? 'ESPACE ADMIN SPHOT'
+            : 'ESSAI GRATUIT 8 JOURS',
+        style: const TextStyle(
+          color: adminColor,
+          fontSize: 20,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.2,
+        ),
+      ),
+      if (!isSidePanel) ...[
+        const SizedBox(height: 3),
+        const Text(
+          'Vérifiez votre organisation avant '
+          'd’envoyer la demande d’essai gratuit.',
+          style: TextStyle(
+            color: adminColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    ],
+  ),
+),
+      IconButton(
+        tooltip: 'Fermer',
+        onPressed: onClose,
+        icon: const Icon(Icons.close_rounded),
+      ),
+    ],
+  ),
+),
               Divider(
                 height: 1,
                 color: adminColor.withOpacity(0.20),
@@ -3714,27 +4080,44 @@ Widget _buildTrialSummaryDialog(
                       ),
                       const SizedBox(height: 10),
                       if (otherSpots.isEmpty)
-                        const Text(
-                          'Aucun autre SPHOT enregistré.',
-                          style: TextStyle(
-                            color: adminColor,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        )
-                      else
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: otherSpots.map((spot) {
-                            return SizedBox(
-                              width: 300,
-                              child:
-                                  _buildTrialOtherSpotTile(
-                                spot,
-                              ),
-                            );
-                          }).toList(),
-                        ),
+  const Text(
+    'Aucun autre SPHOT enregistré.',
+    style: TextStyle(
+      color: adminColor,
+      fontWeight: FontWeight.w700,
+    ),
+  )
+else if (isSidePanel)
+  Column(
+    children: otherSpots.map((spot) {
+      return Padding(
+        padding: const EdgeInsets.only(
+          bottom: 10,
+        ),
+        child: SizedBox(
+          width: double.infinity,
+          child: _buildTrialOtherSpotTile(
+  spot,
+  showActions: true,
+),
+        ),
+      );
+    }).toList(),
+  )
+else
+  Wrap(
+    spacing: 10,
+    runSpacing: 10,
+    children: otherSpots.map((spot) {
+      return SizedBox(
+        width: 300,
+        child: _buildTrialOtherSpotTile(
+  spot,
+  showActions: true,
+),
+      );
+    }).toList(),
+  ),
                     ],
                   ),
                 ),
@@ -3774,70 +4157,96 @@ Widget _buildTrialSummaryDialog(
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Les postes fermés, hors saison ou sans '
-                      'ouverture programmée ne bloquent pas '
-                      'la demande.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: adminColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 13),
-                    Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(dialogContext).pop();
-                          },
-                          child: const Text('RETOUR'),
-                        ),
-                        const SizedBox(width: 10),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            _submitTrialRequest(
-                              summary,
-                              dialogContext,
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: adminColor,
-                            foregroundColor: Colors.white,
-                            padding:
-                                const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 15,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(14),
-                            ),
-                          ),
-                          icon: const Icon(
-                            Icons.send_rounded,
-                          ),
-                          label: const Text(
-                            'ENVOYER MA DEMANDE '
-                            'D’ESSAI GRATUIT',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    if (!isSidePanel) ...[
+  const SizedBox(height: 12),
+  const Text(
+    'Les postes fermés, hors saison ou sans '
+    'ouverture programmée ne bloquent pas '
+    'la demande.',
+    textAlign: TextAlign.center,
+    style: TextStyle(
+      color: adminColor,
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+    ),
+  ),
+  const SizedBox(height: 13),
+  Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      TextButton(
+        onPressed: onClose,
+        child: const Text('RETOUR'),
+      ),
+      const SizedBox(width: 10),
+      ElevatedButton.icon(
+        onPressed: () {
+          _submitTrialRequest(
+            summary,
+            onClose,
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: adminColor,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 15,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        icon: const Icon(
+          Icons.send_rounded,
+        ),
+        label: const Text(
+          'ENVOYER MA DEMANDE D’ESSAI GRATUIT',
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    ],
+  ),
+],
+                    
                   ],
                 ),
               ),
             ],
           );
-        },
+                },
+  );
+}
+
+Widget _buildTrialSummaryDialog(
+  BuildContext dialogContext,
+  Future<Map<String, dynamic>> summaryFuture,
+) {
+  final screenSize = MediaQuery.sizeOf(dialogContext);
+
+  return Dialog(
+    insetPadding: const EdgeInsets.all(24),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(22),
+      side: const BorderSide(
+        color: adminColor,
+        width: 1.5,
       ),
+    ),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: 1040,
+        maxHeight: screenSize.height * 0.88,
+      ),
+      child: _buildTrialSummaryContent(
+  summaryFuture: summaryFuture,
+  isSidePanel: false,
+  onClose: () {
+    Navigator.of(dialogContext).pop();
+  },
+),
     ),
   );
 }
@@ -3858,15 +4267,105 @@ Future<void> _openTrialSummaryDialog() async {
 
   final summaryFuture = _loadTrialSummaryData();
 
-  await showDialog<void>(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      return _buildTrialSummaryDialog(
-        dialogContext,
-        summaryFuture,
-      );
-    },
+  _trialSummaryDialogOpen = true;
+
+  try {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return _buildTrialSummaryDialog(
+          dialogContext,
+          summaryFuture,
+        );
+      },
+    );
+  } finally {
+    _trialSummaryDialogOpen = false;
+  }
+}
+
+void _openTrialSummaryPanel() {
+  if (_resolvedTerritoireId.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Le territoire doit être chargé avant '
+          'd’ouvrir le récapitulatif.',
+        ),
+        backgroundColor: redColor,
+      ),
+    );
+    return;
+  }
+
+  setState(() {
+    _trialSummaryPanelFuture = _loadTrialSummaryData();
+    _showTrialSummaryPanel = true;
+
+    _showSauveteursManagementPanel = false;
+    _showSurveillancePeriodsPanel = false;
+    _showSauveteurEditorPanel = false;
+    _showSphotEditorPanel = false;
+    _placingSphotOnMap = false;
+
+    _selectedSpot = null;
+    _selectedAdmin = null;
+    _selectedAdvertiser = null;
+    _showLegalDocumentsPanel = false;
+  });
+}
+
+void _closeTrialSummaryPanel() {
+  setState(() {
+    _showTrialSummaryPanel = false;
+    _trialSummaryPanelFuture = null;
+  });
+}
+
+void _closeTrialSummaryDialogBeforeEditing() {
+  if (!_trialSummaryDialogOpen) {
+    return;
+  }
+
+  _trialSummaryDialogOpen = false;
+
+  Navigator.of(
+    context,
+    rootNavigator: true,
+  ).pop();
+}
+
+Widget _buildTrialSummaryPanel() {
+  final summaryFuture = _trialSummaryPanelFuture;
+
+  return Container(
+    width: 430,
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.98),
+      border: Border(
+        left: BorderSide(
+          color: adminColor.withOpacity(0.45),
+          width: 1.5,
+        ),
+      ),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: SafeArea(
+        child: summaryFuture == null
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: adminColor,
+                ),
+              )
+            : _buildTrialSummaryContent(
+                summaryFuture: summaryFuture,
+                isSidePanel: true,
+                onClose: _closeTrialSummaryPanel,
+              ),
+      ),
+    ),
   );
 }
 
@@ -3969,71 +4468,70 @@ Widget _buildRightPanel({
     onTap: _openNewSauveteurEditor,
   ),
 
-  const SizedBox(height: 18),
+  const SizedBox(height: 12),
+
+_summaryCard(
+  title: 'ESPACE ADMIN SPHOT',
+  value: '',
+  color: adminColor,
+  iconPath: 'data/icons/fire_red_icon.png',
+  iconScale: 1.6,
+  titleFontSize: 20,
+  titleLetterSpacing: 1.2,
+  showValue: false,
+  onTap: _openTrialSummaryPanel,
+),
+
+const SizedBox(height: 12),
 
   SizedBox(
-    width: double.infinity,
-    height: 56,
-    child: ElevatedButton.icon(
-      onPressed: _openTrialSummaryDialog,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: adminColor,
-        foregroundColor: Colors.white,
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+  width: double.infinity,
+  height: 80,
+  child: ElevatedButton.icon(
+    onPressed: _openTrialSummaryDialog,
+    style: ElevatedButton.styleFrom(
+      backgroundColor: adminColor,
+      foregroundColor: Colors.white,
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
       ),
-      icon: const Icon(
-        Icons.fact_check_outlined,
-        size: 24,
-      ),
-      label: const Text(
-        'DEMANDE D’ESSAI GRATUIT\n8 JOURS',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0.4,
+    ),
+    icon: SizedBox(
+      width: 34,
+      height: 34,
+      child: Transform.scale(
+        scale: 1.6,
+        alignment: Alignment.center,
+        child: Image.asset(
+          'data/icons/fire_red_icon.png',
+          width: 34,
+          height: 34,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
         ),
       ),
     ),
+    label: const FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        'ESSAI GRATUIT 8 JOURS',
+        maxLines: 1,
+        softWrap: false,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+  fontSize: 20,
+  fontWeight: FontWeight.w900,
+  letterSpacing: 1.2,
+),
+      ),
+    ),
   ),
+),
 
   const Spacer(),
 
-  SizedBox(
-    width: double.infinity,
-    height: 54,
-    child: ElevatedButton.icon(
-      onPressed: _openSauveteursManagementPanel,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.white,
-        foregroundColor: adminColor,
-        elevation: 1,
-        side: const BorderSide(
-          color: adminColor,
-          width: 1.6,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
-      icon: const Icon(
-  Icons.groups_rounded,
-  color: redColor,
-  size: 25,
-),
-label: const Text(
-  'GESTION DES SAUVETEURS',
-        style: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0.7,
-        ),
-      ),
-    ),
-  ),
+  
 ],
         ),
       ),
@@ -4548,6 +5046,9 @@ void _openSurveillancePeriodsPanel() {
   }
 
   setState(() {
+    _showTrialSummaryPanel = false;
+    _trialSummaryPanelFuture = null;
+
     _showSurveillancePeriodsPanel = true;
     _showSauveteurEditorPanel = false;
     _showSauveteursManagementPanel = false;
@@ -4614,6 +5115,13 @@ Future<void> _openSurveillancePeriodDialog({
     if (!mounted) {
       return;
     }
+
+if (_showTrialSummaryPanel) {
+  setState(() {
+    _trialSummaryPanelFuture =
+        _loadTrialSummaryData();
+  });
+}
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -4685,6 +5193,25 @@ Future<void> _deleteSurveillancePeriod(
         .collection('periodesSurveillance')
         .doc(period.id)
         .delete();
+        if (!mounted) {
+  return;
+}
+
+if (_showTrialSummaryPanel) {
+  setState(() {
+    _trialSummaryPanelFuture =
+        _loadTrialSummaryData();
+  });
+}
+
+ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(
+    content: Text(
+      'Période supprimée.',
+    ),
+    backgroundColor: adminColor,
+  ),
+);
   } catch (error) {
     if (!mounted) {
       return;
@@ -5154,11 +5681,17 @@ Future<void> _saveSauveteur() async {
     }
 
     setState(() {
-      _isSavingSauveteur = false;
-      _showSauveteurEditorPanel = false;
-      _showSauveteursManagementPanel = isEditing;
-      _clearSauveteurEditor();
-    });
+  _isSavingSauveteur = false;
+  _showSauveteurEditorPanel = false;
+  _showSauveteursManagementPanel = false;
+
+  _showTrialSummaryPanel = isEditing;
+  _trialSummaryPanelFuture = isEditing
+      ? _loadTrialSummaryData()
+      : null;
+
+  _clearSauveteurEditor();
+});
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -5192,6 +5725,9 @@ void _clearSphotEditor() {
 
 void _openNewSphotEditor() {
   setState(() {
+    _showTrialSummaryPanel = false;
+    _trialSummaryPanelFuture = null;
+
     _clearSphotEditor();
     _showSauveteurEditorPanel = false;
     _showSauveteursManagementPanel = false;
@@ -5223,6 +5759,9 @@ void _openNewSauveteurEditor() {
   }
 
   setState(() {
+    _showTrialSummaryPanel = false;
+    _trialSummaryPanelFuture = null;
+
     _clearSauveteurEditor();
     _showSauveteurEditorPanel = true;
     _showSauveteursManagementPanel = false;
@@ -5250,6 +5789,9 @@ void _openSauveteursManagementPanel() {
   }
 
   setState(() {
+    _showTrialSummaryPanel = false;
+    _trialSummaryPanelFuture = null;
+
     _clearSauveteurEditor();
     _showSauveteursManagementPanel = true;
     _showSauveteurEditorPanel = false;
@@ -5267,6 +5809,8 @@ void _openSauveteurForEditing(
   String sauveteurId,
   Map<String, dynamic> data,
 ) {
+    _closeTrialSummaryDialogBeforeEditing();
+
   final fonctions = (data['fonctions'] as List? ?? const [])
       .map((value) => value.toString())
       .where((value) => value.isNotEmpty)
@@ -5284,6 +5828,9 @@ void _openSauveteurForEditing(
           .toSet();
 
   setState(() {
+  _showTrialSummaryPanel = false;
+  _trialSummaryPanelFuture = null;
+    
     _clearSauveteurEditor();
 
     _editingSauveteurDocId = sauveteurId;
@@ -5446,10 +5993,15 @@ Future<void> _deleteSauveteur(
 }
 
 void _loadSphotInEditor(Map<String, dynamic> data) {
+  _closeTrialSummaryDialogBeforeEditing();
+
   final lat = _toDouble(data['sphotLat']);
   final lng = _toDouble(data['sphotLng']);
 
   setState(() {
+    _showTrialSummaryPanel = false;
+    _trialSummaryPanelFuture = null;
+
     _editingSphotDocId = _cleanText(data['_docId']);
     _sphotIdController.text = _cleanText(
       data['idSphot'] ?? data['_docId'],
@@ -5645,6 +6197,119 @@ Future<void> _saveSphotFromDashboard() async {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Enregistrement impossible : $error'),
+        backgroundColor: redColor,
+      ),
+    );
+  }
+}
+
+Future<void> _deleteSphotFromSummary(
+  Map<String, dynamic> spot,
+) async {
+  final documentId = _cleanText(
+    spot['_docId'] ?? spot['idSphot'],
+  );
+
+  final territoireId =
+      _resolvedTerritoireId.trim();
+
+  if (documentId.isEmpty ||
+      territoireId.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Impossible d’identifier le SPHOT à supprimer.',
+        ),
+        backgroundColor: redColor,
+      ),
+    );
+    return;
+  }
+
+  final sphotName = _spotName(spot);
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text(
+          'SUPPRIMER CE SPHOT',
+          style: TextStyle(
+            color: redColor,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: Text(
+          'Voulez-vous vraiment supprimer le SPHOT '
+          '« $sphotName » ?\n\n'
+          'Cette action est définitive.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop(false);
+            },
+            child: const Text('ANNULER'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(dialogContext).pop(true);
+            },
+            icon: const Icon(
+              Icons.delete_forever_rounded,
+            ),
+            label: const Text('SUPPRIMER'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: redColor,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (confirmed != true || !mounted) {
+    return;
+  }
+
+  try {
+    await FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(territoireId)
+        .collection('spots')
+        .doc(documentId)
+        .delete();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _selectedSpot = null;
+      _showTrialSummaryPanel = true;
+      _trialSummaryPanelFuture =
+          _loadTrialSummaryData();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'SPHOT supprimé avec succès.',
+        ),
+        backgroundColor: adminColor,
+      ),
+    );
+  } catch (error) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Suppression impossible : $error',
+        ),
         backgroundColor: redColor,
       ),
     );
@@ -7579,15 +8244,24 @@ Widget _buildSauveteurEditorPanel() {
                   IconButton(
                     tooltip: 'Fermer',
                     onPressed: () {
-                      final returnToManagement =
-                          _editingSauveteurDocId != null;
-                      setState(() {
-                        _showSauveteurEditorPanel = false;
-                        _clearSauveteurEditor();
-                        _showSauveteursManagementPanel =
-                            returnToManagement;
-                      });
-                    },
+  final returnToSummary =
+      _editingSauveteurDocId != null;
+
+  setState(() {
+    _showSauveteurEditorPanel = false;
+    _showSauveteursManagementPanel = false;
+
+    _showTrialSummaryPanel =
+        returnToSummary;
+
+    _trialSummaryPanelFuture =
+        returnToSummary
+            ? _loadTrialSummaryData()
+            : null;
+
+    _clearSauveteurEditor();
+  });
+},
                     icon: const Icon(Icons.close_rounded),
                   ),
                 ],
@@ -8182,7 +8856,7 @@ _sphotMultiDropdown(
   selectedValues: _selectedSphotLabels,
   maxMenuHeight: 140,
 ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 18),
 
 SizedBox(
   width: double.infinity,
@@ -8845,7 +9519,7 @@ Future<void> _openAdminRejectionDialog(
               ),
             ),
             content: SizedBox(
-              width: 480,
+              width: 430,
               child: TextField(
                 minLines: 4,
                 maxLines: 8,
@@ -9713,7 +10387,7 @@ Widget _buildLegalVersionTile() {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          
 
 const SizedBox(height: 12),
 
@@ -11791,7 +12465,9 @@ final clusteredMarkers = validSpots.map((doc) {
                       if (_selectedAdmin != null)
   _buildAdminDetailPanel(),
 
-if (_showSauveteursManagementPanel)
+if (_showTrialSummaryPanel)
+  _buildTrialSummaryPanel()
+else if (_showSauveteursManagementPanel)
   _buildSauveteursManagementPanel()
 else if (_showSurveillancePeriodsPanel)
   _buildSurveillancePeriodsPanel()
