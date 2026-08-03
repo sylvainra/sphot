@@ -190,25 +190,98 @@ Color _sphotHoverColor = adminColor;
   ];
 
   static const List<String> _sphotLabelChoices = [
-    'AUCUN',
-    '🟦 PAVILLON BLEU',
-    '♿ HANDIPLAGE NIVEAU I',
-    '♿ HANDIPLAGE NIVEAU II',
-    '♿ HANDIPLAGE NIVEAU III',
-    '♿ HANDIPLAGE NIVEAU IV',
-    '🚭 PLAGE SANS TABAC',
-    '🌿 GREEN COAST AWARD',
-    '🌸 VILLES ET VILLAGES FLEURIS',
-    '🏄 VILLE DE SURF',
-    '🌱 NATURA 2000',
-    '🏞️ PARC NATUREL RÉGIONAL DU MARAIS POITEVIN',
-    '🌳 STATION VERTE',
-    '🏖️ QUALITÉ TOURISME',
-    '🌊 FRANCE STATION NAUTIQUE',
-    '🐦 RAMSAR',
-    '🌍 UNESCO',
-    'AUTRE',
-  ];
+  'AUCUN',
+  '🟦 PAVILLON BLEU',
+  '♿ HANDIPLAGE NIVEAU I',
+  '♿ HANDIPLAGE NIVEAU II',
+  '♿ HANDIPLAGE NIVEAU III',
+  '♿ HANDIPLAGE NIVEAU IV',
+  '🚭 PLAGE SANS TABAC',
+
+  // Qualité des eaux
+  'QUALITÉ DES EAUX : EXCELLENTE',
+  'QUALITÉ DES EAUX : BONNE',
+  'QUALITÉ DES EAUX : SUFFISANTE',
+  'QUALITÉ DES EAUX : INSUFFISANTE',
+
+  '🌿 GREEN COAST AWARD',
+  '🌸 VILLES ET VILLAGES FLEURIS',
+  '🏄 VILLE DE SURF',
+  '🌱 NATURA 2000',
+  '🏞️ PARC NATUREL RÉGIONAL DU MARAIS POITEVIN',
+  '🌳 STATION VERTE',
+  '🏖️ QUALITÉ TOURISME',
+  '🌊 FRANCE STATION NAUTIQUE',
+  '🐦 RAMSAR',
+  '🌍 UNESCO',
+  'AUTRE',
+];
+
+static const Set<String> _sphotWaterQualityChoices = {
+  'QUALITÉ DES EAUX : EXCELLENTE',
+  'QUALITÉ DES EAUX : BONNE',
+  'QUALITÉ DES EAUX : SUFFISANTE',
+  'QUALITÉ DES EAUX : INSUFFISANTE',
+};
+
+static const Set<String> _sphotHandiplageChoices = {
+  '♿ HANDIPLAGE NIVEAU I',
+  '♿ HANDIPLAGE NIVEAU II',
+  '♿ HANDIPLAGE NIVEAU III',
+  '♿ HANDIPLAGE NIVEAU IV',
+};
+
+static const Map<String, String> _sphotLabelIconPaths = {
+  '🟦 PAVILLON BLEU':
+      'data/icons/pavillon_bleu.png',
+
+  '♿ HANDIPLAGE NIVEAU I':
+      'data/icons/handiplage1.png',
+
+  '♿ HANDIPLAGE NIVEAU II':
+      'data/icons/handiplage2.png',
+
+  '♿ HANDIPLAGE NIVEAU III':
+      'data/icons/handiplage3.png',
+
+  '♿ HANDIPLAGE NIVEAU IV':
+      'data/icons/handiplage4.png',
+
+  '🚭 PLAGE SANS TABAC':
+      'data/icons/plage_sans_tabac.png',
+
+  'QUALITÉ DES EAUX : EXCELLENTE':
+      'data/icons/qualite_eau_excellente.png',
+
+  'QUALITÉ DES EAUX : BONNE':
+      'data/icons/qualite_eau_bonne.png',
+
+  'QUALITÉ DES EAUX : SUFFISANTE':
+      'data/icons/qualite_eau_suffisante.png',
+
+  'QUALITÉ DES EAUX : INSUFFISANTE':
+      'data/icons/qualite_eau_insuffisante.png',
+};
+
+static const Map<String, String> _sphotLabelDisplayNames = {
+  '🟦 PAVILLON BLEU':
+      'PAVILLON BLEU',
+
+  '♿ HANDIPLAGE NIVEAU I':
+      'HANDIPLAGE NIVEAU I',
+
+  '♿ HANDIPLAGE NIVEAU II':
+      'HANDIPLAGE NIVEAU II',
+
+  '♿ HANDIPLAGE NIVEAU III':
+      'HANDIPLAGE NIVEAU III',
+
+  '♿ HANDIPLAGE NIVEAU IV':
+      'HANDIPLAGE NIVEAU IV',
+
+  '🚭 PLAGE SANS TABAC':
+      'PLAGE SANS TABAC',
+};
 
 LatLng _territoryCenter = const LatLng(20, 0);
 double _territoryZoom = 2.2;
@@ -728,15 +801,15 @@ Widget _buildFiltersBlock() {
         children: [
           Expanded(
             child: Text(
-              displayText,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: redColor,
-              ),
-            ),
+  displayText,
+  softWrap: true,
+  style: const TextStyle(
+    color: adminColor,
+    fontSize: 14,
+    height: 1.35,
+    fontWeight: FontWeight.w800,
+  ),
+),
           ),
           const Icon(
             Icons.checklist_rounded,
@@ -4179,34 +4252,42 @@ else
         child: const Text('RETOUR'),
       ),
       const SizedBox(width: 10),
-      ElevatedButton.icon(
-        onPressed: () {
-          _submitTrialRequest(
-            summary,
-            onClose,
-          );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: adminColor,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 15,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-        icon: const Icon(
-          Icons.send_rounded,
-        ),
-        label: const Text(
-          'ENVOYER MA DEMANDE D’ESSAI GRATUIT',
-          style: TextStyle(
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
+      OutlinedButton.icon(
+  onPressed: () {
+    _submitTrialRequest(
+      summary,
+      onClose,
+    );
+  },
+
+  style: OutlinedButton.styleFrom(
+    foregroundColor: redColor,
+    backgroundColor: Colors.transparent,
+    padding: const EdgeInsets.symmetric(
+      horizontal: 20,
+      vertical: 15,
+    ),
+    side: const BorderSide(
+      color: redColor,
+      width: 1.8,
+    ),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+    ),
+  ),
+
+  icon: const Icon(
+    Icons.send_rounded,
+  ),
+
+  label: const Text(
+    'ENVOYER MA DEMANDE D’ESSAI GRATUIT 8 JOURS',
+    style: TextStyle(
+      color: redColor,
+      fontWeight: FontWeight.w900,
+    ),
+  ),
+),
     ],
   ),
 ],
@@ -4487,16 +4568,21 @@ const SizedBox(height: 12),
   SizedBox(
   width: double.infinity,
   height: 80,
-  child: ElevatedButton.icon(
+  child: OutlinedButton.icon(
     onPressed: _openTrialSummaryDialog,
-    style: ElevatedButton.styleFrom(
-      backgroundColor: adminColor,
-      foregroundColor: Colors.white,
-      elevation: 2,
+
+    style: OutlinedButton.styleFrom(
+      foregroundColor: redColor,
+      backgroundColor: Colors.transparent,
+      side: const BorderSide(
+        color: redColor,
+        width: 1.8,
+      ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
     ),
+
     icon: SizedBox(
       width: 34,
       height: 34,
@@ -4512,6 +4598,7 @@ const SizedBox(height: 12),
         ),
       ),
     ),
+
     label: const FittedBox(
       fit: BoxFit.scaleDown,
       child: Text(
@@ -4520,10 +4607,11 @@ const SizedBox(height: 12),
         softWrap: false,
         textAlign: TextAlign.center,
         style: TextStyle(
-  fontSize: 20,
-  fontWeight: FontWeight.w900,
-  letterSpacing: 1.2,
-),
+          color: redColor,
+          fontSize: 20,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.2,
+        ),
       ),
     ),
   ),
@@ -6482,8 +6570,13 @@ Widget _sphotMultiDropdown({
   double maxMenuHeight = 245,
 }) {
   final displayText = selectedValues.isEmpty
-      ? label
-      : selectedValues.join(' | ');
+    ? label
+    : selectedValues
+        .map(
+          (value) =>
+              _sphotLabelDisplayNames[value] ?? value,
+        )
+        .join('\n');
 
   return GestureDetector(
     key: fieldKey,
@@ -6792,30 +6885,52 @@ void _openSphotMultiChoiceMenu({
 
                           itemBuilder: (context, index) {
                             final choice = choices[index];
-                            final selected =
-                                selectedValues.contains(choice);
+
+final selected =
+    selectedValues.contains(choice);
+
+final choiceIconPath =
+    _sphotLabelIconPaths[choice];
+
+final displayedChoice =
+    _sphotLabelDisplayNames[choice] ?? choice;
 
                             return InkWell(
                               onTap: () {
                                 setState(() {
-                                  if (choice == 'AUCUN') {
-                                    if (selected) {
-                                      selectedValues.clear();
-                                    } else {
-                                      selectedValues
-                                        ..clear()
-                                        ..add(choice);
-                                    }
-                                  } else {
-                                    selectedValues.remove('AUCUN');
+  if (choice == 'AUCUN') {
+    if (selected) {
+      selectedValues.clear();
+    } else {
+      selectedValues
+        ..clear()
+        ..add(choice);
+    }
+  } else {
+    selectedValues.remove('AUCUN');
 
-                                    if (selected) {
-                                      selectedValues.remove(choice);
-                                    } else {
-                                      selectedValues.add(choice);
-                                    }
-                                  }
-                                });
+    if (selected) {
+      selectedValues.remove(choice);
+    } else {
+      // Une seule qualité des eaux peut être sélectionnée.
+      // Une seule qualité des eaux peut être sélectionnée.
+if (_sphotWaterQualityChoices.contains(choice)) {
+  selectedValues.removeAll(
+    _sphotWaterQualityChoices,
+  );
+}
+
+// Un seul niveau Handiplage peut être sélectionné.
+if (_sphotHandiplageChoices.contains(choice)) {
+  selectedValues.removeAll(
+    _sphotHandiplageChoices,
+  );
+}
+
+selectedValues.add(choice);
+    }
+  }
+});
 
                                 overlaySetState(() {});
                               },
@@ -6841,17 +6956,39 @@ void _openSphotMultiChoiceMenu({
 
                                     const SizedBox(width: 10),
 
-                                    Expanded(
-                                      child: Text(
-                                        choice,
-                                        style: const TextStyle(
-                                          color: adminColor,
-                                          fontSize: 13,
-                                          fontWeight:
-                                              FontWeight.w800,
-                                        ),
-                                      ),
-                                    ),
+if (choiceIconPath != null) ...[
+  SizedBox(
+    width: 28,
+    height: 28,
+    child: Image.asset(
+      choiceIconPath,
+      fit: BoxFit.contain,
+      errorBuilder: (
+        context,
+        error,
+        stackTrace,
+      ) {
+        return const Icon(
+          Icons.image_not_supported_outlined,
+          color: adminColor,
+          size: 20,
+        );
+      },
+    ),
+  ),
+  const SizedBox(width: 10),
+],
+
+Expanded(
+  child: Text(
+    displayedChoice,
+    style: const TextStyle(
+      color: adminColor,
+      fontSize: 13,
+      fontWeight: FontWeight.w800,
+    ),
+  ),
+),
                                   ],
                                 ),
                               ),
@@ -8412,18 +8549,20 @@ _buildSauveteurPeriodesField(),
                               ? null
                               : _generateSauveteurAccess,
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: _sauveteurAccessGenerated
-                                ? Colors.white
-                                : redColor,
-                            backgroundColor:
-                                _sauveteurAccessGenerated
-                                    ? redColor
-                                    : Colors.transparent,
-                            side: const BorderSide(
-                              color: redColor,
-                              width: 1.8,
-                            ),
-                          ),
+  foregroundColor: _sauveteurAccessGenerated
+      ? Colors.white
+      : redColor,
+  backgroundColor: _sauveteurAccessGenerated
+      ? redColor
+      : Colors.transparent,
+  side: const BorderSide(
+    color: redColor,
+    width: 1.8,
+  ),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(14),
+  ),
+),
                           child: Text(
                             _sauveteurAccessGenerated
                                 ? 'ACCÈS GÉNÉRÉ'
@@ -8479,25 +8618,26 @@ _buildSauveteurPeriodesField(),
                               ? _sendSauveteurCredentialsEmail
                               : null,
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: _sauveteurEmailSent
-                                ? Colors.white
-                                : redColor,
-                            disabledForegroundColor:
-                                _sauveteurEmailSent
-                                    ? Colors.white
-                                    : redColor.withOpacity(0.45),
-                            backgroundColor: _sauveteurEmailSent
-                                ? redColor
-                                : Colors.transparent,
-                            disabledBackgroundColor:
-                                _sauveteurEmailSent
-                                    ? redColor
-                                    : Colors.transparent,
-                            side: const BorderSide(
-                              color: redColor,
-                              width: 1.8,
-                            ),
-                          ),
+  foregroundColor: _sauveteurEmailSent
+      ? Colors.white
+      : redColor,
+  disabledForegroundColor: _sauveteurEmailSent
+      ? Colors.white
+      : redColor.withOpacity(0.45),
+  backgroundColor: _sauveteurEmailSent
+      ? redColor
+      : Colors.transparent,
+  disabledBackgroundColor: _sauveteurEmailSent
+      ? redColor
+      : Colors.transparent,
+  side: const BorderSide(
+    color: redColor,
+    width: 1.8,
+  ),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(14),
+  ),
+),
                           child: Text(
                             _sauveteurEmailSent
                                 ? 'EMAIL ENVOYÉ'
@@ -8530,24 +8670,27 @@ _buildSauveteurPeriodesField(),
                         )
                       : const Icon(Icons.save_rounded),
                   label: Text(
-                    _isSavingSauveteur
-                        ? 'ENREGISTREMENT...'
-                        : _editingSauveteurDocId == null
-                            ? 'ENREGISTRER'
-                            : 'ENREGISTRER LES MODIFICATIONS',
+  _isSavingSauveteur
+      ? 'ENREGISTREMENT...'
+      : _editingSauveteurDocId == null
+          ? 'CRÉER UN SAUVETEUR'
+          : 'ENREGISTRER LES MODIFICATIONS',
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    foregroundColor: redColor,
-                    backgroundColor: Colors.transparent,
-                    elevation: 0,
-                    side: const BorderSide(
-                      color: redColor,
-                      width: 1.8,
-                    ),
-                  ),
+  foregroundColor: redColor,
+  backgroundColor: Colors.transparent,
+  elevation: 0,
+  side: const BorderSide(
+    color: redColor,
+    width: 1.8,
+  ),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(14),
+  ),
+),
                 ),
               ),
             ],
@@ -8656,8 +8799,8 @@ Widget _buildSphotEditorPanel() {
     alignment: Alignment.centerLeft,
     child: Text(
       hasPosition
-          ? 'CLIQUEZ ICI PUIS SUR LA CARTE POUR MODIFIER L’EMPLACEMENT'
-          : 'CLIQUEZ SUR LA CARTE POUR L’EMPLACEMENT',
+          ? 'CLIQUEZ ICI PUIS UTILISEZ LA CARTE POUR MODIFIER L’EMPLACEMENT'
+          : 'UTILISEZ LA CARTE POUR L’EMPLACEMENT',
       textAlign: TextAlign.left,
       style: const TextStyle(
         color: adminColor,
@@ -8856,24 +8999,29 @@ _sphotMultiDropdown(
   selectedValues: _selectedSphotLabels,
   maxMenuHeight: 140,
 ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 32),
 
 SizedBox(
   width: double.infinity,
   height: 46,
-  child: ElevatedButton.icon(
-    onPressed:
-        _isSavingSphot ? null : _saveSphotFromDashboard,
+  child: OutlinedButton.icon(
+    onPressed: _isSavingSphot
+        ? null
+        : _saveSphotFromDashboard,
+
     icon: _isSavingSphot
         ? const SizedBox(
             width: 18,
             height: 18,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: Colors.white,
+              color: redColor,
             ),
           )
-        : const Icon(Icons.save_rounded),
+        : const Icon(
+            Icons.save_rounded,
+          ),
+
     label: FittedBox(
       fit: BoxFit.scaleDown,
       child: Text(
@@ -8881,17 +9029,24 @@ SizedBox(
             ? 'ENREGISTREMENT...'
             : isEditing
                 ? 'ENREGISTRER LA MODIFICATION DU SPHOT'
-                : 'CRÉER LE SPHOT',
+                : 'CRÉER UN SPHOT',
         style: const TextStyle(
           fontWeight: FontWeight.w900,
         ),
       ),
     ),
-    style: ElevatedButton.styleFrom(
-      backgroundColor: adminColor,
-      foregroundColor: Colors.white,
+
+    style: OutlinedButton.styleFrom(
+      foregroundColor: redColor,
+      backgroundColor: Colors.transparent,
+      disabledForegroundColor:
+          redColor.withOpacity(0.55),
+      side: const BorderSide(
+        color: redColor,
+        width: 1.8,
+      ),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
       ),
     ),
   ),
@@ -12896,7 +13051,7 @@ class _DashboardSurveillancePeriodDialogState
       title: Text(
         widget.period == null
     ? 'CRÉER UNE PÉRIODE DE SURVEILLANCE'
-    : 'MODIFIER LA PÉRIODE DE SURVEILLANCE',
+    : 'MODIFIER UNE PÉRIODE DE SURVEILLANCE',
         style: const TextStyle(
           color: _blue,
           fontWeight: FontWeight.w900,
@@ -13070,28 +13225,43 @@ class _DashboardSurveillancePeriodDialogState
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('ANNULER'),
-        ),
-        OutlinedButton(
-          onPressed: _save,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: _red,
-            side: const BorderSide(
-              color: _red,
-              width: 1.8,
-            ),
-          ),
-          child: const Text(
-            'ENREGISTRER',
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ],
+      actionsAlignment: MainAxisAlignment.center,
+
+actions: [
+  TextButton(
+    onPressed: () {
+      Navigator.of(context).pop();
+    },
+    child: const Text(
+      'RETOUR',
+      style: TextStyle(
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  ),
+
+  OutlinedButton(
+    onPressed: _save,
+    style: OutlinedButton.styleFrom(
+      foregroundColor: _red,
+      side: const BorderSide(
+        color: _red,
+        width: 1.8,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+    ),
+    child: Text(
+      widget.period == null
+          ? 'CRÉER UNE PÉRIODE'
+          : 'MODIFIER UNE PÉRIODE',
+      style: const TextStyle(
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  ),
+],
     );
   }
 }
