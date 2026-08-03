@@ -4530,28 +4530,26 @@ void _closeBillingDocumentsPanel() {
 
 Widget _buildCommercialPanelHeader({
   required String title,
+  String subtitle = '',
   required VoidCallback onClose,
 }) {
   return Padding(
     padding: const EdgeInsets.all(20),
     child: Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Transform.translate(
-  offset: const Offset(-12, 0),
-  child: Transform.scale(
-    scale: 1.5,
-    alignment: Alignment.center,
-    child: Image.asset(
-      'data/icons/fire_red_icon.png',
-      width: 30,
-      height: 30,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-    ),
-  ),
-),
-        
+        Transform.scale(
+          scale: 1.5,
+          alignment: Alignment.center,
+          child: Image.asset(
+            'data/icons/fire_red_icon.png',
+            width: 30,
+            height: 30,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
+        ),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -4565,6 +4563,18 @@ Widget _buildCommercialPanelHeader({
                   letterSpacing: 0.7,
                 ),
               ),
+              if (subtitle.trim().isNotEmpty) ...[
+  const SizedBox(height: 4),
+  Text(
+    subtitle,
+    style: TextStyle(
+      color: adminColor.withOpacity(0.72),
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      height: 1.35,
+    ),
+  ),
+],
             ],
           ),
         ),
@@ -4657,9 +4667,9 @@ Widget _buildSubscriptionPanel() {
         child: Column(
           children: [
             _buildCommercialPanelHeader(
-              title: 'ABONNEMENT',
-              onClose: _closeSubscriptionPanel,
-            ),
+  title: 'ABONNEMENT',
+  onClose: _closeSubscriptionPanel,
+),
             Divider(
               height: 1,
               color: adminColor.withOpacity(0.20),
@@ -4727,9 +4737,9 @@ Widget _buildBillingDocumentsPanel() {
         child: Column(
           children: [
             _buildCommercialPanelHeader(
-              title: 'DOCUMENTS & FACTURES',
-              onClose: _closeBillingDocumentsPanel,
-            ),
+  title: 'DOCUMENTS & FACTURES',
+onClose: _closeBillingDocumentsPanel,
+),
             Divider(
               height: 1,
               color: adminColor.withOpacity(0.20),
@@ -7907,7 +7917,7 @@ Widget _buildSurveillancePeriodsPanel() {
                   Transform.translate(
                     offset: const Offset(-12, 0),
                     child: Transform.scale(
-                      scale: 1.5,
+                      scale: 1.8,
                       alignment: Alignment.center,
                       child: Image.asset(
                         'data/icons/fire_red_icon.png',
@@ -8716,7 +8726,7 @@ Widget _buildSauveteurEditorPanel() {
                   Transform.translate(
                     offset: const Offset(-12, 0),
                     child: Transform.scale(
-                      scale: 1.5,
+                      scale: 1.8,
                       alignment: Alignment.center,
                       child: Image.asset(
                         'data/icons/fire_red_icon.png',
@@ -9093,7 +9103,7 @@ Widget _buildSphotEditorPanel() {
                 Transform.translate(
   offset: const Offset(-12, 0),
   child: Transform.scale(
-    scale: 1.5,
+    scale: 1.8,
     alignment: Alignment.center,
     child: Image.asset(
       'data/icons/fire_red_icon.png',

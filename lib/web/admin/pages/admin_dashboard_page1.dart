@@ -75,12 +75,9 @@ class AdminDashboardPage extends StatefulWidget {
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   static const Color adminColor = Color(0xFF1E3A8A);
   static const Color redColor = Color(0xFFDC2626);
-  static const Color pendingColor = Color(0xFF6B7280);
 
   final MapController _mapController = MapController();
 Timer? _mapMovementTimer;
-Timer? _trialEndRefreshTimer;
-DateTime? _scheduledTrialEndDate;
 OverlayEntry? _sphotHoverOverlayEntry;
 Timer? _sphotHoverExitTimer;
 
@@ -94,8 +91,6 @@ Color _sphotHoverColor = adminColor;
   bool _showSauveteursManagementPanel = false;
   bool _showSurveillancePeriodsPanel = false;
   bool _showTrialSummaryPanel = false;
-  bool _showSubscriptionPanel = false;
-  bool _showBillingDocumentsPanel = false;
   bool _trialSummaryDialogOpen = false;
   Future<Map<String, dynamic>>? _trialSummaryPanelFuture;
   bool _placingSphotOnMap = false;
@@ -1620,27 +1615,6 @@ String _formatDate(dynamic value) {
   }
 
   return value.toString();
-}
-
-void _scheduleTrialEndRefresh(DateTime? trialEndDate) {
-  if (_scheduledTrialEndDate == trialEndDate) return;
-
-  _scheduledTrialEndDate = trialEndDate;
-  _trialEndRefreshTimer?.cancel();
-
-  if (trialEndDate == null) return;
-
-  final delay = trialEndDate.difference(DateTime.now());
-  if (delay <= Duration.zero) return;
-
-  _trialEndRefreshTimer = Timer(
-    delay + const Duration(seconds: 1),
-    () {
-      if (!mounted) return;
-      _scheduledTrialEndDate = null;
-      setState(() {});
-    },
-  );
 }
 
 Widget _selectedAdminCard() {
@@ -3526,8 +3500,6 @@ Widget _buildTrialSauveteurManagementRow({
 
                       setState(() {
                         _showTrialSummaryPanel = true;
-                        _showSubscriptionPanel = false;
-                        _showBillingDocumentsPanel = false;
                         _trialSummaryPanelFuture =
                             _loadTrialSummaryData();
                       });
@@ -4411,8 +4383,6 @@ void _openTrialSummaryPanel() {
   setState(() {
     _trialSummaryPanelFuture = _loadTrialSummaryData();
     _showTrialSummaryPanel = true;
-    _showSubscriptionPanel = false;
-    _showBillingDocumentsPanel = false;
 
     _showSauveteursManagementPanel = false;
     _showSurveillancePeriodsPanel = false;
@@ -4480,315 +4450,11 @@ Widget _buildTrialSummaryPanel() {
   );
 }
 
-void _openSubscriptionPanel() {
-  setState(() {
-    _showSubscriptionPanel = true;
-    _showBillingDocumentsPanel = false;
-    _showTrialSummaryPanel = false;
-    _trialSummaryPanelFuture = null;
-    _showSauveteursManagementPanel = false;
-    _showSurveillancePeriodsPanel = false;
-    _showSauveteurEditorPanel = false;
-    _showSphotEditorPanel = false;
-    _placingSphotOnMap = false;
-    _selectedSpot = null;
-    _selectedAdmin = null;
-    _selectedAdvertiser = null;
-    _showLegalDocumentsPanel = false;
-  });
-}
-
-void _openBillingDocumentsPanel() {
-  setState(() {
-    _showBillingDocumentsPanel = true;
-    _showSubscriptionPanel = false;
-    _showTrialSummaryPanel = false;
-    _trialSummaryPanelFuture = null;
-    _showSauveteursManagementPanel = false;
-    _showSurveillancePeriodsPanel = false;
-    _showSauveteurEditorPanel = false;
-    _showSphotEditorPanel = false;
-    _placingSphotOnMap = false;
-    _selectedSpot = null;
-    _selectedAdmin = null;
-    _selectedAdvertiser = null;
-    _showLegalDocumentsPanel = false;
-  });
-}
-
-void _closeSubscriptionPanel() {
-  setState(() {
-    _showSubscriptionPanel = false;
-  });
-}
-
-void _closeBillingDocumentsPanel() {
-  setState(() {
-    _showBillingDocumentsPanel = false;
-  });
-}
-
-Widget _buildCommercialPanelHeader({
-  required String title,
-  required VoidCallback onClose,
-}) {
-  return Padding(
-    padding: const EdgeInsets.all(20),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Transform.translate(
-  offset: const Offset(-12, 0),
-  child: Transform.scale(
-    scale: 1.5,
-    alignment: Alignment.center,
-    child: Image.asset(
-      'data/icons/fire_red_icon.png',
-      width: 30,
-      height: 30,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-    ),
-  ),
-),
-        
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: adminColor,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.7,
-                ),
-              ),
-            ],
-          ),
-        ),
-        IconButton(
-          tooltip: 'Fermer',
-          onPressed: onClose,
-          icon: const Icon(Icons.close_rounded),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _buildCommercialSection({
-  required IconData icon,
-  required String title,
-  required String description,
-  String status = 'À COMPLÉTER',
-  Color statusColor = pendingColor,
-}) {
-  return Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(
-        color: adminColor.withOpacity(0.22),
-      ),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: adminColor, size: 27),
-        const SizedBox(width: 13),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: adminColor,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                description,
-                style: TextStyle(
-                  color: adminColor.withOpacity(0.72),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  height: 1.35,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                status,
-                style: TextStyle(
-                  color: statusColor,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.6,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _buildSubscriptionPanel() {
-  return Container(
-    width: 430,
-    decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.98),
-      border: Border(
-        left: BorderSide(
-          color: adminColor.withOpacity(0.45),
-          width: 1.5,
-        ),
-      ),
-    ),
-    child: Material(
-      color: Colors.transparent,
-      child: SafeArea(
-        child: Column(
-          children: [
-            _buildCommercialPanelHeader(
-              title: 'ABONNEMENT',
-              onClose: _closeSubscriptionPanel,
-            ),
-            Divider(
-              height: 1,
-              color: adminColor.withOpacity(0.20),
-            ),
-            Expanded(
-              child: Container(
-                color: const Color(0xFFF8FAFC),
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    _buildCommercialSection(
-                      icon: Icons.apartment_rounded,
-                      title: 'ORGANISME PAYEUR',
-                      description:
-                          'Coordonnées administratives et informations de facturation de votre organisme.',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCommercialSection(
-                      icon: Icons.description_outlined,
-                      title: 'OFFRE ET DEVIS',
-                      description:
-                          'Nombre de postes de secours, durée et montant annuel de l’abonnement.',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCommercialSection(
-                      icon: Icons.assignment_turned_in_outlined,
-                      title: 'COMMANDE',
-                      description:
-                          'Bon de commande, numéro d’engagement et code service si nécessaire.',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCommercialSection(
-                      icon: Icons.verified_outlined,
-                      title: 'ACTIVATION',
-                      description:
-                          'L’abonnement sera activé après validation complète de la commande.',
-                      status: 'EN ATTENTE',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-Widget _buildBillingDocumentsPanel() {
-  return Container(
-    width: 430,
-    decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.98),
-      border: Border(
-        left: BorderSide(
-          color: adminColor.withOpacity(0.45),
-          width: 1.5,
-        ),
-      ),
-    ),
-    child: Material(
-      color: Colors.transparent,
-      child: SafeArea(
-        child: Column(
-          children: [
-            _buildCommercialPanelHeader(
-              title: 'DOCUMENTS & FACTURES',
-              onClose: _closeBillingDocumentsPanel,
-            ),
-            Divider(
-              height: 1,
-              color: adminColor.withOpacity(0.20),
-            ),
-            Expanded(
-              child: Container(
-                color: const Color(0xFFF8FAFC),
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    _buildCommercialSection(
-                      icon: Icons.request_quote_outlined,
-                      title: 'DEVIS',
-                      description:
-                          'Les devis générés pour votre organisme apparaîtront ici.',
-                      status: 'AUCUN DOCUMENT',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCommercialSection(
-                      icon: Icons.shopping_cart_checkout_rounded,
-                      title: 'COMMANDES',
-                      description:
-                          'Bons de commande et références d’engagement associés.',
-                      status: 'AUCUN DOCUMENT',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCommercialSection(
-                      icon: Icons.receipt_long_outlined,
-                      title: 'FACTURES ET AVOIRS',
-                      description:
-                          'Factures, avoirs et état de leur transmission électronique.',
-                      status: 'AUCUN DOCUMENT',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCommercialSection(
-                      icon: Icons.account_balance_outlined,
-                      title: 'SUIVI DU PAIEMENT',
-                      description:
-                          'État du dépôt, du traitement et du règlement des factures.',
-                      status: 'AUCUNE FACTURE',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
 Widget _buildRightPanel({
   required int visibleSpots,
-  required bool showTrialButton,
 }) {
   return Container(
     width: 360,
-    padding: const EdgeInsets.all(22),
     decoration: BoxDecoration(
       color: Colors.white.withOpacity(0.96),
       border: Border(
@@ -4799,8 +4465,11 @@ Widget _buildRightPanel({
       ),
     ),
     child: SafeArea(
-      child: Column(
-        children: [
+      child: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
   const SizedBox(
     width: double.infinity,
     child: Text(
@@ -4835,7 +4504,7 @@ Widget _buildRightPanel({
     ),
   ),
 
-  const SizedBox(height: 16),
+  const SizedBox(height: 20),
 
   _summaryCard(
     title: 'CRÉER UN SPHOT',
@@ -4843,14 +4512,14 @@ Widget _buildRightPanel({
     color: adminColor,
     iconPath: 'data/icons/fire_red_icon.png',
     stepNumber: 1,
-    iconScale: 1.35,
-    titleFontSize: 17,
-    titleLetterSpacing: 0.8,
+    iconScale: 1.6,
+    titleFontSize: 20,
+    titleLetterSpacing: 1.2,
     showValue: false,
     onTap: _openNewSphotEditor,
   ),
 
-  const SizedBox(height: 8),
+  const SizedBox(height: 12),
 
   _summaryCard(
     title: 'CRÉER UNE PÉRIODE',
@@ -4858,14 +4527,14 @@ Widget _buildRightPanel({
     color: adminColor,
     iconPath: 'data/icons/fire_red_icon.png',
     stepNumber: 2,
-    iconScale: 1.35,
-    titleFontSize: 17,
-    titleLetterSpacing: 0.8,
+    iconScale: 1.6,
+    titleFontSize: 20,
+    titleLetterSpacing: 1.2,
     showValue: false,
     onTap: _openSurveillancePeriodsPanel,
   ),
 
-  const SizedBox(height: 8),
+  const SizedBox(height: 12),
 
   _summaryCard(
     title: 'CRÉER UN SAUVETEUR',
@@ -4873,78 +4542,86 @@ Widget _buildRightPanel({
     color: adminColor,
     iconPath: 'data/icons/fire_red_icon.png',
     stepNumber: 3,
-    iconScale: 1.35,
-    titleFontSize: 17,
-    titleLetterSpacing: 0.8,
+    iconScale: 1.6,
+    titleFontSize: 20,
+    titleLetterSpacing: 1.2,
     showValue: false,
     onTap: _openNewSauveteurEditor,
   ),
 
-  const SizedBox(height: 8),
+  const SizedBox(height: 12),
 
 _summaryCard(
   title: 'ESPACE ADMIN SPHOT',
   value: '',
   color: adminColor,
   iconPath: 'data/icons/fire_red_icon.png',
-  iconScale: 1.35,
-  titleFontSize: 17,
-  titleLetterSpacing: 0.8,
+  iconScale: 1.6,
+  titleFontSize: 20,
+  titleLetterSpacing: 1.2,
   showValue: false,
   onTap: _openTrialSummaryPanel,
 ),
 
-const SizedBox(height: 8),
+const SizedBox(height: 12),
 
-if (showTrialButton) ...[
-  _summaryCard(
-    title: 'ESSAI GRATUIT 8 JOURS',
-    value: '',
-    color: redColor,
-    iconPath: 'data/icons/fire_red_icon.png',
-    iconScale: 1.35,
-    titleFontSize: 17,
-    titleLetterSpacing: 0.8,
-    showValue: false,
-    onTap: _openTrialSummaryDialog,
+  SizedBox(
+  width: double.infinity,
+  height: 80,
+  child: OutlinedButton.icon(
+    onPressed: _openTrialSummaryDialog,
+
+    style: OutlinedButton.styleFrom(
+      foregroundColor: redColor,
+      backgroundColor: Colors.transparent,
+      side: const BorderSide(
+        color: redColor,
+        width: 1.8,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+    ),
+
+    icon: SizedBox(
+      width: 34,
+      height: 34,
+      child: Transform.scale(
+        scale: 1.6,
+        alignment: Alignment.center,
+        child: Image.asset(
+          'data/icons/fire_red_icon.png',
+          width: 34,
+          height: 34,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+        ),
+      ),
+    ),
+
+    label: const FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        'ESSAI GRATUIT 8 JOURS',
+        maxLines: 1,
+        softWrap: false,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: redColor,
+          fontSize: 20,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.2,
+        ),
+      ),
+    ),
   ),
-  const SizedBox(height: 8),
-],
-
-_summaryCard(
-  title: 'ABONNEMENT',
-  value: '',
-  color: showTrialButton ? pendingColor : redColor,
-  iconPath: 'data/icons/fire_red_icon.png',
-  iconScale: 1.35,
-  titleFontSize: 16,
-  titleLetterSpacing: 0.5,
-  showValue: false,
-  grayscaleIcon: showTrialButton,
-  onTap: _openSubscriptionPanel,
 ),
 
-const SizedBox(height: 8),
-
-_summaryCard(
-  title: 'DOCUMENTS & FACTURES',
-  value: '',
-  color: showTrialButton ? pendingColor : adminColor,
-  iconPath: showTrialButton
-      ? 'data/icons/fire_red_icon.png'
-      : 'data/icons/fire_blue_icon.png',
-  iconScale: 1.35,
-  titleFontSize: 16,
-  titleLetterSpacing: 0.5,
-  showValue: false,
-  grayscaleIcon: showTrialButton,
-  onTap: _openBillingDocumentsPanel,
-),
-
-const SizedBox(height: 4),
+  const Spacer(),
 
   
 ],
+        ),
       ),
     ),
   );
@@ -4960,18 +4637,17 @@ const SizedBox(height: 4),
   double titleFontSize = 13,
   double titleLetterSpacing = 0,
   bool showValue = true,
-  bool grayscaleIcon = false,
   VoidCallback? onTap,
 }) {
     final card = Container(
-  height: 64,
+  height: 80,
   padding: const EdgeInsets.symmetric(
-    horizontal: 12,
-    vertical: 5,
+    horizontal: 14,
+    vertical: 8,
   ),
       decoration: BoxDecoration(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color, width: 1.5),
       ),
       child: Row(
@@ -4986,29 +4662,13 @@ const SizedBox(height: 4),
       Transform.scale(
         scale: iconScale,
         alignment: Alignment.center,
-        child: grayscaleIcon
-            ? ColorFiltered(
-                colorFilter: const ColorFilter.matrix([
-                  0.2126, 0.7152, 0.0722, 0, 0,
-                  0.2126, 0.7152, 0.0722, 0, 0,
-                  0.2126, 0.7152, 0.0722, 0, 0,
-                  0, 0, 0, 1, 0,
-                ]),
-                child: Image.asset(
-                  iconPath,
-                  width: 34,
-                  height: 34,
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.high,
-                ),
-              )
-            : Image.asset(
-                iconPath,
-                width: 34,
-                height: 34,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.high,
-              ),
+        child: Image.asset(
+          iconPath,
+          width: 34,
+          height: 34,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+        ),
       ),
       if (stepNumber != null)
         Transform.translate(
@@ -5041,21 +4701,15 @@ const SizedBox(height: 4),
   mainAxisAlignment: MainAxisAlignment.center,
   crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    softWrap: false,
-                    style: TextStyle(
-                      color: color,
-                      decoration: TextDecoration.none,
-                      decorationColor: Colors.transparent,
-                      fontSize: titleFontSize,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: titleLetterSpacing,
-                    ),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: color,
+                    decoration: TextDecoration.none,
+                    decorationColor: Colors.transparent,
+                    fontSize: titleFontSize,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: titleLetterSpacing,
                   ),
                 ),
                 if (showValue) ...[
@@ -5482,8 +5136,6 @@ void _openSurveillancePeriodsPanel() {
   setState(() {
     _showTrialSummaryPanel = false;
     _trialSummaryPanelFuture = null;
-    _showSubscriptionPanel = false;
-    _showBillingDocumentsPanel = false;
 
     _showSurveillancePeriodsPanel = true;
     _showSauveteurEditorPanel = false;
@@ -6122,8 +5774,6 @@ Future<void> _saveSauveteur() async {
   _showSauveteursManagementPanel = false;
 
   _showTrialSummaryPanel = isEditing;
-  _showSubscriptionPanel = false;
-  _showBillingDocumentsPanel = false;
   _trialSummaryPanelFuture = isEditing
       ? _loadTrialSummaryData()
       : null;
@@ -6165,8 +5815,6 @@ void _openNewSphotEditor() {
   setState(() {
     _showTrialSummaryPanel = false;
     _trialSummaryPanelFuture = null;
-    _showSubscriptionPanel = false;
-    _showBillingDocumentsPanel = false;
 
     _clearSphotEditor();
     _showSauveteurEditorPanel = false;
@@ -6201,8 +5849,6 @@ void _openNewSauveteurEditor() {
   setState(() {
     _showTrialSummaryPanel = false;
     _trialSummaryPanelFuture = null;
-    _showSubscriptionPanel = false;
-    _showBillingDocumentsPanel = false;
 
     _clearSauveteurEditor();
     _showSauveteurEditorPanel = true;
@@ -6233,8 +5879,6 @@ void _openSauveteursManagementPanel() {
   setState(() {
     _showTrialSummaryPanel = false;
     _trialSummaryPanelFuture = null;
-    _showSubscriptionPanel = false;
-    _showBillingDocumentsPanel = false;
 
     _clearSauveteurEditor();
     _showSauveteursManagementPanel = true;
@@ -6274,8 +5918,6 @@ void _openSauveteurForEditing(
   setState(() {
   _showTrialSummaryPanel = false;
   _trialSummaryPanelFuture = null;
-  _showSubscriptionPanel = false;
-  _showBillingDocumentsPanel = false;
     
     _clearSauveteurEditor();
 
@@ -6447,8 +6089,6 @@ void _loadSphotInEditor(Map<String, dynamic> data) {
   setState(() {
     _showTrialSummaryPanel = false;
     _trialSummaryPanelFuture = null;
-    _showSubscriptionPanel = false;
-    _showBillingDocumentsPanel = false;
 
     _editingSphotDocId = _cleanText(data['_docId']);
     _sphotIdController.text = _cleanText(
@@ -6736,8 +6376,6 @@ Future<void> _deleteSphotFromSummary(
     setState(() {
       _selectedSpot = null;
       _showTrialSummaryPanel = true;
-      _showSubscriptionPanel = false;
-      _showBillingDocumentsPanel = false;
       _trialSummaryPanelFuture =
           _loadTrialSummaryData();
     });
@@ -7907,7 +7545,7 @@ Widget _buildSurveillancePeriodsPanel() {
                   Transform.translate(
                     offset: const Offset(-12, 0),
                     child: Transform.scale(
-                      scale: 1.5,
+                      scale: 1.8,
                       alignment: Alignment.center,
                       child: Image.asset(
                         'data/icons/fire_red_icon.png',
@@ -8716,7 +8354,7 @@ Widget _buildSauveteurEditorPanel() {
                   Transform.translate(
                     offset: const Offset(-12, 0),
                     child: Transform.scale(
-                      scale: 1.5,
+                      scale: 1.8,
                       alignment: Alignment.center,
                       child: Image.asset(
                         'data/icons/fire_red_icon.png',
@@ -9093,7 +8731,7 @@ Widget _buildSphotEditorPanel() {
                 Transform.translate(
   offset: const Offset(-12, 0),
   child: Transform.scale(
-    scale: 1.5,
+    scale: 1.8,
     alignment: Alignment.center,
     child: Image.asset(
       'data/icons/fire_red_icon.png',
@@ -11785,7 +11423,6 @@ void initState() {
 @override
 void dispose() {
   _mapMovementTimer?.cancel();
-  _trialEndRefreshTimer?.cancel();
 
   _sphotHoverExitTimer?.cancel();
   _removeSphotHoverLabel();
@@ -12674,27 +12311,6 @@ Widget build(BuildContext context) {
                     for (final doc in subscriptionsDocs) doc.id: doc.data(),
                   };
 
-                  final currentSubscription =
-                      _subscriptionsByUid[widget.adminUid.trim()];
-                  final subscriptionStatus = _cleanText(
-                    currentSubscription?['status'],
-                  ).toLowerCase();
-                  final rawTrialEndDate =
-                      currentSubscription?['trialEndDate'];
-                  final DateTime? trialEndDate = rawTrialEndDate is Timestamp
-                      ? rawTrialEndDate.toDate()
-                      : rawTrialEndDate is DateTime
-                          ? rawTrialEndDate
-                          : null;
-
-                  _scheduleTrialEndRefresh(trialEndDate);
-
-                  final trialHasEnded = trialEndDate != null &&
-                      !DateTime.now().isBefore(trialEndDate);
-                  final showTrialButton = currentSubscription == null ||
-                      subscriptionStatus.isEmpty ||
-                      (subscriptionStatus == 'trial' && !trialHasEnded);
-
                   final validSpots = docs.where((doc) {
   final data = doc.data();
   final lat = _toDouble(data['sphotLat']);
@@ -12781,7 +12397,6 @@ final clusteredMarkers = validSpots.map((doc) {
                     children: [
                       _buildRightPanel(
                         visibleSpots: validSpots.length,
-                        showTrialButton: showTrialButton,
                       ),
                       Expanded(
   child: Stack(
@@ -13005,11 +12620,7 @@ final clusteredMarkers = validSpots.map((doc) {
                       if (_selectedAdmin != null)
   _buildAdminDetailPanel(),
 
-if (_showSubscriptionPanel)
-  _buildSubscriptionPanel()
-else if (_showBillingDocumentsPanel)
-  _buildBillingDocumentsPanel()
-else if (_showTrialSummaryPanel)
+if (_showTrialSummaryPanel)
   _buildTrialSummaryPanel()
 else if (_showSauveteursManagementPanel)
   _buildSauveteursManagementPanel()

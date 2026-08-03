@@ -4530,28 +4530,26 @@ void _closeBillingDocumentsPanel() {
 
 Widget _buildCommercialPanelHeader({
   required String title,
+  required String subtitle,
   required VoidCallback onClose,
 }) {
   return Padding(
     padding: const EdgeInsets.all(20),
     child: Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Transform.translate(
-  offset: const Offset(-12, 0),
-  child: Transform.scale(
-    scale: 1.5,
-    alignment: Alignment.center,
-    child: Image.asset(
-      'data/icons/fire_red_icon.png',
-      width: 30,
-      height: 30,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-    ),
-  ),
-),
-        
+        Transform.scale(
+          scale: 1.5,
+          alignment: Alignment.center,
+          child: Image.asset(
+            'data/icons/fire_red_icon.png',
+            width: 30,
+            height: 30,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
+        ),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -4563,6 +4561,16 @@ Widget _buildCommercialPanelHeader({
                   fontSize: 19,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.7,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: adminColor.withOpacity(0.72),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
                 ),
               ),
             ],
@@ -4658,6 +4666,8 @@ Widget _buildSubscriptionPanel() {
           children: [
             _buildCommercialPanelHeader(
               title: 'ABONNEMENT',
+              subtitle:
+                  'Préparez les informations nécessaires à la commande SPHOT.',
               onClose: _closeSubscriptionPanel,
             ),
             Divider(
@@ -4728,6 +4738,8 @@ Widget _buildBillingDocumentsPanel() {
           children: [
             _buildCommercialPanelHeader(
               title: 'DOCUMENTS & FACTURES',
+              subtitle:
+                  'Retrouvez tous les documents liés à votre abonnement SPHOT.',
               onClose: _closeBillingDocumentsPanel,
             ),
             Divider(
@@ -4921,7 +4933,7 @@ _summaryCard(
   titleLetterSpacing: 0.5,
   showValue: false,
   grayscaleIcon: showTrialButton,
-  onTap: _openSubscriptionPanel,
+  onTap: showTrialButton ? null : _openSubscriptionPanel,
 ),
 
 const SizedBox(height: 8),
@@ -4930,15 +4942,13 @@ _summaryCard(
   title: 'DOCUMENTS & FACTURES',
   value: '',
   color: showTrialButton ? pendingColor : adminColor,
-  iconPath: showTrialButton
-      ? 'data/icons/fire_red_icon.png'
-      : 'data/icons/fire_blue_icon.png',
+  iconPath: 'data/icons/fire_blue_icon.png',
   iconScale: 1.35,
   titleFontSize: 16,
   titleLetterSpacing: 0.5,
   showValue: false,
   grayscaleIcon: showTrialButton,
-  onTap: _openBillingDocumentsPanel,
+  onTap: showTrialButton ? null : _openBillingDocumentsPanel,
 ),
 
 const SizedBox(height: 4),
@@ -7907,7 +7917,7 @@ Widget _buildSurveillancePeriodsPanel() {
                   Transform.translate(
                     offset: const Offset(-12, 0),
                     child: Transform.scale(
-                      scale: 1.5,
+                      scale: 1.8,
                       alignment: Alignment.center,
                       child: Image.asset(
                         'data/icons/fire_red_icon.png',
@@ -8716,7 +8726,7 @@ Widget _buildSauveteurEditorPanel() {
                   Transform.translate(
                     offset: const Offset(-12, 0),
                     child: Transform.scale(
-                      scale: 1.5,
+                      scale: 1.8,
                       alignment: Alignment.center,
                       child: Image.asset(
                         'data/icons/fire_red_icon.png',
@@ -9093,7 +9103,7 @@ Widget _buildSphotEditorPanel() {
                 Transform.translate(
   offset: const Offset(-12, 0),
   child: Transform.scale(
-    scale: 1.5,
+    scale: 1.8,
     alignment: Alignment.center,
     child: Image.asset(
       'data/icons/fire_red_icon.png',
