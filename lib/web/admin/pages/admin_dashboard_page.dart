@@ -140,9 +140,12 @@ Color _sphotHoverColor = adminColor;
   
   bool _isSavingSauveteur = false;
   bool _sauveteurAccessGenerated = false;
+  bool _sauveteurPasswordRegenerated = false;
+  bool _sauveteurHasUnsavedChanges = false;
   bool _sauveteurEmailSent = false;
   String _sauveteurGeneratedLogin = '';
   String _sauveteurGeneratedPassword = '';
+  String? _sauveteurCivilite;
   String? _createdSauveteurDocId;
   String? _editingSauveteurDocId;
   final Set<String> _originalSauveteurPostes = <String>{};
@@ -392,6 +395,7 @@ bool _isListening = false;
   final GlobalKey _sphotEquipmentKey = GlobalKey();
   final GlobalKey _sphotLabelKey = GlobalKey();
   final GlobalKey _adminFiltersKey = GlobalKey();
+  final GlobalKey _sauveteurCiviliteKey = GlobalKey();
 
   final Set<DashboardSpotFilter> _selectedFilters = {
     DashboardSpotFilter.all,
@@ -5663,6 +5667,7 @@ ScaffoldMessenger.of(context).showSnackBar(
 }
 
 void _clearSauveteurEditor() {
+  _sauveteurCivilite = null;
   _sauveteurNomController.clear();
   _sauveteurPrenomController.clear();
   _sauveteurDateNaissanceController.clear();
@@ -5679,6 +5684,8 @@ void _clearSauveteurEditor() {
   _sauveteurPeriodesSurveillance.clear();
   _isSavingSauveteur = false;
   _sauveteurAccessGenerated = false;
+  _sauveteurPasswordRegenerated = false;
+  _sauveteurHasUnsavedChanges = false;
   _sauveteurEmailSent = false;
   _sauveteurGeneratedLogin = '';
   _sauveteurGeneratedPassword = '';
@@ -5730,15 +5737,43 @@ Future<String> _generateUniqueSauveteurLogin(
 }
 
 void _showSauveteurError(String message) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(message),
-      backgroundColor: redColor,
-    ),
+  if (!mounted) {
+    return;
+  }
+
+  showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text(
+          'ERREUR',
+          style: TextStyle(
+            color: redColor,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+            },
+            child: const Text('FERMER'),
+          ),
+        ],
+      );
+    },
   );
 }
 
 bool _validateSauveteurContact() {
+  if (_sauveteurCivilite != 'Monsieur' &&
+    _sauveteurCivilite != 'Madame') {
+  _showSauveteurError(
+    'Sélectionnez la civilité du sauveteur.',
+  );
+  return false;
+}
   if (_sauveteurNomController.text.trim().isEmpty) {
     _showSauveteurError('Le nom du sauveteur est obligatoire.');
     return false;
@@ -5785,6 +5820,7 @@ Future<void> _upsertSauveteurAccount({
       'accountStatus': 'ACTIVE',
       'territoireId': _resolvedTerritoireId,
       'sauveteurId': sauveteurId,
+      'civilite': _sauveteurCivilite,
       'nom': _sauveteurNomController.text.trim().toUpperCase(),
       'prenom': _sauveteurPrenomController.text.trim(),
       'email': _sauveteurEmailController.text.trim(),
@@ -5872,31 +5908,47 @@ Future<void> _generateSauveteurAccess() async {
   }
 }
 
-Future<void> _sendSauveteurCredentialsEmail() async {
-  if (!_sauveteurAccessGenerated || _sauveteurEmailSent) {
+Future<void> _regenerateSauveteurPassword() async {
+  final sauveteurId = _editingSauveteurDocId?.trim() ?? '';
+  final login = _sauveteurGeneratedLogin.trim();
+
+  if (sauveteurId.isEmpty || login.isEmpty) {
+    _showSauveteurError(
+      'Impossible de retrouver l’identifiant du sauveteur.',
+    );
     return;
   }
 
-  final uri = Uri.https(
-    'us-central1-sphot-ab80b.cloudfunctions.net',
-    '/sendSauveteurCredentialsEmail',
-    {
-      'email': _sauveteurEmailController.text.trim(),
-      'prenom': _sauveteurPrenomController.text.trim(),
-      'identifiant': _sauveteurGeneratedLogin,
-      'motdepasse': _sauveteurGeneratedPassword,
-    },
-  );
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  final random = math.Random.secure();
+  final password = List<String>.generate(
+    8,
+    (_) => chars[random.nextInt(chars.length)],
+  ).join();
 
   setState(() {
     _isSavingSauveteur = true;
   });
 
   try {
-    final response = await http.get(uri);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Erreur email ${response.statusCode}.');
-    }
+    final sauveteurReference = FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(_resolvedTerritoireId)
+        .collection('sauveteurs')
+        .doc(sauveteurId);
+
+    await sauveteurReference.set({
+      'temporaryPassword': password,
+      'mustChangePassword': true,
+      'passwordResetAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    await _upsertSauveteurAccount(
+      login: login,
+      temporaryPassword: password,
+      sauveteurId: sauveteurId,
+    );
 
     if (!mounted) {
       return;
@@ -5904,8 +5956,27 @@ Future<void> _sendSauveteurCredentialsEmail() async {
 
     setState(() {
       _isSavingSauveteur = false;
-      _sauveteurEmailSent = true;
+      _sauveteurGeneratedPassword = password;
+      _sauveteurAccessGenerated = true;
+      _sauveteurPasswordRegenerated = true;
+      _sauveteurEmailSent = false;
     });
+    
+try {
+  await _sendSauveteurCredentialsEmail(
+    isReset: true,
+  );
+} catch (emailError) {
+  if (!mounted) {
+    return;
+  }
+
+  _showSauveteurError(
+    'Le mot de passe a bien été régénéré, mais '
+    'l’email n’a pas pu être envoyé : $emailError',
+  );
+}
+
   } catch (error) {
     if (!mounted) {
       return;
@@ -5914,8 +5985,50 @@ Future<void> _sendSauveteurCredentialsEmail() async {
     setState(() {
       _isSavingSauveteur = false;
     });
-    _showSauveteurError('Envoi de l’email impossible : $error');
+
+    _showSauveteurError(
+      'Régénération du mot de passe impossible : $error',
+    );
   }
+}
+
+Future<void> _sendSauveteurCredentialsEmail({
+  bool isReset = false,
+}) async {
+  if (!_sauveteurAccessGenerated || _sauveteurEmailSent) {
+    return;
+  }
+
+  final uri = Uri.https(
+    'us-central1-sphot-ab80b.cloudfunctions.net',
+    '/sendSauveteurCredentialsEmail',
+    {
+  'email': _sauveteurEmailController.text.trim(),
+  'prenom': _sauveteurPrenomController.text.trim(),
+  'nom': _sauveteurNomController.text.trim().toUpperCase(),
+  'civilite': _sauveteurCivilite ?? '',
+  'identifiant': _sauveteurGeneratedLogin,
+  'motdepasse': _sauveteurGeneratedPassword,
+  'type': isReset ? 'reset' : 'creation',
+},
+  );
+
+  final response = await http.get(uri);
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw Exception(
+      'Erreur lors de l’envoi de l’email '
+      '(${response.statusCode}).',
+    );
+  }
+
+  if (!mounted) {
+    return;
+  }
+
+  setState(() {
+    _sauveteurEmailSent = true;
+  });
 }
 
 Future<void> _selectSauveteurBirthDate() async {
@@ -5956,6 +6069,9 @@ Future<void> _selectSauveteurBirthDate() async {
         '${selectedDate.month.toString().padLeft(2, '0')}/'
         '${selectedDate.year}';
     _sauveteurAgeController.text = age.toString();
+    if (_editingSauveteurDocId != null) {
+      _sauveteurHasUnsavedChanges = true;
+    }
   });
 }
 
@@ -5990,13 +6106,7 @@ if (_sauveteurPeriodesSurveillance.isEmpty) {
       );
       return false;
     }
-
-    if (!_sauveteurEmailSent) {
-      _showSauveteurError(
-        'Envoyez les identifiants avant d’enregistrer.',
-      );
-      return false;
-    }
+    
   }
 
   return true;
@@ -6020,6 +6130,7 @@ Future<void> _saveSauveteur() async {
 
   try {
     final data = <String, dynamic>{
+      'civilite': _sauveteurCivilite,
       'nom': _sauveteurNomController.text.trim().toUpperCase(),
       'prenom': _sauveteurPrenomController.text.trim(),
       'role': 'SAUVETEUR',
@@ -6096,47 +6207,44 @@ Future<void> _saveSauveteur() async {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     }
-
-    final existingLogin = _sauveteurGeneratedLogin.trim();
-    if (isEditing && existingLogin.isNotEmpty) {
-      await FirebaseFirestore.instance
-          .collection('sauveteurAccounts')
-          .doc(existingLogin)
-          .set({
-        'nom': data['nom'],
-        'prenom': data['prenom'],
-        'email': data['email'],
-        'territoireId': _resolvedTerritoireId,
-        'sauveteurId': sauveteurId,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-    }
-
+    
+/*
+ * Lors d’une création, le mail est envoyé uniquement après
+ * l’enregistrement du sauveteur et de toutes ses affectations.
+ */
+if (!isEditing) {
+  try {
+    await _sendSauveteurCredentialsEmail();
+  } catch (error) {
     if (!mounted) {
       return;
     }
 
     setState(() {
+      _isSavingSauveteur = false;
+    });
+
+    _showSauveteurError(
+      'Le sauveteur a bien été créé, mais l’envoi '
+      'de l’email a échoué : $error',
+    );
+
+    return;
+  }
+}
+
+if (!mounted) {
+  return;
+}
+
+setState(() {
   _isSavingSauveteur = false;
-  _showSauveteurEditorPanel = false;
-  _showSauveteursManagementPanel = false;
-
-  _showTrialSummaryPanel = isEditing;
-  _showSubscriptionPanel = false;
-  _showBillingDocumentsPanel = false;
-  _trialSummaryPanelFuture = isEditing
-      ? _loadTrialSummaryData()
-      : null;
-
   _clearSauveteurEditor();
 });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Sauveteur enregistré avec succès.'),
-        backgroundColor: adminColor,
-      ),
-    );
+// Ferme MODIFIER LE SAUVETEUR et ouvre ESPACE ADMIN SPHOT.
+_openTrialSummaryPanel();
+    
   } catch (error) {
     if (!mounted) {
       return;
@@ -6283,6 +6391,17 @@ void _openSauveteurForEditing(
     _createdSauveteurDocId = sauveteurId;
     _originalSauveteurPostes.addAll(postes);
 
+    final civilite = _cleanText(data['civilite']).toLowerCase();
+
+_sauveteurCivilite =
+    civilite == 'madame' || civilite == 'mme'
+        ? 'Madame'
+        : civilite == 'monsieur' ||
+                civilite == 'm' ||
+                civilite == 'm.'
+            ? 'Monsieur'
+            : '';
+
     _sauveteurNomController.text =
         _cleanText(data['nom']).toUpperCase();
     _sauveteurPrenomController.text =
@@ -6422,13 +6541,7 @@ Future<void> _deleteSauveteur(
     if (!mounted) {
       return;
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Sauveteur supprimé.'),
-        backgroundColor: adminColor,
-      ),
-    );
+    
   } catch (error) {
     if (!mounted) {
       return;
@@ -6611,30 +6724,28 @@ Future<void> _saveSphotFromDashboard() async {
     }
 
     await targetDocument.set(
-      data,
-      SetOptions(merge: true),
-    );
+  data,
+  SetOptions(merge: true),
+);
 
-    if (!mounted) return;
+// Laisse le panneau visible pendant la mise à jour de la carte.
+if (!wasEditing) {
+  await Future<void>.delayed(
+    const Duration(seconds: 3),
+  );
+}
 
-    setState(() {
-      _isSavingSphot = false;
-      _showSphotEditorPanel = false;
-      _placingSphotOnMap = false;
-      _selectedSpot = null;
-      _clearSphotEditor();
-    });
+if (!mounted) {
+  return;
+}
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          wasEditing
-              ? 'SPHOT modifié avec succès.'
-              : 'SPHOT créé avec succès.',
-        ),
-        backgroundColor: adminColor,
-      ),
-    );
+setState(() {
+  _isSavingSphot = false;
+  _showSphotEditorPanel = false;
+  _placingSphotOnMap = false;
+  _selectedSpot = null;
+  _clearSphotEditor();
+});
   } catch (error) {
     if (!mounted) return;
 
@@ -6883,11 +6994,13 @@ Widget _sphotEditorField({
   required String label,
   TextInputType? keyboardType,
   bool readOnly = false,
+  List<TextInputFormatter>? inputFormatters,
 }) {
   return TextField(
     controller: controller,
     keyboardType: keyboardType,
     readOnly: readOnly,
+    inputFormatters: inputFormatters,
 
 style: const TextStyle(
     color: adminColor,
@@ -7425,6 +7538,204 @@ Widget _sauveteurSectionTitle(
   );
 }
 
+Widget _sauveteurCiviliteField() {
+  return GestureDetector(
+    key: _sauveteurCiviliteKey,
+    behavior: HitTestBehavior.opaque,
+    onTap: _openSauveteurCiviliteMenu,
+    child: InputDecorator(
+      decoration: InputDecoration(
+        labelText: _sauveteurCivilite == null
+            ? null
+            : 'Civilité',
+        labelStyle: const TextStyle(
+          color: adminColor,
+          fontWeight: FontWeight.w700,
+        ),
+        filled: true,
+        fillColor: adminColor.withOpacity(0.035),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(
+            color: adminColor,
+            width: 1.6,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(
+            color: adminColor,
+            width: 1.6,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _sauveteurCivilite ?? 'Civilité',
+              style: const TextStyle(
+                color: adminColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: adminColor,
+            size: 26,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+void _openSauveteurCiviliteMenu() {
+  _dropdownOverlay?.remove();
+  _dropdownOverlay = null;
+
+  final fieldContext =
+      _sauveteurCiviliteKey.currentContext;
+
+  if (fieldContext == null) {
+    return;
+  }
+
+  final renderBox =
+      fieldContext.findRenderObject() as RenderBox;
+
+  final position =
+      renderBox.localToGlobal(Offset.zero);
+
+  final size = renderBox.size;
+
+  const civiliteChoices = <String>[
+    'Monsieur',
+    'Madame',
+  ];
+
+  _dropdownOverlay = OverlayEntry(
+    builder: (context) {
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                _dropdownOverlay?.remove();
+                _dropdownOverlay = null;
+              },
+              child: Container(
+                color: Colors.transparent,
+              ),
+            ),
+          ),
+          Positioned(
+            left: position.dx,
+            top: position.dy + size.height - 12,
+            width: size.width,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.94),
+                  border: const Border(
+                    left: BorderSide(
+                      color: adminColor,
+                      width: 1.4,
+                    ),
+                    right: BorderSide(
+                      color: adminColor,
+                      width: 1.4,
+                    ),
+                    bottom: BorderSide(
+                      color: adminColor,
+                      width: 1.4,
+                    ),
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(10),
+                    bottomRight: Radius.circular(10),
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 8,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: civiliteChoices.map((choice) {
+                    final selected =
+                        _sauveteurCivilite == choice;
+
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          _sauveteurCivilite = choice;
+                          if (_editingSauveteurDocId != null) {
+                            _sauveteurHasUnsavedChanges = true;
+                          }
+                        });
+
+                        _dropdownOverlay?.remove();
+                        _dropdownOverlay = null;
+                      },
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                choice,
+                                style: TextStyle(
+                                  color: selected
+                                      ? redColor
+                                      : adminColor,
+                                  fontSize: 13,
+                                  fontWeight:
+                                      FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            if (selected)
+                              const Icon(
+                                Icons.check_rounded,
+                                color: redColor,
+                                size: 21,
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  Overlay.of(
+    context,
+    rootOverlay: true,
+  ).insert(_dropdownOverlay!);
+}
+
 Widget _sauveteurEditorField({
   required TextEditingController controller,
   required String label,
@@ -7469,7 +7780,11 @@ Widget _sauveteurEditorField({
       }
 
       if (mounted) {
-        setState(() {});
+        setState(() {
+          if (_editingSauveteurDocId != null) {
+            _sauveteurHasUnsavedChanges = true;
+          }
+        });
       }
     },
     style: const TextStyle(
@@ -7562,6 +7877,9 @@ Widget _buildSauveteurFunctionsField() {
                     _sauveteurFonctions.add(fonction);
                   } else {
                     _sauveteurFonctions.remove(fonction);
+                  }
+                  if (_editingSauveteurDocId != null) {
+                    _sauveteurHasUnsavedChanges = true;
                   }
                 });
               },
@@ -7682,6 +8000,9 @@ Widget _buildSauveteurPostesField() {
                     _sauveteurPostes.add(doc.id);
                   } else {
                     _sauveteurPostes.remove(doc.id);
+                  }
+                  if (_editingSauveteurDocId != null) {
+                    _sauveteurHasUnsavedChanges = true;
                   }
                 });
               },
@@ -7869,6 +8190,9 @@ Widget _buildSauveteurPeriodesField() {
                         _sauveteurPeriodesSurveillance.remove(
                           periodId,
                         );
+                      }
+                      if (_editingSauveteurDocId != null) {
+                        _sauveteurHasUnsavedChanges = true;
                       }
                     });
                   },
@@ -8773,6 +9097,8 @@ Widget _buildSauveteurEditorPanel() {
                     children: [
                       _sauveteurSectionTitle(1, 'IDENTITÉ'),
                       const SizedBox(height: 9),
+                      _sauveteurCiviliteField(),
+                      const SizedBox(height: 8),
                       Row(
                         children: [
                           Expanded(
@@ -8895,10 +9221,27 @@ _buildSauveteurPeriodesField(),
                       _sauveteurSectionTitle(6, 'OBSERVATIONS'),
                       const SizedBox(height: 9),
                       _sauveteurEditorField(
-                        controller: _sauveteurObservationsController,
-                        label: 'Observations',
-                        maxLines: 4,
-                      ),
+  controller: _sauveteurObservationsController,
+  label: 'Observations',
+  maxLines: 4,
+  inputFormatters: [
+    TextInputFormatter.withFunction(
+      (oldValue, newValue) {
+        if (newValue.text.isEmpty) {
+          return newValue;
+        }
+
+        final correctedText =
+            newValue.text.substring(0, 1).toUpperCase() +
+            newValue.text.substring(1);
+
+        return newValue.copyWith(
+          text: correctedText,
+        );
+      },
+    ),
+  ],
+),
                       const SizedBox(height: 18),
                       _sauveteurSectionTitle(7, 'ACCÈS SAUVETEUR'),
                       const SizedBox(height: 9),
@@ -8906,15 +9249,22 @@ _buildSauveteurPeriodesField(),
                         width: double.infinity,
                         height: 46,
                         child: OutlinedButton(
-                          onPressed: _isSavingSauveteur
-                                  || _editingSauveteurDocId != null
+                          onPressed: _isSavingSauveteur ||
+                                  (_editingSauveteurDocId != null &&
+                                      _sauveteurPasswordRegenerated)
                               ? null
-                              : _generateSauveteurAccess,
+                              : _editingSauveteurDocId != null
+                                  ? _regenerateSauveteurPassword
+                                  : _generateSauveteurAccess,
                           style: OutlinedButton.styleFrom(
-  foregroundColor: _sauveteurAccessGenerated
+  foregroundColor: (_editingSauveteurDocId != null
+          ? _sauveteurPasswordRegenerated
+          : _sauveteurAccessGenerated)
       ? Colors.white
       : redColor,
-  backgroundColor: _sauveteurAccessGenerated
+  backgroundColor: (_editingSauveteurDocId != null
+          ? _sauveteurPasswordRegenerated
+          : _sauveteurAccessGenerated)
       ? redColor
       : Colors.transparent,
   side: const BorderSide(
@@ -8926,9 +9276,13 @@ _buildSauveteurPeriodesField(),
   ),
 ),
                           child: Text(
-                            _sauveteurAccessGenerated
-                                ? 'ACCÈS GÉNÉRÉ'
-                                : 'GÉNÉRER L’ACCÈS',
+                            _editingSauveteurDocId != null
+                                ? _sauveteurPasswordRegenerated
+                                    ? 'MOT DE PASSE RÉGÉNÉRÉ'
+                                    : 'RÉGÉNÉRER LE MOT DE PASSE'
+                                : _sauveteurAccessGenerated
+                                    ? 'ACCÈS GÉNÉRÉ'
+                                    : 'GÉNÉRER L’ACCÈS',
                             style: const TextStyle(
                               fontWeight: FontWeight.w900,
                             ),
@@ -8968,48 +9322,50 @@ _buildSauveteurPeriodesField(),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 44,
-                        child: OutlinedButton(
-                          onPressed: _sauveteurAccessGenerated &&
-                                  contactOk &&
-                                  !_sauveteurEmailSent &&
-                                  !_isSavingSauveteur
-                              ? _sendSauveteurCredentialsEmail
-                              : null,
-                          style: OutlinedButton.styleFrom(
-  foregroundColor: _sauveteurEmailSent
-      ? Colors.white
-      : redColor,
-  disabledForegroundColor: _sauveteurEmailSent
-      ? Colors.white
-      : redColor.withOpacity(0.45),
-  backgroundColor: _sauveteurEmailSent
-      ? redColor
-      : Colors.transparent,
-  disabledBackgroundColor: _sauveteurEmailSent
-      ? redColor
-      : Colors.transparent,
-  side: const BorderSide(
-    color: redColor,
-    width: 1.8,
-  ),
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(14),
-  ),
-),
-                          child: Text(
-                            _sauveteurEmailSent
-                                ? 'EMAIL ENVOYÉ'
-                                : 'ENVOYER PAR EMAIL',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
+                      if (_editingSauveteurDocId != null &&
+                          _sauveteurPasswordRegenerated) ...[
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 42,
+                          child: OutlinedButton.icon(
+                            onPressed: _sauveteurEmailSent
+                                ? null
+                                : () =>
+                                    _sendSauveteurCredentialsEmail(
+                                      isReset: true,
+                                    ),
+                            icon: Icon(
+                              _sauveteurEmailSent
+                                  ? Icons.mark_email_read_rounded
+                                  : Icons.email_outlined,
+                            ),
+                            label: Text(
+                              _sauveteurEmailSent
+                                  ? 'NOUVEAU MOT DE PASSE ENVOYÉ'
+                                  : 'ENVOYER LE NOUVEAU MOT DE PASSE',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: _sauveteurEmailSent
+                                  ? Colors.white
+                                  : redColor,
+                              backgroundColor: _sauveteurEmailSent
+                                  ? redColor
+                                  : Colors.transparent,
+                              side: const BorderSide(
+                                color: redColor,
+                                width: 1.8,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -9033,7 +9389,9 @@ _buildSauveteurPeriodesField(),
                       : const Icon(Icons.save_rounded),
                   label: Text(
   _isSavingSauveteur
-      ? 'ENREGISTREMENT...'
+      ? _editingSauveteurDocId == null
+          ? 'CRÉATION ET ENVOI...'
+          : 'ENREGISTREMENT...'
       : _editingSauveteurDocId == null
           ? 'CRÉER UN SAUVETEUR'
           : 'ENREGISTRER LES MODIFICATIONS',
@@ -9042,8 +9400,16 @@ _buildSauveteurPeriodesField(),
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-  foregroundColor: redColor,
-  backgroundColor: Colors.transparent,
+  foregroundColor: _editingSauveteurDocId != null &&
+          _sauveteurHasUnsavedChanges
+      ? Colors.white
+      : redColor,
+  backgroundColor: _editingSauveteurDocId != null &&
+          _sauveteurHasUnsavedChanges
+      ? redColor
+      : Colors.transparent,
+  disabledForegroundColor: Colors.white,
+  disabledBackgroundColor: redColor,
   elevation: 0,
   side: const BorderSide(
     color: redColor,
@@ -9224,19 +9590,48 @@ style: OutlinedButton.styleFrom(
             Row(
               children: [
                 SizedBox(
-                  width: 105,
-                  child: _sphotEditorField(
-                    controller: _sphotIdController,
-                    label: 'N° SPHOT',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _sphotEditorField(
-                    controller: _sphotNameController,
-                    label: 'Nom du SPHOT',
-                  ),
-                ),
+  width: 105,
+  child: _sphotEditorField(
+    controller: _sphotIdController,
+    label: 'N° SPHOT',
+    inputFormatters: [
+      TextInputFormatter.withFunction(
+        (oldValue, newValue) {
+          return newValue.copyWith(
+            text: newValue.text.toUpperCase(),
+            composing: TextRange.empty,
+          );
+        },
+      ),
+    ],
+  ),
+),
+const SizedBox(width: 8),
+Expanded(
+  child: _sphotEditorField(
+    controller: _sphotNameController,
+    label: 'Nom du SPHOT',
+    inputFormatters: [
+      TextInputFormatter.withFunction(
+        (oldValue, newValue) {
+          final text = newValue.text;
+
+          if (text.isEmpty) {
+            return newValue;
+          }
+
+          final formattedText =
+              text[0].toUpperCase() + text.substring(1);
+
+          return newValue.copyWith(
+            text: formattedText,
+            composing: TextRange.empty,
+          );
+        },
+      ),
+    ],
+  ),
+),
               ],
             ),
             const SizedBox(height: 14),
@@ -9413,36 +9808,6 @@ SizedBox(
     ),
   ),
 ),
-
-if (isEditing) ...[
-  const SizedBox(height: 6),
-  SizedBox(
-    width: double.infinity,
-    height: 40,
-    child: ElevatedButton.icon(
-      onPressed:
-          _isSavingSphot ? null : _deleteSphotFromDashboard,
-      icon: const Icon(
-        Icons.delete_forever_rounded,
-        size: 21,
-      ),
-      label: const Text(
-        'SUPPRIMER CE SPHOT',
-        style: TextStyle(
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: redColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-    ),
-  ),
-],
            ],
           ),
         ),

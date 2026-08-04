@@ -117,7 +117,9 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
         if (!mounted) return;
 
         setState(() {
-          _loginErrorMessage = 'Identifiant ou mot de passe incorrect.';
+          _loginErrorMessage =
+    'Identifiant ou mot de passe incorrect.\n'
+    'Contactez votre administrateur si oubli.';
         });
 
         return;
@@ -142,7 +144,9 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
         if (!mounted) return;
 
         setState(() {
-          _loginErrorMessage = 'Identifiant ou mot de passe incorrect.';
+          _loginErrorMessage =
+    'Identifiant ou mot de passe incorrect.\n'
+    'Contactez votre administrateur si oubli.';
         });
 
         return;

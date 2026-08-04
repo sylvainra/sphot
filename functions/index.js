@@ -2433,16 +2433,65 @@ exports.sendSauveteurCredentialsEmail = onRequest(
 
       try {
         const email = request.query.email;
-        const prenom = request.query.prenom || "Sauveteur";
         const identifiant = request.query.identifiant || "";
         const motDePasse = request.query.motdepasse || "";
         const type = request.query.type || "creation";
         const isReset = type === "reset";
+        let nom = (request.query.nom || "").toString().trim();
+        let civilite = (request.query.civilite || "")
+            .toString()
+            .trim();
 
         if (!email) {
           response.status(400).send("Email manquant.");
           return;
         }
+
+        if (identifiant && (!nom || !civilite)) {
+          const accountSnapshot = await admin.firestore()
+              .collection("sauveteurAccounts")
+              .doc(identifiant.toString().trim().toLowerCase())
+              .get();
+
+          if (accountSnapshot.exists) {
+            const accountData = accountSnapshot.data() || {};
+            nom = nom || (accountData.nom || "").toString().trim();
+            civilite = civilite || (
+              accountData.civilite ||
+              accountData.sexe ||
+              accountData.genre ||
+              ""
+            ).toString().trim();
+          }
+        }
+
+        const civiliteNormalisee = (() => {
+          const valeur = civilite.toLowerCase();
+
+          if (["madame", "mme", "f", "femme"].includes(valeur)) {
+            return "Madame";
+          }
+
+          if (["monsieur", "m", "m.", "homme"].includes(valeur)) {
+            return "Monsieur";
+          }
+
+          return civilite;
+        })();
+
+        const destinataire = [
+          civiliteNormalisee,
+          nom.toUpperCase(),
+        ]
+            .filter((value) => value)
+            .join(" ") || "Sauveteur";
+
+        const destinataireHtml =
+          `<span style="font-weight:400 !important;">${
+            escapeHtml(civiliteNormalisee)
+          }</span> <span style="font-weight:700 !important;">${
+            escapeHtml(nom.toUpperCase() || "Sauveteur")
+          }</span>`;
 
         const transporter = nodemailer.createTransport({
           service: "gmail",
@@ -2483,7 +2532,9 @@ box-shadow:0 4px 12px rgba(0,0,0,.08);">
     <div style="padding:0 34px 30px 34px;color:#263238;
 font-size:16px;line-height:1.6;">
 
-      <p>Bonjour <strong>${prenom}</strong>,</p>
+      <p style="font-weight:400 !important;">
+  Bonjour ${destinataireHtml},
+</p>
 
 ${isReset ?
   `` :
@@ -2551,8 +2602,8 @@ de votre mot de passe.
 
       ${isReset ? `
 <div style="
-    background:#e3f2fd;
-    border-left:5px solid #1976d2;
+    background:#fff8e1;
+    border-left:5px solid #ff9800;
     padding:16px;
     border-radius:8px;
     margin-bottom:28px;">
@@ -2613,7 +2664,7 @@ vous devrez modifier votre mot de passe.
 </div>
 `,
           text: isReset ?
-`Bonjour ${prenom},
+`Bonjour ${destinataire},
 
 Votre administrateur SPHOT a réinitialisé votre mot de passe.
 
@@ -2630,7 +2681,7 @@ ${SPHOT_LOGIN_URL}
 À bientôt sur SPHOT,
 
 L'équipe SPHOT` :
-`Bonjour ${prenom},
+`Bonjour ${destinataire},
 
 Votre compte SPHOT a été créé par votre administrateur.
 
@@ -2890,44 +2941,142 @@ exports.changeSauveteurPassword = onRequest(
             .toString()
             .trim();
 
-        let email = "";
-        let prenom = "Sauveteur";
-
-        const accountBeforeUpdate = await admin.firestore()
-            .collection("sauveteurAccounts")
-            .doc(login)
-            .get();
-
-        if (accountBeforeUpdate.exists) {
-          const accountData = accountBeforeUpdate.data();
-
-          email = (accountData.email || "").toString().trim();
-          console.log("Email confirmation mdp sauveteur:", email);
-          prenom = (accountData.prenom || "Sauveteur")
-              .toString()
-              .trim();
-        }
-
         if (!login || !newPassword) {
           response.status(400).json({success: false});
           return;
         }
 
-        await admin.firestore()
+        const accountReference = admin.firestore()
             .collection("sauveteurAccounts")
-            .doc(login)
-            .set(
-                {
-                  temporaryPassword: newPassword,
-                  mustChangePassword: false,
-                  passwordUpdatedAt:
-                      admin.firestore.FieldValue.serverTimestamp(),
-                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                },
-                {merge: true},
-            );
+            .doc(login);
 
-        if (email) {
+        const accountResult = await admin.firestore().runTransaction(
+            async (transaction) => {
+              const accountSnapshot = await transaction.get(
+                  accountReference,
+              );
+
+              if (!accountSnapshot.exists) {
+                return {exists: false};
+              }
+
+              const accountData = accountSnapshot.data() || {};
+              const storedPassword =
+                  (accountData.temporaryPassword || "")
+                      .toString();
+
+              const alreadyProcessed =
+                  accountData.mustChangePassword === false &&
+                  storedPassword === newPassword;
+
+              if (!alreadyProcessed) {
+                transaction.set(
+                    accountReference,
+                    {
+                      temporaryPassword: newPassword,
+                      mustChangePassword: false,
+                      passwordUpdatedAt:
+                          admin.firestore.FieldValue.serverTimestamp(),
+                      updatedAt:
+                          admin.firestore.FieldValue.serverTimestamp(),
+                    },
+                    {merge: true},
+                );
+              }
+
+              return {
+                exists: true,
+                email: (accountData.email || "").toString().trim(),
+                prenom: (accountData.prenom || "Sauveteur")
+                    .toString()
+                    .trim(),
+                nom: (accountData.nom || "").toString().trim(),
+                civilite: (accountData.civilite || "")
+                    .toString()
+                    .trim(),
+                territoireId: (accountData.territoireId || "")
+                    .toString()
+                    .trim(),
+                sauveteurId: (accountData.sauveteurId || "")
+                    .toString()
+                    .trim(),
+                sendEmail: !alreadyProcessed,
+              };
+            },
+        );
+
+        if (!accountResult.exists) {
+          response.status(404).json({success: false});
+          return;
+        }
+
+        const email = accountResult.email;
+        const prenom = accountResult.prenom;
+        let nom = accountResult.nom;
+        let civiliteSource = accountResult.civilite;
+
+        if ((!nom || !civiliteSource) &&
+            accountResult.territoireId &&
+            accountResult.sauveteurId) {
+          const sauveteurSnapshot = await admin.firestore()
+              .collection("territoires")
+              .doc(accountResult.territoireId)
+              .collection("sauveteurs")
+              .doc(accountResult.sauveteurId)
+              .get();
+
+          if (sauveteurSnapshot.exists) {
+            const sauveteurData = sauveteurSnapshot.data() || {};
+
+            nom = nom || (sauveteurData.nom || "")
+                .toString()
+                .trim();
+
+            civiliteSource = civiliteSource ||
+                (sauveteurData.civilite || "")
+                    .toString()
+                    .trim();
+
+            if (nom || civiliteSource) {
+              await accountReference.set(
+                  {
+                    nom: nom,
+                    civilite: civiliteSource,
+                    updatedAt:
+                        admin.firestore.FieldValue.serverTimestamp(),
+                  },
+                  {merge: true},
+              );
+            }
+          }
+        }
+
+        nom = nom.toUpperCase();
+        const civiliteValue = civiliteSource.toLowerCase();
+
+        const civilite = ["madame", "mme"].includes(civiliteValue) ?
+          "Madame" :
+          ["monsieur", "m", "m."].includes(civiliteValue) ?
+            "Monsieur" :
+            civiliteSource;
+
+        const destinataire = [civilite, nom]
+            .filter((value) => value)
+            .join(" ") || prenom;
+
+        const destinataireHtml = nom ?
+          `${civilite ?
+            `<span style="font-weight:400 !important;">${
+              escapeHtml(civilite)
+            }</span> ` :
+            ""}<span style="font-weight:700 !important;">${
+            escapeHtml(nom)
+          }</span>` :
+          `<span style="font-weight:700 !important;">${
+            escapeHtml(prenom)
+          }</span>`;
+
+        if (email && accountResult.sendEmail) {
           try {
             const transporter = nodemailer.createTransport({
               service: "gmail",
@@ -2940,6 +3089,7 @@ exports.changeSauveteurPassword = onRequest(
             await transporter.sendMail({
               from: MAIL_FROM,
               to: email,
+              replyTo: "contact@sphot.app",
               subject: "Mise à jour de votre compte SPHOT",
               html: `
 <div style="margin:0;padding:40px 20px;
@@ -2969,24 +3119,23 @@ box-shadow:0 4px 12px rgba(0,0,0,.08);">
       style="padding:0 34px 30px;color:#263238;
       font-size:16px;line-height:1.6;">
 
-      <p>
-  ${escapeHtml(greeting)}
-</p>
+      <p style="font-weight:400 !important;">
+        Bonjour ${destinataireHtml},
+      </p>
 
       <p>
-  Nous vous confirmons que le mot de passe de votre compte SPHOT
-  pour <strong>${organisation}</strong> a été modifié avec succès.
-</p>
-
-<p>
-  Vous pouvez désormais créer et gérer les SPHOTS, les sauveteurs
-  et les périodes de surveillance de <strong>${organisation}</strong>
-  pour démarrer votre période d'essai gratuite de 8 jours.
-</p>
+        Nous vous confirmons que le mot de passe de votre compte
+        SPHOT a été modifié avec succès.
+      </p>
 
 <p>
   Si vous n'êtes pas à l'origine de cette modification,
-  contactez immédiatement l'équipe SPHOT.
+  contactez immédiatement l'équipe SPHOT à l'adresse
+  <a
+    href="mailto:contact@sphot.app"
+    style="color:#1e3a8a;font-weight:700;">
+    contact@sphot.app
+  </a>.
 </p>
 
       <div style="text-align:center;margin:35px 0;">
@@ -3020,13 +3169,14 @@ box-shadow:0 4px 12px rgba(0,0,0,.08);">
 
 </div>
 `,
-              text: `Bonjour ${prenom},
+              text: `Bonjour ${destinataire},
 
 Nous vous confirmons que votre mot de passe SPHOT
 a été modifié avec succès.
 
 Si vous n'êtes pas à l'origine de cette modification,
-contactez immédiatement votre administrateur.
+contactez immédiatement l'équipe SPHOT :
+contact@sphot.app
 
 À bientôt sur SPHOT,
 
@@ -3037,7 +3187,10 @@ L'équipe SPHOT`,
           }
         }
 
-        response.status(200).json({success: true});
+        response.status(200).json({
+          success: true,
+          duplicate: !accountResult.sendEmail,
+        });
       } catch (error) {
         console.error("Erreur changement mot de passe sauveteur:", error);
         response.status(500).json({success: false});

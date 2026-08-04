@@ -90,7 +90,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   ),
                   const SizedBox(height: 18),
                   Container(
-                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
+  width: double.infinity,
+  constraints: const BoxConstraints(
+    maxWidth: 520,
+  ),
+  padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
                     decoration: BoxDecoration(
                       color: Colors.transparent,
                       borderRadius: BorderRadius.circular(24),
