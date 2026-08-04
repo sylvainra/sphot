@@ -3855,6 +3855,9 @@ Widget _buildTrialOtherSpotTile(
                 idSphot.isEmpty
                     ? name
                     : '$idSphot - $name',
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: adminColor,
                   fontSize: 13,
@@ -4071,7 +4074,7 @@ Widget _buildTrialSummaryContent({
       Transform.translate(
         offset: const Offset(-12, 0),
         child: Transform.scale(
-          scale: 1.8,
+          scale: isSidePanel ? 1.5 : 1.8,
           alignment: Alignment.center,
           child: Image.asset(
             'data/icons/fire_red_icon.png',
@@ -4891,6 +4894,7 @@ _summaryCard(
   value: '',
   color: adminColor,
   iconPath: 'data/icons/fire_red_icon.png',
+  stepNumber: 4,
   iconScale: 1.35,
   titleFontSize: 17,
   titleLetterSpacing: 0.8,
@@ -4906,6 +4910,7 @@ if (showTrialButton) ...[
     value: '',
     color: redColor,
     iconPath: 'data/icons/fire_red_icon.png',
+    stepNumber: 5,
     iconScale: 1.35,
     titleFontSize: 17,
     titleLetterSpacing: 0.8,
@@ -4920,6 +4925,7 @@ _summaryCard(
   value: '',
   color: showTrialButton ? pendingColor : redColor,
   iconPath: 'data/icons/fire_red_icon.png',
+  stepNumber: 6,
   iconScale: 1.35,
   titleFontSize: 16,
   titleLetterSpacing: 0.5,
@@ -4937,6 +4943,7 @@ _summaryCard(
   iconPath: showTrialButton
       ? 'data/icons/fire_red_icon.png'
       : 'data/icons/fire_blue_icon.png',
+  stepNumber: 7,
   iconScale: 1.35,
   titleFontSize: 16,
   titleLetterSpacing: 0.5,
@@ -4967,6 +4974,12 @@ const SizedBox(height: 4),
   bool grayscaleIcon = false,
   VoidCallback? onTap,
 }) {
+    final displayedStepNumberColor = grayscaleIcon
+        ? pendingColor
+        : iconPath.contains('fire_blue_icon')
+            ? adminColor
+            : redColor;
+
     final card = Container(
   height: 64,
   padding: const EdgeInsets.symmetric(
@@ -5027,8 +5040,8 @@ const SizedBox(height: 4),
             ),
             child: Text(
               '$stepNumber',
-              style: const TextStyle(
-                color: redColor,
+              style: TextStyle(
+                color: displayedStepNumberColor,
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
               ),
