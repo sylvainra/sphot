@@ -271,6 +271,8 @@ class SuperAdminDashboardFinancesPage extends StatelessWidget {
 
                                     const SizedBox(height: 26),
                                     _sectionTitle('ABONNEMENTS'),
+                                    const _SubscriptionPricingEditor(),
+                                    const SizedBox(height: 14),
                                     Row(
                                       children: [
                                         _kpiCard(
@@ -378,6 +380,165 @@ class SuperAdminDashboardFinancesPage extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _SubscriptionPricingEditor extends StatefulWidget {
+  const _SubscriptionPricingEditor();
+
+  @override
+  State<_SubscriptionPricingEditor> createState() =>
+      _SubscriptionPricingEditorState();
+}
+
+class _SubscriptionPricingEditorState
+    extends State<_SubscriptionPricingEditor> {
+  static const Color _blue = Color(0xFF1E3A8A);
+  static const Color _red = Color(0xFFDC2626);
+
+  final TextEditingController _priceController =
+      TextEditingController();
+
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrice();
+  }
+
+  Future<void> _loadPrice() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('settings')
+        .doc('subscriptionPricing')
+        .get();
+
+    final data = snapshot.data();
+    final value =
+        (data?['annualPricePerRescueStationExclTax'] as num?)
+            ?.toDouble();
+
+    _priceController.text =
+        (value ?? 500.0).toStringAsFixed(2);
+
+    if (mounted) {
+      setState(() {
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _savePrice() async {
+    final price = double.tryParse(
+      _priceController.text.trim().replaceAll(',', '.'),
+    );
+
+    if (price == null || price <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tarif annuel invalide.'),
+          backgroundColor: _red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+    });
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('settings')
+          .doc('subscriptionPricing')
+          .set(
+        {
+          'annualPricePerRescueStationExclTax': price,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tarif annuel enregistré.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _priceController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: _blue,
+          width: 2,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'TARIF ANNUEL PAR POSTE DE SECOURS',
+              style: TextStyle(
+                color: _blue,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 180,
+            child: TextField(
+              controller: _priceController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: '€ HT / an',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: _saving ? null : _savePrice,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _blue,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.save_rounded),
+            label: Text(
+              _saving ? 'ENREGISTREMENT...' : 'ENREGISTRER',
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
