@@ -3665,7 +3665,7 @@ Widget _buildTrialMonitoredSpotCard(
         Row(
   crossAxisAlignment: CrossAxisAlignment.start,
   children: [
-    Image.asset(
+    AdaptiveAssetImage(
       _getMarkerIconPath(spot),
       width: 42,
       height: 42,
@@ -3840,7 +3840,7 @@ Widget _buildTrialOtherSpotTile(
     ),
     child: Row(
       children: [
-        Image.asset(
+        AdaptiveAssetImage(
           _getMarkerIconPath(spot),
           width: 34,
           height: 34,
