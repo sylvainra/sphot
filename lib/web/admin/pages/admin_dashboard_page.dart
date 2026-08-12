@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../widgets/adaptive_asset_image.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
@@ -573,7 +574,7 @@ String _getMarkerIconPath(Map<String, dynamic> data) {
   );
 
   if (type.contains('POSTE DE SECOURS')) {
-    return 'data/icons/fire_red_icon.png';
+    return 'data/icons/fire_red_icon.svg';
   }
 
   if (type.contains('NATURISME') ||
@@ -1197,7 +1198,7 @@ Color _clusterBorderColor(List<Marker> markers) {
 
 String _clusterIconPath(Color color) {
   if (color == const Color(0xFFFF0000)) {
-    return 'data/icons/fire_red_icon.png';
+    return 'data/icons/fire_red_icon.svg';
   }
 
   if (color == const Color(0xFFD87A5C)) {
@@ -4076,8 +4077,8 @@ Widget _buildTrialSummaryContent({
         child: Transform.scale(
           scale: isSidePanel ? 1.5 : 1.8,
           alignment: Alignment.center,
-          child: Image.asset(
-            'data/icons/fire_red_icon.png',
+          child: AdaptiveAssetImage(
+            'data/icons/fire_red_icon.svg',
             width: 30,
             height: 30,
             fit: BoxFit.contain,
@@ -4549,8 +4550,8 @@ Widget _buildCommercialPanelHeader({
   child: Transform.scale(
     scale: 1.5,
     alignment: Alignment.center,
-    child: Image.asset(
-      'data/icons/fire_red_icon.png',
+    child: AdaptiveAssetImage(
+      'data/icons/fire_red_icon.svg',
       width: 30,
       height: 30,
       fit: BoxFit.contain,
@@ -4848,7 +4849,7 @@ Widget _buildRightPanel({
     title: 'CRÉER UN SPHOT',
     value: '',
     color: adminColor,
-    iconPath: 'data/icons/fire_red_icon.png',
+    iconPath: 'data/icons/fire_red_icon.svg',
     stepNumber: 1,
     iconScale: 1.35,
     titleFontSize: 17,
@@ -4863,7 +4864,7 @@ Widget _buildRightPanel({
     title: 'CRÉER UNE PÉRIODE',
     value: '',
     color: adminColor,
-    iconPath: 'data/icons/fire_red_icon.png',
+    iconPath: 'data/icons/fire_red_icon.svg',
     stepNumber: 2,
     iconScale: 1.35,
     titleFontSize: 17,
@@ -4878,7 +4879,7 @@ Widget _buildRightPanel({
     title: 'CRÉER UN SAUVETEUR',
     value: '',
     color: adminColor,
-    iconPath: 'data/icons/fire_red_icon.png',
+    iconPath: 'data/icons/fire_red_icon.svg',
     stepNumber: 3,
     iconScale: 1.35,
     titleFontSize: 17,
@@ -4893,7 +4894,7 @@ _summaryCard(
   title: 'ESPACE ADMIN SPHOT',
   value: '',
   color: adminColor,
-  iconPath: 'data/icons/fire_red_icon.png',
+  iconPath: 'data/icons/fire_red_icon.svg',
   stepNumber: 4,
   iconScale: 1.35,
   titleFontSize: 17,
@@ -4909,7 +4910,7 @@ if (showTrialButton) ...[
     title: 'ESSAI GRATUIT 8 JOURS',
     value: '',
     color: redColor,
-    iconPath: 'data/icons/fire_red_icon.png',
+    iconPath: 'data/icons/fire_red_icon.svg',
     stepNumber: 5,
     iconScale: 1.35,
     titleFontSize: 17,
@@ -4924,7 +4925,7 @@ _summaryCard(
   title: 'ABONNEMENT',
   value: '',
   color: showTrialButton ? pendingColor : redColor,
-  iconPath: 'data/icons/fire_red_icon.png',
+  iconPath: 'data/icons/fire_red_icon.svg',
   stepNumber: 6,
   iconScale: 1.35,
   titleFontSize: 16,
@@ -4941,7 +4942,7 @@ _summaryCard(
   value: '',
   color: showTrialButton ? pendingColor : adminColor,
   iconPath: showTrialButton
-      ? 'data/icons/fire_red_icon.png'
+      ? 'data/icons/fire_red_icon.svg'
       : 'data/icons/fire_blue_icon.png',
   stepNumber: 7,
   iconScale: 1.35,
@@ -5011,7 +5012,7 @@ const SizedBox(height: 4),
                   0.2126, 0.7152, 0.0722, 0, 0,
                   0, 0, 0, 1, 0,
                 ]),
-                child: Image.asset(
+                child: AdaptiveAssetImage(
                   iconPath,
                   width: 34,
                   height: 34,
@@ -5019,7 +5020,7 @@ const SizedBox(height: 4),
                   filterQuality: FilterQuality.high,
                 ),
               )
-            : Image.asset(
+            : AdaptiveAssetImage(
                 iconPath,
                 width: 34,
                 height: 34,
@@ -8246,8 +8247,8 @@ Widget _buildSurveillancePeriodsPanel() {
                     child: Transform.scale(
                       scale: 1.5,
                       alignment: Alignment.center,
-                      child: Image.asset(
-                        'data/icons/fire_red_icon.png',
+                      child: AdaptiveAssetImage(
+                        'data/icons/fire_red_icon.svg',
                         width: 30,
                         height: 30,
                         fit: BoxFit.contain,
@@ -9055,8 +9056,8 @@ Widget _buildSauveteurEditorPanel() {
                     child: Transform.scale(
                       scale: 1.5,
                       alignment: Alignment.center,
-                      child: Image.asset(
-                        'data/icons/fire_red_icon.png',
+                      child: AdaptiveAssetImage(
+                        'data/icons/fire_red_icon.svg',
                         width: 30,
                         height: 30,
                         fit: BoxFit.contain,
@@ -9474,8 +9475,8 @@ Widget _buildSphotEditorPanel() {
   child: Transform.scale(
     scale: 1.5,
     alignment: Alignment.center,
-    child: Image.asset(
-      'data/icons/fire_red_icon.png',
+    child: AdaptiveAssetImage(
+      'data/icons/fire_red_icon.svg',
       width: 30,
       height: 30,
       fit: BoxFit.contain,
@@ -9526,8 +9527,8 @@ Widget _buildSphotEditorPanel() {
                     _placingSphotOnMap = true;
                   });
                 },
-                icon: Image.asset(
-  'data/icons/fire_red_icon.png',
+                icon: AdaptiveAssetImage(
+  'data/icons/fire_red_icon.svg',
   width: 26,
   height: 26,
   fit: BoxFit.contain,
@@ -12856,8 +12857,8 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
             child: Stack(
               alignment: Alignment.topCenter,
               children: [
-                Image.asset(
-  'data/icons/fire_red_icon.png',
+                AdaptiveAssetImage(
+  'data/icons/fire_red_icon.svg',
   width: 85,
   height: 85,
                   fit: BoxFit.contain,
@@ -13130,7 +13131,7 @@ final editedLng = double.tryParse(
 );
 
 final creationMarkerIconPath = _selectedSphotType.isEmpty
-    ? 'data/icons/fire_red_icon.png'
+    ? 'data/icons/fire_red_icon.svg'
     : _getMarkerIconPath({
         'typeSphot': _selectedSphotType,
       });
@@ -13252,7 +13253,7 @@ final clusteredMarkers = validSpots.map((doc) {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        Image.asset(
+                        AdaptiveAssetImage(
                           iconPath,
                           width: 54,
                           height: 54,
@@ -13429,7 +13430,7 @@ class DashboardSpotMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
+    return AdaptiveAssetImage(
       iconPath,
       width: 46,
       height: 46,
