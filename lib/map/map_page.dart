@@ -4,6 +4,7 @@ import 'dart:async';
 import 'profil_login_page.dart';
 
 import 'package:flutter/material.dart';
+import '../widgets/adaptive_asset_image.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:geolocator/geolocator.dart';
@@ -1321,7 +1322,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
 
 String _clusterIconPath(Color color) {
   if (color == const Color(0xFFFF0000)) {
-    return 'data/icons/fire_red_icon.png';
+    return 'data/icons/fire_red_icon.svg';
   }
 
   if (color == const Color(0xFFD87A5C)) {
@@ -1361,7 +1362,7 @@ String _clusterIconPath(Color color) {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Image.asset(
+          AdaptiveAssetImage(
             iconPath,
             width: 54,
             height: 54,
@@ -2235,7 +2236,7 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              Image.asset(
+              AdaptiveAssetImage(
                 widget.iconPath,
                 width: spot.isNaturisme ? 52 : 48,
                 height: spot.isNaturisme ? 52 : 48,
