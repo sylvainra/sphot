@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../widgets/adaptive_asset_image.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
@@ -574,16 +575,16 @@ String _getMarkerIconPath(Map<String, dynamic> data) {
   );
 
   if (type.contains('POSTE DE SECOURS')) {
-    return 'data/icons/fire_red_icon.png';
+    return 'data/icons/fire_red_icon.svg';
   }
 
   if (type.contains('NATURISME') ||
       type.contains('NATURISTE')) {
-    return 'data/icons/fire_skin_icon.png';
+    return 'data/icons/fire_skin_icon.svg';
   }
 
   if (type.contains('PLAGE')) {
-    return 'data/icons/fire_orange_icon.png';
+    return 'data/icons/fire_orange_icon.svg';
   }
 
   if (type.contains('LAC') ||
@@ -591,22 +592,22 @@ String _getMarkerIconPath(Map<String, dynamic> data) {
       type.contains("PLAN D'EAU") ||
       type.contains('PLAN D EAU') ||
       type.contains('BARRAGE')) {
-    return 'data/icons/fire_blue_icon.png';
+    return 'data/icons/fire_blue_icon.svg';
   }
 
   if (type.contains('FLEUVE') ||
       type.contains('RIVIERE') ||
       type.contains('CASCADE')) {
-    return 'data/icons/fire_green_icon.png';
+    return 'data/icons/fire_green_icon.svg';
   }
 
   if (type.contains('LAGON') ||
       type.contains('PISCINE NATURELLE')) {
-    return 'data/icons/fire_cyan_icon.png';
+    return 'data/icons/fire_cyan_icon.svg';
   }
 
   // Base de loisirs, parc et autre.
-  return 'data/icons/fire_orange1_icon.png';
+  return 'data/icons/fire_orange1_icon.svg';
 }
 
 Color _spotTypeColor(Map<String, dynamic> data) {
@@ -1198,30 +1199,30 @@ Color _clusterBorderColor(List<Marker> markers) {
 
 String _clusterIconPath(Color color) {
   if (color == const Color(0xFFFF0000)) {
-    return 'data/icons/fire_red_icon.png';
+    return 'data/icons/fire_red_icon.svg';
   }
 
   if (color == const Color(0xFFD87A5C)) {
-    return 'data/icons/fire_skin_icon.png';
+    return 'data/icons/fire_skin_icon.svg';
   }
 
   if (color == const Color(0xFFFFD000)) {
-    return 'data/icons/fire_orange_icon.png';
+    return 'data/icons/fire_orange_icon.svg';
   }
 
   if (color == const Color(0xFF1E3A8A)) {
-    return 'data/icons/fire_blue_icon.png';
+    return 'data/icons/fire_blue_icon.svg';
   }
 
   if (color == const Color(0xFF2E7D32)) {
-    return 'data/icons/fire_green_icon.png';
+    return 'data/icons/fire_green_icon.svg';
   }
 
   if (color == const Color(0xFF00ACC1)) {
-    return 'data/icons/fire_cyan_icon.png';
+    return 'data/icons/fire_cyan_icon.svg';
   }
 
-  return 'data/icons/fire_orange1_icon.png';
+  return 'data/icons/fire_orange1_icon.svg';
 }
 
 void _showSphotHoverLabel({
@@ -3665,7 +3666,7 @@ Widget _buildTrialMonitoredSpotCard(
         Row(
   crossAxisAlignment: CrossAxisAlignment.start,
   children: [
-    Image.asset(
+    AdaptiveAssetImage(
       _getMarkerIconPath(spot),
       width: 42,
       height: 42,
@@ -3840,7 +3841,7 @@ Widget _buildTrialOtherSpotTile(
     ),
     child: Row(
       children: [
-        Image.asset(
+        AdaptiveAssetImage(
           _getMarkerIconPath(spot),
           width: 34,
           height: 34,
@@ -4077,8 +4078,8 @@ Widget _buildTrialSummaryContent({
         child: Transform.scale(
           scale: isSidePanel ? 1.5 : 1.8,
           alignment: Alignment.center,
-          child: Image.asset(
-            'data/icons/fire_red_icon.png',
+          child: AdaptiveAssetImage(
+            'data/icons/fire_red_icon.svg',
             width: 30,
             height: 30,
             fit: BoxFit.contain,
@@ -4550,8 +4551,8 @@ Widget _buildCommercialPanelHeader({
   child: Transform.scale(
     scale: 1.5,
     alignment: Alignment.center,
-    child: Image.asset(
-      'data/icons/fire_red_icon.png',
+    child: AdaptiveAssetImage(
+      'data/icons/fire_red_icon.svg',
       width: 30,
       height: 30,
       fit: BoxFit.contain,
@@ -4849,7 +4850,7 @@ Widget _buildRightPanel({
     title: 'CRÉER UN SPHOT',
     value: '',
     color: adminColor,
-    iconPath: 'data/icons/fire_red_icon.png',
+    iconPath: 'data/icons/fire_red_icon.svg',
     stepNumber: 1,
     iconScale: 1.35,
     titleFontSize: 17,
@@ -4864,7 +4865,7 @@ Widget _buildRightPanel({
     title: 'CRÉER UNE PÉRIODE',
     value: '',
     color: adminColor,
-    iconPath: 'data/icons/fire_red_icon.png',
+    iconPath: 'data/icons/fire_red_icon.svg',
     stepNumber: 2,
     iconScale: 1.35,
     titleFontSize: 17,
@@ -4879,7 +4880,7 @@ Widget _buildRightPanel({
     title: 'CRÉER UN SAUVETEUR',
     value: '',
     color: adminColor,
-    iconPath: 'data/icons/fire_red_icon.png',
+    iconPath: 'data/icons/fire_red_icon.svg',
     stepNumber: 3,
     iconScale: 1.35,
     titleFontSize: 17,
@@ -4894,7 +4895,7 @@ _summaryCard(
   title: 'ESPACE ADMIN SPHOT',
   value: '',
   color: adminColor,
-  iconPath: 'data/icons/fire_red_icon.png',
+  iconPath: 'data/icons/fire_red_icon.svg',
   stepNumber: 4,
   iconScale: 1.35,
   titleFontSize: 17,
@@ -4910,7 +4911,7 @@ if (showTrialButton) ...[
     title: 'ESSAI GRATUIT 8 JOURS',
     value: '',
     color: adminColor,
-    iconPath: 'data/icons/fire_red_icon.png',
+    iconPath: 'data/icons/fire_red_icon.svg',
     stepNumber: 5,
     iconScale: 1.35,
     titleFontSize: 17,
@@ -4925,7 +4926,7 @@ _summaryCard(
   title: 'ABONNEMENT',
   value: '',
   color: adminColor,
-  iconPath: 'data/icons/fire_red_icon.png',
+  iconPath: 'data/icons/fire_red_icon.svg',
   stepNumber: 6,
   iconScale: 1.35,
   titleFontSize: 16,
@@ -4940,7 +4941,7 @@ _summaryCard(
   title: 'DOCUMENTS & FACTURES',
   value: '',
   color: adminColor,
-  iconPath: 'data/icons/fire_red_icon.png',
+  iconPath: 'data/icons/fire_red_icon.svg',
   stepNumber: 7,
   iconScale: 1.35,
   titleFontSize: 16,
@@ -4962,7 +4963,7 @@ const SizedBox(height: 4),
   required String title,
   required String value,
   required Color color,
-  String iconPath = 'data/icons/fire_blue_icon.png',
+  String iconPath = 'data/icons/fire_blue_icon.svg',
   int? stepNumber,
   double iconScale = 1.0,
   double titleFontSize = 13,
@@ -5008,7 +5009,7 @@ const SizedBox(height: 4),
                   0.2126, 0.7152, 0.0722, 0, 0,
                   0, 0, 0, 1, 0,
                 ]),
-                child: Image.asset(
+                child: AdaptiveAssetImage(
                   iconPath,
                   width: 34,
                   height: 34,
@@ -5016,7 +5017,7 @@ const SizedBox(height: 4),
                   filterQuality: FilterQuality.high,
                 ),
               )
-            : Image.asset(
+            : AdaptiveAssetImage(
                 iconPath,
                 width: 34,
                 height: 34,
@@ -8243,8 +8244,8 @@ Widget _buildSurveillancePeriodsPanel() {
                     child: Transform.scale(
                       scale: 1.5,
                       alignment: Alignment.center,
-                      child: Image.asset(
-                        'data/icons/fire_red_icon.png',
+                      child: AdaptiveAssetImage(
+                        'data/icons/fire_red_icon.svg',
                         width: 30,
                         height: 30,
                         fit: BoxFit.contain,
@@ -9052,8 +9053,8 @@ Widget _buildSauveteurEditorPanel() {
                     child: Transform.scale(
                       scale: 1.5,
                       alignment: Alignment.center,
-                      child: Image.asset(
-                        'data/icons/fire_red_icon.png',
+                      child: AdaptiveAssetImage(
+                        'data/icons/fire_red_icon.svg',
                         width: 30,
                         height: 30,
                         fit: BoxFit.contain,
@@ -9471,8 +9472,8 @@ Widget _buildSphotEditorPanel() {
   child: Transform.scale(
     scale: 1.5,
     alignment: Alignment.center,
-    child: Image.asset(
-      'data/icons/fire_red_icon.png',
+    child: AdaptiveAssetImage(
+      'data/icons/fire_red_icon.svg',
       width: 30,
       height: 30,
       fit: BoxFit.contain,
@@ -9523,8 +9524,8 @@ Widget _buildSphotEditorPanel() {
                     _placingSphotOnMap = true;
                   });
                 },
-                icon: Image.asset(
-  'data/icons/fire_red_icon.png',
+                icon: AdaptiveAssetImage(
+  'data/icons/fire_red_icon.svg',
   width: 26,
   height: 26,
   fit: BoxFit.contain,
@@ -12853,8 +12854,8 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
             child: Stack(
               alignment: Alignment.topCenter,
               children: [
-                Image.asset(
-  'data/icons/fire_red_icon.png',
+                AdaptiveAssetImage(
+  'data/icons/fire_red_icon.svg',
   width: 85,
   height: 85,
                   fit: BoxFit.contain,
@@ -13127,7 +13128,7 @@ final editedLng = double.tryParse(
 );
 
 final creationMarkerIconPath = _selectedSphotType.isEmpty
-    ? 'data/icons/fire_red_icon.png'
+    ? 'data/icons/fire_red_icon.svg'
     : _getMarkerIconPath({
         'typeSphot': _selectedSphotType,
       });
@@ -13249,7 +13250,7 @@ final clusteredMarkers = validSpots.map((doc) {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        Image.asset(
+                        AdaptiveAssetImage(
                           iconPath,
                           width: 54,
                           height: 54,
@@ -13307,7 +13308,7 @@ final clusteredMarkers = validSpots.map((doc) {
         width: 46,
         height: 46,
         alignment: const Alignment(0, -0.9),
-        child: Image.asset(
+        child: AdaptiveAssetImage(
           creationMarkerIconPath,
           width: 46,
           height: 46,
@@ -13429,7 +13430,7 @@ class DashboardSpotMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
+    return AdaptiveAssetImage(
       iconPath,
       width: 46,
       height: 46,
