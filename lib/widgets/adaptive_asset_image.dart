@@ -9,7 +9,7 @@ class AdaptiveAssetImage extends StatelessWidget {
   final String assetName;
   final double? width;
   final double? height;
-  final BoxFit fit;
+  final BoxFit? fit;
   final AlignmentGeometry alignment;
   final FilterQuality filterQuality;
   final ImageErrorWidgetBuilder? errorBuilder;
@@ -19,7 +19,7 @@ class AdaptiveAssetImage extends StatelessWidget {
     super.key,
     this.width,
     this.height,
-    this.fit = BoxFit.contain,
+    this.fit,
     this.alignment = Alignment.center,
     this.filterQuality = FilterQuality.medium,
     this.errorBuilder,
@@ -32,7 +32,7 @@ class AdaptiveAssetImage extends StatelessWidget {
         assetName,
         width: width,
         height: height,
-        fit: fit,
+        fit: fit ?? BoxFit.scaleDown,
         alignment: alignment,
         errorBuilder: errorBuilder,
       );
