@@ -1851,46 +1851,82 @@ _rgpdExpansionController.collapse();
   }
 
   Widget _pageHeader(String title, String subtitle) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 18),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: adminColor.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: adminColor, width: 1.6),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: redColor,
-              fontSize: 19,
-              fontWeight: FontWeight.w900,
+    final stepNumber = _selectedSection.index + 1;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const SizedBox(width: 6),
+            Transform.translate(
+              offset: const Offset(-12, 0),
+              child: Transform.scale(
+                scale: 1.5,
+                alignment: Alignment.center,
+                child: AdaptiveAssetImage(
+                  'data/icons/fire_red_icon.svg',
+                  width: 30,
+                  height: 30,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              color: adminColor,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              height: 1.25,
+            Expanded(
+              child: Text(
+                _isCorrectionMode
+                    ? 'CORRIGER MON DOSSIER ADMIN'
+                    : 'CRÉER MON ESPACE ADMIN',
+                style: const TextStyle(
+                  color: adminColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
+                ),
+              ),
             ),
+          ],
+        ),
+        const SizedBox(height: 22),
+        Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: '$stepNumber. ',
+                style: const TextStyle(color: redColor),
+              ),
+              TextSpan(
+                text: title,
+                style: const TextStyle(color: adminColor),
+              ),
+            ],
           ),
-        ],
-      ),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: adminColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            height: 1.25,
+          ),
+        ),
+        const SizedBox(height: 18),
+      ],
     );
   }
 
   Widget _leftMenu() {
     return Container(
-      width: 280,
+      width: 430,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.97),
+        color: Colors.white.withOpacity(0.98),
         border: Border(
           right: BorderSide(
             color: adminColor.withOpacity(0.25),
@@ -1904,89 +1940,117 @@ _rgpdExpansionController.collapse();
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 18),
-const Text(
-  'ADMIN',
-  textAlign: TextAlign.center,
-  style: TextStyle(
-    color: redColor,
-    fontSize: 18,
-    fontWeight: FontWeight.w900,
-  ),
-),
-const SizedBox(height: 24),
+              const Text(
+                'BIENVENUE SUR SPHOT',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: redColor,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Configurez votre espace admin SPHOT en suivant\n'
+                'les étapes ci-dessous.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: adminColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 22),
               _menuButton(
-  section: _TrialRequestSection.structure,
-  icon: Icons.account_balance_rounded,
-  label: 'STRUCTURE',
-  completed: _isCorrectionMode
-      ? (_sectionHasFieldsToCorrect(_TrialRequestSection.structure) &&
-          _fieldsForSection(_TrialRequestSection.structure)
-              .where(_fieldsToCorrect.contains)
-              .every((key) => _fieldChangedSinceLoad(key) && _correctedFieldIsValid(key)))
-      : _structureComplete,
-  enabled: _correctionSectionEnabled(
-    _TrialRequestSection.structure,
-  ),
-),
-              _menuButton(
-  section: _TrialRequestSection.responsable,
-  icon: Icons.person_rounded,
-  label: 'RESPONSABLE',
-  completed: _isCorrectionMode
-      ? (_sectionHasFieldsToCorrect(_TrialRequestSection.responsable) &&
-          _fieldsForSection(_TrialRequestSection.responsable)
-              .where(_fieldsToCorrect.contains)
-              .every((key) => _fieldChangedSinceLoad(key) && _correctedFieldIsValid(key)))
-      : _responsableComplete,
-  enabled: _correctionSectionEnabled(
-    _TrialRequestSection.responsable,
-  ),
-),
-              _menuButton(
-  section: _TrialRequestSection.territoire,
-  icon: Icons.public_rounded,
-  label: 'TERRITOIRE',
-  completed: _isCorrectionMode
-      ? (_sectionHasFieldsToCorrect(_TrialRequestSection.territoire) &&
-          _fieldsForSection(_TrialRequestSection.territoire)
-              .where(_fieldsToCorrect.contains)
-              .every((key) => _fieldChangedSinceLoad(key) && _correctedFieldIsValid(key)))
-      : _territoireComplete,
-  enabled: _correctionSectionEnabled(
-    _TrialRequestSection.territoire,
-  ),
-),
-              _menuButton(
-  section: _TrialRequestSection.ville,
-  icon: Icons.place_rounded,
-  label: 'LIEU',
-  completed: _isCorrectionMode
-      ? (_sectionHasFieldsToCorrect(_TrialRequestSection.ville) &&
-          _fieldsForSection(_TrialRequestSection.ville)
-              .where(_fieldsToCorrect.contains)
-              .every((key) => _fieldChangedSinceLoad(key) && _correctedFieldIsValid(key)))
-      : _villeComplete,
-  enabled: _correctionSectionEnabled(
-    _TrialRequestSection.ville,
-  ),
-),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Divider(
-                  color: adminColor.withOpacity(0.55),
-                  thickness: 1,
+                section: _TrialRequestSection.structure,
+                icon: Icons.account_balance_rounded,
+                label: 'STRUCTURE',
+                completed: _isCorrectionMode
+                    ? (_sectionHasFieldsToCorrect(
+                            _TrialRequestSection.structure,
+                          ) &&
+                          _fieldsForSection(_TrialRequestSection.structure)
+                              .where(_fieldsToCorrect.contains)
+                              .every(
+                                (key) =>
+                                    _fieldChangedSinceLoad(key) &&
+                                    _correctedFieldIsValid(key),
+                              ))
+                    : _structureComplete,
+                enabled: _correctionSectionEnabled(
+                  _TrialRequestSection.structure,
                 ),
               ),
               _menuButton(
-  section: _TrialRequestSection.essai,
-  icon: Icons.rocket_launch_rounded,
-  label: 'ESSAI GRATUIT',
-  completed: _canSubmitTrialRequest,
-  enabled: _correctionSectionEnabled(
-    _TrialRequestSection.essai,
-  ),
-),
+                section: _TrialRequestSection.responsable,
+                icon: Icons.person_rounded,
+                label: 'RESPONSABLE',
+                completed: _isCorrectionMode
+                    ? (_sectionHasFieldsToCorrect(
+                            _TrialRequestSection.responsable,
+                          ) &&
+                          _fieldsForSection(_TrialRequestSection.responsable)
+                              .where(_fieldsToCorrect.contains)
+                              .every(
+                                (key) =>
+                                    _fieldChangedSinceLoad(key) &&
+                                    _correctedFieldIsValid(key),
+                              ))
+                    : _responsableComplete,
+                enabled: _correctionSectionEnabled(
+                  _TrialRequestSection.responsable,
+                ),
+              ),
+              _menuButton(
+                section: _TrialRequestSection.territoire,
+                icon: Icons.public_rounded,
+                label: 'TERRITOIRE',
+                completed: _isCorrectionMode
+                    ? (_sectionHasFieldsToCorrect(
+                            _TrialRequestSection.territoire,
+                          ) &&
+                          _fieldsForSection(_TrialRequestSection.territoire)
+                              .where(_fieldsToCorrect.contains)
+                              .every(
+                                (key) =>
+                                    _fieldChangedSinceLoad(key) &&
+                                    _correctedFieldIsValid(key),
+                              ))
+                    : _territoireComplete,
+                enabled: _correctionSectionEnabled(
+                  _TrialRequestSection.territoire,
+                ),
+              ),
+              _menuButton(
+                section: _TrialRequestSection.ville,
+                icon: Icons.place_rounded,
+                label: 'LIEU',
+                completed: _isCorrectionMode
+                    ? (_sectionHasFieldsToCorrect(
+                            _TrialRequestSection.ville,
+                          ) &&
+                          _fieldsForSection(_TrialRequestSection.ville)
+                              .where(_fieldsToCorrect.contains)
+                              .every(
+                                (key) =>
+                                    _fieldChangedSinceLoad(key) &&
+                                    _correctedFieldIsValid(key),
+                              ))
+                    : _villeComplete,
+                enabled: _correctionSectionEnabled(
+                  _TrialRequestSection.ville,
+                ),
+              ),
+              _menuButton(
+                section: _TrialRequestSection.essai,
+                icon: Icons.rocket_launch_rounded,
+                label: 'ESSAI GRATUIT 8 JOURS',
+                completed: _canSubmitTrialRequest,
+                enabled: _correctionSectionEnabled(
+                  _TrialRequestSection.essai,
+                ),
+              ),
               const Spacer(),
               _statusCard(),
             ],
@@ -2006,49 +2070,86 @@ const SizedBox(height: 24),
     final selected = _selectedSection == section;
     final effectiveColor =
         !enabled ? Colors.grey : (selected ? redColor : adminColor);
+    final stepNumber = section.index + 1;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: OutlinedButton(
-        onPressed: enabled ? () => _selectSection(section) : null,
-        style: OutlinedButton.styleFrom(
-          elevation: 0,
-          backgroundColor:
-              selected ? effectiveColor.withOpacity(0.08) : Colors.transparent,
-          foregroundColor: effectiveColor,
-          disabledForegroundColor: Colors.grey,
-          side: BorderSide(
-            color: effectiveColor,
-            width: selected ? 2 : 1.5,
+      child: SizedBox(
+        height: 72,
+        child: OutlinedButton(
+          onPressed: enabled ? () => _selectSection(section) : null,
+          style: OutlinedButton.styleFrom(
+            elevation: 0,
+            backgroundColor:
+                selected ? redColor.withOpacity(0.04) : Colors.transparent,
+            foregroundColor: effectiveColor,
+            disabledForegroundColor: Colors.grey,
+            side: BorderSide(
+              color: effectiveColor,
+              width: selected ? 2 : 1.6,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
           ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: 13,
-            vertical: 15,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 22),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
+          child: Row(
+            children: [
+              SizedBox(
+                width: 48,
+                height: 56,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    ColorFiltered(
+                      colorFilter: enabled
+                          ? const ColorFilter.mode(
+                              Colors.transparent,
+                              BlendMode.dst,
+                            )
+                          : const ColorFilter.matrix(<double>[
+                              0.2126, 0.7152, 0.0722, 0, 0,
+                              0.2126, 0.7152, 0.0722, 0, 0,
+                              0.2126, 0.7152, 0.0722, 0, 0,
+                              0, 0, 0, 1, 0,
+                            ]),
+                      child: AdaptiveAssetImage(
+                        'data/icons/fire_red_icon.svg',
+                        width: 44,
+                        height: 56,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    Text(
+                      '$stepNumber',
+                      style: TextStyle(
+                        color: effectiveColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            Icon(
-              completed
-                  ? Icons.check_circle_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              size: 19,
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.25,
+                  ),
+                ),
+              ),
+              Icon(
+                completed
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                size: 21,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2372,7 +2473,7 @@ Widget _correctionNotice() {
 
   Widget _rightPanel() {
     return Container(
-      width: 450,
+      width: 530,
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.985),
         border: Border(
