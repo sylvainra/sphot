@@ -4,6 +4,7 @@
 /// Fire. New SPHOT screens must reference these SVG constants instead of the
 /// legacy PNG files.
 abstract final class FireIconAssets {
+  static const String generic = 'data/icons/fire_icon.svg';
   static const String black = 'data/icons/fire_black_icon.svg';
   static const String blue = 'data/icons/fire_blue_icon.svg';
   static const String cyan = 'data/icons/fire_cyan_icon.svg';
@@ -12,10 +13,13 @@ abstract final class FireIconAssets {
   static const String orangeAlternative = 'data/icons/fire_orange1_icon.svg';
   static const String orangeWithoutWhite = 'data/icons/fire_orange2_icon.svg';
   static const String red = 'data/icons/fire_red_icon.svg';
+  static const String redAlternative = 'data/icons/fire_red_icon2.svg';
+  static const String redLarge = 'data/icons/fire_red_icon3.svg';
   static const String skin = 'data/icons/fire_skin_icon.svg';
   static const String yellow = 'data/icons/fire_yellow_icon.svg';
 
   static const Set<String> all = {
+    generic,
     black,
     blue,
     cyan,
@@ -24,6 +28,8 @@ abstract final class FireIconAssets {
     orangeAlternative,
     orangeWithoutWhite,
     red,
+    redAlternative,
+    redLarge,
     skin,
     yellow,
   };
