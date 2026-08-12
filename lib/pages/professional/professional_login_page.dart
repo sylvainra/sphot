@@ -530,33 +530,38 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
                               const SizedBox(height: 18),
                               _buildProfessionalForm(),
                               const SizedBox(height: 20),
-                                  Container(
-                                  width: 62,
-                                  height: 62,
-                                  decoration: BoxDecoration(
-                                    color: Colors.transparent,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: _proColor,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: IconButton(
-  tooltip: '',
-  onPressed: () {
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      '/',
-      (route) => false,
-    );
-  },
-  icon: const Icon(
-    Icons.arrow_back,
-    color: _proColor,
-    size: 30,
+
+Padding(
+  padding: const EdgeInsets.only(top: 180),
+  child: Container(
+    width: 54,
+    height: 54,
+    decoration: BoxDecoration(
+      color: Colors.transparent,
+      shape: BoxShape.circle,
+      border: Border.all(
+        color: _proColor,
+        width: 2,
+      ),
+    ),
+    child: IconButton(
+      tooltip: 'Retour',
+      onPressed: () {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/',
+          (route) => false,
+        );
+      },
+      icon: const Icon(
+        Icons.arrow_back,
+        color: _proColor,
+        size: 28,
+      ),
+    ),
   ),
 ),
-                                ),
-                              const SizedBox(height: 12),
+
+const SizedBox(height: 12),
                             ],
                           ),
                         ),

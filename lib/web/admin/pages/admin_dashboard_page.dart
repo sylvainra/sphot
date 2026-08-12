@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../../map/map_page.dart';
 import 'package:flutter/services.dart';
+import 'admin_subscription_panel.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -4908,7 +4909,7 @@ if (showTrialButton) ...[
   _summaryCard(
     title: 'ESSAI GRATUIT 8 JOURS',
     value: '',
-    color: redColor,
+    color: adminColor,
     iconPath: 'data/icons/fire_red_icon.png',
     stepNumber: 5,
     iconScale: 1.35,
@@ -4923,14 +4924,13 @@ if (showTrialButton) ...[
 _summaryCard(
   title: 'ABONNEMENT',
   value: '',
-  color: showTrialButton ? pendingColor : redColor,
+  color: adminColor,
   iconPath: 'data/icons/fire_red_icon.png',
   stepNumber: 6,
   iconScale: 1.35,
   titleFontSize: 16,
   titleLetterSpacing: 0.5,
   showValue: false,
-  grayscaleIcon: showTrialButton,
   onTap: _openSubscriptionPanel,
 ),
 
@@ -4939,16 +4939,13 @@ const SizedBox(height: 8),
 _summaryCard(
   title: 'DOCUMENTS & FACTURES',
   value: '',
-  color: showTrialButton ? pendingColor : adminColor,
-  iconPath: showTrialButton
-      ? 'data/icons/fire_red_icon.png'
-      : 'data/icons/fire_blue_icon.png',
+  color: adminColor,
+  iconPath: 'data/icons/fire_red_icon.png',
   stepNumber: 7,
   iconScale: 1.35,
   titleFontSize: 16,
   titleLetterSpacing: 0.5,
   showValue: false,
-  grayscaleIcon: showTrialButton,
   onTap: _openBillingDocumentsPanel,
 ),
 
@@ -13348,8 +13345,8 @@ final clusteredMarkers = validSpots.map((doc) {
         bottom: 22,
         child: Center(
           child: Container(
-            width: 62,
-            height: 62,
+            width: 54,
+            height: 54,
             decoration: BoxDecoration(
               color: Colors.transparent,
               shape: BoxShape.circle,
@@ -13370,7 +13367,7 @@ final clusteredMarkers = validSpots.map((doc) {
               icon: const Icon(
                 Icons.arrow_back_ios_new_rounded,
                 color: adminColor,
-                size: 30,
+                size: 28,
               ),
             ),
           ),
@@ -13384,7 +13381,10 @@ final clusteredMarkers = validSpots.map((doc) {
   _buildAdminDetailPanel(),
 
 if (_showSubscriptionPanel)
-  _buildSubscriptionPanel()
+  AdminSubscriptionPanel(
+    adminUid: widget.adminUid,
+    onClose: _closeSubscriptionPanel,
+  )
 else if (_showBillingDocumentsPanel)
   _buildBillingDocumentsPanel()
 else if (_showTrialSummaryPanel)

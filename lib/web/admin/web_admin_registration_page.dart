@@ -988,6 +988,17 @@ TextField(
               'VILLE',
               uppercase: true,
             ),
+            const SizedBox(height: 8),
+            _textField(
+              'adresse',
+              'ADRESSE',
+            ),
+            const SizedBox(height: 8),
+            _textField(
+              'codePostal',
+              'CODE POSTAL',
+              keyboardType: TextInputType.number,
+            ),
           ],
         );
 
@@ -1272,6 +1283,8 @@ final legalVersionId = _versionId(legalVersion);
         'region': _value('region'),
         'departement': _value('departement'),
         'ville': _value('ville'),
+        'adresse': _value('adresse'),
+        'codePostal': _value('codePostal'),
         'logoVille': _value('logoVille'),
         'siteInternetVille': _value('siteInternetVille'),
         'arretesMunicipaux': _value('arretesMunicipaux'),
@@ -1284,9 +1297,15 @@ final legalVersionId = _versionId(legalVersion);
 'facturation': {
   'billingOrganisation': _value('billingOrganisation'),
   'billingSiret': _value('billingSiret'),
-  'billingAddress': _value('billingAddress'),
-  'billingPostalCode': _value('billingPostalCode'),
-  'billingCity': _value('billingCity'),
+  'billingAddress': _value('billingAddress').isNotEmpty
+      ? _value('billingAddress')
+      : _value('adresse'),
+  'billingPostalCode': _value('billingPostalCode').isNotEmpty
+      ? _value('billingPostalCode')
+      : _value('codePostal'),
+  'billingCity': _value('billingCity').isNotEmpty
+      ? _value('billingCity')
+      : _value('ville'),
   'billingContactName': _value('billingContactName'),
   'billingContactEmail': _value('billingContactEmail'),
   'purchaseOrderNumber': _value('purchaseOrderNumber'),

@@ -221,6 +221,8 @@ void initState() {
       'region',
       'departement',
       'ville',
+      'adresse',
+      'codePostal',
       'logoVille',
       'siteInternetVille',
       'arretesMunicipaux',
@@ -340,6 +342,12 @@ _controller('nomStructure').text =
 
     _controller('ville').text =
         (territoire['ville'] ?? '').toString();
+
+    _controller('adresse').text =
+        (territoire['adresse'] ?? '').toString();
+
+    _controller('codePostal').text =
+        (territoire['codePostal'] ?? '').toString();
 
     _controller('logoVille').text =
         (territoire['logoVille'] ?? '').toString();
@@ -467,7 +475,9 @@ WidgetsBinding.instance.addPostFrameCallback((_) {
     return _value('pays').isNotEmpty &&
         _value('region').isNotEmpty &&
         _value('departement').isNotEmpty &&
-        _value('ville').isNotEmpty;
+        _value('ville').isNotEmpty &&
+        _value('adresse').isNotEmpty &&
+        _value('codePostal').isNotEmpty;
   }
 
   bool get _villeComplete {
@@ -623,6 +633,17 @@ Set<String> _fieldsToCorrectFromReason(String reason) {
     'nom de la ville',
     'ville',
   ]);
+  add('adresse', [
+    'territoire.adresse',
+    'adresse de la mairie',
+    'adresse postale',
+    'adresse',
+  ]);
+  add('codePostal', [
+    'territoire.codePostal',
+    'code postal',
+    'codePostal',
+  ]);
 
   // LIEU
   add('logoVille', [
@@ -685,6 +706,8 @@ String? _controllerKeyForFirestoreField(String rawField) {
     'territoire.region': 'region',
     'territoire.departement': 'departement',
     'territoire.ville': 'ville',
+    'territoire.adresse': 'adresse',
+    'territoire.codePostal': 'codePostal',
     'territoire.logoVille': 'logoVille',
     'territoire.siteInternetVille': 'siteInternetVille',
     'territoire.arretesMunicipaux': 'arretesMunicipaux',
@@ -711,6 +734,8 @@ String? _controllerKeyForFirestoreField(String rawField) {
     'region',
     'departement',
     'ville',
+    'adresse',
+    'codePostal',
     'logoVille',
     'siteInternetVille',
     'arretesMunicipaux',
@@ -735,7 +760,14 @@ Set<String> _fieldsForSection(_TrialRequestSection section) {
         'fonctionResponsable', 'telephoneResponsable', 'emailResponsable',
       };
     case _TrialRequestSection.territoire:
-      return const {'pays', 'region', 'departement', 'ville'};
+      return const {
+        'pays',
+        'region',
+        'departement',
+        'ville',
+        'adresse',
+        'codePostal',
+      };
     case _TrialRequestSection.ville:
       return const {
         'logoVille', 'siteInternetVille', 'arretesMunicipaux',
@@ -1258,6 +1290,8 @@ if (_isCorrectionMode) {
             'region': _value('region'),
             'departement': _value('departement'),
             'ville': _value('ville'),
+            'adresse': _value('adresse'),
+            'codePostal': _value('codePostal'),
             'logoVille': _value('logoVille'),
             'siteInternetVille': _value('siteInternetVille'),
             'arretesMunicipaux':
@@ -1384,6 +1418,8 @@ if (_isCorrectionMode) {
             'region': _value('region'),
             'departement': _value('departement'),
             'ville': _value('ville'),
+            'adresse': _value('adresse'),
+            'codePostal': _value('codePostal'),
             'logoVille': _value('logoVille'),
             'siteInternetVille':
                 _value('siteInternetVille'),
@@ -2522,6 +2558,19 @@ Row(
         _textField('departement', 'Département', uppercase: true, readOnly: !_isFieldEditable('departement')),
         const SizedBox(height: 11),
         _textField('ville', 'Ville', uppercase: true, readOnly: !_isFieldEditable('ville')),
+        const SizedBox(height: 11),
+        _textField(
+          'adresse',
+          'Adresse',
+          readOnly: !_isFieldEditable('adresse'),
+        ),
+        const SizedBox(height: 11),
+        _textField(
+          'codePostal',
+          'Code postal',
+          keyboardType: TextInputType.text,
+          readOnly: !_isFieldEditable('codePostal'),
+        ),
         const SizedBox(height: 22),
 const SizedBox(height: 22),
 
@@ -3208,8 +3257,8 @@ if (_isLoadingCorrection) {
   bottom: 22,
   child: Center(
     child: Container(
-      width: 62,
-      height: 62,
+      width: 54,
+      height: 54,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: Colors.transparent,
@@ -3226,7 +3275,7 @@ if (_isLoadingCorrection) {
         icon: const Icon(
           Icons.arrow_back,
           color: adminColor,
-          size: 30,
+          size: 28,
         ),
       ),
     ),
