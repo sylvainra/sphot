@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../widgets/adaptive_asset_image.dart';
 
 class AdminSubscriptionPanel extends StatefulWidget {
   final String adminUid;
@@ -1254,12 +1255,14 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       padding: const EdgeInsets.all(20),
       child: Row(
         children: [
+          const SizedBox(width: 5),
           Transform.translate(
             offset: const Offset(-12, 0),
             child: Transform.scale(
               scale: 1.5,
-              child: Image.asset(
-                'data/icons/fire_red_icon.png',
+              alignment: Alignment.center,
+              child: AdaptiveAssetImage(
+                'data/icons/fire_red_icon.svg',
                 width: 30,
                 height: 30,
                 fit: BoxFit.contain,
@@ -1272,9 +1275,9 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
               'ABONNEMENT',
               style: TextStyle(
                 color: _blue,
-                fontSize: 19,
+                fontSize: 20,
                 fontWeight: FontWeight.w900,
-                letterSpacing: 0.7,
+                letterSpacing: 1.2,
               ),
             ),
           ),
