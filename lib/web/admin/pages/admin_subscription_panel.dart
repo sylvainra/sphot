@@ -1255,7 +1255,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       padding: const EdgeInsets.all(20),
       child: Row(
         children: [
-          const SizedBox(width: 5),
+          const SizedBox(width: 6),
           Transform.translate(
             offset: const Offset(-12, 0),
             child: Transform.scale(
