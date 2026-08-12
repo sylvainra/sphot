@@ -1255,12 +1255,13 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       padding: const EdgeInsets.all(20),
       child: Row(
         children: [
+          const SizedBox(width: 5),
           Transform.translate(
             offset: const Offset(-12, 0),
             child: Transform.scale(
               scale: 1.5,
+              alignment: Alignment.center,
               child: AdaptiveAssetImage(
-
                 'data/icons/fire_red_icon.svg',
                 width: 30,
                 height: 30,
@@ -1274,9 +1275,9 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
               'ABONNEMENT',
               style: TextStyle(
                 color: _blue,
-                fontSize: 19,
+                fontSize: 20,
                 fontWeight: FontWeight.w900,
-                letterSpacing: 0.7,
+                letterSpacing: 1.2,
               ),
             ),
           ),
