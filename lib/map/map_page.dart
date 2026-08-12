@@ -320,7 +320,12 @@ List<Marker> _buildTerritoryLogoMarkers(
 }
 
   Widget _drawerAssetIcon(String path) {
-    return Image.asset(path, width: 40, height: 40, fit: BoxFit.contain);
+    return AdaptiveAssetImage(
+      path,
+      width: 40,
+      height: 40,
+      fit: BoxFit.contain,
+    );
   }
 
   Widget _filterIcon(SpotFilter filter) {
