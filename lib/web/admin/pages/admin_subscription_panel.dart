@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../widgets/adaptive_asset_image.dart';
 
 class AdminSubscriptionPanel extends StatefulWidget {
   final String adminUid;
@@ -1258,8 +1259,8 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
             offset: const Offset(-12, 0),
             child: Transform.scale(
               scale: 1.5,
-              child: Image.asset(
-                'data/icons/fire_red_icon.png',
+              child: AdaptiveAssetImage(
+                'data/icons/fire_red_icon.svg',
                 width: 30,
                 height: 30,
                 fit: BoxFit.contain,
