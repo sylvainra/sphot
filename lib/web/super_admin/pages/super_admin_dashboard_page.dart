@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../widgets/adaptive_asset_image.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
@@ -291,7 +292,7 @@ String _getMarkerIconPath(Map<String, dynamic> data) {
   }
 
   if (fullType.contains('POSTE DE SECOURS')) {
-    return 'data/icons/fire_red_icon.png';
+    return 'data/icons/fire_red_icon.svg';
   }
 
   if (fullType.contains('ACCES PLAGE')) {
@@ -899,7 +900,7 @@ Color _clusterBorderColor(List<Marker> markers) {
 
 String _clusterIconPath(Color color) {
   if (color == const Color(0xFFFF0000)) {
-    return 'data/icons/fire_red_icon.png';
+    return 'data/icons/fire_red_icon.svg';
   }
 
   if (color == const Color(0xFFD87A5C)) {
@@ -4665,8 +4666,8 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
             child: Stack(
               alignment: Alignment.topCenter,
               children: [
-                Image.asset(
-                  'data/icons/fire_red_icon.png',
+                AdaptiveAssetImage(
+                  'data/icons/fire_red_icon.svg',
                   width: 85,
                   height: 85,
                   fit: BoxFit.contain,
@@ -5006,7 +5007,7 @@ final adminMarkers = <Marker>[
                                         child: Stack(
                                           alignment: Alignment.center,
                                           children: [
-                                            Image.asset(
+                                            AdaptiveAssetImage(
                                               iconPath,
                                               width: 54,
                                               height: 54,
@@ -5128,7 +5129,7 @@ class DashboardSpotMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
+    return AdaptiveAssetImage(
       iconPath,
       width: 46,
       height: 46,
