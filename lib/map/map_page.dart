@@ -4,6 +4,7 @@ import 'dart:async';
 import 'profil_login_page.dart';
 
 import 'package:flutter/material.dart';
+import '../widgets/adaptive_asset_image.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:geolocator/geolocator.dart';
@@ -203,24 +204,24 @@ List<Marker> _buildTerritoryLogoMarkers(
   String _getMarkerIconPath(SpotFlagState spot) {
     final type = spot.normalizedType;
 
-    if (spot.isNaturisme) return 'data/icons/fire_skin_icon.png';
-    if (type.contains('ACCES PLAGE')) return 'data/icons/fire_orange_icon.png';
+    if (spot.isNaturisme) return 'data/icons/fire_skin_icon.svg';
+    if (type.contains('ACCES PLAGE')) return 'data/icons/fire_orange_icon.svg';
 
     if (type.contains('LAC') ||
         type.contains("PLAN D'EAU") ||
         type.contains('BARRAGE')) {
-      return 'data/icons/fire_blue_icon.png';
+      return 'data/icons/fire_blue_icon.svg';
     }
 
     if (type.contains('FLEUVE') || type.contains('RIVIERE')) {
-      return 'data/icons/fire_green_icon.png';
+      return 'data/icons/fire_green_icon.svg';
     }
 
     if (type.contains('LAGON') || type.contains('PISCINE NATURELLE')) {
-      return 'data/icons/fire_cyan_icon.png';
+      return 'data/icons/fire_cyan_icon.svg';
     }
 
-    return 'data/icons/fire_orange_icon.png';
+    return 'data/icons/fire_orange_icon.svg';
   }
 
   Color _typeColor(SpotFlagState spot) {
@@ -329,17 +330,17 @@ List<Marker> _buildTerritoryLogoMarkers(
       case SpotFilter.secours:
         return const _DrawerFlagIcon();
       case SpotFilter.plage:
-        return _drawerAssetIcon('data/icons/fire_orange_icon.png');
+        return _drawerAssetIcon('data/icons/fire_orange_icon.svg');
       case SpotFilter.eauBleue:
-        return _drawerAssetIcon('data/icons/fire_blue_icon.png');
+        return _drawerAssetIcon('data/icons/fire_blue_icon.svg');
       case SpotFilter.eauVerte:
-        return _drawerAssetIcon('data/icons/fire_green_icon.png');
+        return _drawerAssetIcon('data/icons/fire_green_icon.svg');
       case SpotFilter.lagon:
-        return _drawerAssetIcon('data/icons/fire_cyan_icon.png');
+        return _drawerAssetIcon('data/icons/fire_cyan_icon.svg');
       case SpotFilter.naturisme:
-        return _drawerAssetIcon('data/icons/fire_skin_icon.png');
+        return _drawerAssetIcon('data/icons/fire_skin_icon.svg');
       case SpotFilter.autre:
-        return _drawerAssetIcon('data/icons/fire_orange1_icon.png');
+        return _drawerAssetIcon('data/icons/fire_orange1_icon.svg');
     }
   }
 
@@ -1321,30 +1322,30 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
 
 String _clusterIconPath(Color color) {
   if (color == const Color(0xFFFF0000)) {
-    return 'data/icons/fire_red_icon.png';
+    return 'data/icons/fire_red_icon.svg';
   }
 
   if (color == const Color(0xFFD87A5C)) {
-    return 'data/icons/fire_skin_icon.png';
+    return 'data/icons/fire_skin_icon.svg';
   }
 
   if (color == const Color(0xFFFFD000)) {
-    return 'data/icons/fire_orange_icon.png';
+    return 'data/icons/fire_orange_icon.svg';
   }
 
   if (color == const Color(0xFF1E3A8A)) {
-    return 'data/icons/fire_blue_icon.png';
+    return 'data/icons/fire_blue_icon.svg';
   }
 
   if (color == const Color(0xFF2E7D32)) {
-    return 'data/icons/fire_green_icon.png';
+    return 'data/icons/fire_green_icon.svg';
   }
 
   if (color == const Color(0xFF00ACC1)) {
-    return 'data/icons/fire_cyan_icon.png';
+    return 'data/icons/fire_cyan_icon.svg';
   }
 
-  return 'data/icons/fire_orange1_icon.png';
+  return 'data/icons/fire_orange1_icon.svg';
 }
 
   Widget _buildCluster(BuildContext context, List<Marker> markers) {
@@ -1361,7 +1362,8 @@ String _clusterIconPath(Color color) {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Image.asset(
+          AdaptiveAssetImage(
+
             iconPath,
             width: 54,
             height: 54,
@@ -1430,8 +1432,9 @@ Widget _buildAdBanner() {
     width: 52,
     height: 52,
     color: Colors.transparent,
-    child: Image.asset(
-      'data/icons/fire_black_icon.png',
+    child: AdaptiveAssetImage(
+
+      'data/icons/fire_black_icon.svg',
       fit: BoxFit.contain,
     ),
   ),
@@ -1952,12 +1955,12 @@ class _SphotSpinnerIconState extends State<_SphotSpinnerIcon> {
   int _step = 0;
 
   static const List<String> _icons = [
-    'data/icons/fire_orange_icon.png',
-    'data/icons/fire_blue_icon.png',
-    'data/icons/fire_green_icon.png',
-    'data/icons/fire_cyan_icon.png',
-    'data/icons/fire_skin_icon.png',
-    'data/icons/fire_orange1_icon.png',
+    'data/icons/fire_orange_icon.svg',
+    'data/icons/fire_blue_icon.svg',
+    'data/icons/fire_green_icon.svg',
+    'data/icons/fire_cyan_icon.svg',
+    'data/icons/fire_skin_icon.svg',
+    'data/icons/fire_orange1_icon.svg',
   ];
 
   @override
@@ -2235,7 +2238,8 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              Image.asset(
+              AdaptiveAssetImage(
+
                 widget.iconPath,
                 width: spot.isNaturisme ? 52 : 48,
                 height: spot.isNaturisme ? 52 : 48,
