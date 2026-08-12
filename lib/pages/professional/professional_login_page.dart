@@ -1,7 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 
 import '../../web/admin/pages/admin_change_password_page.dart';
 import '../../web/admin/pages/admin_dashboard_page.dart';
@@ -480,9 +482,49 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
         child: Stack(
           fit: StackFit.expand,
           children: [
+            // Low-resolution offline fallback. The live map below covers it
+            // whenever map tiles are available.
             Image.asset(
               'data/images/map_background.jpg',
               fit: BoxFit.cover,
+            ),
+            IgnorePointer(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final aspectRatio =
+                      constraints.maxWidth / constraints.maxHeight;
+                  final initialZoom = aspectRatio >= 1.2 ? 17.35 : 16.2;
+
+                  return FlutterMap(
+                    options: MapOptions(
+                      initialCenter: const LatLng(
+                        46.3893825,
+                        -1.4942598,
+                      ),
+                      initialZoom: initialZoom,
+                      interactionOptions: const InteractionOptions(
+                        flags: InteractiveFlag.none,
+                      ),
+                      backgroundColor: Colors.transparent,
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        maxZoom: 19,
+                        maxNativeZoom: 19,
+                        userAgentPackageName: 'com.sylvainra.sphot',
+                        keepBuffer: 5,
+                        errorTileCallback: (tile, error, stackTrace) {
+                          debugPrint(
+                            'ERREUR FOND CARTE CONNEXION : $error',
+                          );
+                        },
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
             SafeArea(
               child: LayoutBuilder(
