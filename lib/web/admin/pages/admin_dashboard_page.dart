@@ -4073,7 +4073,7 @@ Widget _buildTrialSummaryContent({
   padding: const EdgeInsets.all(20),
   child: Row(
     children: [
-      const SizedBox(width: 10),
+      const SizedBox(width: 5),
       Transform.translate(
         offset: const Offset(-12, 0),
         child: Transform.scale(
@@ -4547,7 +4547,7 @@ Widget _buildCommercialPanelHeader({
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const SizedBox(width: 10),
+        const SizedBox(width: 5),
         Transform.translate(
   offset: const Offset(-12, 0),
   child: Transform.scale(
@@ -8241,7 +8241,7 @@ Widget _buildSurveillancePeriodsPanel() {
             children: [
               Row(
                 children: [
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 5),
                   Transform.translate(
                     offset: const Offset(-12, 0),
                     child: Transform.scale(
@@ -9051,7 +9051,7 @@ Widget _buildSauveteurEditorPanel() {
             children: [
               Row(
                 children: [
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 5),
                   Transform.translate(
                     offset: const Offset(-12, 0),
                     child: Transform.scale(
@@ -9471,7 +9471,7 @@ Widget _buildSphotEditorPanel() {
           children: [
             Row(
               children: [
-                const SizedBox(width: 10),
+                const SizedBox(width: 5),
                 Transform.translate(
   offset: const Offset(-12, 0),
   child: Transform.scale(
