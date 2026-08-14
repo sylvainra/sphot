@@ -4386,7 +4386,17 @@ Future<void> _openTrialSummaryDialog() async {
 
   final summaryFuture = _loadTrialSummaryData();
 
-  _trialSummaryDialogOpen = true;
+  setState(() {
+    _trialSummaryDialogOpen = true;
+    _showTrialSummaryPanel = false;
+    _showSubscriptionPanel = false;
+    _showBillingDocumentsPanel = false;
+    _showSauveteursManagementPanel = false;
+    _showSurveillancePeriodsPanel = false;
+    _showSauveteurEditorPanel = false;
+    _showSphotEditorPanel = false;
+    _placingSphotOnMap = false;
+  });
 
   try {
     await showDialog<void>(
@@ -4400,7 +4410,11 @@ Future<void> _openTrialSummaryDialog() async {
       },
     );
   } finally {
-    _trialSummaryDialogOpen = false;
+    if (mounted) {
+      setState(() {
+        _trialSummaryDialogOpen = false;
+      });
+    }
   }
 }
 
@@ -4854,10 +4868,10 @@ Widget _buildRightPanel({
     color: adminColor,
     iconPath: 'data/icons/fire_red_icon.svg',
     stepNumber: 1,
-    iconScale: 1.35,
     titleFontSize: 17,
     titleLetterSpacing: 0.8,
     showValue: false,
+    isActive: _showSphotEditorPanel,
     onTap: _openNewSphotEditor,
   ),
 
@@ -4869,10 +4883,10 @@ Widget _buildRightPanel({
     color: adminColor,
     iconPath: 'data/icons/fire_red_icon.svg',
     stepNumber: 2,
-    iconScale: 1.35,
     titleFontSize: 17,
     titleLetterSpacing: 0.8,
     showValue: false,
+    isActive: _showSurveillancePeriodsPanel,
     onTap: _openSurveillancePeriodsPanel,
   ),
 
@@ -4884,10 +4898,10 @@ Widget _buildRightPanel({
     color: adminColor,
     iconPath: 'data/icons/fire_red_icon.svg',
     stepNumber: 3,
-    iconScale: 1.35,
     titleFontSize: 17,
     titleLetterSpacing: 0.8,
     showValue: false,
+    isActive: _showSauveteurEditorPanel || _showSauveteursManagementPanel,
     onTap: _openNewSauveteurEditor,
   ),
 
@@ -4899,10 +4913,10 @@ _summaryCard(
   color: adminColor,
   iconPath: 'data/icons/fire_red_icon.svg',
   stepNumber: 4,
-  iconScale: 1.35,
   titleFontSize: 17,
   titleLetterSpacing: 0.8,
   showValue: false,
+  isActive: _showTrialSummaryPanel,
   onTap: _openTrialSummaryPanel,
 ),
 
@@ -4915,10 +4929,10 @@ if (showTrialButton) ...[
     color: adminColor,
     iconPath: 'data/icons/fire_red_icon.svg',
     stepNumber: 5,
-    iconScale: 1.35,
     titleFontSize: 17,
     titleLetterSpacing: 0.8,
     showValue: false,
+    isActive: _trialSummaryDialogOpen,
     onTap: _openTrialSummaryDialog,
   ),
   const SizedBox(height: 8),
@@ -4930,10 +4944,10 @@ _summaryCard(
   color: adminColor,
   iconPath: 'data/icons/fire_red_icon.svg',
   stepNumber: 6,
-  iconScale: 1.35,
   titleFontSize: 16,
   titleLetterSpacing: 0.5,
   showValue: false,
+  isActive: _showSubscriptionPanel,
   onTap: _openSubscriptionPanel,
 ),
 
@@ -4945,10 +4959,10 @@ _summaryCard(
   color: adminColor,
   iconPath: 'data/icons/fire_red_icon.svg',
   stepNumber: 7,
-  iconScale: 1.35,
   titleFontSize: 16,
   titleLetterSpacing: 0.5,
   showValue: false,
+  isActive: _showBillingDocumentsPanel,
   onTap: _openBillingDocumentsPanel,
 ),
 
@@ -4962,101 +4976,83 @@ const SizedBox(height: 4),
 }
 
   Widget _summaryCard({
-  required String title,
-  required String value,
-  required Color color,
-  String iconPath = 'data/icons/fire_blue_icon.svg',
-  int? stepNumber,
-  double iconScale = 1.0,
-  double titleFontSize = 13,
-  double titleLetterSpacing = 0,
-  bool showValue = true,
-  bool grayscaleIcon = false,
-  VoidCallback? onTap,
-}) {
+    required String title,
+    required String value,
+    required Color color,
+    String iconPath = 'data/icons/fire_blue_icon.svg',
+    int? stepNumber,
+    double titleFontSize = 13,
+    double titleLetterSpacing = 0,
+    bool showValue = true,
+    bool grayscaleIcon = false,
+    bool isActive = false,
+    VoidCallback? onTap,
+  }) {
+    final effectiveColor = isActive ? redColor : color;
     final displayedStepNumberColor = grayscaleIcon
         ? pendingColor
-        : iconPath.contains('fire_blue_icon')
-            ? adminColor
-            : redColor;
+        : isActive
+            ? redColor
+            : color;
+
+    final icon = AdaptiveAssetImage(
+      iconPath,
+      width: 44,
+      height: 56,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+    );
 
     final card = Container(
-  height: 64,
-  padding: const EdgeInsets.symmetric(
-    horizontal: 12,
-    vertical: 5,
-  ),
+      height: 72,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color, width: 1.5),
+        color: isActive
+            ? redColor.withOpacity(0.04)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: effectiveColor,
+          width: isActive ? 2 : 1.6,
+        ),
       ),
       child: Row(
         children: [
           SizedBox(
-  width: 34,
-  height: 34,
-  child: Stack(
-    alignment: Alignment.center,
-    clipBehavior: Clip.none,
-    children: [
-      Transform.scale(
-        scale: iconScale,
-        alignment: Alignment.center,
-        child: grayscaleIcon
-            ? ColorFiltered(
-                colorFilter: const ColorFilter.matrix([
-                  0.2126, 0.7152, 0.0722, 0, 0,
-                  0.2126, 0.7152, 0.0722, 0, 0,
-                  0.2126, 0.7152, 0.0722, 0, 0,
-                  0, 0, 0, 1, 0,
-                ]),
-                child: AdaptiveAssetImage(
-                  iconPath,
-                  width: 34,
-                  height: 34,
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.high,
-                ),
-              )
-            : AdaptiveAssetImage(
-                iconPath,
-                width: 34,
-                height: 34,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.high,
-              ),
-      ),
-      if (stepNumber != null)
-        Transform.translate(
-          offset: const Offset(0, -2),
-          child: Container(
-            width: 16,
-            height: 16,
-            alignment: const Alignment(0, 0.5),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              '$stepNumber',
-              style: TextStyle(
-                color: displayedStepNumberColor,
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-              ),
+            width: 48,
+            height: 56,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                grayscaleIcon
+                    ? ColorFiltered(
+                        colorFilter: const ColorFilter.matrix(<double>[
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0, 0, 0, 1, 0,
+                        ]),
+                        child: icon,
+                      )
+                    : icon,
+                if (stepNumber != null)
+                  Text(
+                    '$stepNumber',
+                    style: TextStyle(
+                      color: displayedStepNumberColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+              ],
             ),
           ),
-        ),
-    ],
-  ),
-),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
-  mainAxisSize: MainAxisSize.min,
-  mainAxisAlignment: MainAxisAlignment.center,
-  crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 FittedBox(
                   fit: BoxFit.scaleDown,
@@ -5066,7 +5062,7 @@ const SizedBox(height: 4),
                     maxLines: 1,
                     softWrap: false,
                     style: TextStyle(
-                      color: color,
+                      color: effectiveColor,
                       decoration: TextDecoration.none,
                       decorationColor: Colors.transparent,
                       fontSize: titleFontSize,
@@ -5076,16 +5072,16 @@ const SizedBox(height: 4),
                   ),
                 ),
                 if (showValue) ...[
-  const SizedBox(height: 4),
-  Text(
-    value,
-    style: TextStyle(
-      color: color,
-      fontSize: 28,
-      fontWeight: FontWeight.w900,
-    ),
-  ),
-],
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: effectiveColor,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -5101,7 +5097,8 @@ const SizedBox(height: 4),
       cursor: SystemMouseCursors.click,
       child: Semantics(
         button: true,
-        label: 'Ouvrir la création et la modification des SPHOTS',
+        selected: isActive,
+        label: title,
         child: GestureDetector(
           onTap: onTap,
           behavior: HitTestBehavior.opaque,
