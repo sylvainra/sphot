@@ -161,8 +161,15 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     }
 
     return <String, dynamic>{
-      ...subscription,
-      'billingOrganisation': value('billingOrganisation', [
+  ...subscription,
+
+  'administrativeReference':
+      value('administrativeReference', [
+    request['requestNumber'],
+  ]),
+
+  'billingOrganisation':
+      value('billingOrganisation', [
         facturation['billingOrganisation'],
         structure['nom'],
         proConnect['organisation'],
@@ -412,14 +419,25 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     });
 
     try {
+      final requestSnapshot =
+    await _adminRequestReference.get();
+
+final administrativeReference = _text(
+  requestSnapshot.data()?['requestNumber'],
+);
       await _subscriptionReference.set(
-        <String, dynamic>{
-          'adminUid': _uid,
-          ...fields,
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
+  <String, dynamic>{
+    'adminUid': _uid,
+
+    if (administrativeReference.isNotEmpty)
+      'administrativeReference':
+          administrativeReference,
+
+    ...fields,
+    'updatedAt': FieldValue.serverTimestamp(),
+  },
+  SetOptions(merge: true),
+);
 
       if (!mounted) return;
 
@@ -579,25 +597,26 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
           label: 'Adresse de facturation',
         ),
         Row(
-          children: [
-            Expanded(
-              child: _field(
-                data: data,
-                field: 'billingPostalCode',
-                label: 'Code postal',
-                keyboardType: TextInputType.number,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _field(
-                data: data,
-                field: 'billingCity',
-                label: 'Ville',
-              ),
-            ),
-          ],
-        ),
+  children: [
+    SizedBox(
+      width: 85,
+      child: _field(
+        data: data,
+        field: 'billingPostalCode',
+        label: 'Code postal',
+        keyboardType: TextInputType.number,
+      ),
+    ),
+    const SizedBox(width: 8),
+    Expanded(
+      child: _field(
+        data: data,
+        field: 'billingCity',
+        label: 'Ville',
+      ),
+    ),
+  ],
+),
         _field(
           data: data,
           field: 'billingCountry',
@@ -1388,8 +1407,48 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                             child: ListView(
                               padding: const EdgeInsets.all(20),
                               children: [
-                                _accordionSection(
-                                  id: 'payer',
+                                if (_text(data['administrativeReference']).isNotEmpty) ...[
+  Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 12,
+    ),
+    decoration: BoxDecoration(
+      color: _blue.withOpacity(0.06),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(
+        color: _blue.withOpacity(0.30),
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'RÉFÉRENCE ADMINISTRATIVE',
+          style: TextStyle(
+            color: _grey,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _text(data['administrativeReference']),
+          style: const TextStyle(
+            color: _red,
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    ),
+  ),
+  const SizedBox(height: 12),
+],
+
+_accordionSection(
+  id: 'payer',
                                   icon: Icons.apartment_rounded,
                                   title: 'ORGANISME PAYEUR',
                                   description:
