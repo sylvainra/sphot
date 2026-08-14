@@ -451,18 +451,21 @@ WidgetsBinding.instance.addPostFrameCallback((_) {
   }
 
   bool get _structureComplete {
-  final type = _value('typeStructure');
+    final type = _value('typeStructure').trim().toUpperCase();
+    final hasRequiredIdentity =
+        _value('siretStructure').trim().isNotEmpty &&
+        _value('sirenStructure').trim().isNotEmpty;
 
-  if (type.isEmpty) {
-    return false;
+    if (type.isEmpty || !hasRequiredIdentity) {
+      return false;
+    }
+
+    if (type == 'MAIRIE') {
+      return true;
+    }
+
+    return _value('nomStructure').trim().isNotEmpty;
   }
-
-  if (type == 'MAIRIE') {
-    return true;
-  }
-
-  return _value('nomStructure').isNotEmpty;
-}
 
   bool get _responsableComplete {
   return _value('civiliteResponsable').isNotEmpty &&
@@ -2659,8 +2662,6 @@ Row(
         const SizedBox(height: 11),
         _textField('departement', 'Département', uppercase: true, readOnly: !_isFieldEditable('departement')),
         const SizedBox(height: 11),
-        _textField('ville', 'Ville', uppercase: true, readOnly: !_isFieldEditable('ville')),
-        const SizedBox(height: 11),
         _textField(
           'adresse',
           'Adresse',
@@ -2673,6 +2674,8 @@ Row(
           keyboardType: TextInputType.text,
           readOnly: !_isFieldEditable('codePostal'),
         ),
+        const SizedBox(height: 11),
+        _textField('ville', 'Ville', uppercase: true, readOnly: !_isFieldEditable('ville')),
         const SizedBox(height: 22),
 const SizedBox(height: 22),
 
