@@ -4288,35 +4288,76 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-String _currentAdministrativeReference() {
-  final uid = widget.adminUid.trim();
+  int? _administrativeReferenceYear(Map<String, dynamic>? subscription) {
+    if (subscription == null) return null;
 
-  final subscription =
-      _subscriptionsByUid[uid];
+    for (final field in const [
+      'currentPeriodStartDate',
+      'renewalStartDate',
+      'subscriptionStartDate',
+      'trialStartDate',
+    ]) {
+      final value = subscription[field];
+      if (value is Timestamp) return value.toDate().year;
+      if (value is DateTime) return value.year;
+      if (value is String) {
+        final parsed = DateTime.tryParse(value);
+        if (parsed != null) return parsed.year;
+      }
+    }
 
-  final subscriptionReference = _cleanText(
-    subscription?['administrativeReference'] ??
-        subscription?['requestNumber'],
-  );
-
-  if (subscriptionReference.isNotEmpty) {
-    return subscriptionReference;
+    final explicitYear =
+        subscription['billingYear'] ?? subscription['subscriptionYear'];
+    return explicitYear is num ? explicitYear.toInt() : null;
   }
 
-  for (final document in _latestAdminDocs) {
-    final data = document.data();
+  String _referenceForSubscriptionPeriod(
+    String reference,
+    Map<String, dynamic>? subscription,
+  ) {
+    final year = _administrativeReferenceYear(subscription);
+    if (reference.isEmpty || year == null) return reference;
 
-    if (document.id == uid ||
-        _cleanText(data['uid']) == uid) {
-      return _cleanText(
-        data['requestNumber'] ??
-            data['administrativeReference'],
+    final pattern = RegExp(
+      r'^(SPHOT-ADM-[A-Z]{3}-)\d{4}(-\d+)$',
+      caseSensitive: false,
+    );
+    if (!pattern.hasMatch(reference)) return reference;
+
+    return reference.replaceFirstMapped(
+      pattern,
+      (match) => '${match.group(1)}$year${match.group(2)}',
+    );
+  }
+
+  String _currentAdministrativeReference() {
+    final uid = widget.adminUid.trim();
+    final subscription = _subscriptionsByUid[uid];
+
+    final subscriptionReference = _cleanText(
+      subscription?['administrativeReference'] ??
+          subscription?['requestNumber'],
+    );
+
+    if (subscriptionReference.isNotEmpty) {
+      return _referenceForSubscriptionPeriod(
+        subscriptionReference,
+        subscription,
       );
     }
-  }
 
-  return '';
-}
+    for (final document in _latestAdminDocs) {
+      final data = document.data();
+
+      if (document.id == uid || _cleanText(data['uid']) == uid) {
+        return _cleanText(
+          data['requestNumber'] ?? data['administrativeReference'],
+        );
+      }
+    }
+
+    return '';
+  }
 
   Widget _buildBillingDocumentsPanel() {
   final administrativeReference =
