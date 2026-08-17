@@ -143,6 +143,53 @@ function formatFrenchDate(date) {
  * @param {Date} date Date de création de la demande.
  * @return {Promise<string>} Numéro administratif de la demande.
  */
+
+/**
+ * Retourne le code ISO 3166-1 alpha-3 du pays de la demande.
+ *
+ * La France utilise FRA. Les futurs pays devront fournir
+ * countryIso3 dans le territoire.
+ *
+ * @param {Object} requestData Données de la demande.
+ * @return {string} Code pays sur trois caractères.
+ */
+function resolveAdminCountryCode(requestData) {
+  const territoire = requestData.territoire || {};
+
+  const explicitCode = cleanValue(
+      territoire.countryIso3 ||
+      requestData.countryIso3,
+      "",
+  ).toUpperCase();
+
+  if (/^[A-Z]{3}$/.test(explicitCode)) {
+    return explicitCode;
+  }
+
+  const countryName = cleanValue(
+      territoire.pays || requestData.pays,
+      "France",
+  )
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase();
+
+  if (countryName === "FRANCE" || countryName === "FR") {
+    return "FRA";
+  }
+
+  // Code temporaire pour un pays encore non configuré.
+  return "XXX";
+}
+
+/**
+ * Attribue un numéro administratif unique à une demande Admin.
+ *
+ * @param {FirebaseFirestore.DocumentReference} requestReference
+ * Référence Firestore de la demande.
+ * @param {Date} date Date de création de la demande.
+ * @return {Promise<string>} Référence administrative générée.
+ */
 async function assignAdminRequestNumber(requestReference, date) {
   const db = admin.firestore();
 
@@ -163,6 +210,9 @@ async function assignAdminRequestNumber(requestReference, date) {
 
     const requestData = requestSnapshot.data() || {};
 
+    const countryCode =
+    resolveAdminCountryCode(requestData);
+
     const existingRequestNumber =
         (requestData.requestNumber || "").toString().trim();
 
@@ -181,9 +231,9 @@ async function assignAdminRequestNumber(requestReference, date) {
     const nextNumber = currentNumber + 1;
 
     const requestNumber =
-        `SPHOT-ADM-${year}-${nextNumber
-            .toString()
-            .padStart(6, "0")}`;
+    `SPHOT-ADM-${countryCode}-${year}-${nextNumber
+        .toString()
+        .padStart(6, "0")}`;
 
     transaction.set(
         counterReference,
@@ -200,6 +250,7 @@ async function assignAdminRequestNumber(requestReference, date) {
         requestReference,
         {
           requestNumber: requestNumber,
+          requestCountryCode: countryCode,
           requestSequence: nextNumber,
           requestYear: year,
           updatedAt:
