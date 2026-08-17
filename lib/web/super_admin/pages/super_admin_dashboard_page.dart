@@ -172,10 +172,73 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
   get _spotsStream {
-    return FirebaseFirestore.instance
-        .collectionGroup('spots')
-        .snapshots()
-        .map((snapshot) => snapshot.docs);
+    late final StreamController<
+        List<QueryDocumentSnapshot<Map<String, dynamic>>>> controller;
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+        territoriesSubscription;
+    final spotSubscriptions =
+        <String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>{};
+    final spotsByTerritory =
+        <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+
+    void emitSpots() {
+      if (controller.isClosed) return;
+      controller.add(
+        spotsByTerritory.values.expand((documents) => documents).toList(),
+      );
+    }
+
+    controller = StreamController<
+        List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+      onListen: () {
+        territoriesSubscription = FirebaseFirestore.instance
+            .collection('territoires')
+            .snapshots()
+            .listen(
+          (territoriesSnapshot) {
+            final activeIds =
+                territoriesSnapshot.docs.map((document) => document.id).toSet();
+            final removedIds = spotSubscriptions.keys
+                .where((territoryId) => !activeIds.contains(territoryId))
+                .toList();
+
+            for (final territoryId in removedIds) {
+              spotSubscriptions.remove(territoryId)?.cancel();
+              spotsByTerritory.remove(territoryId);
+            }
+
+            for (final territoryDocument in territoriesSnapshot.docs) {
+              final territoryId = territoryDocument.id;
+              if (spotSubscriptions.containsKey(territoryId)) continue;
+
+              spotSubscriptions[territoryId] = territoryDocument.reference
+                  .collection('spots')
+                  .snapshots()
+                  .listen(
+                (spotsSnapshot) {
+                  spotsByTerritory[territoryId] = spotsSnapshot.docs;
+                  emitSpots();
+                },
+                onError: controller.addError,
+              );
+            }
+
+            emitSpots();
+          },
+          onError: controller.addError,
+        );
+      },
+      onCancel: () async {
+        await territoriesSubscription?.cancel();
+        await Future.wait(
+          spotSubscriptions.values.map((subscription) => subscription.cancel()),
+        );
+        spotSubscriptions.clear();
+        spotsByTerritory.clear();
+      },
+    );
+
+    return controller.stream;
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> get _adminRequestsStream {
