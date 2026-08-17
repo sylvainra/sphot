@@ -9374,7 +9374,7 @@ _sphotWebcamUrlController.clear();
 
                 _sphotEditorField(
                   controller: _sphotWebcamUrlController,
-                  label: 'Adresse internet de la webcam (facultatif)',
+                  label: 'Adresse internet de la webcam si doté',
                   keyboardType: TextInputType.url,
                 ),
 
