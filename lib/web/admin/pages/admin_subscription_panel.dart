@@ -55,6 +55,45 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
 
   String _text(dynamic value) => value?.toString().trim() ?? '';
 
+  int? _administrativeReferenceYear(Map<String, dynamic> data) {
+    for (final field in const [
+      'currentPeriodStartDate',
+      'renewalStartDate',
+      'subscriptionStartDate',
+      'trialStartDate',
+    ]) {
+      final value = data[field];
+      if (value is Timestamp) return value.toDate().year;
+      if (value is DateTime) return value.year;
+      if (value is String) {
+        final parsed = DateTime.tryParse(value);
+        if (parsed != null) return parsed.year;
+      }
+    }
+
+    final explicitYear = data['billingYear'] ?? data['subscriptionYear'];
+    return explicitYear is num ? explicitYear.toInt() : null;
+  }
+
+  String _periodAdministrativeReference(Map<String, dynamic> data) {
+    final reference = _text(
+      data['administrativeReference'] ?? data['requestNumber'],
+    );
+    final year = _administrativeReferenceYear(data);
+    if (reference.isEmpty || year == null) return reference;
+
+    final pattern = RegExp(
+      r'^(SPHOT-ADM-[A-Z]{3}-)\d{4}(-\d+)$',
+      caseSensitive: false,
+    );
+    if (!pattern.hasMatch(reference)) return reference;
+
+    return reference.replaceFirstMapped(
+      pattern,
+      (match) => '${match.group(1)}$year${match.group(2)}',
+    );
+  }
+
   Future<String> _resolveTerritoireId() async {
     if (_uid.isEmpty) return '';
 
@@ -965,7 +1004,7 @@ final administrativeReference = _text(
   Widget _orderForm(Map<String, dynamic> data) {
     final noOrderRequired = _noOrderRequired(data);
     final administrativeReference =
-        _text(data['administrativeReference']);
+        _periodAdministrativeReference(data);
 
     return Column(
       children: [
