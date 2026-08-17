@@ -171,21 +171,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   DashboardAdminFilter _selectedAdminFilter = DashboardAdminFilter.trialRequest;
 
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
-  get _spotsStream async* {
-    await for (final territoiresSnapshot
-        in FirebaseFirestore.instance.collection('territoires').snapshots()) {
-      final allSpots = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-
-      for (final territoireDoc in territoiresSnapshot.docs) {
-        final spotsSnapshot = await territoireDoc.reference
-            .collection('spots')
-            .get();
-
-        allSpots.addAll(spotsSnapshot.docs);
-      }
-
-      yield allSpots;
-    }
+  get _spotsStream {
+    return FirebaseFirestore.instance
+        .collectionGroup('spots')
+        .snapshots()
+        .map((snapshot) => snapshot.docs);
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> get _adminRequestsStream {
@@ -1092,7 +1082,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     }
   }
 
-  bool _matchesAdminFilter(Map<String, dynamic> data) {
+  bool _matchesAdminFilter(
+    Map<String, dynamic> data, {
+    String documentId = '',
+  }) {
     if (_selectedAdminFilter == DashboardAdminFilter.none) {
       return false;
     }
@@ -1101,8 +1094,35 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       return true;
     }
 
-    final uid = _cleanText(data['uid']);
-    final subscription = _subscriptionsByUid[uid];
+    final candidateKeys = <String>{
+      _cleanText(data['uid']),
+      _cleanText(data['adminUid']),
+      _cleanText(data['requestId']),
+      documentId.trim(),
+    }..removeWhere((value) => value.isEmpty);
+
+    Map<String, dynamic>? subscription;
+    for (final key in candidateKeys) {
+      subscription = _subscriptionsByUid[key];
+      if (subscription != null) break;
+    }
+
+    final trialRequestValue = data['trialRequest'];
+    final trialRequest = trialRequestValue is Map
+        ? Map<String, dynamic>.from(trialRequestValue)
+        : const <String, dynamic>{};
+    final commercialTrackingValue = data['commercialTracking'];
+    final commercialTracking = commercialTrackingValue is Map
+        ? Map<String, dynamic>.from(commercialTrackingValue)
+        : const <String, dynamic>{};
+
+    final trialRequestStatus = _cleanText(
+      data['trialRequestStatus'] ?? trialRequest['status'],
+    ).toLowerCase();
+    final commercialStatus =
+        _cleanText(commercialTracking['status']).toLowerCase();
+    final subscriptionStatus =
+        _cleanText(subscription?['status']).toLowerCase();
 
     switch (_selectedAdminFilter) {
       case DashboardAdminFilter.none:
@@ -1112,24 +1132,23 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         return true;
 
       case DashboardAdminFilter.trialRequest:
-        final status = _cleanText(data['status']).toLowerCase();
-        return status == 'pending';
+        return trialRequestStatus == 'pending' ||
+            trialRequestStatus == 'requested' ||
+            trialRequestStatus == 'submitted' ||
+            commercialStatus == 'trial_requested';
 
       case DashboardAdminFilter.trial:
-        if (subscription == null) return false;
-        return _cleanText(subscription['status']) == 'trial';
+        return subscriptionStatus == 'trial' ||
+            trialRequestStatus == 'active';
 
       case DashboardAdminFilter.active:
-        if (subscription == null) return false;
-        return _cleanText(subscription['status']) == 'active';
+        return subscriptionStatus == 'active';
 
       case DashboardAdminFilter.overdue:
-        if (subscription == null) return false;
-        return _cleanText(subscription['status']) == 'overdue';
+        return subscriptionStatus == 'overdue';
 
       case DashboardAdminFilter.cancelled:
-        if (subscription == null) return false;
-        return _cleanText(subscription['status']) == 'cancelled';
+        return subscriptionStatus == 'cancelled';
     }
   }
 
@@ -4706,9 +4725,20 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     final subscriptionsDocs =
                         subscriptionsSnapshot.data?.docs ?? [];
 
-                    _subscriptionsByUid = {
-                      for (final doc in subscriptionsDocs) doc.id: doc.data(),
-                    };
+                    _subscriptionsByUid = {};
+                    for (final doc in subscriptionsDocs) {
+                      final subscriptionData = doc.data();
+                      final keys = <String>{
+                        doc.id,
+                        _cleanText(subscriptionData['adminUid']),
+                        _cleanText(subscriptionData['uid']),
+                        _cleanText(subscriptionData['requestId']),
+                      }..removeWhere((value) => value.isEmpty);
+
+                      for (final key in keys) {
+                        _subscriptionsByUid[key] = subscriptionData;
+                      }
+                    }
 
                     final validSpots = docs.where((doc) {
                       final data = doc.data();
@@ -4730,7 +4760,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                       final lat = _toDouble(territoire['villeLat']);
                       final lng = _toDouble(territoire['villeLng']);
 
-                      return lat != 0 && lng != 0 && _matchesAdminFilter(data);
+                      return lat != 0 &&
+                          lng != 0 &&
+                          _matchesAdminFilter(data, documentId: doc.id);
                     }).toList();
 
                     final adDocs = adsSnapshot.data?.docs ?? [];
