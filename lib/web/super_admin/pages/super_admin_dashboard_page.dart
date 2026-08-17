@@ -19,6 +19,7 @@ enum DashboardSpotFilter {
   plage,
   naturisme,
   loisirs,
+  selectedAdmin,
 }
 
 enum DashboardAdminFilter {
@@ -444,6 +445,29 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     return const Color(0xFFFFA500);
   }
 
+  String get _selectedAdminTerritoryId {
+    final admin = _selectedAdmin;
+    if (admin == null) return '';
+
+    final territoireValue = admin['territoire'];
+    final territoire = territoireValue is Map
+        ? Map<String, dynamic>.from(territoireValue)
+        : const <String, dynamic>{};
+
+    return _cleanText(
+      territoire['territoireId'] ??
+          admin['territoireId'] ??
+          admin['organisationId'],
+    );
+  }
+
+  bool _matchesSelectedAdmin(Map<String, dynamic> data) {
+    final selectedTerritoryId = _selectedAdminTerritoryId;
+    if (selectedTerritoryId.isEmpty) return false;
+
+    return _cleanText(data['territoireId']) == selectedTerritoryId;
+  }
+
   bool _matchesFilter(Map<String, dynamic> data) {
     if (_selectedFilters.contains(DashboardSpotFilter.none)) {
       return false;
@@ -452,29 +476,18 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       return true;
     }
 
-    return _selectedFilters.any((filter) {
-      final previous = _selectedFilters;
-      switch (filter) {
-        case DashboardSpotFilter.none:
-          return false;
-        case DashboardSpotFilter.all:
-          return true;
-        case DashboardSpotFilter.secours:
-          return _matchesFilterType(data, DashboardSpotFilter.secours);
-        case DashboardSpotFilter.eauVerte:
-          return _matchesFilterType(data, DashboardSpotFilter.eauVerte);
-        case DashboardSpotFilter.lagon:
-          return _matchesFilterType(data, DashboardSpotFilter.lagon);
-        case DashboardSpotFilter.eauBleue:
-          return _matchesFilterType(data, DashboardSpotFilter.eauBleue);
-        case DashboardSpotFilter.plage:
-          return _matchesFilterType(data, DashboardSpotFilter.plage);
-        case DashboardSpotFilter.naturisme:
-          return _matchesFilterType(data, DashboardSpotFilter.naturisme);
-        case DashboardSpotFilter.loisirs:
-          return _matchesFilterType(data, DashboardSpotFilter.loisirs);
-      }
-    });
+    final filterBySelectedAdmin =
+        _selectedFilters.contains(DashboardSpotFilter.selectedAdmin);
+    if (filterBySelectedAdmin && !_matchesSelectedAdmin(data)) {
+      return false;
+    }
+
+    final typeFilters = _selectedFilters
+        .where((filter) => filter != DashboardSpotFilter.selectedAdmin)
+        .toList();
+    if (typeFilters.isEmpty) return filterBySelectedAdmin;
+
+    return typeFilters.any((filter) => _matchesFilterType(data, filter));
   }
 
   bool _matchesFilterType(
@@ -518,6 +531,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       case DashboardSpotFilter.loisirs:
         return fullType.contains('BASE DE LOISIRS') ||
             fullType.contains('PARC');
+
+      case DashboardSpotFilter.selectedAdmin:
+        return _matchesSelectedAdmin(data);
     }
   }
 
@@ -541,6 +557,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         return 'Naturisme';
       case DashboardSpotFilter.loisirs:
         return 'Base de loisirs\nParc';
+      case DashboardSpotFilter.selectedAdmin:
+        return 'SPHOTS de l’Admin sélectionné';
     }
   }
 
@@ -564,6 +582,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         return const Color(0xFFD87A5C);
       case DashboardSpotFilter.loisirs:
         return const Color(0xFFFFA500);
+      case DashboardSpotFilter.selectedAdmin:
+        return redColor;
     }
   }
 
@@ -1179,10 +1199,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         return 'Toutes';
 
       case DashboardAdminFilter.trialRequest:
-        return "En demande d'essai";
+        return "Demandes d’accès en attente";
 
       case DashboardAdminFilter.trial:
-        return 'En essai';
+        return 'Période d’essai';
 
       case DashboardAdminFilter.active:
         return 'Actives';
@@ -1257,10 +1277,15 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         return true;
 
       case DashboardAdminFilter.trialRequest:
-        return trialRequestStatus == 'pending' ||
-            trialRequestStatus == 'requested' ||
-            trialRequestStatus == 'submitted' ||
-            commercialStatus == 'trial_requested';
+        final administrativeTrackingValue = data['administrativeTracking'];
+        final administrativeTracking = administrativeTrackingValue is Map
+            ? Map<String, dynamic>.from(administrativeTrackingValue)
+            : const <String, dynamic>{};
+        final administrativeStatus = _cleanText(
+          data['status'] ?? administrativeTracking['status'],
+        ).toLowerCase();
+
+        return administrativeStatus == 'pending';
 
       case DashboardAdminFilter.trial:
         final trialStartValue = subscription?['trialStartDate'];
@@ -1281,6 +1306,21 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             !now.isBefore(trialStart) &&
             !now.isAfter(trialEnd);
 
+        final administrativeStatus =
+            _cleanText(data['status']).toLowerCase();
+        final trialTriggered = administrativeStatus == 'approved' &&
+            (const {
+                  'pending',
+                  'requested',
+                  'submitted',
+                  'active',
+                  'approved',
+                }.contains(trialRequestStatus) ||
+                const {
+                  'trial_requested',
+                  'trial_active',
+                }.contains(commercialStatus));
+
         return const {
               'trial',
               'trial_active',
@@ -1288,8 +1328,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               'in_trial',
             }.contains(subscriptionStatus) ||
             activeTrialDates ||
-            const {'active', 'approved'}.contains(trialRequestStatus) ||
-            commercialStatus == 'trial_active';
+            trialTriggered;
 
       case DashboardAdminFilter.active:
         return subscriptionStatus == 'active';
