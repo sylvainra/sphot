@@ -170,8 +170,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   DashboardAdminFilter _selectedAdminFilter = DashboardAdminFilter.trialRequest;
 
+  late final Stream<
+      List<QueryDocumentSnapshot<Map<String, dynamic>>>> _spotsStream;
+
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
-  get _spotsStream {
+  _createSpotsStream() {
     late final StreamController<
         List<QueryDocumentSnapshot<Map<String, dynamic>>>> controller;
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
@@ -3958,6 +3961,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   @override
   void initState() {
     super.initState();
+    _spotsStream = _createSpotsStream();
     _speech = stt.SpeechToText();
     _legalVersionController.addListener(_markLegalVersionModified);
     _legalPublicationDateController.addListener(_markLegalVersionModified);
