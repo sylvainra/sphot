@@ -9214,7 +9214,7 @@ _sphotWebcamUrlController.clear();
                 Row(
                   children: [
                     SizedBox(
-                      width: 105,
+                      width: 130,
                       child: _sphotEditorField(
                         controller: _sphotIdController,
                         label: 'N° SPHOT',
