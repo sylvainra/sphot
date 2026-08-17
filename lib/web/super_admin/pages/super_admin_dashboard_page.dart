@@ -1207,10 +1207,22 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       return true;
     }
 
+    final profileValue = data['profile'];
+    final profile = profileValue is Map
+        ? Map<String, dynamic>.from(profileValue)
+        : const <String, dynamic>{};
+    final proConnectValue = data['proConnect'];
+    final proConnect = proConnectValue is Map
+        ? Map<String, dynamic>.from(proConnectValue)
+        : const <String, dynamic>{};
+
     final candidateKeys = <String>{
       _cleanText(data['uid']),
       _cleanText(data['adminUid']),
       _cleanText(data['requestId']),
+      _cleanText(data['email']),
+      _cleanText(profile['email']),
+      _cleanText(proConnect['email']),
       documentId.trim(),
     }..removeWhere((value) => value.isEmpty);
 
@@ -1251,8 +1263,33 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             commercialStatus == 'trial_requested';
 
       case DashboardAdminFilter.trial:
-        return subscriptionStatus == 'trial' ||
-            trialRequestStatus == 'active';
+        final trialStartValue = subscription?['trialStartDate'];
+        final trialEndValue = subscription?['trialEndDate'];
+        final trialStart = trialStartValue is Timestamp
+            ? trialStartValue.toDate()
+            : trialStartValue is DateTime
+                ? trialStartValue
+                : null;
+        final trialEnd = trialEndValue is Timestamp
+            ? trialEndValue.toDate()
+            : trialEndValue is DateTime
+                ? trialEndValue
+                : null;
+        final now = DateTime.now();
+        final activeTrialDates = trialStart != null &&
+            trialEnd != null &&
+            !now.isBefore(trialStart) &&
+            !now.isAfter(trialEnd);
+
+        return const {
+              'trial',
+              'trial_active',
+              'trialing',
+              'in_trial',
+            }.contains(subscriptionStatus) ||
+            activeTrialDates ||
+            const {'active', 'approved'}.contains(trialRequestStatus) ||
+            commercialStatus == 'trial_active';
 
       case DashboardAdminFilter.active:
         return subscriptionStatus == 'active';
@@ -4847,6 +4884,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         _cleanText(subscriptionData['adminUid']),
                         _cleanText(subscriptionData['uid']),
                         _cleanText(subscriptionData['requestId']),
+                        _cleanText(subscriptionData['email']),
+                        _cleanText(subscriptionData['login']),
+                        _cleanText(subscriptionData['billingContactEmail']),
                       }..removeWhere((value) => value.isEmpty);
 
                       for (final key in keys) {
