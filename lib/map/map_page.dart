@@ -485,6 +485,54 @@ SpotFlagState? _findBestSpotMatch(
       _isMapStyleOpen = false;
     });
 
+    final screenWidth = MediaQuery.sizeOf(context).width;
+
+    if (screenWidth >= 900) {
+      showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: 'Fermer la fiche publique',
+        barrierColor: Colors.black.withOpacity(0.12),
+        transitionDuration: const Duration(milliseconds: 320),
+        pageBuilder: (_, __, ___) {
+          return SafeArea(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(
+                width: min(560, screenWidth * 0.42),
+                height: double.infinity,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(22),
+                    bottomLeft: Radius.circular(22),
+                  ),
+                  child: PublicSpotDetailPage(spot: spot),
+                ),
+              ),
+            ),
+          );
+        },
+        transitionBuilder: (_, animation, __, child) {
+          final slideAnimation = Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            ),
+          );
+
+          return SlideTransition(
+            position: slideAnimation,
+            child: child,
+          );
+        },
+      );
+      return;
+    }
+
     Navigator.of(context).push(
       PageRouteBuilder<void>(
         opaque: true,
@@ -2313,7 +2361,7 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '${spot.name} - ${spot.nomSphot}',
+                            spot.mapDisplayName,
                             textAlign: TextAlign.center,
                             style: _mapLabelStyle(
                               fontSize: _labelSize(11),
@@ -2430,7 +2478,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '${spot.name} - ${spot.nomSphot}',
+                            spot.mapDisplayName,
                             textAlign: TextAlign.center,
                             style: _mapLabelStyle(
                               fontSize: _labelSize(11),
@@ -2581,4 +2629,3 @@ TextStyle _mapLabelStyle({
     ],
   );
 }
-

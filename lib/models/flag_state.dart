@@ -1,5 +1,6 @@
 class SpotFlagState {
   final String id;
+  final String idSphot;
   final String territoireId;
   final String name;
   final String nomSphot;
@@ -32,6 +33,7 @@ class SpotFlagState {
 
   SpotFlagState({
     required this.id,
+    required this.idSphot,
     required this.territoireId,
     required this.name,
     required this.nomSphot,
@@ -62,6 +64,7 @@ class SpotFlagState {
   factory SpotFlagState.fromFirestore(String id, Map<String, dynamic> data) {
   return SpotFlagState(
     id: id,
+    idSphot: _readString(data['idSphot']),
     territoireId: _readString(data['territoireId']),
     name: _readString(data['nomSecours']),
     nomSphot: _readString(data['nomSphot']),
@@ -108,6 +111,12 @@ class SpotFlagState {
     if (nomSphot.isNotEmpty) return nomSphot;
     if (name.isNotEmpty) return name;
     return 'SPHOT';
+  }
+
+  String get mapDisplayName {
+    if (idSphot.isEmpty) return displayName;
+    if (displayName.toLowerCase() == idSphot.toLowerCase()) return idSphot;
+    return '$idSphot - $displayName';
   }
 
   List<String> get publicEquipment => _splitPublicValues(equipement);
@@ -348,6 +357,5 @@ enum FlagPosition {
   affale,
   none,
 }
-
 
 
