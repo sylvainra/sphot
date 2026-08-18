@@ -110,6 +110,12 @@ Color _sphotHoverColor = adminColor;
   final TextEditingController _sphotNameController = TextEditingController();
   final TextEditingController _sphotLatController = TextEditingController();
   final TextEditingController _sphotLngController = TextEditingController();
+  final TextEditingController _sphotOtherTypeController =
+      TextEditingController();
+  final TextEditingController _sphotOtherEquipmentController =
+      TextEditingController();
+  final TextEditingController _sphotOtherLabelController =
+      TextEditingController();
 
   final TextEditingController _sauveteurNomController =
       TextEditingController();
@@ -186,9 +192,12 @@ Color _sphotHoverColor = adminColor;
     '🏋️ FITNESS AREA',
     '🗑️ POUBELLE',
     '🚯 SANS POUBELLE',
-    '🚻 TOILETTES',
-    '🅿️ PARKING',
-    '🚐 PARKING CAMPING-CAR',
+    '🚻 TOILETTES GRATUITES',
+    '🚻 TOILETTES PAYANTES',
+    '🅿️ PARKING GRATUIT',
+    '🅿️ PARKING PAYANT',
+    '🚐 PARKING CAMPING-CAR GRATUIT',
+    '🚐 PARKING CAMPING-CAR PAYANT',
     '🚿 DOUCHE',
     '🤿 PLONGEOIR',
     '🛟 PLATE FORME FLOTTANTE',
@@ -196,6 +205,21 @@ Color _sphotHoverColor = adminColor;
     '⚓ PONTON',
     'AUTRE',
   ];
+
+  static const Set<String> _sphotToiletChoices = {
+    '🚻 TOILETTES GRATUITES',
+    '🚻 TOILETTES PAYANTES',
+  };
+
+  static const Set<String> _sphotParkingChoices = {
+    '🅿️ PARKING GRATUIT',
+    '🅿️ PARKING PAYANT',
+  };
+
+  static const Set<String> _sphotCampingCarParkingChoices = {
+    '🚐 PARKING CAMPING-CAR GRATUIT',
+    '🚐 PARKING CAMPING-CAR PAYANT',
+  };
 
   static const List<String> _sphotLabelChoices = [
   'AUCUN',
@@ -6280,6 +6304,9 @@ void _clearSphotEditor() {
   _sphotNameController.clear();
   _sphotLatController.clear();
   _sphotLngController.clear();
+  _sphotOtherTypeController.clear();
+  _sphotOtherEquipmentController.clear();
+  _sphotOtherLabelController.clear();
 }
 
 void _openNewSphotEditor() {
@@ -6569,6 +6596,18 @@ void _loadSphotInEditor(Map<String, dynamic> data) {
 
   final lat = _toDouble(data['sphotLat']);
   final lng = _toDouble(data['sphotLng']);
+  final loadedEquipments = _readSphotMultiValue(data['equipement']);
+
+  // Compatibilité avec les SPHOTS créés avant la différenciation tarifaire.
+  if (loadedEquipments.remove('🚻 TOILETTES')) {
+    loadedEquipments.add('🚻 TOILETTES GRATUITES');
+  }
+  if (loadedEquipments.remove('🅿️ PARKING')) {
+    loadedEquipments.add('🅿️ PARKING GRATUIT');
+  }
+  if (loadedEquipments.remove('🚐 PARKING CAMPING-CAR')) {
+    loadedEquipments.add('🚐 PARKING CAMPING-CAR GRATUIT');
+  }
 
   setState(() {
     _showTrialSummaryPanel = false;
@@ -6586,12 +6625,21 @@ void _loadSphotInEditor(Map<String, dynamic> data) {
     _sphotLatController.text = lat == 0 ? '' : lat.toStringAsFixed(6);
     _sphotLngController.text = lng == 0 ? '' : lng.toStringAsFixed(6);
     _selectedSphotType = _cleanText(data['typeSphot']);
+    _sphotOtherTypeController.text = _cleanText(
+      data['autreTypeSphot'] ?? data['typeSphotAutre'],
+    );
     _selectedSphotEquipments
       ..clear()
-      ..addAll(_readSphotMultiValue(data['equipement']));
+      ..addAll(loadedEquipments);
     _selectedSphotLabels
       ..clear()
       ..addAll(_readSphotMultiValue(data['labelSphot']));
+    _sphotOtherEquipmentController.text = _cleanText(
+      data['autreEquipement'] ?? data['equipementAutre'],
+    );
+    _sphotOtherLabelController.text = _cleanText(
+      data['autreLabel'] ?? data['labelSphotAutre'],
+    );
     _showSauveteurEditorPanel = false;
     _showSauveteursManagementPanel = false;
     _showSurveillancePeriodsPanel = false;
@@ -6671,6 +6719,15 @@ Future<void> _saveSphotFromDashboard() async {
     errorMessage = 'Positionnez le SPHOT sur la carte.';
   } else if (_selectedSphotType.isEmpty) {
     errorMessage = 'Sélectionnez le type de SPHOT.';
+  } else if (_selectedSphotType == 'AUTRE' &&
+      _sphotOtherTypeController.text.trim().isEmpty) {
+    errorMessage = 'Précisez l’autre type de SPHOT.';
+  } else if (_selectedSphotEquipments.contains('AUTRE') &&
+      _sphotOtherEquipmentController.text.trim().isEmpty) {
+    errorMessage = 'Précisez l’autre équipement du SPHOT.';
+  } else if (_selectedSphotLabels.contains('AUTRE') &&
+      _sphotOtherLabelController.text.trim().isEmpty) {
+    errorMessage = 'Précisez l’autre label du SPHOT.';
   }
 
   if (errorMessage != null) {
@@ -6710,12 +6767,21 @@ Future<void> _saveSphotFromDashboard() async {
       'idSphot': idSphot,
       'nomSphot': _sphotNameController.text.trim(),
       'typeSphot': _selectedSphotType,
+      'autreTypeSphot': _selectedSphotType == 'AUTRE'
+          ? _sphotOtherTypeController.text.trim()
+          : '',
       'isPosteSecours':
           _selectedSphotType == '🚨 POSTE DE SECOURS 🚨',
       'sphotLat': lat,
       'sphotLng': lng,
       'equipement': _selectedSphotEquipments.join(' | '),
+      'autreEquipement': _selectedSphotEquipments.contains('AUTRE')
+          ? _sphotOtherEquipmentController.text.trim()
+          : '',
       'labelSphot': _selectedSphotLabels.join(' | '),
+      'autreLabel': _selectedSphotLabels.contains('AUTRE')
+          ? _sphotOtherLabelController.text.trim()
+          : '',
       'pays': territoryData['pays'] ?? '',
       'region': territoryData['region'] ?? '',
       'departement': territoryData['departement'] ?? '',
@@ -7233,6 +7299,9 @@ void _openSphotTypeMenu() {
                           onTap: () {
                             setState(() {
                               _selectedSphotType = choice;
+                              if (choice != 'AUTRE') {
+                                _sphotOtherTypeController.clear();
+                              }
                             });
 
                             _dropdownOverlay?.remove();
@@ -7412,6 +7481,20 @@ if (_sphotWaterQualityChoices.contains(choice)) {
 if (_sphotHandiplageChoices.contains(choice)) {
   selectedValues.removeAll(
     _sphotHandiplageChoices,
+  );
+}
+
+if (_sphotToiletChoices.contains(choice)) {
+  selectedValues.removeAll(_sphotToiletChoices);
+}
+
+if (_sphotParkingChoices.contains(choice)) {
+  selectedValues.removeAll(_sphotParkingChoices);
+}
+
+if (_sphotCampingCarParkingChoices.contains(choice)) {
+  selectedValues.removeAll(
+    _sphotCampingCarParkingChoices,
   );
 }
 
@@ -9739,6 +9822,13 @@ const SizedBox(height: 9),
   ),
 ),
             ),
+            if (_selectedSphotType == 'AUTRE') ...[
+              const SizedBox(height: 9),
+              _sphotEditorField(
+                controller: _sphotOtherTypeController,
+                label: 'Précisez l’autre type de SPHOT',
+              ),
+            ],
             const SizedBox(height: 20),
             _sphotSectionTitle(
   4,
@@ -9752,6 +9842,14 @@ const SizedBox(height: 9),
   selectedValues: _selectedSphotEquipments,
   maxMenuHeight: 220,
 ),
+
+if (_selectedSphotEquipments.contains('AUTRE')) ...[
+  const SizedBox(height: 9),
+  _sphotEditorField(
+    controller: _sphotOtherEquipmentController,
+    label: 'Précisez l’autre équipement',
+  ),
+],
 
 const SizedBox(height: 14),
 
@@ -9769,6 +9867,13 @@ _sphotMultiDropdown(
   selectedValues: _selectedSphotLabels,
   maxMenuHeight: 140,
 ),
+if (_selectedSphotLabels.contains('AUTRE')) ...[
+  const SizedBox(height: 9),
+  _sphotEditorField(
+    controller: _sphotOtherLabelController,
+    label: 'Précisez l’autre label',
+  ),
+],
             const SizedBox(height: 32),
 
 SizedBox(
@@ -12193,6 +12298,9 @@ void dispose() {
   _sphotNameController.dispose();
   _sphotLatController.dispose();
   _sphotLngController.dispose();
+  _sphotOtherTypeController.dispose();
+  _sphotOtherEquipmentController.dispose();
+  _sphotOtherLabelController.dispose();
   _sauveteurNomController.dispose();
   _sauveteurPrenomController.dispose();
   _sauveteurDateNaissanceController.dispose();
