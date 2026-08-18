@@ -238,6 +238,32 @@ async function reconcilePublicTerritory(territoireId, publish) {
   territorySources.forEach((source) => {
     territoryData = mergePublicTerritoryData(territoryData, source);
   });
+  if (publish && (!territorySnapshot || !territorySnapshot.exists)) {
+    const parentTerritoryData = {territoireId};
+    const parentTerritoryFields = [
+      "pays",
+      "region",
+      "departement",
+      "ville",
+      "villeLat",
+      "villeLng",
+      "departementLat",
+      "departementLng",
+      "logoVille",
+      "siteInternetVille",
+      "arretesMunicipaux",
+    ];
+    parentTerritoryFields.forEach((field) => {
+      const value = territoryData[field];
+      const hasValue = value !== undefined &&
+        value !== null &&
+        !(typeof value === "string" && value.trim() === "");
+      if (hasValue) parentTerritoryData[field] = value;
+    });
+    parentTerritoryData.publicProjectionCreatedAt =
+      admin.firestore.FieldValue.serverTimestamp();
+    await territoryReference.set(parentTerritoryData, {merge: true});
+  }
   const historicalSpots = new Map();
   if (spotSnapshot && !spotSnapshot.empty) {
     const historicalSnapshots = await db.getAll(
