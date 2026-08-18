@@ -209,8 +209,11 @@ async function reconcilePublicTerritory(territoireId, publish) {
   const approvedRequest = requestSnapshot ? requestSnapshot.docs.find(
       (document) => isApprovedAdminRequest(document.data()),
   ) : null;
-  const territoryData = approvedRequest ?
-    (approvedRequest.data().territoire || {}) : {};
+  const approvedRequestData = approvedRequest ? approvedRequest.data() : {};
+  const territoryData = {
+    ...approvedRequestData,
+    ...(approvedRequestData.territoire || {}),
+  };
   const historicalSpots = new Map();
   if (spotSnapshot && !spotSnapshot.empty) {
     const historicalSnapshots = await db.getAll(

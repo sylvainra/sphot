@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/flag_state.dart';
@@ -73,13 +74,13 @@ class PublicSpotDetailPage extends StatelessWidget {
                     ),
                   ),
                   if (commune.isNotEmpty) ...[
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 3),
                     Text(
                       commune.toUpperCase(),
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
@@ -395,19 +396,17 @@ class _PublicChips extends StatelessWidget {
   });
 
   static const Map<String, String> _labelIconPaths = {
-    '🟦 PAVILLON BLEU': 'data/icons/pavillon_bleu.png',
-    '♿ HANDIPLAGE NIVEAU I': 'data/icons/handiplage1.png',
-    '♿ HANDIPLAGE NIVEAU II': 'data/icons/handiplage2.png',
-    '♿ HANDIPLAGE NIVEAU III': 'data/icons/handiplage3.png',
-    '♿ HANDIPLAGE NIVEAU IV': 'data/icons/handiplage4.png',
-    '🚭 PLAGE SANS TABAC': 'data/icons/plage_sans_tabac.png',
-    'QUALITÉ DES EAUX : EXCELLENTE':
-        'data/icons/qualite_eau_excellente.png',
-    'QUALITÉ DES EAUX : BONNE': 'data/icons/qualite_eau_bonne.png',
-    'QUALITÉ DES EAUX : SUFFISANTE':
-        'data/icons/qualite_eau_suffisante.png',
+    '🟦 PAVILLON BLEU': 'data/icons/pavillon_bleu.svg',
+    '♿ HANDIPLAGE NIVEAU I': 'data/icons/handiplage1.svg',
+    '♿ HANDIPLAGE NIVEAU II': 'data/icons/handiplage2.svg',
+    '♿ HANDIPLAGE NIVEAU III': 'data/icons/handiplage3.svg',
+    '♿ HANDIPLAGE NIVEAU IV': 'data/icons/handiplage4.svg',
+    '🚭 PLAGE SANS TABAC': 'data/icons/plage_sans_tabac.svg',
+    'QUALITÉ DES EAUX : EXCELLENTE': 'data/icons/qualite_eau_excellente.svg',
+    'QUALITÉ DES EAUX : BONNE': 'data/icons/qualite_eau_bonne.svg',
+    'QUALITÉ DES EAUX : SUFFISANTE': 'data/icons/qualite_eau_suffisante.svg',
     'QUALITÉ DES EAUX : INSUFFISANTE':
-        'data/icons/qualite_eau_insuffisante.png',
+        'data/icons/qualite_eau_insuffisante.svg',
   };
 
   static const Map<String, String> _labelDisplayNames = {
@@ -457,12 +456,12 @@ class _PublicChips extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (iconPath != null) ...[
-            Image.asset(
+            SvgPicture.asset(
               iconPath,
               width: 24,
               height: 24,
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              placeholderBuilder: (_) => const SizedBox.square(dimension: 24),
             ),
             const SizedBox(width: 7),
           ],
