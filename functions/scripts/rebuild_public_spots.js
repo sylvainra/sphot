@@ -2,6 +2,11 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
+/**
+ * Relance la projection publique pour les essais et abonnements actifs.
+ *
+ * @return {Promise<void>}
+ */
 async function rebuildPublicSpots() {
   const db = admin.firestore();
   const statuses = ["trial", "active"];
