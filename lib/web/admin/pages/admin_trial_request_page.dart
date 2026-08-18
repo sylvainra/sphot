@@ -889,7 +889,7 @@ bool _correctionSectionEnabled(_TrialRequestSection section) {
 
       return separator +
           firstLetter.toUpperCase() +
-          remainingLetters.toLowerCase();
+          remainingLetters;
     },
   );
 }
@@ -2159,58 +2159,83 @@ _rgpdExpansionController.collapse();
   }
 
   Widget _statusCard() {
-    final correctionReady = _allRequestedCorrectionsCompleted;
-    final normalReady = _canOpenTrialRequest;
+  final correctionReady = _allRequestedCorrectionsCompleted;
+  final normalReady = _canOpenTrialRequest;
 
-    final bool ready = _isCorrectionMode ? correctionReady : normalReady;
-    final String text;
+  final bool ready =
+      _isCorrectionMode ? correctionReady : normalReady;
 
-    if (_isCorrectionMode) {
-      if (_fieldsToCorrect.isEmpty) {
-        text = 'Correction bloquée.\nAucun nom de champ n’a été reconnu dans le motif du refus.';
-      } else if (correctionReady) {
-        text = 'Corrections terminées.\nVous pouvez renvoyer votre demande.';
-      } else {
-        text = 'Modifiez tous les champs signalés\npour débloquer le renvoi.';
-      }
+  final String text;
+
+  if (_saved) {
+    text = _isCorrectionMode
+        ? 'Corrections envoyées.\nVotre dossier est en attente de validation.'
+        : 'Demande envoyée.\nVotre dossier est en attente de validation.';
+  } else if (_isCorrectionMode) {
+    if (_fieldsToCorrect.isEmpty) {
+      text =
+          'Correction bloquée.\n'
+          'Aucun nom de champ n’a été reconnu dans le motif du refus.';
+    } else if (correctionReady) {
+      text =
+          'Corrections terminées.\n'
+          'Vous pouvez renvoyer votre demande.';
     } else {
-      text = normalReady
-          ? 'Dossier complet.\nVous pouvez demander votre essai gratuit.'
-          : 'Complétez les étapes pour débloquer la demande d’essai.';
+      text =
+          'Modifiez tous les champs signalés\n'
+          'pour débloquer le renvoi.';
     }
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: (ready ? adminColor : Colors.grey).withOpacity(0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: ready ? adminColor : Colors.grey,
-          width: 1.4,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            ready ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
-            color: ready ? adminColor : Colors.grey.shade700,
-            size: 26,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            text,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: ready ? adminColor : Colors.grey.shade700,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              height: 1.25,
-            ),
-          ),
-        ],
-      ),
-    );
+  } else {
+    text = normalReady
+        ? 'Dossier complet.\n'
+            'Vous pouvez demander votre essai gratuit.'
+        : 'Complétez les étapes pour débloquer la demande d’essai.';
   }
+
+  final Color statusColor = _saved
+      ? redColor
+      : ready
+          ? adminColor
+          : Colors.grey;
+
+  final IconData statusIcon = _saved
+      ? Icons.check_circle_rounded
+      : ready
+          ? Icons.lock_open_rounded
+          : Icons.lock_outline_rounded;
+
+  return Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: statusColor.withOpacity(0.08),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(
+        color: statusColor,
+        width: 1.4,
+      ),
+    ),
+    child: Column(
+      children: [
+        Icon(
+          statusIcon,
+          color: statusColor,
+          size: 26,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          text,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: statusColor,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            height: 1.25,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _mapCenter() {
   

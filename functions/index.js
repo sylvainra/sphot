@@ -3378,6 +3378,7 @@ exports.changeAdminPassword = onRequest(
             await transporter.sendMail({
               from: MAIL_FROM,
               to: email,
+              replyTo: "contact@sphot.app",
               subject:
                   "Mise à jour de votre compte administrateur SPHOT",
 
@@ -3398,7 +3399,8 @@ vos SPHOTS, vos sauveteurs et vos périodes de surveillance
 renseignés, puis l'essai activé.
 
 Si vous n'êtes pas à l'origine de cette modification,
-contactez immédiatement l'équipe SPHOT.
+contactez immédiatement l'équipe SPHOT :
+contact@sphot.app
 
 Accéder à la page de connexion :
 ${loginUrl}
@@ -3499,7 +3501,13 @@ L'équipe SPHOT`,
       line-height:1.6;
     ">
       Si vous n'êtes pas à l'origine de cette modification,
-      contactez immédiatement l'équipe SPHOT.
+contactez immédiatement l'équipe SPHOT à l'adresse
+<a
+  href="mailto:contact@sphot.app"
+  style="color:#1e3a8a;font-weight:700;"
+>
+  contact@sphot.app
+</a>.
     </div>
 
     <div style="text-align:center;margin:30px 0;">
