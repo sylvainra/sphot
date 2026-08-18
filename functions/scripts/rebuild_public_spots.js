@@ -9,13 +9,24 @@ admin.initializeApp();
  */
 async function rebuildPublicSpots() {
   const db = admin.firestore();
-  const admins = await db.collection("admins")
-      .where("accessStatus", "==", "approved")
-      .get();
+  const [admins, requests] = await Promise.all([
+    db.collection("admins")
+        .where("accessStatus", "==", "approved")
+        .get(),
+    db.collection("adminRequests").get(),
+  ]);
+  const approvedRequests = requests.docs.filter((document) => {
+    const data = document.data();
+    const tracking = data.administrativeTracking || {};
+    return data.status === "approved" ||
+      tracking.status === "approved" ||
+      data.accessPhase === "configuration_access";
+  });
+  const documents = [...admins.docs, ...approvedRequests];
 
-  for (let index = 0; index < admins.docs.length; index += 450) {
+  for (let index = 0; index < documents.length; index += 450) {
     const batch = db.batch();
-    admins.docs.slice(index, index + 450).forEach((document) => {
+    documents.slice(index, index + 450).forEach((document) => {
       batch.set(
           document.ref,
           {
@@ -29,7 +40,7 @@ async function rebuildPublicSpots() {
   }
 
   console.log(
-      `${admins.size} administrateur(s) approuvé(s) transmis ` +
+      `${documents.length} validation(s) administrative(s) transmise(s) ` +
       "à la projection publique.",
   );
 }

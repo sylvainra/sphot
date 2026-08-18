@@ -117,6 +117,33 @@ function mergePublicSpotData(spot, historical) {
 }
 
 /**
+ * Lit l'identifiant de territoire d'une demande administrative.
+ *
+ * @param {Object|null} data Données de la demande.
+ * @return {string} Identifiant normalisé.
+ */
+function adminRequestTerritoryId(data) {
+  if (!data) return "";
+  const territoire = data.territoire || {};
+  return (data.territoireId || territoire.territoireId || "")
+      .toString()
+      .trim();
+}
+
+/**
+ * Indique si la demande a été validée par le Super Admin.
+ *
+ * @param {Object} data Données de la demande.
+ * @return {boolean} Vrai lorsque l'accès administratif est validé.
+ */
+function isApprovedAdminRequest(data) {
+  const administrativeTracking = data.administrativeTracking || {};
+  return data.status === "approved" ||
+    administrativeTracking.status === "approved" ||
+    data.accessPhase === "configuration_access";
+}
+
+/**
  * Supprime puis reconstruit la projection publique d'un territoire.
  *
  * @param {string} territoireId Identifiant du territoire.
@@ -202,12 +229,21 @@ async function reconcilePublicTerritory(territoireId, publish) {
  */
 async function isTerritoryPublic(territoireId) {
   const db = admin.firestore();
-  const adminsSnapshot = await db.collection("admins")
-      .where("territoireId", "==", territoireId)
-      .get();
-  return adminsSnapshot.docs.some((document) => {
+  const [adminsSnapshot, requestsSnapshot] = await Promise.all([
+    db.collection("admins")
+        .where("territoireId", "==", territoireId)
+        .get(),
+    db.collection("adminRequests")
+        .where("territoire.territoireId", "==", territoireId)
+        .get(),
+  ]);
+  const approvedAdmin = adminsSnapshot.docs.some((document) => {
     return document.data().accessStatus === "approved";
   });
+  const approvedRequest = requestsSnapshot.docs.some((document) => {
+    return isApprovedAdminRequest(document.data());
+  });
+  return approvedAdmin || approvedRequest;
 }
 
 /**
@@ -2397,6 +2433,56 @@ exports.syncPublicSpotsForAdmin = onDocumentWritten(
             .trim();
         if (territoireId) territoireIds.add(territoireId);
       });
+
+      for (const territoireId of territoireIds) {
+        const publish = await isTerritoryPublic(territoireId);
+        await reconcilePublicTerritory(territoireId, publish);
+      }
+    },
+);
+
+exports.syncPublicSpotsForAdminRequest = onDocumentWritten(
+    {
+      document: "adminRequests/{requestId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const before = event.data.before.exists ?
+        event.data.before.data() : null;
+      const after = event.data.after.exists ?
+        event.data.after.data() : null;
+      const territoireIds = new Set([
+        adminRequestTerritoryId(before),
+        adminRequestTerritoryId(after),
+      ]);
+      territoireIds.delete("");
+
+      for (const territoireId of territoireIds) {
+        const publish = await isTerritoryPublic(territoireId);
+        await reconcilePublicTerritory(territoireId, publish);
+      }
+    },
+);
+
+exports.syncPublicSpotsForAdminAccount = onDocumentWritten(
+    {
+      document: "adminAccounts/{accountId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const before = event.data.before.exists ?
+        event.data.before.data() : null;
+      const after = event.data.after.exists ?
+        event.data.after.data() : null;
+      const territoireIds = new Set([
+        adminRequestTerritoryId(before),
+        adminRequestTerritoryId(after),
+      ]);
+      territoireIds.delete("");
 
       for (const territoireId of territoireIds) {
         const publish = await isTerritoryPublic(territoireId);
