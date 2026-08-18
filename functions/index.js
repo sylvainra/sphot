@@ -117,6 +117,45 @@ function mergePublicSpotData(spot, historical) {
 }
 
 /**
+ * Complète les champs géographiques vides avec la demande administrative.
+ *
+ * @param {Object} spot Données consolidées du SPHOT.
+ * @param {Object} territory Données publiques du territoire.
+ * @return {Object} Données complétées sans écraser les valeurs du SPHOT.
+ */
+function mergePublicTerritoryData(spot, territory) {
+  const result = {...spot};
+  const territoryFields = [
+    "pays",
+    "region",
+    "departement",
+    "ville",
+    "villeLat",
+    "villeLng",
+    "logoVille",
+    "siteInternetVille",
+    "arretesMunicipaux",
+  ];
+
+  territoryFields.forEach((field) => {
+    const currentValue = result[field];
+    const territoryValue = territory[field];
+    const currentIsEmpty = currentValue === undefined ||
+      currentValue === null ||
+      (typeof currentValue === "string" && currentValue.trim() === "") ||
+      ((field === "villeLat" || field === "villeLng") &&
+        Number(currentValue) === 0);
+
+    if (currentIsEmpty && territoryValue !== undefined &&
+        territoryValue !== null) {
+      result[field] = territoryValue;
+    }
+  });
+
+  return result;
+}
+
+/**
  * Lit l'identifiant de territoire d'une demande administrative.
  *
  * @param {Object|null} data Données de la demande.
@@ -163,6 +202,15 @@ async function reconcilePublicTerritory(territoireId, publish) {
       .doc(territoireId)
       .collection("spots")
       .get() : null;
+  const requestSnapshot = publish ? await db
+      .collection("adminRequests")
+      .where("territoire.territoireId", "==", territoireId)
+      .get() : null;
+  const approvedRequest = requestSnapshot ? requestSnapshot.docs.find(
+      (document) => isApprovedAdminRequest(document.data()),
+  ) : null;
+  const territoryData = approvedRequest ?
+    (approvedRequest.data().territoire || {}) : {};
   const historicalSpots = new Map();
   if (spotSnapshot && !spotSnapshot.empty) {
     const historicalSnapshots = await db.getAll(
@@ -198,9 +246,12 @@ async function reconcilePublicTerritory(territoireId, publish) {
         data: buildPublicSpot(
             territoireId,
             document.id,
-            mergePublicSpotData(
-                document.data(),
-                historicalSpots.get(document.id) || null,
+            mergePublicTerritoryData(
+                mergePublicSpotData(
+                    document.data(),
+                    historicalSpots.get(document.id) || null,
+                ),
+                territoryData,
             ),
         ),
       });
