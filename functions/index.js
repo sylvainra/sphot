@@ -222,12 +222,22 @@ async function reconcilePublicTerritory(territoireId, publish) {
       (document) => isApprovedAdminRequest(document.data()),
   ) : null;
   const approvedRequestData = approvedRequest ? approvedRequest.data() : {};
-  const territoryData = {
-    ...approvedRequestData,
-    ...(approvedRequestData.territoire || {}),
-    ...(territorySnapshot && territorySnapshot.exists ?
-      territorySnapshot.data() : {}),
-  };
+  const territorySources = [
+    approvedRequestData.territoire || {},
+    approvedRequestData,
+    territorySnapshot && territorySnapshot.exists ?
+      territorySnapshot.data() : {},
+    ...(spotSnapshot ? spotSnapshot.docs.map((document) => {
+      return document.data();
+    }) : []),
+    ...publicSnapshot.docs.map((document) => {
+      return document.data();
+    }),
+  ];
+  let territoryData = {};
+  territorySources.forEach((source) => {
+    territoryData = mergePublicTerritoryData(territoryData, source);
+  });
   const historicalSpots = new Map();
   if (spotSnapshot && !spotSnapshot.empty) {
     const historicalSnapshots = await db.getAll(
