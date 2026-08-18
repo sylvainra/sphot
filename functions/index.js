@@ -125,6 +125,18 @@ function mergePublicSpotData(spot, historical) {
  */
 function mergePublicTerritoryData(spot, territory) {
   const result = {...spot};
+  const normalizedTerritory = {
+    ...territory,
+    siteInternetVille: territory.siteInternetVille ||
+      territory.siteInternet ||
+      (territory.structure || {}).siteInternet ||
+      "",
+    arretesMunicipaux: territory.arretesMunicipaux ||
+      territory.reglementsBaignade ||
+      territory.reglementBaignade ||
+      territory.siteReglements ||
+      "",
+  };
   const territoryFields = [
     "pays",
     "region",
@@ -139,7 +151,7 @@ function mergePublicTerritoryData(spot, territory) {
 
   territoryFields.forEach((field) => {
     const currentValue = result[field];
-    const territoryValue = territory[field];
+    const territoryValue = normalizedTerritory[field];
     const currentIsEmpty = currentValue === undefined ||
       currentValue === null ||
       (typeof currentValue === "string" && currentValue.trim() === "") ||
@@ -193,15 +205,15 @@ async function reconcilePublicTerritory(territoireId, publish) {
   if (!territoireId) return;
 
   const db = admin.firestore();
+  const territoryReference = db.collection("territoires").doc(territoireId);
   const publicSnapshot = await db
       .collection("publicSpots")
       .where("territoireId", "==", territoireId)
       .get();
-  const spotSnapshot = publish ? await db
-      .collection("territoires")
-      .doc(territoireId)
+  const spotSnapshot = publish ? await territoryReference
       .collection("spots")
       .get() : null;
+  const territorySnapshot = publish ? await territoryReference.get() : null;
   const requestSnapshot = publish ? await db
       .collection("adminRequests")
       .where("territoire.territoireId", "==", territoireId)
@@ -213,6 +225,8 @@ async function reconcilePublicTerritory(territoireId, publish) {
   const territoryData = {
     ...approvedRequestData,
     ...(approvedRequestData.territoire || {}),
+    ...(territorySnapshot && territorySnapshot.exists ?
+      territorySnapshot.data() : {}),
   };
   const historicalSpots = new Map();
   if (spotSnapshot && !spotSnapshot.empty) {

@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/flag_state.dart';
+import 'public_webcam_view.dart';
 
 class PublicSpotDetailPage extends StatelessWidget {
   final SpotFlagState spot;
@@ -170,8 +171,13 @@ class PublicSpotDetailPage extends StatelessWidget {
                               showLabelIcons: true,
                             ),
                           ],
+                          if (spot.adresseWebcam.isNotEmpty) ...[
+                            const SizedBox(height: 20),
+                            const Divider(),
+                            const SizedBox(height: 8),
+                            _PublicWebcamSection(url: spot.adresseWebcam),
+                          ],
                           if (spot.siteInternetVille.isNotEmpty ||
-                              spot.adresseWebcam.isNotEmpty ||
                               spot.arretesMunicipaux.isNotEmpty) ...[
                             const SizedBox(height: 20),
                             const Divider(),
@@ -198,13 +204,6 @@ class PublicSpotDetailPage extends StatelessWidget {
                                       context,
                                       spot.siteInternetVille,
                                     ),
-                                  ),
-                                if (spot.adresseWebcam.isNotEmpty)
-                                  _PublicLinkButton(
-                                    icon: Icons.videocam_outlined,
-                                    label: 'Webcam',
-                                    onTap: () =>
-                                        _openUrl(context, spot.adresseWebcam),
                                   ),
                                 if (spot.arretesMunicipaux.isNotEmpty)
                                   _PublicLinkButton(
@@ -247,6 +246,68 @@ class PublicSpotDetailPage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PublicWebcamSection extends StatelessWidget {
+  final String url;
+
+  const _PublicWebcamSection({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(
+              Icons.videocam_outlined,
+              size: 19,
+              color: Color(0xFF1E3A8A),
+            ),
+            SizedBox(width: 7),
+            Text(
+              'WEBCAM EN DIRECT',
+              style: TextStyle(
+                color: Color(0xFF1E3A8A),
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: PublicWebcamView(url: url),
+          ),
+        ),
+        const SizedBox(height: 9),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => PublicWebcamFullScreenPage(url: url),
+              ),
+            ),
+            icon: const Icon(Icons.fullscreen_rounded),
+            label: const Text('AGRANDIR LA WEBCAM'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF1E3A8A),
+              side: const BorderSide(color: Color(0xFF1E3A8A)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
