@@ -2559,6 +2559,20 @@ exports.syncPublicSpotsForAdminAccount = onDocumentWritten(
     },
 );
 
+exports.syncPublicSpotsForTerritory = onDocumentWritten(
+    {
+      document: "territoires/{territoireId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const territoireId = event.params.territoireId;
+      const publish = await isTerritoryPublic(territoireId);
+      await reconcilePublicTerritory(territoireId, publish);
+    },
+);
+
 exports.syncPublicSpotOnWrite = onDocumentWritten(
     {
       document: "territoires/{territoireId}/spots/{spotId}",
