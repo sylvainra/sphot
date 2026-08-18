@@ -1,5 +1,6 @@
 class SpotFlagState {
   final String id;
+  final String territoireId;
   final String name;
   final String nomSphot;
   final String ville;
@@ -23,10 +24,15 @@ class SpotFlagState {
   final String heureFin;
   final String phone;
   final String activite;
+  final String equipement;
+  final String labelSphot;
+  final String adresseWebcam;
+  final String arretesMunicipaux;
   final Map<String, dynamic>? liveFlag;
 
   SpotFlagState({
     required this.id,
+    required this.territoireId,
     required this.name,
     required this.nomSphot,
     required this.ville,
@@ -46,12 +52,17 @@ class SpotFlagState {
     required this.heureFin,
     required this.phone,
     required this.activite,
+    required this.equipement,
+    required this.labelSphot,
+    required this.adresseWebcam,
+    required this.arretesMunicipaux,
     this.liveFlag,
   });
 
   factory SpotFlagState.fromFirestore(String id, Map<String, dynamic> data) {
   return SpotFlagState(
     id: id,
+    territoireId: _readString(data['territoireId']),
     name: _readString(data['nomSecours']),
     nomSphot: _readString(data['nomSphot']),
     ville: _readString(data['ville']),
@@ -72,8 +83,12 @@ class SpotFlagState {
     periode: _readString(data['periode']),
     heureDebut: _readString(data['heureDebut']),
     heureFin: _readString(data['heureFin']),
-    phone: _readString(data['phone']),
+    phone: _readString(data['phone'] ?? data['telephonePoste']),
     activite: _readString(data['activite']),
+    equipement: _readString(data['equipement']),
+    labelSphot: _readString(data['labelSphot']),
+    adresseWebcam: _readString(data['adresseWebcam']),
+    arretesMunicipaux: _readString(data['arretesMunicipaux']),
 
     liveFlag: data['liveFlag'] is Map<String, dynamic>
         ? data['liveFlag'] as Map<String, dynamic>
@@ -88,6 +103,16 @@ class SpotFlagState {
   bool get isNaturisme {
     return activite.toLowerCase().contains('naturisme');
   }
+
+  String get displayName {
+    if (nomSphot.isNotEmpty) return nomSphot;
+    if (name.isNotEmpty) return name;
+    return 'SPHOT';
+  }
+
+  List<String> get publicEquipment => _splitPublicValues(equipement);
+
+  List<String> get publicLabels => _splitPublicValues(labelSphot);
 
   String get normalizedType {
     return typeSphot
@@ -299,6 +324,14 @@ class SpotFlagState {
     if (value is num) return value.toDouble();
 
     return double.tryParse(value.toString().replaceAll(',', '.')) ?? 0.0;
+  }
+
+  static List<String> _splitPublicValues(String value) {
+    return value
+        .split(RegExp(r'\s*[|,;]\s*'))
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
   }
 }
 

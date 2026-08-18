@@ -6,7 +6,7 @@ class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Stream<List<SpotFlagState>> getSpotsStream() {
-    return _firestore.collection('spots').snapshots().map((snapshot) {
+    return _firestore.collection('publicSpots').snapshots().map((snapshot) {
       return snapshot.docs.map((doc) {
         return SpotFlagState.fromFirestore(doc.id, doc.data());
       }).toList();

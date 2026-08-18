@@ -4,6 +4,7 @@ const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {
   onDocumentCreated,
   onDocumentUpdated,
+  onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 const {getDownloadURL} = require("firebase-admin/storage");
@@ -18,6 +19,271 @@ const SPHOT_LOGIN_URL = "https://sphot.app";
 
 
 setGlobalOptions({maxInstances: 10});
+
+const PUBLIC_SUBSCRIPTION_STATUSES = new Set(["trial", "active"]);
+
+/**
+ * Indique si un abonnement autorise actuellement la publication des SPHOTS.
+ *
+ * @param {Object} subscription Données de l'abonnement.
+ * @param {Date} now Date de référence.
+ * @return {boolean} Vrai lorsque la période est publiable.
+ */
+function isPublicSubscription(subscription, now = new Date()) {
+  const status = (subscription.status || "").toString().trim().toLowerCase();
+  if (!PUBLIC_SUBSCRIPTION_STATUSES.has(status)) return false;
+
+  const startField = status === "trial" ?
+    subscription.trialStartDate : subscription.subscriptionStartDate;
+  const endField = status === "trial" ?
+    subscription.trialEndDate : subscription.subscriptionEndDate;
+
+  const start = startField && typeof startField.toDate === "function" ?
+    startField.toDate() : null;
+  const end = endField && typeof endField.toDate === "function" ?
+    endField.toDate() : null;
+
+  if (start && now < start) return false;
+  if (end && now > end) return false;
+  return true;
+}
+
+/**
+ * Construit la projection strictement publique d'un SPHOT.
+ *
+ * @param {string} territoireId Identifiant du territoire.
+ * @param {string} spotId Identifiant du SPHOT.
+ * @param {Object} spot Données internes du SPHOT.
+ * @return {Object} Données autorisées sur la carte publique.
+ */
+function buildPublicSpot(territoireId, spotId, spot) {
+  const publicFields = [
+    "idSphot",
+    "nomSecours",
+    "nomSphot",
+    "typeSphot",
+    "isPosteSecours",
+    "sphotLat",
+    "sphotLng",
+    "pays",
+    "region",
+    "departement",
+    "ville",
+    "villeLat",
+    "villeLng",
+    "departementLat",
+    "departementLng",
+    "logoVille",
+    "siteInternetVille",
+    "adresseWebcam",
+    "arretesMunicipaux",
+    "statutBaignade",
+    "periode",
+    "heureDebut",
+    "heureFin",
+    "phone",
+    "telephonePoste",
+    "activite",
+    "equipement",
+    "labelSphot",
+    "liveFlag",
+  ];
+
+  const result = {territoireId, spotId};
+  publicFields.forEach((field) => {
+    if (spot[field] !== undefined && spot[field] !== null) {
+      result[field] = spot[field];
+    }
+  });
+  result.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+  return result;
+}
+
+/**
+ * Extrait uniquement l'état public temps réel d'un SPHOT historique.
+ *
+ * @param {Object} spot Données de la collection racine spots.
+ * @return {Object} État public à fusionner dans la projection.
+ */
+function buildPublicLiveState(spot) {
+  const liveFields = [
+    "liveFlag",
+    "statutBaignade",
+    "periode",
+    "heureDebut",
+    "heureFin",
+    "phone",
+    "telephonePoste",
+  ];
+  const result = {};
+  liveFields.forEach((field) => {
+    if (spot[field] !== undefined && spot[field] !== null) {
+      result[field] = spot[field];
+    }
+  });
+  if (spot.liveFlag === undefined || spot.liveFlag === null) {
+    result.liveFlag = admin.firestore.FieldValue.delete();
+  }
+  result.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+  return result;
+}
+
+/**
+ * Fusionne la configuration territoriale avec l'état historique public.
+ * L'absence de liveFlag dans un document historique existant est conservée.
+ *
+ * @param {Object} spot Configuration du SPHOT territorial.
+ * @param {Object|null} historical État de la collection racine spots.
+ * @return {Object} Données consolidées.
+ */
+function mergePublicSpotData(spot, historical) {
+  const result = {...spot, ...(historical || {})};
+  if (historical && historical.liveFlag === undefined) {
+    delete result.liveFlag;
+  }
+  return result;
+}
+
+/**
+ * Supprime puis reconstruit la projection publique d'un territoire.
+ *
+ * @param {string} territoireId Identifiant du territoire.
+ * @param {boolean} publish Autorisation de publication.
+ * @return {Promise<void>}
+ */
+async function reconcilePublicTerritory(territoireId, publish) {
+  if (!territoireId) return;
+
+  const db = admin.firestore();
+  const publicSnapshot = await db
+      .collection("publicSpots")
+      .where("territoireId", "==", territoireId)
+      .get();
+  const spotSnapshot = publish ? await db
+      .collection("territoires")
+      .doc(territoireId)
+      .collection("spots")
+      .get() : null;
+  const historicalSpots = new Map();
+  if (spotSnapshot && !spotSnapshot.empty) {
+    const historicalSnapshots = await db.getAll(
+        ...spotSnapshot.docs.map((document) => {
+          return db.collection("spots").doc(document.id);
+        }),
+    );
+    historicalSnapshots.forEach((document) => {
+      if (document.exists) {
+        historicalSpots.set(document.id, document.data());
+      }
+    });
+  }
+
+  const writes = [];
+  const desiredPublicIds = new Set(
+      spotSnapshot ? spotSnapshot.docs.map((document) => {
+        return `${territoireId}__${document.id}`;
+      }) : [],
+  );
+  publicSnapshot.docs.forEach((document) => {
+    if (!desiredPublicIds.has(document.id)) {
+      writes.push({type: "delete", reference: document.ref});
+    }
+  });
+  if (spotSnapshot) {
+    spotSnapshot.docs.forEach((document) => {
+      const reference = db.collection("publicSpots")
+          .doc(`${territoireId}__${document.id}`);
+      writes.push({
+        type: "set",
+        reference,
+        data: buildPublicSpot(
+            territoireId,
+            document.id,
+            mergePublicSpotData(
+                document.data(),
+                historicalSpots.get(document.id) || null,
+            ),
+        ),
+      });
+    });
+  }
+
+  for (let index = 0; index < writes.length; index += 450) {
+    const batch = db.batch();
+    writes.slice(index, index + 450).forEach((write) => {
+      if (write.type === "delete") {
+        batch.delete(write.reference);
+      } else {
+        batch.set(write.reference, write.data);
+      }
+    });
+    await batch.commit();
+  }
+}
+
+/**
+ * Vérifie qu'au moins un administrateur approuvé du territoire dispose
+ * actuellement d'un essai ou d'un abonnement actif.
+ *
+ * @param {string} territoireId Identifiant du territoire.
+ * @param {string|null} changedUid Administrateur dont l'abonnement change.
+ * @param {Object|null|undefined} changedSubscription Nouvel abonnement.
+ * @return {Promise<boolean>}
+ */
+async function isTerritoryPublic(
+    territoireId,
+    changedUid = null,
+    changedSubscription = undefined,
+) {
+  const db = admin.firestore();
+  const adminsSnapshot = await db.collection("admins")
+      .where("territoireId", "==", territoireId)
+      .get();
+  const approvedAdmins = adminsSnapshot.docs.filter((document) => {
+    return document.data().accessStatus === "approved";
+  });
+
+  const checks = approvedAdmins.map(async (document) => {
+    if (document.id === changedUid && changedSubscription !== undefined) {
+      return changedSubscription &&
+        isPublicSubscription(changedSubscription);
+    }
+    const snapshot = await db.collection("subscriptions")
+        .doc(document.id)
+        .get();
+    const subscription = snapshot.data();
+    return subscription && isPublicSubscription(subscription);
+  });
+
+  const results = await Promise.all(checks);
+  return results.some(Boolean);
+}
+
+/**
+ * Applique le statut d'un abonnement à la projection publique associée.
+ *
+ * @param {string} subscriptionId Identifiant du document abonnement.
+ * @param {Object|null} subscription Données de l'abonnement.
+ * @return {Promise<void>}
+ */
+async function reconcilePublicSubscription(subscriptionId, subscription) {
+  const db = admin.firestore();
+  const adminUid = ((subscription && subscription.adminUid) || subscriptionId)
+      .toString().trim();
+  if (!adminUid) return;
+
+  const adminSnapshot = await db.collection("admins").doc(adminUid).get();
+  const adminData = adminSnapshot.data() || {};
+  const territoireId = (adminData.territoireId || "").toString().trim();
+  if (!territoireId) return;
+
+  const publish = await isTerritoryPublic(
+      territoireId,
+      adminUid,
+      subscription,
+  );
+  await reconcilePublicTerritory(territoireId, publish);
+}
 
 /**
  * Nettoie une valeur texte et applique une valeur par défaut.
@@ -2144,6 +2410,91 @@ L'équipe SPHOT`,
           "Email activation abonnement envoyé à:",
           email,
       );
+    },
+);
+
+exports.syncPublicSpotsForSubscription = onDocumentWritten(
+    {
+      document: "subscriptions/{subscriptionId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const subscription = event.data.after.exists ?
+        event.data.after.data() : null;
+      await reconcilePublicSubscription(
+          event.params.subscriptionId,
+          subscription,
+      );
+    },
+);
+
+exports.syncPublicSpotOnWrite = onDocumentWritten(
+    {
+      document: "territoires/{territoireId}/spots/{spotId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const db = admin.firestore();
+      const territoireId = event.params.territoireId;
+      const spotId = event.params.spotId;
+      const publicReference = db.collection("publicSpots")
+          .doc(`${territoireId}__${spotId}`);
+
+      if (!event.data.after.exists) {
+        await publicReference.delete();
+        return;
+      }
+
+      if (!await isTerritoryPublic(territoireId)) {
+        await publicReference.delete();
+        return;
+      }
+
+      const historicalSnapshot = await db.collection("spots")
+          .doc(spotId)
+          .get();
+      const historicalData = historicalSnapshot.exists ?
+        historicalSnapshot.data() : null;
+
+      await publicReference.set(
+          buildPublicSpot(
+              territoireId,
+              spotId,
+              mergePublicSpotData(
+                  event.data.after.data(),
+                  historicalData,
+              ),
+          ),
+      );
+    },
+);
+
+exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
+    {
+      document: "spots/{spotId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const db = admin.firestore();
+      const publicSnapshot = await db.collection("publicSpots")
+          .where("spotId", "==", event.params.spotId)
+          .get();
+      if (publicSnapshot.empty) return;
+
+      const liveState = buildPublicLiveState(
+          event.data.after.exists ? event.data.after.data() : {},
+      );
+      const batch = db.batch();
+      publicSnapshot.docs.forEach((document) => {
+        batch.set(document.ref, liveState, {merge: true});
+      });
+      await batch.commit();
     },
 );
 
