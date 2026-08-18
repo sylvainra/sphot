@@ -171,12 +171,6 @@ class PublicSpotDetailPage extends StatelessWidget {
                               showLabelIcons: true,
                             ),
                           ],
-                          if (spot.adresseWebcam.isNotEmpty) ...[
-                            const SizedBox(height: 20),
-                            const Divider(),
-                            const SizedBox(height: 8),
-                            _PublicWebcamSection(url: spot.adresseWebcam),
-                          ],
                           if (spot.siteInternetVille.isNotEmpty ||
                               spot.arretesMunicipaux.isNotEmpty) ...[
                             const SizedBox(height: 20),
@@ -216,6 +210,12 @@ class PublicSpotDetailPage extends StatelessWidget {
                                   ),
                               ],
                             ),
+                          ],
+                          if (spot.adresseWebcam.isNotEmpty) ...[
+                            const SizedBox(height: 20),
+                            const Divider(),
+                            const SizedBox(height: 8),
+                            _PublicWebcamSection(url: spot.adresseWebcam),
                           ],
                           const SizedBox(height: 24),
                           SizedBox(
