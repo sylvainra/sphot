@@ -44,6 +44,13 @@ class PublicSpotDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusColor = Color(spot.statutColor);
     final commune = spot.ville.trim();
+    final flagIsLowered =
+        spot.isPosteSecours && spot.flagPosition == FlagPosition.affale;
+    final showUnsupervisedWarning =
+        spot.isMissingFlagColorDuringSurveillance || flagIsLowered;
+    final publicDetailStatus = flagIsLowered
+        ? 'BAIGNADE NON SURVEILLÉE TEMPORAIREMENT'
+        : spot.displayStatut;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FA),
@@ -68,7 +75,7 @@ class PublicSpotDetailPage extends StatelessWidget {
                   if (commune.isNotEmpty) ...[
                     const SizedBox(height: 5),
                     Text(
-                      'Commune de $commune',
+                      commune.toUpperCase(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
@@ -104,8 +111,12 @@ class PublicSpotDetailPage extends StatelessWidget {
                         children: [
                           _StatusCard(
                             color: statusColor,
-                            text: spot.displayStatut,
+                            text: publicDetailStatus,
                           ),
+                          if (showUnsupervisedWarning) ...[
+                            const SizedBox(height: 10),
+                            const _UnsupervisedWarning(),
+                          ],
                           const SizedBox(height: 18),
                           _PublicInfoLine(
                             icon: spot.isPosteSecours
@@ -155,6 +166,7 @@ class PublicSpotDetailPage extends StatelessWidget {
                             _PublicChips(
                               title: 'Labels',
                               values: spot.publicLabels,
+                              showLabelIcons: true,
                             ),
                           ],
                           if (spot.siteInternetVille.isNotEmpty ||
@@ -268,6 +280,46 @@ class _StatusCard extends StatelessWidget {
   }
 }
 
+class _UnsupervisedWarning extends StatelessWidget {
+  const _UnsupervisedWarning();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFF0000)),
+      ),
+      child: const Column(
+        children: [
+          Text(
+            'BAIGNADE NON SURVEILLÉE',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFFFF0000),
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          SizedBox(height: 3),
+          Text(
+            'BAIGNADE À VOS RISQUES ET PÉRILS',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFFFF0000),
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PublicInfoLine extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -334,8 +386,38 @@ class _PublicInfoLine extends StatelessWidget {
 class _PublicChips extends StatelessWidget {
   final String title;
   final List<String> values;
+  final bool showLabelIcons;
 
-  const _PublicChips({required this.title, required this.values});
+  const _PublicChips({
+    required this.title,
+    required this.values,
+    this.showLabelIcons = false,
+  });
+
+  static const Map<String, String> _labelIconPaths = {
+    '🟦 PAVILLON BLEU': 'data/icons/pavillon_bleu.png',
+    '♿ HANDIPLAGE NIVEAU I': 'data/icons/handiplage1.png',
+    '♿ HANDIPLAGE NIVEAU II': 'data/icons/handiplage2.png',
+    '♿ HANDIPLAGE NIVEAU III': 'data/icons/handiplage3.png',
+    '♿ HANDIPLAGE NIVEAU IV': 'data/icons/handiplage4.png',
+    '🚭 PLAGE SANS TABAC': 'data/icons/plage_sans_tabac.png',
+    'QUALITÉ DES EAUX : EXCELLENTE':
+        'data/icons/qualite_eau_excellente.png',
+    'QUALITÉ DES EAUX : BONNE': 'data/icons/qualite_eau_bonne.png',
+    'QUALITÉ DES EAUX : SUFFISANTE':
+        'data/icons/qualite_eau_suffisante.png',
+    'QUALITÉ DES EAUX : INSUFFISANTE':
+        'data/icons/qualite_eau_insuffisante.png',
+  };
+
+  static const Map<String, String> _labelDisplayNames = {
+    '🟦 PAVILLON BLEU': 'PAVILLON BLEU',
+    '♿ HANDIPLAGE NIVEAU I': 'HANDIPLAGE NIVEAU I',
+    '♿ HANDIPLAGE NIVEAU II': 'HANDIPLAGE NIVEAU II',
+    '♿ HANDIPLAGE NIVEAU III': 'HANDIPLAGE NIVEAU III',
+    '♿ HANDIPLAGE NIVEAU IV': 'HANDIPLAGE NIVEAU IV',
+    '🚭 PLAGE SANS TABAC': 'PLAGE SANS TABAC',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -356,17 +438,40 @@ class _PublicChips extends StatelessWidget {
           spacing: 7,
           runSpacing: 7,
           children: values
-              .map(
-                (value) => Chip(
-                  label: Text(value),
-                  visualDensity: VisualDensity.compact,
-                  backgroundColor: const Color(0xFFF2F6FB),
-                  side: const BorderSide(color: Color(0xFFD7E0EC)),
-                ),
-              )
+              .map((value) => _buildChip(value))
               .toList(growable: false),
         ),
       ],
+    );
+  }
+
+  Widget _buildChip(String value) {
+    final normalizedValue = value.trim().toUpperCase();
+    final iconPath = showLabelIcons ? _labelIconPaths[normalizedValue] : null;
+    final displayName = showLabelIcons
+        ? (_labelDisplayNames[normalizedValue] ?? value)
+        : value;
+
+    return Chip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (iconPath != null) ...[
+            Image.asset(
+              iconPath,
+              width: 24,
+              height: 24,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+            const SizedBox(width: 7),
+          ],
+          Flexible(child: Text(displayName)),
+        ],
+      ),
+      visualDensity: VisualDensity.compact,
+      backgroundColor: const Color(0xFFF2F6FB),
+      side: const BorderSide(color: Color(0xFFD7E0EC)),
     );
   }
 }
