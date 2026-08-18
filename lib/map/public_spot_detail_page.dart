@@ -43,10 +43,7 @@ class PublicSpotDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final statusColor = Color(spot.statutColor);
-    final location = [
-      spot.ville,
-      spot.departement,
-    ].where((value) => value.trim().isNotEmpty).join(' · ');
+    final commune = spot.ville.trim();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FA),
@@ -55,46 +52,30 @@ class PublicSpotDetailPage extends StatelessWidget {
           children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(8, 12, 16, 16),
+              padding: const EdgeInsets.fromLTRB(22, 16, 18, 18),
               color: statusColor,
-              child: Row(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IconButton(
-                    tooltip: 'Retour à la carte',
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
+                  Text(
+                    spot.mapDisplayName.toUpperCase(),
+                    style: const TextStyle(
                       color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          spot.displayName.toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        if (location.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            location,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ],
+                  if (commune.isNotEmpty) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      'Commune de $commune',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
