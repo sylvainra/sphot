@@ -2567,10 +2567,9 @@ exports.syncPublicSpotOnWrite = onDocumentWritten(
       memory: "256MiB",
     },
     async (event) => {
-      const db = admin.firestore();
       const territoireId = event.params.territoireId;
       const spotId = event.params.spotId;
-      const publicReference = db.collection("publicSpots")
+      const publicReference = admin.firestore().collection("publicSpots")
           .doc(`${territoireId}__${spotId}`);
 
       if (!event.data.after.exists) {
@@ -2578,27 +2577,13 @@ exports.syncPublicSpotOnWrite = onDocumentWritten(
         return;
       }
 
-      if (!await isTerritoryPublic(territoireId)) {
+      const publish = await isTerritoryPublic(territoireId);
+      if (!publish) {
         await publicReference.delete();
         return;
       }
 
-      const historicalSnapshot = await db.collection("spots")
-          .doc(spotId)
-          .get();
-      const historicalData = historicalSnapshot.exists ?
-        historicalSnapshot.data() : null;
-
-      await publicReference.set(
-          buildPublicSpot(
-              territoireId,
-              spotId,
-              mergePublicSpotData(
-                  event.data.after.data(),
-                  historicalData,
-              ),
-          ),
-      );
+      await reconcilePublicTerritory(territoireId, true);
     },
 );
 
