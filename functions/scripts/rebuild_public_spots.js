@@ -3,25 +3,19 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 /**
- * Relance la projection publique pour les essais et abonnements actifs.
+ * Relance la projection publique pour les administrateurs approuvés.
  *
  * @return {Promise<void>}
  */
 async function rebuildPublicSpots() {
   const db = admin.firestore();
-  const statuses = ["trial", "active"];
-  const subscriptions = [];
+  const admins = await db.collection("admins")
+      .where("accessStatus", "==", "approved")
+      .get();
 
-  for (const status of statuses) {
-    const snapshot = await db.collection("subscriptions")
-        .where("status", "==", status)
-        .get();
-    subscriptions.push(...snapshot.docs);
-  }
-
-  for (let index = 0; index < subscriptions.length; index += 450) {
+  for (let index = 0; index < admins.docs.length; index += 450) {
     const batch = db.batch();
-    subscriptions.slice(index, index + 450).forEach((document) => {
+    admins.docs.slice(index, index + 450).forEach((document) => {
       batch.set(
           document.ref,
           {
@@ -35,7 +29,7 @@ async function rebuildPublicSpots() {
   }
 
   console.log(
-      `${subscriptions.length} abonnement(s) transmis ` +
+      `${admins.size} administrateur(s) approuvé(s) transmis ` +
       "à la projection publique.",
   );
 }

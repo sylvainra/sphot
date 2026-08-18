@@ -20,34 +20,6 @@ const SPHOT_LOGIN_URL = "https://sphot.app";
 
 setGlobalOptions({maxInstances: 10});
 
-const PUBLIC_SUBSCRIPTION_STATUSES = new Set(["trial", "active"]);
-
-/**
- * Indique si un abonnement autorise actuellement la publication des SPHOTS.
- *
- * @param {Object} subscription Données de l'abonnement.
- * @param {Date} now Date de référence.
- * @return {boolean} Vrai lorsque la période est publiable.
- */
-function isPublicSubscription(subscription, now = new Date()) {
-  const status = (subscription.status || "").toString().trim().toLowerCase();
-  if (!PUBLIC_SUBSCRIPTION_STATUSES.has(status)) return false;
-
-  const startField = status === "trial" ?
-    subscription.trialStartDate : subscription.subscriptionStartDate;
-  const endField = status === "trial" ?
-    subscription.trialEndDate : subscription.subscriptionEndDate;
-
-  const start = startField && typeof startField.toDate === "function" ?
-    startField.toDate() : null;
-  const end = endField && typeof endField.toDate === "function" ?
-    endField.toDate() : null;
-
-  if (start && now < start) return false;
-  if (end && now > end) return false;
-  return true;
-}
-
 /**
  * Construit la projection strictement publique d'un SPHOT.
  *
@@ -222,41 +194,20 @@ async function reconcilePublicTerritory(territoireId, publish) {
 }
 
 /**
- * Vérifie qu'au moins un administrateur approuvé du territoire dispose
- * actuellement d'un essai ou d'un abonnement actif.
+ * Vérifie qu'au moins un administrateur du territoire a été approuvé
+ * par le Super Admin.
  *
  * @param {string} territoireId Identifiant du territoire.
- * @param {string|null} changedUid Administrateur dont l'abonnement change.
- * @param {Object|null|undefined} changedSubscription Nouvel abonnement.
  * @return {Promise<boolean>}
  */
-async function isTerritoryPublic(
-    territoireId,
-    changedUid = null,
-    changedSubscription = undefined,
-) {
+async function isTerritoryPublic(territoireId) {
   const db = admin.firestore();
   const adminsSnapshot = await db.collection("admins")
       .where("territoireId", "==", territoireId)
       .get();
-  const approvedAdmins = adminsSnapshot.docs.filter((document) => {
+  return adminsSnapshot.docs.some((document) => {
     return document.data().accessStatus === "approved";
   });
-
-  const checks = approvedAdmins.map(async (document) => {
-    if (document.id === changedUid && changedSubscription !== undefined) {
-      return changedSubscription &&
-        isPublicSubscription(changedSubscription);
-    }
-    const snapshot = await db.collection("subscriptions")
-        .doc(document.id)
-        .get();
-    const subscription = snapshot.data();
-    return subscription && isPublicSubscription(subscription);
-  });
-
-  const results = await Promise.all(checks);
-  return results.some(Boolean);
 }
 
 /**
@@ -277,11 +228,7 @@ async function reconcilePublicSubscription(subscriptionId, subscription) {
   const territoireId = (adminData.territoireId || "").toString().trim();
   if (!territoireId) return;
 
-  const publish = await isTerritoryPublic(
-      territoireId,
-      adminUid,
-      subscription,
-  );
+  const publish = await isTerritoryPublic(territoireId);
   await reconcilePublicTerritory(territoireId, publish);
 }
 
@@ -2427,6 +2374,34 @@ exports.syncPublicSpotsForSubscription = onDocumentWritten(
           event.params.subscriptionId,
           subscription,
       );
+    },
+);
+
+exports.syncPublicSpotsForAdmin = onDocumentWritten(
+    {
+      document: "admins/{adminUid}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const before = event.data.before.exists ?
+        event.data.before.data() : null;
+      const after = event.data.after.exists ?
+        event.data.after.data() : null;
+      const territoireIds = new Set();
+
+      [before, after].forEach((data) => {
+        const territoireId = ((data && data.territoireId) || "")
+            .toString()
+            .trim();
+        if (territoireId) territoireIds.add(territoireId);
+      });
+
+      for (const territoireId of territoireIds) {
+        const publish = await isTerritoryPublic(territoireId);
+        await reconcilePublicTerritory(territoireId, publish);
+      }
     },
 );
 
