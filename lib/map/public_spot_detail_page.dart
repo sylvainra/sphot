@@ -203,7 +203,7 @@ class PublicSpotDetailPage extends StatelessWidget {
                                 if (spot.siteInternetVille.isNotEmpty)
                                   _PublicLinkButton(
                                     icon: Icons.language,
-                                    label: 'Site de la commune',
+                                    label: 'Site internet du lieu',
                                     onTap: () => _openUrl(
                                       context,
                                       spot.siteInternetVille,
@@ -215,7 +215,7 @@ class PublicSpotDetailPage extends StatelessWidget {
                                 if (spot.arretesMunicipaux.isNotEmpty)
                                   _PublicLinkButton(
                                     icon: Icons.gavel_outlined,
-                                    label: 'Arrêtés municipaux',
+                                    label: 'Règlementations de baignade',
                                     onTap: () => _openUrl(
                                       context,
                                       spot.arretesMunicipaux,
