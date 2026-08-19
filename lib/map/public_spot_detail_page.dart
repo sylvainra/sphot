@@ -129,6 +129,9 @@ class PublicSpotDetailPage extends StatelessWidget {
                             iconAssetPath: spot.markerIconPath,
                             label: 'Type de SPHOT',
                             value: spot.typeSphot,
+                            valueWidget: spot.isPosteSecours
+                                ? const _PublicRescueStationValue()
+                                : null,
                           ),
                           if (spot.adresseWebcam.isNotEmpty) ...[
                             const SizedBox(height: 14),
@@ -394,6 +397,7 @@ class _PublicInfoLine extends StatelessWidget {
   final String? iconAssetPath;
   final String label;
   final String value;
+  final Widget? valueWidget;
   final VoidCallback? onTap;
 
   const _PublicInfoLine({
@@ -401,6 +405,7 @@ class _PublicInfoLine extends StatelessWidget {
     this.iconAssetPath,
     required this.label,
     required this.value,
+    this.valueWidget,
     this.onTap,
   }) : assert(icon != null || iconAssetPath != null);
 
@@ -441,25 +446,59 @@ class _PublicInfoLine extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    value,
-                    style: TextStyle(
-                      color: onTap == null
-                          ? Colors.black87
-                          : const Color(0xFF1E3A8A),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      decoration: onTap == null
-                          ? null
-                          : TextDecoration.underline,
-                    ),
-                  ),
+                  valueWidget ??
+                      Text(
+                        value,
+                        style: TextStyle(
+                          color: onTap == null
+                              ? Colors.black87
+                              : const Color(0xFF1E3A8A),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          decoration: onTap == null
+                              ? null
+                              : TextDecoration.underline,
+                        ),
+                      ),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PublicRescueStationValue extends StatelessWidget {
+  const _PublicRescueStationValue();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 13,
+          height: 20,
+          child: SvgPicture.asset(
+            'data/icons/flag_red_yellow_5x3.svg',
+            fit: BoxFit.contain,
+          ),
+        ),
+        const SizedBox(width: 6),
+        const Flexible(
+          child: Text(
+            'POSTE DE SECOURS',
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.black87,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
