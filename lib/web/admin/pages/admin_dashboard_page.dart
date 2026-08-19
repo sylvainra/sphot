@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../../map/map_page.dart';
 import 'package:flutter/services.dart';
+import 'admin_subscription_panel.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -4740,7 +4741,46 @@ Widget _buildSubscriptionPanel() {
   );
 }
 
+String _currentAdministrativeReference() {
+  final uid = widget.adminUid.trim();
+  final territoireId = _resolvedTerritoireId.trim();
+
+  for (final document in _latestAdminDocs) {
+    final data = document.data();
+    final adminAccount = Map<String, dynamic>.from(
+      data['adminAccount'] ?? const <String, dynamic>{},
+    );
+    final territoire = Map<String, dynamic>.from(
+      data['territoire'] ?? const <String, dynamic>{},
+    );
+    final documentTerritoireId = _cleanText(
+      data['territoireId'] ?? territoire['territoireId'],
+    );
+
+    final matchesAdmin = document.id == uid ||
+        _cleanText(data['uid']) == uid ||
+        _cleanText(data['adminUid']) == uid ||
+        _cleanText(adminAccount['adminUid']) == uid ||
+        (territoireId.isNotEmpty && documentTerritoireId == territoireId);
+
+    if (!matchesAdmin) continue;
+
+    final reference = _cleanText(
+      data['requestNumber'] ?? data['administrativeReference'],
+    );
+    if (reference.isNotEmpty) return reference;
+  }
+
+  final subscription = _subscriptionsByUid[uid];
+  return _cleanText(
+    subscription?['administrativeReference'] ??
+        subscription?['requestNumber'],
+  );
+}
+
 Widget _buildBillingDocumentsPanel() {
+  final administrativeReference = _currentAdministrativeReference();
+
   return Container(
     width: 430,
     decoration: BoxDecoration(
@@ -4768,10 +4808,49 @@ Widget _buildBillingDocumentsPanel() {
             Expanded(
               child: Container(
                 color: const Color(0xFFF8FAFC),
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    _buildCommercialSection(
+                  child: ListView(
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      if (administrativeReference.isNotEmpty) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: adminColor.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: adminColor.withOpacity(0.30),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'RÉFÉRENCE ADMINISTRATIVE',
+                                style: TextStyle(
+                                  color: pendingColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                administrativeReference,
+                                style: const TextStyle(
+                                  color: redColor,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      _buildCommercialSection(
                       icon: Icons.request_quote_outlined,
                       title: 'DEVIS',
                       description:
@@ -4947,14 +5026,13 @@ if (showTrialButton) ...[
 _summaryCard(
   title: 'ABONNEMENT',
   value: '',
-  color: showTrialButton ? pendingColor : redColor,
+  color: adminColor,
   iconPath: 'data/icons/fire_red_icon.png',
   stepNumber: 6,
   iconScale: 1.35,
   titleFontSize: 16,
   titleLetterSpacing: 0.5,
   showValue: false,
-  grayscaleIcon: showTrialButton,
   onTap: _openSubscriptionPanel,
 ),
 
@@ -4963,16 +5041,13 @@ const SizedBox(height: 8),
 _summaryCard(
   title: 'DOCUMENTS & FACTURES',
   value: '',
-  color: showTrialButton ? pendingColor : adminColor,
-  iconPath: showTrialButton
-      ? 'data/icons/fire_red_icon.png'
-      : 'data/icons/fire_blue_icon.png',
+  color: adminColor,
+  iconPath: 'data/icons/fire_red_icon.png',
   stepNumber: 7,
   iconScale: 1.35,
   titleFontSize: 16,
   titleLetterSpacing: 0.5,
   showValue: false,
-  grayscaleIcon: showTrialButton,
   onTap: _openBillingDocumentsPanel,
 ),
 
@@ -12929,6 +13004,10 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
         'ADMIN',
   );
 
+  final ville = _cleanText(
+    territoire['ville'] ?? data['ville'] ?? organisation,
+  ).toUpperCase();
+
   final logoUrl = _cleanText(
   territoire['logoVille'] ??
       territoire['logoUrl'] ??
@@ -12958,10 +13037,23 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
             _selectedLegalChapter = null;
           });
         },
-          child: SizedBox(
-            width: 85,
-            height: 85,
-            child: Stack(
+          child: Tooltip(
+            message: ville,
+            preferBelow: true,
+            verticalOffset: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF0000),
+              borderRadius: BorderRadius.circular(5),
+            ),
+            textStyle: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+            child: SizedBox(
+              width: 85,
+              height: 85,
+              child: Stack(
               alignment: Alignment.topCenter,
               children: [
                 Image.asset(
@@ -13021,7 +13113,8 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
                     ),
                   ),
                 ),
-                            ],
+              ],
+              ),
             ),
           ),
       ),
@@ -13492,7 +13585,10 @@ final clusteredMarkers = validSpots.map((doc) {
   _buildAdminDetailPanel(),
 
 if (_showSubscriptionPanel)
-  _buildSubscriptionPanel()
+  AdminSubscriptionPanel(
+    adminUid: widget.adminUid,
+    onClose: _closeSubscriptionPanel,
+  )
 else if (_showBillingDocumentsPanel)
   _buildBillingDocumentsPanel()
 else if (_showTrialSummaryPanel)

@@ -193,6 +193,8 @@ List<Marker> _buildAdminMarkers(
             onTap: () => _openCityWebsite(siteInternetVille),
             child: Tooltip(
               message: spot.ville.toUpperCase(),
+              preferBelow: true,
+              verticalOffset: 40,
               decoration: BoxDecoration(
                 color: const Color(0xFFFF0000),
                 borderRadius: BorderRadius.circular(5),
