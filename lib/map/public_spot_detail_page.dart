@@ -128,6 +128,14 @@ class PublicSpotDetailPage extends StatelessWidget {
                             label: 'Type de SPHOT',
                             value: spot.typeSphot,
                           ),
+                          if (spot.adresseWebcam.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            const Divider(),
+                            const SizedBox(height: 8),
+                            _PublicWebcamSection(url: spot.adresseWebcam),
+                            const SizedBox(height: 14),
+                            const Divider(),
+                          ],
                           if (spot.periode.isNotEmpty)
                             _PublicInfoLine(
                               icon: Icons.date_range_outlined,
@@ -211,12 +219,6 @@ class PublicSpotDetailPage extends StatelessWidget {
                                   ),
                               ],
                             ),
-                          ],
-                          if (spot.adresseWebcam.isNotEmpty) ...[
-                            const SizedBox(height: 20),
-                            const Divider(),
-                            const SizedBox(height: 8),
-                            _PublicWebcamSection(url: spot.adresseWebcam),
                           ],
                           const SizedBox(height: 24),
                           SizedBox(
