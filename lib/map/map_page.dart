@@ -150,7 +150,7 @@ void initState() {
   }
 }
 
-List<Marker> _buildTerritoryLogoMarkers(
+List<Marker> _buildAdminMarkers(
   List<SpotFlagState> spots,
   double zoom,
   double rotation,
@@ -159,36 +159,91 @@ List<Marker> _buildTerritoryLogoMarkers(
 
   if (zoom < 12) return markers;
 
-  final cities = <String, SpotFlagState>{};
+  final admins = <String, SpotFlagState>{};
 
   for (final spot in spots) {
     final ville = spot.ville.trim();
+    final siteInternetVille = spot.siteInternetVille.trim();
 
     if (ville.isEmpty) continue;
     if (spot.villeLat == 0 || spot.villeLng == 0) continue;
+    if (siteInternetVille.isEmpty) continue;
 
-    cities.putIfAbsent(ville, () => spot);
+    final adminKey = spot.territoireId.trim().isNotEmpty
+        ? spot.territoireId.trim()
+        : ville.toUpperCase();
+
+    admins.putIfAbsent(adminKey, () => spot);
   }
 
-  for (final spot in cities.values) {
+  for (final spot in admins.values) {
     final logoVille = spot.logoVille.trim();
     final siteInternetVille = spot.siteInternetVille.trim();
-
-    if (logoVille.isEmpty) continue;
 
     markers.add(
       Marker(
         point: LatLng(spot.villeLat, spot.villeLng),
-        width: 70,
-        height: 70,
-        child: GestureDetector(
-          onTap: () => _openCityWebsite(siteInternetVille),
-          child: Transform.rotate(
-            angle: -rotation * pi / 180,
-            child: Image.network(
-              logoVille,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        width: 85,
+        height: 85,
+        alignment: Alignment.topCenter,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _openCityWebsite(siteInternetVille),
+            child: Tooltip(
+              message: 'Site officiel - ${spot.ville}',
+              child: Transform.rotate(
+                angle: -rotation * pi / 180,
+                child: SizedBox(
+                  width: 85,
+                  height: 85,
+                  child: Stack(
+                    alignment: Alignment.topCenter,
+                    children: [
+                      Image.asset(
+                        'data/icons/fire_red_icon.png',
+                        width: 85,
+                        height: 85,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                      ),
+                      Positioned(
+                        top: 23,
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: ClipOval(
+                            child: logoVille.isEmpty
+                                ? const Icon(
+                                    Icons.account_balance_rounded,
+                                    color: Color(0xFF1E3A8A),
+                                    size: 23,
+                                  )
+                                : Image.network(
+                                    logoVille,
+                                    width: 34,
+                                    height: 34,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.account_balance_rounded,
+                                      color: Color(0xFF1E3A8A),
+                                      size: 23,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -1870,7 +1925,7 @@ onPositionChanged: (position, hasGesture) {
                       final rotation = MapCamera.of(context).rotation;
 
                       return MarkerLayer(
-                        markers: _buildTerritoryLogoMarkers(allSpots, zoom, rotation),
+                        markers: _buildAdminMarkers(allSpots, zoom, rotation),
                       );
                     },
                   ),
