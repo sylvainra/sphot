@@ -476,25 +476,42 @@ function formatFrenchDate(date) {
 }
 
 /**
- * Génère un numéro unique de demande administrateur SPHOT.
+ * Retourne le code ISO 3166-1 alpha-3 du pays de la demande.
  *
- * @param {string} uid Identifiant de la demande ou de l'utilisateur.
- * @param {Date} date Date de création de la demande.
- * @return {string} Numéro de demande SPHOT.
+ * @param {Object} requestData Données de la demande.
+ * @return {string} Code pays sur trois caractères.
  */
+function resolveAdminCountryCode(requestData) {
+  const territoire = requestData.territoire || {};
+  const explicitCode = cleanValue(
+      territoire.countryIso3 || requestData.countryIso3,
+      "",
+  ).toUpperCase();
+
+  if (/^[A-Z]{3}$/.test(explicitCode)) {
+    return explicitCode;
+  }
+
+  const countryName = cleanValue(
+      territoire.pays || requestData.pays,
+      "France",
+  )
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase();
+
+  if (countryName === "FRANCE" || countryName === "FR") {
+    return "FRA";
+  }
+
+  return "XXX";
+}
+
 /**
  * Attribue un numéro séquentiel unique à une demande administrateur.
  *
  * Le numéro est généré une seule fois, même en cas de nouvelle exécution
  * de la fonction Cloud.
- *
- * @param {FirebaseFirestore.DocumentReference} requestReference
- * Référence Firestore de la demande.
- * @param {Date} date Date de création de la demande.
- * @return {Promise<string>} Numéro administratif de la demande.
- */
-/**
- * Attribue un numéro séquentiel unique à une demande administrateur.
  *
  * @param {FirebaseFirestore.DocumentReference} requestReference
  * Référence Firestore de la demande.
@@ -520,6 +537,7 @@ async function assignAdminRequestNumber(requestReference, date) {
         await transaction.get(requestReference);
 
     const requestData = requestSnapshot.data() || {};
+    const countryCode = resolveAdminCountryCode(requestData);
 
     const existingRequestNumber =
         (requestData.requestNumber || "").toString().trim();
@@ -539,7 +557,7 @@ async function assignAdminRequestNumber(requestReference, date) {
     const nextNumber = currentNumber + 1;
 
     const requestNumber =
-        `SPHOT-ADM-${year}-${nextNumber
+        `SPHOT-ADM-${countryCode}-${year}-${nextNumber
             .toString()
             .padStart(6, "0")}`;
 
@@ -558,6 +576,7 @@ async function assignAdminRequestNumber(requestReference, date) {
         requestReference,
         {
           requestNumber: requestNumber,
+          requestCountryCode: countryCode,
           requestSequence: nextNumber,
           requestYear: year,
           updatedAt:
@@ -569,6 +588,245 @@ async function assignAdminRequestNumber(requestReference, date) {
     return requestNumber;
   });
 }
+
+/**
+ * Retourne l'année civile française d'un document commercial.
+ *
+ * @param {Object} data Données du document.
+ * @param {string|undefined} eventTime Date de l'événement Cloud.
+ * @return {number} Année utilisée dans le numéro commercial.
+ */
+function commercialDocumentYear(data, eventTime) {
+  const candidates = [
+    data.issueDate,
+    data.createdAt,
+  ];
+
+  for (const value of candidates) {
+    if (value && typeof value.toDate === "function") {
+      return Number(
+          new Intl.DateTimeFormat("fr-FR", {
+            timeZone: "Europe/Paris",
+            year: "numeric",
+          }).format(value.toDate()),
+      );
+    }
+
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return Number(
+          new Intl.DateTimeFormat("fr-FR", {
+            timeZone: "Europe/Paris",
+            year: "numeric",
+          }).format(value),
+      );
+    }
+  }
+
+  const fallbackDate = eventTime ? new Date(eventTime) : new Date();
+  return Number(
+      new Intl.DateTimeFormat("fr-FR", {
+        timeZone: "Europe/Paris",
+        year: "numeric",
+      }).format(fallbackDate),
+  );
+}
+
+/**
+ * Extrait le numéro d'adhérent d'une référence Admin SPHOT.
+ *
+ * @param {string} administrativeReference Référence du dossier Admin.
+ * @return {string} Numéro d'adhérent sur six chiffres ou chaîne vide.
+ */
+function adminMemberNumber(administrativeReference) {
+  const match = cleanValue(administrativeReference, "").match(
+      /^SPHOT-ADM-(?:[A-Z]{3}-)?\d{4}-(\d{6})$/i,
+  );
+  return match ? match[1] : "";
+}
+
+/**
+ * Construit l'identifiant du compteur d'un document commercial.
+ *
+ * @param {Object} definition Définition du type de document.
+ * @param {number} year Année du document.
+ * @param {string} memberNumber Numéro d'adhérent.
+ * @return {string} Identifiant du compteur Firestore.
+ */
+function commercialCounterId(definition, year, memberNumber) {
+  const suffix = definition.perMember ? `_${memberNumber}` : "";
+  return `${definition.counterPrefix}_${year}${suffix}`;
+}
+
+/**
+ * Construit le numéro métier d'un document commercial.
+ *
+ * @param {Object} definition Définition du type de document.
+ * @param {number} year Année du document.
+ * @param {string} memberNumber Numéro d'adhérent.
+ * @param {number} sequence Séquence réservée.
+ * @return {string} Numéro commercial définitif.
+ */
+function commercialDocumentNumber(
+    definition,
+    year,
+    memberNumber,
+    sequence,
+) {
+  const paddedSequence = sequence
+      .toString()
+      .padStart(definition.sequenceLength, "0");
+
+  if (definition.perMember) {
+    return `${definition.prefix}-${year}-${memberNumber}-${paddedSequence}`;
+  }
+
+  return `${definition.prefix}-${year}-${paddedSequence}`;
+}
+
+/**
+ * Réserve atomiquement un numéro pour un document commercial.
+ *
+ * La fonction peut être rappelée sans consommer de nouveau numéro si le
+ * document possède déjà son numéro métier.
+ *
+ * @param {Object} event Événement Firestore de seconde génération.
+ * @param {Object} definition Définition du type de document.
+ * @return {Promise<void>} Fin de l'attribution éventuelle.
+ */
+async function assignCommercialDocumentNumber(event, definition) {
+  if (!event.data.after.exists) return;
+
+  const documentReference = event.data.after.ref;
+  const db = admin.firestore();
+
+  await db.runTransaction(async (transaction) => {
+    const documentSnapshot = await transaction.get(documentReference);
+    if (!documentSnapshot.exists) return;
+
+    const data = documentSnapshot.data() || {};
+    const existingNumber = cleanValue(data[definition.numberField], "");
+    if (existingNumber) return;
+
+    const adminUid = cleanValue(data.adminUid, "");
+    let administrativeReference = cleanValue(
+        data.administrativeReference,
+        "",
+    );
+
+    if (!administrativeReference && adminUid) {
+      const requestReference = db.collection("adminRequests").doc(adminUid);
+      const requestSnapshot = await transaction.get(requestReference);
+      administrativeReference = cleanValue(
+          (requestSnapshot.data() || {}).requestNumber,
+          "",
+      );
+    }
+
+    const memberNumber = adminMemberNumber(administrativeReference);
+    if (!administrativeReference || !memberNumber) {
+      console.warn(
+          `Numérotation ${definition.label} différée : ` +
+          "référence Admin absente ou invalide pour " +
+          `${documentReference.path}.`,
+      );
+      return;
+    }
+
+    if (definition.originalNumberField &&
+        !cleanValue(data[definition.originalNumberField], "")) {
+      console.warn(
+          `Numérotation ${definition.label} différée : ` +
+          `facture d'origine absente pour ${documentReference.path}.`,
+      );
+      return;
+    }
+
+    const year = commercialDocumentYear(data, event.time);
+    const counterId = commercialCounterId(
+        definition,
+        year,
+        memberNumber,
+    );
+    const counterReference = db.collection("counters").doc(counterId);
+    const counterSnapshot = await transaction.get(counterReference);
+    const currentNumber = Number(
+        (counterSnapshot.data() || {}).lastNumber || 0,
+    );
+    const nextNumber = currentNumber + 1;
+    const documentNumber = commercialDocumentNumber(
+        definition,
+        year,
+        memberNumber,
+        nextNumber,
+    );
+
+    transaction.set(
+        counterReference,
+        {
+          documentType: definition.documentType,
+          year: year,
+          perMember: definition.perMember,
+          ...(definition.perMember ? {memberNumber: memberNumber} : {}),
+          lastNumber: nextNumber,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        {merge: true},
+    );
+
+    transaction.set(
+        documentReference,
+        {
+          administrativeReference: administrativeReference,
+          [definition.numberField]: documentNumber,
+          year: year,
+          sequence: nextNumber,
+          numberedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        {merge: true},
+    );
+  });
+}
+
+const COMMERCIAL_DOCUMENTS = {
+  quote: {
+    label: "devis",
+    documentType: "quote",
+    numberField: "quoteNumber",
+    counterPrefix: "quotes",
+    prefix: "DV",
+    perMember: true,
+    sequenceLength: 3,
+  },
+  order: {
+    label: "commande",
+    documentType: "order",
+    numberField: "orderNumber",
+    counterPrefix: "orders",
+    prefix: "CMD",
+    perMember: true,
+    sequenceLength: 3,
+  },
+  invoice: {
+    label: "facture",
+    documentType: "invoice",
+    numberField: "invoiceNumber",
+    counterPrefix: "invoices",
+    prefix: "FA",
+    perMember: false,
+    sequenceLength: 6,
+  },
+  creditNote: {
+    label: "avoir",
+    documentType: "credit_note",
+    numberField: "creditNoteNumber",
+    originalNumberField: "originalInvoiceNumber",
+    counterPrefix: "creditNotes",
+    prefix: "AV",
+    perMember: false,
+    sequenceLength: 6,
+  },
+};
 
 /**
  * Génère le PDF d'accusé de réception d'une demande administrateur.
@@ -2664,6 +2922,66 @@ exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
         batch.set(document.ref, liveState, {merge: true});
       });
       await batch.commit();
+    },
+);
+
+exports.assignQuoteNumberOnWrite = onDocumentWritten(
+    {
+      document: "quotes/{quoteId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      await assignCommercialDocumentNumber(
+          event,
+          COMMERCIAL_DOCUMENTS.quote,
+      );
+    },
+);
+
+exports.assignOrderNumberOnWrite = onDocumentWritten(
+    {
+      document: "orders/{orderId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      await assignCommercialDocumentNumber(
+          event,
+          COMMERCIAL_DOCUMENTS.order,
+      );
+    },
+);
+
+exports.assignInvoiceNumberOnWrite = onDocumentWritten(
+    {
+      document: "invoices/{invoiceId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      await assignCommercialDocumentNumber(
+          event,
+          COMMERCIAL_DOCUMENTS.invoice,
+      );
+    },
+);
+
+exports.assignCreditNoteNumberOnWrite = onDocumentWritten(
+    {
+      document: "creditNotes/{creditNoteId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      await assignCommercialDocumentNumber(
+          event,
+          COMMERCIAL_DOCUMENTS.creditNote,
+      );
     },
 );
 
