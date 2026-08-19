@@ -4741,46 +4741,7 @@ Widget _buildSubscriptionPanel() {
   );
 }
 
-String _currentAdministrativeReference() {
-  final uid = widget.adminUid.trim();
-  final territoireId = _resolvedTerritoireId.trim();
-
-  for (final document in _latestAdminDocs) {
-    final data = document.data();
-    final adminAccount = Map<String, dynamic>.from(
-      data['adminAccount'] ?? const <String, dynamic>{},
-    );
-    final territoire = Map<String, dynamic>.from(
-      data['territoire'] ?? const <String, dynamic>{},
-    );
-    final documentTerritoireId = _cleanText(
-      data['territoireId'] ?? territoire['territoireId'],
-    );
-
-    final matchesAdmin = document.id == uid ||
-        _cleanText(data['uid']) == uid ||
-        _cleanText(data['adminUid']) == uid ||
-        _cleanText(adminAccount['adminUid']) == uid ||
-        (territoireId.isNotEmpty && documentTerritoireId == territoireId);
-
-    if (!matchesAdmin) continue;
-
-    final reference = _cleanText(
-      data['requestNumber'] ?? data['administrativeReference'],
-    );
-    if (reference.isNotEmpty) return reference;
-  }
-
-  final subscription = _subscriptionsByUid[uid];
-  return _cleanText(
-    subscription?['administrativeReference'] ??
-        subscription?['requestNumber'],
-  );
-}
-
 Widget _buildBillingDocumentsPanel() {
-  final administrativeReference = _currentAdministrativeReference();
-
   return Container(
     width: 430,
     decoration: BoxDecoration(
@@ -4811,45 +4772,6 @@ Widget _buildBillingDocumentsPanel() {
                   child: ListView(
                     padding: const EdgeInsets.all(20),
                     children: [
-                      if (administrativeReference.isNotEmpty) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: adminColor.withOpacity(0.06),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: adminColor.withOpacity(0.30),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'RÉFÉRENCE ADMINISTRATIVE',
-                                style: TextStyle(
-                                  color: pendingColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                administrativeReference,
-                                style: const TextStyle(
-                                  color: redColor,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
                       _buildCommercialSection(
                       icon: Icons.request_quote_outlined,
                       title: 'DEVIS',
