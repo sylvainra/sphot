@@ -51,9 +51,13 @@ class PublicSpotDetailPage extends StatelessWidget {
         spot.isPosteSecours && spot.flagPosition == FlagPosition.affale;
     final showUnsupervisedWarning =
         spot.isMissingFlagColorDuringSurveillance || flagIsLowered;
-    final publicDetailStatus = flagIsLowered
+    final rawPublicDetailStatus = flagIsLowered
         ? 'BAIGNADE NON SURVEILLÉE TEMPORAIREMENT'
         : spot.displayStatut;
+    final publicDetailStatus = rawPublicDetailStatus.replaceFirst(
+      ' ⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
+      '\n⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FA),
