@@ -5,6 +5,13 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/flag_state.dart';
 import 'public_webcam_view.dart';
 
+const TextStyle _publicSectionTitleStyle = TextStyle(
+  color: Color(0xFF1E3A8A),
+  fontSize: 11,
+  fontWeight: FontWeight.w900,
+  letterSpacing: 0.5,
+);
+
 class PublicSpotDetailPage extends StatelessWidget {
   final SpotFlagState spot;
 
@@ -129,6 +136,7 @@ class PublicSpotDetailPage extends StatelessWidget {
                             iconAssetPath: spot.markerIconPath,
                             label: 'Type de SPHOT',
                             value: spot.typeSphot,
+                            valueColor: const Color(0xFF1E3A8A),
                             valueWidget: spot.isPosteSecours
                                 ? const _PublicRescueStationValue()
                                 : null,
@@ -192,12 +200,7 @@ class PublicSpotDetailPage extends StatelessWidget {
                             const SizedBox(height: 8),
                             const Text(
                               'LIENS PUBLICS',
-                              style: TextStyle(
-                                color: Color(0xFF1E3A8A),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.8,
-                              ),
+                              style: _publicSectionTitleStyle,
                             ),
                             const SizedBox(height: 10),
                             Column(
@@ -280,12 +283,7 @@ class _PublicWebcamSection extends StatelessWidget {
             SizedBox(width: 7),
             Text(
               'WEBCAM EN DIRECT',
-              style: TextStyle(
-                color: Color(0xFF1E3A8A),
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.8,
-              ),
+              style: _publicSectionTitleStyle,
             ),
           ],
         ),
@@ -397,6 +395,7 @@ class _PublicInfoLine extends StatelessWidget {
   final String? iconAssetPath;
   final String label;
   final String value;
+  final Color? valueColor;
   final Widget? valueWidget;
   final VoidCallback? onTap;
 
@@ -405,6 +404,7 @@ class _PublicInfoLine extends StatelessWidget {
     this.iconAssetPath,
     required this.label,
     required this.value,
+    this.valueColor,
     this.valueWidget,
     this.onTap,
   }) : assert(icon != null || iconAssetPath != null);
@@ -438,21 +438,18 @@ class _PublicInfoLine extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    label,
-                    style: const TextStyle(
-                      color: Colors.black54,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    label.toUpperCase(),
+                    style: _publicSectionTitleStyle,
                   ),
                   const SizedBox(height: 2),
                   valueWidget ??
                       Text(
                         value,
                         style: TextStyle(
-                          color: onTap == null
-                              ? Colors.black87
-                              : const Color(0xFF1E3A8A),
+                          color: valueColor ??
+                              (onTap == null
+                                  ? Colors.black87
+                                  : const Color(0xFF1E3A8A)),
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                           decoration: onTap == null
@@ -492,7 +489,7 @@ class _PublicRescueStationValue extends StatelessWidget {
             'POSTE DE SECOURS',
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: Colors.black87,
+              color: Color(0xFF1E3A8A),
               fontSize: 14,
               fontWeight: FontWeight.w800,
             ),
@@ -544,12 +541,7 @@ class _PublicChips extends StatelessWidget {
       children: [
         Text(
           title.toUpperCase(),
-          style: const TextStyle(
-            color: Color(0xFF1E3A8A),
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.5,
-          ),
+          style: _publicSectionTitleStyle,
         ),
         const SizedBox(height: 8),
         Column(
@@ -621,3 +613,4 @@ class _PublicLinkButton extends StatelessWidget {
     );
   }
 }
+
