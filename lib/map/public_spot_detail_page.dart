@@ -52,7 +52,7 @@ class PublicSpotDetailPage extends StatelessWidget {
     final showUnsupervisedWarning =
         spot.isMissingFlagColorDuringSurveillance || flagIsLowered;
     final rawPublicDetailStatus = flagIsLowered
-        ? 'BAIGNADE NON SURVEILLÉE TEMPORAIREMENT'
+        ? '⚠️ BAIGNADE NON SURVEILLÉE TEMPORAIREMENT'
         : spot.displayStatut;
     final publicDetailStatus = rawPublicDetailStatus.replaceFirst(
       ' ⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
@@ -365,7 +365,7 @@ class _UnsupervisedWarning extends StatelessWidget {
       child: const Column(
         children: [
           Text(
-            'BAIGNADE NON SURVEILLÉE',
+            '⚠️ BAIGNADE NON SURVEILLÉE',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFFFF0000),
@@ -375,7 +375,7 @@ class _UnsupervisedWarning extends StatelessWidget {
           ),
           SizedBox(height: 3),
           Text(
-            'BAIGNADE À VOS RISQUES ET PÉRILS',
+            '⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFFFF0000),

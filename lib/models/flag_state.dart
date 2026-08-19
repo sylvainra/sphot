@@ -278,20 +278,20 @@ class SpotFlagState {
     }
 
     if (flagColor == FlagColor.none) {
-      return 'COULEUR DE LA FLAMME NON RENSEIGNÉE';
+      return '⚠️ COULEUR DE LA FLAMME NON RENSEIGNÉE';
     }
 
     switch (flagColor) {
       case FlagColor.green:
         return 'BAIGNADE SURVEILLÉE ET AUTORISÉE';
       case FlagColor.yellow:
-        return 'BAIGNADE SURVEILLÉE MAIS DANGEREUSE';
+        return '⚠️ BAIGNADE SURVEILLÉE MAIS DANGEREUSE';
       case FlagColor.red:
-        return 'BAIGNADE INTERDITE';
+        return '⚠️ BAIGNADE INTERDITE';
       case FlagColor.violet:
-        return 'BAIGNADE INTERDITE - POLLUTION OU PRÉSENCE D’ESPÈCES DANGEREUSES';
+        return '⚠️ BAIGNADE INTERDITE - POLLUTION OU PRÉSENCE D’ESPÈCES DANGEREUSES';
       case FlagColor.none:
-        return 'COULEUR DE LA FLAMME NON RENSEIGNÉE';
+        return '⚠️ COULEUR DE LA FLAMME NON RENSEIGNÉE';
     }
   }
 
