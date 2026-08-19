@@ -143,16 +143,24 @@ class SpotFlagState {
     final type = normalizedType;
 
     if (isPosteSecours) return 0xFFFF0000;
-    if (isNaturisme) return 0xFFD87A5C;
+    if (isNaturisme ||
+        type.contains('NATURISME') ||
+        type.contains('NATURISTE')) {
+      return 0xFFD87A5C;
+    }
     if (type.contains('PLAGE')) return 0xFFFFD000;
 
     if (type.contains('LAC') ||
+        type.contains('ETANG') ||
         type.contains("PLAN D'EAU") ||
+        type.contains('PLAN D EAU') ||
         type.contains('BARRAGE')) {
       return 0xFF1E3A8A;
     }
 
-    if (type.contains('FLEUVE') || type.contains('RIVIERE')) {
+    if (type.contains('FLEUVE') ||
+        type.contains('RIVIERE') ||
+        type.contains('CASCADE')) {
       return 0xFF2E7D32;
     }
 
@@ -161,6 +169,42 @@ class SpotFlagState {
     }
 
     return 0xFFFFA500;
+  }
+
+  String get markerIconPath {
+    final type = normalizedType;
+
+    if (isPosteSecours) return 'data/icons/fire_red_icon.png';
+
+    if (isNaturisme ||
+        type.contains('NATURISME') ||
+        type.contains('NATURISTE')) {
+      return 'data/icons/fire_skin_icon.png';
+    }
+
+    if (type.contains('PLAGE')) {
+      return 'data/icons/fire_orange_icon.png';
+    }
+
+    if (type.contains('LAC') ||
+        type.contains('ETANG') ||
+        type.contains("PLAN D'EAU") ||
+        type.contains('PLAN D EAU') ||
+        type.contains('BARRAGE')) {
+      return 'data/icons/fire_blue_icon.png';
+    }
+
+    if (type.contains('FLEUVE') ||
+        type.contains('RIVIERE') ||
+        type.contains('CASCADE')) {
+      return 'data/icons/fire_green_icon.png';
+    }
+
+    if (type.contains('LAGON') || type.contains('PISCINE NATURELLE')) {
+      return 'data/icons/fire_cyan_icon.png';
+    }
+
+    return 'data/icons/fire_orange1_icon.png';
   }
 
   FlagColor get flagColor {
@@ -381,4 +425,3 @@ enum FlagPosition {
   affale,
   none,
 }
-

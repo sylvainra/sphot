@@ -122,9 +122,7 @@ class PublicSpotDetailPage extends StatelessWidget {
                           ],
                           const SizedBox(height: 18),
                           _PublicInfoLine(
-                            icon: spot.isPosteSecours
-                                ? Icons.health_and_safety_outlined
-                                : Icons.place_outlined,
+                            iconAssetPath: spot.markerIconPath,
                             label: 'Type de SPHOT',
                             value: spot.typeSphot,
                           ),
@@ -386,17 +384,19 @@ class _UnsupervisedWarning extends StatelessWidget {
 }
 
 class _PublicInfoLine extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? iconAssetPath;
   final String label;
   final String value;
   final VoidCallback? onTap;
 
   const _PublicInfoLine({
-    required this.icon,
+    this.icon,
+    this.iconAssetPath,
     required this.label,
     required this.value,
     this.onTap,
-  });
+  }) : assert(icon != null || iconAssetPath != null);
 
   @override
   Widget build(BuildContext context) {
@@ -410,7 +410,16 @@ class _PublicInfoLine extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 22, color: const Color(0xFF1E3A8A)),
+            if (iconAssetPath != null)
+              Image.asset(
+                iconAssetPath!,
+                width: 34,
+                height: 34,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+              )
+            else
+              Icon(icon, size: 22, color: const Color(0xFF1E3A8A)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
