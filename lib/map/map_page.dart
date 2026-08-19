@@ -6,6 +6,7 @@ import 'profil_login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -2563,14 +2564,27 @@ class _HoverMarkerState extends State<_HoverMarker> {
 
                           SizedBox(height: _lineSpacing() + 5),
 
-                          Text(
-                            '🚨 POSTE DE SECOURS 🚨',
-                            textAlign: TextAlign.center,
-                            style: _mapLabelStyle(
-                              fontSize: _labelSize(12),
-                              fontWeight: FontWeight.w900,
-                              color: const Color(0xFFFF0000),
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 13,
+                                height: 20,
+                                child: SvgPicture.asset(
+                                  'data/icons/flag_red_yellow_5x3.svg',
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                'POSTE DE SECOURS',
+                                style: _mapLabelStyle(
+                                  fontSize: _labelSize(12),
+                                  fontWeight: FontWeight.w900,
+                                  color: const Color(0xFFFF0000),
+                                ),
+                              ),
+                            ],
                           ),
 
                           SizedBox(height: _lineSpacing() - 1.8),
