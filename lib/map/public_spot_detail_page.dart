@@ -45,6 +45,7 @@ class PublicSpotDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final statusColor = Color(spot.statutColor);
+    final headerColor = Color(spot.markerColor);
     final commune = spot.ville.trim();
     final flagIsLowered =
         spot.isPosteSecours && spot.flagPosition == FlagPosition.affale;
@@ -62,7 +63,7 @@ class PublicSpotDetailPage extends StatelessWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(22, 16, 18, 18),
-              color: statusColor,
+              color: headerColor,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

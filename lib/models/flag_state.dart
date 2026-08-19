@@ -139,6 +139,30 @@ class SpotFlagState {
         .trim();
   }
 
+  int get markerColor {
+    final type = normalizedType;
+
+    if (isPosteSecours) return 0xFFFF0000;
+    if (isNaturisme) return 0xFFD87A5C;
+    if (type.contains('PLAGE')) return 0xFFFFD000;
+
+    if (type.contains('LAC') ||
+        type.contains("PLAN D'EAU") ||
+        type.contains('BARRAGE')) {
+      return 0xFF1E3A8A;
+    }
+
+    if (type.contains('FLEUVE') || type.contains('RIVIERE')) {
+      return 0xFF2E7D32;
+    }
+
+    if (type.contains('LAGON') || type.contains('PISCINE NATURELLE')) {
+      return 0xFF00ACC1;
+    }
+
+    return 0xFFFFA500;
+  }
+
   FlagColor get flagColor {
     switch (_readString(liveFlag?['flagColor']).toLowerCase()) {
       case 'green':
@@ -357,5 +381,4 @@ enum FlagPosition {
   affale,
   none,
 }
-
 
