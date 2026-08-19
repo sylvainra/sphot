@@ -174,16 +174,16 @@ class SpotFlagState {
   String get markerIconPath {
     final type = normalizedType;
 
-    if (isPosteSecours) return 'data/icons/fire_red_icon.png';
+    if (isPosteSecours) return 'data/icons/fire_red_icon.svg';
 
     if (isNaturisme ||
         type.contains('NATURISME') ||
         type.contains('NATURISTE')) {
-      return 'data/icons/fire_skin_icon.png';
+      return 'data/icons/fire_skin_icon.svg';
     }
 
     if (type.contains('PLAGE')) {
-      return 'data/icons/fire_orange_icon.png';
+      return 'data/icons/fire_orange_icon.svg';
     }
 
     if (type.contains('LAC') ||
@@ -191,20 +191,20 @@ class SpotFlagState {
         type.contains("PLAN D'EAU") ||
         type.contains('PLAN D EAU') ||
         type.contains('BARRAGE')) {
-      return 'data/icons/fire_blue_icon.png';
+      return 'data/icons/fire_blue_icon.svg';
     }
 
     if (type.contains('FLEUVE') ||
         type.contains('RIVIERE') ||
         type.contains('CASCADE')) {
-      return 'data/icons/fire_green_icon.png';
+      return 'data/icons/fire_green_icon.svg';
     }
 
     if (type.contains('LAGON') || type.contains('PISCINE NATURELLE')) {
-      return 'data/icons/fire_cyan_icon.png';
+      return 'data/icons/fire_cyan_icon.svg';
     }
 
-    return 'data/icons/fire_orange1_icon.png';
+    return 'data/icons/fire_orange1_icon.svg';
   }
 
   FlagColor get flagColor {

@@ -413,12 +413,13 @@ class _PublicInfoLine extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (iconAssetPath != null)
-              Image.asset(
+              SvgPicture.asset(
                 iconAssetPath!,
                 width: 34,
                 height: 34,
                 fit: BoxFit.contain,
-                filterQuality: FilterQuality.high,
+                placeholderBuilder: (_) =>
+                    const SizedBox.square(dimension: 34),
               )
             else
               Icon(icon, size: 22, color: const Color(0xFF1E3A8A)),
