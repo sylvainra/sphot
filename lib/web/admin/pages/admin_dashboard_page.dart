@@ -2516,8 +2516,13 @@ Widget _buildAdminDetailPanel() {
     );
   }
 
-  return Container(
-    width: 420,
+  return DefaultTextStyle.merge(
+    style: const TextStyle(
+      decoration: TextDecoration.none,
+      decorationColor: Colors.transparent,
+    ),
+    child: Container(
+      width: 420,
     decoration: BoxDecoration(
       color: Colors.white.withOpacity(0.98),
       border: Border(
@@ -2995,6 +3000,7 @@ const SizedBox(height: 18),
           ),
         ],
       ),
+    ),
     ),
   );
 }
