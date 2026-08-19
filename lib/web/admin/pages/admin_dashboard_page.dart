@@ -7129,6 +7129,7 @@ Widget _sphotMultiDropdown({
   required String label,
   required List<String> choices,
   required Set<String> selectedValues,
+  required TextEditingController otherController,
   double maxMenuHeight = 245,
 }) {
   final displayText = selectedValues.isEmpty
@@ -7148,6 +7149,7 @@ Widget _sphotMultiDropdown({
   fieldKey: fieldKey,
   choices: choices,
   selectedValues: selectedValues,
+  otherController: otherController,
   maxMenuHeight: maxMenuHeight,
 );
     },
@@ -7218,11 +7220,13 @@ Widget _sphotTypeLabel(
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SvgPicture.asset(
-          _rescueStationFlagAsset,
-          width: 26,
-          height: 18,
-          fit: BoxFit.contain,
+        SizedBox(
+          width: 13,
+          height: 20,
+          child: SvgPicture.asset(
+            _rescueStationFlagAsset,
+            fit: BoxFit.contain,
+          ),
         ),
         const SizedBox(width: 8),
         Flexible(
@@ -7344,31 +7348,65 @@ void _openSphotTypeMenu() {
                         final choice =
                             _sphotTypeChoices[index];
 
-                        return InkWell(
-                          onTap: () {
-                            setState(() {
-                              _selectedSphotType = choice;
-                              if (choice != 'AUTRE') {
-                                _sphotOtherTypeController.clear();
-                              }
-                            });
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _selectedSphotType = choice;
+                                  if (choice != 'AUTRE') {
+                                    _sphotOtherTypeController.clear();
+                                  }
+                                });
 
-                            _dropdownOverlay?.remove();
-                            _dropdownOverlay = null;
-                          },
-
-                          child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
+                                if (choice == 'AUTRE') {
+                                  _dropdownOverlay?.markNeedsBuild();
+                                  WidgetsBinding.instance
+                                      .addPostFrameCallback((_) {
+                                    if (scrollController.hasClients) {
+                                      scrollController.animateTo(
+                                        scrollController.position
+                                            .maxScrollExtent,
+                                        duration: const Duration(
+                                          milliseconds: 180,
+                                        ),
+                                        curve: Curves.easeOut,
+                                      );
+                                    }
+                                  });
+                                } else {
+                                  _dropdownOverlay?.remove();
+                                  _dropdownOverlay = null;
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                child: _sphotTypeLabel(
+                                  choice,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ),
-
-                            child: _sphotTypeLabel(
-                              choice,
-                              fontSize: 13,
-                            ),
-                          ),
+                            if (choice == 'AUTRE' &&
+                                _selectedSphotType == 'AUTRE')
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  14,
+                                  0,
+                                  14,
+                                  10,
+                                ),
+                                child: _sphotEditorField(
+                                  controller: _sphotOtherTypeController,
+                                  label: 'Précisez :',
+                                ),
+                              ),
+                          ],
                         );
                       },
                     ),
@@ -7389,6 +7427,7 @@ void _openSphotMultiChoiceMenu({
   required GlobalKey fieldKey,
   required List<String> choices,
   required Set<String> selectedValues,
+  required TextEditingController otherController,
   required double maxMenuHeight,
 }) {
   _dropdownOverlay?.remove();
@@ -7497,7 +7536,11 @@ final choiceIconPath =
 final displayedChoice =
     _sphotLabelDisplayNames[choice] ?? choice;
 
-                            return InkWell(
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                            InkWell(
                               onTap: () {
                                 setState(() {
   if (choice == 'AUCUN') {
@@ -7549,6 +7592,21 @@ selectedValues.add(choice);
 });
 
                                 overlaySetState(() {});
+                                if (choice == 'AUTRE' && !selected) {
+                                  WidgetsBinding.instance
+                                      .addPostFrameCallback((_) {
+                                    if (scrollController.hasClients) {
+                                      scrollController.animateTo(
+                                        scrollController.position
+                                            .maxScrollExtent,
+                                        duration: const Duration(
+                                          milliseconds: 180,
+                                        ),
+                                        curve: Curves.easeOut,
+                                      );
+                                    }
+                                  });
+                                }
                               },
 
                               child: Padding(
@@ -7608,6 +7666,22 @@ Expanded(
                                   ],
                                 ),
                               ),
+                            ),
+                            if (choice == 'AUTRE' &&
+                                selectedValues.contains('AUTRE'))
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  14,
+                                  0,
+                                  14,
+                                  10,
+                                ),
+                                child: _sphotEditorField(
+                                  controller: otherController,
+                                  label: 'Précisez :',
+                                ),
+                              ),
+                              ],
                             );
                           },
                         ),
@@ -9855,13 +9929,6 @@ const SizedBox(height: 9),
   ),
 ),
             ),
-            if (_selectedSphotType == 'AUTRE') ...[
-              const SizedBox(height: 9),
-              _sphotEditorField(
-                controller: _sphotOtherTypeController,
-                label: 'Précisez l’autre type de SPHOT',
-              ),
-            ],
             const SizedBox(height: 20),
             _sphotSectionTitle(
   4,
@@ -9873,16 +9940,9 @@ const SizedBox(height: 9),
   label: 'Équipements du SPHOT',
   choices: _sphotEquipmentChoices,
   selectedValues: _selectedSphotEquipments,
-  maxMenuHeight: 220,
+  otherController: _sphotOtherEquipmentController,
+  maxMenuHeight: 160,
 ),
-
-if (_selectedSphotEquipments.contains('AUTRE')) ...[
-  const SizedBox(height: 9),
-  _sphotEditorField(
-    controller: _sphotOtherEquipmentController,
-    label: 'Précisez l’autre équipement',
-  ),
-],
 
 const SizedBox(height: 14),
 
@@ -9898,15 +9958,9 @@ _sphotMultiDropdown(
   label: 'Labels du SPHOT',
   choices: _sphotLabelChoices,
   selectedValues: _selectedSphotLabels,
+  otherController: _sphotOtherLabelController,
   maxMenuHeight: 140,
 ),
-if (_selectedSphotLabels.contains('AUTRE')) ...[
-  const SizedBox(height: 9),
-  _sphotEditorField(
-    controller: _sphotOtherLabelController,
-    label: 'Précisez l’autre label',
-  ),
-],
             const SizedBox(height: 32),
 
 SizedBox(
