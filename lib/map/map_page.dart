@@ -192,7 +192,16 @@ List<Marker> _buildAdminMarkers(
             behavior: HitTestBehavior.opaque,
             onTap: () => _openCityWebsite(siteInternetVille),
             child: Tooltip(
-              message: 'Site officiel - ${spot.ville}',
+              message: spot.ville.toUpperCase(),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF0000),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              textStyle: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
               child: Transform.rotate(
                 angle: -rotation * pi / 180,
                 child: SizedBox(
@@ -226,15 +235,23 @@ List<Marker> _buildAdminMarkers(
                                     color: Color(0xFF1E3A8A),
                                     size: 23,
                                   )
-                                : Image.network(
-                                    logoVille,
-                                    width: 34,
-                                    height: 34,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.account_balance_rounded,
-                                      color: Color(0xFF1E3A8A),
-                                      size: 23,
+                                : IgnorePointer(
+                                    child: Image.network(
+                                      logoVille,
+                                      key: ValueKey<String>(
+                                        'public-admin-logo-$logoVille',
+                                      ),
+                                      width: 34,
+                                      height: 34,
+                                      fit: BoxFit.contain,
+                                      gaplessPlayback: true,
+                                      webHtmlElementStrategy:
+                                          WebHtmlElementStrategy.prefer,
+                                      errorBuilder: (_, __, ___) => const Icon(
+                                        Icons.account_balance_rounded,
+                                        color: Color(0xFF1E3A8A),
+                                        size: 23,
+                                      ),
                                     ),
                                   ),
                           ),

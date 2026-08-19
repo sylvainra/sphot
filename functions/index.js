@@ -127,6 +127,11 @@ function mergePublicTerritoryData(spot, territory) {
   const result = {...spot};
   const normalizedTerritory = {
     ...territory,
+    logoVille: territory.logoVille ||
+      territory.logoUrl ||
+      (territory.structure || {}).logoVille ||
+      (territory.structure || {}).logoUrl ||
+      "",
     siteInternetVille: territory.siteInternetVille ||
       territory.siteInternet ||
       (territory.structure || {}).siteInternet ||
