@@ -110,11 +110,7 @@ Color _sphotHoverColor = adminColor;
   final TextEditingController _sphotNameController = TextEditingController();
   final TextEditingController _sphotLatController = TextEditingController();
   final TextEditingController _sphotLngController = TextEditingController();
-  final TextEditingController _sphotOtherTypeController =
-      TextEditingController();
-  final TextEditingController _sphotOtherEquipmentController =
-      TextEditingController();
-  final TextEditingController _sphotOtherLabelController =
+  final TextEditingController _sphotWebcamUrlController =
       TextEditingController();
 
   final TextEditingController _sauveteurNomController =
@@ -192,12 +188,9 @@ Color _sphotHoverColor = adminColor;
     '🏋️ FITNESS AREA',
     '🗑️ POUBELLE',
     '🚯 SANS POUBELLE',
-    '🚻 TOILETTES GRATUITES',
-    '🚻 TOILETTES PAYANTES',
-    '🅿️ PARKING GRATUIT',
-    '🅿️ PARKING PAYANT',
-    '🚐 PARKING CAMPING-CAR GRATUIT',
-    '🚐 PARKING CAMPING-CAR PAYANT',
+    '🚻 TOILETTES',
+    '🅿️ PARKING',
+    '🚐 PARKING CAMPING-CAR',
     '🚿 DOUCHE',
     '🤿 PLONGEOIR',
     '🛟 PLATE FORME FLOTTANTE',
@@ -205,21 +198,6 @@ Color _sphotHoverColor = adminColor;
     '⚓ PONTON',
     'AUTRE',
   ];
-
-  static const Set<String> _sphotToiletChoices = {
-    '🚻 TOILETTES GRATUITES',
-    '🚻 TOILETTES PAYANTES',
-  };
-
-  static const Set<String> _sphotParkingChoices = {
-    '🅿️ PARKING GRATUIT',
-    '🅿️ PARKING PAYANT',
-  };
-
-  static const Set<String> _sphotCampingCarParkingChoices = {
-    '🚐 PARKING CAMPING-CAR GRATUIT',
-    '🚐 PARKING CAMPING-CAR PAYANT',
-  };
 
   static const List<String> _sphotLabelChoices = [
   'AUCUN',
@@ -6304,9 +6282,7 @@ void _clearSphotEditor() {
   _sphotNameController.clear();
   _sphotLatController.clear();
   _sphotLngController.clear();
-  _sphotOtherTypeController.clear();
-  _sphotOtherEquipmentController.clear();
-  _sphotOtherLabelController.clear();
+  _sphotWebcamUrlController.clear();
 }
 
 void _openNewSphotEditor() {
@@ -6596,18 +6572,6 @@ void _loadSphotInEditor(Map<String, dynamic> data) {
 
   final lat = _toDouble(data['sphotLat']);
   final lng = _toDouble(data['sphotLng']);
-  final loadedEquipments = _readSphotMultiValue(data['equipement']);
-
-  // Compatibilité avec les SPHOTS créés avant la différenciation tarifaire.
-  if (loadedEquipments.remove('🚻 TOILETTES')) {
-    loadedEquipments.add('🚻 TOILETTES GRATUITES');
-  }
-  if (loadedEquipments.remove('🅿️ PARKING')) {
-    loadedEquipments.add('🅿️ PARKING GRATUIT');
-  }
-  if (loadedEquipments.remove('🚐 PARKING CAMPING-CAR')) {
-    loadedEquipments.add('🚐 PARKING CAMPING-CAR GRATUIT');
-  }
 
   setState(() {
     _showTrialSummaryPanel = false;
@@ -6624,22 +6588,19 @@ void _loadSphotInEditor(Map<String, dynamic> data) {
         : _spotName(data);
     _sphotLatController.text = lat == 0 ? '' : lat.toStringAsFixed(6);
     _sphotLngController.text = lng == 0 ? '' : lng.toStringAsFixed(6);
-    _selectedSphotType = _cleanText(data['typeSphot']);
-    _sphotOtherTypeController.text = _cleanText(
-      data['autreTypeSphot'] ?? data['typeSphotAutre'],
+    _sphotWebcamUrlController.text = _cleanText(
+      data['adresseWebcam'] ??
+          data['webcamUrl'] ??
+          data['urlWebcam'] ??
+          data['webcam'],
     );
+    _selectedSphotType = _cleanText(data['typeSphot']);
     _selectedSphotEquipments
       ..clear()
-      ..addAll(loadedEquipments);
+      ..addAll(_readSphotMultiValue(data['equipement']));
     _selectedSphotLabels
       ..clear()
       ..addAll(_readSphotMultiValue(data['labelSphot']));
-    _sphotOtherEquipmentController.text = _cleanText(
-      data['autreEquipement'] ?? data['equipementAutre'],
-    );
-    _sphotOtherLabelController.text = _cleanText(
-      data['autreLabel'] ?? data['labelSphotAutre'],
-    );
     _showSauveteurEditorPanel = false;
     _showSauveteursManagementPanel = false;
     _showSurveillancePeriodsPanel = false;
@@ -6719,15 +6680,6 @@ Future<void> _saveSphotFromDashboard() async {
     errorMessage = 'Positionnez le SPHOT sur la carte.';
   } else if (_selectedSphotType.isEmpty) {
     errorMessage = 'Sélectionnez le type de SPHOT.';
-  } else if (_selectedSphotType == 'AUTRE' &&
-      _sphotOtherTypeController.text.trim().isEmpty) {
-    errorMessage = 'Précisez l’autre type de SPHOT.';
-  } else if (_selectedSphotEquipments.contains('AUTRE') &&
-      _sphotOtherEquipmentController.text.trim().isEmpty) {
-    errorMessage = 'Précisez l’autre équipement du SPHOT.';
-  } else if (_selectedSphotLabels.contains('AUTRE') &&
-      _sphotOtherLabelController.text.trim().isEmpty) {
-    errorMessage = 'Précisez l’autre label du SPHOT.';
   }
 
   if (errorMessage != null) {
@@ -6767,21 +6719,13 @@ Future<void> _saveSphotFromDashboard() async {
       'idSphot': idSphot,
       'nomSphot': _sphotNameController.text.trim(),
       'typeSphot': _selectedSphotType,
-      'autreTypeSphot': _selectedSphotType == 'AUTRE'
-          ? _sphotOtherTypeController.text.trim()
-          : '',
       'isPosteSecours':
           _selectedSphotType == '🚨 POSTE DE SECOURS 🚨',
       'sphotLat': lat,
       'sphotLng': lng,
       'equipement': _selectedSphotEquipments.join(' | '),
-      'autreEquipement': _selectedSphotEquipments.contains('AUTRE')
-          ? _sphotOtherEquipmentController.text.trim()
-          : '',
       'labelSphot': _selectedSphotLabels.join(' | '),
-      'autreLabel': _selectedSphotLabels.contains('AUTRE')
-          ? _sphotOtherLabelController.text.trim()
-          : '',
+      'adresseWebcam': _sphotWebcamUrlController.text.trim(),
       'pays': territoryData['pays'] ?? '',
       'region': territoryData['region'] ?? '',
       'departement': territoryData['departement'] ?? '',
@@ -7123,14 +7067,43 @@ Widget _sphotMultiDropdown({
   required Set<String> selectedValues,
   double maxMenuHeight = 245,
 }) {
-  final displayText = selectedValues.isEmpty
-    ? label
-    : selectedValues
-        .map(
-          (value) =>
-              _sphotLabelDisplayNames[value] ?? value,
-        )
-        .join('\n');
+  final selectedValueSpans = <InlineSpan>[];
+
+  for (var index = 0; index < selectedValues.length; index++) {
+    final value = selectedValues.elementAt(index);
+    final iconPath = _sphotLabelIconPaths[value];
+    final displayName = _sphotLabelDisplayNames[value] ?? value;
+
+    if (iconPath != null) {
+      selectedValueSpans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Image.asset(
+              iconPath,
+              width: 18,
+              height: 18,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(
+                  Icons.image_not_supported_outlined,
+                  color: adminColor,
+                  size: 16,
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    }
+
+    selectedValueSpans.add(TextSpan(text: displayName));
+
+    if (index < selectedValues.length - 1) {
+      selectedValueSpans.add(const TextSpan(text: '\n'));
+    }
+  }
 
   return GestureDetector(
     key: fieldKey,
@@ -7174,16 +7147,27 @@ Widget _sphotMultiDropdown({
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              displayText,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: adminColor,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
+            child: selectedValues.isEmpty
+                ? Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: adminColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  )
+                : Text.rich(
+                    TextSpan(children: selectedValueSpans),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: adminColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
           ),
           const Icon(
             Icons.checklist_rounded,
@@ -7299,9 +7283,6 @@ void _openSphotTypeMenu() {
                           onTap: () {
                             setState(() {
                               _selectedSphotType = choice;
-                              if (choice != 'AUTRE') {
-                                _sphotOtherTypeController.clear();
-                              }
                             });
 
                             _dropdownOverlay?.remove();
@@ -7481,20 +7462,6 @@ if (_sphotWaterQualityChoices.contains(choice)) {
 if (_sphotHandiplageChoices.contains(choice)) {
   selectedValues.removeAll(
     _sphotHandiplageChoices,
-  );
-}
-
-if (_sphotToiletChoices.contains(choice)) {
-  selectedValues.removeAll(_sphotToiletChoices);
-}
-
-if (_sphotParkingChoices.contains(choice)) {
-  selectedValues.removeAll(_sphotParkingChoices);
-}
-
-if (_sphotCampingCarParkingChoices.contains(choice)) {
-  selectedValues.removeAll(
-    _sphotCampingCarParkingChoices,
   );
 }
 
@@ -9546,7 +9513,7 @@ Widget _buildSphotEditorPanel() {
       color: Colors.transparent,
       child: SafeArea(
   child: Padding(
-    padding: const EdgeInsets.all(20),
+    padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
     child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -9594,12 +9561,12 @@ Widget _buildSphotEditorPanel() {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 8),
             _sphotSectionTitle(
   1,
   'EMPLACEMENT',
 ),
-            const SizedBox(height: 9),
+            const SizedBox(height: 5),
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -9677,12 +9644,12 @@ style: OutlinedButton.styleFrom(
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
             _sphotSectionTitle(
   2,
   'IDENTIFICATION',
 ),
-            const SizedBox(height: 9),
+            const SizedBox(height: 5),
             Row(
               children: [
                 SizedBox(
@@ -9730,14 +9697,14 @@ Expanded(
 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
 
 _sphotSectionTitle(
   3,
   'TYPE',
 ),
 
-const SizedBox(height: 9),
+const SizedBox(height: 5),
             Theme(
   data: Theme.of(context).copyWith(
     scrollbarTheme: const ScrollbarThemeData(
@@ -9822,19 +9789,12 @@ const SizedBox(height: 9),
   ),
 ),
             ),
-            if (_selectedSphotType == 'AUTRE') ...[
-              const SizedBox(height: 9),
-              _sphotEditorField(
-                controller: _sphotOtherTypeController,
-                label: 'Précisez l’autre type de SPHOT',
-              ),
-            ],
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
             _sphotSectionTitle(
   4,
   'ÉQUIPEMENTS',
 ),
-            const SizedBox(height: 9),
+            const SizedBox(height: 5),
            _sphotMultiDropdown(
   fieldKey: _sphotEquipmentKey,
   label: 'Équipements du SPHOT',
@@ -9843,22 +9803,14 @@ const SizedBox(height: 9),
   maxMenuHeight: 220,
 ),
 
-if (_selectedSphotEquipments.contains('AUTRE')) ...[
-  const SizedBox(height: 9),
-  _sphotEditorField(
-    controller: _sphotOtherEquipmentController,
-    label: 'Précisez l’autre équipement',
-  ),
-],
-
-const SizedBox(height: 14),
+const SizedBox(height: 8),
 
 _sphotSectionTitle(
   5,
   'LABELS',
 ),
 
-const SizedBox(height: 9),
+const SizedBox(height: 5),
 
 _sphotMultiDropdown(
   fieldKey: _sphotLabelKey,
@@ -9867,14 +9819,22 @@ _sphotMultiDropdown(
   selectedValues: _selectedSphotLabels,
   maxMenuHeight: 140,
 ),
-if (_selectedSphotLabels.contains('AUTRE')) ...[
-  const SizedBox(height: 9),
-  _sphotEditorField(
-    controller: _sphotOtherLabelController,
-    label: 'Précisez l’autre label',
-  ),
-],
-            const SizedBox(height: 32),
+
+const SizedBox(height: 8),
+
+_sphotSectionTitle(
+  6,
+  'WEBCAM',
+),
+
+const SizedBox(height: 5),
+
+_sphotEditorField(
+  controller: _sphotWebcamUrlController,
+  label: 'Adresse internet de la webcam si doté',
+  keyboardType: TextInputType.url,
+),
+            const SizedBox(height: 45),
 
 SizedBox(
   width: double.infinity,
@@ -12298,9 +12258,7 @@ void dispose() {
   _sphotNameController.dispose();
   _sphotLatController.dispose();
   _sphotLngController.dispose();
-  _sphotOtherTypeController.dispose();
-  _sphotOtherEquipmentController.dispose();
-  _sphotOtherLabelController.dispose();
+  _sphotWebcamUrlController.dispose();
   _sauveteurNomController.dispose();
   _sauveteurPrenomController.dispose();
   _sauveteurDateNaissanceController.dispose();
@@ -12929,20 +12887,26 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
         'ADMIN',
   );
 
+  final ville = _cleanText(
+    territoire['ville'] ??
+        data['ville'] ??
+        organisation,
+  ).toUpperCase();
+
   final logoUrl = _cleanText(
-  territoire['logoVille'] ??
-      territoire['logoUrl'] ??
-      structure['logoVille'] ??
-      structure['logoUrl'] ??
-      data['logoVille'] ??
-      data['logoUrl'],
-);
+    territoire['logoVille'] ??
+        territoire['logoUrl'] ??
+        structure['logoVille'] ??
+        structure['logoUrl'] ??
+        data['logoVille'] ??
+        data['logoUrl'],
+  );
 
   return Marker(
-  point: LatLng(lat, lng),
-  width: 85,
-  height: 85,
-  alignment: Alignment.topCenter,
+    point: LatLng(lat, lng),
+    width: 85,
+    height: 85,
+    alignment: Alignment.topCenter,
     child: MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -12950,14 +12914,26 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
         onTap: () {
           setState(() {
             _selectedSpot = null;
-            _selectedAdmin =
-                Map<String, dynamic>.from(data);
+            _selectedAdmin = Map<String, dynamic>.from(data);
             _selectedAdvertiser = null;
             _showLegalDocumentsPanel = false;
             _selectedLegalDocument = null;
             _selectedLegalChapter = null;
           });
         },
+        child: Tooltip(
+          message: ville,
+          preferBelow: true,
+          verticalOffset: 40,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF0000),
+            borderRadius: BorderRadius.circular(5),
+          ),
+          textStyle: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
           child: SizedBox(
             width: 85,
             height: 85,
@@ -12965,13 +12941,12 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
               alignment: Alignment.topCenter,
               children: [
                 Image.asset(
-  'data/icons/fire_red_icon.png',
-  width: 85,
-  height: 85,
+                  'data/icons/fire_red_icon.png',
+                  width: 85,
+                  height: 85,
                   fit: BoxFit.contain,
                   filterQuality: FilterQuality.high,
                 ),
-
                 Positioned(
                   top: 23,
                   child: Container(
@@ -13021,9 +12996,10 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
                     ),
                   ),
                 ),
-                            ],
+              ],
             ),
           ),
+        ),
       ),
     ),
   );
