@@ -215,7 +215,7 @@ class PublicSpotDetailPage extends StatelessWidget {
                                 if (spot.arretesMunicipaux.isNotEmpty)
                                   _PublicLinkButton(
                                     icon: Icons.gavel_outlined,
-                                    label: 'Règlementations de baignade',
+                                    label: 'Réglementation de baignade',
                                     onTap: () => _openUrl(
                                       context,
                                       spot.arretesMunicipaux,
