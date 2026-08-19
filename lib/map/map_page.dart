@@ -2638,7 +2638,7 @@ Widget _warningLineUniform(String text, double size) {
           Icon(
             Icons.warning_amber_rounded,
             size: size,
-            color: const Color(0xFFFF0000),
+            color: const Color(0xFFFFC107),
           ),
         ],
       ),
@@ -2717,3 +2717,4 @@ TextStyle _mapLabelStyle({
     ],
   );
 }
+
