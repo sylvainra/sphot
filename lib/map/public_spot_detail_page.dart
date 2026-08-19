@@ -193,9 +193,8 @@ class PublicSpotDetailPage extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 if (spot.siteInternetVille.isNotEmpty)
                                   _PublicLinkButton(
@@ -206,6 +205,9 @@ class PublicSpotDetailPage extends StatelessWidget {
                                       spot.siteInternetVille,
                                     ),
                                   ),
+                                if (spot.siteInternetVille.isNotEmpty &&
+                                    spot.arretesMunicipaux.isNotEmpty)
+                                  const SizedBox(height: 8),
                                 if (spot.arretesMunicipaux.isNotEmpty)
                                   _PublicLinkButton(
                                     icon: Icons.gavel_outlined,
@@ -506,12 +508,14 @@ class _PublicChips extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 7,
-          runSpacing: 7,
-          children: values
-              .map((value) => _buildChip(value))
-              .toList(growable: false),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var index = 0; index < values.length; index++) ...[
+              _buildChip(values[index]),
+              if (index < values.length - 1) const SizedBox(height: 7),
+            ],
+          ],
         ),
       ],
     );

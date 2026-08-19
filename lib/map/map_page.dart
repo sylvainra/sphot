@@ -573,7 +573,7 @@ SpotFlagState? _findBestSpotMatch(
             child: Align(
               alignment: Alignment.centerRight,
               child: SizedBox(
-                width: min(560, screenWidth * 0.42),
+                width: min(460, screenWidth * 0.38),
                 height: double.infinity,
                 child: ClipRRect(
                   borderRadius: const BorderRadius.only(
