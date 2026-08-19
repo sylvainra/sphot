@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'dart:math' as math;
@@ -77,6 +78,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   static const Color adminColor = Color(0xFF1E3A8A);
   static const Color redColor = Color(0xFFDC2626);
   static const Color pendingColor = Color(0xFF6B7280);
+  static const String _rescueStationType =
+      '🚨 POSTE DE SECOURS 🚨';
+  static const String _rescueStationFlagAsset =
+      'data/icons/flag_red_yellow_5x3.svg';
 
   final MapController _mapController = MapController();
 Timer? _mapMovementTimer;
@@ -164,7 +169,7 @@ Color _sphotHoverColor = adminColor;
   ];
 
   static const List<String> _sphotTypeChoices = [
-  '🚨 POSTE DE SECOURS 🚨',
+  _rescueStationType,
   '🏖️ PLAGE',
   '🏞️ LAC',
   '🏞️ ÉTANG',
@@ -7205,6 +7210,47 @@ Widget _sphotMultiDropdown({
   );
 }
 
+Widget _sphotTypeLabel(
+  String type, {
+  double fontSize = 14,
+}) {
+  if (type == _rescueStationType) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SvgPicture.asset(
+          _rescueStationFlagAsset,
+          width: 26,
+          height: 18,
+          fit: BoxFit.contain,
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            'POSTE DE SECOURS',
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: adminColor,
+              fontSize: fontSize,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  return Text(
+    type.isEmpty ? 'Type de SPHOT' : type,
+    overflow: TextOverflow.ellipsis,
+    style: TextStyle(
+      color: adminColor,
+      fontSize: fontSize,
+      fontWeight: FontWeight.w800,
+    ),
+  );
+}
+
 void _openSphotTypeMenu() {
   _dropdownOverlay?.remove();
   _dropdownOverlay = null;
@@ -7318,13 +7364,9 @@ void _openSphotTypeMenu() {
                               vertical: 10,
                             ),
 
-                            child: Text(
+                            child: _sphotTypeLabel(
                               choice,
-                              style: const TextStyle(
-                                color: adminColor,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                              ),
+                              fontSize: 13,
                             ),
                           ),
                         );
@@ -9800,19 +9842,7 @@ const SizedBox(height: 9),
     child: Row(
       children: [
         Expanded(
-          child: Text(
-            _selectedSphotType.isEmpty
-                ? 'Type de SPHOT'
-                : _selectedSphotType,
-
-            overflow: TextOverflow.ellipsis,
-
-            style: const TextStyle(
-              color: adminColor,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+          child: _sphotTypeLabel(_selectedSphotType),
         ),
 
         const Icon(
