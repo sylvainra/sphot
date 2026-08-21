@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'dart:async';
 import 'profil_login_page.dart';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
@@ -122,7 +123,10 @@ void initState() {
     return 0.0;
   }
 
-  Future<void> _openCityWebsite(String rawUrl) async {
+  Future<void> _openCityWebsite(
+    String rawUrl,
+    SpotFlagState spot,
+  ) async {
   var url = rawUrl.trim();
 
   if (url.isEmpty) {
@@ -140,6 +144,18 @@ void initState() {
     _showMapMessage('Adresse du site internet invalide.');
     return;
   }
+
+  final territoireId = spot.territoireId.trim();
+  final ville = spot.ville.trim();
+  unawaited(
+    _firestoreService.recordPublicClick(
+      territoireId: territoireId,
+      targetId: territoireId.isNotEmpty ? territoireId : ville.toUpperCase(),
+      targetType: 'admin',
+      targetName: 'SPHOT ADMIN - ${ville.toUpperCase()}',
+      source: kIsWeb ? 'web' : 'app',
+    ),
+  );
 
   final opened = await launchUrl(
     uri,
@@ -191,7 +207,7 @@ List<Marker> _buildAdminMarkers(
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => _openCityWebsite(siteInternetVille),
+            onTap: () => _openCityWebsite(siteInternetVille, spot),
             child: Tooltip(
               message: spot.ville.toUpperCase(),
               preferBelow: true,
@@ -554,6 +570,16 @@ SpotFlagState? _findBestSpotMatch(
 
   void _openPublicSpotDetail(SpotFlagState spot) {
     _searchFocusNode.unfocus();
+
+    unawaited(
+      _firestoreService.recordPublicClick(
+        territoireId: spot.territoireId,
+        targetId: spot.id,
+        targetType: 'spot',
+        targetName: spot.mapDisplayName,
+        source: kIsWeb ? 'web' : 'app',
+      ),
+    );
 
     setState(() {
       _isFilterOpen = false;
@@ -2717,4 +2743,5 @@ TextStyle _mapLabelStyle({
     ],
   );
 }
+
 
