@@ -4435,9 +4435,9 @@ exports.recordPublicClick = onRequest(
               day: "2-digit",
             },
         ).format(new Date());
-        const sourceField = source === "app"
-            ? "appClicks"
-            : "webClicks";
+        const sourceField = source === "app" ?
+            "appClicks" :
+            "webClicks";
         const increment =
             admin.firestore.FieldValue.increment(1);
         const updatedAt =
