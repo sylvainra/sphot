@@ -3,10 +3,12 @@ import 'dart:ui' as ui;
 import 'dart:async';
 import 'profil_login_page.dart';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../widgets/adaptive_asset_image.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -16,6 +18,7 @@ import 'flag_marker.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import 'app_info_page.dart';
+import 'public_spot_detail_page.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
@@ -102,8 +105,6 @@ void initState() {
   _speech = stt.SpeechToText();
 }
 
-  bool _showFlagForZoom(double zoom) => zoom >= 12.5;
-
   bool _showTextForZoom(double zoom) {
     final isTouchDevice =
         Theme.of(context).platform == TargetPlatform.android ||
@@ -123,7 +124,10 @@ void initState() {
     return 0.0;
   }
 
-  Future<void> _openCityWebsite(String rawUrl) async {
+  Future<void> _openCityWebsite(
+    String rawUrl,
+    SpotFlagState spot,
+  ) async {
   var url = rawUrl.trim();
 
   if (url.isEmpty) {
@@ -142,6 +146,18 @@ void initState() {
     return;
   }
 
+  final territoireId = spot.territoireId.trim();
+  final ville = spot.ville.trim();
+  unawaited(
+    _firestoreService.recordPublicClick(
+      territoireId: territoireId,
+      targetId: territoireId.isNotEmpty ? territoireId : ville.toUpperCase(),
+      targetType: 'admin',
+      targetName: 'SPHOT ADMIN - ${ville.toUpperCase()}',
+      source: kIsWeb ? 'web' : 'app',
+    ),
+  );
+
   final opened = await launchUrl(
     uri,
     mode: LaunchMode.externalApplication,
@@ -152,7 +168,7 @@ void initState() {
   }
 }
 
-List<Marker> _buildTerritoryLogoMarkers(
+List<Marker> _buildAdminMarkers(
   List<SpotFlagState> spots,
   double zoom,
   double rotation,
@@ -161,36 +177,110 @@ List<Marker> _buildTerritoryLogoMarkers(
 
   if (zoom < 12) return markers;
 
-  final cities = <String, SpotFlagState>{};
+  final admins = <String, SpotFlagState>{};
 
   for (final spot in spots) {
     final ville = spot.ville.trim();
+    final siteInternetVille = spot.siteInternetVille.trim();
 
     if (ville.isEmpty) continue;
     if (spot.villeLat == 0 || spot.villeLng == 0) continue;
+    if (siteInternetVille.isEmpty) continue;
 
-    cities.putIfAbsent(ville, () => spot);
+    final adminKey = spot.territoireId.trim().isNotEmpty
+        ? spot.territoireId.trim()
+        : ville.toUpperCase();
+
+    admins.putIfAbsent(adminKey, () => spot);
   }
 
-  for (final spot in cities.values) {
+  for (final spot in admins.values) {
     final logoVille = spot.logoVille.trim();
     final siteInternetVille = spot.siteInternetVille.trim();
-
-    if (logoVille.isEmpty) continue;
 
     markers.add(
       Marker(
         point: LatLng(spot.villeLat, spot.villeLng),
-        width: 70,
-        height: 70,
-        child: GestureDetector(
-          onTap: () => _openCityWebsite(siteInternetVille),
-          child: Transform.rotate(
-            angle: -rotation * pi / 180,
-            child: Image.network(
-              logoVille,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        width: 85,
+        height: 85,
+        alignment: Alignment.topCenter,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _openCityWebsite(siteInternetVille, spot),
+            child: Tooltip(
+              message: spot.ville.toUpperCase(),
+              preferBelow: true,
+              verticalOffset: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF0000),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              textStyle: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+              child: Transform.rotate(
+                angle: -rotation * pi / 180,
+                child: SizedBox(
+                  width: 85,
+                  height: 85,
+                  child: Stack(
+                    alignment: Alignment.topCenter,
+                    children: [
+                      Image.asset(
+                        'data/icons/fire_red_icon.png',
+                        width: 85,
+                        height: 85,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                      ),
+                      Positioned(
+                        top: 23,
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: ClipOval(
+                            child: logoVille.isEmpty
+                                ? const Icon(
+                                    Icons.account_balance_rounded,
+                                    color: Color(0xFF1E3A8A),
+                                    size: 23,
+                                  )
+                                : IgnorePointer(
+                                    child: Image.network(
+                                      logoVille,
+                                      key: ValueKey<String>(
+                                        'public-admin-logo-$logoVille',
+                                      ),
+                                      width: 34,
+                                      height: 34,
+                                      fit: BoxFit.contain,
+                                      gaplessPlayback: true,
+                                      webHtmlElementStrategy:
+                                          WebHtmlElementStrategy.prefer,
+                                      errorBuilder: (_, __, ___) => const Icon(
+                                        Icons.account_balance_rounded,
+                                        color: Color(0xFF1E3A8A),
+                                        size: 23,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -480,6 +570,100 @@ SpotFlagState? _findBestSpotMatch(
       SnackBar(
         content: Text(message),
         duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _openPublicSpotDetail(SpotFlagState spot) {
+    _searchFocusNode.unfocus();
+
+    unawaited(
+      _firestoreService.recordPublicClick(
+        territoireId: spot.territoireId,
+        targetId: spot.id,
+        targetType: 'spot',
+        targetName: spot.mapDisplayName,
+        source: kIsWeb ? 'web' : 'app',
+      ),
+    );
+
+    setState(() {
+      _isFilterOpen = false;
+      _isMapStyleOpen = false;
+    });
+
+    final screenWidth = MediaQuery.sizeOf(context).width;
+
+    if (screenWidth >= 900) {
+      showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: 'Fermer la fiche publique',
+        barrierColor: Colors.black.withOpacity(0.12),
+        transitionDuration: const Duration(milliseconds: 320),
+        pageBuilder: (_, __, ___) {
+          return SafeArea(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(
+                width: min(460, screenWidth * 0.38),
+                height: double.infinity,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(22),
+                    bottomLeft: Radius.circular(22),
+                  ),
+                  child: PublicSpotDetailPage(spot: spot),
+                ),
+              ),
+            ),
+          );
+        },
+        transitionBuilder: (_, animation, __, child) {
+          final slideAnimation = Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            ),
+          );
+
+          return SlideTransition(
+            position: slideAnimation,
+            child: child,
+          );
+        },
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: true,
+        maintainState: true,
+        transitionDuration: const Duration(milliseconds: 320),
+        reverseTransitionDuration: const Duration(milliseconds: 260),
+        pageBuilder: (_, __, ___) => PublicSpotDetailPage(spot: spot),
+        transitionsBuilder: (_, animation, __, child) {
+          final slideAnimation = Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            ),
+          );
+
+          return SlideTransition(
+            position: slideAnimation,
+            child: child,
+          );
+        },
       ),
     );
   }
@@ -1122,46 +1306,43 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
       width: 56,
       height: 56,
       alignment: Alignment.center,
-      child: _OtherSpotMarker(
-        spot: spot,
-        iconPath: _getMarkerIconPath(spot),
-        showTextAllowed: showText,
-        zoom: zoom,
-        rotation: rotation,
-        labelOpacity: _labelOpacity(zoom),
-        typeTextColor: _typeColor(spot),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _openPublicSpotDetail(spot),
+        child: _OtherSpotMarker(
+          spot: spot,
+          iconPath: _getMarkerIconPath(spot),
+          showTextAllowed: showText,
+          zoom: zoom,
+          rotation: rotation,
+          labelOpacity: _labelOpacity(zoom),
+          typeTextColor: _typeColor(spot),
+        ),
       ),
     );
   }
 
   Marker _buildSecoursMarker(
     SpotFlagState spot,
-    bool showFlag,
     bool showText,
     double zoom,
     double rotation,
   ) {
-    if (!showFlag) {
-      return Marker(
-        point: LatLng(spot.lat, spot.lng),
-        width: 18,
-        height: 18,
-        alignment: Alignment.center,
-        child: _SimplePostePoint(spot: spot),
-      );
-    }
-
     return Marker(
       point: LatLng(spot.lat, spot.lng),
       width: 70,
       height: 95,
       alignment: Alignment.center,
-      child: _HoverMarker(
-        spot: spot,
-        showTextAllowed: showText,
-        zoom: zoom,
-        rotation: rotation,
-        labelOpacity: _labelOpacity(zoom),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _openPublicSpotDetail(spot),
+        child: _HoverMarker(
+          spot: spot,
+          showTextAllowed: showText,
+          zoom: zoom,
+          rotation: rotation,
+          labelOpacity: _labelOpacity(zoom),
+        ),
       ),
     );
   }
@@ -1171,7 +1352,6 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   double zoom,
   double rotation,
 ) {
-  final showFlag = _showFlagForZoom(zoom);
   final showText = _showTextForZoom(zoom);
 
   debugPrint('MARKERS À AFFICHER : ${spots.length}');
@@ -1180,10 +1360,28 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
       .where((spot) => spot.lat.isFinite && spot.lng.isFinite)
       .map((spot) {
     if (spot.isPosteSecours) {
-      return _buildSecoursMarker(spot, showFlag, showText, zoom, rotation);
+      return _buildSecoursMarker(spot, showText, zoom, rotation);
     }
     return _buildOtherSpotMarker(spot, showText, zoom, rotation);
   }).toList();
+}
+
+List<Marker> _buildSecoursMarkers(
+  List<SpotFlagState> spots,
+  double zoom,
+  double rotation,
+) {
+  final showText = _showTextForZoom(zoom);
+
+  return spots
+      .where(
+        (spot) =>
+            spot.isPosteSecours && spot.lat.isFinite && spot.lng.isFinite,
+      )
+      .map(
+        (spot) => _buildSecoursMarker(spot, showText, zoom, rotation),
+      )
+      .toList();
 }
 
   Widget _buildDrawer() {
@@ -1290,16 +1488,13 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   final colors = <Color>{};
 
   for (final marker in markers) {
-    final child = marker.child;
+    final markerChild = marker.child;
+    final child = markerChild is GestureDetector
+        ? markerChild.child
+        : markerChild;
     if (child is _OtherSpotMarker) {
       colors.add(child.typeTextColor);
-    } else if (child is _SimplePostePoint || child is _HoverMarker) {
-      colors.add(const Color(0xFFFF0000));
     }
-  }
-
-  if (colors.contains(const Color(0xFFFF0000))) {
-    return const Color(0xFFFF0000); // Poste de secours
   }
 
   if (colors.contains(const Color(0xFFD87A5C))) {
@@ -1326,10 +1521,6 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
 }
 
 String _clusterIconPath(Color color) {
-  if (color == const Color(0xFFFF0000)) {
-    return 'data/icons/fire_red_icon.svg';
-  }
-
   if (color == const Color(0xFFD87A5C)) {
     return 'data/icons/fire_skin_icon.svg';
   }
@@ -1788,7 +1979,7 @@ onPositionChanged: (position, hasGesture) {
                       final rotation = MapCamera.of(context).rotation;
 
                       return MarkerLayer(
-                        markers: _buildTerritoryLogoMarkers(allSpots, zoom, rotation),
+                        markers: _buildAdminMarkers(allSpots, zoom, rotation),
                       );
                     },
                   ),
@@ -1796,7 +1987,11 @@ onPositionChanged: (position, hasGesture) {
                     builder: (context) {
                       final zoom = MapCamera.of(context).zoom;
                       final rotation = MapCamera.of(context).rotation;
-                      final markers = _buildMarkers(spots, zoom, rotation);
+                      final otherSpots = spots
+                          .where((spot) => !spot.isPosteSecours)
+                          .toList();
+                      final markers =
+                          _buildMarkers(otherSpots, zoom, rotation);
 
                       return MarkerClusterLayerWidget(
                         options: MarkerClusterLayerOptions(
@@ -1805,6 +2000,20 @@ onPositionChanged: (position, hasGesture) {
                           maxClusterRadius: 45,
                           disableClusteringAtZoom: 16,
                           builder: _buildCluster,
+                        ),
+                      );
+                    },
+                  ),
+                  Builder(
+                    builder: (context) {
+                      final zoom = MapCamera.of(context).zoom;
+                      final rotation = MapCamera.of(context).rotation;
+
+                      return MarkerLayer(
+                        markers: _buildSecoursMarkers(
+                          spots,
+                          zoom,
+                          rotation,
                         ),
                       );
                     },
@@ -2262,7 +2471,7 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '${spot.name} - ${spot.nomSphot}',
+                            spot.mapDisplayName,
                             textAlign: TextAlign.center,
                             style: _mapLabelStyle(
                               fontSize: _labelSize(11),
@@ -2298,45 +2507,6 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                 ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SimplePostePoint extends StatelessWidget {
-  final SpotFlagState spot;
-
-  const _SimplePostePoint({required this.spot});
-
-  Color _getColor() {
-    switch (spot.flagColor) {
-      case FlagColor.green:
-        return const Color(0xFF22C55E);
-      case FlagColor.yellow:
-        return const Color(0xFFFDE047);
-      case FlagColor.red:
-        return const Color(0xFFEF4444);
-      case FlagColor.violet:
-        return const Color(0xFFD946EF);
-      case FlagColor.none:
-        return Colors.transparent;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final hasFlag = spot.hasValidFlag;
-
-    return Container(
-      width: 12,
-      height: 12,
-      decoration: BoxDecoration(
-        color: hasFlag ? _getColor() : Colors.transparent,
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: hasFlag ? Colors.white : Colors.black,
-          width: 2,
         ),
       ),
     );
@@ -2418,7 +2588,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '${spot.name} - ${spot.nomSphot}',
+                            spot.mapDisplayName,
                             textAlign: TextAlign.center,
                             style: _mapLabelStyle(
                               fontSize: _labelSize(11),
@@ -2429,14 +2599,27 @@ class _HoverMarkerState extends State<_HoverMarker> {
 
                           SizedBox(height: _lineSpacing() + 5),
 
-                          Text(
-                            '🚨 POSTE DE SECOURS 🚨',
-                            textAlign: TextAlign.center,
-                            style: _mapLabelStyle(
-                              fontSize: _labelSize(12),
-                              fontWeight: FontWeight.w900,
-                              color: const Color(0xFFFF0000),
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 13,
+                                height: 20,
+                                child: SvgPicture.asset(
+                                  'data/icons/flag_red_yellow_5x3.svg',
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                'POSTE DE SECOURS',
+                                style: _mapLabelStyle(
+                                  fontSize: _labelSize(12),
+                                  fontWeight: FontWeight.w900,
+                                  color: const Color(0xFFFF0000),
+                                ),
+                              ),
+                            ],
                           ),
 
                           SizedBox(height: _lineSpacing() - 1.8),
@@ -2490,7 +2673,7 @@ Widget _warningLineUniform(String text, double size) {
           Icon(
             Icons.warning_amber_rounded,
             size: size,
-            color: const Color(0xFFFF0000),
+            color: const Color(0xFFFFC107),
           ),
         ],
       ),
@@ -2569,8 +2752,5 @@ TextStyle _mapLabelStyle({
     ],
   );
 }
-
-
-
 
 

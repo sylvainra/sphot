@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import '../../../map/map_page.dart';
 import 'package:flutter/services.dart';
 import 'admin_subscription_panel.dart';
+import 'admin_statistics_panel.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -77,6 +78,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   static const Color adminColor = Color(0xFF1E3A8A);
   static const Color redColor = Color(0xFFDC2626);
   static const Color pendingColor = Color(0xFF6B7280);
+  static const String _rescueStationType = '🚨 POSTE DE SECOURS 🚨';
+  static const String _rescueStationFlagAsset =
+      'data/icons/flag_red_yellow_5x3.svg';
 
   final MapController _mapController = MapController();
   Timer? _mapMovementTimer;
@@ -97,6 +101,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _showTrialSummaryPanel = false;
   bool _showSubscriptionPanel = false;
   bool _showBillingDocumentsPanel = false;
+  bool _showStatisticsPanel = false;
   bool _trialSummaryDialogOpen = false;
   Future<Map<String, dynamic>>? _trialSummaryPanelFuture;
   bool _placingSphotOnMap = false;
@@ -171,7 +176,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   ];
 
   static const List<String> _sphotTypeChoices = [
-    '🚨 POSTE DE SECOURS 🚨',
+    _rescueStationType,
     '🏖️ PLAGE',
     '🏞️ LAC',
     '🏞️ ÉTANG',
@@ -3960,6 +3965,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final summaryFuture = _loadTrialSummaryData();
 
     setState(() {
+      _showStatisticsPanel = false;
       _trialSummaryDialogOpen = true;
       _showTrialSummaryPanel = false;
       _showSubscriptionPanel = false;
@@ -4003,6 +4009,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     setState(() {
+      _showStatisticsPanel = false;
       _trialSummaryPanelFuture = _loadTrialSummaryData();
       _showTrialSummaryPanel = true;
       _showSubscriptionPanel = false;
@@ -4068,6 +4075,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   void _openSubscriptionPanel() {
     setState(() {
+      _showStatisticsPanel = false;
       _showSubscriptionPanel = true;
       _showBillingDocumentsPanel = false;
       _showTrialSummaryPanel = false;
@@ -4086,6 +4094,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   void _openBillingDocumentsPanel() {
     setState(() {
+      _showStatisticsPanel = false;
       _showBillingDocumentsPanel = true;
       _showSubscriptionPanel = false;
       _showTrialSummaryPanel = false;
@@ -4111,6 +4120,31 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _closeBillingDocumentsPanel() {
     setState(() {
       _showBillingDocumentsPanel = false;
+    });
+  }
+
+  void _openStatisticsPanel() {
+    setState(() {
+      _showStatisticsPanel = true;
+      _showSubscriptionPanel = false;
+      _showBillingDocumentsPanel = false;
+      _showTrialSummaryPanel = false;
+      _trialSummaryPanelFuture = null;
+      _showSauveteursManagementPanel = false;
+      _showSurveillancePeriodsPanel = false;
+      _showSauveteurEditorPanel = false;
+      _showSphotEditorPanel = false;
+      _placingSphotOnMap = false;
+      _selectedSpot = null;
+      _selectedAdmin = null;
+      _selectedAdvertiser = null;
+      _showLegalDocumentsPanel = false;
+    });
+  }
+
+  void _closeStatisticsPanel() {
+    setState(() {
+      _showStatisticsPanel = false;
     });
   }
 
@@ -4475,7 +4509,10 @@ _buildCommercialSection(
   }) {
     return Container(
       width: 360,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: 14,
+      ),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.96),
         border: Border(
@@ -4501,7 +4538,7 @@ _buildCommercialSection(
               ),
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
 
             SizedBox(
               width: double.infinity,
@@ -4519,114 +4556,127 @@ _buildCommercialSection(
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
-            _summaryCard(
-              title: 'CRÉER UN SPHOT',
-              value: '',
-              color: adminColor,
-              iconPath: 'data/icons/fire_red_icon.svg',
-              stepNumber: 1,
-              titleFontSize: 17,
-              titleLetterSpacing: 0.8,
-              showValue: false,
-              isActive: _showSphotEditorPanel,
-              onTap: _openNewSphotEditor,
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _summaryCard(
+                            title: 'CRÉER UN SPHOT',
+                            value: '',
+                            color: adminColor,
+                            iconPath: 'data/icons/fire_red_icon.svg',
+                            stepNumber: 1,
+                            titleFontSize: 17,
+                            titleLetterSpacing: 0.8,
+                            showValue: false,
+                            isActive: _showSphotEditorPanel,
+                            onTap: _openNewSphotEditor,
+                          ),
+                          _summaryCard(
+                            title: 'CRÉER UNE PÉRIODE',
+                            value: '',
+                            color: adminColor,
+                            iconPath: 'data/icons/fire_red_icon.svg',
+                            stepNumber: 2,
+                            titleFontSize: 17,
+                            titleLetterSpacing: 0.8,
+                            showValue: false,
+                            isActive: _showSurveillancePeriodsPanel,
+                            onTap: _openSurveillancePeriodsPanel,
+                          ),
+                          _summaryCard(
+                            title: 'CRÉER UN SAUVETEUR',
+                            value: '',
+                            color: adminColor,
+                            iconPath: 'data/icons/fire_red_icon.svg',
+                            stepNumber: 3,
+                            titleFontSize: 17,
+                            titleLetterSpacing: 0.8,
+                            showValue: false,
+                            isActive: _showSauveteurEditorPanel ||
+                                _showSauveteursManagementPanel,
+                            onTap: _openNewSauveteurEditor,
+                          ),
+                          _summaryCard(
+                            title: 'ESPACE ADMIN SPHOT',
+                            value: '',
+                            color: adminColor,
+                            iconPath: 'data/icons/fire_red_icon.svg',
+                            stepNumber: 4,
+                            titleFontSize: 17,
+                            titleLetterSpacing: 0.8,
+                            showValue: false,
+                            isActive: _showTrialSummaryPanel,
+                            onTap: _openTrialSummaryPanel,
+                          ),
+                          _summaryCard(
+                            title: 'ESSAI GRATUIT 8 JOURS',
+                            value: '',
+                            color: canRequestTrial ? adminColor : pendingColor,
+                            iconPath: 'data/icons/fire_red_icon.svg',
+                            stepNumber: 5,
+                            titleFontSize: 17,
+                            titleLetterSpacing: 0.8,
+                            showValue: false,
+                            grayscaleIcon: !canRequestTrial,
+                            isActive: canRequestTrial &&
+                                _trialSummaryDialogOpen,
+                            onTap: canRequestTrial
+                                ? _openTrialSummaryDialog
+                                : null,
+                          ),
+                          _summaryCard(
+                            title: 'ABONNEMENT',
+                            value: '',
+                            color: adminColor,
+                            iconPath: 'data/icons/fire_red_icon.svg',
+                            stepNumber: 6,
+                            titleFontSize: 16,
+                            titleLetterSpacing: 0.5,
+                            showValue: false,
+                            isActive: _showSubscriptionPanel,
+                            onTap: _openSubscriptionPanel,
+                          ),
+                          _summaryCard(
+                            title: 'DOCUMENTS & FACTURES',
+                            value: '',
+                            color: adminColor,
+                            iconPath: 'data/icons/fire_red_icon.svg',
+                            stepNumber: 7,
+                            titleFontSize: 16,
+                            titleLetterSpacing: 0.5,
+                            showValue: false,
+                            isActive: _showBillingDocumentsPanel,
+                            onTap: _openBillingDocumentsPanel,
+                          ),
+                          _summaryCard(
+                            title: 'STATISTIQUES',
+                            value: '',
+                            color: adminColor,
+                            iconPath: 'data/icons/fire_red_icon.svg',
+                            stepNumber: 8,
+                            titleFontSize: 16,
+                            titleLetterSpacing: 0.5,
+                            showValue: false,
+                            isActive: _showStatisticsPanel,
+                            onTap: _openStatisticsPanel,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
-
-            const SizedBox(height: 8),
-
-            _summaryCard(
-              title: 'CRÉER UNE PÉRIODE',
-              value: '',
-              color: adminColor,
-              iconPath: 'data/icons/fire_red_icon.svg',
-              stepNumber: 2,
-              titleFontSize: 17,
-              titleLetterSpacing: 0.8,
-              showValue: false,
-              isActive: _showSurveillancePeriodsPanel,
-              onTap: _openSurveillancePeriodsPanel,
-            ),
-
-            const SizedBox(height: 8),
-
-            _summaryCard(
-              title: 'CRÉER UN SAUVETEUR',
-              value: '',
-              color: adminColor,
-              iconPath: 'data/icons/fire_red_icon.svg',
-              stepNumber: 3,
-              titleFontSize: 17,
-              titleLetterSpacing: 0.8,
-              showValue: false,
-              isActive:
-                  _showSauveteurEditorPanel || _showSauveteursManagementPanel,
-              onTap: _openNewSauveteurEditor,
-            ),
-
-            const SizedBox(height: 8),
-
-            _summaryCard(
-              title: 'ESPACE ADMIN SPHOT',
-              value: '',
-              color: adminColor,
-              iconPath: 'data/icons/fire_red_icon.svg',
-              stepNumber: 4,
-              titleFontSize: 17,
-              titleLetterSpacing: 0.8,
-              showValue: false,
-              isActive: _showTrialSummaryPanel,
-              onTap: _openTrialSummaryPanel,
-            ),
-
-            const SizedBox(height: 8),
-
-            _summaryCard(
-              title: 'ESSAI GRATUIT 8 JOURS',
-              value: '',
-              color: canRequestTrial ? adminColor : pendingColor,
-              iconPath: 'data/icons/fire_red_icon.svg',
-              stepNumber: 5,
-              titleFontSize: 17,
-              titleLetterSpacing: 0.8,
-              showValue: false,
-              grayscaleIcon: !canRequestTrial,
-              isActive: canRequestTrial && _trialSummaryDialogOpen,
-              onTap: canRequestTrial ? _openTrialSummaryDialog : null,
-            ),
-
-            const SizedBox(height: 8),
-
-            _summaryCard(
-              title: 'ABONNEMENT',
-              value: '',
-              color: adminColor,
-              iconPath: 'data/icons/fire_red_icon.svg',
-              stepNumber: 6,
-              titleFontSize: 16,
-              titleLetterSpacing: 0.5,
-              showValue: false,
-              isActive: _showSubscriptionPanel,
-              onTap: _openSubscriptionPanel,
-            ),
-
-            const SizedBox(height: 8),
-
-            _summaryCard(
-              title: 'DOCUMENTS & FACTURES',
-              value: '',
-              color: adminColor,
-              iconPath: 'data/icons/fire_red_icon.svg',
-              stepNumber: 7,
-              titleFontSize: 16,
-              titleLetterSpacing: 0.5,
-              showValue: false,
-              isActive: _showBillingDocumentsPanel,
-              onTap: _openBillingDocumentsPanel,
-            ),
-
-            const SizedBox(height: 4),
           ],
         ),
       ),
@@ -5156,6 +5206,7 @@ _buildCommercialSection(
     }
 
     setState(() {
+      _showStatisticsPanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
@@ -5910,6 +5961,7 @@ _sphotWebcamUrlController.clear();
 
   void _openNewSphotEditor() {
     setState(() {
+      _showStatisticsPanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
@@ -5946,6 +5998,7 @@ _sphotWebcamUrlController.clear();
     }
 
     setState(() {
+      _showStatisticsPanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
@@ -6184,6 +6237,7 @@ _sphotWebcamUrlController.clear();
     }
 
     setState(() {
+      _showStatisticsPanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
@@ -6746,6 +6800,47 @@ _sphotWebcamUrlController.clear();
     );
   }
 
+  Widget _sphotTypeLabel(
+    String type, {
+    double fontSize = 14,
+  }) {
+    if (type == _rescueStationType) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AdaptiveAssetImage(
+            _rescueStationFlagAsset,
+            width: 13,
+            height: 20,
+            fit: BoxFit.contain,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              'POSTE DE SECOURS',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: adminColor,
+                fontSize: fontSize,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Text(
+      type.isEmpty ? 'Type de SPHOT' : type,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: adminColor,
+        fontSize: fontSize,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+
   void _openSphotTypeMenu() {
   _dropdownOverlay?.remove();
   _dropdownOverlay = null;
@@ -6911,18 +7006,9 @@ _sphotWebcamUrlController.clear();
                                     child: Row(
                                       children: [
                                         Expanded(
-                                          child: Text(
+                                          child: _sphotTypeLabel(
                                             choice,
-                                            style:
-                                                TextStyle(
-                                              color: selected
-                                                  ? redColor
-                                                  : adminColor,
-                                              fontSize: 13,
-                                              fontWeight:
-                                                  FontWeight
-                                                      .w800,
-                                            ),
+                                            fontSize: 13,
                                           ),
                                         ),
                                         if (selected)
@@ -9312,19 +9398,7 @@ _sphotWebcamUrlController.clear();
                       child: Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              _selectedSphotType.isEmpty
-                                  ? 'Type de SPHOT'
-                                  : _selectedSphotType,
-
-                              overflow: TextOverflow.ellipsis,
-
-                              style: const TextStyle(
-                                color: adminColor,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
+                            child: _sphotTypeLabel(_selectedSphotType),
                           ),
 
                           const Icon(
@@ -12228,6 +12302,7 @@ _sphotWebcamUrlController.clear();
     }
 
     setState(() {
+      _showStatisticsPanel = false;
       _selectedSpot = type == 'spot' ? data : null;
       _selectedAdmin = type == 'admin' ? data : null;
       _selectedAdvertiser = type == 'advertiser' ? data : null;
@@ -12275,6 +12350,7 @@ _sphotWebcamUrlController.clear();
           behavior: HitTestBehavior.opaque,
           onTap: () {
             setState(() {
+              _showStatisticsPanel = false;
               _selectedSpot = null;
               _selectedAdmin = Map<String, dynamic>.from(data);
               _selectedAdvertiser = null;
@@ -12379,6 +12455,7 @@ _sphotWebcamUrlController.clear();
       child: GestureDetector(
         onTap: () {
           setState(() {
+            _showStatisticsPanel = false;
             _selectedSpot = null;
             _selectedAdmin = null;
             _selectedAdvertiser = data;
@@ -12642,6 +12719,7 @@ _sphotWebcamUrlController.clear();
                                     }
 
                                     setState(() {
+                                      _showStatisticsPanel = false;
                                       _selectedSpot = null;
                                       _selectedAdmin = null;
                                       _selectedAdvertiser = null;
@@ -12847,6 +12925,11 @@ _sphotWebcamUrlController.clear();
                           )
                         else if (_showBillingDocumentsPanel)
                           _buildBillingDocumentsPanel()
+                        else if (_showStatisticsPanel)
+                          AdminStatisticsPanel(
+                            territoireId: _resolvedTerritoireId,
+                            onClose: _closeStatisticsPanel,
+                          )
                         else if (_showTrialSummaryPanel)
                           _buildTrialSummaryPanel()
                         else if (_showSauveteursManagementPanel)

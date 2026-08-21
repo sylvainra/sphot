@@ -4,6 +4,7 @@ const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {
   onDocumentCreated,
   onDocumentUpdated,
+  onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 const {getDownloadURL} = require("firebase-admin/storage");
@@ -18,6 +19,363 @@ const SPHOT_LOGIN_URL = "https://sphot.app";
 
 
 setGlobalOptions({maxInstances: 10});
+
+/**
+ * Construit la projection strictement publique d'un SPHOT.
+ *
+ * @param {string} territoireId Identifiant du territoire.
+ * @param {string} spotId Identifiant du SPHOT.
+ * @param {Object} spot Données internes du SPHOT.
+ * @return {Object} Données autorisées sur la carte publique.
+ */
+function buildPublicSpot(territoireId, spotId, spot) {
+  const publicFields = [
+    "idSphot",
+    "nomSecours",
+    "nomSphot",
+    "typeSphot",
+    "isPosteSecours",
+    "sphotLat",
+    "sphotLng",
+    "pays",
+    "region",
+    "departement",
+    "ville",
+    "villeLat",
+    "villeLng",
+    "departementLat",
+    "departementLng",
+    "logoVille",
+    "siteInternetVille",
+    "adresseWebcam",
+    "arretesMunicipaux",
+    "statutBaignade",
+    "periode",
+    "heureDebut",
+    "heureFin",
+    "phone",
+    "telephonePoste",
+    "activite",
+    "equipement",
+    "labelSphot",
+    "liveFlag",
+  ];
+
+  const result = {territoireId, spotId};
+  publicFields.forEach((field) => {
+    if (spot[field] !== undefined && spot[field] !== null) {
+      result[field] = spot[field];
+    }
+  });
+  result.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+  return result;
+}
+
+/**
+ * Extrait uniquement l'état public temps réel d'un SPHOT historique.
+ *
+ * @param {Object} spot Données de la collection racine spots.
+ * @return {Object} État public à fusionner dans la projection.
+ */
+function buildPublicLiveState(spot) {
+  const liveFields = [
+    "liveFlag",
+    "statutBaignade",
+    "periode",
+    "heureDebut",
+    "heureFin",
+    "phone",
+    "telephonePoste",
+  ];
+  const result = {};
+  liveFields.forEach((field) => {
+    if (spot[field] !== undefined && spot[field] !== null) {
+      result[field] = spot[field];
+    }
+  });
+  if (spot.liveFlag === undefined || spot.liveFlag === null) {
+    result.liveFlag = admin.firestore.FieldValue.delete();
+  }
+  result.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+  return result;
+}
+
+/**
+ * Fusionne la configuration territoriale avec l'état historique public.
+ * L'absence de liveFlag dans un document historique existant est conservée.
+ *
+ * @param {Object} spot Configuration du SPHOT territorial.
+ * @param {Object|null} historical État de la collection racine spots.
+ * @return {Object} Données consolidées.
+ */
+function mergePublicSpotData(spot, historical) {
+  const result = {...spot, ...(historical || {})};
+  if (historical && historical.liveFlag === undefined) {
+    delete result.liveFlag;
+  }
+  return result;
+}
+
+/**
+ * Complète les champs géographiques vides avec la demande administrative.
+ *
+ * @param {Object} spot Données consolidées du SPHOT.
+ * @param {Object} territory Données publiques du territoire.
+ * @return {Object} Données complétées sans écraser les valeurs du SPHOT.
+ */
+function mergePublicTerritoryData(spot, territory) {
+  const result = {...spot};
+  const normalizedTerritory = {
+    ...territory,
+    logoVille: territory.logoVille ||
+      territory.logoUrl ||
+      (territory.structure || {}).logoVille ||
+      (territory.structure || {}).logoUrl ||
+      "",
+    siteInternetVille: territory.siteInternetVille ||
+      territory.siteInternet ||
+      (territory.structure || {}).siteInternet ||
+      "",
+    arretesMunicipaux: territory.arretesMunicipaux ||
+      territory.reglementsBaignade ||
+      territory.reglementBaignade ||
+      territory.siteReglements ||
+      "",
+  };
+  const territoryFields = [
+    "pays",
+    "region",
+    "departement",
+    "ville",
+    "villeLat",
+    "villeLng",
+    "logoVille",
+    "siteInternetVille",
+    "arretesMunicipaux",
+  ];
+
+  territoryFields.forEach((field) => {
+    const currentValue = result[field];
+    const territoryValue = normalizedTerritory[field];
+    const currentIsEmpty = currentValue === undefined ||
+      currentValue === null ||
+      (typeof currentValue === "string" && currentValue.trim() === "") ||
+      ((field === "villeLat" || field === "villeLng") &&
+        Number(currentValue) === 0);
+
+    if (currentIsEmpty && territoryValue !== undefined &&
+        territoryValue !== null) {
+      result[field] = territoryValue;
+    }
+  });
+
+  return result;
+}
+
+/**
+ * Lit l'identifiant de territoire d'une demande administrative.
+ *
+ * @param {Object|null} data Données de la demande.
+ * @return {string} Identifiant normalisé.
+ */
+function adminRequestTerritoryId(data) {
+  if (!data) return "";
+  const territoire = data.territoire || {};
+  return (data.territoireId || territoire.territoireId || "")
+      .toString()
+      .trim();
+}
+
+/**
+ * Indique si la demande a été validée par le Super Admin.
+ *
+ * @param {Object} data Données de la demande.
+ * @return {boolean} Vrai lorsque l'accès administratif est validé.
+ */
+function isApprovedAdminRequest(data) {
+  const administrativeTracking = data.administrativeTracking || {};
+  return data.status === "approved" ||
+    administrativeTracking.status === "approved" ||
+    data.accessPhase === "configuration_access";
+}
+
+/**
+ * Supprime puis reconstruit la projection publique d'un territoire.
+ *
+ * @param {string} territoireId Identifiant du territoire.
+ * @param {boolean} publish Autorisation de publication.
+ * @return {Promise<void>}
+ */
+async function reconcilePublicTerritory(territoireId, publish) {
+  if (!territoireId) return;
+
+  const db = admin.firestore();
+  const territoryReference = db.collection("territoires").doc(territoireId);
+  const publicSnapshot = await db
+      .collection("publicSpots")
+      .where("territoireId", "==", territoireId)
+      .get();
+  const spotSnapshot = publish ? await territoryReference
+      .collection("spots")
+      .get() : null;
+  const territorySnapshot = publish ? await territoryReference.get() : null;
+  const requestSnapshot = publish ? await db
+      .collection("adminRequests")
+      .where("territoire.territoireId", "==", territoireId)
+      .get() : null;
+  const approvedRequest = requestSnapshot ? requestSnapshot.docs.find(
+      (document) => isApprovedAdminRequest(document.data()),
+  ) : null;
+  const approvedRequestData = approvedRequest ? approvedRequest.data() : {};
+  const territorySources = [
+    approvedRequestData.territoire || {},
+    approvedRequestData,
+    territorySnapshot && territorySnapshot.exists ?
+      territorySnapshot.data() : {},
+    ...(spotSnapshot ? spotSnapshot.docs.map((document) => {
+      return document.data();
+    }) : []),
+    ...publicSnapshot.docs.map((document) => {
+      return document.data();
+    }),
+  ];
+  let territoryData = {};
+  territorySources.forEach((source) => {
+    territoryData = mergePublicTerritoryData(territoryData, source);
+  });
+  if (publish && (!territorySnapshot || !territorySnapshot.exists)) {
+    const parentTerritoryData = {territoireId};
+    const parentTerritoryFields = [
+      "pays",
+      "region",
+      "departement",
+      "ville",
+      "villeLat",
+      "villeLng",
+      "departementLat",
+      "departementLng",
+      "logoVille",
+      "siteInternetVille",
+      "arretesMunicipaux",
+    ];
+    parentTerritoryFields.forEach((field) => {
+      const value = territoryData[field];
+      const hasValue = value !== undefined &&
+        value !== null &&
+        !(typeof value === "string" && value.trim() === "");
+      if (hasValue) parentTerritoryData[field] = value;
+    });
+    parentTerritoryData.publicProjectionCreatedAt =
+      admin.firestore.FieldValue.serverTimestamp();
+    await territoryReference.set(parentTerritoryData, {merge: true});
+  }
+  const historicalSpots = new Map();
+  if (spotSnapshot && !spotSnapshot.empty) {
+    const historicalSnapshots = await db.getAll(
+        ...spotSnapshot.docs.map((document) => {
+          return db.collection("spots").doc(document.id);
+        }),
+    );
+    historicalSnapshots.forEach((document) => {
+      if (document.exists) {
+        historicalSpots.set(document.id, document.data());
+      }
+    });
+  }
+
+  const writes = [];
+  const desiredPublicIds = new Set(
+      spotSnapshot ? spotSnapshot.docs.map((document) => {
+        return `${territoireId}__${document.id}`;
+      }) : [],
+  );
+  publicSnapshot.docs.forEach((document) => {
+    if (!desiredPublicIds.has(document.id)) {
+      writes.push({type: "delete", reference: document.ref});
+    }
+  });
+  if (spotSnapshot) {
+    spotSnapshot.docs.forEach((document) => {
+      const reference = db.collection("publicSpots")
+          .doc(`${territoireId}__${document.id}`);
+      writes.push({
+        type: "set",
+        reference,
+        data: buildPublicSpot(
+            territoireId,
+            document.id,
+            mergePublicTerritoryData(
+                mergePublicSpotData(
+                    document.data(),
+                    historicalSpots.get(document.id) || null,
+                ),
+                territoryData,
+            ),
+        ),
+      });
+    });
+  }
+
+  for (let index = 0; index < writes.length; index += 450) {
+    const batch = db.batch();
+    writes.slice(index, index + 450).forEach((write) => {
+      if (write.type === "delete") {
+        batch.delete(write.reference);
+      } else {
+        batch.set(write.reference, write.data);
+      }
+    });
+    await batch.commit();
+  }
+}
+
+/**
+ * Vérifie qu'au moins un administrateur du territoire a été approuvé
+ * par le Super Admin.
+ *
+ * @param {string} territoireId Identifiant du territoire.
+ * @return {Promise<boolean>}
+ */
+async function isTerritoryPublic(territoireId) {
+  const db = admin.firestore();
+  const [adminsSnapshot, requestsSnapshot] = await Promise.all([
+    db.collection("admins")
+        .where("territoireId", "==", territoireId)
+        .get(),
+    db.collection("adminRequests")
+        .where("territoire.territoireId", "==", territoireId)
+        .get(),
+  ]);
+  const approvedAdmin = adminsSnapshot.docs.some((document) => {
+    return document.data().accessStatus === "approved";
+  });
+  const approvedRequest = requestsSnapshot.docs.some((document) => {
+    return isApprovedAdminRequest(document.data());
+  });
+  return approvedAdmin || approvedRequest;
+}
+
+/**
+ * Applique le statut d'un abonnement à la projection publique associée.
+ *
+ * @param {string} subscriptionId Identifiant du document abonnement.
+ * @param {Object|null} subscription Données de l'abonnement.
+ * @return {Promise<void>}
+ */
+async function reconcilePublicSubscription(subscriptionId, subscription) {
+  const db = admin.firestore();
+  const adminUid = ((subscription && subscription.adminUid) || subscriptionId)
+      .toString().trim();
+  if (!adminUid) return;
+
+  const adminSnapshot = await db.collection("admins").doc(adminUid).get();
+  const adminData = adminSnapshot.data() || {};
+  const territoireId = (adminData.territoireId || "").toString().trim();
+  if (!territoireId) return;
+
+  const publish = await isTerritoryPublic(territoireId);
+  await reconcilePublicTerritory(territoireId, publish);
+}
 
 /**
  * Nettoie une valeur texte et applique une valeur par défaut.
@@ -118,47 +476,15 @@ function formatFrenchDate(date) {
 }
 
 /**
- * Génère un numéro unique de demande administrateur SPHOT.
- *
- * @param {string} uid Identifiant de la demande ou de l'utilisateur.
- * @param {Date} date Date de création de la demande.
- * @return {string} Numéro de demande SPHOT.
- */
-/**
- * Attribue un numéro séquentiel unique à une demande administrateur.
- *
- * Le numéro est généré une seule fois, même en cas de nouvelle exécution
- * de la fonction Cloud.
- *
- * @param {FirebaseFirestore.DocumentReference} requestReference
- * Référence Firestore de la demande.
- * @param {Date} date Date de création de la demande.
- * @return {Promise<string>} Numéro administratif de la demande.
- */
-/**
- * Attribue un numéro séquentiel unique à une demande administrateur.
- *
- * @param {FirebaseFirestore.DocumentReference} requestReference
- * Référence Firestore de la demande.
- * @param {Date} date Date de création de la demande.
- * @return {Promise<string>} Numéro administratif de la demande.
- */
-
-/**
  * Retourne le code ISO 3166-1 alpha-3 du pays de la demande.
- *
- * La France utilise FRA. Les futurs pays devront fournir
- * countryIso3 dans le territoire.
  *
  * @param {Object} requestData Données de la demande.
  * @return {string} Code pays sur trois caractères.
  */
 function resolveAdminCountryCode(requestData) {
   const territoire = requestData.territoire || {};
-
   const explicitCode = cleanValue(
-      territoire.countryIso3 ||
-      requestData.countryIso3,
+      territoire.countryIso3 || requestData.countryIso3,
       "",
   ).toUpperCase();
 
@@ -178,17 +504,19 @@ function resolveAdminCountryCode(requestData) {
     return "FRA";
   }
 
-  // Code temporaire pour un pays encore non configuré.
   return "XXX";
 }
 
 /**
- * Attribue un numéro administratif unique à une demande Admin.
+ * Attribue un numéro séquentiel unique à une demande administrateur.
+ *
+ * Le numéro est généré une seule fois, même en cas de nouvelle exécution
+ * de la fonction Cloud.
  *
  * @param {FirebaseFirestore.DocumentReference} requestReference
  * Référence Firestore de la demande.
  * @param {Date} date Date de création de la demande.
- * @return {Promise<string>} Référence administrative générée.
+ * @return {Promise<string>} Numéro administratif de la demande.
  */
 async function assignAdminRequestNumber(requestReference, date) {
   const db = admin.firestore();
@@ -209,9 +537,7 @@ async function assignAdminRequestNumber(requestReference, date) {
         await transaction.get(requestReference);
 
     const requestData = requestSnapshot.data() || {};
-
-    const countryCode =
-    resolveAdminCountryCode(requestData);
+    const countryCode = resolveAdminCountryCode(requestData);
 
     const existingRequestNumber =
         (requestData.requestNumber || "").toString().trim();
@@ -231,9 +557,9 @@ async function assignAdminRequestNumber(requestReference, date) {
     const nextNumber = currentNumber + 1;
 
     const requestNumber =
-    `SPHOT-ADM-${countryCode}-${year}-${nextNumber
-        .toString()
-        .padStart(6, "0")}`;
+        `SPHOT-ADM-${countryCode}-${year}-${nextNumber
+            .toString()
+            .padStart(6, "0")}`;
 
     transaction.set(
         counterReference,
@@ -262,6 +588,245 @@ async function assignAdminRequestNumber(requestReference, date) {
     return requestNumber;
   });
 }
+
+/**
+ * Retourne l'année civile française d'un document commercial.
+ *
+ * @param {Object} data Données du document.
+ * @param {string|undefined} eventTime Date de l'événement Cloud.
+ * @return {number} Année utilisée dans le numéro commercial.
+ */
+function commercialDocumentYear(data, eventTime) {
+  const candidates = [
+    data.issueDate,
+    data.createdAt,
+  ];
+
+  for (const value of candidates) {
+    if (value && typeof value.toDate === "function") {
+      return Number(
+          new Intl.DateTimeFormat("fr-FR", {
+            timeZone: "Europe/Paris",
+            year: "numeric",
+          }).format(value.toDate()),
+      );
+    }
+
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return Number(
+          new Intl.DateTimeFormat("fr-FR", {
+            timeZone: "Europe/Paris",
+            year: "numeric",
+          }).format(value),
+      );
+    }
+  }
+
+  const fallbackDate = eventTime ? new Date(eventTime) : new Date();
+  return Number(
+      new Intl.DateTimeFormat("fr-FR", {
+        timeZone: "Europe/Paris",
+        year: "numeric",
+      }).format(fallbackDate),
+  );
+}
+
+/**
+ * Extrait le numéro d'adhérent d'une référence Admin SPHOT.
+ *
+ * @param {string} administrativeReference Référence du dossier Admin.
+ * @return {string} Numéro d'adhérent sur six chiffres ou chaîne vide.
+ */
+function adminMemberNumber(administrativeReference) {
+  const match = cleanValue(administrativeReference, "").match(
+      /^SPHOT-ADM-(?:[A-Z]{3}-)?\d{4}-(\d{6})$/i,
+  );
+  return match ? match[1] : "";
+}
+
+/**
+ * Construit l'identifiant du compteur d'un document commercial.
+ *
+ * @param {Object} definition Définition du type de document.
+ * @param {number} year Année du document.
+ * @param {string} memberNumber Numéro d'adhérent.
+ * @return {string} Identifiant du compteur Firestore.
+ */
+function commercialCounterId(definition, year, memberNumber) {
+  const suffix = definition.perMember ? `_${memberNumber}` : "";
+  return `${definition.counterPrefix}_${year}${suffix}`;
+}
+
+/**
+ * Construit le numéro métier d'un document commercial.
+ *
+ * @param {Object} definition Définition du type de document.
+ * @param {number} year Année du document.
+ * @param {string} memberNumber Numéro d'adhérent.
+ * @param {number} sequence Séquence réservée.
+ * @return {string} Numéro commercial définitif.
+ */
+function commercialDocumentNumber(
+    definition,
+    year,
+    memberNumber,
+    sequence,
+) {
+  const paddedSequence = sequence
+      .toString()
+      .padStart(definition.sequenceLength, "0");
+
+  if (definition.perMember) {
+    return `${definition.prefix}-${year}-${memberNumber}-${paddedSequence}`;
+  }
+
+  return `${definition.prefix}-${year}-${paddedSequence}`;
+}
+
+/**
+ * Réserve atomiquement un numéro pour un document commercial.
+ *
+ * La fonction peut être rappelée sans consommer de nouveau numéro si le
+ * document possède déjà son numéro métier.
+ *
+ * @param {Object} event Événement Firestore de seconde génération.
+ * @param {Object} definition Définition du type de document.
+ * @return {Promise<void>} Fin de l'attribution éventuelle.
+ */
+async function assignCommercialDocumentNumber(event, definition) {
+  if (!event.data.after.exists) return;
+
+  const documentReference = event.data.after.ref;
+  const db = admin.firestore();
+
+  await db.runTransaction(async (transaction) => {
+    const documentSnapshot = await transaction.get(documentReference);
+    if (!documentSnapshot.exists) return;
+
+    const data = documentSnapshot.data() || {};
+    const existingNumber = cleanValue(data[definition.numberField], "");
+    if (existingNumber) return;
+
+    const adminUid = cleanValue(data.adminUid, "");
+    let administrativeReference = cleanValue(
+        data.administrativeReference,
+        "",
+    );
+
+    if (!administrativeReference && adminUid) {
+      const requestReference = db.collection("adminRequests").doc(adminUid);
+      const requestSnapshot = await transaction.get(requestReference);
+      administrativeReference = cleanValue(
+          (requestSnapshot.data() || {}).requestNumber,
+          "",
+      );
+    }
+
+    const memberNumber = adminMemberNumber(administrativeReference);
+    if (!administrativeReference || !memberNumber) {
+      console.warn(
+          `Numérotation ${definition.label} différée : ` +
+          "référence Admin absente ou invalide pour " +
+          `${documentReference.path}.`,
+      );
+      return;
+    }
+
+    if (definition.originalNumberField &&
+        !cleanValue(data[definition.originalNumberField], "")) {
+      console.warn(
+          `Numérotation ${definition.label} différée : ` +
+          `facture d'origine absente pour ${documentReference.path}.`,
+      );
+      return;
+    }
+
+    const year = commercialDocumentYear(data, event.time);
+    const counterId = commercialCounterId(
+        definition,
+        year,
+        memberNumber,
+    );
+    const counterReference = db.collection("counters").doc(counterId);
+    const counterSnapshot = await transaction.get(counterReference);
+    const currentNumber = Number(
+        (counterSnapshot.data() || {}).lastNumber || 0,
+    );
+    const nextNumber = currentNumber + 1;
+    const documentNumber = commercialDocumentNumber(
+        definition,
+        year,
+        memberNumber,
+        nextNumber,
+    );
+
+    transaction.set(
+        counterReference,
+        {
+          documentType: definition.documentType,
+          year: year,
+          perMember: definition.perMember,
+          ...(definition.perMember ? {memberNumber: memberNumber} : {}),
+          lastNumber: nextNumber,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        {merge: true},
+    );
+
+    transaction.set(
+        documentReference,
+        {
+          administrativeReference: administrativeReference,
+          [definition.numberField]: documentNumber,
+          year: year,
+          sequence: nextNumber,
+          numberedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        {merge: true},
+    );
+  });
+}
+
+const COMMERCIAL_DOCUMENTS = {
+  quote: {
+    label: "devis",
+    documentType: "quote",
+    numberField: "quoteNumber",
+    counterPrefix: "quotes",
+    prefix: "DV",
+    perMember: true,
+    sequenceLength: 3,
+  },
+  order: {
+    label: "commande",
+    documentType: "order",
+    numberField: "orderNumber",
+    counterPrefix: "orders",
+    prefix: "CMD",
+    perMember: true,
+    sequenceLength: 3,
+  },
+  invoice: {
+    label: "facture",
+    documentType: "invoice",
+    numberField: "invoiceNumber",
+    counterPrefix: "invoices",
+    prefix: "FA",
+    perMember: false,
+    sequenceLength: 6,
+  },
+  creditNote: {
+    label: "avoir",
+    documentType: "credit_note",
+    numberField: "creditNoteNumber",
+    originalNumberField: "originalInvoiceNumber",
+    counterPrefix: "creditNotes",
+    prefix: "AV",
+    perMember: false,
+    sequenceLength: 6,
+  },
+};
 
 /**
  * Génère le PDF d'accusé de réception d'une demande administrateur.
@@ -2198,6 +2763,228 @@ L'équipe SPHOT`,
     },
 );
 
+exports.syncPublicSpotsForSubscription = onDocumentWritten(
+    {
+      document: "subscriptions/{subscriptionId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const subscription = event.data.after.exists ?
+        event.data.after.data() : null;
+      await reconcilePublicSubscription(
+          event.params.subscriptionId,
+          subscription,
+      );
+    },
+);
+
+exports.syncPublicSpotsForAdmin = onDocumentWritten(
+    {
+      document: "admins/{adminUid}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const before = event.data.before.exists ?
+        event.data.before.data() : null;
+      const after = event.data.after.exists ?
+        event.data.after.data() : null;
+      const territoireIds = new Set();
+
+      [before, after].forEach((data) => {
+        const territoireId = ((data && data.territoireId) || "")
+            .toString()
+            .trim();
+        if (territoireId) territoireIds.add(territoireId);
+      });
+
+      for (const territoireId of territoireIds) {
+        const publish = await isTerritoryPublic(territoireId);
+        await reconcilePublicTerritory(territoireId, publish);
+      }
+    },
+);
+
+exports.syncPublicSpotsForAdminRequest = onDocumentWritten(
+    {
+      document: "adminRequests/{requestId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const before = event.data.before.exists ?
+        event.data.before.data() : null;
+      const after = event.data.after.exists ?
+        event.data.after.data() : null;
+      const territoireIds = new Set([
+        adminRequestTerritoryId(before),
+        adminRequestTerritoryId(after),
+      ]);
+      territoireIds.delete("");
+
+      for (const territoireId of territoireIds) {
+        const publish = await isTerritoryPublic(territoireId);
+        await reconcilePublicTerritory(territoireId, publish);
+      }
+    },
+);
+
+exports.syncPublicSpotsForAdminAccount = onDocumentWritten(
+    {
+      document: "adminAccounts/{accountId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const before = event.data.before.exists ?
+        event.data.before.data() : null;
+      const after = event.data.after.exists ?
+        event.data.after.data() : null;
+      const territoireIds = new Set([
+        adminRequestTerritoryId(before),
+        adminRequestTerritoryId(after),
+      ]);
+      territoireIds.delete("");
+
+      for (const territoireId of territoireIds) {
+        const publish = await isTerritoryPublic(territoireId);
+        await reconcilePublicTerritory(territoireId, publish);
+      }
+    },
+);
+
+exports.syncPublicSpotsForTerritory = onDocumentWritten(
+    {
+      document: "territoires/{territoireId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const territoireId = event.params.territoireId;
+      const publish = await isTerritoryPublic(territoireId);
+      await reconcilePublicTerritory(territoireId, publish);
+    },
+);
+
+exports.syncPublicSpotOnWrite = onDocumentWritten(
+    {
+      document: "territoires/{territoireId}/spots/{spotId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const territoireId = event.params.territoireId;
+      const spotId = event.params.spotId;
+      const publicReference = admin.firestore().collection("publicSpots")
+          .doc(`${territoireId}__${spotId}`);
+
+      if (!event.data.after.exists) {
+        await publicReference.delete();
+        return;
+      }
+
+      const publish = await isTerritoryPublic(territoireId);
+      if (!publish) {
+        await publicReference.delete();
+        return;
+      }
+
+      await reconcilePublicTerritory(territoireId, true);
+    },
+);
+
+exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
+    {
+      document: "spots/{spotId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const db = admin.firestore();
+      const publicSnapshot = await db.collection("publicSpots")
+          .where("spotId", "==", event.params.spotId)
+          .get();
+      if (publicSnapshot.empty) return;
+
+      const liveState = buildPublicLiveState(
+          event.data.after.exists ? event.data.after.data() : {},
+      );
+      const batch = db.batch();
+      publicSnapshot.docs.forEach((document) => {
+        batch.set(document.ref, liveState, {merge: true});
+      });
+      await batch.commit();
+    },
+);
+
+exports.assignQuoteNumberOnWrite = onDocumentWritten(
+    {
+      document: "quotes/{quoteId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      await assignCommercialDocumentNumber(
+          event,
+          COMMERCIAL_DOCUMENTS.quote,
+      );
+    },
+);
+
+exports.assignOrderNumberOnWrite = onDocumentWritten(
+    {
+      document: "orders/{orderId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      await assignCommercialDocumentNumber(
+          event,
+          COMMERCIAL_DOCUMENTS.order,
+      );
+    },
+);
+
+exports.assignInvoiceNumberOnWrite = onDocumentWritten(
+    {
+      document: "invoices/{invoiceId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      await assignCommercialDocumentNumber(
+          event,
+          COMMERCIAL_DOCUMENTS.invoice,
+      );
+    },
+);
+
+exports.assignCreditNoteNumberOnWrite = onDocumentWritten(
+    {
+      document: "creditNotes/{creditNoteId}",
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      await assignCommercialDocumentNumber(
+          event,
+          COMMERCIAL_DOCUMENTS.creditNote,
+      );
+    },
+);
+
 exports.updateSubscriptionStatuses = onSchedule(
     {
       schedule: "0 1 * * *",
@@ -3378,6 +4165,7 @@ exports.changeAdminPassword = onRequest(
             await transporter.sendMail({
               from: MAIL_FROM,
               to: email,
+              replyTo: "contact@sphot.app",
               subject:
                   "Mise à jour de votre compte administrateur SPHOT",
 
@@ -3398,7 +4186,8 @@ vos SPHOTS, vos sauveteurs et vos périodes de surveillance
 renseignés, puis l'essai activé.
 
 Si vous n'êtes pas à l'origine de cette modification,
-contactez immédiatement l'équipe SPHOT.
+contactez immédiatement l'équipe SPHOT :
+contact@sphot.app
 
 Accéder à la page de connexion :
 ${loginUrl}
@@ -3499,7 +4288,13 @@ L'équipe SPHOT`,
       line-height:1.6;
     ">
       Si vous n'êtes pas à l'origine de cette modification,
-      contactez immédiatement l'équipe SPHOT.
+contactez immédiatement l'équipe SPHOT à l'adresse
+<a
+  href="mailto:contact@sphot.app"
+  style="color:#1e3a8a;font-weight:700;"
+>
+  contact@sphot.app
+</a>.
     </div>
 
     <div style="text-align:center;margin:30px 0;">
@@ -3586,6 +4381,171 @@ exports.deleteSauveteurAccount = onRequest(
         response.status(200).json({success: true});
       } catch (error) {
         console.error("Erreur suppression sauveteurAccount:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.recordPublicClick = onRequest(
+    {
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      if (request.method !== "POST") {
+        response.status(405).json({success: false});
+        return;
+      }
+
+      try {
+        const payload = request.body || {};
+        const territoireId = (payload.territoireId || "")
+            .toString()
+            .trim();
+        const targetId = (payload.targetId || "").toString().trim();
+        const targetType = (payload.targetType || "").toString().trim();
+        const targetName = (payload.targetName || "")
+            .toString()
+            .trim()
+            .slice(0, 160);
+        const source = (payload.source || "").toString().trim();
+
+        if (!territoireId || !targetId || !targetName) {
+          response.status(400).json({success: false});
+          return;
+        }
+
+        if (!["spot", "admin"].includes(targetType) ||
+            !["web", "app"].includes(source)) {
+          response.status(400).json({success: false});
+          return;
+        }
+
+        const statId = Buffer.from(
+            `${territoireId}|${targetType}|${targetId}`,
+        ).toString("base64url");
+        const dayKey = new Intl.DateTimeFormat(
+            "fr-CA",
+            {
+              timeZone: "Europe/Paris",
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+            },
+        ).format(new Date());
+        const sourceField = source === "app" ?
+            "appClicks" :
+            "webClicks";
+        const increment =
+            admin.firestore.FieldValue.increment(1);
+        const updatedAt =
+            admin.firestore.FieldValue.serverTimestamp();
+        const statReference = admin.firestore()
+            .collection("publicClickStats")
+            .doc(statId);
+        const dayReference = statReference
+            .collection("daily")
+            .doc(dayKey);
+        const batch = admin.firestore().batch();
+
+        batch.set(
+            statReference,
+            {
+              territoireId: territoireId,
+              targetId: targetId,
+              targetType: targetType,
+              targetName: targetName,
+              totalClicks: increment,
+              [sourceField]: increment,
+              updatedAt: updatedAt,
+            },
+            {merge: true},
+        );
+
+        batch.set(
+            dayReference,
+            {
+              date: dayKey,
+              totalClicks: increment,
+              [sourceField]: increment,
+              updatedAt: updatedAt,
+            },
+            {merge: true},
+        );
+
+        await batch.commit();
+        response.status(200).json({success: true});
+      } catch (error) {
+        console.error("Erreur comptage clic public SPHOT:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.getPublicClickStats = onRequest(
+    {
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      if (request.method !== "POST") {
+        response.status(405).json({success: false});
+        return;
+      }
+
+      try {
+        const territoireId = ((request.body || {}).territoireId || "")
+            .toString()
+            .trim();
+
+        if (!territoireId) {
+          response.status(400).json({success: false});
+          return;
+        }
+
+        const snapshot = await admin.firestore()
+            .collection("publicClickStats")
+            .where("territoireId", "==", territoireId)
+            .get();
+        const statistics = snapshot.docs.map((document) => {
+          const data = document.data();
+          return {
+            id: document.id,
+            targetId: (data.targetId || "").toString(),
+            targetType: (data.targetType || "").toString(),
+            targetName: (data.targetName || "").toString(),
+            appClicks: Number(data.appClicks || 0),
+            webClicks: Number(data.webClicks || 0),
+            totalClicks: Number(data.totalClicks || 0),
+          };
+        });
+
+        response.status(200).json({
+          success: true,
+          statistics: statistics,
+        });
+      } catch (error) {
+        console.error("Erreur lecture statistiques SPHOT:", error);
         response.status(500).json({success: false});
       }
     },

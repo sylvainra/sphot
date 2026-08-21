@@ -23,7 +23,6 @@ dependencies:
   firebase_core: ^4.7.0
   cloud_firestore: ^6.3.0
   flutter_map: ^8.3.0
-  flutter_svg: ^2.2.4
   flutter_map_tile_caching: ^10.1.1
   latlong2: ^0.9.1
   flutter_map_marker_cluster: ^8.2.2
@@ -34,7 +33,9 @@ dependencies:
   file_picker: ^11.0.2
   url_launcher: ^6.3.1
   flutter_appauth: ^8.0.3
-  
+  flutter_svg: ^2.3.0
+  webview_flutter: ^4.14.1
+  webview_flutter_web: ^0.2.3+4
 
 dev_dependencies:
   flutter_test:

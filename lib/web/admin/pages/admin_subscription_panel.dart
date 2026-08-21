@@ -200,15 +200,11 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     }
 
     return <String, dynamic>{
-  ...subscription,
-
-  'administrativeReference':
-      value('administrativeReference', [
-    request['requestNumber'],
-  ]),
-
-  'billingOrganisation':
-      value('billingOrganisation', [
+      ...subscription,
+      'administrativeReference': value('administrativeReference', [
+        request['requestNumber'],
+      ]),
+      'billingOrganisation': value('billingOrganisation', [
         facturation['billingOrganisation'],
         structure['nom'],
         proConnect['organisation'],
@@ -458,25 +454,21 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     });
 
     try {
-      final requestSnapshot =
-    await _adminRequestReference.get();
+      final requestSnapshot = await _adminRequestReference.get();
+      final administrativeReference = _text(
+        requestSnapshot.data()?['requestNumber'],
+      );
 
-final administrativeReference = _text(
-  requestSnapshot.data()?['requestNumber'],
-);
       await _subscriptionReference.set(
-  <String, dynamic>{
-    'adminUid': _uid,
-
-    if (administrativeReference.isNotEmpty)
-      'administrativeReference':
-          administrativeReference,
-
-    ...fields,
-    'updatedAt': FieldValue.serverTimestamp(),
-  },
-  SetOptions(merge: true),
-);
+        <String, dynamic>{
+          'adminUid': _uid,
+          if (administrativeReference.isNotEmpty)
+            'administrativeReference': administrativeReference,
+          ...fields,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
 
       if (!mounted) return;
 
@@ -636,26 +628,26 @@ final administrativeReference = _text(
           label: 'Adresse de facturation',
         ),
         Row(
-  children: [
-    SizedBox(
-      width: 85,
-      child: _field(
-        data: data,
-        field: 'billingPostalCode',
-        label: 'Code postal',
-        keyboardType: TextInputType.number,
-      ),
-    ),
-    const SizedBox(width: 8),
-    Expanded(
-      child: _field(
-        data: data,
-        field: 'billingCity',
-        label: 'Ville',
-      ),
-    ),
-  ],
-),
+          children: [
+            SizedBox(
+              width: 85,
+              child: _field(
+                data: data,
+                field: 'billingPostalCode',
+                label: 'Code postal',
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _field(
+                data: data,
+                field: 'billingCity',
+                label: 'Ville',
+              ),
+            ),
+          ],
+        ),
         _field(
           data: data,
           field: 'billingCountry',
