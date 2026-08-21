@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import '../../../map/map_page.dart';
 import 'package:flutter/services.dart';
 import 'admin_subscription_panel.dart';
+import 'admin_statistics_panel.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -102,6 +103,7 @@ Color _sphotHoverColor = adminColor;
   bool _showTrialSummaryPanel = false;
   bool _showSubscriptionPanel = false;
   bool _showBillingDocumentsPanel = false;
+  bool _showStatisticsPanel = false;
   bool _trialSummaryDialogOpen = false;
   Future<Map<String, dynamic>>? _trialSummaryPanelFuture;
   bool _placingSphotOnMap = false;
@@ -4452,6 +4454,7 @@ void _openTrialSummaryPanel() {
   }
 
   setState(() {
+    _showStatisticsPanel = false;
     _trialSummaryPanelFuture = _loadTrialSummaryData();
     _showTrialSummaryPanel = true;
     _showSubscriptionPanel = false;
@@ -4525,6 +4528,7 @@ Widget _buildTrialSummaryPanel() {
 
 void _openSubscriptionPanel() {
   setState(() {
+    _showStatisticsPanel = false;
     _showSubscriptionPanel = true;
     _showBillingDocumentsPanel = false;
     _showTrialSummaryPanel = false;
@@ -4543,6 +4547,7 @@ void _openSubscriptionPanel() {
 
 void _openBillingDocumentsPanel() {
   setState(() {
+    _showStatisticsPanel = false;
     _showBillingDocumentsPanel = true;
     _showSubscriptionPanel = false;
     _showTrialSummaryPanel = false;
@@ -4568,6 +4573,31 @@ void _closeSubscriptionPanel() {
 void _closeBillingDocumentsPanel() {
   setState(() {
     _showBillingDocumentsPanel = false;
+  });
+}
+
+void _openStatisticsPanel() {
+  setState(() {
+    _showStatisticsPanel = true;
+    _showSubscriptionPanel = false;
+    _showBillingDocumentsPanel = false;
+    _showTrialSummaryPanel = false;
+    _trialSummaryPanelFuture = null;
+    _showSauveteursManagementPanel = false;
+    _showSurveillancePeriodsPanel = false;
+    _showSauveteurEditorPanel = false;
+    _showSphotEditorPanel = false;
+    _placingSphotOnMap = false;
+    _selectedSpot = null;
+    _selectedAdmin = null;
+    _selectedAdvertiser = null;
+    _showLegalDocumentsPanel = false;
+  });
+}
+
+void _closeStatisticsPanel() {
+  setState(() {
+    _showStatisticsPanel = false;
   });
 }
 
@@ -4982,6 +5012,21 @@ _summaryCard(
   titleLetterSpacing: 0.5,
   showValue: false,
   onTap: _openBillingDocumentsPanel,
+),
+
+const SizedBox(height: 8),
+
+_summaryCard(
+  title: 'STATISTIQUES',
+  value: '',
+  color: adminColor,
+  iconPath: 'data/icons/fire_red_icon.png',
+  stepNumber: 8,
+  iconScale: 1.35,
+  titleFontSize: 16,
+  titleLetterSpacing: 0.5,
+  showValue: false,
+  onTap: _openStatisticsPanel,
 ),
 
 const SizedBox(height: 4),
@@ -5529,6 +5574,7 @@ void _openSurveillancePeriodsPanel() {
   }
 
   setState(() {
+    _showStatisticsPanel = false;
     _showTrialSummaryPanel = false;
     _trialSummaryPanelFuture = null;
     _showSubscriptionPanel = false;
@@ -6319,6 +6365,7 @@ void _clearSphotEditor() {
 
 void _openNewSphotEditor() {
   setState(() {
+    _showStatisticsPanel = false;
     _showTrialSummaryPanel = false;
     _trialSummaryPanelFuture = null;
     _showSubscriptionPanel = false;
@@ -6355,6 +6402,7 @@ void _openNewSauveteurEditor() {
   }
 
   setState(() {
+    _showStatisticsPanel = false;
     _showTrialSummaryPanel = false;
     _trialSummaryPanelFuture = null;
     _showSubscriptionPanel = false;
@@ -6618,6 +6666,7 @@ void _loadSphotInEditor(Map<String, dynamic> data) {
   }
 
   setState(() {
+    _showStatisticsPanel = false;
     _showTrialSummaryPanel = false;
     _trialSummaryPanelFuture = null;
     _showSubscriptionPanel = false;
@@ -12985,6 +13034,7 @@ void _centerOnFirstCurrentResult() {
   }
 
   setState(() {
+    _showStatisticsPanel = false;
     _selectedSpot = type == 'spot' ? data : null;
     _selectedAdmin = type == 'admin' ? data : null;
     _selectedAdvertiser = type == 'advertiser' ? data : null;
@@ -13040,6 +13090,7 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
         behavior: HitTestBehavior.opaque,
         onTap: () {
           setState(() {
+                _showStatisticsPanel = false;
             _selectedSpot = null;
             _selectedAdmin =
                 Map<String, dynamic>.from(data);
@@ -13163,6 +13214,7 @@ Marker _buildAdvertiserMarker(Map<String, dynamic> data) {
     child: GestureDetector(
       onTap: () {
         setState(() {
+          _showStatisticsPanel = false;
           _selectedSpot = null;
           _selectedAdmin = null;
           _selectedAdvertiser = data;
@@ -13396,6 +13448,7 @@ final clusteredMarkers = validSpots.map((doc) {
               }
 
               setState(() {
+                _showStatisticsPanel = false;
                 _selectedSpot = null;
                 _selectedAdmin = null;
                 _selectedAdvertiser = null;
@@ -13603,6 +13656,11 @@ if (_showSubscriptionPanel)
   )
 else if (_showBillingDocumentsPanel)
   _buildBillingDocumentsPanel()
+else if (_showStatisticsPanel)
+  AdminStatisticsPanel(
+    territoireId: _resolvedTerritoireId,
+    onClose: _closeStatisticsPanel,
+  )
 else if (_showTrialSummaryPanel)
   _buildTrialSummaryPanel()
 else if (_showSauveteursManagementPanel)
