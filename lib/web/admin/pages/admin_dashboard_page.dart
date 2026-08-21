@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'dart:math' as math;
@@ -11,6 +12,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../../map/map_page.dart';
 import 'package:flutter/services.dart';
+import 'admin_subscription_panel.dart';
+import 'admin_statistics_panel.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -76,6 +79,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   static const Color adminColor = Color(0xFF1E3A8A);
   static const Color redColor = Color(0xFFDC2626);
   static const Color pendingColor = Color(0xFF6B7280);
+  static const String _rescueStationType =
+      '🚨 POSTE DE SECOURS 🚨';
+  static const String _rescueStationFlagAsset =
+      'data/icons/flag_red_yellow_5x3.svg';
 
   final MapController _mapController = MapController();
 Timer? _mapMovementTimer;
@@ -96,6 +103,7 @@ Color _sphotHoverColor = adminColor;
   bool _showTrialSummaryPanel = false;
   bool _showSubscriptionPanel = false;
   bool _showBillingDocumentsPanel = false;
+  bool _showStatisticsPanel = false;
   bool _trialSummaryDialogOpen = false;
   Future<Map<String, dynamic>>? _trialSummaryPanelFuture;
   bool _placingSphotOnMap = false;
@@ -110,6 +118,12 @@ Color _sphotHoverColor = adminColor;
   final TextEditingController _sphotNameController = TextEditingController();
   final TextEditingController _sphotLatController = TextEditingController();
   final TextEditingController _sphotLngController = TextEditingController();
+  final TextEditingController _sphotOtherTypeController =
+      TextEditingController();
+  final TextEditingController _sphotOtherEquipmentController =
+      TextEditingController();
+  final TextEditingController _sphotOtherLabelController =
+      TextEditingController();
 
   final TextEditingController _sauveteurNomController =
       TextEditingController();
@@ -157,7 +171,7 @@ Color _sphotHoverColor = adminColor;
   ];
 
   static const List<String> _sphotTypeChoices = [
-  '🚨 POSTE DE SECOURS 🚨',
+  _rescueStationType,
   '🏖️ PLAGE',
   '🏞️ LAC',
   '🏞️ ÉTANG',
@@ -186,9 +200,12 @@ Color _sphotHoverColor = adminColor;
     '🏋️ FITNESS AREA',
     '🗑️ POUBELLE',
     '🚯 SANS POUBELLE',
-    '🚻 TOILETTES',
-    '🅿️ PARKING',
-    '🚐 PARKING CAMPING-CAR',
+    '🚻 TOILETTES GRATUITES',
+    '🚻 TOILETTES PAYANTES',
+    '🅿️ PARKING GRATUIT',
+    '🅿️ PARKING PAYANT',
+    '🚐 PARKING CAMPING-CAR GRATUIT',
+    '🚐 PARKING CAMPING-CAR PAYANT',
     '🚿 DOUCHE',
     '🤿 PLONGEOIR',
     '🛟 PLATE FORME FLOTTANTE',
@@ -196,6 +213,21 @@ Color _sphotHoverColor = adminColor;
     '⚓ PONTON',
     'AUTRE',
   ];
+
+  static const Set<String> _sphotToiletChoices = {
+    '🚻 TOILETTES GRATUITES',
+    '🚻 TOILETTES PAYANTES',
+  };
+
+  static const Set<String> _sphotParkingChoices = {
+    '🅿️ PARKING GRATUIT',
+    '🅿️ PARKING PAYANT',
+  };
+
+  static const Set<String> _sphotCampingCarParkingChoices = {
+    '🚐 PARKING CAMPING-CAR GRATUIT',
+    '🚐 PARKING CAMPING-CAR PAYANT',
+  };
 
   static const List<String> _sphotLabelChoices = [
   'AUCUN',
@@ -4422,6 +4454,7 @@ void _openTrialSummaryPanel() {
   }
 
   setState(() {
+    _showStatisticsPanel = false;
     _trialSummaryPanelFuture = _loadTrialSummaryData();
     _showTrialSummaryPanel = true;
     _showSubscriptionPanel = false;
@@ -4495,6 +4528,7 @@ Widget _buildTrialSummaryPanel() {
 
 void _openSubscriptionPanel() {
   setState(() {
+    _showStatisticsPanel = false;
     _showSubscriptionPanel = true;
     _showBillingDocumentsPanel = false;
     _showTrialSummaryPanel = false;
@@ -4513,6 +4547,7 @@ void _openSubscriptionPanel() {
 
 void _openBillingDocumentsPanel() {
   setState(() {
+    _showStatisticsPanel = false;
     _showBillingDocumentsPanel = true;
     _showSubscriptionPanel = false;
     _showTrialSummaryPanel = false;
@@ -4538,6 +4573,31 @@ void _closeSubscriptionPanel() {
 void _closeBillingDocumentsPanel() {
   setState(() {
     _showBillingDocumentsPanel = false;
+  });
+}
+
+void _openStatisticsPanel() {
+  setState(() {
+    _showStatisticsPanel = true;
+    _showSubscriptionPanel = false;
+    _showBillingDocumentsPanel = false;
+    _showTrialSummaryPanel = false;
+    _trialSummaryPanelFuture = null;
+    _showSauveteursManagementPanel = false;
+    _showSurveillancePeriodsPanel = false;
+    _showSauveteurEditorPanel = false;
+    _showSphotEditorPanel = false;
+    _placingSphotOnMap = false;
+    _selectedSpot = null;
+    _selectedAdmin = null;
+    _selectedAdvertiser = null;
+    _showLegalDocumentsPanel = false;
+  });
+}
+
+void _closeStatisticsPanel() {
+  setState(() {
+    _showStatisticsPanel = false;
   });
 }
 
@@ -4750,10 +4810,10 @@ Widget _buildBillingDocumentsPanel() {
             Expanded(
               child: Container(
                 color: const Color(0xFFF8FAFC),
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    _buildCommercialSection(
+                  child: ListView(
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      _buildCommercialSection(
                       icon: Icons.request_quote_outlined,
                       title: 'DEVIS',
                       description:
@@ -4929,14 +4989,13 @@ if (showTrialButton) ...[
 _summaryCard(
   title: 'ABONNEMENT',
   value: '',
-  color: showTrialButton ? pendingColor : redColor,
+  color: adminColor,
   iconPath: 'data/icons/fire_red_icon.png',
   stepNumber: 6,
   iconScale: 1.35,
   titleFontSize: 16,
   titleLetterSpacing: 0.5,
   showValue: false,
-  grayscaleIcon: showTrialButton,
   onTap: _openSubscriptionPanel,
 ),
 
@@ -4945,17 +5004,29 @@ const SizedBox(height: 8),
 _summaryCard(
   title: 'DOCUMENTS & FACTURES',
   value: '',
-  color: showTrialButton ? pendingColor : adminColor,
-  iconPath: showTrialButton
-      ? 'data/icons/fire_red_icon.png'
-      : 'data/icons/fire_blue_icon.png',
+  color: adminColor,
+  iconPath: 'data/icons/fire_red_icon.png',
   stepNumber: 7,
   iconScale: 1.35,
   titleFontSize: 16,
   titleLetterSpacing: 0.5,
   showValue: false,
-  grayscaleIcon: showTrialButton,
   onTap: _openBillingDocumentsPanel,
+),
+
+const SizedBox(height: 8),
+
+_summaryCard(
+  title: 'STATISTIQUES',
+  value: '',
+  color: adminColor,
+  iconPath: 'data/icons/fire_red_icon.png',
+  stepNumber: 8,
+  iconScale: 1.35,
+  titleFontSize: 16,
+  titleLetterSpacing: 0.5,
+  showValue: false,
+  onTap: _openStatisticsPanel,
 ),
 
 const SizedBox(height: 4),
@@ -5503,6 +5574,7 @@ void _openSurveillancePeriodsPanel() {
   }
 
   setState(() {
+    _showStatisticsPanel = false;
     _showTrialSummaryPanel = false;
     _trialSummaryPanelFuture = null;
     _showSubscriptionPanel = false;
@@ -6286,10 +6358,14 @@ void _clearSphotEditor() {
   _sphotNameController.clear();
   _sphotLatController.clear();
   _sphotLngController.clear();
+  _sphotOtherTypeController.clear();
+  _sphotOtherEquipmentController.clear();
+  _sphotOtherLabelController.clear();
 }
 
 void _openNewSphotEditor() {
   setState(() {
+    _showStatisticsPanel = false;
     _showTrialSummaryPanel = false;
     _trialSummaryPanelFuture = null;
     _showSubscriptionPanel = false;
@@ -6326,6 +6402,7 @@ void _openNewSauveteurEditor() {
   }
 
   setState(() {
+    _showStatisticsPanel = false;
     _showTrialSummaryPanel = false;
     _trialSummaryPanelFuture = null;
     _showSubscriptionPanel = false;
@@ -6575,8 +6652,21 @@ void _loadSphotInEditor(Map<String, dynamic> data) {
 
   final lat = _toDouble(data['sphotLat']);
   final lng = _toDouble(data['sphotLng']);
+  final loadedEquipments = _readSphotMultiValue(data['equipement']);
+
+  // Compatibilité avec les SPHOTS créés avant la différenciation tarifaire.
+  if (loadedEquipments.remove('🚻 TOILETTES')) {
+    loadedEquipments.add('🚻 TOILETTES GRATUITES');
+  }
+  if (loadedEquipments.remove('🅿️ PARKING')) {
+    loadedEquipments.add('🅿️ PARKING GRATUIT');
+  }
+  if (loadedEquipments.remove('🚐 PARKING CAMPING-CAR')) {
+    loadedEquipments.add('🚐 PARKING CAMPING-CAR GRATUIT');
+  }
 
   setState(() {
+    _showStatisticsPanel = false;
     _showTrialSummaryPanel = false;
     _trialSummaryPanelFuture = null;
     _showSubscriptionPanel = false;
@@ -6592,12 +6682,21 @@ void _loadSphotInEditor(Map<String, dynamic> data) {
     _sphotLatController.text = lat == 0 ? '' : lat.toStringAsFixed(6);
     _sphotLngController.text = lng == 0 ? '' : lng.toStringAsFixed(6);
     _selectedSphotType = _cleanText(data['typeSphot']);
+    _sphotOtherTypeController.text = _cleanText(
+      data['autreTypeSphot'] ?? data['typeSphotAutre'],
+    );
     _selectedSphotEquipments
       ..clear()
-      ..addAll(_readSphotMultiValue(data['equipement']));
+      ..addAll(loadedEquipments);
     _selectedSphotLabels
       ..clear()
       ..addAll(_readSphotMultiValue(data['labelSphot']));
+    _sphotOtherEquipmentController.text = _cleanText(
+      data['autreEquipement'] ?? data['equipementAutre'],
+    );
+    _sphotOtherLabelController.text = _cleanText(
+      data['autreLabel'] ?? data['labelSphotAutre'],
+    );
     _showSauveteurEditorPanel = false;
     _showSauveteursManagementPanel = false;
     _showSurveillancePeriodsPanel = false;
@@ -6677,6 +6776,15 @@ Future<void> _saveSphotFromDashboard() async {
     errorMessage = 'Positionnez le SPHOT sur la carte.';
   } else if (_selectedSphotType.isEmpty) {
     errorMessage = 'Sélectionnez le type de SPHOT.';
+  } else if (_selectedSphotType == 'AUTRE' &&
+      _sphotOtherTypeController.text.trim().isEmpty) {
+    errorMessage = 'Précisez l’autre type de SPHOT.';
+  } else if (_selectedSphotEquipments.contains('AUTRE') &&
+      _sphotOtherEquipmentController.text.trim().isEmpty) {
+    errorMessage = 'Précisez l’autre équipement du SPHOT.';
+  } else if (_selectedSphotLabels.contains('AUTRE') &&
+      _sphotOtherLabelController.text.trim().isEmpty) {
+    errorMessage = 'Précisez l’autre label du SPHOT.';
   }
 
   if (errorMessage != null) {
@@ -6716,12 +6824,21 @@ Future<void> _saveSphotFromDashboard() async {
       'idSphot': idSphot,
       'nomSphot': _sphotNameController.text.trim(),
       'typeSphot': _selectedSphotType,
+      'autreTypeSphot': _selectedSphotType == 'AUTRE'
+          ? _sphotOtherTypeController.text.trim()
+          : '',
       'isPosteSecours':
           _selectedSphotType == '🚨 POSTE DE SECOURS 🚨',
       'sphotLat': lat,
       'sphotLng': lng,
       'equipement': _selectedSphotEquipments.join(' | '),
+      'autreEquipement': _selectedSphotEquipments.contains('AUTRE')
+          ? _sphotOtherEquipmentController.text.trim()
+          : '',
       'labelSphot': _selectedSphotLabels.join(' | '),
+      'autreLabel': _selectedSphotLabels.contains('AUTRE')
+          ? _sphotOtherLabelController.text.trim()
+          : '',
       'pays': territoryData['pays'] ?? '',
       'region': territoryData['region'] ?? '',
       'departement': territoryData['departement'] ?? '',
@@ -7061,6 +7178,7 @@ Widget _sphotMultiDropdown({
   required String label,
   required List<String> choices,
   required Set<String> selectedValues,
+  required TextEditingController otherController,
   double maxMenuHeight = 245,
 }) {
   final displayText = selectedValues.isEmpty
@@ -7080,6 +7198,7 @@ Widget _sphotMultiDropdown({
   fieldKey: fieldKey,
   choices: choices,
   selectedValues: selectedValues,
+  otherController: otherController,
   maxMenuHeight: maxMenuHeight,
 );
     },
@@ -7138,6 +7257,49 @@ Widget _sphotMultiDropdown({
           ),
         ],
       ),
+    ),
+  );
+}
+
+Widget _sphotTypeLabel(
+  String type, {
+  double fontSize = 14,
+}) {
+  if (type == _rescueStationType) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 13,
+          height: 20,
+          child: SvgPicture.asset(
+            _rescueStationFlagAsset,
+            fit: BoxFit.contain,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            'POSTE DE SECOURS',
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: adminColor,
+              fontSize: fontSize,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  return Text(
+    type.isEmpty ? 'Type de SPHOT' : type,
+    overflow: TextOverflow.ellipsis,
+    style: TextStyle(
+      color: adminColor,
+      fontSize: fontSize,
+      fontWeight: FontWeight.w800,
     ),
   );
 }
@@ -7235,32 +7397,65 @@ void _openSphotTypeMenu() {
                         final choice =
                             _sphotTypeChoices[index];
 
-                        return InkWell(
-                          onTap: () {
-                            setState(() {
-                              _selectedSphotType = choice;
-                            });
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _selectedSphotType = choice;
+                                  if (choice != 'AUTRE') {
+                                    _sphotOtherTypeController.clear();
+                                  }
+                                });
 
-                            _dropdownOverlay?.remove();
-                            _dropdownOverlay = null;
-                          },
-
-                          child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-
-                            child: Text(
-                              choice,
-                              style: const TextStyle(
-                                color: adminColor,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
+                                if (choice == 'AUTRE') {
+                                  _dropdownOverlay?.markNeedsBuild();
+                                  WidgetsBinding.instance
+                                      .addPostFrameCallback((_) {
+                                    if (scrollController.hasClients) {
+                                      scrollController.animateTo(
+                                        scrollController.position
+                                            .maxScrollExtent,
+                                        duration: const Duration(
+                                          milliseconds: 180,
+                                        ),
+                                        curve: Curves.easeOut,
+                                      );
+                                    }
+                                  });
+                                } else {
+                                  _dropdownOverlay?.remove();
+                                  _dropdownOverlay = null;
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                child: _sphotTypeLabel(
+                                  choice,
+                                  fontSize: 13,
+                                ),
                               ),
                             ),
-                          ),
+                            if (choice == 'AUTRE' &&
+                                _selectedSphotType == 'AUTRE')
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  14,
+                                  0,
+                                  14,
+                                  10,
+                                ),
+                                child: _sphotEditorField(
+                                  controller: _sphotOtherTypeController,
+                                  label: 'Précisez :',
+                                ),
+                              ),
+                          ],
                         );
                       },
                     ),
@@ -7281,6 +7476,7 @@ void _openSphotMultiChoiceMenu({
   required GlobalKey fieldKey,
   required List<String> choices,
   required Set<String> selectedValues,
+  required TextEditingController otherController,
   required double maxMenuHeight,
 }) {
   _dropdownOverlay?.remove();
@@ -7389,7 +7585,11 @@ final choiceIconPath =
 final displayedChoice =
     _sphotLabelDisplayNames[choice] ?? choice;
 
-                            return InkWell(
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                            InkWell(
                               onTap: () {
                                 setState(() {
   if (choice == 'AUCUN') {
@@ -7421,12 +7621,41 @@ if (_sphotHandiplageChoices.contains(choice)) {
   );
 }
 
+if (_sphotToiletChoices.contains(choice)) {
+  selectedValues.removeAll(_sphotToiletChoices);
+}
+
+if (_sphotParkingChoices.contains(choice)) {
+  selectedValues.removeAll(_sphotParkingChoices);
+}
+
+if (_sphotCampingCarParkingChoices.contains(choice)) {
+  selectedValues.removeAll(
+    _sphotCampingCarParkingChoices,
+  );
+}
+
 selectedValues.add(choice);
     }
   }
 });
 
                                 overlaySetState(() {});
+                                if (choice == 'AUTRE' && !selected) {
+                                  WidgetsBinding.instance
+                                      .addPostFrameCallback((_) {
+                                    if (scrollController.hasClients) {
+                                      scrollController.animateTo(
+                                        scrollController.position
+                                            .maxScrollExtent,
+                                        duration: const Duration(
+                                          milliseconds: 180,
+                                        ),
+                                        curve: Curves.easeOut,
+                                      );
+                                    }
+                                  });
+                                }
                               },
 
                               child: Padding(
@@ -7486,6 +7715,22 @@ Expanded(
                                   ],
                                 ),
                               ),
+                            ),
+                            if (choice == 'AUTRE' &&
+                                selectedValues.contains('AUTRE'))
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  14,
+                                  0,
+                                  14,
+                                  10,
+                                ),
+                                child: _sphotEditorField(
+                                  controller: otherController,
+                                  label: 'Précisez :',
+                                ),
+                              ),
+                              ],
                             );
                           },
                         ),
@@ -9720,19 +9965,7 @@ const SizedBox(height: 9),
     child: Row(
       children: [
         Expanded(
-          child: Text(
-            _selectedSphotType.isEmpty
-                ? 'Type de SPHOT'
-                : _selectedSphotType,
-
-            overflow: TextOverflow.ellipsis,
-
-            style: const TextStyle(
-              color: adminColor,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+          child: _sphotTypeLabel(_selectedSphotType),
         ),
 
         const Icon(
@@ -9756,7 +9989,8 @@ const SizedBox(height: 9),
   label: 'Équipements du SPHOT',
   choices: _sphotEquipmentChoices,
   selectedValues: _selectedSphotEquipments,
-  maxMenuHeight: 220,
+  otherController: _sphotOtherEquipmentController,
+  maxMenuHeight: 160,
 ),
 
 const SizedBox(height: 14),
@@ -9773,6 +10007,7 @@ _sphotMultiDropdown(
   label: 'Labels du SPHOT',
   choices: _sphotLabelChoices,
   selectedValues: _selectedSphotLabels,
+  otherController: _sphotOtherLabelController,
   maxMenuHeight: 140,
 ),
             const SizedBox(height: 32),
@@ -12199,6 +12434,9 @@ void dispose() {
   _sphotNameController.dispose();
   _sphotLatController.dispose();
   _sphotLngController.dispose();
+  _sphotOtherTypeController.dispose();
+  _sphotOtherEquipmentController.dispose();
+  _sphotOtherLabelController.dispose();
   _sauveteurNomController.dispose();
   _sauveteurPrenomController.dispose();
   _sauveteurDateNaissanceController.dispose();
@@ -12796,6 +13034,7 @@ void _centerOnFirstCurrentResult() {
   }
 
   setState(() {
+    _showStatisticsPanel = false;
     _selectedSpot = type == 'spot' ? data : null;
     _selectedAdmin = type == 'admin' ? data : null;
     _selectedAdvertiser = type == 'advertiser' ? data : null;
@@ -12827,6 +13066,10 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
         'ADMIN',
   );
 
+  final ville = _cleanText(
+    territoire['ville'] ?? data['ville'] ?? organisation,
+  ).toUpperCase();
+
   final logoUrl = _cleanText(
   territoire['logoVille'] ??
       territoire['logoUrl'] ??
@@ -12847,6 +13090,7 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
         behavior: HitTestBehavior.opaque,
         onTap: () {
           setState(() {
+                _showStatisticsPanel = false;
             _selectedSpot = null;
             _selectedAdmin =
                 Map<String, dynamic>.from(data);
@@ -12856,10 +13100,23 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
             _selectedLegalChapter = null;
           });
         },
-          child: SizedBox(
-            width: 85,
-            height: 85,
-            child: Stack(
+          child: Tooltip(
+            message: ville,
+            preferBelow: true,
+            verticalOffset: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF0000),
+              borderRadius: BorderRadius.circular(5),
+            ),
+            textStyle: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+            child: SizedBox(
+              width: 85,
+              height: 85,
+              child: Stack(
               alignment: Alignment.topCenter,
               children: [
                 Image.asset(
@@ -12919,7 +13176,8 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
                     ),
                   ),
                 ),
-                            ],
+              ],
+              ),
             ),
           ),
       ),
@@ -12956,6 +13214,7 @@ Marker _buildAdvertiserMarker(Map<String, dynamic> data) {
     child: GestureDetector(
       onTap: () {
         setState(() {
+          _showStatisticsPanel = false;
           _selectedSpot = null;
           _selectedAdmin = null;
           _selectedAdvertiser = data;
@@ -13189,6 +13448,7 @@ final clusteredMarkers = validSpots.map((doc) {
               }
 
               setState(() {
+                _showStatisticsPanel = false;
                 _selectedSpot = null;
                 _selectedAdmin = null;
                 _selectedAdvertiser = null;
@@ -13390,9 +13650,17 @@ final clusteredMarkers = validSpots.map((doc) {
   _buildAdminDetailPanel(),
 
 if (_showSubscriptionPanel)
-  _buildSubscriptionPanel()
+  AdminSubscriptionPanel(
+    adminUid: widget.adminUid,
+    onClose: _closeSubscriptionPanel,
+  )
 else if (_showBillingDocumentsPanel)
   _buildBillingDocumentsPanel()
+else if (_showStatisticsPanel)
+  AdminStatisticsPanel(
+    territoireId: _resolvedTerritoireId,
+    onClose: _closeStatisticsPanel,
+  )
 else if (_showTrialSummaryPanel)
   _buildTrialSummaryPanel()
 else if (_showSauveteursManagementPanel)
