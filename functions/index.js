@@ -4377,3 +4377,169 @@ exports.deleteSauveteurAccount = onRequest(
       }
     },
 );
+
+exports.recordPublicClick = onRequest(
+    {
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      if (request.method !== "POST") {
+        response.status(405).json({success: false});
+        return;
+      }
+
+      try {
+        const payload = request.body || {};
+        const territoireId = (payload.territoireId || "")
+            .toString()
+            .trim();
+        const targetId = (payload.targetId || "").toString().trim();
+        const targetType = (payload.targetType || "").toString().trim();
+        const targetName = (payload.targetName || "")
+            .toString()
+            .trim()
+            .slice(0, 160);
+        const source = (payload.source || "").toString().trim();
+
+        if (!territoireId || !targetId || !targetName) {
+          response.status(400).json({success: false});
+          return;
+        }
+
+        if (!["spot", "admin"].includes(targetType) ||
+            !["web", "app"].includes(source)) {
+          response.status(400).json({success: false});
+          return;
+        }
+
+        const statId = Buffer.from(
+            `${territoireId}|${targetType}|${targetId}`,
+        ).toString("base64url");
+        const dayKey = new Intl.DateTimeFormat(
+            "fr-CA",
+            {
+              timeZone: "Europe/Paris",
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+            },
+        ).format(new Date());
+        const sourceField = source === "app"
+            ? "appClicks"
+            : "webClicks";
+        const increment =
+            admin.firestore.FieldValue.increment(1);
+        const updatedAt =
+            admin.firestore.FieldValue.serverTimestamp();
+        const statReference = admin.firestore()
+            .collection("publicClickStats")
+            .doc(statId);
+        const dayReference = statReference
+            .collection("daily")
+            .doc(dayKey);
+        const batch = admin.firestore().batch();
+
+        batch.set(
+            statReference,
+            {
+              territoireId: territoireId,
+              targetId: targetId,
+              targetType: targetType,
+              targetName: targetName,
+              totalClicks: increment,
+              [sourceField]: increment,
+              updatedAt: updatedAt,
+            },
+            {merge: true},
+        );
+
+        batch.set(
+            dayReference,
+            {
+              date: dayKey,
+              totalClicks: increment,
+              [sourceField]: increment,
+              updatedAt: updatedAt,
+            },
+            {merge: true},
+        );
+
+        await batch.commit();
+        response.status(200).json({success: true});
+      } catch (error) {
+        console.error("Erreur comptage clic public SPHOT:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.getPublicClickStats = onRequest(
+    {
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      if (request.method !== "POST") {
+        response.status(405).json({success: false});
+        return;
+      }
+
+      try {
+        const territoireId = ((request.body || {}).territoireId || "")
+            .toString()
+            .trim();
+
+        if (!territoireId) {
+          response.status(400).json({success: false});
+          return;
+        }
+
+        const snapshot = await admin.firestore()
+            .collection("publicClickStats")
+            .where("territoireId", "==", territoireId)
+            .get();
+        const statistics = snapshot.docs.map((document) => {
+          const data = document.data();
+          return {
+            id: document.id,
+            targetId: (data.targetId || "").toString(),
+            targetType: (data.targetType || "").toString(),
+            targetName: (data.targetName || "").toString(),
+            appClicks: Number(data.appClicks || 0),
+            webClicks: Number(data.webClicks || 0),
+            totalClicks: Number(data.totalClicks || 0),
+          };
+        });
+
+        response.status(200).json({
+          success: true,
+          statistics: statistics,
+        });
+      } catch (error) {
+        console.error("Erreur lecture statistiques SPHOT:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
