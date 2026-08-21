@@ -605,16 +605,16 @@ String _getMarkerIconPath(Map<String, dynamic> data) {
   );
 
   if (type.contains('POSTE DE SECOURS')) {
-    return 'data/icons/fire_red_icon.png';
+    return 'data/icons/fire_red_icon.svg';
   }
 
   if (type.contains('NATURISME') ||
       type.contains('NATURISTE')) {
-    return 'data/icons/fire_skin_icon.png';
+    return 'data/icons/fire_skin_icon.svg';
   }
 
   if (type.contains('PLAGE')) {
-    return 'data/icons/fire_orange_icon.png';
+    return 'data/icons/fire_orange_icon.svg';
   }
 
   if (type.contains('LAC') ||
@@ -622,22 +622,22 @@ String _getMarkerIconPath(Map<String, dynamic> data) {
       type.contains("PLAN D'EAU") ||
       type.contains('PLAN D EAU') ||
       type.contains('BARRAGE')) {
-    return 'data/icons/fire_blue_icon.png';
+    return 'data/icons/fire_blue_icon.svg';
   }
 
   if (type.contains('FLEUVE') ||
       type.contains('RIVIERE') ||
       type.contains('CASCADE')) {
-    return 'data/icons/fire_green_icon.png';
+    return 'data/icons/fire_green_icon.svg';
   }
 
   if (type.contains('LAGON') ||
       type.contains('PISCINE NATURELLE')) {
-    return 'data/icons/fire_cyan_icon.png';
+    return 'data/icons/fire_cyan_icon.svg';
   }
 
   // Base de loisirs, parc et autre.
-  return 'data/icons/fire_orange1_icon.png';
+  return 'data/icons/fire_orange1_icon.svg';
 }
 
 Color _spotTypeColor(Map<String, dynamic> data) {
@@ -1229,30 +1229,30 @@ Color _clusterBorderColor(List<Marker> markers) {
 
 String _clusterIconPath(Color color) {
   if (color == const Color(0xFFFF0000)) {
-    return 'data/icons/fire_red_icon.png';
+    return 'data/icons/fire_red_icon.svg';
   }
 
   if (color == const Color(0xFFD87A5C)) {
-    return 'data/icons/fire_skin_icon.png';
+    return 'data/icons/fire_skin_icon.svg';
   }
 
   if (color == const Color(0xFFFFD000)) {
-    return 'data/icons/fire_orange_icon.png';
+    return 'data/icons/fire_orange_icon.svg';
   }
 
   if (color == const Color(0xFF1E3A8A)) {
-    return 'data/icons/fire_blue_icon.png';
+    return 'data/icons/fire_blue_icon.svg';
   }
 
   if (color == const Color(0xFF2E7D32)) {
-    return 'data/icons/fire_green_icon.png';
+    return 'data/icons/fire_green_icon.svg';
   }
 
   if (color == const Color(0xFF00ACC1)) {
-    return 'data/icons/fire_cyan_icon.png';
+    return 'data/icons/fire_cyan_icon.svg';
   }
 
-  return 'data/icons/fire_orange1_icon.png';
+  return 'data/icons/fire_orange1_icon.svg';
 }
 
 void _showSphotHoverLabel({
@@ -3702,12 +3702,11 @@ Widget _buildTrialMonitoredSpotCard(
         Row(
   crossAxisAlignment: CrossAxisAlignment.start,
   children: [
-    Image.asset(
+    SvgPicture.asset(
       _getMarkerIconPath(spot),
       width: 42,
       height: 42,
       fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
     ),
     const SizedBox(width: 10),
     Expanded(
@@ -3877,12 +3876,11 @@ Widget _buildTrialOtherSpotTile(
     ),
     child: Row(
       children: [
-        Image.asset(
+        SvgPicture.asset(
           _getMarkerIconPath(spot),
           width: 34,
           height: 34,
           fit: BoxFit.contain,
-          filterQuality: FilterQuality.high,
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -4114,13 +4112,12 @@ Widget _buildTrialSummaryContent({
         child: Transform.scale(
           scale: isSidePanel ? 1.5 : 1.8,
           alignment: Alignment.center,
-          child: Image.asset(
-            'data/icons/fire_red_icon.png',
-            width: 30,
-            height: 30,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-          ),
+          child: SvgPicture.asset(
+  'data/icons/fire_red_icon.svg',
+  width: 30,
+  height: 30,
+  fit: BoxFit.contain,
+),
         ),
       ),
       Expanded(
@@ -4615,13 +4612,12 @@ Widget _buildCommercialPanelHeader({
   child: Transform.scale(
     scale: 1.5,
     alignment: Alignment.center,
-    child: Image.asset(
-      'data/icons/fire_red_icon.png',
-      width: 30,
-      height: 30,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-    ),
+    child: SvgPicture.asset(
+  'data/icons/fire_red_icon.svg',
+  width: 30,
+  height: 30,
+  fit: BoxFit.contain,
+),
   ),
 ),
         
@@ -4913,128 +4909,130 @@ Widget _buildRightPanel({
 
   const SizedBox(height: 12),
 
-  _summaryCard(
-    title: 'CRÉER UN SPHOT',
-    value: '',
-    color: adminColor,
-    iconPath: 'data/icons/fire_red_icon.png',
-    stepNumber: 1,
-    iconScale: 1.35,
-    titleFontSize: 17,
-    titleLetterSpacing: 0.8,
-    showValue: false,
-    onTap: _openNewSphotEditor,
+  Expanded(
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _summaryCard(
+                    title: 'CRÉER UN SPHOT',
+                    value: '',
+                    color: adminColor,
+                    iconPath: 'data/icons/fire_red_icon.svg',
+                    stepNumber: 1,
+                    iconScale: 1.35,
+                    titleFontSize: 17,
+                    titleLetterSpacing: 0.8,
+                    showValue: false,
+                    onTap: _openNewSphotEditor,
+                  ),
+                
+                  _summaryCard(
+                    title: 'CRÉER UNE PÉRIODE',
+                    value: '',
+                    color: adminColor,
+                    iconPath: 'data/icons/fire_red_icon.svg',
+                    stepNumber: 2,
+                    iconScale: 1.35,
+                    titleFontSize: 17,
+                    titleLetterSpacing: 0.8,
+                    showValue: false,
+                    onTap: _openSurveillancePeriodsPanel,
+                  ),
+                
+                  _summaryCard(
+                    title: 'CRÉER UN SAUVETEUR',
+                    value: '',
+                    color: adminColor,
+                    iconPath: 'data/icons/fire_red_icon.svg',
+                    stepNumber: 3,
+                    iconScale: 1.35,
+                    titleFontSize: 17,
+                    titleLetterSpacing: 0.8,
+                    showValue: false,
+                    onTap: _openNewSauveteurEditor,
+                  ),
+                
+                _summaryCard(
+                  title: 'ESPACE ADMIN SPHOT',
+                  value: '',
+                  color: adminColor,
+                  iconPath: 'data/icons/fire_red_icon.svg',
+                  stepNumber: 4,
+                  iconScale: 1.35,
+                  titleFontSize: 17,
+                  titleLetterSpacing: 0.8,
+                  showValue: false,
+                  onTap: _openTrialSummaryPanel,
+                ),
+                
+                if (showTrialButton) ...[
+                  _summaryCard(
+                    title: 'ESSAI GRATUIT 8 JOURS',
+                    value: '',
+                    color: redColor,
+                    iconPath: 'data/icons/fire_red_icon.svg',
+                    stepNumber: 5,
+                    iconScale: 1.35,
+                    titleFontSize: 17,
+                    titleLetterSpacing: 0.8,
+                    showValue: false,
+                    onTap: _openTrialSummaryDialog,
+                  ),
+                ],
+                
+                _summaryCard(
+                  title: 'ABONNEMENT',
+                  value: '',
+                  color: adminColor,
+                  iconPath: 'data/icons/fire_red_icon.svg',
+                  stepNumber: 6,
+                  iconScale: 1.35,
+                  titleFontSize: 16,
+                  titleLetterSpacing: 0.5,
+                  showValue: false,
+                  onTap: _openSubscriptionPanel,
+                ),
+                
+                _summaryCard(
+                  title: 'DOCUMENTS & FACTURES',
+                  value: '',
+                  color: adminColor,
+                  iconPath: 'data/icons/fire_red_icon.svg',
+                  stepNumber: 7,
+                  iconScale: 1.35,
+                  titleFontSize: 16,
+                  titleLetterSpacing: 0.5,
+                  showValue: false,
+                  onTap: _openBillingDocumentsPanel,
+                ),
+                
+                _summaryCard(
+                  title: 'STATISTIQUES',
+                  value: '',
+                  color: adminColor,
+                  iconPath: 'data/icons/fire_red_icon.svg',
+                  stepNumber: 8,
+                  iconScale: 1.35,
+                  titleFontSize: 16,
+                  titleLetterSpacing: 0.5,
+                  showValue: false,
+                  onTap: _openStatisticsPanel,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
   ),
 
-  const SizedBox(height: 6),
-
-  _summaryCard(
-    title: 'CRÉER UNE PÉRIODE',
-    value: '',
-    color: adminColor,
-    iconPath: 'data/icons/fire_red_icon.png',
-    stepNumber: 2,
-    iconScale: 1.35,
-    titleFontSize: 17,
-    titleLetterSpacing: 0.8,
-    showValue: false,
-    onTap: _openSurveillancePeriodsPanel,
-  ),
-
-  const SizedBox(height: 6),
-
-  _summaryCard(
-    title: 'CRÉER UN SAUVETEUR',
-    value: '',
-    color: adminColor,
-    iconPath: 'data/icons/fire_red_icon.png',
-    stepNumber: 3,
-    iconScale: 1.35,
-    titleFontSize: 17,
-    titleLetterSpacing: 0.8,
-    showValue: false,
-    onTap: _openNewSauveteurEditor,
-  ),
-
-  const SizedBox(height: 6),
-
-_summaryCard(
-  title: 'ESPACE ADMIN SPHOT',
-  value: '',
-  color: adminColor,
-  iconPath: 'data/icons/fire_red_icon.png',
-  stepNumber: 4,
-  iconScale: 1.35,
-  titleFontSize: 17,
-  titleLetterSpacing: 0.8,
-  showValue: false,
-  onTap: _openTrialSummaryPanel,
-),
-
-const SizedBox(height: 6),
-
-if (showTrialButton) ...[
-  _summaryCard(
-    title: 'ESSAI GRATUIT 8 JOURS',
-    value: '',
-    color: redColor,
-    iconPath: 'data/icons/fire_red_icon.png',
-    stepNumber: 5,
-    iconScale: 1.35,
-    titleFontSize: 17,
-    titleLetterSpacing: 0.8,
-    showValue: false,
-    onTap: _openTrialSummaryDialog,
-  ),
-  const SizedBox(height: 6),
-],
-
-_summaryCard(
-  title: 'ABONNEMENT',
-  value: '',
-  color: adminColor,
-  iconPath: 'data/icons/fire_red_icon.png',
-  stepNumber: 6,
-  iconScale: 1.35,
-  titleFontSize: 16,
-  titleLetterSpacing: 0.5,
-  showValue: false,
-  onTap: _openSubscriptionPanel,
-),
-
-const SizedBox(height: 6),
-
-_summaryCard(
-  title: 'DOCUMENTS & FACTURES',
-  value: '',
-  color: adminColor,
-  iconPath: 'data/icons/fire_red_icon.png',
-  stepNumber: 7,
-  iconScale: 1.35,
-  titleFontSize: 16,
-  titleLetterSpacing: 0.5,
-  showValue: false,
-  onTap: _openBillingDocumentsPanel,
-),
-
-const SizedBox(height: 6),
-
-_summaryCard(
-  title: 'STATISTIQUES',
-  value: '',
-  color: adminColor,
-  iconPath: 'data/icons/fire_red_icon.png',
-  stepNumber: 8,
-  iconScale: 1.35,
-  titleFontSize: 16,
-  titleLetterSpacing: 0.5,
-  showValue: false,
-  onTap: _openStatisticsPanel,
-),
-
-const SizedBox(height: 4),
-
-  
 ],
       ),
     ),
@@ -5045,7 +5043,7 @@ const SizedBox(height: 4),
   required String title,
   required String value,
   required Color color,
-  String iconPath = 'data/icons/fire_blue_icon.png',
+  String iconPath = 'data/icons/fire_blue_icon.svg',
   int? stepNumber,
   double iconScale = 1.0,
   double titleFontSize = 13,
@@ -5061,7 +5059,7 @@ const SizedBox(height: 4),
             : redColor;
 
     final card = Container(
-  height: 60,
+  height: 64,
   padding: const EdgeInsets.symmetric(
     horizontal: 12,
     vertical: 5,
@@ -5091,20 +5089,18 @@ const SizedBox(height: 4),
                   0.2126, 0.7152, 0.0722, 0, 0,
                   0, 0, 0, 1, 0,
                 ]),
-                child: Image.asset(
+                child: SvgPicture.asset(
                   iconPath,
                   width: 34,
                   height: 34,
                   fit: BoxFit.contain,
-                  filterQuality: FilterQuality.high,
                 ),
               )
-            : Image.asset(
+            : SvgPicture.asset(
                 iconPath,
                 width: 34,
                 height: 34,
                 fit: BoxFit.contain,
-                filterQuality: FilterQuality.high,
               ),
       ),
       if (stepNumber != null)
@@ -8500,13 +8496,12 @@ Widget _buildSurveillancePeriodsPanel() {
                     child: Transform.scale(
                       scale: 1.5,
                       alignment: Alignment.center,
-                      child: Image.asset(
-                        'data/icons/fire_red_icon.png',
-                        width: 30,
-                        height: 30,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                      ),
+                      child: SvgPicture.asset(
+  'data/icons/fire_red_icon.svg',
+  width: 30,
+  height: 30,
+  fit: BoxFit.contain,
+),
                     ),
                   ),
                   const Expanded(
@@ -9309,13 +9304,12 @@ Widget _buildSauveteurEditorPanel() {
                     child: Transform.scale(
                       scale: 1.5,
                       alignment: Alignment.center,
-                      child: Image.asset(
-                        'data/icons/fire_red_icon.png',
-                        width: 30,
-                        height: 30,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                      ),
+                      child: SvgPicture.asset(
+  'data/icons/fire_red_icon.svg',
+  width: 30,
+  height: 30,
+  fit: BoxFit.contain,
+),
                     ),
                   ),
                   Expanded(
@@ -9728,13 +9722,12 @@ Widget _buildSphotEditorPanel() {
   child: Transform.scale(
     scale: 1.5,
     alignment: Alignment.center,
-    child: Image.asset(
-      'data/icons/fire_red_icon.png',
-      width: 30,
-      height: 30,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-    ),
+    child: SvgPicture.asset(
+  'data/icons/fire_red_icon.svg',
+  width: 30,
+  height: 30,
+  fit: BoxFit.contain,
+),
   ),
 ),
                 const SizedBox(width: 0),
@@ -9780,12 +9773,11 @@ Widget _buildSphotEditorPanel() {
                     _placingSphotOnMap = true;
                   });
                 },
-                icon: Image.asset(
-  'data/icons/fire_red_icon.png',
+                icon: SvgPicture.asset(
+  'data/icons/fire_red_icon.svg',
   width: 26,
   height: 26,
   fit: BoxFit.contain,
-  filterQuality: FilterQuality.high,
 ),
                 label: Align(
   alignment: Alignment.centerLeft,
@@ -13122,13 +13114,12 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
               child: Stack(
               alignment: Alignment.topCenter,
               children: [
-                Image.asset(
-  'data/icons/fire_red_icon.png',
+                SvgPicture.asset(
+  'data/icons/fire_red_icon.svg',
   width: 85,
   height: 85,
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.high,
-                ),
+  fit: BoxFit.contain,
+),
 
                 Positioned(
                   top: 23,
@@ -13398,7 +13389,7 @@ final editedLng = double.tryParse(
 );
 
 final creationMarkerIconPath = _selectedSphotType.isEmpty
-    ? 'data/icons/fire_red_icon.png'
+    ? 'data/icons/fire_red_icon.svg'
     : _getMarkerIconPath({
         'typeSphot': _selectedSphotType,
       });
@@ -13521,13 +13512,11 @@ final clusteredMarkers = validSpots.map((doc) {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        Image.asset(
+                        SvgPicture.asset(
                           iconPath,
                           width: 54,
                           height: 54,
                           fit: BoxFit.contain,
-                          filterQuality:
-                              FilterQuality.high,
                         ),
                         Text(
                           count,
@@ -13579,12 +13568,11 @@ final clusteredMarkers = validSpots.map((doc) {
         width: 46,
         height: 46,
         alignment: const Alignment(0, -0.9),
-        child: Image.asset(
+        child: SvgPicture.asset(
           creationMarkerIconPath,
           width: 46,
           height: 46,
           fit: BoxFit.contain,
-          filterQuality: FilterQuality.high,
         ),
       ),
     ],
@@ -13706,19 +13694,16 @@ class DashboardSpotMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
+    return SvgPicture.asset(
       iconPath,
       width: 46,
       height: 46,
       fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-      errorBuilder: (_, __, ___) {
-        return Icon(
-          Icons.place,
-          color: typeColor,
-          size: 34,
-        );
-      },
+      placeholderBuilder: (_) => Icon(
+        Icons.place,
+        color: typeColor,
+        size: 34,
+      ),
     );
   }
 }
