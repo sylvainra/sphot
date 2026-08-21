@@ -4861,7 +4861,10 @@ Widget _buildRightPanel({
 }) {
   return Container(
     width: 360,
-    padding: const EdgeInsets.all(22),
+    padding: const EdgeInsets.symmetric(
+      horizontal: 20,
+      vertical: 14,
+    ),
     decoration: BoxDecoration(
       color: Colors.white.withOpacity(0.96),
       border: Border(
@@ -4890,7 +4893,7 @@ Widget _buildRightPanel({
     ),
   ),
 
-  const SizedBox(height: 8),
+  const SizedBox(height: 6),
 
   SizedBox(
     width: double.infinity,
@@ -4908,7 +4911,7 @@ Widget _buildRightPanel({
     ),
   ),
 
-  const SizedBox(height: 16),
+  const SizedBox(height: 12),
 
   _summaryCard(
     title: 'CRÉER UN SPHOT',
@@ -4923,7 +4926,7 @@ Widget _buildRightPanel({
     onTap: _openNewSphotEditor,
   ),
 
-  const SizedBox(height: 8),
+  const SizedBox(height: 6),
 
   _summaryCard(
     title: 'CRÉER UNE PÉRIODE',
@@ -4938,7 +4941,7 @@ Widget _buildRightPanel({
     onTap: _openSurveillancePeriodsPanel,
   ),
 
-  const SizedBox(height: 8),
+  const SizedBox(height: 6),
 
   _summaryCard(
     title: 'CRÉER UN SAUVETEUR',
@@ -4953,7 +4956,7 @@ Widget _buildRightPanel({
     onTap: _openNewSauveteurEditor,
   ),
 
-  const SizedBox(height: 8),
+  const SizedBox(height: 6),
 
 _summaryCard(
   title: 'ESPACE ADMIN SPHOT',
@@ -4968,7 +4971,7 @@ _summaryCard(
   onTap: _openTrialSummaryPanel,
 ),
 
-const SizedBox(height: 8),
+const SizedBox(height: 6),
 
 if (showTrialButton) ...[
   _summaryCard(
@@ -4983,7 +4986,7 @@ if (showTrialButton) ...[
     showValue: false,
     onTap: _openTrialSummaryDialog,
   ),
-  const SizedBox(height: 8),
+  const SizedBox(height: 6),
 ],
 
 _summaryCard(
@@ -4999,7 +5002,7 @@ _summaryCard(
   onTap: _openSubscriptionPanel,
 ),
 
-const SizedBox(height: 8),
+const SizedBox(height: 6),
 
 _summaryCard(
   title: 'DOCUMENTS & FACTURES',
@@ -5014,7 +5017,7 @@ _summaryCard(
   onTap: _openBillingDocumentsPanel,
 ),
 
-const SizedBox(height: 8),
+const SizedBox(height: 6),
 
 _summaryCard(
   title: 'STATISTIQUES',
@@ -5058,7 +5061,7 @@ const SizedBox(height: 4),
             : redColor;
 
     final card = Container(
-  height: 64,
+  height: 60,
   padding: const EdgeInsets.symmetric(
     horizontal: 12,
     vertical: 5,
