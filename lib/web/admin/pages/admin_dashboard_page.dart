@@ -9170,7 +9170,7 @@ _sphotWebcamUrlController.clear();
         color: Colors.transparent,
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -9294,7 +9294,7 @@ _sphotWebcamUrlController.clear();
                     ),
                   ],
                 ),
-                const Spacer(),
+                const SizedBox(height: 6),
                 _sphotSectionTitle(2, 'IDENTIFICATION'),
                 const SizedBox(height: 9),
                 Row(
@@ -9340,7 +9340,7 @@ _sphotWebcamUrlController.clear();
                     ),
                   ],
                 ),
-                const Spacer(),
+                const SizedBox(height: 6),
 
                 _sphotSectionTitle(3, 'TYPE'),
 
@@ -9411,7 +9411,7 @@ _sphotWebcamUrlController.clear();
                     ),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(height: 6),
                 _sphotSectionTitle(4, 'ÉQUIPEMENTS'),
 
                 const SizedBox(height: 5),
@@ -9425,7 +9425,7 @@ _sphotWebcamUrlController.clear();
                   maxMenuHeight: 240,
                 ),
 
-                const Spacer(),
+                const SizedBox(height: 6),
 
                 _sphotSectionTitle(5, 'LABELS'),
 
@@ -9440,7 +9440,7 @@ _sphotWebcamUrlController.clear();
                   maxMenuHeight: 145,
                 ),
 
-                const Spacer(),
+                const SizedBox(height: 6),
 
                 _sphotSectionTitle(6, 'WEBCAM'),
 
@@ -9452,7 +9452,7 @@ _sphotWebcamUrlController.clear();
                   keyboardType: TextInputType.url,
                 ),
 
-                const Spacer(),
+                const SizedBox(height: 6),
 
                 SizedBox(
                   width: double.infinity,
