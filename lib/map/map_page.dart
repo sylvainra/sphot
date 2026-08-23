@@ -2602,15 +2602,20 @@ class _HoverMarkerState extends State<_HoverMarker> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              SizedBox(
-                                width: 13,
-                                height: 20,
-                                child: SvgPicture.asset(
-                                  'data/icons/flag_red_yellow_5x3.svg',
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                              const SizedBox(width: 5),
+                              Transform.scale(
+  scaleX: 0.8,
+  scaleY: 1.4,
+  alignment: Alignment.centerLeft,
+  child: SizedBox(
+    width: 18,
+    height: 28,
+    child: SvgPicture.asset(
+      'data/icons/flag_red_yellow_5x3.svg',
+      fit: BoxFit.contain,
+    ),
+  ),
+),
+const SizedBox(width: 2),
                               Text(
                                 'POSTE DE SECOURS',
                                 style: _mapLabelStyle(

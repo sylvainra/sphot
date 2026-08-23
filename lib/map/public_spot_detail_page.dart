@@ -282,7 +282,7 @@ class _PublicWebcamSection extends StatelessWidget {
             ),
             SizedBox(width: 7),
             Text(
-              'WEBCAM EN DIRECT',
+              'WEBCAM',
               style: _publicSectionTitleStyle,
             ),
           ],
@@ -475,15 +475,20 @@ class _PublicRescueStationValue extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SizedBox(
-          width: 13,
-          height: 20,
-          child: SvgPicture.asset(
-            'data/icons/flag_red_yellow_5x3.svg',
-            fit: BoxFit.contain,
-          ),
-        ),
-        const SizedBox(width: 6),
+        Transform.scale(
+  scaleX: 0.8,
+  scaleY: 1.4,
+  alignment: Alignment.centerLeft,
+  child: SizedBox(
+    width: 18,
+    height: 28,
+    child: SvgPicture.asset(
+      'data/icons/flag_red_yellow_5x3.svg',
+      fit: BoxFit.contain,
+    ),
+  ),
+),
+const SizedBox(width: 2),
         const Flexible(
           child: Text(
             'POSTE DE SECOURS',
