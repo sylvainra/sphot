@@ -4523,17 +4523,58 @@ exports.getPublicClickStats = onRequest(
           return;
         }
 
-        const snapshot = await admin.firestore()
-            .collection("publicClickStats")
-            .where("territoireId", "==", territoireId)
-            .get();
+        const firestore = admin.firestore();
+        const [snapshot, publicSpotsSnapshot] = await Promise.all([
+          firestore
+              .collection("publicClickStats")
+              .where("territoireId", "==", territoireId)
+              .get(),
+          firestore
+              .collection("publicSpots")
+              .where("territoireId", "==", territoireId)
+              .get(),
+        ]);
+        const publicSpotsById = new Map();
+
+        publicSpotsSnapshot.docs.forEach((document) => {
+          const data = document.data();
+          const metadata = {
+            typeSphot: (data.typeSphot || "").toString(),
+            isPosteSecours: data.isPosteSecours === true,
+          };
+          const identifiers = [
+            document.id,
+            data.spotId,
+            data.idSphot,
+          ];
+
+          identifiers.forEach((identifier) => {
+            const normalizedIdentifier = (identifier || "")
+                .toString()
+                .trim();
+            if (normalizedIdentifier) {
+              publicSpotsById.set(normalizedIdentifier, metadata);
+            }
+          });
+        });
+
         const statistics = snapshot.docs.map((document) => {
           const data = document.data();
+          const targetId = (data.targetId || "").toString();
+          const targetType = (data.targetType || "").toString();
+          const spotMetadata = targetType === "spot" ?
+            publicSpotsById.get(targetId) :
+            null;
+
           return {
             id: document.id,
-            targetId: (data.targetId || "").toString(),
-            targetType: (data.targetType || "").toString(),
+            targetId: targetId,
+            targetType: targetType,
             targetName: (data.targetName || "").toString(),
+            typeSphot: spotMetadata ? spotMetadata.typeSphot : "",
+            isPosteSecours: spotMetadata ?
+              spotMetadata.isPosteSecours :
+              false,
             appClicks: Number(data.appClicks || 0),
             webClicks: Number(data.webClicks || 0),
             totalClicks: Number(data.totalClicks || 0),
