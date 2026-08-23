@@ -165,14 +165,20 @@ class _AdminStatisticsPanelState extends State<AdminStatisticsPanel> {
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          const SizedBox(width: 6),
           Transform.translate(
             offset: const Offset(-12, 0),
-            child: SvgPicture.asset(
-              'data/icons/fire_red_icon.svg',
-              width: 45,
-              height: 45,
-              fit: BoxFit.contain,
+            child: Transform.scale(
+              scale: 1.5,
+              alignment: Alignment.center,
+              child: SvgPicture.asset(
+                'data/icons/fire_red_icon.svg',
+                width: 30,
+                height: 30,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
           const Expanded(
@@ -180,9 +186,9 @@ class _AdminStatisticsPanelState extends State<AdminStatisticsPanel> {
               'STATISTIQUES',
               style: TextStyle(
                 color: _blue,
-                fontSize: 20,
+                fontSize: 19,
                 fontWeight: FontWeight.w900,
-                letterSpacing: 0.6,
+                letterSpacing: 0.7,
               ),
             ),
           ),
@@ -427,14 +433,14 @@ class _AdminStatisticsPanelState extends State<AdminStatisticsPanel> {
           Row(
             children: [
               SizedBox(
-                width: 24,
+                width: 18,
                 height: 30,
                 child: SvgPicture.asset(
                   _statisticMarkerAsset(statistic),
                   fit: BoxFit.contain,
                 ),
               ),
-              const SizedBox(width: 9),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   statistic.targetName.isEmpty
