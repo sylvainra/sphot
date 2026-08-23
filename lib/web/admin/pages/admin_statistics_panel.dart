@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 
 class AdminStatisticsPanel extends StatefulWidget {
@@ -167,16 +168,11 @@ class _AdminStatisticsPanelState extends State<AdminStatisticsPanel> {
         children: [
           Transform.translate(
             offset: const Offset(-12, 0),
-            child: Transform.scale(
-              scale: 1.5,
-              alignment: Alignment.center,
-              child: Image.asset(
-                'data/icons/fire_red_icon.png',
-                width: 30,
-                height: 30,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.high,
-              ),
+            child: SvgPicture.asset(
+              'data/icons/fire_red_icon.svg',
+              width: 45,
+              height: 45,
+              fit: BoxFit.contain,
             ),
           ),
           const Expanded(
@@ -356,6 +352,62 @@ class _AdminStatisticsPanelState extends State<AdminStatisticsPanel> {
     );
   }
 
+  String _normalizeSpotType(String value) {
+    return value
+        .toUpperCase()
+        .replaceAll('É', 'E')
+        .replaceAll('È', 'E')
+        .replaceAll('Ê', 'E')
+        .replaceAll('À', 'A')
+        .replaceAll('Â', 'A')
+        .replaceAll('Î', 'I')
+        .replaceAll('Ô', 'O')
+        .replaceAll('Ù', 'U')
+        .replaceAll('Û', 'U')
+        .replaceAll('Ç', 'C')
+        .trim();
+  }
+
+  String _statisticMarkerAsset(_PublicClickStatistic statistic) {
+    if (statistic.targetType == 'admin' || statistic.isPosteSecours) {
+      return 'data/icons/fire_red_icon.svg';
+    }
+
+    final type = _normalizeSpotType(statistic.typeSphot);
+
+    if (type.contains('POSTE DE SECOURS')) {
+      return 'data/icons/fire_red_icon.svg';
+    }
+
+    if (type.contains('NATURISME') || type.contains('NATURISTE')) {
+      return 'data/icons/fire_skin_icon.svg';
+    }
+
+    if (type.contains('PLAGE')) {
+      return 'data/icons/fire_orange_icon.svg';
+    }
+
+    if (type.contains('LAC') ||
+        type.contains('ETANG') ||
+        type.contains("PLAN D'EAU") ||
+        type.contains('PLAN D EAU') ||
+        type.contains('BARRAGE')) {
+      return 'data/icons/fire_blue_icon.svg';
+    }
+
+    if (type.contains('FLEUVE') ||
+        type.contains('RIVIERE') ||
+        type.contains('CASCADE')) {
+      return 'data/icons/fire_green_icon.svg';
+    }
+
+    if (type.contains('LAGON') || type.contains('PISCINE NATURELLE')) {
+      return 'data/icons/fire_cyan_icon.svg';
+    }
+
+    return 'data/icons/fire_orange1_icon.svg';
+  }
+
   Widget _buildStatisticCard(_PublicClickStatistic statistic) {
     final isAdmin = statistic.targetType == 'admin';
 
@@ -374,10 +426,13 @@ class _AdminStatisticsPanelState extends State<AdminStatisticsPanel> {
         children: [
           Row(
             children: [
-              Icon(
-                isAdmin ? Icons.location_city_rounded : Icons.place_rounded,
-                color: isAdmin ? _red : _blue,
-                size: 22,
+              SizedBox(
+                width: 24,
+                height: 30,
+                child: SvgPicture.asset(
+                  _statisticMarkerAsset(statistic),
+                  fit: BoxFit.contain,
+                ),
               ),
               const SizedBox(width: 9),
               Expanded(
@@ -510,6 +565,8 @@ class _AdminStatisticsPanelState extends State<AdminStatisticsPanel> {
 class _PublicClickStatistic {
   final String targetType;
   final String targetName;
+  final String typeSphot;
+  final bool isPosteSecours;
   final int appClicks;
   final int webClicks;
   final int totalClicks;
@@ -517,6 +574,8 @@ class _PublicClickStatistic {
   const _PublicClickStatistic({
     required this.targetType,
     required this.targetName,
+    required this.typeSphot,
+    required this.isPosteSecours,
     required this.appClicks,
     required this.webClicks,
     required this.totalClicks,
@@ -532,6 +591,8 @@ class _PublicClickStatistic {
     return _PublicClickStatistic(
       targetType: (json['targetType'] ?? '').toString(),
       targetName: (json['targetName'] ?? '').toString(),
+      typeSphot: (json['typeSphot'] ?? '').toString(),
+      isPosteSecours: json['isPosteSecours'] == true,
       appClicks: readCount(json['appClicks']),
       webClicks: readCount(json['webClicks']),
       totalClicks: readCount(json['totalClicks']),
