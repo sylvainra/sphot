@@ -169,7 +169,7 @@ class _AdminStatisticsPanelState extends State<AdminStatisticsPanel> {
         children: [
           const SizedBox(width: 6),
           Transform.translate(
-            offset: const Offset(-12, 0),
+            offset: const Offset(-12, -2),
             child: Transform.scale(
               scale: 1.5,
               alignment: Alignment.center,

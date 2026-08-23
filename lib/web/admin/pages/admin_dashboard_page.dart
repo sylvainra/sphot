@@ -6808,24 +6808,31 @@ _sphotWebcamUrlController.clear();
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AdaptiveAssetImage(
-            _rescueStationFlagAsset,
-            width: 13,
-            height: 20,
-            fit: BoxFit.contain,
-          ),
-          const SizedBox(width: 8),
+          Transform.scale(
+  scaleX: 0.4,
+  scaleY: 0.7,
+  alignment: Alignment.centerLeft,
+  child: AdaptiveAssetImage(
+    _rescueStationFlagAsset,
+    width: 13,
+    height: 20,
+    fit: BoxFit.contain,
+  ),
+),
           Flexible(
-            child: Text(
-              'POSTE DE SECOURS',
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: adminColor,
-                fontSize: fontSize,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
+  child: Transform.translate(
+    offset: const Offset(-13, 0),
+    child: Text(
+      'POSTE DE SECOURS',
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: adminColor,
+        fontSize: fontSize,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  ),
+),
         ],
       );
     }
@@ -9157,7 +9164,7 @@ _sphotWebcamUrlController.clear();
     final lat = double.tryParse(_sphotLatController.text.trim());
     final lng = double.tryParse(_sphotLngController.text.trim());
     final hasPosition = lat != null && lng != null;
-
+    
     return Container(
       width: 430,
       decoration: BoxDecoration(
@@ -9170,7 +9177,7 @@ _sphotWebcamUrlController.clear();
         color: Colors.transparent,
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -9294,7 +9301,7 @@ _sphotWebcamUrlController.clear();
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 14),
                 _sphotSectionTitle(2, 'IDENTIFICATION'),
                 const SizedBox(height: 9),
                 Row(
@@ -9340,7 +9347,7 @@ _sphotWebcamUrlController.clear();
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 14),
 
                 _sphotSectionTitle(3, 'TYPE'),
 
@@ -9411,7 +9418,7 @@ _sphotWebcamUrlController.clear();
                     ),
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 14),
                 _sphotSectionTitle(4, 'ÉQUIPEMENTS'),
 
                 const SizedBox(height: 5),
@@ -9425,7 +9432,7 @@ _sphotWebcamUrlController.clear();
                   maxMenuHeight: 240,
                 ),
 
-                const SizedBox(height: 6),
+                const SizedBox(height: 14),
 
                 _sphotSectionTitle(5, 'LABELS'),
 
@@ -9440,7 +9447,7 @@ _sphotWebcamUrlController.clear();
                   maxMenuHeight: 145,
                 ),
 
-                const SizedBox(height: 6),
+                const SizedBox(height: 14),
 
                 _sphotSectionTitle(6, 'WEBCAM'),
 
@@ -9452,7 +9459,7 @@ _sphotWebcamUrlController.clear();
                   keyboardType: TextInputType.url,
                 ),
 
-                const SizedBox(height: 6),
+                const Spacer(),
 
                 SizedBox(
                   width: double.infinity,
