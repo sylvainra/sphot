@@ -64,7 +64,24 @@ class _AdvertiserAccessGateState extends State<_AdvertiserAccessGate> {
     });
 
     try {
-      await AdvertiserAuthService.signInWithProConnectRedirect();
+      final provider = OAuthProvider(AdvertiserAuthService.providerId)
+        ..addScope('openid')
+        ..addScope('email');
+
+      final credential =
+          await FirebaseAuth.instance.signInWithPopup(provider);
+
+      if (credential.user == null) {
+        throw FirebaseAuthException(
+          code: 'proconnect-user-missing',
+          message:
+              'ProConnect a répondu, mais Firebase n’a créé aucune session.',
+        );
+      }
+
+      if (mounted) {
+        setState(() => _startingSignIn = false);
+      }
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
       setState(() {
