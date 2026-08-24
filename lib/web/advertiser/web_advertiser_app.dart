@@ -44,58 +44,49 @@ class _AdvertiserAccessGateState extends State<_AdvertiserAccessGate> {
   }
 
   Future<void> _resolveRedirect() async {
-    try {
-      await AdvertiserAuthService.handleRedirectResult();
-    } on FirebaseAuthException catch (error) {
-      _error = error.message ?? error.code;
-    } catch (error) {
-      _error = error.toString();
-    } finally {
-      if (mounted) {
-        setState(() => _checkingRedirect = false);
-      }
+  try {
+    await AdvertiserAuthService.handleRedirectResult();
+  } on FirebaseAuthException catch (error) {
+    _error = '[${error.code}] ${error.message ?? 'Erreur Firebase'}';
+    debugPrint(
+      'ERREUR RETOUR PROCONNECT : '
+      'code=${error.code}, message=${error.message}',
+    );
+  } catch (error, stackTrace) {
+    _error = error.toString();
+    debugPrint('ERREUR RETOUR PROCONNECT : $error');
+    debugPrintStack(stackTrace: stackTrace);
+  } finally {
+    if (mounted) {
+      setState(() => _checkingRedirect = false);
     }
   }
+}
 
   Future<void> _signIn() async {
+  setState(() {
+    _startingSignIn = true;
+    _error = null;
+  });
+
+  try {
+    await AdvertiserAuthService.signInWithProConnectRedirect();
+  } on FirebaseAuthException catch (error) {
+    if (!mounted) return;
+
     setState(() {
-      _startingSignIn = true;
-      _error = null;
+      _startingSignIn = false;
+      _error = '[${error.code}] ${error.message ?? 'Erreur Firebase'}';
     });
+  } catch (error) {
+    if (!mounted) return;
 
-    try {
-      final provider = OAuthProvider(AdvertiserAuthService.providerId)
-        ..addScope('openid')
-        ..addScope('email');
-
-      final credential =
-          await FirebaseAuth.instance.signInWithPopup(provider);
-
-      if (credential.user == null) {
-        throw FirebaseAuthException(
-          code: 'proconnect-user-missing',
-          message:
-              'ProConnect a répondu, mais Firebase n’a créé aucune session.',
-        );
-      }
-
-      if (mounted) {
-        setState(() => _startingSignIn = false);
-      }
-    } on FirebaseAuthException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _startingSignIn = false;
-        _error = error.message ?? error.code;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _startingSignIn = false;
-        _error = error.toString();
-      });
-    }
+    setState(() {
+      _startingSignIn = false;
+      _error = error.toString();
+    });
   }
+}
 
   bool _isProConnectUser(User user) {
     return user.providerData.any(
