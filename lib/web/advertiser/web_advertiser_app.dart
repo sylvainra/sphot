@@ -6,6 +6,11 @@ import '../../services/advertiser_auth_service.dart';
 import '../shared/web_colors.dart';
 import 'pages/advertiser_dashboard_page.dart';
 
+const bool _advertiserDevBypassEnabled = bool.fromEnvironment(
+  'SPHOT_ADVERTISER_DEV_BYPASS',
+  defaultValue: false,
+);
+
 class WebAdvertiserApp extends StatelessWidget {
   const WebAdvertiserApp({super.key});
 
@@ -28,65 +33,66 @@ class _AdvertiserAccessGate extends StatefulWidget {
   const _AdvertiserAccessGate();
 
   @override
-  State<_AdvertiserAccessGate> createState() =>
-      _AdvertiserAccessGateState();
+  State<_AdvertiserAccessGate> createState() => _AdvertiserAccessGateState();
 }
 
 class _AdvertiserAccessGateState extends State<_AdvertiserAccessGate> {
-  bool _checkingRedirect = true;
+  bool _checkingRedirect = !_advertiserDevBypassEnabled;
   bool _startingSignIn = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _resolveRedirect();
+    if (!_advertiserDevBypassEnabled) {
+      _resolveRedirect();
+    }
   }
 
   Future<void> _resolveRedirect() async {
-  try {
-    await AdvertiserAuthService.handleRedirectResult();
-  } on FirebaseAuthException catch (error) {
-    _error = '[${error.code}] ${error.message ?? 'Erreur Firebase'}';
-    debugPrint(
-      'ERREUR RETOUR PROCONNECT : '
-      'code=${error.code}, message=${error.message}',
-    );
-  } catch (error, stackTrace) {
-    _error = error.toString();
-    debugPrint('ERREUR RETOUR PROCONNECT : $error');
-    debugPrintStack(stackTrace: stackTrace);
-  } finally {
-    if (mounted) {
-      setState(() => _checkingRedirect = false);
+    try {
+      await AdvertiserAuthService.handleRedirectResult();
+    } on FirebaseAuthException catch (error) {
+      _error = '[${error.code}] ${error.message ?? 'Erreur Firebase'}';
+      debugPrint(
+        'ERREUR RETOUR PROCONNECT : '
+        'code=${error.code}, message=${error.message}',
+      );
+    } catch (error, stackTrace) {
+      _error = error.toString();
+      debugPrint('ERREUR RETOUR PROCONNECT : $error');
+      debugPrintStack(stackTrace: stackTrace);
+    } finally {
+      if (mounted) {
+        setState(() => _checkingRedirect = false);
+      }
     }
   }
-}
 
   Future<void> _signIn() async {
-  setState(() {
-    _startingSignIn = true;
-    _error = null;
-  });
-
-  try {
-    await AdvertiserAuthService.signInWithProConnectRedirect();
-  } on FirebaseAuthException catch (error) {
-    if (!mounted) return;
-
     setState(() {
-      _startingSignIn = false;
-      _error = '[${error.code}] ${error.message ?? 'Erreur Firebase'}';
+      _startingSignIn = true;
+      _error = null;
     });
-  } catch (error) {
-    if (!mounted) return;
 
-    setState(() {
-      _startingSignIn = false;
-      _error = error.toString();
-    });
+    try {
+      await AdvertiserAuthService.signInWithProConnectRedirect();
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _startingSignIn = false;
+        _error = '[${error.code}] ${error.message ?? 'Erreur Firebase'}';
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _startingSignIn = false;
+        _error = error.toString();
+      });
+    }
   }
-}
 
   bool _isProConnectUser(User user) {
     return user.providerData.any(
@@ -100,13 +106,22 @@ class _AdvertiserAccessGateState extends State<_AdvertiserAccessGate> {
       return const _AdvertiserLoadingPage();
     }
 
+    if (_advertiserDevBypassEnabled) {
+      return AdvertiserDashboardPage(
+        user: null,
+        developmentBypass: true,
+        onSignOut: () async {},
+      );
+    }
+
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       initialData: FirebaseAuth.instance.currentUser,
       builder: (context, snapshot) {
         final user = snapshot.data;
 
-        if (snapshot.connectionState == ConnectionState.waiting && user == null) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            user == null) {
           return const _AdvertiserLoadingPage();
         }
 
@@ -119,9 +134,7 @@ class _AdvertiserAccessGateState extends State<_AdvertiserAccessGate> {
 
         return _AdvertiserLoginPage(
           isLoading: _startingSignIn,
-          error: user == null
-              ? _error
-              : 'Cette session ne provient pas de ProConnect. Déconnectez-vous puis identifiez-vous avec votre identité professionnelle.',
+          error: user == null ? _error : 'Cette session ne provient pas de ProConnect. Déconnectez-vous puis identifiez-vous avec votre identité professionnelle.',
           onSignIn: _signIn,
           onClearSession: user == null ? null : AdvertiserAuthService.signOut,
         );
@@ -136,9 +149,7 @@ class _AdvertiserLoadingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(color: WebColors.red),
-      ),
+      body: Center(child: CircularProgressIndicator(color: WebColors.red)),
     );
   }
 }
@@ -241,7 +252,9 @@ class _AdvertiserLoginPage extends StatelessWidget {
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.verified_user_outlined),
                         label: Text(
@@ -252,7 +265,10 @@ class _AdvertiserLoginPage extends StatelessWidget {
                         ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: WebColors.blue,
-                          side: const BorderSide(color: WebColors.blue, width: 2),
+                          side: const BorderSide(
+                            color: WebColors.blue,
+                            width: 2,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
