@@ -11,10 +11,12 @@ class AdvertiserDashboardPage extends StatefulWidget {
     super.key,
     required this.user,
     required this.onSignOut,
+    this.developmentBypass = false,
   });
 
-  final User user;
+  final User? user;
   final Future<void> Function() onSignOut;
+  final bool developmentBypass;
 
   @override
   State<AdvertiserDashboardPage> createState() =>
@@ -78,15 +80,9 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
 
           return Row(
             children: [
-              SizedBox(
-                width: sidebarWidth,
-                child: _buildSidebar(),
-              ),
+              SizedBox(width: sidebarWidth, child: _buildSidebar()),
               Expanded(child: _buildMap()),
-              SizedBox(
-                width: panelWidth,
-                child: _buildDetailPanel(),
-              ),
+              SizedBox(width: panelWidth, child: _buildDetailPanel()),
             ],
           );
         },
@@ -95,9 +91,12 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   }
 
   Widget _buildSidebar() {
-    final name = widget.user.displayName?.trim();
-    final identity = name == null || name.isEmpty
-        ? widget.user.email ?? 'Professionnel ProConnect'
+    final user = widget.user;
+    final name = user?.displayName?.trim();
+    final identity = widget.developmentBypass
+        ? 'MODE DÉVELOPPEMENT'
+        : name == null || name.isEmpty
+        ? user?.email ?? 'Professionnel ProConnect'
         : name;
 
     return ColoredBox(
@@ -127,6 +126,31 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              if (widget.developmentBypass) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3CD),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFF59E0B)),
+                  ),
+                  child: const Text(
+                    'PROCONNECT CONTOURNÉ\nDONNÉES NON CERTIFIÉES',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF92400E),
+                      fontSize: 11,
+                      height: 1.25,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 18),
               Expanded(
                 child: ListView.separated(
@@ -249,9 +273,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               decoration: const BoxDecoration(
                 color: Colors.white,
-                border: Border(
-                  bottom: BorderSide(color: Color(0xFFD5DCE8)),
-                ),
+                border: Border(bottom: BorderSide(color: Color(0xFFD5DCE8))),
               ),
               child: Row(
                 children: [
@@ -310,16 +332,22 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           _StatusCard(
             icon: Icons.verified_user_outlined,
             title: 'IDENTITÉ PROFESSIONNELLE',
-            description:
-                'Les données d’identité certifiées restent distinctes des informations commerciales modifiables dans SPHOT.',
-            status: 'VÉRIFIÉE PAR PROCONNECT',
-            statusColor: const Color(0xFF15803D),
+            description: widget.developmentBypass
+                ? 'Le contrôle ProConnect est temporairement contourné pour permettre la conception du dashboard.'
+                : 'Les données d’identité certifiées restent distinctes des informations commerciales modifiables dans SPHOT.',
+            status: widget.developmentBypass
+                ? 'NON VÉRIFIÉE — DÉVELOPPEMENT'
+                : 'VÉRIFIÉE PAR PROCONNECT',
+            statusColor: widget.developmentBypass
+                ? const Color(0xFFD97706)
+                : const Color(0xFF15803D),
           ),
           _StatusCard(
             icon: Icons.alternate_email,
             title: 'COMPTE CONNECTÉ',
-            description: widget.user.email ?? 'Adresse non communiquée',
-            status: 'LECTURE SEULE',
+            description:
+                widget.user?.email ?? 'Aucun compte connecté en développement',
+            status: widget.developmentBypass ? 'SIMULATION' : 'LECTURE SEULE',
           ),
         ];
       case 4:
@@ -327,16 +355,14 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           _StatusCard(
             icon: Icons.event_available_outlined,
             title: 'RÉSERVATION EXCLUSIVE',
-            description:
-                'Une seule campagne peut occuper un emplacement donné pendant une même période.',
+            description: 'Une seule campagne peut occuper un emplacement donné pendant une même période.',
             status: 'RÈGLE COMMERCIALE ACTIVE',
             statusColor: Color(0xFF15803D),
           ),
           _StatusCard(
             icon: Icons.radar_outlined,
             title: 'RAYONNEMENT',
-            description:
-                'La disponibilité sera calculée selon l’épicentre, le rayon, les SPHOTS couverts et les dates.',
+            description: 'La disponibilité sera calculée selon l’épicentre, le rayon, les SPHOTS couverts et les dates.',
             status: 'À CONFIGURER',
           ),
         ];
@@ -345,15 +371,13 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           _StatusCard(
             icon: Icons.receipt_long_outlined,
             title: 'FACTURATION ÉLECTRONIQUE',
-            description:
-                'Numérotation, intégrité et transmission seront préparées pour une plateforme agréée.',
+            description: 'Numérotation, intégrité et transmission seront préparées pour une plateforme agréée.',
             status: 'À RACCORDER',
           ),
           _StatusCard(
             icon: Icons.inventory_2_outlined,
             title: 'ARCHIVAGE',
-            description:
-                'Les documents finalisés seront conservés sans écrasement et corrigés par avoir ou facture rectificative.',
+            description: 'Les documents finalisés seront conservés sans écrasement et corrigés par avoir ou facture rectificative.',
             status: 'À RACCORDER',
           ),
         ];
@@ -362,8 +386,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           _StatusCard(
             icon: _sections[index].icon,
             title: _sections[index].label,
-            description:
-                'Cette rubrique est prête à recevoir les données et règles déjà validées du parcours annonceur.',
+            description: 'Cette rubrique est prête à recevoir les données et règles déjà validées du parcours annonceur.',
             status: 'À COMPLÉTER',
           ),
         ];
