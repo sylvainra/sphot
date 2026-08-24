@@ -4,6 +4,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../map/map_page.dart';
+import '../../../widgets/adaptive_asset_image.dart';
 import '../../shared/web_colors.dart';
 
 class AdvertiserDashboardPage extends StatefulWidget {
@@ -91,14 +93,6 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   }
 
   Widget _buildSidebar() {
-    final user = widget.user;
-    final name = user?.displayName?.trim();
-    final identity = widget.developmentBypass
-        ? 'MODE DÉVELOPPEMENT'
-        : name == null || name.isEmpty
-        ? user?.email ?? 'Professionnel ProConnect'
-        : name;
-
     return ColoredBox(
       color: Colors.white,
       child: SafeArea(
@@ -115,64 +109,19 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 5),
-              Text(
-                identity,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: WebColors.blue,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              if (widget.developmentBypass) ...[
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF3CD),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFF59E0B)),
-                  ),
-                  child: const Text(
-                    'PROCONNECT CONTOURNÉ\nDONNÉES NON CERTIFIÉES',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Color(0xFF92400E),
-                      fontSize: 11,
-                      height: 1.25,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ],
               const SizedBox(height: 18),
               Expanded(
-                child: ListView.separated(
-                  itemCount: _sections.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final selected = index == _selectedIndex;
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: List.generate(_sections.length, (index) {
                     return _SidebarButton(
                       number: index + 1,
                       label: _sections[index].label,
-                      selected: selected,
+                      selected: index == _selectedIndex,
                       onTap: () => setState(() => _selectedIndex = index),
                     );
-                  },
+                  }),
                 ),
-              ),
-              const SizedBox(height: 10),
-              TextButton.icon(
-                onPressed: widget.onSignOut,
-                icon: const Icon(Icons.logout_rounded),
-                label: const Text('DÉCONNEXION'),
-                style: TextButton.styleFrom(foregroundColor: WebColors.red),
               ),
             ],
           ),
@@ -198,59 +147,43 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           ],
         ),
         Positioned(
-          top: 18,
-          left: 24,
-          right: 24,
-          child: Container(
-            height: 68,
-            padding: const EdgeInsets.symmetric(horizontal: 22),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.92),
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x30000000),
-                  blurRadius: 14,
-                  offset: Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Image.asset(
-                  'data/icons/title.png',
-                  width: 190,
-                  fit: BoxFit.contain,
-                ),
-                const Spacer(),
-                const Icon(Icons.lock_outline, color: WebColors.blue),
-                const SizedBox(width: 8),
-                const Text(
-                  'IDENTITÉ VÉRIFIÉE PAR PROCONNECT',
-                  style: TextStyle(
-                    color: WebColors.blue,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
+          top: 8,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Image.asset(
+              'data/icons/title.png',
+              height: 68,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
             ),
           ),
         ),
         Positioned(
-          left: 24,
-          bottom: 24,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.94),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: WebColors.blue),
-            ),
-            child: const Text(
-              'UN SPHOT · UN EMPLACEMENT · UNE PÉRIODE · UN ANNONCEUR',
-              style: TextStyle(
-                color: WebColors.blue,
-                fontWeight: FontWeight.w900,
+          left: 0,
+          right: 0,
+          bottom: 22,
+          child: Center(
+            child: Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                shape: BoxShape.circle,
+                border: Border.all(color: WebColors.blue, width: 2),
+              ),
+              child: IconButton(
+                onPressed: () {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const MapPage()),
+                    (route) => false,
+                  );
+                },
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: WebColors.blue,
+                  size: 28,
+                ),
               ),
             ),
           ),
@@ -333,21 +266,22 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             icon: Icons.verified_user_outlined,
             title: 'IDENTITÉ PROFESSIONNELLE',
             description: widget.developmentBypass
-                ? 'Le contrôle ProConnect est temporairement contourné pour permettre la conception du dashboard.'
+                ? 'Renseignez les informations professionnelles de l’annonceur.'
                 : 'Les données d’identité certifiées restent distinctes des informations commerciales modifiables dans SPHOT.',
             status: widget.developmentBypass
-                ? 'NON VÉRIFIÉE — DÉVELOPPEMENT'
+                ? 'À COMPLÉTER'
                 : 'VÉRIFIÉE PAR PROCONNECT',
             statusColor: widget.developmentBypass
-                ? const Color(0xFFD97706)
+                ? const Color(0xFF6B7280)
                 : const Color(0xFF15803D),
           ),
           _StatusCard(
             icon: Icons.alternate_email,
             title: 'COMPTE CONNECTÉ',
-            description:
-                widget.user?.email ?? 'Aucun compte connecté en développement',
-            status: widget.developmentBypass ? 'SIMULATION' : 'LECTURE SEULE',
+            description: widget.developmentBypass
+                ? 'Les coordonnées de connexion seront affichées après identification.'
+                : widget.user?.email ?? 'Adresse non communiquée',
+            status: widget.developmentBypass ? 'À COMPLÉTER' : 'LECTURE SEULE',
           ),
         ];
       case 4:
@@ -411,8 +345,16 @@ class _SidebarButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = selected ? WebColors.red : WebColors.blue;
 
+    final icon = AdaptiveAssetImage(
+      'data/icons/fire_red_icon.svg',
+      width: 44,
+      height: 56,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+    );
+
     return SizedBox(
-      height: 68,
+      height: 72,
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
@@ -426,27 +368,18 @@ class _SidebarButton extends StatelessWidget {
         child: Row(
           children: [
             SizedBox(
-              width: 40,
-              height: 48,
+              width: 48,
+              height: 56,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  SvgPicture.asset('data/icons/fire_red_icon.svg'),
-                  Container(
-                    width: 23,
-                    height: 23,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '$number',
-                      style: const TextStyle(
-                        color: WebColors.red,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                      ),
+                  icon,
+                  Text(
+                    '$number',
+                    style: TextStyle(
+                      color: selected ? WebColors.red : WebColors.blue,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
@@ -547,3 +480,4 @@ class _AdvertiserSection {
   final IconData icon;
   final String description;
 }
+
