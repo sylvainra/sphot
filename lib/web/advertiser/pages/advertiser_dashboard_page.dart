@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../map/map_page.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../../shared/web_colors.dart';
+import '../widgets/identity_professional_section.dart';
 
 class AdvertiserDashboardPage extends StatefulWidget {
   const AdvertiserDashboardPage({
@@ -262,26 +263,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     switch (index) {
       case 0:
         return [
-          _StatusCard(
-            icon: Icons.verified_user_outlined,
-            title: 'IDENTITÉ PROFESSIONNELLE',
-            description: widget.developmentBypass
-                ? 'Renseignez les informations professionnelles de l’annonceur.'
-                : 'Les données d’identité certifiées restent distinctes des informations commerciales modifiables dans SPHOT.',
-            status: widget.developmentBypass
-                ? 'À COMPLÉTER'
-                : 'VÉRIFIÉE PAR PROCONNECT',
-            statusColor: widget.developmentBypass
-                ? const Color(0xFF6B7280)
-                : const Color(0xFF15803D),
-          ),
-          _StatusCard(
-            icon: Icons.alternate_email,
-            title: 'COMPTE CONNECTÉ',
-            description: widget.developmentBypass
-                ? 'Les coordonnées de connexion seront affichées après identification.'
-                : widget.user?.email ?? 'Adresse non communiquée',
-            status: widget.developmentBypass ? 'À COMPLÉTER' : 'LECTURE SEULE',
+          IdentityProfessionalSection(
+            user: widget.user,
           ),
         ];
       case 4:
@@ -480,4 +463,3 @@ class _AdvertiserSection {
   final IconData icon;
   final String description;
 }
-
