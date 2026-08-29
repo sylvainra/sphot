@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../map/map_page.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../../shared/web_colors.dart';
+import '../models/advertising_visual_data.dart';
 import '../models/diffusion_preview_data.dart';
 import '../widgets/advertising_spot_section.dart';
 import '../widgets/diffusion_central_preview.dart';
@@ -79,6 +80,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   int _selectedIndex = 0;
   final MapController _mapController = MapController();
   LatLng? _advertisingPoint;
+  AdvertisingVisualData _advertisingVisual = const AdvertisingVisualData();
   DiffusionPreviewData _diffusionPreview = const DiffusionPreviewData();
 
   void _setAdvertisingPoint(LatLng point, {required bool centerMap}) {
@@ -94,6 +96,11 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   void _setDiffusionPreview(DiffusionPreviewData preview) {
     if (!mounted) return;
     setState(() => _diffusionPreview = preview);
+  }
+
+  void _setAdvertisingVisual(AdvertisingVisualData visual) {
+    if (!mounted) return;
+    setState(() => _advertisingVisual = visual);
   }
 
   void _returnToPublicMap() {
@@ -164,9 +171,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
 
   Widget _buildMap() {
     if (_selectedIndex == 3 && _diffusionPreview.hasSelection) {
-      return DiffusionCentralPreview(
-        data: _diffusionPreview,
-      );
+      return DiffusionCentralPreview(data: _diffusionPreview);
     }
 
     return Stack(
@@ -180,8 +185,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             minZoom: 4,
             maxZoom: 18,
             onTap: _selectedIndex == 2
-                ? (_, point) =>
-                    _setAdvertisingPoint(point, centerMap: false)
+                ? (_, point) => _setAdvertisingPoint(point, centerMap: false)
                 : null,
           ),
           children: [
@@ -349,21 +353,17 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   List<Widget> _buildSectionContent(int index) {
     switch (index) {
       case 0:
-        return [
-          IdentityProfessionalSection(
-            user: widget.user,
-          ),
-        ];
+        return [IdentityProfessionalSection(user: widget.user)];
       case 1:
-        return [
-          EstablishmentSection(user: widget.user),
-        ];
+        return [EstablishmentSection(user: widget.user)];
       case 2:
         return [
           AdvertisingSpotSection(
             user: widget.user,
             position: _advertisingPoint,
+            initialVisual: _advertisingVisual,
             onPositionChanged: _setAdvertisingPoint,
+            onVisualChanged: _setAdvertisingVisual,
           ),
         ];
       case 3:
@@ -371,6 +371,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           DiffusionSection(
             user: widget.user,
             advertisingPosition: _advertisingPoint,
+            advertisingVisual: _advertisingVisual,
             onPreviewChanged: _setDiffusionPreview,
           ),
         ];

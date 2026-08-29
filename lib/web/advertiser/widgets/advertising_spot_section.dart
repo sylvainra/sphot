@@ -1,27 +1,35 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../shared/web_colors.dart';
+import '../models/advertising_visual_data.dart';
 
 class AdvertisingSpotSection extends StatefulWidget {
   const AdvertisingSpotSection({
     super.key,
     required this.user,
     required this.position,
+    required this.initialVisual,
     required this.onPositionChanged,
+    required this.onVisualChanged,
   });
 
   final User? user;
   final LatLng? position;
+  final AdvertisingVisualData initialVisual;
   final void Function(LatLng point, {required bool centerMap})
-      onPositionChanged;
+  onPositionChanged;
+  final ValueChanged<AdvertisingVisualData> onVisualChanged;
 
   @override
-  State<AdvertisingSpotSection> createState() =>
-      _AdvertisingSpotSectionState();
+  State<AdvertisingSpotSection> createState() => _AdvertisingSpotSectionState();
 }
 
 class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
@@ -30,12 +38,33 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   bool _completed = false;
   bool _requestExists = false;
   bool _loadingSavedPosition = false;
+  Uint8List? _bannerBytes;
+  String? _bannerUrl;
+  String? _bannerFileName;
+  String? _bannerExtension;
+  String? _bannerMimeType;
+  int? _bannerFileSizeBytes;
+  int? _bannerWidth;
+  int? _bannerHeight;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _restoreInitialVisual();
     _initialiseSpot();
+  }
+
+  void _restoreInitialVisual() {
+    final visual = widget.initialVisual;
+    _bannerBytes = visual.bytes;
+    _bannerUrl = visual.url;
+    _bannerFileName = visual.fileName;
+    _bannerExtension = visual.extension;
+    _bannerMimeType = visual.mimeType;
+    _bannerFileSizeBytes = visual.fileSizeBytes;
+    _bannerWidth = visual.width;
+    _bannerHeight = visual.height;
   }
 
   @override
@@ -62,6 +91,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
 
         if (data != null) {
           final advertisingSpot = _map(data['advertisingSpot']);
+          final legacyDiffusion = _map(data['diffusion']);
 
           final latitude = _toDouble(advertisingSpot['latitude']);
           final longitude = _toDouble(advertisingSpot['longitude']);
@@ -73,9 +103,41 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               widget.onPositionChanged(savedPoint, centerMap: true);
             });
           }
-          _completed = data['advertisingSpotCompleted'] == true &&
+          final savedBannerUrl = _nullableText(
+            advertisingSpot['bannerUrl'] ?? legacyDiffusion['bannerUrl'],
+          );
+          if (savedBannerUrl != null) {
+            _bannerUrl = savedBannerUrl;
+            _bannerBytes = null;
+            _bannerFileName = _nullableText(
+              advertisingSpot['bannerFileName'] ??
+                  legacyDiffusion['bannerFileName'],
+            );
+            _bannerExtension = _nullableText(
+              advertisingSpot['bannerExtension'] ??
+                  legacyDiffusion['bannerExtension'],
+            );
+            _bannerMimeType = _nullableText(
+              advertisingSpot['bannerMimeType'] ??
+                  legacyDiffusion['bannerMimeType'],
+            );
+            _bannerFileSizeBytes = _toInt(
+              advertisingSpot['bannerFileSizeBytes'] ??
+                  legacyDiffusion['bannerFileSizeBytes'],
+            );
+            _bannerWidth = _toInt(
+              advertisingSpot['bannerWidth'] ?? legacyDiffusion['bannerWidth'],
+            );
+            _bannerHeight = _toInt(
+              advertisingSpot['bannerHeight'] ??
+                  legacyDiffusion['bannerHeight'],
+            );
+          }
+          _completed =
+              data['advertisingSpotCompleted'] == true &&
               latitude != null &&
-              longitude != null;
+              longitude != null &&
+              _bannerUrl != null;
         }
       } catch (error) {
         _error = 'Impossible de charger le SPHOT publicitaire enregistré.';
@@ -85,6 +147,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
 
     if (!mounted) return;
     setState(() => _loading = false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _notifyVisual();
+    });
   }
 
   Map<String, dynamic> _map(Object? value) {
@@ -96,11 +161,141 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     return double.tryParse(value?.toString() ?? '');
   }
 
+  int? _toInt(Object? value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  String? _nullableText(Object? value) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? null : text;
+  }
+
+  void _notifyVisual() {
+    widget.onVisualChanged(
+      AdvertisingVisualData(
+        bytes: _bannerBytes,
+        url: _bannerUrl,
+        fileName: _bannerFileName,
+        extension: _bannerExtension,
+        mimeType: _bannerMimeType,
+        fileSizeBytes: _bannerFileSizeBytes,
+        width: _bannerWidth,
+        height: _bannerHeight,
+      ),
+    );
+  }
+
+  Future<void> _pickBanner() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
+
+    final bytes = await picked.readAsBytes();
+    final fileName = picked.name;
+    final extension = fileName.contains('.')
+        ? fileName.split('.').last.toLowerCase()
+        : '';
+    const allowedExtensions = {'png', 'jpg', 'jpeg', 'webp'};
+
+    if (!allowedExtensions.contains(extension)) {
+      setState(() {
+        _error = 'Format refusé. Utilisez PNG, JPG ou WEBP.';
+      });
+      return;
+    }
+
+    final image = await decodeImageFromList(bytes);
+    final mimeType = switch (extension) {
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      _ => 'image/jpeg',
+    };
+
+    setState(() {
+      _bannerBytes = bytes;
+      _bannerFileName = fileName;
+      _bannerExtension = extension;
+      _bannerMimeType = mimeType;
+      _bannerFileSizeBytes = bytes.length;
+      _bannerWidth = image.width;
+      _bannerHeight = image.height;
+      _completed = false;
+      _error = null;
+    });
+    _notifyVisual();
+  }
+
+  bool get _bannerIsValid {
+    final width = _bannerWidth;
+    final height = _bannerHeight;
+    final fileSize = _bannerFileSizeBytes;
+    if (_bannerUrl != null && _bannerBytes == null) return true;
+    if (width == null || height == null || fileSize == null) return false;
+    if (fileSize > 2 * 1024 * 1024) return false;
+    if (width < 900 || height < 450) return false;
+    if (width > 2400 || height > 1200) return false;
+    final ratio = width / height;
+    return ratio >= 1.85 && ratio <= 2.15;
+  }
+
+  String get _bannerQualityMessage {
+    if (_bannerBytes == null && _bannerUrl == null) {
+      return 'Ajoutez le visuel qui sera présenté dans les aperçus de diffusion.';
+    }
+    if (_bannerBytes == null && _bannerUrl != null) {
+      return 'Visuel publicitaire enregistré.';
+    }
+    if (_bannerFileSizeBytes != null &&
+        _bannerFileSizeBytes! > 2 * 1024 * 1024) {
+      return 'Visuel non conforme : 2 Mo maximum.';
+    }
+    if (_bannerWidth == null || _bannerHeight == null) return '';
+    if (!_bannerIsValid) {
+      return 'Visuel non conforme : utilisez un format proche de 1200 × 600 px.';
+    }
+    if (_bannerWidth == 1200 && _bannerHeight == 600) {
+      return 'Visuel conforme SPHOT : 1200 × 600 px.';
+    }
+    return 'Visuel compatible SPHOT : $_bannerWidth × $_bannerHeight px.';
+  }
+
+  String _formatFileSize(int? bytes) {
+    if (bytes == null) return '';
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} Mo';
+    }
+    return '${(bytes / 1024).toStringAsFixed(1)} Ko';
+  }
+
+  Future<String?> _uploadBanner(String uid) async {
+    final bytes = _bannerBytes;
+    if (bytes == null) return _bannerUrl;
+
+    final extension = _bannerExtension ?? 'jpg';
+    final reference = FirebaseStorage.instance
+        .ref()
+        .child('advertising_banners')
+        .child(uid)
+        .child('banner_${DateTime.now().millisecondsSinceEpoch}.$extension');
+
+    await reference.putData(
+      bytes,
+      SettableMetadata(contentType: _bannerMimeType ?? 'image/jpeg'),
+    );
+    return reference.getDownloadURL();
+  }
+
   Future<void> _save() async {
     final position = widget.position;
     if (position == null) {
       setState(() {
         _error = 'Cliquez sur la carte pour positionner le SPHOT publicitaire.';
+      });
+      return;
+    }
+    if (!_bannerIsValid) {
+      setState(() {
+        _error = 'Ajoutez un visuel publicitaire conforme avant d’enregistrer.';
       });
       return;
     }
@@ -112,7 +307,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
 
     try {
       final user = widget.user;
+      var bannerUrl = _bannerUrl;
       if (user != null) {
+        bannerUrl = await _uploadBanner(user.uid);
         final creationData = _requestExists
             ? <String, Object?>{}
             : <String, Object?>{
@@ -123,21 +320,33 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             .collection('advertiserRequests')
             .doc(user.uid)
             .set({
-          ...creationData,
-          'uid': user.uid,
-          'advertisingSpotCompleted': true,
-          'advertisingSpot': <String, Object?>{
-            'latitude': position.latitude,
-            'longitude': position.longitude,
-            'confirmedAt': FieldValue.serverTimestamp(),
-          },
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+              ...creationData,
+              'uid': user.uid,
+              'advertisingSpotCompleted': true,
+              'advertisingSpot': <String, Object?>{
+                'latitude': position.latitude,
+                'longitude': position.longitude,
+                'bannerUrl': bannerUrl,
+                'bannerFileName': _bannerFileName,
+                'bannerExtension': _bannerExtension,
+                'bannerMimeType': _bannerMimeType,
+                'bannerFileSizeBytes': _bannerFileSizeBytes,
+                'bannerWidth': _bannerWidth,
+                'bannerHeight': _bannerHeight,
+                'confirmedAt': FieldValue.serverTimestamp(),
+              },
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
         _requestExists = true;
       }
 
       if (!mounted) return;
-      setState(() => _completed = true);
+      setState(() {
+        _bannerUrl = bannerUrl;
+        if (user != null) _bannerBytes = null;
+        _completed = true;
+      });
+      _notifyVisual();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('SPHOT publicitaire enregistré.')),
       );
@@ -150,14 +359,127 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     }
   }
 
+  Widget _buildBannerCard() {
+    final hasBanner = _bannerBytes != null || _bannerUrl != null;
+    final qualityColor = _bannerIsValid
+        ? WebColors.blue
+        : hasBanner
+        ? WebColors.red
+        : const Color(0xFF6B7280);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.image_outlined, color: WebColors.blue, size: 30),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'VISUEL PUBLICITAIRE',
+                      style: TextStyle(
+                        color: WebColors.blue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'FORMAT RECOMMANDÉ : 1200 × 600 PX',
+                      style: TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: _saving ? null : _pickBanner,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: WebColors.blue,
+              side: const BorderSide(color: WebColors.blue, width: 1.5),
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: const Icon(Icons.upload_file_outlined),
+            label: Text(
+              hasBanner ? 'REMPLACER LE VISUEL' : 'AJOUTER LE VISUEL',
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+          const SizedBox(height: 9),
+          const Text(
+            'PNG, JPG ou WEBP • 2 Mo maximum',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF4B5F97),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (_bannerFileName != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _bannerFileName!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: WebColors.blue,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            if (_bannerFileSizeBytes != null)
+              Text(
+                _formatFileSize(_bannerFileSizeBytes),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: WebColors.blue,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          ],
+          const SizedBox(height: 9),
+          Text(
+            _bannerQualityMessage,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: qualityColor,
+              fontSize: 12,
+              height: 1.3,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 48),
-        child: Center(
-          child: CircularProgressIndicator(color: WebColors.red),
-        ),
+        child: Center(child: CircularProgressIndicator(color: WebColors.red)),
       );
     }
 
@@ -192,6 +514,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             ],
           ),
         ),
+        _buildBannerCard(),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -232,8 +555,8 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               _saving
                   ? 'ENREGISTREMENT…'
                   : _completed
-                      ? 'SPHOT PUBLICITAIRE ENREGISTRÉ'
-                      : 'ENREGISTRER LE SPHOT PUBLICITAIRE',
+                  ? 'SPHOT PUBLICITAIRE ENREGISTRÉ'
+                  : 'ENREGISTRER LE SPHOT PUBLICITAIRE',
               style: const TextStyle(fontWeight: FontWeight.w900),
             ),
           ),
@@ -279,8 +602,8 @@ class _SpotCard extends StatelessWidget {
               SizedBox(
                 width: 30,
                 height: 30,
-                child: iconWidget ??
-                    Icon(icon, color: WebColors.blue, size: 30),
+                child:
+                    iconWidget ?? Icon(icon, color: WebColors.blue, size: 30),
               ),
               const SizedBox(width: 14),
               Expanded(

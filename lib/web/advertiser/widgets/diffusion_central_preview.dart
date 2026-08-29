@@ -7,10 +7,7 @@ import '../../shared/web_colors.dart';
 import '../models/diffusion_preview_data.dart';
 
 class DiffusionCentralPreview extends StatelessWidget {
-  const DiffusionCentralPreview({
-    super.key,
-    required this.data,
-  });
+  const DiffusionCentralPreview({super.key, required this.data});
 
   final DiffusionPreviewData data;
 
@@ -23,8 +20,9 @@ class DiffusionCentralPreview extends StatelessWidget {
           builder: (context, constraints) {
             final isPack = data.type == DiffusionPreviewType.pack;
             final availablePhoneHeight = constraints.maxHeight - 215;
-            final heightBasedWidth =
-                (availablePhoneHeight * 0.60).clamp(220.0, 350.0).toDouble();
+            final heightBasedWidth = (availablePhoneHeight * 0.60)
+                .clamp(220.0, 350.0)
+                .toDouble();
             final singleWidth = heightBasedWidth;
             final packWidth = ((constraints.maxWidth - 86) / 2)
                 .clamp(200.0, heightBasedWidth)
@@ -160,8 +158,10 @@ class _PreviewColumn extends StatelessWidget {
             child: GestureDetector(
               onTap: () => _openLargePreview(context),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(99),
@@ -275,11 +275,7 @@ class _PhoneShell extends StatelessWidget {
           children: [
             FittedBox(
               fit: BoxFit.fill,
-              child: SizedBox(
-                width: 360,
-                height: 600,
-                child: child,
-              ),
+              child: SizedBox(width: 360, height: 600, child: child),
             ),
             Align(
               alignment: Alignment.topCenter,
@@ -309,10 +305,7 @@ class _MapPhonePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final center = LatLng(
-      data.latitude ?? 46.3445,
-      data.longitude ?? -1.4376,
-    );
+    final center = LatLng(data.latitude ?? 46.3445, data.longitude ?? -1.4376);
 
     return Stack(
       fit: StackFit.expand,
@@ -328,8 +321,7 @@ class _MapPhonePreview extends StatelessWidget {
             ),
             children: [
               TileLayer(
-                urlTemplate:
-                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.sphot.app',
               ),
               MarkerLayer(
@@ -339,9 +331,12 @@ class _MapPhonePreview extends StatelessWidget {
                     width: 46,
                     height: 58,
                     alignment: Alignment.center,
-                    child: SvgPicture.asset(
-                      'data/icons/fire_red_icon.svg',
-                      fit: BoxFit.contain,
+                    child: Transform.translate(
+                      offset: const Offset(0, -29),
+                      child: SvgPicture.asset(
+                        'data/icons/fire_red_icon.svg',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                   Marker(
@@ -549,11 +544,17 @@ class _PremiumPhonePreview extends StatelessWidget {
                     const SizedBox(height: 7),
                     const Row(
                       children: [
-                        Expanded(child: _ForecastDay(day: 'LUN', value: '23°')),
+                        Expanded(
+                          child: _ForecastDay(day: 'LUN', value: '23°'),
+                        ),
                         SizedBox(width: 5),
-                        Expanded(child: _ForecastDay(day: 'MAR', value: '24°')),
+                        Expanded(
+                          child: _ForecastDay(day: 'MAR', value: '24°'),
+                        ),
                         SizedBox(width: 5),
-                        Expanded(child: _ForecastDay(day: 'MER', value: '22°')),
+                        Expanded(
+                          child: _ForecastDay(day: 'MER', value: '22°'),
+                        ),
                       ],
                     ),
                   ],
@@ -693,9 +694,7 @@ class _BannerPlaceholder extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFFFF4E8), Colors.white],
-        ),
+        gradient: LinearGradient(colors: [Color(0xFFFFF4E8), Colors.white]),
       ),
       child: Row(
         children: [
