@@ -13,6 +13,8 @@ class DiffusionPreviewData {
     this.bannerUrl,
     this.advertiserName = '',
     this.logoUrl,
+    this.latitude,
+    this.longitude,
   });
 
   final DiffusionPreviewType? type;
@@ -20,6 +22,8 @@ class DiffusionPreviewData {
   final String? bannerUrl;
   final String advertiserName;
   final String? logoUrl;
+  final double? latitude;
+  final double? longitude;
 
   bool get hasSelection => type != null;
 }
