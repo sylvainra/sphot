@@ -239,6 +239,7 @@ class _AdvertiserPricingEditor extends StatefulWidget {
 }
 
 class _AdvertiserPricingEditorState extends State<_AdvertiserPricingEditor> {
+  static const _blue = Color(0xFF1E3A8A);
   static const _red = Color(0xFFDC2626);
 
   final Map<String, TextEditingController> _controllers = {};
@@ -288,6 +289,25 @@ class _AdvertiserPricingEditorState extends State<_AdvertiserPricingEditor> {
 
   TextEditingController _controller(String duration) =>
       _controllers[_key(_visibility, _radiusKm, duration)]!;
+
+  InputDecoration _dropdownDecoration(String label) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: _blue, width: 1.5),
+    );
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: _blue, fontWeight: FontWeight.w800),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: border,
+      enabledBorder: border,
+      focusedBorder: border.copyWith(
+        borderSide: const BorderSide(color: _red, width: 1.8),
+      ),
+    );
+  }
 
   Future<void> _save() async {
     final grid = <String, Map<String, Map<String, double>>>{};
@@ -349,15 +369,27 @@ class _AdvertiserPricingEditorState extends State<_AdvertiserPricingEditor> {
             children: [
               DropdownButtonFormField<String>(
                 value: _visibility,
-                decoration: const InputDecoration(
-                  labelText: 'DIFFUSION',
-                  border: OutlineInputBorder(),
+                isExpanded: true,
+                dropdownColor: Colors.white,
+                iconEnabledColor: _blue,
+                borderRadius: BorderRadius.circular(14),
+                style: const TextStyle(
+                  color: _blue,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
                 ),
+                decoration: _dropdownDecoration('DIFFUSION'),
                 items: AdvertisingPricingConfig.visibilityLabels.entries
                     .map(
                       (entry) => DropdownMenuItem(
                         value: entry.key,
-                        child: Text(entry.value),
+                        child: Text(
+                          entry.value,
+                          style: const TextStyle(
+                            color: _blue,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ),
                     )
                     .toList(),
@@ -369,16 +401,26 @@ class _AdvertiserPricingEditorState extends State<_AdvertiserPricingEditor> {
               const SizedBox(height: 12),
               DropdownButtonFormField<double>(
                 value: _radiusKm,
-                decoration: const InputDecoration(
-                  labelText: 'RAYON D’ACTION',
-                  border: OutlineInputBorder(),
+                isExpanded: true,
+                dropdownColor: Colors.white,
+                iconEnabledColor: _blue,
+                borderRadius: BorderRadius.circular(14),
+                style: const TextStyle(
+                  color: _blue,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
                 ),
+                decoration: _dropdownDecoration('RAYON D’ACTION'),
                 items: AdvertisingPricingConfig.radiusChoices
                     .map(
                       (radius) => DropdownMenuItem(
                         value: radius,
                         child: Text(
                           AdvertisingPricingConfig.radiusLabel(radius),
+                          style: const TextStyle(
+                            color: _blue,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
                     )
