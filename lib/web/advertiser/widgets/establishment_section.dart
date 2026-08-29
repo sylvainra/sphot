@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../shared/web_colors.dart';
@@ -47,6 +48,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   final _formKey = GlobalKey<FormState>();
   final _legalNameController = TextEditingController();
   final _businessNameController = TextEditingController();
+  final _otherActivityController = TextEditingController();
   final _siretController = TextEditingController();
   final _sirenController = TextEditingController();
   final _addressController = TextEditingController();
@@ -59,6 +61,9 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   final _websiteController = TextEditingController();
 
   String? _activityType;
+  final _activityFieldKey = GlobalKey();
+  OverlayEntry? _activityOverlay;
+  String? _activityError;
   Uint8List? _logoBytes;
   String? _logoFileName;
   String? _logoExtension;
@@ -79,9 +84,11 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
 
   @override
   void dispose() {
+    _closeActivityMenu();
     _siretController.removeListener(_updateSiren);
     _legalNameController.dispose();
     _businessNameController.dispose();
+    _otherActivityController.dispose();
     _siretController.dispose();
     _sirenController.dispose();
     _addressController.dispose();
@@ -157,6 +164,9 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
           if (_activityTypes.contains(savedActivity)) {
             _activityType = savedActivity;
           }
+          _otherActivityController.text = _read(
+            establishment['activityTypeOther'],
+          );
 
           _completed = data['establishmentCompleted'] == true;
         }
@@ -193,6 +203,225 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
 
   void _markAsModified([Object? _]) {
     if (_completed) setState(() => _completed = false);
+  }
+
+  void _closeActivityMenu() {
+    _activityOverlay?.remove();
+    _activityOverlay = null;
+  }
+
+  void _openActivityMenu(FormFieldState<String> fieldState) {
+    _closeActivityMenu();
+
+    final renderObject = _activityFieldKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox) return;
+
+    final position = renderObject.localToGlobal(Offset.zero);
+    final size = renderObject.size;
+    final scrollController = ScrollController();
+
+    void scrollToOtherField() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!scrollController.hasClients) return;
+        scrollController.animateTo(
+          scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      });
+    }
+
+    _activityOverlay = OverlayEntry(
+      builder: (overlayContext) {
+        return StatefulBuilder(
+          builder: (overlayContext, overlaySetState) {
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _closeActivityMenu,
+                    child: const ColoredBox(color: Colors.transparent),
+                  ),
+                ),
+                Positioned(
+                  left: position.dx,
+                  top: position.dy + size.height - 12,
+                  width: size.width,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      constraints: const BoxConstraints(maxHeight: 330),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.97),
+                        border: const Border(
+                          left: BorderSide(color: WebColors.blue, width: 1.4),
+                          right: BorderSide(color: WebColors.blue, width: 1.4),
+                          bottom: BorderSide(color: WebColors.blue, width: 1.4),
+                        ),
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(10),
+                          bottomRight: Radius.circular(10),
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 8,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ScrollbarTheme(
+                        data: const ScrollbarThemeData(
+                          thumbColor:
+                              MaterialStatePropertyAll(WebColors.blue),
+                          thumbVisibility: MaterialStatePropertyAll(true),
+                          thickness: MaterialStatePropertyAll(9),
+                          radius: Radius.circular(10),
+                        ),
+                        child: Scrollbar(
+                          controller: scrollController,
+                          thumbVisibility: true,
+                          thickness: 9,
+                          radius: const Radius.circular(10),
+                          child: ListView.builder(
+                            controller: scrollController,
+                            primary: false,
+                            padding: EdgeInsets.zero,
+                            shrinkWrap: true,
+                            itemCount: _activityTypes.length,
+                            itemBuilder: (context, index) {
+                              final choice = _activityTypes[index];
+                              final selected = _activityType == choice;
+                              final showOtherField =
+                                  choice == 'Autre' && selected;
+
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _activityType = choice;
+                                        _activityError = null;
+                                        _completed = false;
+                                        if (choice != 'Autre') {
+                                          _otherActivityController.clear();
+                                        }
+                                      });
+                                      fieldState.didChange(choice);
+                                      overlaySetState(() {});
+
+                                      if (choice == 'Autre') {
+                                        scrollToOtherField();
+                                      } else {
+                                        _closeActivityMenu();
+                                      }
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 10,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              choice,
+                                              style: const TextStyle(
+                                                color: WebColors.blue,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ),
+                                          if (selected)
+                                            const Icon(
+                                              Icons.check_rounded,
+                                              color: WebColors.red,
+                                              size: 20,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  if (showOtherField)
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        14,
+                                        0,
+                                        16,
+                                        10,
+                                      ),
+                                      child: TextField(
+                                        controller: _otherActivityController,
+                                        autofocus: true,
+                                        style: const TextStyle(
+                                          color: WebColors.blue,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        textCapitalization:
+                                            TextCapitalization.sentences,
+                                        onChanged: (value) {
+                                          setState(() {
+                                            _activityError = null;
+                                            _completed = false;
+                                          });
+                                          overlaySetState(() {});
+                                        },
+                                        onSubmitted: (_) => _closeActivityMenu(),
+                                        decoration: InputDecoration(
+                                          labelText: 'Précisez :',
+                                          errorText: _activityError,
+                                          labelStyle: const TextStyle(
+                                            color: WebColors.blue,
+                                          ),
+                                          isDense: true,
+                                          filled: true,
+                                          fillColor:
+                                              WebColors.blue.withOpacity(0.035),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 10,
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            borderSide: BorderSide(
+                                              color: WebColors.blue
+                                                  .withOpacity(0.55),
+                                            ),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            borderSide: const BorderSide(
+                                              color: WebColors.blue,
+                                              width: 1.7,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    Overlay.of(context, rootOverlay: true).insert(_activityOverlay!);
+    if (_activityType == 'Autre') scrollToOtherField();
   }
 
   Future<void> _pickLogo() async {
@@ -259,7 +488,13 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
 
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final formIsValid = _formKey.currentState?.validate() ?? false;
+    final otherActivityIsValid = _activityType != 'Autre' ||
+        _otherActivityController.text.trim().isNotEmpty;
+    if (!otherActivityIsValid) {
+      setState(() => _activityError = 'Précisez le type d’activité');
+    }
+    if (!formIsValid || !otherActivityIsValid) return;
 
     setState(() {
       _saving = true;
@@ -308,6 +543,9 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
             'legalName': legalName,
             'businessName': businessName,
             'activityType': _activityType,
+            'activityTypeOther': _activityType == 'Autre'
+                ? _otherActivityController.text.trim()
+                : '',
             'siret': siret,
             'siren': siren,
             'address': _addressController.text.trim(),
@@ -414,29 +652,49 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                   validator: _requiredValidator,
                   onChanged: _markAsModified,
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: DropdownButtonFormField<String>(
-                    value: _activityType,
-                    isExpanded: true,
-                    decoration: _fieldDecoration('Type d’activité *'),
-                    items: _activityTypes
-                        .map(
-                          (type) => DropdownMenuItem(
-                            value: type,
-                            child: Text(type, overflow: TextOverflow.ellipsis),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _activityType = value;
-                        _completed = false;
-                      });
-                    },
-                    validator: (value) => value == null
-                        ? 'Sélectionnez un type d’activité'
-                        : null,
+                FormField<String>(
+                  initialValue: _activityType,
+                  validator: (value) => value == null
+                      ? 'Sélectionnez un type d’activité'
+                      : null,
+                  builder: (fieldState) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: GestureDetector(
+                      key: _activityFieldKey,
+                      onTap: () => _openActivityMenu(fieldState),
+                      child: InputDecorator(
+                        decoration:
+                            _activityFieldDecoration('Type d’activité *')
+                            .copyWith(errorText: fieldState.errorText),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _activityType == null
+                                    ? 'Sélectionnez une activité'
+                                    : _activityType == 'Autre' &&
+                                            _otherActivityController.text
+                                                .trim()
+                                                .isNotEmpty
+                                        ? 'Autre — ${_otherActivityController.text.trim()}'
+                                        : _activityType!,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: _activityType == null
+                                      ? const Color(0xFF4B5F97)
+                                      : WebColors.blue,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: WebColors.red,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 _EstablishmentField(
@@ -459,7 +717,12 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
             ),
           ),
           _EstablishmentCard(
-            icon: Icons.location_on_outlined,
+            iconWidget: SvgPicture.asset(
+              'data/icons/fire_blue_icon.svg',
+              width: 30,
+              height: 30,
+              fit: BoxFit.contain,
+            ),
             title: 'ADRESSE PUBLIQUE',
             status: 'INFORMATIONS PUBLIQUES',
             child: Column(
@@ -548,7 +811,8 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
             child: FilledButton.icon(
               onPressed: _saving ? null : _save,
               style: FilledButton.styleFrom(
-                backgroundColor: WebColors.blue,
+                backgroundColor:
+                    _completed ? WebColors.red : WebColors.blue,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -563,9 +827,17 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                         strokeWidth: 2,
                       ),
                     )
-                  : const Icon(Icons.save_outlined),
+                  : Icon(
+                      _completed
+                          ? Icons.check_circle_outline_rounded
+                          : Icons.save_outlined,
+                    ),
               label: Text(
-                _saving ? 'ENREGISTREMENT…' : 'ENREGISTRER L’ÉTABLISSEMENT',
+                _saving
+                    ? 'ENREGISTREMENT…'
+                    : _completed
+                        ? 'ÉTABLISSEMENT ENREGISTRÉ'
+                        : 'ENREGISTRER L’ÉTABLISSEMENT',
                 style: const TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
@@ -598,16 +870,43 @@ InputDecoration _fieldDecoration(String label) {
   );
 }
 
+InputDecoration _activityFieldDecoration(String label) {
+  return InputDecoration(
+    labelText: label,
+    labelStyle: const TextStyle(
+      color: WebColors.blue,
+      fontWeight: FontWeight.w700,
+    ),
+    filled: true,
+    fillColor: WebColors.blue.withOpacity(0.025),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: WebColors.blue, width: 1.6),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: WebColors.blue, width: 1.6),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: WebColors.blue, width: 2),
+    ),
+  );
+}
+
 class _EstablishmentCard extends StatelessWidget {
   const _EstablishmentCard({
-    required this.icon,
+    this.icon,
+    this.iconWidget,
     required this.title,
     required this.status,
     required this.child,
     this.statusColor = const Color(0xFF6B7280),
   });
 
-  final IconData icon;
+  final IconData? icon;
+  final Widget? iconWidget;
   final String title;
   final String status;
   final Widget child;
@@ -629,7 +928,12 @@ class _EstablishmentCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: WebColors.blue, size: 30),
+              SizedBox(
+                width: 30,
+                height: 30,
+                child: iconWidget ??
+                    Icon(icon, color: WebColors.blue, size: 30),
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -701,6 +1005,10 @@ class _EstablishmentField extends StatelessWidget {
         readOnly: readOnly,
         validator: validator,
         onChanged: onChanged,
+        style: const TextStyle(
+          color: WebColors.blue,
+          fontWeight: FontWeight.w700,
+        ),
         autovalidateMode: AutovalidateMode.onUserInteraction,
         decoration: _fieldDecoration(label).copyWith(
           fillColor: readOnly
@@ -751,7 +1059,7 @@ class _LogoPicker extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           const Text(
-            'PNG, JPG ou WEBP · 2 Mo maximum',
+            'Format recommandé : 1200 × 600 px\nPNG, JPG ou WEBP · 2 Mo maximum',
             style: TextStyle(
               color: Color(0xFF4B5F97),
               fontWeight: FontWeight.w600,
