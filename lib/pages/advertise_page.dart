@@ -55,13 +55,16 @@ int? _bannerHeight;
   String _category = '';
   String _visibility = 'pack';
   String _broadcastType = 'local';
-  String _duration = '15 jours';
+  String _duration = '1 semaine';
   DateTime _campaignStartDate = DateTime.now();
 
 DateTime get _campaignEndDate {
   switch (_duration) {
-    case '15 jours':
-      return _campaignStartDate.add(const Duration(days: 15));
+    case '1 semaine':
+      return _campaignStartDate.add(const Duration(days: 7));
+
+    case '2 semaines':
+      return _campaignStartDate.add(const Duration(days: 14));
 
     case '1 mois':
       return DateTime(
@@ -70,10 +73,10 @@ DateTime get _campaignEndDate {
         _campaignStartDate.day,
       );
 
-    case '3 mois':
+    case '2 mois':
       return DateTime(
         _campaignStartDate.year,
-        _campaignStartDate.month + 3,
+        _campaignStartDate.month + 2,
         _campaignStartDate.day,
       );
 
@@ -84,7 +87,7 @@ DateTime get _campaignEndDate {
         _campaignStartDate.day,
       );
 
-    case '12 mois':
+    case '1 an':
       return DateTime(
         _campaignStartDate.year + 1,
         _campaignStartDate.month,
@@ -142,13 +145,7 @@ DateTime get _campaignEndDate {
   'Autre',
 ];
 
-  final List<String> _durationChoices = [
-    '15 jours',
-    '1 mois',
-    '3 mois',
-    '6 mois',
-    '12 mois',
-  ];
+  final List<String> _durationChoices = AdvertisingPricingConfig.durations;
 
   final List<double> _radiusChoices = AdvertisingPricingConfig.radiusChoices;
 
@@ -206,7 +203,7 @@ DateTime get _campaignEndDate {
         ? pricing['radiusMultipliers'] as Map
         : _defaultPricing()['radiusMultipliers'] as Map;
 
-    final base = _numFromMap(basePrices, _duration, 99);
+    final base = _numFromMap(basePrices, _duration, 49);
     final visibility = _numFromMap(visibilityMultipliers, _visibility, 2.5);
     final radius = _numFromMap(
       radiusMultipliers,

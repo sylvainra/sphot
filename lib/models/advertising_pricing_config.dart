@@ -2,11 +2,12 @@ class AdvertisingPricingConfig {
   const AdvertisingPricingConfig._();
 
   static const durations = <String>[
-    '15 jours',
+    '1 semaine',
+    '2 semaines',
     '1 mois',
-    '3 mois',
+    '2 mois',
     '6 mois',
-    '12 mois',
+    '1 an',
   ];
 
   static const visibilityLabels = <String, String>{
@@ -20,11 +21,12 @@ class AdvertisingPricingConfig {
   static Map<String, dynamic> defaults() {
     return {
       'basePrices': <String, num>{
-        '15 jours': 99,
+        '1 semaine': 49,
+        '2 semaines': 99,
         '1 mois': 149,
-        '3 mois': 349,
+        '2 mois': 249,
         '6 mois': 599,
-        '12 mois': 999,
+        '1 an': 999,
       },
       'visibilityMultipliers': <String, num>{
         'map': 1,
@@ -40,25 +42,28 @@ class AdvertisingPricingConfig {
       },
       'nationalFlatPrices': <String, Map<String, num>>{
         'map': <String, num>{
-          '15 jours': 490,
+          '1 semaine': 250,
+          '2 semaines': 490,
           '1 mois': 790,
-          '3 mois': 1900,
+          '2 mois': 1390,
           '6 mois': 2900,
-          '12 mois': 4900,
+          '1 an': 4900,
         },
         'premium': <String, num>{
-          '15 jours': 890,
+          '1 semaine': 450,
+          '2 semaines': 890,
           '1 mois': 1490,
-          '3 mois': 3400,
+          '2 mois': 2600,
           '6 mois': 5400,
-          '12 mois': 8900,
+          '1 an': 8900,
         },
         'pack': <String, num>{
-          '15 jours': 1190,
+          '1 semaine': 590,
+          '2 semaines': 1190,
           '1 mois': 1990,
-          '3 mois': 4500,
+          '2 mois': 3500,
           '6 mois': 7400,
-          '12 mois': 11900,
+          '1 an': 11900,
         },
       },
     };
@@ -76,5 +81,45 @@ class AdvertisingPricingConfig {
     if (value <= 0) return 'SPHOT ONLY';
     if (value < 1) return '${(value * 1000).round()} m';
     return '${radiusKey(value).replaceAll('.', ',')} km';
+  }
+
+  static int localPrice({
+    required Map<String, dynamic> pricing,
+    required String durationLabel,
+    required String visibilityType,
+    required num radiusKm,
+  }) {
+    final defaults = AdvertisingPricingConfig.defaults();
+    final basePrices = _map(pricing['basePrices']);
+    final visibilityMultipliers = _map(pricing['visibilityMultipliers']);
+    final radiusMultipliers = _map(pricing['radiusMultipliers']);
+    final radius = radiusKey(radiusKm);
+    final base = _number(
+      basePrices[durationLabel],
+      _map(defaults['basePrices'])[durationLabel],
+    );
+    final visibility = _number(
+      visibilityMultipliers[visibilityType],
+      _map(defaults['visibilityMultipliers'])[visibilityType],
+    );
+    final radiusMultiplier = _number(
+      radiusMultipliers[radius],
+      _map(defaults['radiusMultipliers'])[radius],
+    );
+    return (base * visibility * radiusMultiplier).round();
+  }
+
+  static Map<String, dynamic> _map(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, item) => MapEntry(key.toString(), item));
+    }
+    return <String, dynamic>{};
+  }
+
+  static num _number(dynamic value, dynamic fallback) {
+    if (value is num) return value;
+    if (fallback is num) return fallback;
+    return 1;
   }
 }

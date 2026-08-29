@@ -392,8 +392,8 @@ class _MapPhonePreview extends StatelessWidget {
           child: _MapControl(icon: Icons.remove_rounded),
         ),
         Positioned(
-          left: 10,
-          right: 10,
+          left: 62,
+          right: 62,
           bottom: 54,
           child: _AdvertisingBanner(data: data),
         ),

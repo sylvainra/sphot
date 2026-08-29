@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../models/advertising_pricing_config.dart';
 import '../../shared/web_colors.dart';
 import '../models/advertising_visual_data.dart';
 import '../models/diffusion_preview_data.dart';
@@ -14,15 +15,21 @@ class DiffusionSection extends StatefulWidget {
     required this.user,
     required this.advertisingPosition,
     required this.advertisingVisual,
+    required this.radiusKm,
+    required this.startingPriceExclTax,
     required this.initialPreview,
     required this.onPreviewChanged,
+    required this.onRadiusChanged,
   });
 
   final User? user;
   final LatLng? advertisingPosition;
   final AdvertisingVisualData advertisingVisual;
+  final double radiusKm;
+  final int startingPriceExclTax;
   final DiffusionPreviewData initialPreview;
   final ValueChanged<DiffusionPreviewData> onPreviewChanged;
+  final ValueChanged<double> onRadiusChanged;
 
   @override
   State<DiffusionSection> createState() => _DiffusionSectionState();
@@ -78,7 +85,8 @@ class _DiffusionSectionState extends State<DiffusionSection> {
     final visualIsUnchanged =
         oldWidget.advertisingVisual.bytes == widget.advertisingVisual.bytes &&
         oldWidget.advertisingVisual.url == widget.advertisingVisual.url;
-    if (positionIsUnchanged && visualIsUnchanged) return;
+    final radiusIsUnchanged = oldWidget.radiusKm == widget.radiusKm;
+    if (positionIsUnchanged && visualIsUnchanged && radiusIsUnchanged) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _notifyPreview();
     });
@@ -198,6 +206,14 @@ class _DiffusionSectionState extends State<DiffusionSection> {
     _notifyPreview();
   }
 
+  void _selectRadius(double value) {
+    setState(() {
+      _completed = false;
+      _error = null;
+    });
+    widget.onRadiusChanged(value);
+  }
+
   Future<void> _save() async {
     final selectedValue = _selectedValue;
     if (selectedValue == null) {
@@ -239,6 +255,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
               ...creationData,
               'uid': user.uid,
               'diffusionCompleted': true,
+              'advertisingSpot': <String, Object?>{'radiusKm': widget.radiusKm},
               'diffusion': <String, Object?>{
                 'visibilityType': selectedOption.value,
                 'visibilityLabel': selectedOption.label,
@@ -327,6 +344,76 @@ class _DiffusionSectionState extends State<DiffusionSection> {
                     selected: option.value == _selectedValue,
                     onTap: () => _select(option.value),
                   ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'RAYON D’ACTION',
+                style: TextStyle(
+                  color: WebColors.blue,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 5),
+              const Text(
+                'Vous pouvez ajuster ici la zone choisie à l’étape 3.',
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: AdvertisingPricingConfig.radiusChoices.map((radius) {
+                  final selected = widget.radiusKm == radius;
+                  return OutlinedButton(
+                    onPressed: () => _selectRadius(radius),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: selected
+                          ? WebColors.red
+                          : WebColors.blue,
+                      backgroundColor: selected
+                          ? WebColors.red.withOpacity(0.045)
+                          : Colors.white,
+                      side: BorderSide(
+                        color: selected ? WebColors.red : WebColors.blue,
+                        width: selected ? 2 : 1.3,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                    child: Text(
+                      AdvertisingPricingConfig.radiusLabel(radius),
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'À PARTIR DE ${widget.startingPriceExclTax} € HT / SEMAINE',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: WebColors.red,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ],

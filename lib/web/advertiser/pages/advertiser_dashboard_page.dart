@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -5,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../map/map_page.dart';
+import '../../../models/advertising_pricing_config.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../../shared/web_colors.dart';
 import '../models/advertising_visual_data.dart';
@@ -16,6 +18,7 @@ import '../widgets/diffusion_section.dart';
 import '../widgets/establishment_section.dart';
 import '../widgets/identity_professional_section.dart';
 import '../widgets/planning_section.dart';
+import '../widgets/quote_order_section.dart';
 
 class AdvertiserDashboardPage extends StatefulWidget {
   const AdvertiserDashboardPage({
@@ -60,7 +63,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'PLANIFICATION',
       Icons.calendar_month_outlined,
-      'Rayonnement, dates et réservation exclusive de l’emplacement.',
+      'Planifiez en exclusivité votre activité professionnelle.',
     ),
     _AdvertiserSection(
       'DEVIS & COMMANDE',
@@ -81,11 +84,71 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
 
   int _selectedIndex = 0;
   final MapController _mapController = MapController();
+  final ScrollController _detailScrollController = ScrollController();
   LatLng? _advertisingPoint;
   double _advertisingRadiusKm = 0;
   AdvertisingVisualData _advertisingVisual = const AdvertisingVisualData();
   DiffusionPreviewData _diffusionPreview = const DiffusionPreviewData();
   PlanningData _planningData = const PlanningData();
+  Map<String, dynamic> _pricing = AdvertisingPricingConfig.defaults();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPricing();
+  }
+
+  @override
+  void dispose() {
+    _detailScrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPricing() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('settings')
+          .doc('advertisingPricing')
+          .get();
+      if (!mounted || snapshot.data() == null) return;
+      setState(() => _pricing = snapshot.data()!);
+    } catch (error) {
+      debugPrint('Chargement tarifs annonceur impossible : $error');
+    }
+  }
+
+  String get _visibilityType {
+    switch (_diffusionPreview.type) {
+      case DiffusionPreviewType.premium:
+        return 'premium';
+      case DiffusionPreviewType.pack:
+        return 'pack';
+      case DiffusionPreviewType.map:
+      case null:
+        return 'map';
+    }
+  }
+
+  int _costFor({
+    required String durationLabel,
+    String? visibilityType,
+    double? radiusKm,
+  }) {
+    return AdvertisingPricingConfig.localPrice(
+      pricing: _pricing,
+      durationLabel: durationLabel,
+      visibilityType: visibilityType ?? _visibilityType,
+      radiusKm: radiusKm ?? _advertisingRadiusKm,
+    );
+  }
+
+  void _selectSection(int index) {
+    setState(() => _selectedIndex = index);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_detailScrollController.hasClients) return;
+      _detailScrollController.jumpTo(0);
+    });
+  }
 
   void _setAdvertisingPoint(LatLng point, {required bool centerMap}) {
     setState(() => _advertisingPoint = point);
@@ -109,8 +172,38 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
 
   void _setAdvertisingRadius(double radiusKm) {
     if (!mounted) return;
-    setState(() => _advertisingRadiusKm = radiusKm);
+    if (_advertisingRadiusKm == radiusKm) return;
+    setState(() {
+      _advertisingRadiusKm = radiusKm;
+      _planningData = PlanningData(
+        durationLabel: _planningData.durationLabel,
+        startDate: _planningData.startDate,
+        endDate: _planningData.endDate,
+        exclusiveReservation: _planningData.exclusiveReservation,
+        availabilityConfirmed: false,
+      );
+    });
   }
+
+  void _setDiffusionType(DiffusionPreviewType type) {
+    final current = _diffusionPreview;
+    _setDiffusionPreview(
+      DiffusionPreviewData(
+        type: type,
+        bannerBytes: current.bannerBytes,
+        bannerUrl: current.bannerUrl,
+        advertiserName: current.advertiserName,
+        logoUrl: current.logoUrl,
+        latitude: current.latitude,
+        longitude: current.longitude,
+      ),
+    );
+  }
+
+  Map<String, int> get _durationPrices => {
+    for (final duration in AdvertisingPricingConfig.durations)
+      duration: _costFor(durationLabel: duration),
+  };
 
   void _setPlanningData(PlanningData planning) {
     if (!mounted) return;
@@ -171,7 +264,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                       number: index + 1,
                       label: _sections[index].label,
                       selected: index == _selectedIndex,
-                      onTap: () => setState(() => _selectedIndex = index),
+                      onTap: () => _selectSection(index),
                     );
                   }),
                 ),
@@ -354,6 +447,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             ),
             Expanded(
               child: SingleChildScrollView(
+                controller: _detailScrollController,
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -392,6 +486,10 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             position: _advertisingPoint,
             initialVisual: _advertisingVisual,
             initialRadiusKm: _advertisingRadiusKm,
+            startingPriceExclTax: _costFor(
+              durationLabel: '1 semaine',
+              visibilityType: 'map',
+            ),
             onPositionChanged: _setAdvertisingPoint,
             onVisualChanged: _setAdvertisingVisual,
             onRadiusChanged: _setAdvertisingRadius,
@@ -403,8 +501,11 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             user: widget.user,
             advertisingPosition: _advertisingPoint,
             advertisingVisual: _advertisingVisual,
+            radiusKm: _advertisingRadiusKm,
+            startingPriceExclTax: _costFor(durationLabel: '1 semaine'),
             initialPreview: _diffusionPreview,
             onPreviewChanged: _setDiffusionPreview,
+            onRadiusChanged: _setAdvertisingRadius,
           ),
         ];
       case 4:
@@ -415,8 +516,27 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             radiusKm: _advertisingRadiusKm,
             hasDiffusionSelection: _diffusionPreview.hasSelection,
             developmentBypass: widget.developmentBypass,
+            costExclTax: _costFor(
+              durationLabel: _planningData.durationLabel ?? '1 semaine',
+            ),
             initialPlanning: _planningData,
             onPlanningChanged: _setPlanningData,
+          ),
+        ];
+      case 5:
+        return [
+          QuoteOrderSection(
+            user: widget.user,
+            radiusKm: _advertisingRadiusKm,
+            diffusionType: _diffusionPreview.type,
+            planning: _planningData,
+            costExclTax: _costFor(
+              durationLabel: _planningData.durationLabel ?? '1 semaine',
+            ),
+            durationPrices: _durationPrices,
+            onRadiusChanged: _setAdvertisingRadius,
+            onDiffusionChanged: _setDiffusionType,
+            onEditStep: _selectSection,
           ),
         ];
       case 6:

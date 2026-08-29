@@ -17,6 +17,7 @@ class PlanningSection extends StatefulWidget {
     required this.radiusKm,
     required this.hasDiffusionSelection,
     required this.developmentBypass,
+    required this.costExclTax,
     required this.initialPlanning,
     required this.onPlanningChanged,
   });
@@ -26,6 +27,7 @@ class PlanningSection extends StatefulWidget {
   final double radiusKm;
   final bool hasDiffusionSelection;
   final bool developmentBypass;
+  final int costExclTax;
   final PlanningData initialPlanning;
   final ValueChanged<PlanningData> onPlanningChanged;
 
@@ -34,26 +36,29 @@ class PlanningSection extends StatefulWidget {
 }
 
 class _PlanningSectionState extends State<PlanningSection> {
-  String _durationLabel = AdvertisingPricingConfig.durations.first;
+  String _durationLabel = '1 semaine';
   late DateTime _startDate;
   late DateTime _endDate;
+  late DateTime _displayedMonth;
+  List<DateTimeRange> _reservedPeriods = const [];
   bool _loading = true;
-  bool _checking = false;
   bool _saving = false;
   bool _saved = false;
-  bool _availabilityChecked = false;
-  bool _available = false;
+  bool _reservationsLoaded = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     final today = _dateOnly(DateTime.now());
-    _durationLabel =
-        widget.initialPlanning.durationLabel ??
-        AdvertisingPricingConfig.durations.first;
+    final initialDuration = widget.initialPlanning.durationLabel;
+    if (initialDuration != null &&
+        AdvertisingPricingConfig.durations.contains(initialDuration)) {
+      _durationLabel = initialDuration;
+    }
     _startDate = widget.initialPlanning.startDate ?? today;
     _endDate = _calculateEndDate(_startDate, _durationLabel);
+    _displayedMonth = DateTime(_startDate.year, _startDate.month);
     _load();
   }
 
@@ -61,14 +66,9 @@ class _PlanningSectionState extends State<PlanningSection> {
   void didUpdateWidget(covariant PlanningSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.advertisingPosition != widget.advertisingPosition ||
-        oldWidget.radiusKm != widget.radiusKm ||
-        oldWidget.hasDiffusionSelection != widget.hasDiffusionSelection) {
-      _availabilityChecked = false;
-      _available = false;
-      _saved = false;
-      _error = null;
+        oldWidget.radiusKm != widget.radiusKm) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _notifyPlanning();
+        if (mounted) _refreshReservations();
       });
     }
   }
@@ -100,30 +100,28 @@ class _PlanningSectionState extends State<PlanningSection> {
   }
 
   DateTime _addMonths(DateTime start, int months) {
-    final firstTargetMonth = DateTime(start.year, start.month + months, 1);
-    final lastTargetDay = DateTime(
-      firstTargetMonth.year,
-      firstTargetMonth.month + 1,
-      0,
-    ).day;
+    final target = DateTime(start.year, start.month + months, 1);
+    final lastDay = DateTime(target.year, target.month + 1, 0).day;
     return DateTime(
-      firstTargetMonth.year,
-      firstTargetMonth.month,
-      start.day > lastTargetDay ? lastTargetDay : start.day,
+      target.year,
+      target.month,
+      start.day > lastDay ? lastDay : start.day,
     );
   }
 
   DateTime _calculateEndDate(DateTime start, String durationLabel) {
     switch (durationLabel) {
-      case '15 jours':
-        return start.add(const Duration(days: 15));
+      case '1 semaine':
+        return start.add(const Duration(days: 7));
+      case '2 semaines':
+        return start.add(const Duration(days: 14));
       case '1 mois':
         return _addMonths(start, 1);
-      case '3 mois':
-        return _addMonths(start, 3);
+      case '2 mois':
+        return _addMonths(start, 2);
       case '6 mois':
         return _addMonths(start, 6);
-      case '12 mois':
+      case '1 an':
         return _addMonths(start, 12);
       default:
         return start;
@@ -136,8 +134,117 @@ class _PlanningSectionState extends State<PlanningSection> {
     return '$day/$month/${value.year}';
   }
 
-  String get _radiusLabel =>
-      AdvertisingPricingConfig.radiusLabel(widget.radiusKm);
+  String _monthLabel(DateTime value) {
+    const months = <String>[
+      'JANVIER',
+      'FÉVRIER',
+      'MARS',
+      'AVRIL',
+      'MAI',
+      'JUIN',
+      'JUILLET',
+      'AOÛT',
+      'SEPTEMBRE',
+      'OCTOBRE',
+      'NOVEMBRE',
+      'DÉCEMBRE',
+    ];
+    return '${months[value.month - 1]} ${value.year}';
+  }
+
+  bool _periodsOverlap(
+    DateTime firstStart,
+    DateTime firstEnd,
+    DateTime secondStart,
+    DateTime secondEnd,
+  ) {
+    return !firstEnd.isBefore(secondStart) && !secondEnd.isBefore(firstStart);
+  }
+
+  bool _isSameDay(DateTime first, DateTime second) =>
+      first.year == second.year &&
+      first.month == second.month &&
+      first.day == second.day;
+
+  bool _isReserved(DateTime day) => _reservedPeriods.any(
+    (period) =>
+        !day.isBefore(_dateOnly(period.start)) &&
+        !day.isAfter(_dateOnly(period.end)),
+  );
+
+  bool _hasConflict(DateTime start, DateTime end) => _reservedPeriods.any(
+    (period) => _periodsOverlap(
+      start,
+      end,
+      _dateOnly(period.start),
+      _dateOnly(period.end),
+    ),
+  );
+
+  double _distanceKm(LatLng first, LatLng second) {
+    const earthRadiusKm = 6371.0;
+    final latitudeDelta = (second.latitude - first.latitude) * math.pi / 180;
+    final longitudeDelta = (second.longitude - first.longitude) * math.pi / 180;
+    final firstLatitude = first.latitude * math.pi / 180;
+    final secondLatitude = second.latitude * math.pi / 180;
+    final haversine =
+        math.sin(latitudeDelta / 2) * math.sin(latitudeDelta / 2) +
+        math.cos(firstLatitude) *
+            math.cos(secondLatitude) *
+            math.sin(longitudeDelta / 2) *
+            math.sin(longitudeDelta / 2);
+    final bounded = haversine.clamp(0.0, 1.0).toDouble();
+    return earthRadiusKm *
+        2 *
+        math.atan2(math.sqrt(bounded), math.sqrt(1 - bounded));
+  }
+
+  Future<List<DateTimeRange>> _fetchReservedPeriods() async {
+    final position = widget.advertisingPosition;
+    if (position == null) return const [];
+    if (widget.developmentBypass && widget.user == null) return const [];
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('adRequests')
+        .get();
+    final periods = <DateTimeRange>[];
+    for (final document in snapshot.docs) {
+      final data = document.data();
+      final status = (data['status'] ?? '').toString().toLowerCase();
+      if (<String>{
+        'cancelled',
+        'deleted',
+        'disabled',
+        'finished',
+        'rejected',
+      }.contains(status)) {
+        continue;
+      }
+      if ((data['broadcastType'] ?? 'local').toString() == 'national') {
+        continue;
+      }
+
+      final latitude = _toDouble(data['centerLat']);
+      final longitude = _toDouble(data['centerLng']);
+      final start = _toDate(data['campaignStartDate']);
+      final end = _toDate(data['campaignEndDate']);
+      if (latitude == null ||
+          longitude == null ||
+          start == null ||
+          end == null) {
+        continue;
+      }
+
+      final existingRadius = _toDouble(data['radiusKm']) ?? 0;
+      final exclusiveDistance = widget.radiusKm + existingRadius;
+      final tolerance = exclusiveDistance <= 0 ? 0.025 : 0.0;
+      final separation = _distanceKm(position, LatLng(latitude, longitude));
+      if (separation <= exclusiveDistance + tolerance) {
+        periods.add(DateTimeRange(start: start, end: end));
+      }
+    }
+    return periods;
+  }
 
   Future<void> _load() async {
     final user = widget.user;
@@ -156,22 +263,52 @@ class _PlanningSectionState extends State<PlanningSection> {
         }
         if (savedStart != null) _startDate = savedStart;
         _endDate = _calculateEndDate(_startDate, _durationLabel);
+        _displayedMonth = DateTime(_startDate.year, _startDate.month);
         _saved = snapshot.data()?['planningCompleted'] == true;
-        _availabilityChecked =
-            _saved && planning['availabilityStatus'] == 'available';
-        _available = _availabilityChecked;
       } catch (error) {
         debugPrint('Chargement planification annonceur impossible : $error');
         _error = 'Impossible de charger la planification enregistrée.';
       }
     }
-
+    try {
+      _reservedPeriods = await _fetchReservedPeriods();
+      _reservationsLoaded = true;
+    } catch (error) {
+      debugPrint('Chargement réservations publicitaires impossible : $error');
+      _error = 'Impossible de charger le calendrier des réservations.';
+    }
     if (!mounted) return;
     setState(() => _loading = false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _notifyPlanning();
     });
   }
+
+  Future<void> _refreshReservations() async {
+    setState(() {
+      _reservationsLoaded = false;
+      _saved = false;
+      _error = null;
+    });
+    try {
+      final periods = await _fetchReservedPeriods();
+      if (!mounted) return;
+      setState(() {
+        _reservedPeriods = periods;
+        _reservationsLoaded = true;
+        if (_hasConflict(_startDate, _endDate)) {
+          _error = 'La période sélectionnée contient déjà des dates réservées.';
+        }
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = 'Impossible d’actualiser les réservations.');
+    }
+    _notifyPlanning();
+  }
+
+  bool get _selectionIsAvailable =>
+      _reservationsLoaded && !_hasConflict(_startDate, _endDate);
 
   void _notifyPlanning() {
     widget.onPlanningChanged(
@@ -180,189 +317,68 @@ class _PlanningSectionState extends State<PlanningSection> {
         startDate: _startDate,
         endDate: _endDate,
         exclusiveReservation: true,
-        availabilityConfirmed: _availabilityChecked && _available,
+        availabilityConfirmed: _selectionIsAvailable,
       ),
     );
   }
 
   void _selectDuration(String value) {
+    final newEnd = _calculateEndDate(_startDate, value);
     setState(() {
       _durationLabel = value;
-      _endDate = _calculateEndDate(_startDate, value);
-      _availabilityChecked = false;
-      _available = false;
+      _endDate = newEnd;
       _saved = false;
-      _error = null;
+      _error = _hasConflict(_startDate, newEnd)
+          ? 'Cette durée traverse une période déjà réservée.'
+          : null;
     });
     _notifyPlanning();
   }
 
-  Future<void> _pickStartDate() async {
+  void _selectStartDate(DateTime value) {
     final today = _dateOnly(DateTime.now());
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _startDate.isBefore(today) ? today : _startDate,
-      firstDate: today,
-      lastDate: DateTime(today.year + 3, today.month, today.day),
-      helpText: 'DATE DE DÉBUT DE CAMPAGNE',
-      cancelText: 'ANNULER',
-      confirmText: 'VALIDER',
-    );
-    if (picked == null || !mounted) return;
+    if (value.isBefore(today) || _isReserved(value)) return;
+    final newEnd = _calculateEndDate(value, _durationLabel);
+    if (_hasConflict(value, newEnd)) {
+      setState(() {
+        _error =
+            'Cette période contient une ou plusieurs dates déjà réservées.';
+      });
+      return;
+    }
     setState(() {
-      _startDate = _dateOnly(picked);
-      _endDate = _calculateEndDate(_startDate, _durationLabel);
-      _availabilityChecked = false;
-      _available = false;
+      _startDate = value;
+      _endDate = newEnd;
       _saved = false;
       _error = null;
     });
     _notifyPlanning();
-  }
-
-  bool _periodsOverlap(
-    DateTime firstStart,
-    DateTime firstEnd,
-    DateTime secondStart,
-    DateTime secondEnd,
-  ) {
-    return !firstEnd.isBefore(secondStart) && !secondEnd.isBefore(firstStart);
-  }
-
-  double _distanceKm(LatLng first, LatLng second) {
-    const earthRadiusKm = 6371.0;
-    final latitudeDelta = (second.latitude - first.latitude) * math.pi / 180;
-    final longitudeDelta = (second.longitude - first.longitude) * math.pi / 180;
-    final firstLatitude = first.latitude * math.pi / 180;
-    final secondLatitude = second.latitude * math.pi / 180;
-    final haversine =
-        math.sin(latitudeDelta / 2) * math.sin(latitudeDelta / 2) +
-        math.cos(firstLatitude) *
-            math.cos(secondLatitude) *
-            math.sin(longitudeDelta / 2) *
-            math.sin(longitudeDelta / 2);
-    final boundedHaversine = haversine.clamp(0.0, 1.0).toDouble();
-    return earthRadiusKm *
-        2 *
-        math.atan2(
-          math.sqrt(boundedHaversine),
-          math.sqrt(1 - boundedHaversine),
-        );
-  }
-
-  Future<bool> _checkAvailability() async {
-    final position = widget.advertisingPosition;
-    if (position == null) {
-      setState(() {
-        _error = 'Définissez d’abord le SPHOT publicitaire à l’étape 3.';
-      });
-      return false;
-    }
-    if (!widget.hasDiffusionSelection) {
-      setState(() {
-        _error = 'Sélectionnez d’abord une offre de diffusion à l’étape 4.';
-      });
-      return false;
-    }
-
-    setState(() {
-      _checking = true;
-      _error = null;
-      _availabilityChecked = false;
-      _available = false;
-    });
-
-    if (widget.developmentBypass && widget.user == null) {
-      setState(() {
-        _checking = false;
-        _availabilityChecked = true;
-        _available = true;
-        _saved = false;
-      });
-      _notifyPlanning();
-      return true;
-    }
-
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('adRequests')
-          .get();
-      var conflictFound = false;
-
-      for (final document in snapshot.docs) {
-        final data = document.data();
-        final status = (data['status'] ?? '').toString().toLowerCase();
-        if (<String>{
-          'cancelled',
-          'deleted',
-          'disabled',
-          'finished',
-          'rejected',
-        }.contains(status)) {
-          continue;
-        }
-        if ((data['broadcastType'] ?? 'local').toString() == 'national') {
-          continue;
-        }
-
-        final existingStart = _toDate(data['campaignStartDate']);
-        final existingEnd = _toDate(data['campaignEndDate']);
-        if (existingStart == null ||
-            existingEnd == null ||
-            !_periodsOverlap(
-              _startDate,
-              _endDate,
-              existingStart,
-              existingEnd,
-            )) {
-          continue;
-        }
-
-        final latitude = _toDouble(data['centerLat']);
-        final longitude = _toDouble(data['centerLng']);
-        if (latitude == null || longitude == null) continue;
-
-        final existingRadius = _toDouble(data['radiusKm']) ?? 0;
-        final exclusiveDistance = widget.radiusKm + existingRadius;
-        final minimumSpotTolerance = exclusiveDistance <= 0 ? 0.025 : 0.0;
-        final separationKm = _distanceKm(position, LatLng(latitude, longitude));
-        if (separationKm <= exclusiveDistance + minimumSpotTolerance) {
-          conflictFound = true;
-          break;
-        }
-      }
-
-      if (!mounted) return false;
-      setState(() {
-        _availabilityChecked = true;
-        _available = !conflictFound;
-        _saved = false;
-        if (conflictFound) {
-          _error = 'Cette zone est déjà réservée par une autre campagne pendant tout ou partie de la période choisie.';
-        }
-      });
-      _notifyPlanning();
-      return !conflictFound;
-    } catch (error) {
-      if (!mounted) return false;
-      setState(() {
-        _error = 'La disponibilité ne peut pas être vérifiée pour le moment. Réessayez.';
-      });
-      debugPrint('Vérification disponibilité publicitaire impossible : $error');
-      return false;
-    } finally {
-      if (mounted) setState(() => _checking = false);
-    }
   }
 
   Future<void> _save() async {
-    if (!await _checkAvailability()) return;
-
-    setState(() {
-      _saving = true;
-      _error = null;
-    });
-
+    if (widget.advertisingPosition == null) {
+      setState(() {
+        _error = 'Définissez d’abord le SPHOT publicitaire à l’étape 3.';
+      });
+      return;
+    }
+    if (!widget.hasDiffusionSelection) {
+      setState(() {
+        _error = 'Sélectionnez d’abord une diffusion à l’étape 4.';
+      });
+      return;
+    }
+    setState(() => _saving = true);
+    await _refreshReservations();
+    if (!mounted) return;
+    if (!_selectionIsAvailable) {
+      setState(() {
+        _saving = false;
+        _error =
+            'Cette période n’est plus disponible. Choisissez d’autres dates.';
+      });
+      return;
+    }
     try {
       final user = widget.user;
       if (user != null) {
@@ -379,14 +395,11 @@ class _PlanningSectionState extends State<PlanningSection> {
                 'exclusiveReservation': true,
                 'availabilityStatus': 'available',
                 'radiusKm': widget.radiusKm,
-                'latitude': widget.advertisingPosition!.latitude,
-                'longitude': widget.advertisingPosition!.longitude,
                 'confirmedAt': FieldValue.serverTimestamp(),
               },
               'updatedAt': FieldValue.serverTimestamp(),
             }, SetOptions(merge: true));
       }
-
       if (!mounted) return;
       setState(() => _saved = true);
       _notifyPlanning();
@@ -399,7 +412,7 @@ class _PlanningSectionState extends State<PlanningSection> {
     }
   }
 
-  Widget _card({required Widget child}) {
+  Widget _card(Widget child) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(18),
@@ -412,87 +425,139 @@ class _PlanningSectionState extends State<PlanningSection> {
     );
   }
 
-  Widget _title(IconData icon, String title, String subtitle) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _calendar() {
+    final firstDay = DateTime(_displayedMonth.year, _displayedMonth.month, 1);
+    final daysInMonth = DateTime(
+      _displayedMonth.year,
+      _displayedMonth.month + 1,
+      0,
+    ).day;
+    final leadingDays = firstDay.weekday - 1;
+    final cellCount = leadingDays + daysInMonth;
+    final rowCount = (cellCount / 7).ceil();
+    final today = _dateOnly(DateTime.now());
+
+    return Column(
       children: [
-        Icon(icon, color: WebColors.blue, size: 30),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
+        Row(
+          children: [
+            IconButton(
+              onPressed: () => setState(() {
+                _displayedMonth = DateTime(
+                  _displayedMonth.year,
+                  _displayedMonth.month - 1,
+                );
+              }),
+              icon: const Icon(Icons.chevron_left, color: WebColors.blue),
+            ),
+            Expanded(
+              child: Text(
+                _monthLabel(_displayedMonth),
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: WebColors.blue,
-                  fontSize: 16,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  color: Color(0xFF6B7280),
-                  height: 1.35,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
+            ),
+            IconButton(
+              onPressed: () => setState(() {
+                _displayedMonth = DateTime(
+                  _displayedMonth.year,
+                  _displayedMonth.month + 1,
+                );
+              }),
+              icon: const Icon(Icons.chevron_right, color: WebColors.blue),
+            ),
+          ],
         ),
-      ],
-    );
-  }
-
-  Widget _dateBox({
-    required String label,
-    required DateTime value,
-    required IconData icon,
-    VoidCallback? onTap,
-  }) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(13),
-        child: Container(
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: WebColors.blue, width: 1.3),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, color: WebColors.blue, size: 18),
-                  const SizedBox(width: 6),
-                  Text(
+        const Row(
+          children: [
+            for (final label in ['L', 'M', 'M', 'J', 'V', 'S', 'D'])
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Text(
                     label,
-                    style: const TextStyle(
-                      color: WebColors.blue,
-                      fontSize: 11,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _formatDate(value),
-                style: const TextStyle(
-                  color: WebColors.blue,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
                 ),
               ),
-            ],
-          ),
+          ],
         ),
-      ),
+        for (var row = 0; row < rowCount; row++)
+          Row(
+            children: List.generate(7, (column) {
+              final dayNumber = row * 7 + column - leadingDays + 1;
+              if (dayNumber < 1 || dayNumber > daysInMonth) {
+                return const Expanded(child: SizedBox(height: 42));
+              }
+              final day = DateTime(
+                _displayedMonth.year,
+                _displayedMonth.month,
+                dayNumber,
+              );
+              final reserved = _isReserved(day);
+              final selected =
+                  !day.isBefore(_startDate) && !day.isAfter(_endDate);
+              final disabled = day.isBefore(today) || reserved;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: InkWell(
+                    onTap: disabled ? null : () => _selectStartDate(day),
+                    borderRadius: BorderRadius.circular(9),
+                    child: Container(
+                      height: 38,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: reserved
+                            ? WebColors.red.withOpacity(0.18)
+                            : selected
+                            ? WebColors.blue.withOpacity(0.13)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(
+                          color: _isSameDay(day, _startDate)
+                              ? WebColors.blue
+                              : reserved
+                              ? WebColors.red
+                              : Colors.transparent,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Text(
+                        '$dayNumber',
+                        style: TextStyle(
+                          color: disabled
+                              ? reserved
+                                    ? WebColors.red
+                                    : const Color(0xFFB0B7C3)
+                              : WebColors.blue,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        const SizedBox(height: 10),
+        const Wrap(
+          spacing: 14,
+          runSpacing: 6,
+          alignment: WrapAlignment.center,
+          children: [
+            _CalendarLegend(color: WebColors.red, label: 'Déjà réservé'),
+            _CalendarLegend(color: WebColors.blue, label: 'Votre période'),
+          ],
+        ),
+      ],
     );
   }
 
@@ -504,60 +569,76 @@ class _PlanningSectionState extends State<PlanningSection> {
         child: Center(child: CircularProgressIndicator(color: WebColors.red)),
       );
     }
-
-    final availabilityColor = !_availabilityChecked
-        ? const Color(0xFF6B7280)
-        : _available
-        ? const Color(0xFF15803D)
-        : WebColors.red;
-    final availabilityLabel = !_availabilityChecked
-        ? 'DISPONIBILITÉ À VÉRIFIER'
-        : _available
-        ? 'ZONE ET PÉRIODE DISPONIBLES'
-        : 'ZONE OU PÉRIODE INDISPONIBLE';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _title(
-                Icons.verified_user_outlined,
-                'RÉSERVATION EXCLUSIVE',
-                'Une seule campagne publicitaire peut être diffusée dans la zone sélectionnée pendant la période définie.',
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Zone réservée : $_radiusLabel',
-                style: const TextStyle(
-                  color: WebColors.red,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Toute campagne dont la zone et les dates se chevauchent sera refusée. Il n’y a ni alternance ni rotation entre annonceurs.',
-                style: TextStyle(
-                  color: Color(0xFF4B5F97),
-                  height: 1.4,
-                  fontWeight: FontWeight.w700,
+              Icon(Icons.shield_outlined, color: WebColors.blue, size: 30),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'PLANIFICATION EXCLUSIVE',
+                      style: TextStyle(
+                        color: WebColors.blue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 7),
+                    Text(
+                      'Une seule campagne publicitaire peut être active dans le rayon et pendant la période choisis. Les dates déjà réservées apparaissent directement dans le calendrier.',
+                      style: TextStyle(
+                        color: Color(0xFF4B5F97),
+                        height: 1.4,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
         _card(
-          child: Column(
+          Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _title(
-                Icons.calendar_month_outlined,
-                'PÉRIODE DE DIFFUSION',
-                'Choisissez une durée puis la date de début de la campagne.',
+              const Row(
+                children: [
+                  Icon(
+                    Icons.calendar_month_outlined,
+                    color: WebColors.blue,
+                    size: 30,
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'PÉRIODE DE DIFFUSION',
+                      style: TextStyle(
+                        color: WebColors.blue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
+              const Text(
+                'Choisissez une durée puis sélectionnez le premier jour disponible dans le calendrier.',
+                style: TextStyle(
+                  color: Color(0xFF4B5F97),
+                  height: 1.4,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 15),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -569,9 +650,6 @@ class _PlanningSectionState extends State<PlanningSection> {
                       foregroundColor: selected
                           ? WebColors.red
                           : WebColors.blue,
-                      backgroundColor: selected
-                          ? WebColors.red.withOpacity(0.045)
-                          : Colors.white,
                       side: BorderSide(
                         color: selected ? WebColors.red : WebColors.blue,
                         width: selected ? 2 : 1.3,
@@ -588,19 +666,22 @@ class _PlanningSectionState extends State<PlanningSection> {
                 }).toList(),
               ),
               const SizedBox(height: 16),
+              _calendar(),
+              const SizedBox(height: 15),
               Row(
                 children: [
-                  _dateBox(
-                    label: 'DÉBUT',
-                    value: _startDate,
-                    icon: Icons.edit_calendar_outlined,
-                    onTap: _pickStartDate,
+                  Expanded(
+                    child: _DateSummary(
+                      label: 'DÉBUT',
+                      value: _formatDate(_startDate),
+                    ),
                   ),
                   const SizedBox(width: 10),
-                  _dateBox(
-                    label: 'FIN CALCULÉE',
-                    value: _endDate,
-                    icon: Icons.event_available_outlined,
+                  Expanded(
+                    child: _DateSummary(
+                      label: 'FIN CALCULÉE',
+                      value: _formatDate(_endDate),
+                    ),
                   ),
                 ],
               ),
@@ -608,49 +689,31 @@ class _PlanningSectionState extends State<PlanningSection> {
           ),
         ),
         _card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          Column(
             children: [
-              _title(
-                Icons.radar_outlined,
-                'DISPONIBILITÉ',
-                'La zone et les dates sont comparées aux campagnes déjà réservées.',
-              ),
-              const SizedBox(height: 8),
               const Text(
-                'La disponibilité sera contrôlée une dernière fois lors de la validation de la commande.',
+                'COÛT',
                 style: TextStyle(
-                  color: Color(0xFF4B5F97),
-                  height: 1.35,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                availabilityLabel,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: availabilityColor,
+                  color: WebColors.blue,
+                  fontSize: 16,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _checking ? null : _checkAvailability,
-                icon: _checking
-                    ? const SizedBox(
-                        width: 17,
-                        height: 17,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.manage_search_outlined),
-                label: Text(
-                  _checking ? 'VÉRIFICATION…' : 'VÉRIFIER LA DISPONIBILITÉ',
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+              const SizedBox(height: 8),
+              Text(
+                '${widget.costExclTax} € HT',
+                style: const TextStyle(
+                  color: WebColors.red,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
                 ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: WebColors.blue,
-                  side: const BorderSide(color: WebColors.blue, width: 1.4),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Du ${_formatDate(_startDate)} au ${_formatDate(_endDate)}',
+                style: const TextStyle(
+                  color: Color(0xFF4B5F97),
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -671,7 +734,7 @@ class _PlanningSectionState extends State<PlanningSection> {
         SizedBox(
           height: 48,
           child: FilledButton.icon(
-            onPressed: _saving || _checking ? null : _save,
+            onPressed: _saving ? null : _save,
             style: FilledButton.styleFrom(
               backgroundColor: _saved ? WebColors.red : WebColors.blue,
               foregroundColor: Colors.white,
@@ -704,6 +767,80 @@ class _PlanningSectionState extends State<PlanningSection> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CalendarLegend extends StatelessWidget {
+  const _CalendarLegend({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 11,
+          height: 11,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.18),
+            border: Border.all(color: color),
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF4B5F97),
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DateSummary extends StatelessWidget {
+  const _DateSummary({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: WebColors.blue, width: 1.3),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF6B7280),
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              color: WebColors.blue,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

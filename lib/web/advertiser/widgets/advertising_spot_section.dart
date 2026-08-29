@@ -19,6 +19,7 @@ class AdvertisingSpotSection extends StatefulWidget {
     required this.position,
     required this.initialVisual,
     required this.initialRadiusKm,
+    required this.startingPriceExclTax,
     required this.onPositionChanged,
     required this.onVisualChanged,
     required this.onRadiusChanged,
@@ -28,6 +29,7 @@ class AdvertisingSpotSection extends StatefulWidget {
   final LatLng? position;
   final AdvertisingVisualData initialVisual;
   final double initialRadiusKm;
+  final int startingPriceExclTax;
   final void Function(LatLng point, {required bool centerMap})
   onPositionChanged;
   final ValueChanged<AdvertisingVisualData> onVisualChanged;
@@ -568,6 +570,51 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               );
             }).toList(),
           ),
+          const SizedBox(height: 14),
+          Text(
+            'À PARTIR DE ${widget.startingPriceExclTax} € HT / SEMAINE',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: WebColors.red,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReachCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'FAITES RAYONNER VOTRE ACTIVITÉ PROFESSIONNELLE EN EXCLUSIVITÉ',
+            style: TextStyle(
+              color: WebColors.blue,
+              fontSize: 16,
+              height: 1.25,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          SizedBox(height: 9),
+          Text(
+            'Choisissez la zone dans laquelle votre établissement bénéficiera d’une présence publicitaire exclusive. Plus le rayon est étendu, plus votre activité gagne en visibilité autour du SPHOT publicitaire.',
+            style: TextStyle(
+              color: Color(0xFF4B5F97),
+              height: 1.4,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
@@ -614,6 +661,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           ),
         ),
         _buildBannerCard(),
+        _buildReachCard(),
         _buildRadiusCard(),
         if (_error != null)
           Padding(
