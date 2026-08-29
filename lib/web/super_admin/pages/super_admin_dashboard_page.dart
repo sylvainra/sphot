@@ -1558,8 +1558,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     required Color color,
   }) {
     return Container(
-      height: 72,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(16),
@@ -1569,35 +1569,31 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         children: [
           AdaptiveAssetImage(
             'data/icons/fire_blue_icon.svg',
-            width: 34,
-            height: 34,
+            width: 30,
+            height: 30,
             filterQuality: FilterQuality.high,
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              color: color,
+              fontSize: 27,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],
