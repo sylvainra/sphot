@@ -471,16 +471,16 @@ class _PlanningSectionState extends State<PlanningSection> {
             ),
           ],
         ),
-        const Row(
+        Row(
           children: [
-            for (final label in ['L', 'M', 'M', 'J', 'V', 'S', 'D'])
+            for (final label in const ['L', 'M', 'M', 'J', 'V', 'S', 'D'])
               Expanded(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 6),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Text(
                     label,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Color(0xFF6B7280),
                       fontWeight: FontWeight.w900,
                     ),
