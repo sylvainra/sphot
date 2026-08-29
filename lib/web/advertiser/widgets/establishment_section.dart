@@ -1,12 +1,8 @@
-import 'dart:typed_data';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../shared/web_colors.dart';
 
@@ -36,15 +32,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     'Autre',
   ];
 
-  static const _allowedLogoExtensions = <String>{
-    'png',
-    'jpg',
-    'jpeg',
-    'webp',
-  };
-
-  static const _maximumLogoSize = 2 * 1024 * 1024;
-
   final _formKey = GlobalKey<FormState>();
   final _legalNameController = TextEditingController();
   final _businessNameController = TextEditingController();
@@ -64,11 +51,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   final _activityFieldKey = GlobalKey();
   OverlayEntry? _activityOverlay;
   String? _activityError;
-  Uint8List? _logoBytes;
-  String? _logoFileName;
-  String? _logoExtension;
-  String? _logoMimeType;
-  String? _existingLogoUrl;
   bool _loading = true;
   bool _saving = false;
   bool _completed = false;
@@ -155,11 +137,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
             establishment['websiteUrl'],
             data['websiteUrl'],
           );
-          _existingLogoUrl = _nullableRead(
-            establishment['logoUrl'],
-            data['logoUrl'],
-          );
-
           final savedActivity = _read(establishment['activityType']);
           if (_activityTypes.contains(savedActivity)) {
             _activityType = savedActivity;
@@ -184,11 +161,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     final primaryText = primary?.toString().trim() ?? '';
     if (primaryText.isNotEmpty) return primaryText;
     return fallback?.toString().trim() ?? '';
-  }
-
-  String? _nullableRead(Object? primary, [Object? fallback]) {
-    final value = _read(primary, fallback);
-    return value.isEmpty ? null : value;
   }
 
   String _digits(String value) => value.replaceAll(RegExp(r'[^0-9]'), '');
@@ -424,68 +396,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     if (_activityType == 'Autre') scrollToOtherField();
   }
 
-  Future<void> _pickLogo() async {
-    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (picked == null) return;
-
-    final bytes = await picked.readAsBytes();
-    final fileName = picked.name;
-    final parts = fileName.split('.');
-    final extension = parts.length > 1 ? parts.last.toLowerCase() : '';
-
-    if (!_allowedLogoExtensions.contains(extension)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Format refusé. Utilisez PNG, JPG, JPEG ou WEBP.'),
-        ),
-      );
-      return;
-    }
-
-    if (bytes.length > _maximumLogoSize) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Le logo ne doit pas dépasser 2 Mo.')),
-      );
-      return;
-    }
-
-    final mimeType = switch (extension) {
-      'png' => 'image/png',
-      'webp' => 'image/webp',
-      _ => 'image/jpeg',
-    };
-
-    if (!mounted) return;
-    setState(() {
-      _logoBytes = bytes;
-      _logoFileName = fileName;
-      _logoExtension = extension;
-      _logoMimeType = mimeType;
-      _completed = false;
-      _error = null;
-    });
-  }
-
-  Future<String?> _uploadLogo(String uid) async {
-    final bytes = _logoBytes;
-    if (bytes == null) return _existingLogoUrl;
-
-    final extension = _logoExtension ?? 'jpg';
-    final reference = FirebaseStorage.instance
-        .ref()
-        .child('advertiser_logos')
-        .child(uid)
-        .child('logo_${DateTime.now().millisecondsSinceEpoch}.$extension');
-
-    await reference.putData(
-      bytes,
-      SettableMetadata(contentType: _logoMimeType ?? 'image/jpeg'),
-    );
-    return reference.getDownloadURL();
-  }
-
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
     final formIsValid = _formKey.currentState?.validate() ?? false;
@@ -503,11 +413,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
 
     try {
       final user = widget.user;
-      var logoUrl = _existingLogoUrl;
-      if (user != null) {
-        logoUrl = await _uploadLogo(user.uid);
-      }
-
       final siret = _digits(_siretController.text);
       final siren = _digits(_sirenController.text);
       final legalName = _legalNameController.text.trim();
@@ -537,7 +442,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
           'phone': publicPhone,
           'publicEmail': publicEmail,
           'websiteUrl': websiteUrl,
-          'logoUrl': logoUrl,
           'establishmentCompleted': true,
           'establishment': <String, Object?>{
             'legalName': legalName,
@@ -556,7 +460,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
             'publicPhone': publicPhone,
             'publicEmail': publicEmail,
             'websiteUrl': websiteUrl,
-            'logoUrl': logoUrl,
             'updatedAt': FieldValue.serverTimestamp(),
           },
           'updatedAt': FieldValue.serverTimestamp(),
@@ -565,12 +468,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
       }
 
       if (!mounted) return;
-      setState(() {
-        _existingLogoUrl = logoUrl;
-        _logoBytes = null;
-        _logoFileName = null;
-        _completed = true;
-      });
+      setState(() => _completed = true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Établissement enregistré.')),
       );
@@ -785,12 +683,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                   validator: _websiteValidator,
                   onChanged: _markAsModified,
                   keyboardType: TextInputType.url,
-                ),
-                _LogoPicker(
-                  bytes: _logoBytes,
-                  existingLogoUrl: _existingLogoUrl,
-                  fileName: _logoFileName,
-                  onPick: _saving ? null : _pickLogo,
                 ),
               ],
             ),
@@ -1018,104 +910,6 @@ class _EstablishmentField extends StatelessWidget {
               ? const Icon(Icons.lock_outline, color: Color(0xFF6B7280))
               : null,
         ),
-      ),
-    );
-  }
-}
-
-class _LogoPicker extends StatelessWidget {
-  const _LogoPicker({
-    required this.bytes,
-    required this.existingLogoUrl,
-    required this.fileName,
-    required this.onPick,
-  });
-
-  final Uint8List? bytes;
-  final String? existingLogoUrl;
-  final String? fileName;
-  final VoidCallback? onPick;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasLogo = bytes != null || existingLogoUrl != null;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFCBD5E1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'LOGO DE L’ÉTABLISSEMENT',
-            style: TextStyle(
-              color: WebColors.blue,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Format recommandé : 1200 × 600 px\nPNG, JPG ou WEBP · 2 Mo maximum',
-            style: TextStyle(
-              color: Color(0xFF4B5F97),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (hasLogo) ...[
-            const SizedBox(height: 12),
-            Container(
-              height: 110,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: bytes != null
-                  ? Image.memory(bytes!, fit: BoxFit.contain)
-                  : Image.network(
-                      existingLogoUrl!,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.broken_image_outlined,
-                        color: Color(0xFF6B7280),
-                        size: 42,
-                      ),
-                    ),
-            ),
-          ],
-          if (fileName != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              fileName!,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF4B5F97),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: onPick,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: WebColors.blue,
-              side: const BorderSide(color: WebColors.blue),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            icon: const Icon(Icons.upload_file_outlined),
-            label: Text(
-              hasLogo ? 'REMPLACER LE LOGO' : 'AJOUTER UN LOGO',
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-          ),
-        ],
       ),
     );
   }
