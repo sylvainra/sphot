@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../shared/web_colors.dart';
 import '../models/diffusion_preview_data.dart';
@@ -8,11 +10,9 @@ class DiffusionCentralPreview extends StatelessWidget {
   const DiffusionCentralPreview({
     super.key,
     required this.data,
-    required this.onBack,
   });
 
   final DiffusionPreviewData data;
-  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -22,94 +22,63 @@ class DiffusionCentralPreview extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final isPack = data.type == DiffusionPreviewType.pack;
-            final availableHeight = constraints.maxHeight - 150;
-            final singleWidth =
-                (availableHeight * 0.52).clamp(250.0, 390.0).toDouble();
+            final availablePhoneHeight = constraints.maxHeight - 215;
+            final heightBasedWidth =
+                (availablePhoneHeight * 0.60).clamp(220.0, 350.0).toDouble();
+            final singleWidth = heightBasedWidth;
             final packWidth = ((constraints.maxWidth - 86) / 2)
-                .clamp(230.0, 330.0)
+                .clamp(200.0, heightBasedWidth)
                 .toDouble();
             final phoneWidth = isPack ? packWidth : singleWidth;
 
-            return Stack(
+            return Column(
               children: [
-                Positioned.fill(
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 18),
-                      const Text(
-                        'APERÇU DE VOTRE PUBLICITÉ',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: WebColors.blue,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        _previewSubtitle(data.type),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFF4B5F97),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Expanded(
-                        child: Center(
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.fromLTRB(28, 0, 28, 82),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                if (data.type == DiffusionPreviewType.map ||
-                                    isPack)
-                                  _PreviewColumn(
-                                    label: 'CARTE SPHOT',
-                                    detail: 'EMPLACEMENT DÉFINI',
-                                    phoneWidth: phoneWidth,
-                                    child: _MapPhonePreview(data: data),
-                                  ),
-                                if (isPack) const SizedBox(width: 26),
-                                if (data.type ==
-                                        DiffusionPreviewType.premium ||
-                                    isPack)
-                                  _PreviewColumn(
-                                    label: 'FICHE SPHOT PREMIUM',
-                                    detail: 'INTÉGRATION INDICATIVE',
-                                    phoneWidth: phoneWidth,
-                                    child: _PremiumPhonePreview(data: data),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 18),
+                const Text(
+                  'APERÇU DE VOTRE PUBLICITÉ',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: WebColors.blue,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.4,
                   ),
                 ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 22,
+                const SizedBox(height: 5),
+                Text(
+                  _previewSubtitle(data.type),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFF4B5F97),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Expanded(
                   child: Center(
-                    child: Container(
-                      width: 54,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.78),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: WebColors.blue, width: 2),
-                      ),
-                      child: IconButton(
-                        onPressed: onBack,
-                        icon: const Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: WebColors.blue,
-                          size: 28,
-                        ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.fromLTRB(28, 0, 28, 24),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (data.type == DiffusionPreviewType.map || isPack)
+                            _PreviewColumn(
+                              label: 'CARTE SPHOT',
+                              detail: 'EMPLACEMENT DÉFINI',
+                              phoneWidth: phoneWidth,
+                              child: _MapPhonePreview(data: data),
+                            ),
+                          if (isPack) const SizedBox(width: 26),
+                          if (data.type == DiffusionPreviewType.premium ||
+                              isPack)
+                            _PreviewColumn(
+                              label: 'FICHE SPHOT PREMIUM',
+                              detail: 'INTÉGRATION INDICATIVE',
+                              phoneWidth: phoneWidth,
+                              child: _PremiumPhonePreview(data: data),
+                            ),
+                        ],
                       ),
                     ),
                   ),
@@ -180,18 +149,44 @@ class _PreviewColumn extends StatelessWidget {
             child: GestureDetector(
               onTap: () => _openLargePreview(context),
               child: AspectRatio(
-                aspectRatio: 0.52,
+                aspectRatio: 0.60,
                 child: _PhoneShell(child: child),
               ),
             ),
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'CLIQUEZ POUR AGRANDIR',
-            style: TextStyle(
-              color: Color(0xFF6B7280),
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
+          const SizedBox(height: 8),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => _openLargePreview(context),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(color: WebColors.blue, width: 1.3),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.open_in_full_rounded,
+                      color: WebColors.blue,
+                      size: 15,
+                    ),
+                    SizedBox(width: 7),
+                    Text(
+                      'CLIQUEZ POUR AGRANDIR',
+                      style: TextStyle(
+                        color: WebColors.blue,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -204,21 +199,48 @@ class _PreviewColumn extends StatelessWidget {
       context: context,
       barrierColor: Colors.black.withOpacity(0.72),
       builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(18),
-          child: InteractiveViewer(
-            minScale: 0.8,
-            maxScale: 4,
-            child: Center(
-              child: SizedBox(
-                width: 390,
-                child: AspectRatio(
-                  aspectRatio: 0.52,
-                  child: _PhoneShell(child: child),
+        return Material(
+          color: Colors.transparent,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: InteractiveViewer(
+                  minScale: 0.8,
+                  maxScale: 4,
+                  child: Center(
+                    child: SizedBox(
+                      width: 360,
+                      child: AspectRatio(
+                        aspectRatio: 0.60,
+                        child: _PhoneShell(child: child),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              Positioned(
+                top: 24,
+                left: 24,
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.42),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: IconButton(
+                    tooltip: 'Fermer l’aperçu',
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -251,7 +273,14 @@ class _PhoneShell extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            child,
+            FittedBox(
+              fit: BoxFit.fill,
+              child: SizedBox(
+                width: 360,
+                height: 600,
+                child: child,
+              ),
+            ),
             Align(
               alignment: Alignment.topCenter,
               child: Container(
@@ -280,11 +309,72 @@ class _MapPhonePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final center = LatLng(
+      data.latitude ?? 46.3445,
+      data.longitude ?? -1.4376,
+    );
+
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset('data/images/map_background.jpg', fit: BoxFit.cover),
-        Container(color: Colors.white.withOpacity(0.05)),
+        IgnorePointer(
+          child: FlutterMap(
+            options: MapOptions(
+              initialCenter: center,
+              initialZoom: 15.5,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.none,
+              ),
+            ),
+            children: [
+              TileLayer(
+                urlTemplate:
+                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.sphot.app',
+              ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: center,
+                    width: 46,
+                    height: 58,
+                    alignment: Alignment.center,
+                    child: SvgPicture.asset(
+                      'data/icons/fire_red_icon.svg',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  Marker(
+                    point: LatLng(
+                      center.latitude - 0.0016,
+                      center.longitude - 0.0018,
+                    ),
+                    width: 38,
+                    height: 48,
+                    alignment: Alignment.center,
+                    child: SvgPicture.asset(
+                      'data/icons/fire_blue_icon.svg',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  Marker(
+                    point: LatLng(
+                      center.latitude + 0.0014,
+                      center.longitude + 0.0020,
+                    ),
+                    width: 36,
+                    height: 45,
+                    alignment: Alignment.center,
+                    child: SvgPicture.asset(
+                      'data/icons/fire_blue_icon.svg',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
         Positioned(
           top: 22,
           left: 18,
@@ -304,33 +394,6 @@ class _MapPhonePreview extends StatelessWidget {
           left: 22,
           top: 143,
           child: _MapControl(icon: Icons.remove_rounded),
-        ),
-        Positioned(
-          right: 26,
-          top: 130,
-          child: SvgPicture.asset(
-            'data/icons/fire_red_icon.svg',
-            width: 38,
-            height: 48,
-          ),
-        ),
-        Positioned(
-          left: 72,
-          top: 210,
-          child: SvgPicture.asset(
-            'data/icons/fire_blue_icon.svg',
-            width: 33,
-            height: 42,
-          ),
-        ),
-        Positioned(
-          right: 64,
-          top: 280,
-          child: SvgPicture.asset(
-            'data/icons/fire_blue_icon.svg',
-            width: 30,
-            height: 38,
-          ),
         ),
         Positioned(
           left: 10,
