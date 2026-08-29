@@ -69,6 +69,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   static const Color redColor = Color(0xFFDC2626);
 
   final MapController _mapController = MapController();
+  final ScrollController _leftPanelScrollController = ScrollController();
   Timer? _mapMovementTimer;
 
   int _selectedTileStyle = 0;
@@ -1458,94 +1459,93 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         ),
       ),
       child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _summaryCard(
-                title: 'SPHOTS',
-                value: '$_visibleOnMapSpotCount',
-                color: adminColor,
-              ),
-              const SizedBox(height: 18),
-              _buildFiltersBlock(),
-
-              const SizedBox(height: 24),
-
-              _summaryCard(
-                title: 'ADMINS',
-                value: '$_visibleOnMapAdminCount',
-                color: adminColor,
-              ),
-              const SizedBox(height: 18),
-              _buildAdminFiltersBlock(),
-
-              const SizedBox(height: 24),
-
-              _summaryCard(
-                title: 'ANNONCEURS',
-                value: '$_visibleAdvertiserCount',
-                color: adminColor,
-              ),
-              const SizedBox(height: 18),
-              _buildAdvertiserFiltersBlock(),
-
-              const SizedBox(height: 24),
-
-              _summaryCard(
-                title: 'SAUVETEURS',
-                value: '$_visibleOnMapSauveteurCount',
-                color: adminColor,
-              ),
-
-              const SizedBox(height: 14),
-
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _showLegalDocumentsPanel = true;
-                    _selectedSpot = null;
-                    _selectedAdmin = null;
-                    _selectedAdvertiser = null;
-                  });
-                },
-                child: Container(
-                  height: 58,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: (_showLegalDocumentsPanel ? redColor : adminColor)
-                        .withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _showLegalDocumentsPanel ? redColor : adminColor,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      AdaptiveAssetImage(
-                        'data/icons/fire_blue_icon.svg',
-                        width: 30,
-                        height: 30,
-                        filterQuality: FilterQuality.high,
+        child: Scrollbar(
+          controller: _leftPanelScrollController,
+          thumbVisibility: true,
+          child: SingleChildScrollView(
+            controller: _leftPanelScrollController,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _summaryCard(
+                  title: 'SPHOTS',
+                  value: '$_visibleOnMapSpotCount',
+                  color: adminColor,
+                ),
+                const SizedBox(height: 10),
+                _buildFiltersBlock(),
+                const SizedBox(height: 18),
+                _summaryCard(
+                  title: 'ADMINS',
+                  value: '$_visibleOnMapAdminCount',
+                  color: adminColor,
+                ),
+                const SizedBox(height: 10),
+                _buildAdminFiltersBlock(),
+                const SizedBox(height: 18),
+                _summaryCard(
+                  title: 'ANNONCEURS',
+                  value: '$_visibleAdvertiserCount',
+                  color: adminColor,
+                ),
+                const SizedBox(height: 10),
+                _buildAdvertiserFiltersBlock(),
+                const SizedBox(height: 18),
+                _summaryCard(
+                  title: 'SAUVETEURS',
+                  value: '$_visibleOnMapSauveteurCount',
+                  color: adminColor,
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showLegalDocumentsPanel = true;
+                      _selectedSpot = null;
+                      _selectedAdmin = null;
+                      _selectedAdvertiser = null;
+                    });
+                  },
+                  child: Container(
+                    height: 54,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: (_showLegalDocumentsPanel ? redColor : adminColor)
+                          .withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: _showLegalDocumentsPanel
+                            ? redColor
+                            : adminColor,
+                        width: 1.5,
                       ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Text(
-                          'DOCUMENTS JURIDIQUES',
-                          style: TextStyle(
-                            color: adminColor,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
+                    ),
+                    child: Row(
+                      children: [
+                        AdaptiveAssetImage(
+                          'data/icons/fire_blue_icon.svg',
+                          width: 28,
+                          height: 28,
+                          filterQuality: FilterQuality.high,
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'DOCUMENTS JURIDIQUES',
+                            style: TextStyle(
+                              color: adminColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1558,7 +1558,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     required Color color,
   }) {
     return Container(
-      height: 80,
+      height: 72,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
@@ -4099,6 +4099,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   void dispose() {
     _speech.stop();
     _dropdownOverlay?.remove();
+    _leftPanelScrollController.dispose();
     _searchController.dispose();
     _legalTitleController.dispose();
     _legalContentController.dispose();
