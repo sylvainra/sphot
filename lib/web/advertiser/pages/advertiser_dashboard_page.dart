@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../map/map_page.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../../shared/web_colors.dart';
+import '../widgets/advertising_spot_section.dart';
 import '../widgets/establishment_section.dart';
 import '../widgets/identity_professional_section.dart';
 
@@ -72,6 +73,18 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   ];
 
   int _selectedIndex = 0;
+  final MapController _mapController = MapController();
+  LatLng? _advertisingPoint;
+
+  void _setAdvertisingPoint(LatLng point, {required bool centerMap}) {
+    setState(() => _advertisingPoint = point);
+    if (!centerMap) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _mapController.move(point, 15);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -137,17 +150,72 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
       fit: StackFit.expand,
       children: [
         FlutterMap(
-          options: const MapOptions(
-            initialCenter: LatLng(46.6, 2.4),
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: const LatLng(46.6, 2.4),
             initialZoom: 5.4,
+            minZoom: 4,
+            maxZoom: 18,
+            onTap: _selectedIndex == 2
+                ? (_, point) =>
+                    _setAdvertisingPoint(point, centerMap: false)
+                : null,
           ),
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.sphot.app',
             ),
+            if (_advertisingPoint != null)
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: _advertisingPoint!,
+                    width: 60,
+                    height: 60,
+                    alignment: Alignment.center,
+                    child: Transform.translate(
+                      offset: const Offset(0, -28),
+                      child: AdaptiveAssetImage(
+                        'data/icons/fire_red_icon.svg',
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
           ],
         ),
+        if (_selectedIndex == 2)
+          Positioned(
+            top: 88,
+            left: 20,
+            right: 20,
+            child: IgnorePointer(
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: WebColors.blue, width: 1.4),
+                  ),
+                  child: const Text(
+                    'CLIQUEZ SUR LA CARTE POUR AJUSTER LE SPHOT PUBLICITAIRE',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: WebColors.blue,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         Positioned(
           top: 8,
           left: 0,
@@ -271,6 +339,14 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
       case 1:
         return [
           EstablishmentSection(user: widget.user),
+        ];
+      case 2:
+        return [
+          AdvertisingSpotSection(
+            user: widget.user,
+            position: _advertisingPoint,
+            onPositionChanged: _setAdvertisingPoint,
+          ),
         ];
       case 4:
         return const [
