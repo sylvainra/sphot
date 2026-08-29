@@ -14,6 +14,7 @@ import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
+import '../models/advertising_pricing_config.dart';
 
 class AdvertisePage extends StatefulWidget {
   const AdvertisePage({super.key});
@@ -149,7 +150,7 @@ DateTime get _campaignEndDate {
     '12 mois',
   ];
 
-  final List<double> _radiusChoices = [0.5, 2, 5, 10, 20, 50, 100];
+  final List<double> _radiusChoices = AdvertisingPricingConfig.radiusChoices;
 
   @override
   void dispose() {
@@ -169,52 +170,7 @@ DateTime get _campaignEndDate {
   }
 
   Map<String, dynamic> _defaultPricing() {
-    return {
-      'basePrices': {
-        '15 jours': 99,
-        '1 mois': 149,
-        '3 mois': 349,
-        '6 mois': 599,
-        '12 mois': 999,
-      },
-      'visibilityMultipliers': {
-        'map': 1.0,
-        'premium': 2.0,
-        'pack': 2.5,
-      },
-      'radiusMultipliers': {
-  '0.5': 1.0,
-  '2': 1.5,
-  '5': 2.0,
-  '10': 2.8,
-  '20': 3.8,
-  '50': 5.5,
-  '100': 8.0,
-},
-      'nationalFlatPrices': {
-        'map': {
-          '15 jours': 490,
-          '1 mois': 790,
-          '3 mois': 1900,
-          '6 mois': 2900,
-          '12 mois': 4900,
-        },
-        'premium': {
-          '15 jours': 890,
-          '1 mois': 1490,
-          '3 mois': 3400,
-          '6 mois': 5400,
-          '12 mois': 8900,
-        },
-        'pack': {
-          '15 jours': 1190,
-          '1 mois': 1990,
-          '3 mois': 4500,
-          '6 mois': 7400,
-          '12 mois': 11900,
-        },
-      },
-    };
+    return AdvertisingPricingConfig.defaults();
   }
 
   num _numFromMap(Map map, String key, num fallback) {
@@ -252,7 +208,11 @@ DateTime get _campaignEndDate {
 
     final base = _numFromMap(basePrices, _duration, 99);
     final visibility = _numFromMap(visibilityMultipliers, _visibility, 2.5);
-    final radius = _numFromMap(radiusMultipliers, _radiusKm.toString(), 1.0);
+    final radius = _numFromMap(
+      radiusMultipliers,
+      AdvertisingPricingConfig.radiusKey(_radiusKm),
+      1.0,
+    );
 
     return (base * visibility * radius).round();
   }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../models/advertising_pricing_config.dart';
 import '../../shared/web_colors.dart';
 import '../models/advertising_visual_data.dart';
 import '../models/diffusion_preview_data.dart';
@@ -29,7 +30,7 @@ class DiffusionSection extends StatefulWidget {
 }
 
 class _DiffusionSectionState extends State<DiffusionSection> {
-  static const _radiusChoices = <double>[5, 10, 20, 50, 100];
+  static const _radiusChoices = AdvertisingPricingConfig.radiusChoices;
   static const _options = <_DiffusionOption>[
     _DiffusionOption(
       value: 'map',
@@ -57,7 +58,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
   bool _completed = false;
   bool _requestExists = false;
   String? _selectedValue;
-  double _radiusKm = 5;
+  double _radiusKm = 0.5;
   String? _savedBannerUrl;
   String _advertiserName = '';
   String? _logoUrl;
@@ -465,7 +466,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
                   ),
                 ),
                 child: Text(
-                  '${radius.toInt()} km',
+                  AdvertisingPricingConfig.radiusLabel(radius),
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               );

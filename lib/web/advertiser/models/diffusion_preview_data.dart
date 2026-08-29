@@ -11,7 +11,7 @@ class DiffusionPreviewData {
     this.logoUrl,
     this.latitude,
     this.longitude,
-    this.radiusKm = 5,
+    this.radiusKm = 0.5,
   });
 
   final DiffusionPreviewType? type;

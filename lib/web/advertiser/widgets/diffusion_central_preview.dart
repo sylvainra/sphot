@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../models/advertising_pricing_config.dart';
 import '../../shared/web_colors.dart';
 import '../models/diffusion_preview_data.dart';
 
@@ -64,7 +65,7 @@ class DiffusionCentralPreview extends StatelessWidget {
                             _PreviewColumn(
                               label: 'CARTE SPHOT',
                               detail:
-                                  'EMPLACEMENT DÉFINI • RAYON ${data.radiusKm.toInt()} KM',
+                                  'EMPLACEMENT DÉFINI • RAYON ${AdvertisingPricingConfig.radiusLabel(data.radiusKm).toUpperCase()}',
                               phoneWidth: phoneWidth,
                               child: _MapPhonePreview(data: data),
                             ),
@@ -426,7 +427,9 @@ class _MapPhonePreview extends StatelessWidget {
     if (radiusKm >= 50) return 7.4;
     if (radiusKm >= 20) return 8.7;
     if (radiusKm >= 10) return 9.7;
-    return 10.7;
+    if (radiusKm >= 5) return 10.7;
+    if (radiusKm >= 2) return 12;
+    return 13.7;
   }
 }
 
