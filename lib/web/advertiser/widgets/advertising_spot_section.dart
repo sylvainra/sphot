@@ -177,7 +177,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           status: position == null ? 'AUCUNE POSITION' : 'POSITION DÉFINIE',
           statusColor: position == null
               ? const Color(0xFF6B7280)
-              : const Color(0xFF15803D),
+              : WebColors.red,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
