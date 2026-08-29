@@ -598,7 +598,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'FAITES RAYONNER VOTRE ACTIVITÉ PROFESSIONNELLE EN EXCLUSIVITÉ',
+            'FAITES RAYONNER VOTRE SPHOT PUBLICITAIRE',
             style: TextStyle(
               color: WebColors.blue,
               fontSize: 16,
@@ -608,7 +608,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           ),
           SizedBox(height: 9),
           Text(
-            'Choisissez la zone dans laquelle votre établissement bénéficiera d’une présence publicitaire exclusive. Plus le rayon est étendu, plus votre activité gagne en visibilité autour du SPHOT publicitaire.',
+            'Choisissez la zone dans laquelle votre SPHOT bénéficiera d’une présence publicitaire exclusive. Plus le rayon est étendu, plus votre SPHOT gagne en visibilité auprès des utilisateurs présents à proximité.',
             style: TextStyle(
               color: Color(0xFF4B5F97),
               height: 1.4,
@@ -650,7 +650,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Déplacez et zoomez la carte, puis cliquez à l’emplacement exact de l’établissement.',
+                'Déplacez et zoomez la carte, puis cliquez à l’emplacement exact de votre SPHOT publicitaire.',
                 style: TextStyle(
                   color: Color(0xFF4B5F97),
                   height: 1.4,

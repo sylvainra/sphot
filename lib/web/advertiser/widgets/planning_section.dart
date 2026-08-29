@@ -592,7 +592,7 @@ class _PlanningSectionState extends State<PlanningSection> {
                     ),
                     SizedBox(height: 7),
                     Text(
-                      'Une seule campagne publicitaire peut être active dans le rayon et pendant la période choisis. Les dates déjà réservées apparaissent directement dans le calendrier.',
+                      'Une seule campagne publicitaire peut être active dans le rayon et durant la période que vous avez choisis. Selon les dates disponibles, votre SPHOT publicitaire bénéficie ainsi d’une exclusivité d’affichage dans toute la zone sélectionnée et pendant toute la période réservée.',
                       style: TextStyle(
                         color: Color(0xFF4B5F97),
                         height: 1.4,

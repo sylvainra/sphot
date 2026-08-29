@@ -392,10 +392,10 @@ class _MapPhonePreview extends StatelessWidget {
           child: _MapControl(icon: Icons.remove_rounded),
         ),
         Positioned(
-          left: 62,
-          right: 62,
+          left: 10,
+          right: 10,
           bottom: 54,
-          child: _AdvertisingBanner(data: data),
+          child: _AdvertisingBanner(data: data, panoramic: true),
         ),
         const Positioned(
           left: 8,
@@ -641,14 +641,15 @@ class _ForecastDay extends StatelessWidget {
 }
 
 class _AdvertisingBanner extends StatelessWidget {
-  const _AdvertisingBanner({required this.data});
+  const _AdvertisingBanner({required this.data, this.panoramic = false});
 
   final DiffusionPreviewData data;
+  final bool panoramic;
 
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
-      aspectRatio: 2,
+      aspectRatio: panoramic ? 3 : 2,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(11),
         child: DecoratedBox(
@@ -656,23 +657,23 @@ class _AdvertisingBanner extends StatelessWidget {
             color: Colors.white.withOpacity(0.94),
             border: Border.all(color: WebColors.red, width: 1.4),
           ),
-          child: _bannerContent(),
+          child: _bannerContent(panoramic ? BoxFit.fill : BoxFit.contain),
         ),
       ),
     );
   }
 
-  Widget _bannerContent() {
+  Widget _bannerContent(BoxFit fit) {
     final bytes = data.bannerBytes;
     if (bytes != null) {
-      return Image.memory(bytes, fit: BoxFit.contain);
+      return Image.memory(bytes, fit: fit);
     }
 
     final bannerUrl = data.bannerUrl?.trim() ?? '';
     if (bannerUrl.isNotEmpty) {
       return Image.network(
         bannerUrl,
-        fit: BoxFit.contain,
+        fit: fit,
         errorBuilder: (_, __, ___) => _BannerPlaceholder(data: data),
       );
     }

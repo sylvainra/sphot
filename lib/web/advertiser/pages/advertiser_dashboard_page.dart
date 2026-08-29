@@ -52,18 +52,18 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'SPHOT PUBLICITAIRE',
       Icons.location_on_outlined,
-      'Positionnez l’établissement qui portera votre publicité.',
+      'Positionnez votre SPHOT publicitaire.',
     ),
     _AdvertiserSection(
       'DIFFUSION',
       Icons.campaign_outlined,
-      'Choisissez la CARTE SPHOT, la FICHE SPHOT PREMIUM '
+      'Choisissez votre diffusion entre la CARTE SPHOT, la FICHE SPHOT PREMIUM '
           'ou le PACK VISIBILITÉ TOTALE.',
     ),
     _AdvertiserSection(
       'PLANIFICATION',
       Icons.calendar_month_outlined,
-      'Planifiez en exclusivité votre activité professionnelle.',
+      'Planifiez en exclusivité votre SPHOT publicitaire.',
     ),
     _AdvertiserSection(
       'DEVIS & COMMANDE',
