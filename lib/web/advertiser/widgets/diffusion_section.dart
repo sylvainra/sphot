@@ -6,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../shared/web_colors.dart';
 import '../models/diffusion_preview_data.dart';
@@ -14,10 +15,12 @@ class DiffusionSection extends StatefulWidget {
   const DiffusionSection({
     super.key,
     required this.user,
+    required this.advertisingPosition,
     required this.onPreviewChanged,
   });
 
   final User? user;
+  final LatLng? advertisingPosition;
   final ValueChanged<DiffusionPreviewData> onPreviewChanged;
 
   @override
@@ -65,12 +68,23 @@ class _DiffusionSectionState extends State<DiffusionSection> {
   int? _bannerHeight;
   String _advertiserName = '';
   String? _logoUrl;
+  double? _savedLatitude;
+  double? _savedLongitude;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _initialiseDiffusion();
+  }
+
+  @override
+  void didUpdateWidget(covariant DiffusionSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.advertisingPosition == widget.advertisingPosition) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _notifyPreview();
+    });
   }
 
   Future<void> _initialiseDiffusion() async {
@@ -87,6 +101,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
         if (data != null) {
           final diffusion = _map(data['diffusion']);
           final establishment = _map(data['establishment']);
+          final advertisingSpot = _map(data['advertisingSpot']);
           final savedValue = diffusion['visibilityType']?.toString();
           if (_options.any((option) => option.value == savedValue)) {
             _selectedValue = savedValue;
@@ -103,6 +118,8 @@ class _DiffusionSectionState extends State<DiffusionSection> {
           _logoUrl = _nullableText(
             establishment['logoUrl'] ?? data['logoUrl'],
           );
+          _savedLatitude = _toDouble(advertisingSpot['latitude']);
+          _savedLongitude = _toDouble(advertisingSpot['longitude']);
           _completed =
               data['diffusionCompleted'] == true &&
               _selectedValue != null &&
@@ -141,6 +158,11 @@ class _DiffusionSectionState extends State<DiffusionSection> {
     return int.tryParse(value?.toString() ?? '');
   }
 
+  double? _toDouble(Object? value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
+  }
+
   DiffusionPreviewType? get _previewType {
     return switch (_selectedValue) {
       'map' => DiffusionPreviewType.map,
@@ -151,6 +173,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
   }
 
   void _notifyPreview() {
+    final position = widget.advertisingPosition;
     widget.onPreviewChanged(
       DiffusionPreviewData(
         type: _previewType,
@@ -158,6 +181,8 @@ class _DiffusionSectionState extends State<DiffusionSection> {
         bannerUrl: _bannerUrl,
         advertiserName: _advertiserName,
         logoUrl: _logoUrl,
+        latitude: position?.latitude ?? _savedLatitude,
+        longitude: position?.longitude ?? _savedLongitude,
       ),
     );
   }
@@ -480,6 +505,8 @@ class _DiffusionSectionState extends State<DiffusionSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _buildBannerCard(),
+        const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
@@ -538,8 +565,6 @@ class _DiffusionSectionState extends State<DiffusionSection> {
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        _buildBannerCard(),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 12),
