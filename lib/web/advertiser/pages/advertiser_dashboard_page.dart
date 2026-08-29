@@ -7,7 +7,9 @@ import 'package:latlong2/latlong.dart';
 import '../../../map/map_page.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../../shared/web_colors.dart';
+import '../models/diffusion_preview_data.dart';
 import '../widgets/advertising_spot_section.dart';
+import '../widgets/diffusion_central_preview.dart';
 import '../widgets/diffusion_section.dart';
 import '../widgets/establishment_section.dart';
 import '../widgets/identity_professional_section.dart';
@@ -76,6 +78,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   int _selectedIndex = 0;
   final MapController _mapController = MapController();
   LatLng? _advertisingPoint;
+  DiffusionPreviewData _diffusionPreview = const DiffusionPreviewData();
 
   void _setAdvertisingPoint(LatLng point, {required bool centerMap}) {
     setState(() => _advertisingPoint = point);
@@ -85,6 +88,18 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
       if (!mounted) return;
       _mapController.move(point, 15);
     });
+  }
+
+  void _setDiffusionPreview(DiffusionPreviewData preview) {
+    if (!mounted) return;
+    setState(() => _diffusionPreview = preview);
+  }
+
+  void _returnToPublicMap() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MapPage()),
+      (route) => false,
+    );
   }
 
   @override
@@ -147,6 +162,13 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   }
 
   Widget _buildMap() {
+    if (_selectedIndex == 3 && _diffusionPreview.hasSelection) {
+      return DiffusionCentralPreview(
+        data: _diffusionPreview,
+        onBack: _returnToPublicMap,
+      );
+    }
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -244,12 +266,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                 border: Border.all(color: WebColors.blue, width: 2),
               ),
               child: IconButton(
-                onPressed: () {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const MapPage()),
-                    (route) => false,
-                  );
-                },
+                onPressed: _returnToPublicMap,
                 icon: const Icon(
                   Icons.arrow_back_ios_new_rounded,
                   color: WebColors.blue,
@@ -351,7 +368,10 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
         ];
       case 3:
         return [
-          DiffusionSection(user: widget.user),
+          DiffusionSection(
+            user: widget.user,
+            onPreviewChanged: _setDiffusionPreview,
+          ),
         ];
       case 4:
         return const [
