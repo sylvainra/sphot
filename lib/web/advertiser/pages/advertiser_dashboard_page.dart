@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../map/map_page.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../../shared/web_colors.dart';
+import '../widgets/establishment_section.dart';
 import '../widgets/identity_professional_section.dart';
 
 class AdvertiserDashboardPage extends StatefulWidget {
@@ -266,6 +267,10 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           IdentityProfessionalSection(
             user: widget.user,
           ),
+        ];
+      case 1:
+        return [
+          EstablishmentSection(user: widget.user),
         ];
       case 4:
         return const [
