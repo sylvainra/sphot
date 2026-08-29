@@ -625,7 +625,7 @@ class _AdvertisingPricingEditorState extends State<_AdvertisingPricingEditor> {
             'radiusMultipliers': radiusMultipliers,
             'nationalFlatPrices': nationalFlatPrices,
             'updatedAt': FieldValue.serverTimestamp(),
-          });
+          }, SetOptions(merge: true));
       if (mounted) setState(() => _saved = true);
     } catch (error) {
       if (!mounted) return;

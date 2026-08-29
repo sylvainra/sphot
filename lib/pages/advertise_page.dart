@@ -170,11 +170,6 @@ DateTime get _campaignEndDate {
     return AdvertisingPricingConfig.defaults();
   }
 
-  num _numFromMap(Map map, String key, num fallback) {
-    final value = map[key];
-    return value is num ? value : fallback;
-  }
-
   int _campaignPrice(Map<String, dynamic>? firestorePricing) {
     final pricing = firestorePricing ?? _defaultPricing();
 
@@ -191,27 +186,12 @@ DateTime get _campaignEndDate {
       return fallback;
     }
 
-    final basePrices = pricing['basePrices'] is Map
-        ? pricing['basePrices'] as Map
-        : _defaultPricing()['basePrices'] as Map;
-
-    final visibilityMultipliers = pricing['visibilityMultipliers'] is Map
-        ? pricing['visibilityMultipliers'] as Map
-        : _defaultPricing()['visibilityMultipliers'] as Map;
-
-    final radiusMultipliers = pricing['radiusMultipliers'] is Map
-        ? pricing['radiusMultipliers'] as Map
-        : _defaultPricing()['radiusMultipliers'] as Map;
-
-    final base = _numFromMap(basePrices, _duration, 49);
-    final visibility = _numFromMap(visibilityMultipliers, _visibility, 2.5);
-    final radius = _numFromMap(
-      radiusMultipliers,
-      AdvertisingPricingConfig.radiusKey(_radiusKm),
-      1.0,
+    return AdvertisingPricingConfig.localPrice(
+      pricing: pricing,
+      durationLabel: _duration,
+      visibilityType: _visibility,
+      radiusKm: _radiusKm,
     );
-
-    return (base * visibility * radius).round();
   }
 
   String _visibilityLabel() {

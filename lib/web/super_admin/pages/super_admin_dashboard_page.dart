@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../models/advertising_pricing_config.dart';
 import '../../../widgets/adaptive_asset_image.dart';
+import '../widgets/super_admin_pricing_panel.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
@@ -101,6 +102,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   Map<String, dynamic>? _selectedAdvertiser;
 
   bool _showLegalDocumentsPanel = false;
+  bool _showPricingPanel = false;
 
   String? _selectedLegalDocument;
   String? _selectedLegalChapter;
@@ -1061,6 +1063,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             _selectedAdmin = null;
             _selectedAdvertiser = null;
             _showLegalDocumentsPanel = false;
+            _showPricingPanel = false;
           });
 
           _mapController.move(LatLng(lat, lng), 18);
@@ -1502,6 +1505,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   onTap: () {
                     setState(() {
                       _showLegalDocumentsPanel = true;
+                      _showPricingPanel = false;
                       _selectedSpot = null;
                       _selectedAdmin = null;
                       _selectedAdvertiser = null;
@@ -1533,6 +1537,47 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         const Expanded(
                           child: Text(
                             'DOCUMENTS JURIDIQUES',
+                            style: TextStyle(
+                              color: adminColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showPricingPanel = true;
+                      _showLegalDocumentsPanel = false;
+                      _selectedSpot = null;
+                      _selectedAdmin = null;
+                      _selectedAdvertiser = null;
+                    });
+                  },
+                  child: Container(
+                    height: 54,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: (_showPricingPanel ? redColor : adminColor)
+                          .withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: _showPricingPanel ? redColor : adminColor,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.euro_rounded, color: adminColor, size: 28),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'GRILLES TARIFAIRES',
                             style: TextStyle(
                               color: adminColor,
                               fontSize: 13,
@@ -4712,6 +4757,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               _selectedAdmin = Map<String, dynamic>.from(data);
               _selectedAdvertiser = null;
               _showLegalDocumentsPanel = false;
+              _showPricingPanel = false;
               _selectedLegalDocument = null;
               _selectedLegalChapter = null;
             });
@@ -4820,6 +4866,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             _selectedSpot = null;
             _selectedAdmin = null;
             _selectedAdvertiser = data;
+            _showPricingPanel = false;
+            _showLegalDocumentsPanel = false;
           });
 
           _mapController.move(LatLng(lat, lng), 18);
@@ -5016,6 +5064,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                                       _selectedAdmin = null;
                                       _selectedAdvertiser = null;
                                       _showLegalDocumentsPanel = false;
+                                      _showPricingPanel = false;
                                       _selectedLegalDocument = null;
                                       _selectedLegalChapter = null;
                                     });
@@ -5163,7 +5212,13 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                           ),
                         ),
 
-                        if (_showLegalDocumentsPanel)
+                        if (_showPricingPanel)
+                          SuperAdminPricingPanel(
+                            onClose: () {
+                              setState(() => _showPricingPanel = false);
+                            },
+                          )
+                        else if (_showLegalDocumentsPanel)
                           _buildLegalDocumentsPanel()
                         else if (_selectedSpot != null)
                           _buildSpotDetailPanel()

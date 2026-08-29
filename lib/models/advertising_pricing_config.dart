@@ -94,6 +94,11 @@ class AdvertisingPricingConfig {
     final visibilityMultipliers = _map(pricing['visibilityMultipliers']);
     final radiusMultipliers = _map(pricing['radiusMultipliers']);
     final radius = radiusKey(radiusKm);
+    final localFlatPrices = _map(pricing['localFlatPrices']);
+    final visibilityPrices = _map(localFlatPrices[visibilityType]);
+    final radiusPrices = _map(visibilityPrices[radius]);
+    final exactPrice = radiusPrices[durationLabel];
+    if (exactPrice is num && exactPrice > 0) return exactPrice.round();
     final base = _number(
       basePrices[durationLabel],
       _map(defaults['basePrices'])[durationLabel],
