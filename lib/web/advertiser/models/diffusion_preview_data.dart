@@ -1,10 +1,6 @@
 import 'dart:typed_data';
 
-enum DiffusionPreviewType {
-  map,
-  premium,
-  pack,
-}
+enum DiffusionPreviewType { map, premium, pack }
 
 class DiffusionPreviewData {
   const DiffusionPreviewData({
@@ -15,6 +11,7 @@ class DiffusionPreviewData {
     this.logoUrl,
     this.latitude,
     this.longitude,
+    this.radiusKm = 5,
   });
 
   final DiffusionPreviewType? type;
@@ -24,6 +21,7 @@ class DiffusionPreviewData {
   final String? logoUrl;
   final double? latitude;
   final double? longitude;
+  final double radiusKm;
 
   bool get hasSelection => type != null;
 }

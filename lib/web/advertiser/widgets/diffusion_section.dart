@@ -14,12 +14,14 @@ class DiffusionSection extends StatefulWidget {
     required this.user,
     required this.advertisingPosition,
     required this.advertisingVisual,
+    required this.initialPreview,
     required this.onPreviewChanged,
   });
 
   final User? user;
   final LatLng? advertisingPosition;
   final AdvertisingVisualData advertisingVisual;
+  final DiffusionPreviewData initialPreview;
   final ValueChanged<DiffusionPreviewData> onPreviewChanged;
 
   @override
@@ -27,6 +29,7 @@ class DiffusionSection extends StatefulWidget {
 }
 
 class _DiffusionSectionState extends State<DiffusionSection> {
+  static const _radiusChoices = <double>[5, 10, 20, 50, 100];
   static const _options = <_DiffusionOption>[
     _DiffusionOption(
       value: 'map',
@@ -54,6 +57,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
   bool _completed = false;
   bool _requestExists = false;
   String? _selectedValue;
+  double _radiusKm = 5;
   String? _savedBannerUrl;
   String _advertiserName = '';
   String? _logoUrl;
@@ -64,6 +68,8 @@ class _DiffusionSectionState extends State<DiffusionSection> {
   @override
   void initState() {
     super.initState();
+    _selectedValue = _valueForPreviewType(widget.initialPreview.type);
+    _radiusKm = widget.initialPreview.radiusKm;
     _initialiseDiffusion();
   }
 
@@ -99,6 +105,10 @@ class _DiffusionSectionState extends State<DiffusionSection> {
           final savedValue = diffusion['visibilityType']?.toString();
           if (_options.any((option) => option.value == savedValue)) {
             _selectedValue = savedValue;
+          }
+          final savedRadius = _toDouble(diffusion['radiusKm']);
+          if (savedRadius != null && _radiusChoices.contains(savedRadius)) {
+            _radiusKm = savedRadius;
           }
           _savedBannerUrl = _nullableText(
             advertisingSpot['bannerUrl'] ?? diffusion['bannerUrl'],
@@ -157,6 +167,15 @@ class _DiffusionSectionState extends State<DiffusionSection> {
     };
   }
 
+  String? _valueForPreviewType(DiffusionPreviewType? type) {
+    return switch (type) {
+      DiffusionPreviewType.map => 'map',
+      DiffusionPreviewType.premium => 'premium',
+      DiffusionPreviewType.pack => 'pack',
+      null => null,
+    };
+  }
+
   void _notifyPreview() {
     final position = widget.advertisingPosition;
     final visual = widget.advertisingVisual;
@@ -169,6 +188,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
         logoUrl: _logoUrl,
         latitude: position?.latitude ?? _savedLatitude,
         longitude: position?.longitude ?? _savedLongitude,
+        radiusKm: _radiusKm,
       ),
     );
   }
@@ -180,6 +200,15 @@ class _DiffusionSectionState extends State<DiffusionSection> {
   void _select(String value) {
     setState(() {
       _selectedValue = value;
+      _completed = false;
+      _error = null;
+    });
+    _notifyPreview();
+  }
+
+  void _selectRadius(double radius) {
+    setState(() {
+      _radiusKm = radius;
       _completed = false;
       _error = null;
     });
@@ -230,6 +259,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
               'diffusion': <String, Object?>{
                 'visibilityType': selectedOption.value,
                 'visibilityLabel': selectedOption.label,
+                'radiusKm': _radiusKm,
                 'confirmedAt': FieldValue.serverTimestamp(),
               },
               'updatedAt': FieldValue.serverTimestamp(),
@@ -240,9 +270,6 @@ class _DiffusionSectionState extends State<DiffusionSection> {
       if (!mounted) return;
       setState(() => _completed = true);
       _notifyPreview();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Diffusion enregistrée.')));
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = 'L’enregistrement a échoué. Réessayez.');
@@ -322,6 +349,8 @@ class _DiffusionSectionState extends State<DiffusionSection> {
             ],
           ),
         ),
+        const SizedBox(height: 14),
+        _buildRadiusCard(),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 12),
@@ -370,6 +399,80 @@ class _DiffusionSectionState extends State<DiffusionSection> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildRadiusCard() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.radar_rounded, color: WebColors.blue, size: 30),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'RAYON D’ACTION',
+                      style: TextStyle(
+                        color: WebColors.blue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'AUTOUR DE VOTRE SPHOT PUBLICITAIRE',
+                      style: TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _radiusChoices.map((radius) {
+              final selected = _radiusKm == radius;
+              return OutlinedButton(
+                onPressed: () => _selectRadius(radius),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: selected ? WebColors.red : WebColors.blue,
+                  backgroundColor: selected
+                      ? WebColors.red.withOpacity(0.045)
+                      : Colors.white,
+                  side: BorderSide(
+                    color: selected ? WebColors.red : WebColors.blue,
+                    width: selected ? 2 : 1.3,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                child: Text(
+                  '${radius.toInt()} km',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
     );
   }
 }

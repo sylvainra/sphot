@@ -372,6 +372,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             user: widget.user,
             advertisingPosition: _advertisingPoint,
             advertisingVisual: _advertisingVisual,
+            initialPreview: _diffusionPreview,
             onPreviewChanged: _setDiffusionPreview,
           ),
         ];

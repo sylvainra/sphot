@@ -347,9 +347,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
         _completed = true;
       });
       _notifyVisual();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('SPHOT publicitaire enregistré.')),
-      );
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = 'L’enregistrement a échoué. Réessayez.');

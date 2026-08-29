@@ -5,10 +5,7 @@ import 'package:flutter/material.dart';
 import '../../shared/web_colors.dart';
 
 class IdentityProfessionalSection extends StatefulWidget {
-  const IdentityProfessionalSection({
-    super.key,
-    required this.user,
-  });
+  const IdentityProfessionalSection({super.key, required this.user});
 
   final User? user;
 
@@ -64,10 +61,14 @@ class _IdentityProfessionalSectionState
         _requestExists = snapshot.exists;
 
         if (data != null) {
-          _lastNameController.text =
-              _textValue(data['contactLastName'], _lastNameController.text);
-          _firstNameController.text =
-              _textValue(data['contactFirstName'], _firstNameController.text);
+          _lastNameController.text = _textValue(
+            data['contactLastName'],
+            _lastNameController.text,
+          );
+          _firstNameController.text = _textValue(
+            data['contactFirstName'],
+            _firstNameController.text,
+          );
           _functionController.text = _textValue(data['contactFunction']);
           _phoneController.text = _textValue(data['contactPhone']);
           _professionalEmailController.text = _textValue(
@@ -140,27 +141,24 @@ class _IdentityProfessionalSectionState
             .collection('advertiserRequests')
             .doc(user.uid)
             .set({
-          ...creationData,
-          'uid': user.uid,
-          'email': user.email ?? '',
-          'displayName': user.displayName ?? '',
-          'contactName': '$firstName $lastName'.trim(),
-          'contactFirstName': firstName,
-          'contactLastName': lastName,
-          'contactFunction': _functionController.text.trim(),
-          'contactPhone': _phoneController.text.trim(),
-          'contactEmail': contactEmail,
-          'profileCompleted': true,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+              ...creationData,
+              'uid': user.uid,
+              'email': user.email ?? '',
+              'displayName': user.displayName ?? '',
+              'contactName': '$firstName $lastName'.trim(),
+              'contactFirstName': firstName,
+              'contactLastName': lastName,
+              'contactFunction': _functionController.text.trim(),
+              'contactPhone': _phoneController.text.trim(),
+              'contactEmail': contactEmail,
+              'profileCompleted': true,
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
         _requestExists = true;
       }
 
       if (!mounted) return;
       setState(() => _completed = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Identité professionnelle enregistrée.')),
-      );
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = 'L’enregistrement a échoué. Réessayez.');
@@ -195,9 +193,7 @@ class _IdentityProfessionalSectionState
     if (_loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 48),
-        child: Center(
-          child: CircularProgressIndicator(color: WebColors.red),
-        ),
+        child: Center(child: CircularProgressIndicator(color: WebColors.red)),
       );
     }
 
@@ -217,10 +213,7 @@ class _IdentityProfessionalSectionState
                 label: 'Nom et prénom',
                 value: widget.user?.displayName,
               ),
-              _ReadOnlyLine(
-                label: 'Email certifié',
-                value: widget.user?.email,
-              ),
+              _ReadOnlyLine(label: 'Email certifié', value: widget.user?.email),
               _ReadOnlyLine(
                 label: 'Identifiant',
                 value: widget.user?.uid,

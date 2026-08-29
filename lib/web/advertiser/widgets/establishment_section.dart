@@ -121,10 +121,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
           );
           _postalCodeController.text = _read(establishment['postalCode']);
           _cityController.text = _read(establishment['city']);
-          _countryController.text = _read(
-            establishment['country'],
-            'France',
-          );
+          _countryController.text = _read(establishment['country'], 'France');
           _publicPhoneController.text = _read(
             establishment['publicPhone'],
             data['phone'],
@@ -245,8 +242,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                       ),
                       child: ScrollbarTheme(
                         data: const ScrollbarThemeData(
-                          thumbColor:
-                              MaterialStatePropertyAll(WebColors.blue),
+                          thumbColor: MaterialStatePropertyAll(WebColors.blue),
                           thumbVisibility: MaterialStatePropertyAll(true),
                           thickness: MaterialStatePropertyAll(9),
                           radius: Radius.circular(10),
@@ -341,7 +337,8 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                                           });
                                           overlaySetState(() {});
                                         },
-                                        onSubmitted: (_) => _closeActivityMenu(),
+                                        onSubmitted: (_) =>
+                                            _closeActivityMenu(),
                                         decoration: InputDecoration(
                                           labelText: 'Précisez :',
                                           errorText: _activityError,
@@ -350,24 +347,28 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                                           ),
                                           isDense: true,
                                           filled: true,
-                                          fillColor:
-                                              WebColors.blue.withOpacity(0.035),
+                                          fillColor: WebColors.blue.withOpacity(
+                                            0.035,
+                                          ),
                                           contentPadding:
                                               const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 10,
-                                          ),
+                                                horizontal: 12,
+                                                vertical: 10,
+                                              ),
                                           enabledBorder: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(10),
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
                                             borderSide: BorderSide(
-                                              color: WebColors.blue
-                                                  .withOpacity(0.55),
+                                              color: WebColors.blue.withOpacity(
+                                                0.55,
+                                              ),
                                             ),
                                           ),
                                           focusedBorder: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(10),
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
                                             borderSide: const BorderSide(
                                               color: WebColors.blue,
                                               width: 1.7,
@@ -399,7 +400,8 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
     final formIsValid = _formKey.currentState?.validate() ?? false;
-    final otherActivityIsValid = _activityType != 'Autre' ||
+    final otherActivityIsValid =
+        _activityType != 'Autre' ||
         _otherActivityController.text.trim().isNotEmpty;
     if (!otherActivityIsValid) {
       setState(() => _activityError = 'Précisez le type d’activité');
@@ -433,45 +435,42 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
             .collection('advertiserRequests')
             .doc(user.uid)
             .set({
-          ...creationData,
-          'uid': user.uid,
-          'organisation': legalName,
-          'advertiserName': businessName,
-          'siret': siret,
-          'siren': siren,
-          'phone': publicPhone,
-          'publicEmail': publicEmail,
-          'websiteUrl': websiteUrl,
-          'establishmentCompleted': true,
-          'establishment': <String, Object?>{
-            'legalName': legalName,
-            'businessName': businessName,
-            'activityType': _activityType,
-            'activityTypeOther': _activityType == 'Autre'
-                ? _otherActivityController.text.trim()
-                : '',
-            'siret': siret,
-            'siren': siren,
-            'address': _addressController.text.trim(),
-            'addressComplement': _addressComplementController.text.trim(),
-            'postalCode': _postalCodeController.text.trim(),
-            'city': _cityController.text.trim(),
-            'country': _countryController.text.trim(),
-            'publicPhone': publicPhone,
-            'publicEmail': publicEmail,
-            'websiteUrl': websiteUrl,
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+              ...creationData,
+              'uid': user.uid,
+              'organisation': legalName,
+              'advertiserName': businessName,
+              'siret': siret,
+              'siren': siren,
+              'phone': publicPhone,
+              'publicEmail': publicEmail,
+              'websiteUrl': websiteUrl,
+              'establishmentCompleted': true,
+              'establishment': <String, Object?>{
+                'legalName': legalName,
+                'businessName': businessName,
+                'activityType': _activityType,
+                'activityTypeOther': _activityType == 'Autre'
+                    ? _otherActivityController.text.trim()
+                    : '',
+                'siret': siret,
+                'siren': siren,
+                'address': _addressController.text.trim(),
+                'addressComplement': _addressComplementController.text.trim(),
+                'postalCode': _postalCodeController.text.trim(),
+                'city': _cityController.text.trim(),
+                'country': _countryController.text.trim(),
+                'publicPhone': publicPhone,
+                'publicEmail': publicEmail,
+                'websiteUrl': websiteUrl,
+                'updatedAt': FieldValue.serverTimestamp(),
+              },
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
         _requestExists = true;
       }
 
       if (!mounted) return;
       setState(() => _completed = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Établissement enregistré.')),
-      );
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = 'L’enregistrement a échoué. Réessayez.');
@@ -497,9 +496,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   String? _emailValidator(String? value) {
     final requiredError = _requiredValidator(value);
     if (requiredError != null) return requiredError;
-    final valid = RegExp(
-      r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-    ).hasMatch(value!.trim());
+    final valid = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value!.trim());
     return valid ? null : 'Adresse email invalide';
   }
 
@@ -518,9 +515,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     if (_loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 48),
-        child: Center(
-          child: CircularProgressIndicator(color: WebColors.red),
-        ),
+        child: Center(child: CircularProgressIndicator(color: WebColors.red)),
       );
     }
 
@@ -552,18 +547,17 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                 ),
                 FormField<String>(
                   initialValue: _activityType,
-                  validator: (value) => value == null
-                      ? 'Sélectionnez un type d’activité'
-                      : null,
+                  validator: (value) =>
+                      value == null ? 'Sélectionnez un type d’activité' : null,
                   builder: (fieldState) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: GestureDetector(
                       key: _activityFieldKey,
                       onTap: () => _openActivityMenu(fieldState),
                       child: InputDecorator(
-                        decoration:
-                            _activityFieldDecoration('Type d’activité *')
-                            .copyWith(errorText: fieldState.errorText),
+                        decoration: _activityFieldDecoration(
+                          'Type d’activité *',
+                        ).copyWith(errorText: fieldState.errorText),
                         child: Row(
                           children: [
                             Expanded(
@@ -571,11 +565,11 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                                 _activityType == null
                                     ? 'Sélectionnez une activité'
                                     : _activityType == 'Autre' &&
-                                            _otherActivityController.text
-                                                .trim()
-                                                .isNotEmpty
-                                        ? 'Autre — ${_otherActivityController.text.trim()}'
-                                        : _activityType!,
+                                          _otherActivityController.text
+                                              .trim()
+                                              .isNotEmpty
+                                    ? 'Autre — ${_otherActivityController.text.trim()}'
+                                    : _activityType!,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: _activityType == null
@@ -703,8 +697,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
             child: FilledButton.icon(
               onPressed: _saving ? null : _save,
               style: FilledButton.styleFrom(
-                backgroundColor:
-                    _completed ? WebColors.red : WebColors.blue,
+                backgroundColor: _completed ? WebColors.red : WebColors.blue,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -728,8 +721,8 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                 _saving
                     ? 'ENREGISTREMENT…'
                     : _completed
-                        ? 'ÉTABLISSEMENT ENREGISTRÉ'
-                        : 'ENREGISTRER L’ÉTABLISSEMENT',
+                    ? 'ÉTABLISSEMENT ENREGISTRÉ'
+                    : 'ENREGISTRER L’ÉTABLISSEMENT',
                 style: const TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
@@ -823,8 +816,8 @@ class _EstablishmentCard extends StatelessWidget {
               SizedBox(
                 width: 30,
                 height: 30,
-                child: iconWidget ??
-                    Icon(icon, color: WebColors.blue, size: 30),
+                child:
+                    iconWidget ?? Icon(icon, color: WebColors.blue, size: 30),
               ),
               const SizedBox(width: 14),
               Expanded(
