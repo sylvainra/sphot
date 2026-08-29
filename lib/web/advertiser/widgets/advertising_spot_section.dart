@@ -1,10 +1,7 @@
-import 'dart:convert';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 import '../../shared/web_colors.dart';
@@ -28,15 +25,11 @@ class AdvertisingSpotSection extends StatefulWidget {
 }
 
 class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
-  final _referenceController = TextEditingController();
-
   bool _loading = true;
-  bool _searching = false;
   bool _saving = false;
   bool _completed = false;
   bool _requestExists = false;
   bool _loadingSavedPosition = false;
-  String? _resolvedAddress;
   String? _error;
 
   @override
@@ -56,12 +49,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     _completed = false;
   }
 
-  @override
-  void dispose() {
-    _referenceController.dispose();
-    super.dispose();
-  }
-
   Future<void> _initialiseSpot() async {
     final user = widget.user;
     if (user != null) {
@@ -74,17 +61,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
         _requestExists = snapshot.exists;
 
         if (data != null) {
-          final establishment = _map(data['establishment']);
           final advertisingSpot = _map(data['advertisingSpot']);
-
-          final savedReference = _read(advertisingSpot['referenceLabel']);
-          final establishmentAddress = _composeAddress(establishment);
-          _referenceController.text = savedReference.isNotEmpty
-              ? savedReference
-              : establishmentAddress;
-          _resolvedAddress = _nullableRead(
-            advertisingSpot['resolvedAddress'],
-          );
 
           final latitude = _toDouble(advertisingSpot['latitude']);
           final longitude = _toDouble(advertisingSpot['longitude']);
@@ -114,103 +91,16 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     return value is Map ? Map<String, dynamic>.from(value) : {};
   }
 
-  String _read(Object? value) => value?.toString().trim() ?? '';
-
-  String? _nullableRead(Object? value) {
-    final text = _read(value);
-    return text.isEmpty ? null : text;
-  }
-
   double? _toDouble(Object? value) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '');
-  }
-
-  String _composeAddress(Map<String, dynamic> establishment) {
-    return [
-      _read(establishment['businessName']),
-      _read(establishment['address']),
-      _read(establishment['addressComplement']),
-      [
-        _read(establishment['postalCode']),
-        _read(establishment['city']),
-      ].where((part) => part.isNotEmpty).join(' '),
-      _read(establishment['country']),
-    ].where((part) => part.isNotEmpty).join(', ');
-  }
-
-  void _markAsModified(String _) {
-    if (_completed) setState(() => _completed = false);
-  }
-
-  Future<void> _searchReference() async {
-    final query = _referenceController.text.trim();
-    if (query.isEmpty) {
-      setState(() => _error = 'Saisissez une adresse, une commune ou un lieu.');
-      return;
-    }
-
-    setState(() {
-      _searching = true;
-      _error = null;
-    });
-
-    try {
-      final uri = Uri.https(
-        'nominatim.openstreetmap.org',
-        '/search',
-        {
-          'q': query,
-          'format': 'json',
-          'limit': '1',
-          'countrycodes': 'fr',
-        },
-      );
-      final response = await http.get(
-        uri,
-        headers: const {'User-Agent': 'SPHOT advertiser portal'},
-      );
-      if (response.statusCode != 200) {
-        throw Exception('Erreur géocodage ${response.statusCode}');
-      }
-
-      final results = jsonDecode(response.body) as List<dynamic>;
-      if (results.isEmpty) {
-        if (!mounted) return;
-        setState(() => _error = 'Lieu introuvable. Précisez votre recherche.');
-        return;
-      }
-
-      final result = Map<String, dynamic>.from(results.first as Map);
-      final latitude = double.tryParse(result['lat'].toString());
-      final longitude = double.tryParse(result['lon'].toString());
-      if (latitude == null || longitude == null) {
-        throw Exception('Coordonnées invalides');
-      }
-
-      final point = LatLng(latitude, longitude);
-      if (!mounted) return;
-      setState(() {
-        _resolvedAddress = _read(result['display_name']);
-        _completed = false;
-      });
-      widget.onPositionChanged(point, centerMap: true);
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Impossible de localiser ce lieu pour le moment.';
-      });
-      debugPrint('Localisation SPHOT publicitaire impossible : $error');
-    } finally {
-      if (mounted) setState(() => _searching = false);
-    }
   }
 
   Future<void> _save() async {
     final position = widget.position;
     if (position == null) {
       setState(() {
-        _error = 'Recherchez un lieu ou cliquez sur la carte pour le positionner.';
+        _error = 'Cliquez sur la carte pour positionner le SPHOT publicitaire.';
       });
       return;
     }
@@ -237,8 +127,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           'uid': user.uid,
           'advertisingSpotCompleted': true,
           'advertisingSpot': <String, Object?>{
-            'referenceLabel': _referenceController.text.trim(),
-            'resolvedAddress': _resolvedAddress,
             'latitude': position.latitude,
             'longitude': position.longitude,
             'confirmedAt': FieldValue.serverTimestamp(),
@@ -279,83 +167,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _SpotCard(
-          icon: Icons.search_rounded,
-          title: 'RECHERCHER L’ÉTABLISSEMENT',
-          status: _completed ? 'POSITION CONFIRMÉE' : 'À POSITIONNER',
-          statusColor: _completed
-              ? const Color(0xFF15803D)
-              : const Color(0xFF6B7280),
-          child: Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _referenceController,
-                      onChanged: _markAsModified,
-                      onSubmitted: (_) => _searchReference(),
-                      style: const TextStyle(
-                        color: WebColors.blue,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      decoration: _fieldDecoration(
-                        'Adresse, commune ou lieu de référence',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 50,
-                    height: 56,
-                    child: OutlinedButton(
-                      onPressed: _searching ? null : _searchReference,
-                      style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        side: const BorderSide(
-                          color: WebColors.blue,
-                          width: 2,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: _searching
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                color: WebColors.blue,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.search_rounded,
-                              color: WebColors.red,
-                              size: 27,
-                            ),
-                    ),
-                  ),
-                ],
-              ),
-              if (_resolvedAddress != null) ...[
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    _resolvedAddress!,
-                    style: const TextStyle(
-                      color: WebColors.blue,
-                      height: 1.35,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        _SpotCard(
           iconWidget: SvgPicture.asset(
             'data/icons/fire_blue_icon.svg',
             width: 30,
@@ -371,22 +182,12 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Déplacez et zoomez la grande carte, puis cliquez à l’emplacement exact de l’établissement.',
+                'Déplacez et zoomez la carte, puis cliquez à l’emplacement exact de l’établissement.',
                 style: TextStyle(
                   color: Color(0xFF4B5F97),
                   height: 1.4,
                   fontWeight: FontWeight.w700,
                 ),
-              ),
-              const SizedBox(height: 14),
-              _CoordinateLine(
-                label: 'Latitude',
-                value: position?.latitude.toStringAsFixed(6),
-              ),
-              _CoordinateLine(
-                label: 'Longitude',
-                value: position?.longitude.toStringAsFixed(6),
-                isLast: true,
               ),
             ],
           ),
@@ -440,28 +241,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       ],
     );
   }
-}
-
-InputDecoration _fieldDecoration(String label) {
-  return InputDecoration(
-    labelText: label,
-    labelStyle: const TextStyle(color: Color(0xFF4B5F97)),
-    filled: true,
-    fillColor: const Color(0xFFF8FAFC),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: WebColors.blue, width: 1.6),
-    ),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: WebColors.blue, width: 1.6),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: WebColors.blue, width: 2),
-    ),
-  );
 }
 
 class _SpotCard extends StatelessWidget {
@@ -531,53 +310,6 @@ class _SpotCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           child,
-        ],
-      ),
-    );
-  }
-}
-
-class _CoordinateLine extends StatelessWidget {
-  const _CoordinateLine({
-    required this.label,
-    required this.value,
-    this.isLast = false,
-  });
-
-  final String label;
-  final String? value;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : const Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF4B5F97),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value ?? 'Non définie',
-              style: const TextStyle(
-                color: WebColors.blue,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
         ],
       ),
     );
