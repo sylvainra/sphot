@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../models/advertising_pricing_config.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
@@ -9649,7 +9650,9 @@ _sphotWebcamUrlController.clear();
     final targetCity = _cleanText(advertiser['centerCity'] ?? 'Non renseignée');
 
     final radiusLabel = advertiser['radiusKm'] != null
-        ? '${advertiser['radiusKm']} km'
+        ? AdvertisingPricingConfig.radiusLabel(
+            _toDouble(advertiser['radiusKm']),
+          )
         : advertiser['broadcastType'] == 'national'
         ? 'National'
         : 'Non renseigné';

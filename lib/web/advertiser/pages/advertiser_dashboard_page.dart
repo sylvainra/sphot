@@ -80,6 +80,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   int _selectedIndex = 0;
   final MapController _mapController = MapController();
   LatLng? _advertisingPoint;
+  double _advertisingRadiusKm = 0;
   AdvertisingVisualData _advertisingVisual = const AdvertisingVisualData();
   DiffusionPreviewData _diffusionPreview = const DiffusionPreviewData();
 
@@ -101,6 +102,11 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   void _setAdvertisingVisual(AdvertisingVisualData visual) {
     if (!mounted) return;
     setState(() => _advertisingVisual = visual);
+  }
+
+  void _setAdvertisingRadius(double radiusKm) {
+    if (!mounted) return;
+    setState(() => _advertisingRadiusKm = radiusKm);
   }
 
   void _returnToPublicMap() {
@@ -193,6 +199,21 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.sphot.app',
             ),
+            if (_selectedIndex == 2 &&
+                _advertisingPoint != null &&
+                _advertisingRadiusKm > 0)
+              CircleLayer(
+                circles: [
+                  CircleMarker(
+                    point: _advertisingPoint!,
+                    radius: _advertisingRadiusKm * 1000,
+                    useRadiusInMeter: true,
+                    color: WebColors.red.withOpacity(0.14),
+                    borderColor: WebColors.red,
+                    borderStrokeWidth: 2,
+                  ),
+                ],
+              ),
             if (_advertisingPoint != null)
               MarkerLayer(
                 markers: [
@@ -362,8 +383,10 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             user: widget.user,
             position: _advertisingPoint,
             initialVisual: _advertisingVisual,
+            initialRadiusKm: _advertisingRadiusKm,
             onPositionChanged: _setAdvertisingPoint,
             onVisualChanged: _setAdvertisingVisual,
+            onRadiusChanged: _setAdvertisingRadius,
           ),
         ];
       case 3:

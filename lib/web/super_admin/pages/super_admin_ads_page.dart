@@ -18,6 +18,11 @@ class _SuperAdminAdsPageState extends State<SuperAdminAdsPage> {
 
   String _text(dynamic value) => (value ?? '').toString();
 
+  num _number(dynamic value) {
+    if (value is num) return value;
+    return num.tryParse(_text(value).replaceAll(',', '.')) ?? 0;
+  }
+
   String _formatDate(dynamic value) {
     if (value == null) return '—';
 
@@ -265,7 +270,7 @@ class _SuperAdminAdsPageState extends State<SuperAdminAdsPage> {
                         Text(
                           broadcastType == 'national'
                               ? 'Zone : Diffusion nationale'
-                              : 'Zone : ${_text(data['centerCity']).isEmpty ? 'Localisation carte' : _text(data['centerCity'])} • Rayon ${_text(data['radiusKm'])} km',
+                              : 'Zone : ${_text(data['centerCity']).isEmpty ? 'Localisation carte' : _text(data['centerCity'])} • ${AdvertisingPricingConfig.radiusLabel(_number(data['radiusKm']))}',
                           style: const TextStyle(
                             color: Colors.black,
                             fontWeight: FontWeight.w700,
@@ -620,7 +625,7 @@ class _AdvertisingPricingEditorState extends State<_AdvertisingPricingEditor> {
             'radiusMultipliers': radiusMultipliers,
             'nationalFlatPrices': nationalFlatPrices,
             'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+          });
       if (mounted) setState(() => _saved = true);
     } catch (error) {
       if (!mounted) return;
@@ -756,7 +761,7 @@ class _AdvertisingPricingEditorState extends State<_AdvertisingPricingEditor> {
         _group(
           title: 'COEFFICIENTS DE RAYON',
           subtitle:
-              'La grille comprend les zones resserrées de 0,5 km et 2 km.',
+              'Grille exclusive : SPHOT ONLY, 50 m, 100 m, 150 m et 200 m.',
           fields: AdvertisingPricingConfig.radiusChoices.map((radius) {
             final radiusKey = AdvertisingPricingConfig.radiusKey(radius);
             return _field(

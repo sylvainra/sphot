@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../models/advertising_pricing_config.dart';
 import '../../shared/web_colors.dart';
 import '../models/advertising_visual_data.dart';
 import '../models/diffusion_preview_data.dart';
@@ -30,7 +29,6 @@ class DiffusionSection extends StatefulWidget {
 }
 
 class _DiffusionSectionState extends State<DiffusionSection> {
-  static const _radiusChoices = AdvertisingPricingConfig.radiusChoices;
   static const _options = <_DiffusionOption>[
     _DiffusionOption(
       value: 'map',
@@ -58,7 +56,6 @@ class _DiffusionSectionState extends State<DiffusionSection> {
   bool _completed = false;
   bool _requestExists = false;
   String? _selectedValue;
-  double _radiusKm = 0.5;
   String? _savedBannerUrl;
   String _advertiserName = '';
   String? _logoUrl;
@@ -70,7 +67,6 @@ class _DiffusionSectionState extends State<DiffusionSection> {
   void initState() {
     super.initState();
     _selectedValue = _valueForPreviewType(widget.initialPreview.type);
-    _radiusKm = widget.initialPreview.radiusKm;
     _initialiseDiffusion();
   }
 
@@ -106,10 +102,6 @@ class _DiffusionSectionState extends State<DiffusionSection> {
           final savedValue = diffusion['visibilityType']?.toString();
           if (_options.any((option) => option.value == savedValue)) {
             _selectedValue = savedValue;
-          }
-          final savedRadius = _toDouble(diffusion['radiusKm']);
-          if (savedRadius != null && _radiusChoices.contains(savedRadius)) {
-            _radiusKm = savedRadius;
           }
           _savedBannerUrl = _nullableText(
             advertisingSpot['bannerUrl'] ?? diffusion['bannerUrl'],
@@ -189,7 +181,6 @@ class _DiffusionSectionState extends State<DiffusionSection> {
         logoUrl: _logoUrl,
         latitude: position?.latitude ?? _savedLatitude,
         longitude: position?.longitude ?? _savedLongitude,
-        radiusKm: _radiusKm,
       ),
     );
   }
@@ -201,15 +192,6 @@ class _DiffusionSectionState extends State<DiffusionSection> {
   void _select(String value) {
     setState(() {
       _selectedValue = value;
-      _completed = false;
-      _error = null;
-    });
-    _notifyPreview();
-  }
-
-  void _selectRadius(double radius) {
-    setState(() {
-      _radiusKm = radius;
       _completed = false;
       _error = null;
     });
@@ -260,7 +242,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
               'diffusion': <String, Object?>{
                 'visibilityType': selectedOption.value,
                 'visibilityLabel': selectedOption.label,
-                'radiusKm': _radiusKm,
+                'radiusKm': FieldValue.delete(),
                 'confirmedAt': FieldValue.serverTimestamp(),
               },
               'updatedAt': FieldValue.serverTimestamp(),
@@ -350,8 +332,6 @@ class _DiffusionSectionState extends State<DiffusionSection> {
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        _buildRadiusCard(),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 12),
@@ -400,80 +380,6 @@ class _DiffusionSectionState extends State<DiffusionSection> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildRadiusCard() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFCBD5E1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.radar_rounded, color: WebColors.blue, size: 30),
-              SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'RAYON D’ACTION',
-                      style: TextStyle(
-                        color: WebColors.blue,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'AUTOUR DE VOTRE SPHOT PUBLICITAIRE',
-                      style: TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _radiusChoices.map((radius) {
-              final selected = _radiusKm == radius;
-              return OutlinedButton(
-                onPressed: () => _selectRadius(radius),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: selected ? WebColors.red : WebColors.blue,
-                  backgroundColor: selected
-                      ? WebColors.red.withOpacity(0.045)
-                      : Colors.white,
-                  side: BorderSide(
-                    color: selected ? WebColors.red : WebColors.blue,
-                    width: selected ? 2 : 1.3,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
-                child: Text(
-                  AdvertisingPricingConfig.radiusLabel(radius),
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
     );
   }
 }

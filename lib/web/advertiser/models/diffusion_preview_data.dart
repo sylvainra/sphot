@@ -11,7 +11,6 @@ class DiffusionPreviewData {
     this.logoUrl,
     this.latitude,
     this.longitude,
-    this.radiusKm = 0.5,
   });
 
   final DiffusionPreviewType? type;
@@ -21,7 +20,6 @@ class DiffusionPreviewData {
   final String? logoUrl;
   final double? latitude;
   final double? longitude;
-  final double radiusKm;
 
   bool get hasSelection => type != null;
 }

@@ -3,7 +3,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../models/advertising_pricing_config.dart';
 import '../../shared/web_colors.dart';
 import '../models/diffusion_preview_data.dart';
 
@@ -64,8 +63,7 @@ class DiffusionCentralPreview extends StatelessWidget {
                           if (data.type == DiffusionPreviewType.map || isPack)
                             _PreviewColumn(
                               label: 'CARTE SPHOT',
-                              detail:
-                                  'EMPLACEMENT DÉFINI • RAYON ${AdvertisingPricingConfig.radiusLabel(data.radiusKm).toUpperCase()}',
+                              detail: 'EMPLACEMENT DÉFINI',
                               phoneWidth: phoneWidth,
                               child: _MapPhonePreview(data: data),
                             ),
@@ -308,17 +306,16 @@ class _MapPhonePreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final center = LatLng(data.latitude ?? 46.3445, data.longitude ?? -1.4376);
-    final radiusKm = data.radiusKm;
 
     return Stack(
       fit: StackFit.expand,
       children: [
         IgnorePointer(
           child: FlutterMap(
-            key: ValueKey('${center.latitude}:${center.longitude}:$radiusKm'),
+            key: ValueKey('${center.latitude}:${center.longitude}'),
             options: MapOptions(
               initialCenter: center,
-              initialZoom: _zoomForRadius(radiusKm),
+              initialZoom: 15.5,
               interactionOptions: const InteractionOptions(
                 flags: InteractiveFlag.none,
               ),
@@ -327,18 +324,6 @@ class _MapPhonePreview extends StatelessWidget {
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.sphot.app',
-              ),
-              CircleLayer(
-                circles: [
-                  CircleMarker(
-                    point: center,
-                    radius: radiusKm * 1000,
-                    useRadiusInMeter: true,
-                    color: WebColors.red.withOpacity(0.14),
-                    borderColor: WebColors.red,
-                    borderStrokeWidth: 2,
-                  ),
-                ],
               ),
               MarkerLayer(
                 markers: [
@@ -420,16 +405,6 @@ class _MapPhonePreview extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  double _zoomForRadius(double radiusKm) {
-    if (radiusKm >= 100) return 6.4;
-    if (radiusKm >= 50) return 7.4;
-    if (radiusKm >= 20) return 8.7;
-    if (radiusKm >= 10) return 9.7;
-    if (radiusKm >= 5) return 10.7;
-    if (radiusKm >= 2) return 12;
-    return 13.7;
   }
 }
 

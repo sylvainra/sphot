@@ -32,8 +32,10 @@ commits servent de points de restauration et ne doivent pas remplacer une
 - La diffusion publicitaire locale repose sur un établissement positionné sur
   la carte, un rayon et une période.
 - Un emplacement publicitaire donné est réservé à un seul annonceur pendant
-  une même période. La rotation simultanée de plusieurs annonceurs n'est pas la
-  règle commerciale retenue.
+  une même période. L'alternance ou la rotation simultanée de plusieurs
+  annonceurs sur cette zone est obsolète et ne doit pas être appliquée.
+- Les zones locales proposées sont exclusivement : SPHOT ONLY, 50 m, 100 m,
+  150 m et 200 m autour du SPHOT publicitaire.
 - La facturation devra anticiper la facturation électronique française et
   distinguer les références administratives, devis, commandes et factures.
 

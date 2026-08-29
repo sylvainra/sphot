@@ -94,7 +94,7 @@ DateTime get _campaignEndDate {
 
   return _campaignStartDate;
 }
-  double _radiusKm = 0.5;
+  double _radiusKm = 0;
   bool _isSubmitting = false;
   bool _orderSent = false;
 
@@ -1360,18 +1360,19 @@ Text(
                           'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.example.bathing_spots_app',
                     ),
-                    CircleLayer(
-                      circles: [
-                        CircleMarker(
+                    if (_radiusKm > 0)
+                      CircleLayer(
+                        circles: [
+                          CircleMarker(
   point: _circleCenter,
-  radius: _radiusKm == 0 ? 1 : _radiusKm * 1000,
+  radius: _radiusKm * 1000,
   useRadiusInMeter: true,
   color: redRefColor.withOpacity(0.12),
   borderColor: redRefColor,
   borderStrokeWidth: 2,
 ),
-                      ],
-                    ),
+                        ],
+                      ),
                     MarkerLayer(
   markers: [
     Marker(
@@ -1429,7 +1430,7 @@ Text(
               ),
             ),
             child: Text(
-              '$radius km',
+              AdvertisingPricingConfig.radiusLabel(radius),
               style: const TextStyle(fontWeight: FontWeight.w900),
             ),
           );
@@ -1779,7 +1780,7 @@ Text(
                 : Icons.location_on_rounded,
             _broadcastType == 'national'
                 ? 'Diffusion nationale'
-                : '${_centerCityController.text.trim().isEmpty ? 'Épicentre à renseigner' : _centerCityController.text.trim()} • Rayon $_radiusKm km',
+                : '${_centerCityController.text.trim().isEmpty ? 'Épicentre à renseigner' : _centerCityController.text.trim()} • ${AdvertisingPricingConfig.radiusLabel(_radiusKm)}',
           ),
           _summaryLine(Icons.calendar_month_rounded, _duration),
           _summaryLine(Icons.category_rounded, _category),

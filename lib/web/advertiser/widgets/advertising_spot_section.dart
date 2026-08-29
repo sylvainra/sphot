@@ -8,6 +8,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../models/advertising_pricing_config.dart';
 import '../../shared/web_colors.dart';
 import '../models/advertising_visual_data.dart';
 
@@ -17,16 +18,20 @@ class AdvertisingSpotSection extends StatefulWidget {
     required this.user,
     required this.position,
     required this.initialVisual,
+    required this.initialRadiusKm,
     required this.onPositionChanged,
     required this.onVisualChanged,
+    required this.onRadiusChanged,
   });
 
   final User? user;
   final LatLng? position;
   final AdvertisingVisualData initialVisual;
+  final double initialRadiusKm;
   final void Function(LatLng point, {required bool centerMap})
   onPositionChanged;
   final ValueChanged<AdvertisingVisualData> onVisualChanged;
+  final ValueChanged<double> onRadiusChanged;
 
   @override
   State<AdvertisingSpotSection> createState() => _AdvertisingSpotSectionState();
@@ -38,6 +43,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   bool _completed = false;
   bool _requestExists = false;
   bool _loadingSavedPosition = false;
+  double _radiusKm = 0;
   Uint8List? _bannerBytes;
   String? _bannerUrl;
   String? _bannerFileName;
@@ -51,6 +57,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   @override
   void initState() {
     super.initState();
+    _radiusKm = widget.initialRadiusKm;
     _restoreInitialVisual();
     _initialiseSpot();
   }
@@ -95,6 +102,13 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
 
           final latitude = _toDouble(advertisingSpot['latitude']);
           final longitude = _toDouble(advertisingSpot['longitude']);
+          final savedRadius = _toDouble(
+            advertisingSpot['radiusKm'] ?? legacyDiffusion['radiusKm'],
+          );
+          if (savedRadius != null &&
+              AdvertisingPricingConfig.radiusChoices.contains(savedRadius)) {
+            _radiusKm = savedRadius;
+          }
           if (latitude != null && longitude != null) {
             final savedPoint = LatLng(latitude, longitude);
             _loadingSavedPosition = true;
@@ -148,7 +162,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     if (!mounted) return;
     setState(() => _loading = false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _notifyVisual();
+      if (!mounted) return;
+      _notifyVisual();
+      widget.onRadiusChanged(_radiusKm);
     });
   }
 
@@ -184,6 +200,15 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
         height: _bannerHeight,
       ),
     );
+  }
+
+  void _selectRadius(double radiusKm) {
+    setState(() {
+      _radiusKm = radiusKm;
+      _completed = false;
+      _error = null;
+    });
+    widget.onRadiusChanged(radiusKm);
   }
 
   Future<void> _pickBanner() async {
@@ -326,6 +351,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               'advertisingSpot': <String, Object?>{
                 'latitude': position.latitude,
                 'longitude': position.longitude,
+                'radiusKm': _radiusKm,
                 'bannerUrl': bannerUrl,
                 'bannerFileName': _bannerFileName,
                 'bannerExtension': _bannerExtension,
@@ -335,6 +361,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                 'bannerHeight': _bannerHeight,
                 'confirmedAt': FieldValue.serverTimestamp(),
               },
+              'diffusion': <String, Object?>{'radiusKm': FieldValue.delete()},
               'updatedAt': FieldValue.serverTimestamp(),
             }, SetOptions(merge: true));
         _requestExists = true;
@@ -471,6 +498,81 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     );
   }
 
+  Widget _buildRadiusCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.radar_rounded, color: WebColors.blue, size: 30),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'RAYON D’ACTION',
+                      style: TextStyle(
+                        color: WebColors.blue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'ZONE EXCLUSIVE AUTOUR DE VOTRE SPHOT',
+                      style: TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: AdvertisingPricingConfig.radiusChoices.map((radius) {
+              final selected = _radiusKm == radius;
+              return OutlinedButton(
+                onPressed: () => _selectRadius(radius),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: selected ? WebColors.red : WebColors.blue,
+                  backgroundColor: selected
+                      ? WebColors.red.withOpacity(0.045)
+                      : Colors.white,
+                  side: BorderSide(
+                    color: selected ? WebColors.red : WebColors.blue,
+                    width: selected ? 2 : 1.3,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                child: Text(
+                  AdvertisingPricingConfig.radiusLabel(radius),
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -512,6 +614,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           ),
         ),
         _buildBannerCard(),
+        _buildRadiusCard(),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),

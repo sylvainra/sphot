@@ -15,7 +15,7 @@ class AdvertisingPricingConfig {
     'pack': 'PACK VISIBILITÉ TOTALE',
   };
 
-  static const radiusChoices = <double>[0.5, 2, 5, 10, 20, 50, 100];
+  static const radiusChoices = <double>[0, 0.05, 0.1, 0.15, 0.2];
 
   static Map<String, dynamic> defaults() {
     return {
@@ -32,13 +32,11 @@ class AdvertisingPricingConfig {
         'pack': 2.5,
       },
       'radiusMultipliers': <String, num>{
-        '0.5': 1,
-        '2': 1.5,
-        '5': 2,
-        '10': 2.8,
-        '20': 3.8,
-        '50': 5.5,
-        '100': 8,
+        '0': 1,
+        '0.05': 1.15,
+        '0.1': 1.3,
+        '0.15': 1.45,
+        '0.2': 1.6,
       },
       'nationalFlatPrices': <String, Map<String, num>>{
         'map': <String, num>{
@@ -74,6 +72,9 @@ class AdvertisingPricingConfig {
   }
 
   static String radiusLabel(num radiusKm) {
-    return '${radiusKey(radiusKm).replaceAll('.', ',')} km';
+    final value = radiusKm.toDouble();
+    if (value <= 0) return 'SPHOT ONLY';
+    if (value < 1) return '${(value * 1000).round()} m';
+    return '${radiusKey(value).replaceAll('.', ',')} km';
   }
 }
