@@ -9,11 +9,13 @@ import '../../../widgets/adaptive_asset_image.dart';
 import '../../shared/web_colors.dart';
 import '../models/advertising_visual_data.dart';
 import '../models/diffusion_preview_data.dart';
+import '../models/planning_data.dart';
 import '../widgets/advertising_spot_section.dart';
 import '../widgets/diffusion_central_preview.dart';
 import '../widgets/diffusion_section.dart';
 import '../widgets/establishment_section.dart';
 import '../widgets/identity_professional_section.dart';
+import '../widgets/planning_section.dart';
 
 class AdvertiserDashboardPage extends StatefulWidget {
   const AdvertiserDashboardPage({
@@ -83,6 +85,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   double _advertisingRadiusKm = 0;
   AdvertisingVisualData _advertisingVisual = const AdvertisingVisualData();
   DiffusionPreviewData _diffusionPreview = const DiffusionPreviewData();
+  PlanningData _planningData = const PlanningData();
 
   void _setAdvertisingPoint(LatLng point, {required bool centerMap}) {
     setState(() => _advertisingPoint = point);
@@ -107,6 +110,11 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   void _setAdvertisingRadius(double radiusKm) {
     if (!mounted) return;
     setState(() => _advertisingRadiusKm = radiusKm);
+  }
+
+  void _setPlanningData(PlanningData planning) {
+    if (!mounted) return;
+    setState(() => _planningData = planning);
   }
 
   void _returnToPublicMap() {
@@ -400,19 +408,15 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           ),
         ];
       case 4:
-        return const [
-          _StatusCard(
-            icon: Icons.event_available_outlined,
-            title: 'RÉSERVATION EXCLUSIVE',
-            description: 'Une seule campagne peut occuper un emplacement donné pendant une même période.',
-            status: 'RÈGLE COMMERCIALE ACTIVE',
-            statusColor: Color(0xFF15803D),
-          ),
-          _StatusCard(
-            icon: Icons.radar_outlined,
-            title: 'RAYONNEMENT',
-            description: 'La disponibilité sera calculée selon l’épicentre, le rayon, les SPHOTS couverts et les dates.',
-            status: 'À CONFIGURER',
+        return [
+          PlanningSection(
+            user: widget.user,
+            advertisingPosition: _advertisingPoint,
+            radiusKm: _advertisingRadiusKm,
+            hasDiffusionSelection: _diffusionPreview.hasSelection,
+            developmentBypass: widget.developmentBypass,
+            initialPlanning: _planningData,
+            onPlanningChanged: _setPlanningData,
           ),
         ];
       case 6:

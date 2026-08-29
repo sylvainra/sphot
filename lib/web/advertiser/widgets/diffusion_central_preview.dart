@@ -395,7 +395,7 @@ class _MapPhonePreview extends StatelessWidget {
           left: 10,
           right: 10,
           bottom: 54,
-          child: _AdvertisingBanner(data: data, compact: true),
+          child: _AdvertisingBanner(data: data),
         ),
         const Positioned(
           left: 8,
@@ -641,15 +641,14 @@ class _ForecastDay extends StatelessWidget {
 }
 
 class _AdvertisingBanner extends StatelessWidget {
-  const _AdvertisingBanner({required this.data, this.compact = false});
+  const _AdvertisingBanner({required this.data});
 
   final DiffusionPreviewData data;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
-      aspectRatio: compact ? 3 : 2,
+      aspectRatio: 2,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(11),
         child: DecoratedBox(
@@ -666,14 +665,14 @@ class _AdvertisingBanner extends StatelessWidget {
   Widget _bannerContent() {
     final bytes = data.bannerBytes;
     if (bytes != null) {
-      return Image.memory(bytes, fit: BoxFit.cover);
+      return Image.memory(bytes, fit: BoxFit.contain);
     }
 
     final bannerUrl = data.bannerUrl?.trim() ?? '';
     if (bannerUrl.isNotEmpty) {
       return Image.network(
         bannerUrl,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         errorBuilder: (_, __, ___) => _BannerPlaceholder(data: data),
       );
     }
