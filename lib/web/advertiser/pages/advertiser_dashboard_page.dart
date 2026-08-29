@@ -51,7 +51,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'DIFFUSION',
       Icons.campaign_outlined,
-      'Choisissez la carte, la fiche SPHOT ou la visibilité totale.',
+      'Choisissez la CARTE SPHOT, la FICHE SPHOT PREMIUM '
+          'ou le PACK VISIBILITÉ TOTALE.',
     ),
     _AdvertiserSection(
       'PLANIFICATION',
@@ -165,7 +166,6 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     if (_selectedIndex == 3 && _diffusionPreview.hasSelection) {
       return DiffusionCentralPreview(
         data: _diffusionPreview,
-        onBack: _returnToPublicMap,
       );
     }
 
@@ -370,6 +370,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
         return [
           DiffusionSection(
             user: widget.user,
+            advertisingPosition: _advertisingPoint,
             onPreviewChanged: _setDiffusionPreview,
           ),
         ];
