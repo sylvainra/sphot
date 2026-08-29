@@ -481,6 +481,10 @@ class _ProfileField extends StatelessWidget {
         keyboardType: keyboardType,
         validator: validator,
         onChanged: onChanged,
+        style: const TextStyle(
+          color: WebColors.blue,
+          fontWeight: FontWeight.w700,
+        ),
         autovalidateMode: AutovalidateMode.onUserInteraction,
         decoration: InputDecoration(
           labelText: label,
