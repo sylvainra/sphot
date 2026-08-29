@@ -8,6 +8,7 @@ import '../../../map/map_page.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../../shared/web_colors.dart';
 import '../widgets/advertising_spot_section.dart';
+import '../widgets/diffusion_section.dart';
 import '../widgets/establishment_section.dart';
 import '../widgets/identity_professional_section.dart';
 
@@ -347,6 +348,10 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             position: _advertisingPoint,
             onPositionChanged: _setAdvertisingPoint,
           ),
+        ];
+      case 3:
+        return [
+          DiffusionSection(user: widget.user),
         ];
       case 4:
         return const [
