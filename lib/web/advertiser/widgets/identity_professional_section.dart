@@ -296,7 +296,9 @@ class _IdentityProfessionalSectionState
                           )
                         : const Icon(Icons.save_outlined),
                     label: Text(
-                      _saving ? 'ENREGISTREMENT…' : 'ENREGISTRER',
+                      _saving
+                          ? 'ENREGISTREMENT…'
+                          : 'ENREGISTRER L’IDENTITÉ PROFESSIONNELLE',
                       style: const TextStyle(fontWeight: FontWeight.w900),
                     ),
                   ),
