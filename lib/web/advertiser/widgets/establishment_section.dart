@@ -52,7 +52,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   final _countryController = TextEditingController(text: 'France');
   final _publicPhoneController = TextEditingController();
   final _publicEmailController = TextEditingController();
-  final _websiteController = TextEditingController();
 
   String? _activityType;
   final _activityFieldKey = GlobalKey();
@@ -93,7 +92,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     _countryController.dispose();
     _publicPhoneController.dispose();
     _publicEmailController.dispose();
-    _websiteController.dispose();
     super.dispose();
   }
 
@@ -142,10 +140,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
           _publicEmailController.text = _read(
             establishment['publicEmail'],
             data['publicEmail'],
-          );
-          _websiteController.text = _read(
-            establishment['websiteUrl'],
-            data['websiteUrl'],
           );
           final savedActivity = _read(establishment['activityType']);
           if (_activityTypes.contains(savedActivity)) {
@@ -435,7 +429,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
       final businessName = _businessNameController.text.trim();
       final publicPhone = _publicPhoneController.text.trim();
       final publicEmail = _publicEmailController.text.trim();
-      final websiteUrl = _websiteController.text.trim();
 
       if (requestId != null) {
         final creationData = _requestExists
@@ -457,7 +450,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
               'siren': siren,
               'phone': publicPhone,
               'publicEmail': publicEmail,
-              'websiteUrl': websiteUrl,
               'establishmentCompleted': true,
               'establishment': <String, Object?>{
                 'legalName': legalName,
@@ -475,7 +467,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                 'country': _countryController.text.trim(),
                 'publicPhone': publicPhone,
                 'publicEmail': publicEmail,
-                'websiteUrl': websiteUrl,
                 'updatedAt': FieldValue.serverTimestamp(),
               },
               'updatedAt': FieldValue.serverTimestamp(),
@@ -514,16 +505,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     return valid ? null : 'Adresse email invalide';
   }
 
-  String? _websiteValidator(String? value) {
-    final text = value?.trim() ?? '';
-    if (text.isEmpty) return null;
-    final candidate = text.contains('://') ? text : 'https://$text';
-    final uri = Uri.tryParse(candidate);
-    return uri != null && uri.host.contains('.')
-        ? null
-        : 'Adresse de site invalide';
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -539,7 +520,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
         if (widget.readOnly)
           _EstablishmentCard(
             icon: Icons.lock_outline_rounded,
-            title: 'ÉTABLISSEMENT VALIDÉ PAR SPHOT',
+            title: 'ENTREPRISE VALIDÉE PAR SPHOT',
             status: 'LECTURE SEULE',
             statusColor: const Color(0xFF15803D),
             child: const Text(
@@ -560,7 +541,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
               children: [
                 _EstablishmentCard(
                   icon: Icons.storefront_outlined,
-                  title: 'INFORMATIONS DE L’ÉTABLISSEMENT',
+                  title: 'INFORMATIONS DE L’ENTREPRISE',
                   status: _completed ? 'COMPLET' : 'À COMPLÉTER',
                   statusColor: _completed
                       ? const Color(0xFF15803D)
@@ -652,8 +633,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                     height: 30,
                     fit: BoxFit.contain,
                   ),
-                  title: 'ADRESSE DE L’ÉTABLISSEMENT',
-                  status: 'RÉSERVÉE AU CONTRÔLE SPHOT',
+                  title: 'ADRESSE DE L’ENTREPRISE',
                   child: Column(
                     children: [
                       _EstablishmentField(
@@ -684,22 +664,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                         label: 'Pays *',
                         validator: _requiredValidator,
                         onChanged: _markAsModified,
-                      ),
-                    ],
-                  ),
-                ),
-                _EstablishmentCard(
-                  icon: Icons.public_outlined,
-                  title: 'PRÉSENCE EN LIGNE',
-                  status: 'INFORMATION DE CONTRÔLE',
-                  child: Column(
-                    children: [
-                      _EstablishmentField(
-                        controller: _websiteController,
-                        label: 'Site Internet',
-                        validator: _websiteValidator,
-                        onChanged: _markAsModified,
-                        keyboardType: TextInputType.url,
                       ),
                     ],
                   ),
@@ -747,8 +711,8 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                         _saving
                             ? 'ENREGISTREMENT…'
                             : _completed
-                            ? 'ÉTABLISSEMENT ENREGISTRÉ'
-                            : 'ENREGISTRER L’ÉTABLISSEMENT',
+                            ? 'ENTREPRISE ENREGISTRÉE'
+                            : 'ENREGISTRER L’ENTREPRISE',
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ),
@@ -814,7 +778,7 @@ class _EstablishmentCard extends StatelessWidget {
     this.icon,
     this.iconWidget,
     required this.title,
-    required this.status,
+    this.status,
     required this.child,
     this.statusColor = const Color(0xFF6B7280),
   });
@@ -822,7 +786,7 @@ class _EstablishmentCard extends StatelessWidget {
   final IconData? icon;
   final Widget? iconWidget;
   final String title;
-  final String status;
+  final String? status;
   final Widget child;
   final Color statusColor;
 
@@ -861,14 +825,16 @@ class _EstablishmentCard extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      status,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontWeight: FontWeight.w900,
+                    if (status != null && status!.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        status!,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),

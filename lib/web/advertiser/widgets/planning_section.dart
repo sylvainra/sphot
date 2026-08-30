@@ -22,6 +22,7 @@ class PlanningSection extends StatefulWidget {
     required this.initialPlanning,
     required this.onPlanningChanged,
     this.requestedScope = 'local',
+    this.activityType = '',
   });
 
   final User? user;
@@ -34,6 +35,7 @@ class PlanningSection extends StatefulWidget {
   final PlanningData initialPlanning;
   final ValueChanged<PlanningData> onPlanningChanged;
   final String requestedScope;
+  final String activityType;
 
   @override
   State<PlanningSection> createState() => _PlanningSectionState();
@@ -76,7 +78,9 @@ class _PlanningSectionState extends State<PlanningSection> {
   void didUpdateWidget(covariant PlanningSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.advertisingPosition != widget.advertisingPosition ||
-        oldWidget.radiusKm != widget.radiusKm) {
+        oldWidget.radiusKm != widget.radiusKm ||
+        oldWidget.requestedScope != widget.requestedScope ||
+        oldWidget.activityType != widget.activityType) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _refreshReservations();
       });
@@ -97,6 +101,10 @@ class _PlanningSectionState extends State<PlanningSection> {
   double? _toDouble(dynamic value) {
     if (value is num) return value.toDouble();
     return double.tryParse((value ?? '').toString().replaceAll(',', '.'));
+  }
+
+  String _normaliseActivity(Object? value) {
+    return (value ?? '').toString().trim().toLowerCase();
   }
 
   DateTime? _toDate(dynamic value) {
@@ -221,6 +229,7 @@ class _PlanningSectionState extends State<PlanningSection> {
     final nationalScope =
         widget.requestedScope == 'national' ||
         widget.requestedScope == 'local_and_national';
+    final requestedActivity = _normaliseActivity(widget.activityType);
     for (final document in snapshot.docs) {
       final data = document.data();
       final status = (data['status'] ?? '').toString().toLowerCase();
@@ -231,6 +240,14 @@ class _PlanningSectionState extends State<PlanningSection> {
         'finished',
         'rejected',
       }.contains(status)) {
+        continue;
+      }
+      final existingActivity = _normaliseActivity(
+        data['categoryLabel'] ?? data['activityType'],
+      );
+      if (requestedActivity.isNotEmpty &&
+          existingActivity.isNotEmpty &&
+          requestedActivity != existingActivity) {
         continue;
       }
       final existingScope = (data['broadcastType'] ?? 'local').toString();
@@ -413,6 +430,7 @@ class _PlanningSectionState extends State<PlanningSection> {
                 'exclusiveReservation': true,
                 'availabilityStatus': 'available',
                 'requestedScope': widget.requestedScope,
+                'activityType': widget.activityType,
                 'radiusKm': widget.radiusKm,
                 'confirmedAt': FieldValue.serverTimestamp(),
               },
@@ -616,8 +634,8 @@ class _PlanningSectionState extends State<PlanningSection> {
                     const SizedBox(height: 7),
                     Text(
                       widget.requestedScope == 'national'
-                          ? 'Une seule campagne nationale peut être active pendant la période choisie. Selon les dates disponibles, votre SPHOT publicitaire bénéficie d’une exclusivité d’affichage nationale pendant toute la période réservée.'
-                          : 'Une seule campagne publicitaire peut être active dans la portée et durant la période choisies. Selon les dates disponibles, votre SPHOT publicitaire bénéficie ainsi d’une exclusivité d’affichage dans toute la zone sélectionnée et pendant toute la période réservée.',
+                          ? 'Une seule campagne de la même catégorie d’activité peut être active à l’échelle nationale pendant la période choisie. Votre SPHOT publicitaire bénéficie ainsi d’une exclusivité d’affichage dans sa catégorie pendant toute la période réservée.'
+                          : 'Une seule campagne de la même catégorie d’activité peut être active dans le rayon et durant la période choisis. Votre SPHOT publicitaire bénéficie ainsi d’une exclusivité d’affichage dans sa catégorie, dans toute la zone sélectionnée et pendant toute la période réservée.',
                       style: const TextStyle(
                         color: Color(0xFF4B5F97),
                         height: 1.4,

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -38,16 +39,10 @@ class AdvertiserApplicationSection extends StatefulWidget {
 
 class _AdvertiserApplicationSectionState
     extends State<AdvertiserApplicationSection> {
-  static const _scopes = <String, String>{
-    'local': 'LOCAL',
-    'national': 'NATIONAL',
-    'local_and_national': 'LOCAL ET NATIONAL',
-  };
-
   final _destinationController = TextEditingController();
   bool _loading = true;
   bool _submitting = false;
-  String _scope = 'local';
+  bool _submitted = false;
   Uint8List? _bannerBytes;
   String? _bannerUrl;
   String? _bannerFileName;
@@ -61,14 +56,29 @@ class _AdvertiserApplicationSectionState
 
   bool get _locked {
     final status = widget.requestStatus.toLowerCase();
-    return status == 'pending' || status == 'approved';
+    return _submitted || status == 'pending' || status == 'approved';
   }
+
+  bool get _requestTransmitted =>
+      _submitted || widget.requestStatus.toLowerCase() == 'pending';
 
   @override
   void initState() {
     super.initState();
     _restoreVisual(widget.initialVisual);
     _initialise();
+  }
+
+  @override
+  void didUpdateWidget(covariant AdvertiserApplicationSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final status = widget.requestStatus.toLowerCase();
+    if (oldWidget.requestStatus != widget.requestStatus &&
+        status != 'pending' &&
+        status != 'approved') {
+      _submitted = false;
+      _success = null;
+    }
   }
 
   @override
@@ -103,10 +113,6 @@ class _AdvertiserApplicationSectionState
           final visual = _map(
             data['proposedVisual'] ?? application['proposedVisual'],
           );
-          final savedScope = _text(
-            application['scope'] ?? data['requestedScope'],
-          );
-          if (_scopes.containsKey(savedScope)) _scope = savedScope;
           _destinationController.text = _text(
             application['destinationUrl'] ?? data['destinationUrl'],
           );
@@ -321,7 +327,7 @@ class _AdvertiserApplicationSectionState
       await reference.set({
         'uid': requestId,
         'status': 'pending',
-        'requestedScope': _scope,
+        'requestedScope': FieldValue.delete(),
         'destinationUrl': normalizedDestination,
         'centerLat': FieldValue.delete(),
         'centerLng': FieldValue.delete(),
@@ -341,7 +347,6 @@ class _AdvertiserApplicationSectionState
         },
         'bannerUrl': bannerUrl,
         'application': <String, Object?>{
-          'scope': _scope,
           'destinationUrl': normalizedDestination,
           'submittedAt': FieldValue.serverTimestamp(),
         },
@@ -364,6 +369,7 @@ class _AdvertiserApplicationSectionState
       setState(() {
         _bannerUrl = bannerUrl;
         _bannerBytes = null;
+        _submitted = true;
         _success = 'Votre demande a été transmise au Super Admin.';
       });
       _notifyVisual();
@@ -380,10 +386,12 @@ class _AdvertiserApplicationSectionState
   }
 
   Widget _card({
-    required IconData icon,
+    IconData? icon,
+    Widget? iconWidget,
     required String title,
     required Widget child,
     String? subtitle,
+    Color subtitleColor = const Color(0xFF6B7280),
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -399,7 +407,12 @@ class _AdvertiserApplicationSectionState
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: WebColors.blue, size: 30),
+              SizedBox(
+                width: 30,
+                height: 30,
+                child:
+                    iconWidget ?? Icon(icon, color: WebColors.blue, size: 30),
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -417,8 +430,8 @@ class _AdvertiserApplicationSectionState
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        style: const TextStyle(
-                          color: Color(0xFF6B7280),
+                        style: TextStyle(
+                          color: subtitleColor,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -436,7 +449,9 @@ class _AdvertiserApplicationSectionState
   }
 
   Widget _statusCard() {
-    final status = widget.requestStatus.toLowerCase();
+    final status = _requestTransmitted
+        ? 'pending'
+        : widget.requestStatus.toLowerCase();
     final (label, color, message) = switch (status) {
       'pending' => (
         'EN COURS DE TRAITEMENT',
@@ -459,7 +474,7 @@ class _AdvertiserApplicationSectionState
         'Vos identifiants de connexion ont été envoyés par email. Utilisez-les pour ouvrir votre espace annonceur complet.',
       ),
       _ => (
-        'BROUILLON',
+        'DEMANDE À COMPLÉTER',
         const Color(0xFF6B7280),
         'Complétez les deux étapes avant de transmettre votre demande.',
       ),
@@ -483,13 +498,21 @@ class _AdvertiserApplicationSectionState
 
   Widget _positionCard() {
     return _card(
-      icon: Icons.location_on_outlined,
-      title: 'POSITION DE L’ANNONCEUR',
+      iconWidget: SvgPicture.asset(
+        'data/icons/fire_red_icon.svg',
+        width: 30,
+        height: 30,
+        fit: BoxFit.contain,
+      ),
+      title: 'POSITION DE VOTRE ENTREPRISE',
       subtitle: widget.position == null
           ? 'AUCUNE POSITION'
           : 'POSITION DÉFINIE',
+      subtitleColor: widget.position == null
+          ? const Color(0xFF6B7280)
+          : WebColors.red,
       child: Text(
-        _locked ? 'La position transmise est en cours de contrôle.' : 'Déplacez et zoomez la carte, puis cliquez à l’emplacement exact de votre établissement.',
+        _locked ? 'La position de votre entreprise est en cours de contrôle.' : 'Déplacez et zoomez la carte, puis cliquez à l’emplacement exact de votre entreprise ; votre SPHOT sera ainsi défini.',
         style: const TextStyle(
           color: Color(0xFF4B5F97),
           fontWeight: FontWeight.w700,
@@ -499,55 +522,7 @@ class _AdvertiserApplicationSectionState
     );
   }
 
-  Widget _scopeCard() {
-    return _card(
-      icon: Icons.public_rounded,
-      title: 'PORTÉE SOUHAITÉE',
-      subtitle: 'INDIQUEZ VOTRE OBJECTIF AU SUPER ADMIN',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _scopes.entries.map((entry) {
-              final selected = _scope == entry.key;
-              return ChoiceChip(
-                selected: selected,
-                onSelected: _locked
-                    ? null
-                    : (_) => setState(() => _scope = entry.key),
-                selectedColor: WebColors.red.withOpacity(0.10),
-                side: BorderSide(
-                  color: selected ? WebColors.red : WebColors.blue,
-                  width: selected ? 2 : 1.3,
-                ),
-                label: Text(
-                  entry.value,
-                  style: TextStyle(
-                    color: selected ? WebColors.red : WebColors.blue,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            'Une campagne locale apparaît lorsque l’utilisateur explore la zone du SPHOT. Une demande nationale signale une présence souhaitée à l’échelle du pays ; sa diffusion et sa tarification seront validées par SPHOT selon les niveaux de zoom et les emplacements disponibles.',
-            style: TextStyle(
-              color: Color(0xFF4B5F97),
-              fontWeight: FontWeight.w700,
-              height: 1.4,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _visualCard() {
-    final hasVisual = _bannerBytes != null || _bannerUrl != null;
     final preview = _bannerBytes != null
         ? Image.memory(_bannerBytes!, fit: BoxFit.contain)
         : _bannerUrl != null
@@ -556,7 +531,7 @@ class _AdvertiserApplicationSectionState
     return _card(
       icon: Icons.image_outlined,
       title: 'VISUEL PUBLICITAIRE',
-      subtitle: 'FORMAT RECOMMANDÉ : 1200 × 600 PX',
+      subtitle: 'FORMAT RECOMMANDÉ : 1200 × 600 PX • MAXI 2 Mo',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -573,11 +548,15 @@ class _AdvertiserApplicationSectionState
             ),
             const SizedBox(height: 12),
           ],
-          OutlinedButton.icon(
+          FilledButton.icon(
             onPressed: _locked || _submitting ? null : _pickBanner,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: WebColors.blue,
-              side: const BorderSide(color: WebColors.blue, width: 1.5),
+            style: FilledButton.styleFrom(
+              backgroundColor: _bannerIsValid ? WebColors.red : WebColors.blue,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: _bannerIsValid
+                  ? WebColors.red
+                  : const Color(0xFF94A3B8),
+              disabledForegroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 13),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -585,7 +564,7 @@ class _AdvertiserApplicationSectionState
             ),
             icon: const Icon(Icons.upload_file_outlined),
             label: Text(
-              hasVisual ? 'REMPLACER LE VISUEL' : 'AJOUTER LE VISUEL',
+              _bannerIsValid ? 'VISUEL AJOUTÉ' : 'AJOUTER LE VISUEL',
               style: const TextStyle(fontWeight: FontWeight.w900),
             ),
           ),
@@ -616,13 +595,19 @@ class _AdvertiserApplicationSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _statusCard(),
+        if (_submitted ||
+            <String>{
+              'pending',
+              'changes_requested',
+              'rejected',
+              'approved',
+            }.contains(widget.requestStatus.toLowerCase()))
+          _statusCard(),
         _positionCard(),
-        _scopeCard(),
         _visualCard(),
         _card(
           icon: Icons.link_rounded,
-          title: 'DESTINATION DE LA PUBLICITÉ',
+          title: 'DESTINATION DU SPHOT PUBLICITAIRE',
           subtitle: 'PAGE OU SITE OUVERT APRÈS LE CLIC',
           child: TextField(
             controller: _destinationController,
@@ -676,36 +661,47 @@ class _AdvertiserApplicationSectionState
               ),
             ),
           ),
-        if (!_locked)
-          SizedBox(
-            height: 50,
-            child: FilledButton.icon(
-              onPressed: _submitting ? null : _submit,
-              style: FilledButton.styleFrom(
-                backgroundColor: WebColors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: _submitting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Icon(Icons.send_rounded),
-              label: Text(
-                _submitting
-                    ? 'ENVOI EN COURS…'
-                    : 'TRANSMETTRE LA DEMANDE AU SUPER ADMIN',
-                style: const TextStyle(fontWeight: FontWeight.w900),
+        SizedBox(
+          height: 50,
+          child: FilledButton.icon(
+            onPressed: _locked || _submitting ? null : _submit,
+            style: FilledButton.styleFrom(
+              backgroundColor: _requestTransmitted
+                  ? WebColors.red
+                  : WebColors.blue,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: _requestTransmitted
+                  ? WebColors.red
+                  : const Color(0xFF94A3B8),
+              disabledForegroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
+            icon: _submitting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Icon(
+                    _requestTransmitted
+                        ? Icons.check_circle_outline_rounded
+                        : Icons.send_rounded,
+                  ),
+            label: Text(
+              _submitting
+                  ? 'ENVOI EN COURS…'
+                  : _requestTransmitted
+                  ? 'DEMANDE TRANSMISE'
+                  : 'TRANSMETTRE LA DEMANDE',
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
           ),
+        ),
       ],
     );
   }

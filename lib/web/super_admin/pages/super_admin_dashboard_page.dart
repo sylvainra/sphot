@@ -2402,7 +2402,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           'approvedApplication': <String, Object?>{
             'location': _advertiserMap(advertiser['applicantLocation']),
             'visual': _advertiserMap(advertiser['proposedVisual']),
-            'scope': advertiser['requestedScope'] ?? 'local',
             'destinationUrl': advertiser['destinationUrl'] ?? '',
             'approvedAt': FieldValue.serverTimestamp(),
           },
@@ -2579,14 +2578,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           establishment['legalName'] ??
           'Annonceur',
     );
-    final scope = _cleanText(
-      advertiser['requestedScope'] ?? application['scope'],
-    );
-    final scopeLabel = switch (scope) {
-      'national' => 'Nationale',
-      'local_and_national' => 'Locale et nationale',
-      _ => 'Locale',
-    };
     final bannerUrl = _cleanText(
       proposedVisual['url'] ?? advertiser['bannerUrl'],
     );
@@ -2690,7 +2681,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 _cleanText(establishment['siret'] ?? advertiser['siret']),
               ),
               _spotInfoLine('Adresse', address),
-              _spotInfoLine('Portée souhaitée', scopeLabel),
               _spotInfoLine(
                 'Destination',
                 _cleanText(

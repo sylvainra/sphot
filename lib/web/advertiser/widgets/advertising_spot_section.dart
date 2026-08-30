@@ -24,6 +24,7 @@ class AdvertisingSpotSection extends StatefulWidget {
     required this.onPositionChanged,
     required this.onVisualChanged,
     required this.onRadiusChanged,
+    required this.onScopeChanged,
     this.approvedAssetsLocked = false,
     this.assetChangeMode = false,
     this.assetChangeRequestStatus = '',
@@ -40,6 +41,7 @@ class AdvertisingSpotSection extends StatefulWidget {
   onPositionChanged;
   final ValueChanged<AdvertisingVisualData> onVisualChanged;
   final ValueChanged<double> onRadiusChanged;
+  final ValueChanged<String> onScopeChanged;
   final bool approvedAssetsLocked;
   final bool assetChangeMode;
   final String assetChangeRequestStatus;
@@ -56,6 +58,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   bool _requestExists = false;
   bool _loadingSavedPosition = false;
   double _radiusKm = 0;
+  String _scope = 'local';
   Uint8List? _bannerBytes;
   String? _bannerUrl;
   String? _bannerFileName;
@@ -76,6 +79,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   void initState() {
     super.initState();
     _radiusKm = widget.initialRadiusKm;
+    _scope = widget.requestedScope;
     _restoreInitialVisual();
     _initialiseSpot();
   }
@@ -95,6 +99,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   @override
   void didUpdateWidget(covariant AdvertisingSpotSection oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.requestedScope != widget.requestedScope &&
+        _scope != widget.requestedScope) {
+      _scope = widget.requestedScope;
+    }
     if (oldWidget.position == widget.position) return;
     if (_loadingSavedPosition) {
       _loadingSavedPosition = false;
@@ -136,6 +144,18 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           final savedRadius = _toDouble(
             advertisingSpot['radiusKm'] ?? legacyDiffusion['radiusKm'],
           );
+          final savedScope =
+              (advertisingSpot['scope'] ??
+                      data['requestedScope'] ??
+                      approvedApplication['scope'])
+                  ?.toString();
+          if (<String>{
+            'local',
+            'national',
+            'local_and_national',
+          }.contains(savedScope)) {
+            _scope = savedScope!;
+          }
           if (savedRadius != null &&
               AdvertisingPricingConfig.radiusChoices.contains(savedRadius)) {
             _radiusKm = savedRadius;
@@ -212,6 +232,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       if (!mounted) return;
       _notifyVisual();
       widget.onRadiusChanged(_radiusKm);
+      widget.onScopeChanged(_scope);
     });
   }
 
@@ -256,6 +277,16 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       _error = null;
     });
     widget.onRadiusChanged(radiusKm);
+  }
+
+  void _selectScope(String scope) {
+    if (_scope == scope) return;
+    setState(() {
+      _scope = scope;
+      _completed = false;
+      _error = null;
+    });
+    widget.onScopeChanged(scope);
   }
 
   Future<void> _pickBanner() async {
@@ -425,6 +456,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             .doc(requestId);
         if (widget.assetChangeMode) {
           await requestReference.set({
+            'requestedScope': _scope,
             'applicantLocation': <String, Object?>{
               'latitude': position.latitude,
               'longitude': position.longitude,
@@ -448,16 +480,19 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           }, SetOptions(merge: true));
           await requestReference.update({
             'advertisingSpot.radiusKm': _radiusKm,
+            'advertisingSpot.scope': _scope,
           });
         } else {
           await requestReference.set({
             ...creationData,
             'uid': requestId,
+            'requestedScope': _scope,
             'advertisingSpotCompleted': true,
             'advertisingSpot': <String, Object?>{
               'latitude': position.latitude,
               'longitude': position.longitude,
               'radiusKm': _radiusKm,
+              'scope': _scope,
               'bannerUrl': bannerUrl,
               'bannerFileName': _bannerFileName,
               'bannerExtension': _bannerExtension,
@@ -732,28 +767,64 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   }
 
   Widget _buildApprovedScopeCard() {
-    final label = switch (widget.requestedScope) {
+    final label = switch (_scope) {
       'national' => 'NATIONALE',
       'local_and_national' => 'LOCALE ET NATIONALE',
       _ => 'LOCALE',
     };
-    final description = switch (widget.requestedScope) {
-      'national' => 'Votre portée nationale a été validée. La tarification nationale s’applique sans choix de rayon local.',
-      'local_and_national' => 'Votre présence nationale est complétée par le rayon local configuré autour de votre SPHOT.',
-      _ => 'Votre campagne est configurée autour du SPHOT et selon le rayon d’action sélectionné.',
+    final description = switch (_scope) {
+      'national' => 'Votre SPHOT publicitaire bénéficie d’une diffusion nationale adaptée aux niveaux de zoom, sans choix de rayon local.',
+      'local_and_national' => 'Votre diffusion nationale est complétée par le rayon local configuré autour de votre SPHOT publicitaire.',
+      _ => 'Votre SPHOT publicitaire apparaît localement selon le rayon d’action sélectionné et le niveau de zoom.',
     };
     return _SpotCard(
       icon: Icons.public_rounded,
-      title: 'PORTÉE VALIDÉE',
+      title: 'PORTÉE DU SPHOT PUBLICITAIRE',
       status: label,
-      statusColor: const Color(0xFF15803D),
-      child: Text(
-        description,
-        style: const TextStyle(
-          color: Color(0xFF4B5F97),
-          height: 1.4,
-          fontWeight: FontWeight.w700,
-        ),
+      statusColor: WebColors.red,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children:
+                const <String, String>{
+                  'local': 'LOCALE',
+                  'national': 'NATIONALE',
+                  'local_and_national': 'LOCALE ET NATIONALE',
+                }.entries.map((entry) {
+                  final selected = _scope == entry.key;
+                  return OutlinedButton(
+                    onPressed: () => _selectScope(entry.key),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: selected ? Colors.white : WebColors.blue,
+                      backgroundColor: selected ? WebColors.red : Colors.white,
+                      side: BorderSide(
+                        color: selected ? WebColors.red : WebColors.blue,
+                        width: selected ? 2 : 1.3,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                    child: Text(
+                      entry.value,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  );
+                }).toList(),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            description,
+            style: const TextStyle(
+              color: Color(0xFF4B5F97),
+              height: 1.4,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -828,7 +899,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               ),
             ),
           ),
-        if (widget.requestedScope != 'national') ...[
+        if (_scope != 'national') ...[
           _buildReachCard(),
           _buildRadiusCard(),
         ] else

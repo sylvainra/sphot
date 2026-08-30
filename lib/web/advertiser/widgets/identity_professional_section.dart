@@ -38,7 +38,6 @@ class _IdentityProfessionalSectionState
   String? _certifiedDisplayName;
   String? _certifiedEmail;
   String? _certifiedId;
-  String? _accountLogin;
 
   String? get _requestId {
     final value = widget.requestId?.trim() ?? '';
@@ -90,7 +89,6 @@ class _IdentityProfessionalSectionState
             data['email'] ?? data['contactEmail'],
             _certifiedEmail ?? '',
           );
-          _accountLogin = _textValue(data['accountLogin']);
           _lastNameController.text = _textValue(
             data['contactLastName'],
             _lastNameController.text,
@@ -329,7 +327,9 @@ class _IdentityProfessionalSectionState
                     child: FilledButton.icon(
                       onPressed: _saving ? null : _save,
                       style: FilledButton.styleFrom(
-                        backgroundColor: WebColors.blue,
+                        backgroundColor: _completed
+                            ? WebColors.red
+                            : WebColors.blue,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -344,10 +344,16 @@ class _IdentityProfessionalSectionState
                                 strokeWidth: 2,
                               ),
                             )
-                          : const Icon(Icons.save_outlined),
+                          : Icon(
+                              _completed
+                                  ? Icons.check_circle_outline_rounded
+                                  : Icons.save_outlined,
+                            ),
                       label: Text(
                         _saving
                             ? 'ENREGISTREMENT…'
+                            : _completed
+                            ? 'IDENTITÉ PROFESSIONNELLE ENREGISTRÉE'
                             : 'ENREGISTRER L’IDENTITÉ PROFESSIONNELLE',
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
@@ -355,30 +361,6 @@ class _IdentityProfessionalSectionState
                   ),
               ],
             ),
-          ),
-        ),
-        _SectionCard(
-          icon: Icons.alternate_email,
-          title: 'COMPTE CONNECTÉ',
-          status: 'LECTURE SEULE',
-          child: Column(
-            children: [
-              _ReadOnlyLine(
-                label: widget.readOnly
-                    ? 'Identifiant de connexion'
-                    : 'Adresse de connexion',
-                value: widget.readOnly ? _accountLogin : _certifiedEmail,
-              ),
-              _ReadOnlyLine(
-                label: 'Fournisseur',
-                value: widget.readOnly
-                    ? 'Compte annonceur SPHOT'
-                    : widget.user == null
-                    ? null
-                    : 'ProConnect',
-                isLast: true,
-              ),
-            ],
           ),
         ),
         if (_error != null)

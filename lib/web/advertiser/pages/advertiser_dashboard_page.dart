@@ -49,12 +49,12 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'IDENTITÉ & ENTREPRISE',
       Icons.verified_user_outlined,
-      'Présentez votre identité professionnelle et votre établissement.',
+      'Présentez votre identité professionnelle et votre entreprise.',
     ),
     _AdvertiserSection(
       'LOCALISATION & DEMANDE',
       Icons.fact_check_outlined,
-      'Positionnez votre établissement, indiquez la portée souhaitée et transmettez votre visuel.',
+      'Positionnez votre entreprise et transmettez votre visuel.',
     ),
   ];
 
@@ -112,6 +112,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   _requestSubscription;
   bool _developmentApprovedPreview = false;
   bool _restoredRequestAssets = false;
+  String? _requestedScopeOverride;
 
   String? get _requestId {
     final explicitId = widget.advertiserRequestId?.trim() ?? '';
@@ -140,8 +141,26 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     return request['status']?.toString() ?? '';
   }
 
-  String get _requestedScope =>
-      _requestData['requestedScope']?.toString() ?? 'local';
+  String get _requestedScope {
+    if (_requestedScopeOverride != null) return _requestedScopeOverride!;
+    final advertisingSpot = _map(_requestData['advertisingSpot']);
+    final approvedApplication = _map(_requestData['approvedApplication']);
+    return (advertisingSpot['scope'] ??
+            _requestData['requestedScope'] ??
+            approvedApplication['scope'] ??
+            'local')
+        .toString();
+  }
+
+  String get _activityType {
+    final establishment = _map(_requestData['establishment']);
+    final activity = establishment['activityType']?.toString().trim() ?? '';
+    if (activity == 'Autre') {
+      final other = establishment['activityTypeOther']?.toString().trim() ?? '';
+      return other.isEmpty ? activity : other;
+    }
+    return activity;
+  }
 
   bool get _usesNationalPricing =>
       _requestedScope == 'national' || _requestedScope == 'local_and_national';
@@ -325,6 +344,20 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     });
   }
 
+  void _setRequestedScope(String scope) {
+    if (!mounted || _requestedScope == scope) return;
+    setState(() {
+      _requestedScopeOverride = scope;
+      _planningData = PlanningData(
+        durationLabel: _planningData.durationLabel,
+        startDate: _planningData.startDate,
+        endDate: _planningData.endDate,
+        exclusiveReservation: _planningData.exclusiveReservation,
+        availabilityConfirmed: false,
+      );
+    });
+  }
+
   void _setDiffusionType(DiffusionPreviewType type) {
     final current = _diffusionPreview;
     _setDiffusionPreview(
@@ -422,16 +455,16 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                 const SizedBox(height: 8),
               ],
               Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: List.generate(_sections.length, (index) {
-                    return _SidebarButton(
-                      number: index + 1,
-                      label: _sections[index].label,
-                      selected: index == _selectedIndex,
-                      onTap: () => _selectSection(index),
-                    );
-                  }),
+                child: ListView.separated(
+                  padding: const EdgeInsets.only(top: 10),
+                  itemCount: _sections.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) => _SidebarButton(
+                    number: index + 1,
+                    label: _sections[index].label,
+                    selected: index == _selectedIndex,
+                    onTap: () => _selectSection(index),
+                  ),
                 ),
               ),
             ],
@@ -529,7 +562,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                   child: Text(
                     canEditApprovedPosition
                         ? 'CLIQUEZ SUR LA CARTE POUR PROPOSER UNE NOUVELLE POSITION'
-                        : 'CLIQUEZ SUR LA CARTE POUR POSITIONNER VOTRE ÉTABLISSEMENT',
+                        : 'CLIQUEZ SUR LA CARTE POUR POSITIONNER VOTRE ENTREPRISE',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: WebColors.blue,
@@ -540,14 +573,14 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               ),
             ),
           ),
-        if (_selectedIndex == 0)
+        if (_selectedIndex == 0 && _requestStatus.toLowerCase() != 'pending')
           Positioned(
             top: 92,
             left: 20,
             right: 20,
             child: Center(
               child: Container(
-                constraints: const BoxConstraints(maxWidth: 620),
+                constraints: const BoxConstraints(maxWidth: 760),
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.95),
@@ -565,7 +598,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'UNE VISIBILITÉ QUI S’ADAPTE À LA CARTE',
+                      'FAITES RAYONNER VOTRE ACTIVITÉ PROFESSIONNELLE EN UN SPHOT PUBLICITAIRE EXCLUSIF !',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: WebColors.blue,
@@ -575,11 +608,65 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'La carte s’ouvre sur le monde. Les campagnes locales se révèlent lorsque l’utilisateur explore leur zone ; les campagnes nationales sont étudiées pour une présence à plus grande échelle. Le niveau de zoom permet ainsi de présenter une publicité pertinente sans saturer la carte.',
+                      'SPHOT ouvre le monde au grand public. Selon le niveau de zoom, les SPHOTS PUBLICITAIRES LOCAUX apparaissent à l’échelle communale, tandis que les SPHOTS PUBLICITAIRES NATIONAUX bénéficient d’une visibilité à plus grande échelle, voire permanente lorsqu’aucune publicité locale n’est diffusée. En plus d’être diffusé en EXCLUSIVITÉ dans la catégorie choisie, selon le rayon géographique et la période définis, votre SPHOT PUBLICITAIRE redirige le grand public vers votre site internet d’un simple clic.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFF4B5F97),
                         height: 1.4,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        if (!_approvedFlow && _requestStatus.toLowerCase() == 'pending')
+          Positioned(
+            top: 92,
+            left: 20,
+            right: 20,
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 720),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.97),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: WebColors.red, width: 1.8),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x22000000),
+                      blurRadius: 16,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.mark_email_read_outlined,
+                      color: WebColors.red,
+                      size: 34,
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      'VOTRE DEMANDE A BIEN ÉTÉ TRANSMISE',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: WebColors.red,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 9),
+                    Text(
+                      'L’équipe SPHOT vous remercie et traitera votre demande dans les meilleurs délais. Vous recevrez par e-mail les prochaines indications pour finaliser votre SPHOT PUBLICITAIRE. À TRÈS BIENTÔT SUR SPHOT !',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: WebColors.blue,
+                        height: 1.45,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -758,6 +845,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             onPositionChanged: _setAdvertisingPoint,
             onVisualChanged: _setAdvertisingVisual,
             onRadiusChanged: _setAdvertisingRadius,
+            onScopeChanged: _setRequestedScope,
             approvedAssetsLocked: !_assetChangeAuthorized,
             assetChangeMode: _assetChangeAuthorized,
             assetChangeRequestStatus: _assetChangeStatus,
@@ -794,6 +882,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             initialPlanning: _planningData,
             onPlanningChanged: _setPlanningData,
             requestedScope: _requestedScope,
+            activityType: _activityType,
           ),
         ];
       case 4:
