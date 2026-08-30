@@ -184,6 +184,10 @@ class _AdminPricingEditorState extends State<_AdminPricingEditor> {
             children: [
               TextField(
                 controller: _priceController,
+                style: const TextStyle(
+                  color: _blue,
+                  fontWeight: FontWeight.w800,
+                ),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
@@ -191,10 +195,9 @@ class _AdminPricingEditorState extends State<_AdminPricingEditor> {
                   _saved = false;
                   _error = null;
                 }),
-                decoration: const InputDecoration(
-                  labelText: 'PRIX PAR POSTE DE SECOURS',
-                  suffixText: '€ HT / an',
-                  border: OutlineInputBorder(),
+                decoration: _tariffInputDecoration(
+                  label: 'PRIX PAR POSTE DE SECOURS',
+                  suffix: '€ HT / an',
                 ),
               ),
               const SizedBox(height: 18),
@@ -243,6 +246,8 @@ class _AdvertiserPricingEditorState extends State<_AdvertiserPricingEditor> {
   static const _red = Color(0xFFDC2626);
 
   final Map<String, TextEditingController> _controllers = {};
+  final _visibilityFieldKey = GlobalKey();
+  final _radiusFieldKey = GlobalKey();
   Map<String, dynamic> _pricing = AdvertisingPricingConfig.defaults();
   String _visibility = 'map';
   double _radiusKm = 0;
@@ -250,6 +255,8 @@ class _AdvertiserPricingEditorState extends State<_AdvertiserPricingEditor> {
   bool _saving = false;
   bool _saved = false;
   String? _error;
+  OverlayEntry? _choiceOverlay;
+  String? _openChoiceId;
 
   @override
   void initState() {
@@ -290,10 +297,10 @@ class _AdvertiserPricingEditorState extends State<_AdvertiserPricingEditor> {
   TextEditingController _controller(String duration) =>
       _controllers[_key(_visibility, _radiusKm, duration)]!;
 
-  InputDecoration _dropdownDecoration(String label) {
+  InputDecoration _dropdownDecoration(String label, {required bool open}) {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: _blue, width: 1.5),
+      borderSide: BorderSide(color: open ? _red : _blue, width: 1.6),
     );
     return InputDecoration(
       labelText: label,
@@ -303,8 +310,169 @@ class _AdvertiserPricingEditorState extends State<_AdvertiserPricingEditor> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       border: border,
       enabledBorder: border,
-      focusedBorder: border.copyWith(
-        borderSide: const BorderSide(color: _red, width: 1.8),
+      focusedBorder: border,
+    );
+  }
+
+  void _closeChoiceMenu() {
+    _choiceOverlay?.remove();
+    _choiceOverlay = null;
+    if (mounted && _openChoiceId != null) {
+      setState(() => _openChoiceId = null);
+    }
+  }
+
+  void _openChoiceMenu<T>({
+    required String id,
+    required GlobalKey fieldKey,
+    required T selectedValue,
+    required List<_PricingChoice<T>> choices,
+    required ValueChanged<T> onSelected,
+  }) {
+    _closeChoiceMenu();
+
+    final renderObject = fieldKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox) return;
+
+    final position = renderObject.localToGlobal(Offset.zero);
+    final size = renderObject.size;
+    setState(() => _openChoiceId = id);
+
+    _choiceOverlay = OverlayEntry(
+      builder: (overlayContext) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _closeChoiceMenu,
+              child: const ColoredBox(color: Colors.transparent),
+            ),
+          ),
+          Positioned(
+            left: position.dx,
+            top: position.dy + size.height - 10,
+            width: size.width,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 260),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.98),
+                  border: const Border(
+                    left: BorderSide(color: _blue, width: 1.6),
+                    right: BorderSide(color: _blue, width: 1.6),
+                    bottom: BorderSide(color: _blue, width: 1.6),
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(14),
+                    bottomRight: Radius.circular(14),
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 8,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  shrinkWrap: true,
+                  children: [
+                    for (final choice in choices)
+                      InkWell(
+                        onTap: () {
+                          _closeChoiceMenu();
+                          onSelected(choice.value);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  choice.label,
+                                  style: const TextStyle(
+                                    color: _blue,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              if (choice.value == selectedValue)
+                                const Icon(
+                                  Icons.check_rounded,
+                                  color: _red,
+                                  size: 20,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    Overlay.of(context, rootOverlay: true).insert(_choiceOverlay!);
+  }
+
+  Widget _choiceField<T>({
+    required String id,
+    required GlobalKey fieldKey,
+    required String label,
+    required T value,
+    required List<_PricingChoice<T>> choices,
+    required ValueChanged<T> onSelected,
+  }) {
+    final selectedLabel = choices
+        .firstWhere((choice) => choice.value == value)
+        .label;
+    final open = _openChoiceId == id;
+
+    return GestureDetector(
+      key: fieldKey,
+      behavior: HitTestBehavior.opaque,
+      onTap: () => open
+          ? _closeChoiceMenu()
+          : _openChoiceMenu<T>(
+              id: id,
+              fieldKey: fieldKey,
+              selectedValue: value,
+              choices: choices,
+              onSelected: onSelected,
+            ),
+      child: InputDecorator(
+        decoration: _dropdownDecoration(label, open: open),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                selectedLabel,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _blue,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Icon(
+              open
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded,
+              color: _red,
+              size: 25,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -367,73 +535,48 @@ class _AdvertiserPricingEditorState extends State<_AdvertiserPricingEditor> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              DropdownButtonFormField<String>(
+              _choiceField<String>(
+                id: 'visibility',
+                fieldKey: _visibilityFieldKey,
+                label: 'DIFFUSION',
                 value: _visibility,
-                isExpanded: true,
-                dropdownColor: Colors.white,
-                iconEnabledColor: _blue,
-                borderRadius: BorderRadius.circular(14),
-                style: const TextStyle(
-                  color: _blue,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-                decoration: _dropdownDecoration('DIFFUSION'),
-                items: AdvertisingPricingConfig.visibilityLabels.entries
-                    .map(
-                      (entry) => DropdownMenuItem(
-                        value: entry.key,
-                        child: Text(
-                          entry.value,
-                          style: const TextStyle(
-                            color: _blue,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    )
+                choices: AdvertisingPricingConfig.visibilityLabels.entries
+                    .map((entry) => _PricingChoice(entry.key, entry.value))
                     .toList(),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() => _visibility = value);
-                },
+                onSelected: (value) => setState(() {
+                  _visibility = value;
+                  _saved = false;
+                  _error = null;
+                }),
               ),
               const SizedBox(height: 12),
-              DropdownButtonFormField<double>(
+              _choiceField<double>(
+                id: 'radius',
+                fieldKey: _radiusFieldKey,
+                label: 'RAYON D’ACTION',
                 value: _radiusKm,
-                isExpanded: true,
-                dropdownColor: Colors.white,
-                iconEnabledColor: _blue,
-                borderRadius: BorderRadius.circular(14),
-                style: const TextStyle(
-                  color: _blue,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-                decoration: _dropdownDecoration('RAYON D’ACTION'),
-                items: AdvertisingPricingConfig.radiusChoices
+                choices: AdvertisingPricingConfig.radiusChoices
                     .map(
-                      (radius) => DropdownMenuItem(
-                        value: radius,
-                        child: Text(
-                          AdvertisingPricingConfig.radiusLabel(radius),
-                          style: const TextStyle(
-                            color: _blue,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
+                      (radius) => _PricingChoice(
+                        radius,
+                        AdvertisingPricingConfig.radiusLabel(radius),
                       ),
                     )
                     .toList(),
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() => _radiusKm = value);
-                },
+                onSelected: (value) => setState(() {
+                  _radiusKm = value;
+                  _saved = false;
+                  _error = null;
+                }),
               ),
               const SizedBox(height: 18),
               for (final duration in AdvertisingPricingConfig.durations) ...[
                 TextField(
                   controller: _controller(duration),
+                  style: const TextStyle(
+                    color: _blue,
+                    fontWeight: FontWeight.w800,
+                  ),
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
@@ -441,10 +584,9 @@ class _AdvertiserPricingEditorState extends State<_AdvertiserPricingEditor> {
                     _saved = false;
                     _error = null;
                   }),
-                  decoration: InputDecoration(
-                    labelText: duration.toUpperCase(),
-                    suffixText: '€ HT',
-                    border: const OutlineInputBorder(),
+                  decoration: _tariffInputDecoration(
+                    label: duration.toUpperCase(),
+                    suffix: '€ HT',
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -466,11 +608,50 @@ class _AdvertiserPricingEditorState extends State<_AdvertiserPricingEditor> {
 
   @override
   void dispose() {
+    _choiceOverlay?.remove();
+    _choiceOverlay = null;
     for (final controller in _controllers.values) {
       controller.dispose();
     }
     super.dispose();
   }
+}
+
+class _PricingChoice<T> {
+  const _PricingChoice(this.value, this.label);
+
+  final T value;
+  final String label;
+}
+
+InputDecoration _tariffInputDecoration({
+  required String label,
+  required String suffix,
+}) {
+  const blue = Color(0xFF1E3A8A);
+  const red = Color(0xFFDC2626);
+  final enabledBorder = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12),
+    borderSide: const BorderSide(color: blue, width: 1.25),
+  );
+  return InputDecoration(
+    labelText: label,
+    suffixText: suffix,
+    labelStyle: const TextStyle(color: blue, fontWeight: FontWeight.w700),
+    floatingLabelStyle: const TextStyle(
+      color: blue,
+      fontWeight: FontWeight.w800,
+    ),
+    suffixStyle: const TextStyle(color: blue, fontWeight: FontWeight.w700),
+    filled: true,
+    fillColor: Colors.white,
+    border: enabledBorder,
+    enabledBorder: enabledBorder,
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: red, width: 1.8),
+    ),
+  );
 }
 
 Widget _pricingCard({
