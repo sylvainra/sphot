@@ -1,14 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+
 import '../../../models/advertising_pricing_config.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../widgets/super_admin_pricing_panel.dart';
+
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+
 import 'dart:math' as math;
+
 import 'package:url_launcher/url_launcher.dart';
+
 import 'dart:async';
 
 enum DashboardSpotFilter {
@@ -83,8 +88,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     ),
     _SuperAdminTileStyle(
       name: 'Satellite',
-      url:
-          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       maxZoom: 19,
     ),
     _SuperAdminTileStyle(
@@ -175,17 +179,19 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   DashboardAdminFilter _selectedAdminFilter = DashboardAdminFilter.trialRequest;
 
-  late final Stream<
-      List<QueryDocumentSnapshot<Map<String, dynamic>>>> _spotsStream;
+  late final Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+  _spotsStream;
 
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
   _createSpotsStream() {
     late final StreamController<
-        List<QueryDocumentSnapshot<Map<String, dynamic>>>> controller;
+      List<QueryDocumentSnapshot<Map<String, dynamic>>>
+    >
+    controller;
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
-        territoriesSubscription;
+    territoriesSubscription;
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
-        adminRequestsSubscription;
+    adminRequestsSubscription;
     final spotSubscriptions =
         <String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>{};
     final spotsByTerritory =
@@ -223,75 +229,68 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             .doc(territoryId)
             .collection('spots')
             .snapshots()
-            .listen(
-          (spotsSnapshot) {
-            spotsByTerritory[territoryId] = spotsSnapshot.docs;
-            emitSpots();
-          },
-          onError: controller.addError,
-        );
+            .listen((spotsSnapshot) {
+              spotsByTerritory[territoryId] = spotsSnapshot.docs;
+              emitSpots();
+            }, onError: controller.addError);
       }
 
       emitSpots();
     }
 
-    controller = StreamController<
-        List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-      onListen: () {
-        territoriesSubscription = FirebaseFirestore.instance
-            .collection('territoires')
-            .snapshots()
-            .listen(
-          (territoriesSnapshot) {
-            territoryDocumentIds
-              ..clear()
-              ..addAll(
-                territoriesSnapshot.docs.map((document) => document.id),
-              );
-            reconcileTerritories();
+    controller =
+        StreamController<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+          onListen: () {
+            territoriesSubscription = FirebaseFirestore.instance
+                .collection('territoires')
+                .snapshots()
+                .listen((territoriesSnapshot) {
+                  territoryDocumentIds
+                    ..clear()
+                    ..addAll(
+                      territoriesSnapshot.docs.map((document) => document.id),
+                    );
+                  reconcileTerritories();
+                }, onError: controller.addError);
+
+            adminRequestsSubscription = FirebaseFirestore.instance
+                .collection('adminRequests')
+                .snapshots()
+                .listen((requestsSnapshot) {
+                  requestedTerritoryIds.clear();
+
+                  for (final document in requestsSnapshot.docs) {
+                    final data = document.data();
+                    final territoireValue = data['territoire'];
+                    final territoire = territoireValue is Map
+                        ? Map<String, dynamic>.from(territoireValue)
+                        : const <String, dynamic>{};
+                    final territoryId = _cleanText(
+                      territoire['territoireId'] ??
+                          data['territoireId'] ??
+                          data['organisationId'],
+                    );
+
+                    if (territoryId.isNotEmpty) {
+                      requestedTerritoryIds.add(territoryId);
+                    }
+                  }
+
+                  reconcileTerritories();
+                }, onError: controller.addError);
           },
-          onError: controller.addError,
-        );
-
-        adminRequestsSubscription = FirebaseFirestore.instance
-            .collection('adminRequests')
-            .snapshots()
-            .listen(
-          (requestsSnapshot) {
-            requestedTerritoryIds.clear();
-
-            for (final document in requestsSnapshot.docs) {
-              final data = document.data();
-              final territoireValue = data['territoire'];
-              final territoire = territoireValue is Map
-                  ? Map<String, dynamic>.from(territoireValue)
-                  : const <String, dynamic>{};
-              final territoryId = _cleanText(
-                territoire['territoireId'] ??
-                    data['territoireId'] ??
-                    data['organisationId'],
-              );
-
-              if (territoryId.isNotEmpty) {
-                requestedTerritoryIds.add(territoryId);
-              }
-            }
-
-            reconcileTerritories();
+          onCancel: () async {
+            await territoriesSubscription?.cancel();
+            await adminRequestsSubscription?.cancel();
+            await Future.wait(
+              spotSubscriptions.values.map(
+                (subscription) => subscription.cancel(),
+              ),
+            );
+            spotSubscriptions.clear();
+            spotsByTerritory.clear();
           },
-          onError: controller.addError,
         );
-      },
-      onCancel: () async {
-        await territoriesSubscription?.cancel();
-        await adminRequestsSubscription?.cancel();
-        await Future.wait(
-          spotSubscriptions.values.map((subscription) => subscription.cancel()),
-        );
-        spotSubscriptions.clear();
-        spotsByTerritory.clear();
-      },
-    );
 
     return controller.stream;
   }
@@ -305,7 +304,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> get _adRequestsStream {
-    return FirebaseFirestore.instance.collection('adRequests').snapshots();
+    return FirebaseFirestore.instance
+        .collection('advertiserRequests')
+        .snapshots();
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> get _sauveteursStream {
@@ -324,6 +325,31 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   double _toDouble(dynamic value) {
     if (value is num) return value.toDouble();
     return double.tryParse((value ?? '').toString()) ?? 0;
+  }
+
+  Map<String, dynamic> _advertiserMap(Object? value) {
+    return value is Map ? Map<String, dynamic>.from(value) : {};
+  }
+
+  LatLng? _advertiserLocation(Map<String, dynamic> data) {
+    final applicantLocation = _advertiserMap(data['applicantLocation']);
+    final approvedApplication = _advertiserMap(data['approvedApplication']);
+    final approvedLocation = _advertiserMap(approvedApplication['location']);
+    final advertisingSpot = _advertiserMap(data['advertisingSpot']);
+    final lat = _toDouble(
+      applicantLocation['latitude'] ??
+          approvedLocation['latitude'] ??
+          advertisingSpot['latitude'] ??
+          data['centerLat'],
+    );
+    final lng = _toDouble(
+      applicantLocation['longitude'] ??
+          approvedLocation['longitude'] ??
+          advertisingSpot['longitude'] ??
+          data['centerLng'],
+    );
+    if (lat == 0 && lng == 0) return null;
+    return LatLng(lat, lng);
   }
 
   double _distanceKm(double lat1, double lon1, double lat2, double lon2) {
@@ -480,8 +506,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       return true;
     }
 
-    final filterBySelectedAdmin =
-        _selectedFilters.contains(DashboardSpotFilter.selectedAdmin);
+    final filterBySelectedAdmin = _selectedFilters.contains(
+      DashboardSpotFilter.selectedAdmin,
+    );
     if (filterBySelectedAdmin && !_matchesSelectedAdmin(data)) {
       return false;
     }
@@ -1269,10 +1296,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final trialRequestStatus = _cleanText(
       data['trialRequestStatus'] ?? trialRequest['status'],
     ).toLowerCase();
-    final commercialStatus =
-        _cleanText(commercialTracking['status']).toLowerCase();
-    final subscriptionStatus =
-        _cleanText(subscription?['status']).toLowerCase();
+    final commercialStatus = _cleanText(commercialTracking['status'])
+        .toLowerCase();
+    final subscriptionStatus = _cleanText(subscription?['status'])
+        .toLowerCase();
 
     switch (_selectedAdminFilter) {
       case DashboardAdminFilter.none:
@@ -1298,22 +1325,23 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         final trialStart = trialStartValue is Timestamp
             ? trialStartValue.toDate()
             : trialStartValue is DateTime
-                ? trialStartValue
-                : null;
+            ? trialStartValue
+            : null;
         final trialEnd = trialEndValue is Timestamp
             ? trialEndValue.toDate()
             : trialEndValue is DateTime
-                ? trialEndValue
-                : null;
+            ? trialEndValue
+            : null;
         final now = DateTime.now();
-        final activeTrialDates = trialStart != null &&
+        final activeTrialDates =
+            trialStart != null &&
             trialEnd != null &&
             !now.isBefore(trialStart) &&
             !now.isAfter(trialEnd);
 
-        final administrativeStatus =
-            _cleanText(data['status']).toLowerCase();
-        final trialTriggered = administrativeStatus == 'approved' &&
+        final administrativeStatus = _cleanText(data['status']).toLowerCase();
+        final trialTriggered =
+            administrativeStatus == 'approved' &&
             (const {
                   'pending',
                   'requested',
@@ -1392,9 +1420,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         final subscriptionStart = subscription['subscriptionStartDate'];
         final subscriptionEnd = subscription['subscriptionEndDate'];
 
-        final numberOfSpots = _toDouble(
-          subscription['numberOfRescueStations'],
-        ).toInt();
+        final numberOfSpots = _toDouble(subscription['numberOfRescueStations'])
+            .toInt();
 
         final pricePerSpot = _toDouble(subscription['pricePerStationExclTax']);
 
@@ -1519,9 +1546,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                           .withOpacity(0.08),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: _showLegalDocumentsPanel
-                            ? redColor
-                            : adminColor,
+                        color: _showLegalDocumentsPanel ? redColor : adminColor,
                         width: 1.5,
                       ),
                     ),
@@ -1884,13 +1909,16 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         return false;
 
       case DashboardAdvertiserFilter.pending:
-        return status == 'pending';
+        final assetChange = _advertiserMap(data['assetChangeRequest']);
+        return status == 'pending' ||
+            assetChange['status'] == 'pending' ||
+            assetChange['status'] == 'submitted';
 
       case DashboardAdvertiserFilter.all:
         return true;
 
       case DashboardAdvertiserFilter.active:
-        return status == 'active';
+        return status == 'active' || status == 'approved';
 
       case DashboardAdvertiserFilter.expiringSoon:
         final endDate = data['campaignEndDate'];
@@ -2264,6 +2292,495 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _askAdvertiserReviewReason({required String title}) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(
+            title,
+            style: const TextStyle(
+              color: adminColor,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            minLines: 3,
+            maxLines: 6,
+            style: const TextStyle(
+              color: adminColor,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              labelText: 'Motif communiqué à l’annonceur',
+              labelStyle: const TextStyle(color: adminColor),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('ANNULER'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final reason = controller.text.trim();
+                if (reason.isEmpty) return;
+                Navigator.of(dialogContext).pop(reason);
+              },
+              style: FilledButton.styleFrom(backgroundColor: adminColor),
+              child: const Text('CONFIRMER'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    return result;
+  }
+
+  Future<void> _reviewAdvertiserRequest(
+    Map<String, dynamic> advertiser, {
+    required String decision,
+  }) async {
+    final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
+    if (requestId.isEmpty) return;
+
+    String reason = '';
+    if (decision != 'approved') {
+      final result = await _askAdvertiserReviewReason(
+        title: decision == 'changes_requested'
+            ? 'DEMANDER UNE MODIFICATION'
+            : 'REFUSER LA DEMANDE',
+      );
+      if (result == null) return;
+      reason = result;
+    }
+
+    final reference = FirebaseFirestore.instance
+        .collection('advertiserRequests')
+        .doc(requestId);
+    final recipient = _cleanText(
+      advertiser['contactEmail'] ?? advertiser['email'],
+    );
+    final assetChange = _advertiserMap(advertiser['assetChangeRequest']);
+    final isAssetApproval =
+        decision == 'approved' &&
+        _cleanText(advertiser['status']).toLowerCase() == 'approved' &&
+        assetChange['status'] == 'submitted';
+    final isAssetReview =
+        _cleanText(advertiser['status']).toLowerCase() == 'approved' &&
+        assetChange['status'] == 'submitted';
+
+    try {
+      final update = <String, Object?>{
+        'status': decision,
+        'review': <String, Object?>{
+          'status': decision,
+          'reason': reason,
+          'reviewedBy': 'super_admin',
+          'reviewedAt': FieldValue.serverTimestamp(),
+        },
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (decision == 'approved') {
+        update.addAll({
+          'approvedApplication': <String, Object?>{
+            'location': _advertiserMap(advertiser['applicantLocation']),
+            'visual': _advertiserMap(advertiser['proposedVisual']),
+            'scope': advertiser['requestedScope'] ?? 'local',
+            'destinationUrl': advertiser['destinationUrl'] ?? '',
+            'approvedAt': FieldValue.serverTimestamp(),
+          },
+          'approvalEmail': <String, Object?>{
+            'status': 'pending',
+            'recipient': recipient,
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+          'approvedAt': FieldValue.serverTimestamp(),
+        });
+        if (isAssetApproval) {
+          update.remove('approvalEmail');
+          update['assetChangeRequest'] = <String, Object?>{
+            ...assetChange,
+            'status': 'approved',
+            'reviewedAt': FieldValue.serverTimestamp(),
+          };
+        }
+      } else if (decision == 'changes_requested') {
+        update['changeRequestEmail'] = <String, Object?>{
+          'status': 'pending',
+          'recipient': recipient,
+          'reason': reason,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+        if (isAssetReview) {
+          update['status'] = 'approved';
+          update['assetChangeRequest'] = <String, Object?>{
+            ...assetChange,
+            'status': 'authorized',
+            'reason': reason,
+            'reviewedAt': FieldValue.serverTimestamp(),
+          };
+        }
+      } else {
+        update['rejectionEmail'] = <String, Object?>{
+          'status': 'pending',
+          'recipient': recipient,
+          'reason': reason,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+        if (isAssetReview) {
+          update['status'] = 'approved';
+          update['assetChangeRequest'] = <String, Object?>{
+            ...assetChange,
+            'status': 'rejected',
+            'reason': reason,
+            'reviewedAt': FieldValue.serverTimestamp(),
+          };
+        }
+      }
+
+      await reference.set(update, SetOptions(merge: true));
+      if (!mounted) return;
+      setState(() {
+        _selectedAdvertiser = {...advertiser, ...update};
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              decision == 'approved'
+                  ? 'Demande approuvée. Les identifiants vont être envoyés.'
+                  : decision == 'changes_requested'
+                  ? 'Demande de modification enregistrée.'
+                  : 'Refus enregistré.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Mise à jour impossible : $error'),
+          backgroundColor: redColor,
+        ),
+      );
+    }
+  }
+
+  Future<void> _authorizeAdvertiserAssetChange(
+    Map<String, dynamic> advertiser,
+  ) async {
+    final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
+    if (requestId.isEmpty) return;
+    final assetChange = _advertiserMap(advertiser['assetChangeRequest']);
+    try {
+      await FirebaseFirestore.instance
+          .collection('advertiserRequests')
+          .doc(requestId)
+          .set({
+            'assetChangeRequest': <String, Object?>{
+              ...assetChange,
+              'status': 'authorized',
+              'authorizedAt': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            },
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+      if (!mounted) return;
+      setState(() {
+        _selectedAdvertiser = {
+          ...advertiser,
+          'assetChangeRequest': {...assetChange, 'status': 'authorized'},
+        };
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Autorisation impossible : $error')),
+      );
+    }
+  }
+
+  void _showAdvertiserVisual(String bannerUrl) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          insetPadding: const EdgeInsets.all(28),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100, maxHeight: 760),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 12, 10, 10),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'VISUEL PROPOSÉ PAR L’ANNONCEUR',
+                          style: TextStyle(
+                            color: adminColor,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                Flexible(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                    child: Image.network(bannerUrl, fit: BoxFit.contain),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAdvertiserApplicationPanel() {
+    final advertiser = _selectedAdvertiser;
+    if (advertiser == null) return const SizedBox.shrink();
+    final establishment = _advertiserMap(advertiser['establishment']);
+    final application = _advertiserMap(advertiser['application']);
+    final proposedVisual = _advertiserMap(advertiser['proposedVisual']);
+    final location = _advertiserLocation(advertiser);
+    final companyName = _cleanText(
+      advertiser['advertiserName'] ??
+          establishment['businessName'] ??
+          advertiser['organisation'] ??
+          establishment['legalName'] ??
+          'Annonceur',
+    );
+    final scope = _cleanText(
+      advertiser['requestedScope'] ?? application['scope'],
+    );
+    final scopeLabel = switch (scope) {
+      'national' => 'Nationale',
+      'local_and_national' => 'Locale et nationale',
+      _ => 'Locale',
+    };
+    final bannerUrl = _cleanText(
+      proposedVisual['url'] ?? advertiser['bannerUrl'],
+    );
+    final status = _cleanText(advertiser['status']).toLowerCase();
+    final review = _advertiserMap(advertiser['review']);
+    final assetChange = _advertiserMap(advertiser['assetChangeRequest']);
+    final assetChangeStatus = _cleanText(assetChange['status']).toLowerCase();
+    final address = [
+      establishment['address'],
+      establishment['postalCode'],
+      establishment['city'],
+      establishment['country'],
+    ].map(_cleanText).where((value) => value.isNotEmpty).join(', ');
+
+    return Container(
+      width: 470,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.99),
+        border: Border(
+          left: BorderSide(color: adminColor.withOpacity(0.25), width: 1.5),
+        ),
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const AdaptiveAssetImage(
+                    'data/icons/fire_green_icon.svg',
+                    width: 34,
+                    height: 46,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      companyName,
+                      style: const TextStyle(
+                        color: adminColor,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => setState(() => _selectedAdvertiser = null),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (bannerUrl.isNotEmpty) ...[
+                AspectRatio(
+                  aspectRatio: 2,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.network(bannerUrl, fit: BoxFit.contain),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _showAdvertiserVisual(bannerUrl),
+                  icon: const Icon(Icons.open_in_full_rounded),
+                  label: const Text('AGRANDIR LE VISUEL'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: adminColor,
+                    side: const BorderSide(color: adminColor),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+              _spotInfoLine(
+                'Responsable',
+                _cleanText(advertiser['contactName'] ?? 'Non renseigné'),
+              ),
+              _spotInfoLine(
+                'Fonction',
+                _cleanText(advertiser['contactFunction'] ?? 'Non renseignée'),
+              ),
+              _spotInfoLine(
+                'Email',
+                _cleanText(advertiser['contactEmail'] ?? advertiser['email']),
+              ),
+              _spotInfoLine(
+                'Téléphone',
+                _cleanText(advertiser['contactPhone'] ?? 'Non renseigné'),
+              ),
+              _spotInfoLine(
+                'Raison sociale',
+                _cleanText(establishment['legalName'] ?? 'Non renseignée'),
+              ),
+              _spotInfoLine(
+                'Activité',
+                _cleanText(establishment['activityType'] ?? 'Non renseignée'),
+              ),
+              _spotInfoLine(
+                'SIRET',
+                _cleanText(establishment['siret'] ?? advertiser['siret']),
+              ),
+              _spotInfoLine('Adresse', address),
+              _spotInfoLine('Portée souhaitée', scopeLabel),
+              _spotInfoLine(
+                'Destination',
+                _cleanText(
+                  advertiser['destinationUrl'] ?? application['destinationUrl'],
+                ),
+              ),
+              if (location != null) ...[
+                _spotInfoLine('Latitude', location.latitude.toStringAsFixed(6)),
+                _spotInfoLine(
+                  'Longitude',
+                  location.longitude.toStringAsFixed(6),
+                ),
+              ],
+              _spotInfoLine('Statut', status.isEmpty ? 'Brouillon' : status),
+              if (assetChangeStatus.isNotEmpty)
+                _spotInfoLine(
+                  'Modification visuel / position',
+                  assetChangeStatus,
+                ),
+              if (_cleanText(review['reason']).isNotEmpty)
+                _spotInfoLine('Motif', _cleanText(review['reason'])),
+              const SizedBox(height: 20),
+              if (assetChangeStatus == 'pending') ...[
+                FilledButton.icon(
+                  onPressed: () => _authorizeAdvertiserAssetChange(advertiser),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: adminColor,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  icon: const Icon(Icons.edit_location_alt_outlined),
+                  label: const Text(
+                    'AUTORISER LA MODIFICATION',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              FilledButton.icon(
+                onPressed:
+                    status == 'approved' && assetChangeStatus != 'submitted'
+                    ? null
+                    : () => _reviewAdvertiserRequest(
+                        advertiser,
+                        decision: 'approved',
+                      ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF15803D),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                icon: const Icon(Icons.check_circle_outline_rounded),
+                label: const Text(
+                  'APPROUVER LA DEMANDE',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () => _reviewAdvertiserRequest(
+                  advertiser,
+                  decision: 'changes_requested',
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: adminColor,
+                  side: const BorderSide(color: adminColor, width: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                icon: const Icon(Icons.edit_note_rounded),
+                label: const Text(
+                  'DEMANDER UNE MODIFICATION',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: status == 'rejected'
+                    ? null
+                    : () => _reviewAdvertiserRequest(
+                        advertiser,
+                        decision: 'rejected',
+                      ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: redColor,
+                  side: const BorderSide(color: redColor, width: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                icon: const Icon(Icons.cancel_outlined),
+                label: const Text(
+                  'REFUSER LA DEMANDE',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
               ),
             ],
           ),
@@ -3241,9 +3758,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Theme(
-                data: Theme.of(
-                  context,
-                ).copyWith(dividerColor: Colors.transparent),
+                data: Theme.of(context)
+                    .copyWith(dividerColor: Colors.transparent),
                 child: ExpansionTile(
                   shape: const Border(),
                   collapsedShape: const Border(),
@@ -3848,9 +4364,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erreur Firebase : $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Erreur Firebase : $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -4846,8 +5361,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   }
 
   Marker _buildAdvertiserMarker(Map<String, dynamic> data) {
-    final lat = _toDouble(data['centerLat']);
-    final lng = _toDouble(data['centerLng']);
+    final location = _advertiserLocation(data)!;
 
     final name = _cleanText(
       data['advertiserName'] ??
@@ -4857,9 +5371,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     );
 
     return Marker(
-      point: LatLng(lat, lng),
-      width: 34,
-      height: 34,
+      point: location,
+      width: 48,
+      height: 58,
       child: GestureDetector(
         onTap: () {
           setState(() {
@@ -4870,14 +5384,17 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             _showLegalDocumentsPanel = false;
           });
 
-          _mapController.move(LatLng(lat, lng), 18);
+          _mapController.move(location, 16);
         },
         child: Tooltip(
           message: name,
-          child: Icon(
-            Icons.location_on,
-            color: _advertiserMarkerColor(data),
-            size: 34,
+          child: Transform.translate(
+            offset: const Offset(0, -22),
+            child: const AdaptiveAssetImage(
+              'data/icons/fire_green_icon.svg',
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+            ),
           ),
         ),
       ),
@@ -4918,10 +5435,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     for (final doc in advertisers) {
       final data = doc.data();
 
-      final lat = _toDouble(data['centerLat']);
-      final lng = _toDouble(data['centerLng']);
+      final location = _advertiserLocation(data);
 
-      if (lat != 0 && lng != 0 && bounds.contains(LatLng(lat, lng))) {
+      if (location != null && bounds.contains(location)) {
         count++;
       }
     }
@@ -5012,11 +5528,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
                     final validAdvertisers = adDocs.where((doc) {
                       final data = doc.data();
-                      final lat = _toDouble(data['centerLat']);
-                      final lng = _toDouble(data['centerLng']);
+                      final location = _advertiserLocation(data);
 
-                      return lat != 0 &&
-                          lng != 0 &&
+                      return location != null &&
                           _matchesAdvertiserFilter(data) &&
                           _matchesAdvertiserSearch(data);
                     }).toList();
@@ -5223,7 +5737,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         else if (_selectedSpot != null)
                           _buildSpotDetailPanel()
                         else if (_selectedAdvertiser != null)
-                          _buildAdvertiserDetailPanel()
+                          _buildAdvertiserApplicationPanel()
                         else if (_selectedAdmin != null)
                           _buildAdminDetailPanel(),
                       ],

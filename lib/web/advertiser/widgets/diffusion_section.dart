@@ -13,6 +13,7 @@ class DiffusionSection extends StatefulWidget {
   const DiffusionSection({
     super.key,
     required this.user,
+    this.requestId,
     required this.advertisingPosition,
     required this.advertisingVisual,
     required this.radiusKm,
@@ -20,9 +21,11 @@ class DiffusionSection extends StatefulWidget {
     required this.initialPreview,
     required this.onPreviewChanged,
     required this.onRadiusChanged,
+    this.requestedScope = 'local',
   });
 
   final User? user;
+  final String? requestId;
   final LatLng? advertisingPosition;
   final AdvertisingVisualData advertisingVisual;
   final double radiusKm;
@@ -30,12 +33,19 @@ class DiffusionSection extends StatefulWidget {
   final DiffusionPreviewData initialPreview;
   final ValueChanged<DiffusionPreviewData> onPreviewChanged;
   final ValueChanged<double> onRadiusChanged;
+  final String requestedScope;
 
   @override
   State<DiffusionSection> createState() => _DiffusionSectionState();
 }
 
 class _DiffusionSectionState extends State<DiffusionSection> {
+  String? get _requestId {
+    final value = widget.requestId?.trim() ?? '';
+    if (value.isNotEmpty) return value;
+    return widget.user?.uid;
+  }
+
   static const _options = <_DiffusionOption>[
     _DiffusionOption(
       value: 'map',
@@ -93,12 +103,12 @@ class _DiffusionSectionState extends State<DiffusionSection> {
   }
 
   Future<void> _initialiseDiffusion() async {
-    final user = widget.user;
-    if (user != null) {
+    final requestId = _requestId;
+    if (requestId != null) {
       try {
         final snapshot = await FirebaseFirestore.instance
             .collection('advertiserRequests')
-            .doc(user.uid)
+            .doc(requestId)
             .get();
         final data = snapshot.data();
         _requestExists = snapshot.exists;
@@ -239,21 +249,21 @@ class _DiffusionSectionState extends State<DiffusionSection> {
     });
 
     try {
-      final user = widget.user;
-      if (user != null) {
+      final requestId = _requestId;
+      if (requestId != null) {
         final creationData = _requestExists
             ? <String, Object?>{}
             : <String, Object?>{
-                'status': 'pending',
+                'status': 'approved',
                 'createdAt': FieldValue.serverTimestamp(),
               };
 
         await FirebaseFirestore.instance
             .collection('advertiserRequests')
-            .doc(user.uid)
+            .doc(requestId)
             .set({
               ...creationData,
-              'uid': user.uid,
+              'uid': requestId,
               'diffusionCompleted': true,
               'advertisingSpot': <String, Object?>{'radiusKm': widget.radiusKm},
               'diffusion': <String, Object?>{
@@ -360,8 +370,10 @@ class _DiffusionSectionState extends State<DiffusionSection> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'RAYON D’ACTION',
+              Text(
+                widget.requestedScope == 'national'
+                    ? 'PORTÉE NATIONALE'
+                    : 'RAYON D’ACTION',
                 style: TextStyle(
                   color: WebColors.blue,
                   fontSize: 16,
@@ -369,43 +381,49 @@ class _DiffusionSectionState extends State<DiffusionSection> {
                 ),
               ),
               const SizedBox(height: 5),
-              const Text(
-                'Vous pouvez ajuster ici la zone choisie à l’étape 3.',
+              Text(
+                widget.requestedScope == 'national'
+                    ? 'La portée validée s’applique à l’échelle nationale.'
+                    : 'Vous pouvez ajuster ici la zone choisie à l’étape 2.',
                 style: TextStyle(
                   color: Color(0xFF6B7280),
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: AdvertisingPricingConfig.radiusChoices.map((radius) {
-                  final selected = widget.radiusKm == radius;
-                  return OutlinedButton(
-                    onPressed: () => _selectRadius(radius),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: selected
-                          ? WebColors.red
-                          : WebColors.blue,
-                      backgroundColor: selected
-                          ? WebColors.red.withOpacity(0.045)
-                          : Colors.white,
-                      side: BorderSide(
-                        color: selected ? WebColors.red : WebColors.blue,
-                        width: selected ? 2 : 1.3,
+              if (widget.requestedScope != 'national') ...[
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: AdvertisingPricingConfig.radiusChoices.map((
+                    radius,
+                  ) {
+                    final selected = widget.radiusKm == radius;
+                    return OutlinedButton(
+                      onPressed: () => _selectRadius(radius),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: selected
+                            ? WebColors.red
+                            : WebColors.blue,
+                        backgroundColor: selected
+                            ? WebColors.red.withOpacity(0.045)
+                            : Colors.white,
+                        side: BorderSide(
+                          color: selected ? WebColors.red : WebColors.blue,
+                          width: selected ? 2 : 1.3,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(99),
+                        ),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(99),
+                      child: Text(
+                        AdvertisingPricingConfig.radiusLabel(radius),
+                        style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
-                    ),
-                    child: Text(
-                      AdvertisingPricingConfig.radiusLabel(radius),
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                  );
-                }).toList(),
-              ),
+                    );
+                  }).toList(),
+                ),
+              ],
               const SizedBox(height: 14),
               Text(
                 'À PARTIR DE ${widget.startingPriceExclTax} € HT / SEMAINE',

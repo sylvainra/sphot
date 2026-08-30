@@ -13,6 +13,7 @@ class PlanningSection extends StatefulWidget {
   const PlanningSection({
     super.key,
     required this.user,
+    this.requestId,
     required this.advertisingPosition,
     required this.radiusKm,
     required this.hasDiffusionSelection,
@@ -20,9 +21,11 @@ class PlanningSection extends StatefulWidget {
     required this.costExclTax,
     required this.initialPlanning,
     required this.onPlanningChanged,
+    this.requestedScope = 'local',
   });
 
   final User? user;
+  final String? requestId;
   final LatLng? advertisingPosition;
   final double radiusKm;
   final bool hasDiffusionSelection;
@@ -30,12 +33,19 @@ class PlanningSection extends StatefulWidget {
   final int costExclTax;
   final PlanningData initialPlanning;
   final ValueChanged<PlanningData> onPlanningChanged;
+  final String requestedScope;
 
   @override
   State<PlanningSection> createState() => _PlanningSectionState();
 }
 
 class _PlanningSectionState extends State<PlanningSection> {
+  String? get _requestId {
+    final value = widget.requestId?.trim() ?? '';
+    if (value.isNotEmpty) return value;
+    return widget.user?.uid;
+  }
+
   String _durationLabel = '1 semaine';
   late DateTime _startDate;
   late DateTime _endDate;
@@ -208,6 +218,9 @@ class _PlanningSectionState extends State<PlanningSection> {
         .collection('adRequests')
         .get();
     final periods = <DateTimeRange>[];
+    final nationalScope =
+        widget.requestedScope == 'national' ||
+        widget.requestedScope == 'local_and_national';
     for (final document in snapshot.docs) {
       final data = document.data();
       final status = (data['status'] ?? '').toString().toLowerCase();
@@ -220,7 +233,8 @@ class _PlanningSectionState extends State<PlanningSection> {
       }.contains(status)) {
         continue;
       }
-      if ((data['broadcastType'] ?? 'local').toString() == 'national') {
+      final existingScope = (data['broadcastType'] ?? 'local').toString();
+      if (!nationalScope && existingScope == 'national') {
         continue;
       }
 
@@ -228,12 +242,16 @@ class _PlanningSectionState extends State<PlanningSection> {
       final longitude = _toDouble(data['centerLng']);
       final start = _toDate(data['campaignStartDate']);
       final end = _toDate(data['campaignEndDate']);
-      if (latitude == null ||
-          longitude == null ||
-          start == null ||
-          end == null) {
+      if (start == null || end == null) {
         continue;
       }
+
+      if (nationalScope && existingScope == 'national') {
+        periods.add(DateTimeRange(start: start, end: end));
+        continue;
+      }
+
+      if (latitude == null || longitude == null) continue;
 
       final existingRadius = _toDouble(data['radiusKm']) ?? 0;
       final exclusiveDistance = widget.radiusKm + existingRadius;
@@ -247,12 +265,12 @@ class _PlanningSectionState extends State<PlanningSection> {
   }
 
   Future<void> _load() async {
-    final user = widget.user;
-    if (user != null) {
+    final requestId = _requestId;
+    if (requestId != null) {
       try {
         final snapshot = await FirebaseFirestore.instance
             .collection('advertiserRequests')
-            .doc(user.uid)
+            .doc(requestId)
             .get();
         final planning = _map(snapshot.data()?['planning']);
         final savedDuration = planning['durationLabel']?.toString();
@@ -380,13 +398,13 @@ class _PlanningSectionState extends State<PlanningSection> {
       return;
     }
     try {
-      final user = widget.user;
-      if (user != null) {
+      final requestId = _requestId;
+      if (requestId != null) {
         await FirebaseFirestore.instance
             .collection('advertiserRequests')
-            .doc(user.uid)
+            .doc(requestId)
             .set({
-              'uid': user.uid,
+              'uid': requestId,
               'planningCompleted': true,
               'planning': <String, Object?>{
                 'durationLabel': _durationLabel,
@@ -394,6 +412,7 @@ class _PlanningSectionState extends State<PlanningSection> {
                 'campaignEndDate': Timestamp.fromDate(_endDate),
                 'exclusiveReservation': true,
                 'availabilityStatus': 'available',
+                'requestedScope': widget.requestedScope,
                 'radiusKm': widget.radiusKm,
                 'confirmedAt': FieldValue.serverTimestamp(),
               },
@@ -573,16 +592,20 @@ class _PlanningSectionState extends State<PlanningSection> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _card(
-          const Row(
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.shield_outlined, color: WebColors.blue, size: 30),
-              SizedBox(width: 12),
+              const Icon(
+                Icons.shield_outlined,
+                color: WebColors.blue,
+                size: 30,
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'PLANIFICATION EXCLUSIVE',
                       style: TextStyle(
                         color: WebColors.blue,
@@ -590,10 +613,12 @@ class _PlanningSectionState extends State<PlanningSection> {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    SizedBox(height: 7),
+                    const SizedBox(height: 7),
                     Text(
-                      'Une seule campagne publicitaire peut être active dans le rayon et durant la période que vous avez choisis. Selon les dates disponibles, votre SPHOT publicitaire bénéficie ainsi d’une exclusivité d’affichage dans toute la zone sélectionnée et pendant toute la période réservée.',
-                      style: TextStyle(
+                      widget.requestedScope == 'national'
+                          ? 'Une seule campagne nationale peut être active pendant la période choisie. Selon les dates disponibles, votre SPHOT publicitaire bénéficie d’une exclusivité d’affichage nationale pendant toute la période réservée.'
+                          : 'Une seule campagne publicitaire peut être active dans la portée et durant la période choisies. Selon les dates disponibles, votre SPHOT publicitaire bénéficie ainsi d’une exclusivité d’affichage dans toute la zone sélectionnée et pendant toute la période réservée.',
+                      style: const TextStyle(
                         color: Color(0xFF4B5F97),
                         height: 1.4,
                         fontWeight: FontWeight.w700,

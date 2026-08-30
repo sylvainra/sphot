@@ -7,13 +7,14 @@ import 'package:latlong2/latlong.dart';
 
 import '../../web/admin/pages/admin_change_password_page.dart';
 import '../../web/admin/pages/admin_dashboard_page.dart';
+import '../../web/advertiser/pages/advertiser_change_password_page.dart';
+import '../../web/advertiser/pages/advertiser_dashboard_page.dart';
 
 class ProfessionalLoginPage extends StatefulWidget {
   const ProfessionalLoginPage({super.key});
 
   @override
-  State<ProfessionalLoginPage> createState() =>
-      _ProfessionalLoginPageState();
+  State<ProfessionalLoginPage> createState() => _ProfessionalLoginPageState();
 }
 
 class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
@@ -43,7 +44,12 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
     super.didChangeMetrics();
 
     final bottomInset = WidgetsBinding
-        .instance.platformDispatcher.views.first.viewInsets.bottom;
+        .instance
+        .platformDispatcher
+        .views
+        .first
+        .viewInsets
+        .bottom;
 
     if (bottomInset == 0 && _isEditing) {
       Future.delayed(const Duration(milliseconds: 80), () {
@@ -89,6 +95,24 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
     }
   }
 
+  Future<Map<String, dynamic>?> _tryLogin({
+    required String endpoint,
+    required String login,
+    required String password,
+  }) async {
+    final response = await http.post(
+      Uri.parse('https://us-central1-sphot-ab80b.cloudfunctions.net/$endpoint'),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({'login': login, 'password': password}),
+    );
+    if (response.statusCode != 200) return null;
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
+      return null;
+    }
+    return decoded;
+  }
+
   Future<void> _loginProfessional() async {
     if (_isLoggingIn) return;
 
@@ -104,7 +128,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
     if (login.isEmpty || password.isEmpty) {
       setState(() {
         _errorMessage =
-            'Veuillez renseigner votre adresse email et votre mot de passe.';
+            'Veuillez renseigner votre identifiant et votre mot de passe.';
       });
       return;
     }
@@ -114,32 +138,20 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
     });
 
     try {
-      final uri = Uri.parse(
-        'https://us-central1-sphot-ab80b.cloudfunctions.net/loginAdmin',
+      final adminSession = await _tryLogin(
+        endpoint: 'loginAdmin',
+        login: login,
+        password: password,
       );
+      final decoded =
+          adminSession ??
+          await _tryLogin(
+            endpoint: 'loginAdvertiser',
+            login: login,
+            password: password,
+          );
 
-      final response = await http.post(
-        uri,
-        headers: const {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'login': login,
-          'password': password,
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        if (!mounted) return;
-        setState(() {
-          _errorMessage = 'Identifiant ou mot de passe incorrect.';
-        });
-        return;
-      }
-
-      final decoded = jsonDecode(response.body);
-
-      if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
+      if (decoded == null) {
         if (!mounted) return;
         setState(() {
           _errorMessage = 'Identifiant ou mot de passe incorrect.';
@@ -148,41 +160,72 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
       }
 
       final mustChangePassword = decoded['mustChangePassword'] == true;
-      final adminUid = (decoded['adminUid'] ?? '').toString();
-      final territoireId = (decoded['territoireId'] ?? '').toString();
       final userRole = (decoded['userRole'] ?? 'ADMIN').toString();
-      final civilite = (decoded['civilite'] ?? '').toString();
       final prenom = (decoded['prenom'] ?? '').toString();
       final nom = (decoded['nom'] ?? '').toString();
 
       if (!mounted) return;
 
+      if (userRole.toUpperCase() == 'ANNONCEUR') {
+        final advertiserRequestId = (decoded['advertiserRequestId'] ?? '')
+            .toString();
+        if (mustChangePassword) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => AdvertiserChangePasswordPage(
+                login: login,
+                advertiserRequestId: advertiserRequestId,
+                firstName: prenom,
+                lastName: nom,
+              ),
+            ),
+          );
+          return;
+        }
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => AdvertiserDashboardPage(
+              user: null,
+              advertiserRequestId: advertiserRequestId,
+              approvedAccess: true,
+              onSignOut: () async {},
+            ),
+          ),
+          (route) => false,
+        );
+        return;
+      }
+
+      final adminUid = (decoded['adminUid'] ?? '').toString();
+      final territoireId = (decoded['territoireId'] ?? '').toString();
+      final civilite = (decoded['civilite'] ?? '').toString();
+
       if (mustChangePassword) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => AdminChangePasswordPage(
-  login: login,
-  adminUid: adminUid,
-  territoireId: territoireId,
-  userRole: userRole,
-  civilite: civilite,
-  prenom: prenom,
-  nom: nom,
-),
+              login: login,
+              adminUid: adminUid,
+              territoireId: territoireId,
+              userRole: userRole,
+              civilite: civilite,
+              prenom: prenom,
+              nom: nom,
+            ),
           ),
         );
         return;
       }
 
       Navigator.of(context).pushAndRemoveUntil(
-  MaterialPageRoute(
-    builder: (_) => AdminDashboardPage(
-      adminUid: adminUid,
-      territoireId: territoireId,
-    ),
-  ),
-  (route) => false,
-);
+        MaterialPageRoute(
+          builder: (_) => AdminDashboardPage(
+            adminUid: adminUid,
+            territoireId: territoireId,
+          ),
+        ),
+        (route) => false,
+      );
     } catch (error, stackTrace) {
       debugPrint('Erreur de connexion professionnelle : $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -190,8 +233,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
       if (!mounted) return;
 
       setState(() {
-        _errorMessage =
-            'Connexion impossible. Vérifiez votre connexion internet et réessayez.';
+        _errorMessage = 'Connexion impossible. Vérifiez votre connexion internet et réessayez.';
       });
     } finally {
       if (mounted) {
@@ -209,8 +251,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
 
     if (email.isEmpty) {
       setState(() {
-        _errorMessage =
-            'Renseignez votre adresse email avant de demander un nouveau mot de passe.';
+        _errorMessage = 'Renseignez votre identifiant avant de demander un nouveau mot de passe.';
       });
 
       _emailFocusNode.requestFocus();
@@ -242,48 +283,27 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(
-        color: _proColor,
-        fontWeight: FontWeight.w700,
-      ),
-      prefixIcon: Icon(
-        prefixIcon,
-        color: _proColor,
-      ),
+      hintStyle: const TextStyle(color: _proColor, fontWeight: FontWeight.w700),
+      prefixIcon: Icon(prefixIcon, color: _proColor),
       suffixIcon: suffixIcon,
       filled: true,
       fillColor: Colors.white.withValues(alpha: 0.10),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 18,
-        vertical: 16,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(
-          color: _proColor,
-          width: 2,
-        ),
+        borderSide: const BorderSide(color: _proColor, width: 2),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(
-          color: _proColor,
-          width: 2,
-        ),
+        borderSide: const BorderSide(color: _proColor, width: 2),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(
-          color: _proColor,
-          width: 2.5,
-        ),
+        borderSide: const BorderSide(color: _proColor, width: 2.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(
-          color: Colors.redAccent,
-          width: 2,
-        ),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 2),
       ),
     );
   }
@@ -295,10 +315,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
       decoration: BoxDecoration(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: _proColor,
-          width: 2.5,
-        ),
+        border: Border.all(color: _proColor, width: 2.5),
       ),
       child: Column(
         children: [
@@ -321,10 +338,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
             textInputAction: TextInputAction.next,
             autocorrect: false,
             enableSuggestions: false,
-            autofillHints: const [
-              AutofillHints.username,
-              AutofillHints.email,
-            ],
+            autofillHints: const [AutofillHints.username, AutofillHints.email],
             onTap: _activateEditingMode,
             onChanged: (_) {
               if (_errorMessage != null) {
@@ -341,7 +355,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
               fontWeight: FontWeight.w700,
             ),
             decoration: _buildInputDecoration(
-              hintText: 'Adresse email',
+              hintText: 'Identifiant ou adresse email',
               prefixIcon: Icons.alternate_email_rounded,
             ),
           ),
@@ -354,9 +368,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
             textInputAction: TextInputAction.done,
             autocorrect: false,
             enableSuggestions: false,
-            autofillHints: const [
-              AutofillHints.password,
-            ],
+            autofillHints: const [AutofillHints.password],
             onTap: _activateEditingMode,
             onChanged: (_) {
               if (_errorMessage != null) {
@@ -413,9 +425,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
           ),
           if (_errorMessage != null)
             Padding(
-              padding: const EdgeInsets.only(
-                bottom: 12,
-              ),
+              padding: const EdgeInsets.only(bottom: 12),
               child: Text(
                 _errorMessage!,
                 textAlign: TextAlign.center,
@@ -435,8 +445,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
                 backgroundColor: Colors.transparent,
                 foregroundColor: _proColor,
                 disabledBackgroundColor: Colors.transparent,
-                disabledForegroundColor:
-                    _proColor.withValues(alpha: 0.55),
+                disabledForegroundColor: _proColor.withValues(alpha: 0.55),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(18),
@@ -484,10 +493,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
           children: [
             // Low-resolution offline fallback. The live map below covers it
             // whenever map tiles are available.
-            Image.asset(
-              'data/images/map_background.jpg',
-              fit: BoxFit.cover,
-            ),
+            Image.asset('data/images/map_background.jpg', fit: BoxFit.cover),
             IgnorePointer(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -497,10 +503,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
 
                   return FlutterMap(
                     options: MapOptions(
-                      initialCenter: const LatLng(
-                        46.3893825,
-                        -1.4942598,
-                      ),
+                      initialCenter: const LatLng(46.3893825, -1.4942598),
                       initialZoom: initialZoom,
                       interactionOptions: const InteractionOptions(
                         flags: InteractiveFlag.none,
@@ -516,9 +519,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
                         userAgentPackageName: 'com.sylvainra.sphot',
                         keepBuffer: 5,
                         errorTileCallback: (tile, error, stackTrace) {
-                          debugPrint(
-                            'ERREUR FOND CARTE CONNEXION : $error',
-                          );
+                          debugPrint('ERREUR FOND CARTE CONNEXION : $error');
                         },
                       ),
                     ],
@@ -532,18 +533,14 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
                   return SingleChildScrollView(
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 26,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 26),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
                         minHeight: constraints.maxHeight,
                       ),
                       child: Center(
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            maxWidth: 520,
-                          ),
+                          constraints: const BoxConstraints(maxWidth: 520),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -560,50 +557,51 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
                                 maintainAnimation: true,
                                 maintainState: true,
                                 child: const Text(
-  'CONNEXION',
-  style: TextStyle(
-    fontSize: 32,
-    fontWeight: FontWeight.w900,
-    color: Color(0xFFEF4444),
-    letterSpacing: 0.5,
-  ),
-),
+                                  'CONNEXION',
+                                  style: TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFFEF4444),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
                               ),
                               const SizedBox(height: 18),
                               _buildProfessionalForm(),
                               const SizedBox(height: 20),
 
-Padding(
-  padding: const EdgeInsets.only(top: 180),
-  child: Container(
-    width: 54,
-    height: 54,
-    decoration: BoxDecoration(
-      color: Colors.transparent,
-      shape: BoxShape.circle,
-      border: Border.all(
-        color: _proColor,
-        width: 2,
-      ),
-    ),
-    child: IconButton(
-      tooltip: 'Retour',
-      onPressed: () {
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          '/',
-          (route) => false,
-        );
-      },
-      icon: const Icon(
-        Icons.arrow_back,
-        color: _proColor,
-        size: 28,
-      ),
-    ),
-  ),
-),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 180),
+                                child: Container(
+                                  width: 54,
+                                  height: 54,
+                                  decoration: BoxDecoration(
+                                    color: Colors.transparent,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: _proColor,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: IconButton(
+                                    tooltip: 'Retour',
+                                    onPressed: () {
+                                      Navigator.of(context)
+                                          .pushNamedAndRemoveUntil(
+                                            '/',
+                                            (route) => false,
+                                          );
+                                    },
+                                    icon: const Icon(
+                                      Icons.arrow_back,
+                                      color: _proColor,
+                                      size: 28,
+                                    ),
+                                  ),
+                                ),
+                              ),
 
-const SizedBox(height: 12),
+                              const SizedBox(height: 12),
                             ],
                           ),
                         ),

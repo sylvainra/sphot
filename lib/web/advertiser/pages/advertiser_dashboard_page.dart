@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +15,7 @@ import '../models/advertising_visual_data.dart';
 import '../models/diffusion_preview_data.dart';
 import '../models/planning_data.dart';
 import '../widgets/advertising_spot_section.dart';
+import '../widgets/advertiser_application_section.dart';
 import '../widgets/diffusion_central_preview.dart';
 import '../widgets/diffusion_section.dart';
 import '../widgets/establishment_section.dart';
@@ -26,11 +29,15 @@ class AdvertiserDashboardPage extends StatefulWidget {
     required this.user,
     required this.onSignOut,
     this.developmentBypass = false,
+    this.advertiserRequestId,
+    this.approvedAccess = false,
   });
 
   final User? user;
   final Future<void> Function() onSignOut;
   final bool developmentBypass;
+  final String? advertiserRequestId;
+  final bool approvedAccess;
 
   @override
   State<AdvertiserDashboardPage> createState() =>
@@ -38,21 +45,29 @@ class AdvertiserDashboardPage extends StatefulWidget {
 }
 
 class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
-  static const _sections = <_AdvertiserSection>[
+  static const _applicationSections = <_AdvertiserSection>[
     _AdvertiserSection(
-      'IDENTITÉ PROFESSIONNELLE',
+      'IDENTITÉ & ENTREPRISE',
       Icons.verified_user_outlined,
-      'Identité certifiée par ProConnect et informations de contact.',
+      'Présentez votre identité professionnelle et votre établissement.',
     ),
     _AdvertiserSection(
-      'ÉTABLISSEMENT',
-      Icons.storefront_outlined,
-      'Établissement, activité et coordonnées publiques.',
+      'LOCALISATION & DEMANDE',
+      Icons.fact_check_outlined,
+      'Positionnez votre établissement, indiquez la portée souhaitée et transmettez votre visuel.',
+    ),
+  ];
+
+  static const _approvedSections = <_AdvertiserSection>[
+    _AdvertiserSection(
+      'IDENTITÉ & ENTREPRISE',
+      Icons.verified_user_outlined,
+      'Profil professionnel validé par SPHOT.',
     ),
     _AdvertiserSection(
       'SPHOT PUBLICITAIRE',
       Icons.location_on_outlined,
-      'Positionnez votre SPHOT publicitaire.',
+      'Configurez le rayon de votre SPHOT publicitaire depuis la position et le visuel approuvés.',
     ),
     _AdvertiserSection(
       'DIFFUSION',
@@ -91,17 +106,135 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   DiffusionPreviewData _diffusionPreview = const DiffusionPreviewData();
   PlanningData _planningData = const PlanningData();
   Map<String, dynamic> _pricing = AdvertisingPricingConfig.defaults();
+  Map<String, dynamic> _requestData = <String, dynamic>{};
+  String _requestStatus = 'draft';
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  _requestSubscription;
+  bool _developmentApprovedPreview = false;
+  bool _restoredRequestAssets = false;
+
+  String? get _requestId {
+    final explicitId = widget.advertiserRequestId?.trim() ?? '';
+    if (explicitId.isNotEmpty) return explicitId;
+    if (widget.user != null) return widget.user!.uid;
+    if (widget.developmentBypass) return 'advertiser-dev-preview';
+    return null;
+  }
+
+  bool get _approvedFlow {
+    return widget.approvedAccess || _developmentApprovedPreview;
+  }
+
+  bool get _applicationLocked {
+    final status = _requestStatus.toLowerCase();
+    return status == 'pending' || _approvedFlow;
+  }
+
+  bool get _assetChangeAuthorized {
+    final request = _map(_requestData['assetChangeRequest']);
+    return request['status']?.toString() == 'authorized';
+  }
+
+  String get _assetChangeStatus {
+    final request = _map(_requestData['assetChangeRequest']);
+    return request['status']?.toString() ?? '';
+  }
+
+  String get _requestedScope =>
+      _requestData['requestedScope']?.toString() ?? 'local';
+
+  bool get _usesNationalPricing =>
+      _requestedScope == 'national' || _requestedScope == 'local_and_national';
+
+  List<_AdvertiserSection> get _sections =>
+      _approvedFlow ? _approvedSections : _applicationSections;
 
   @override
   void initState() {
     super.initState();
     _loadPricing();
+    _listenToRequest();
   }
 
   @override
   void dispose() {
+    _requestSubscription?.cancel();
     _detailScrollController.dispose();
     super.dispose();
+  }
+
+  void _listenToRequest() {
+    final requestId = _requestId;
+    if (requestId == null) return;
+    _requestSubscription = FirebaseFirestore.instance
+        .collection('advertiserRequests')
+        .doc(requestId)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            if (!mounted) return;
+            final data = snapshot.data() ?? <String, dynamic>{};
+            final status = (data['status'] ?? 'draft').toString();
+            setState(() {
+              _requestData = data;
+              _requestStatus = status;
+              if (_selectedIndex >= _sections.length) _selectedIndex = 0;
+            });
+            if (!_restoredRequestAssets) _restoreRequestAssets(data);
+          },
+          onError: (Object error) {
+            debugPrint('Écoute demande annonceur impossible : $error');
+          },
+        );
+  }
+
+  Map<String, dynamic> _map(Object? value) {
+    return value is Map ? Map<String, dynamic>.from(value) : {};
+  }
+
+  double? _double(Object? value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
+  }
+
+  int? _int(Object? value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  String? _nullableText(Object? value) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? null : text;
+  }
+
+  void _restoreRequestAssets(Map<String, dynamic> data) {
+    final approved = _map(data['approvedApplication']);
+    final location = approved.isNotEmpty
+        ? _map(approved['location'])
+        : _map(data['applicantLocation']);
+    final visual = approved.isNotEmpty
+        ? _map(approved['visual'])
+        : _map(data['proposedVisual']);
+    final latitude = _double(location['latitude']);
+    final longitude = _double(location['longitude']);
+    if (latitude != null && longitude != null) {
+      _setAdvertisingPoint(LatLng(latitude, longitude), centerMap: false);
+    }
+    final url = _nullableText(visual['url'] ?? data['bannerUrl']);
+    if (url != null) {
+      _setAdvertisingVisual(
+        AdvertisingVisualData(
+          url: url,
+          fileName: _nullableText(visual['fileName']),
+          extension: _nullableText(visual['extension']),
+          mimeType: _nullableText(visual['mimeType']),
+          fileSizeBytes: _int(visual['fileSizeBytes']),
+          width: _int(visual['width']),
+          height: _int(visual['height']),
+        ),
+      );
+    }
+    _restoredRequestAssets = true;
   }
 
   Future<void> _loadPricing() async {
@@ -134,6 +267,13 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     String? visibilityType,
     double? radiusKm,
   }) {
+    if (_usesNationalPricing) {
+      return AdvertisingPricingConfig.nationalPrice(
+        pricing: _pricing,
+        durationLabel: durationLabel,
+        visibilityType: visibilityType ?? _visibilityType,
+      );
+    }
     return AdvertisingPricingConfig.localPrice(
       pricing: _pricing,
       durationLabel: durationLabel,
@@ -256,6 +396,31 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                 ),
               ),
               const SizedBox(height: 18),
+              if (widget.developmentBypass) ...[
+                OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _developmentApprovedPreview =
+                          !_developmentApprovedPreview;
+                      _selectedIndex = 0;
+                    });
+                  },
+                  icon: Icon(
+                    _approvedFlow
+                        ? Icons.lock_open_rounded
+                        : Icons.fact_check_outlined,
+                  ),
+                  label: Text(
+                    _approvedFlow ? 'APERÇU VALIDÉ' : 'APERÇU CANDIDAT',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: WebColors.blue,
+                    side: const BorderSide(color: WebColors.blue),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -277,9 +442,17 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   }
 
   Widget _buildMap() {
-    if (_selectedIndex == 3 && _diffusionPreview.hasSelection) {
+    if (_approvedFlow &&
+        _selectedIndex == 2 &&
+        _diffusionPreview.hasSelection) {
       return DiffusionCentralPreview(data: _diffusionPreview);
     }
+
+    final canSelectApplicationPosition =
+        !_approvedFlow && _selectedIndex == 1 && !_applicationLocked;
+    final canEditApprovedPosition =
+        _approvedFlow && _selectedIndex == 1 && _assetChangeAuthorized;
+    final showApprovedRadius = _approvedFlow && _selectedIndex == 1;
 
     return Stack(
       fit: StackFit.expand,
@@ -287,11 +460,11 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
         FlutterMap(
           mapController: _mapController,
           options: MapOptions(
-            initialCenter: const LatLng(46.6, 2.4),
-            initialZoom: 5.4,
-            minZoom: 4,
+            initialCenter: const LatLng(20, 0),
+            initialZoom: 2.2,
+            minZoom: 2,
             maxZoom: 18,
-            onTap: _selectedIndex == 2
+            onTap: canSelectApplicationPosition || canEditApprovedPosition
                 ? (_, point) => _setAdvertisingPoint(point, centerMap: false)
                 : null,
           ),
@@ -300,7 +473,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.sphot.app',
             ),
-            if (_selectedIndex == 2 &&
+            if (showApprovedRadius &&
                 _advertisingPoint != null &&
                 _advertisingRadiusKm > 0)
               CircleLayer(
@@ -336,7 +509,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               ),
           ],
         ),
-        if (_selectedIndex == 2)
+        if (canSelectApplicationPosition || canEditApprovedPosition)
           Positioned(
             top: 88,
             left: 20,
@@ -353,14 +526,64 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: WebColors.blue, width: 1.4),
                   ),
-                  child: const Text(
-                    'CLIQUEZ SUR LA CARTE POUR AJUSTER LE SPHOT PUBLICITAIRE',
+                  child: Text(
+                    canEditApprovedPosition
+                        ? 'CLIQUEZ SUR LA CARTE POUR PROPOSER UNE NOUVELLE POSITION'
+                        : 'CLIQUEZ SUR LA CARTE POUR POSITIONNER VOTRE ÉTABLISSEMENT',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: WebColors.blue,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
+                ),
+              ),
+            ),
+          ),
+        if (_selectedIndex == 0)
+          Positioned(
+            top: 92,
+            left: 20,
+            right: 20,
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 620),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: WebColors.blue, width: 1.6),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x22000000),
+                      blurRadius: 16,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'UNE VISIBILITÉ QUI S’ADAPTE À LA CARTE',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: WebColors.blue,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'La carte s’ouvre sur le monde. Les campagnes locales se révèlent lorsque l’utilisateur explore leur zone ; les campagnes nationales sont étudiées pour une présence à plus grande échelle. Le niveau de zoom permet ainsi de présenter une publicité pertinente sans saturer la carte.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF4B5F97),
+                        height: 1.4,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -474,15 +697,57 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   }
 
   List<Widget> _buildSectionContent(int index) {
+    if (!_approvedFlow) {
+      switch (index) {
+        case 0:
+          return [
+            IdentityProfessionalSection(
+              user: widget.user,
+              requestId: _requestId,
+              readOnly: _applicationLocked,
+            ),
+            const SizedBox(height: 8),
+            EstablishmentSection(
+              user: widget.user,
+              requestId: _requestId,
+              readOnly: _applicationLocked,
+            ),
+          ];
+        default:
+          return [
+            AdvertiserApplicationSection(
+              user: widget.user,
+              requestId: _requestId,
+              position: _advertisingPoint,
+              initialVisual: _advertisingVisual,
+              requestStatus: _requestStatus,
+              onPositionChanged: _setAdvertisingPoint,
+              onVisualChanged: _setAdvertisingVisual,
+            ),
+          ];
+      }
+    }
+
     switch (index) {
       case 0:
-        return [IdentityProfessionalSection(user: widget.user)];
+        return [
+          IdentityProfessionalSection(
+            user: widget.user,
+            requestId: _requestId,
+            readOnly: true,
+          ),
+          const SizedBox(height: 8),
+          EstablishmentSection(
+            user: widget.user,
+            requestId: _requestId,
+            readOnly: true,
+          ),
+        ];
       case 1:
-        return [EstablishmentSection(user: widget.user)];
-      case 2:
         return [
           AdvertisingSpotSection(
             user: widget.user,
+            requestId: _requestId,
             position: _advertisingPoint,
             initialVisual: _advertisingVisual,
             initialRadiusKm: _advertisingRadiusKm,
@@ -493,12 +758,17 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             onPositionChanged: _setAdvertisingPoint,
             onVisualChanged: _setAdvertisingVisual,
             onRadiusChanged: _setAdvertisingRadius,
+            approvedAssetsLocked: !_assetChangeAuthorized,
+            assetChangeMode: _assetChangeAuthorized,
+            assetChangeRequestStatus: _assetChangeStatus,
+            requestedScope: _requestedScope,
           ),
         ];
-      case 3:
+      case 2:
         return [
           DiffusionSection(
             user: widget.user,
+            requestId: _requestId,
             advertisingPosition: _advertisingPoint,
             advertisingVisual: _advertisingVisual,
             radiusKm: _advertisingRadiusKm,
@@ -506,12 +776,14 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             initialPreview: _diffusionPreview,
             onPreviewChanged: _setDiffusionPreview,
             onRadiusChanged: _setAdvertisingRadius,
+            requestedScope: _requestedScope,
           ),
         ];
-      case 4:
+      case 3:
         return [
           PlanningSection(
             user: widget.user,
+            requestId: _requestId,
             advertisingPosition: _advertisingPoint,
             radiusKm: _advertisingRadiusKm,
             hasDiffusionSelection: _diffusionPreview.hasSelection,
@@ -521,12 +793,14 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             ),
             initialPlanning: _planningData,
             onPlanningChanged: _setPlanningData,
+            requestedScope: _requestedScope,
           ),
         ];
-      case 5:
+      case 4:
         return [
           QuoteOrderSection(
             user: widget.user,
+            requestId: _requestId,
             radiusKm: _advertisingRadiusKm,
             diffusionType: _diffusionPreview.type,
             planning: _planningData,
@@ -536,10 +810,14 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             durationPrices: _durationPrices,
             onRadiusChanged: _setAdvertisingRadius,
             onDiffusionChanged: _setDiffusionType,
-            onEditStep: _selectSection,
+            requestedScope: _requestedScope,
+            onEditStep: (oldStep) {
+              final mergedStep = oldStep <= 1 ? 0 : oldStep - 1;
+              _selectSection(mergedStep);
+            },
           ),
         ];
-      case 6:
+      case 5:
         return const [
           _StatusCard(
             icon: Icons.receipt_long_outlined,

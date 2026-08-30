@@ -11,6 +11,7 @@ class QuoteOrderSection extends StatefulWidget {
   const QuoteOrderSection({
     super.key,
     required this.user,
+    this.requestId,
     required this.radiusKm,
     required this.diffusionType,
     required this.planning,
@@ -19,9 +20,11 @@ class QuoteOrderSection extends StatefulWidget {
     required this.onRadiusChanged,
     required this.onDiffusionChanged,
     required this.onEditStep,
+    this.requestedScope = 'local',
   });
 
   final User? user;
+  final String? requestId;
   final double radiusKm;
   final DiffusionPreviewType? diffusionType;
   final PlanningData planning;
@@ -30,12 +33,19 @@ class QuoteOrderSection extends StatefulWidget {
   final ValueChanged<double> onRadiusChanged;
   final ValueChanged<DiffusionPreviewType> onDiffusionChanged;
   final ValueChanged<int> onEditStep;
+  final String requestedScope;
 
   @override
   State<QuoteOrderSection> createState() => _QuoteOrderSectionState();
 }
 
 class _QuoteOrderSectionState extends State<QuoteOrderSection> {
+  String? get _requestId {
+    final value = widget.requestId?.trim() ?? '';
+    if (value.isNotEmpty) return value;
+    return widget.user?.uid;
+  }
+
   bool _loading = true;
   String _professionalIdentity = 'À compléter';
   String _establishment = 'À compléter';
@@ -66,12 +76,12 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
   }
 
   Future<void> _loadSummary() async {
-    final user = widget.user;
-    if (user != null) {
+    final requestId = _requestId;
+    if (requestId != null) {
       try {
         final snapshot = await FirebaseFirestore.instance
             .collection('advertiserRequests')
-            .doc(user.uid)
+            .doc(requestId)
             .get();
         final data = snapshot.data() ?? <String, dynamic>{};
         final identity = _map(data['professionalIdentity']);
@@ -299,9 +309,13 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
         _summaryCard(
           step: 2,
           title: 'SPHOT PUBLICITAIRE ET RAYON',
-          value: AdvertisingPricingConfig.radiusLabel(widget.radiusKm),
+          value: widget.requestedScope == 'national'
+              ? 'Portée nationale'
+              : widget.requestedScope == 'local_and_national'
+              ? 'Portée nationale + ${AdvertisingPricingConfig.radiusLabel(widget.radiusKm)} en local'
+              : AdvertisingPricingConfig.radiusLabel(widget.radiusKm),
           icon: Icons.location_on_outlined,
-          child: _radiusChoices(),
+          child: widget.requestedScope == 'national' ? null : _radiusChoices(),
         ),
         _summaryCard(
           step: 3,

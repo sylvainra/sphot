@@ -16,6 +16,7 @@ class AdvertisingSpotSection extends StatefulWidget {
   const AdvertisingSpotSection({
     super.key,
     required this.user,
+    this.requestId,
     required this.position,
     required this.initialVisual,
     required this.initialRadiusKm,
@@ -23,9 +24,14 @@ class AdvertisingSpotSection extends StatefulWidget {
     required this.onPositionChanged,
     required this.onVisualChanged,
     required this.onRadiusChanged,
+    this.approvedAssetsLocked = false,
+    this.assetChangeMode = false,
+    this.assetChangeRequestStatus = '',
+    this.requestedScope = 'local',
   });
 
   final User? user;
+  final String? requestId;
   final LatLng? position;
   final AdvertisingVisualData initialVisual;
   final double initialRadiusKm;
@@ -34,6 +40,10 @@ class AdvertisingSpotSection extends StatefulWidget {
   onPositionChanged;
   final ValueChanged<AdvertisingVisualData> onVisualChanged;
   final ValueChanged<double> onRadiusChanged;
+  final bool approvedAssetsLocked;
+  final bool assetChangeMode;
+  final String assetChangeRequestStatus;
+  final String requestedScope;
 
   @override
   State<AdvertisingSpotSection> createState() => _AdvertisingSpotSectionState();
@@ -55,6 +65,12 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   int? _bannerWidth;
   int? _bannerHeight;
   String? _error;
+
+  String? get _requestId {
+    final value = widget.requestId?.trim() ?? '';
+    if (value.isNotEmpty) return value;
+    return widget.user?.uid;
+  }
 
   @override
   void initState() {
@@ -88,22 +104,35 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   }
 
   Future<void> _initialiseSpot() async {
-    final user = widget.user;
-    if (user != null) {
+    final requestId = _requestId;
+    if (requestId != null) {
       try {
         final snapshot = await FirebaseFirestore.instance
             .collection('advertiserRequests')
-            .doc(user.uid)
+            .doc(requestId)
             .get();
         final data = snapshot.data();
         _requestExists = snapshot.exists;
 
         if (data != null) {
+          final approvedApplication = _map(data['approvedApplication']);
+          final approvedLocation = _map(approvedApplication['location']);
+          final approvedVisual = _map(approvedApplication['visual']);
           final advertisingSpot = _map(data['advertisingSpot']);
+          final applicantLocation = _map(data['applicantLocation']);
+          final proposedVisual = _map(data['proposedVisual']);
           final legacyDiffusion = _map(data['diffusion']);
 
-          final latitude = _toDouble(advertisingSpot['latitude']);
-          final longitude = _toDouble(advertisingSpot['longitude']);
+          final latitude = _toDouble(
+            approvedLocation['latitude'] ??
+                advertisingSpot['latitude'] ??
+                applicantLocation['latitude'],
+          );
+          final longitude = _toDouble(
+            approvedLocation['longitude'] ??
+                advertisingSpot['longitude'] ??
+                applicantLocation['longitude'],
+          );
           final savedRadius = _toDouble(
             advertisingSpot['radiusKm'] ?? legacyDiffusion['radiusKm'],
           );
@@ -120,32 +149,48 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             });
           }
           final savedBannerUrl = _nullableText(
-            advertisingSpot['bannerUrl'] ?? legacyDiffusion['bannerUrl'],
+            approvedVisual['url'] ??
+                advertisingSpot['bannerUrl'] ??
+                proposedVisual['url'] ??
+                legacyDiffusion['bannerUrl'],
           );
           if (savedBannerUrl != null) {
             _bannerUrl = savedBannerUrl;
             _bannerBytes = null;
             _bannerFileName = _nullableText(
-              advertisingSpot['bannerFileName'] ??
+              approvedVisual['fileName'] ??
+                  advertisingSpot['bannerFileName'] ??
+                  proposedVisual['fileName'] ??
                   legacyDiffusion['bannerFileName'],
             );
             _bannerExtension = _nullableText(
-              advertisingSpot['bannerExtension'] ??
+              approvedVisual['extension'] ??
+                  advertisingSpot['bannerExtension'] ??
+                  proposedVisual['extension'] ??
                   legacyDiffusion['bannerExtension'],
             );
             _bannerMimeType = _nullableText(
-              advertisingSpot['bannerMimeType'] ??
+              approvedVisual['mimeType'] ??
+                  advertisingSpot['bannerMimeType'] ??
+                  proposedVisual['mimeType'] ??
                   legacyDiffusion['bannerMimeType'],
             );
             _bannerFileSizeBytes = _toInt(
-              advertisingSpot['bannerFileSizeBytes'] ??
+              approvedVisual['fileSizeBytes'] ??
+                  advertisingSpot['bannerFileSizeBytes'] ??
+                  proposedVisual['fileSizeBytes'] ??
                   legacyDiffusion['bannerFileSizeBytes'],
             );
             _bannerWidth = _toInt(
-              advertisingSpot['bannerWidth'] ?? legacyDiffusion['bannerWidth'],
+              approvedVisual['width'] ??
+                  advertisingSpot['bannerWidth'] ??
+                  proposedVisual['width'] ??
+                  legacyDiffusion['bannerWidth'],
             );
             _bannerHeight = _toInt(
-              advertisingSpot['bannerHeight'] ??
+              approvedVisual['height'] ??
+                  advertisingSpot['bannerHeight'] ??
+                  proposedVisual['height'] ??
                   legacyDiffusion['bannerHeight'],
             );
           }
@@ -214,6 +259,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   }
 
   Future<void> _pickBanner() async {
+    if (widget.approvedAssetsLocked) return;
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (picked == null) return;
 
@@ -312,6 +358,37 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     return reference.getDownloadURL();
   }
 
+  Future<void> _requestAssetModification() async {
+    final requestId = _requestId;
+    if (requestId == null) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('advertiserRequests')
+          .doc(requestId)
+          .set({
+            'assetChangeRequest': <String, Object?>{
+              'status': 'pending',
+              'requestedAt': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            },
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Votre demande de modification a été transmise au Super Admin.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = 'La demande de modification a échoué.');
+      }
+    }
+  }
+
   Future<void> _save() async {
     final position = widget.position;
     if (position == null) {
@@ -333,46 +410,74 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     });
 
     try {
-      final user = widget.user;
+      final requestId = _requestId;
       var bannerUrl = _bannerUrl;
-      if (user != null) {
-        bannerUrl = await _uploadBanner(user.uid);
+      if (requestId != null) {
+        bannerUrl = await _uploadBanner(requestId);
         final creationData = _requestExists
             ? <String, Object?>{}
             : <String, Object?>{
-                'status': 'pending',
+                'status': 'draft',
                 'createdAt': FieldValue.serverTimestamp(),
               };
-        await FirebaseFirestore.instance
+        final requestReference = FirebaseFirestore.instance
             .collection('advertiserRequests')
-            .doc(user.uid)
-            .set({
-              ...creationData,
-              'uid': user.uid,
-              'advertisingSpotCompleted': true,
-              'advertisingSpot': <String, Object?>{
-                'latitude': position.latitude,
-                'longitude': position.longitude,
-                'radiusKm': _radiusKm,
-                'bannerUrl': bannerUrl,
-                'bannerFileName': _bannerFileName,
-                'bannerExtension': _bannerExtension,
-                'bannerMimeType': _bannerMimeType,
-                'bannerFileSizeBytes': _bannerFileSizeBytes,
-                'bannerWidth': _bannerWidth,
-                'bannerHeight': _bannerHeight,
-                'confirmedAt': FieldValue.serverTimestamp(),
-              },
-              'diffusion': <String, Object?>{'radiusKm': FieldValue.delete()},
+            .doc(requestId);
+        if (widget.assetChangeMode) {
+          await requestReference.set({
+            'applicantLocation': <String, Object?>{
+              'latitude': position.latitude,
+              'longitude': position.longitude,
+              'selectedAt': FieldValue.serverTimestamp(),
+            },
+            'proposedVisual': <String, Object?>{
+              'url': bannerUrl,
+              'fileName': _bannerFileName,
+              'extension': _bannerExtension,
+              'mimeType': _bannerMimeType,
+              'fileSizeBytes': _bannerFileSizeBytes,
+              'width': _bannerWidth,
+              'height': _bannerHeight,
+            },
+            'assetChangeRequest': <String, Object?>{
+              'status': 'submitted',
+              'submittedAt': FieldValue.serverTimestamp(),
               'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
+            },
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+          await requestReference.update({
+            'advertisingSpot.radiusKm': _radiusKm,
+          });
+        } else {
+          await requestReference.set({
+            ...creationData,
+            'uid': requestId,
+            'advertisingSpotCompleted': true,
+            'advertisingSpot': <String, Object?>{
+              'latitude': position.latitude,
+              'longitude': position.longitude,
+              'radiusKm': _radiusKm,
+              'bannerUrl': bannerUrl,
+              'bannerFileName': _bannerFileName,
+              'bannerExtension': _bannerExtension,
+              'bannerMimeType': _bannerMimeType,
+              'bannerFileSizeBytes': _bannerFileSizeBytes,
+              'bannerWidth': _bannerWidth,
+              'bannerHeight': _bannerHeight,
+              'confirmedAt': FieldValue.serverTimestamp(),
+            },
+            'diffusion': <String, Object?>{'radiusKm': FieldValue.delete()},
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
         _requestExists = true;
       }
 
       if (!mounted) return;
       setState(() {
         _bannerUrl = bannerUrl;
-        if (user != null) _bannerBytes = null;
+        if (requestId != null) _bannerBytes = null;
         _completed = true;
       });
       _notifyVisual();
@@ -436,7 +541,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           ),
           const SizedBox(height: 14),
           OutlinedButton.icon(
-            onPressed: _saving ? null : _pickBanner,
+            onPressed: _saving || widget.approvedAssetsLocked
+                ? null
+                : _pickBanner,
             style: OutlinedButton.styleFrom(
               foregroundColor: WebColors.blue,
               side: const BorderSide(color: WebColors.blue, width: 1.5),
@@ -447,7 +554,11 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             ),
             icon: const Icon(Icons.upload_file_outlined),
             label: Text(
-              hasBanner ? 'REMPLACER LE VISUEL' : 'AJOUTER LE VISUEL',
+              widget.approvedAssetsLocked
+                  ? 'VISUEL VALIDÉ — LECTURE SEULE'
+                  : hasBanner
+                  ? 'REMPLACER LE VISUEL'
+                  : 'AJOUTER LE VISUEL',
               style: const TextStyle(fontWeight: FontWeight.w900),
             ),
           ),
@@ -620,6 +731,33 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     );
   }
 
+  Widget _buildApprovedScopeCard() {
+    final label = switch (widget.requestedScope) {
+      'national' => 'NATIONALE',
+      'local_and_national' => 'LOCALE ET NATIONALE',
+      _ => 'LOCALE',
+    };
+    final description = switch (widget.requestedScope) {
+      'national' => 'Votre portée nationale a été validée. La tarification nationale s’applique sans choix de rayon local.',
+      'local_and_national' => 'Votre présence nationale est complétée par le rayon local configuré autour de votre SPHOT.',
+      _ => 'Votre campagne est configurée autour du SPHOT et selon le rayon d’action sélectionné.',
+    };
+    return _SpotCard(
+      icon: Icons.public_rounded,
+      title: 'PORTÉE VALIDÉE',
+      status: label,
+      statusColor: const Color(0xFF15803D),
+      child: Text(
+        description,
+        style: const TextStyle(
+          color: Color(0xFF4B5F97),
+          height: 1.4,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -649,9 +787,11 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'Déplacez et zoomez la carte, puis cliquez à l’emplacement exact de votre SPHOT publicitaire.',
-                style: TextStyle(
+              Text(
+                widget.approvedAssetsLocked
+                    ? 'Position validée par SPHOT. Demandez une modification pour proposer un nouvel emplacement.'
+                    : 'Déplacez et zoomez la carte, puis cliquez à l’emplacement exact de votre SPHOT publicitaire.',
+                style: const TextStyle(
                   color: Color(0xFF4B5F97),
                   height: 1.4,
                   fontWeight: FontWeight.w700,
@@ -660,9 +800,50 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             ],
           ),
         ),
+        _buildApprovedScopeCard(),
         _buildBannerCard(),
-        _buildReachCard(),
-        _buildRadiusCard(),
+        if (widget.approvedAssetsLocked)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: OutlinedButton.icon(
+              onPressed:
+                  widget.assetChangeRequestStatus == 'pending' ||
+                      widget.assetChangeRequestStatus == 'submitted'
+                  ? null
+                  : _requestAssetModification,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: WebColors.blue,
+                side: const BorderSide(color: WebColors.blue, width: 1.5),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+              ),
+              icon: const Icon(Icons.edit_location_alt_outlined),
+              label: Text(
+                widget.assetChangeRequestStatus == 'pending'
+                    ? 'DEMANDE DE MODIFICATION EN ATTENTE'
+                    : widget.assetChangeRequestStatus == 'submitted'
+                    ? 'NOUVELLE VERSION EN COURS DE CONTRÔLE'
+                    : 'DEMANDER UNE MODIFICATION DU VISUEL OU DE LA POSITION',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+        if (widget.requestedScope != 'national') ...[
+          _buildReachCard(),
+          _buildRadiusCard(),
+        ] else
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Text(
+              'À PARTIR DE ${widget.startingPriceExclTax} € HT / SEMAINE — TARIF NATIONAL',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: WebColors.red,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),

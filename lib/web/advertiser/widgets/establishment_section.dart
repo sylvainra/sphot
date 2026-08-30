@@ -7,9 +7,16 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../shared/web_colors.dart';
 
 class EstablishmentSection extends StatefulWidget {
-  const EstablishmentSection({super.key, required this.user});
+  const EstablishmentSection({
+    super.key,
+    required this.user,
+    this.requestId,
+    this.readOnly = false,
+  });
 
   final User? user;
+  final String? requestId;
+  final bool readOnly;
 
   @override
   State<EstablishmentSection> createState() => _EstablishmentSectionState();
@@ -57,6 +64,12 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   bool _requestExists = false;
   String? _error;
 
+  String? get _requestId {
+    final value = widget.requestId?.trim() ?? '';
+    if (value.isNotEmpty) return value;
+    return widget.user?.uid;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -85,12 +98,12 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   }
 
   Future<void> _initialiseEstablishment() async {
-    final user = widget.user;
-    if (user != null) {
+    final requestId = _requestId;
+    if (requestId != null) {
       try {
         final snapshot = await FirebaseFirestore.instance
             .collection('advertiserRequests')
-            .doc(user.uid)
+            .doc(requestId)
             .get();
         final data = snapshot.data();
         _requestExists = snapshot.exists;
@@ -398,6 +411,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   }
 
   Future<void> _save() async {
+    if (widget.readOnly) return;
     FocusScope.of(context).unfocus();
     final formIsValid = _formKey.currentState?.validate() ?? false;
     final otherActivityIsValid =
@@ -414,7 +428,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     });
 
     try {
-      final user = widget.user;
+      final requestId = _requestId;
       final siret = _digits(_siretController.text);
       final siren = _digits(_sirenController.text);
       final legalName = _legalNameController.text.trim();
@@ -423,20 +437,20 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
       final publicEmail = _publicEmailController.text.trim();
       final websiteUrl = _websiteController.text.trim();
 
-      if (user != null) {
+      if (requestId != null) {
         final creationData = _requestExists
             ? <String, Object?>{}
             : <String, Object?>{
-                'status': 'pending',
+                'status': 'draft',
                 'createdAt': FieldValue.serverTimestamp(),
               };
 
         await FirebaseFirestore.instance
             .collection('advertiserRequests')
-            .doc(user.uid)
+            .doc(requestId)
             .set({
               ...creationData,
-              'uid': user.uid,
+              'uid': requestId,
               'organisation': legalName,
               'advertiserName': businessName,
               'siret': siret,
@@ -519,216 +533,231 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
       );
     }
 
-    return Form(
-      key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.readOnly)
           _EstablishmentCard(
-            icon: Icons.storefront_outlined,
-            title: 'INFORMATIONS DE L’ÉTABLISSEMENT',
-            status: _completed ? 'COMPLET' : 'À COMPLÉTER',
-            statusColor: _completed
-                ? const Color(0xFF15803D)
-                : const Color(0xFF6B7280),
+            icon: Icons.lock_outline_rounded,
+            title: 'ÉTABLISSEMENT VALIDÉ PAR SPHOT',
+            status: 'LECTURE SEULE',
+            statusColor: const Color(0xFF15803D),
+            child: const Text(
+              'Une modification de ces informations nécessitera un nouveau contrôle.',
+              style: TextStyle(
+                color: WebColors.blue,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ),
+        IgnorePointer(
+          ignoring: widget.readOnly,
+          child: Form(
+            key: _formKey,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _EstablishmentField(
-                  controller: _legalNameController,
-                  label: 'Raison sociale *',
-                  validator: _requiredValidator,
-                  onChanged: _markAsModified,
-                ),
-                _EstablishmentField(
-                  controller: _businessNameController,
-                  label: 'Nom commercial / marque *',
-                  validator: _requiredValidator,
-                  onChanged: _markAsModified,
-                ),
-                FormField<String>(
-                  initialValue: _activityType,
-                  validator: (value) =>
-                      value == null ? 'Sélectionnez un type d’activité' : null,
-                  builder: (fieldState) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: GestureDetector(
-                      key: _activityFieldKey,
-                      onTap: () => _openActivityMenu(fieldState),
-                      child: InputDecorator(
-                        decoration: _activityFieldDecoration(
-                          'Type d’activité *',
-                        ).copyWith(errorText: fieldState.errorText),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _activityType == null
-                                    ? 'Sélectionnez une activité'
-                                    : _activityType == 'Autre' &&
-                                          _otherActivityController.text
-                                              .trim()
-                                              .isNotEmpty
-                                    ? 'Autre — ${_otherActivityController.text.trim()}'
-                                    : _activityType!,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: _activityType == null
-                                      ? const Color(0xFF4B5F97)
-                                      : WebColors.blue,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                _EstablishmentCard(
+                  icon: Icons.storefront_outlined,
+                  title: 'INFORMATIONS DE L’ÉTABLISSEMENT',
+                  status: _completed ? 'COMPLET' : 'À COMPLÉTER',
+                  statusColor: _completed
+                      ? const Color(0xFF15803D)
+                      : const Color(0xFF6B7280),
+                  child: Column(
+                    children: [
+                      _EstablishmentField(
+                        controller: _legalNameController,
+                        label: 'Raison sociale *',
+                        validator: _requiredValidator,
+                        onChanged: _markAsModified,
+                      ),
+                      _EstablishmentField(
+                        controller: _businessNameController,
+                        label: 'Nom commercial / marque *',
+                        validator: _requiredValidator,
+                        onChanged: _markAsModified,
+                      ),
+                      FormField<String>(
+                        initialValue: _activityType,
+                        validator: (value) => value == null
+                            ? 'Sélectionnez un type d’activité'
+                            : null,
+                        builder: (fieldState) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: GestureDetector(
+                            key: _activityFieldKey,
+                            onTap: widget.readOnly
+                                ? null
+                                : () => _openActivityMenu(fieldState),
+                            child: InputDecorator(
+                              decoration: _activityFieldDecoration(
+                                'Type d’activité *',
+                              ).copyWith(errorText: fieldState.errorText),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _activityType == null
+                                          ? 'Sélectionnez une activité'
+                                          : _activityType == 'Autre' &&
+                                                _otherActivityController.text
+                                                    .trim()
+                                                    .isNotEmpty
+                                          ? 'Autre — ${_otherActivityController.text.trim()}'
+                                          : _activityType!,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: _activityType == null
+                                            ? const Color(0xFF4B5F97)
+                                            : WebColors.blue,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                    color: WebColors.red,
+                                  ),
+                                ],
                               ),
                             ),
-                            const Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: WebColors.red,
-                            ),
-                          ],
+                          ),
                         ),
+                      ),
+                      _EstablishmentField(
+                        controller: _siretController,
+                        label: 'SIRET *',
+                        validator: _siretValidator,
+                        onChanged: _markAsModified,
+                        keyboardType: TextInputType.number,
+                        digitsOnly: true,
+                        maxLength: 14,
+                      ),
+                      _EstablishmentField(
+                        controller: _sirenController,
+                        label: 'SIREN calculé depuis le SIRET',
+                        validator: _requiredValidator,
+                        onChanged: _markAsModified,
+                        readOnly: true,
+                      ),
+                    ],
+                  ),
+                ),
+                _EstablishmentCard(
+                  iconWidget: SvgPicture.asset(
+                    'data/icons/fire_blue_icon.svg',
+                    width: 30,
+                    height: 30,
+                    fit: BoxFit.contain,
+                  ),
+                  title: 'ADRESSE DE L’ÉTABLISSEMENT',
+                  status: 'RÉSERVÉE AU CONTRÔLE SPHOT',
+                  child: Column(
+                    children: [
+                      _EstablishmentField(
+                        controller: _addressController,
+                        label: 'Adresse *',
+                        validator: _requiredValidator,
+                        onChanged: _markAsModified,
+                      ),
+                      _EstablishmentField(
+                        controller: _addressComplementController,
+                        label: 'Complément d’adresse',
+                        onChanged: _markAsModified,
+                      ),
+                      _EstablishmentField(
+                        controller: _postalCodeController,
+                        label: 'Code postal *',
+                        validator: _requiredValidator,
+                        onChanged: _markAsModified,
+                      ),
+                      _EstablishmentField(
+                        controller: _cityController,
+                        label: 'Ville *',
+                        validator: _requiredValidator,
+                        onChanged: _markAsModified,
+                      ),
+                      _EstablishmentField(
+                        controller: _countryController,
+                        label: 'Pays *',
+                        validator: _requiredValidator,
+                        onChanged: _markAsModified,
+                      ),
+                    ],
+                  ),
+                ),
+                _EstablishmentCard(
+                  icon: Icons.public_outlined,
+                  title: 'PRÉSENCE EN LIGNE',
+                  status: 'INFORMATION DE CONTRÔLE',
+                  child: Column(
+                    children: [
+                      _EstablishmentField(
+                        controller: _websiteController,
+                        label: 'Site Internet',
+                        validator: _websiteValidator,
+                        onChanged: _markAsModified,
+                        keyboardType: TextInputType.url,
+                      ),
+                    ],
+                  ),
+                ),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(
+                        color: WebColors.red,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
-                ),
-                _EstablishmentField(
-                  controller: _siretController,
-                  label: 'SIRET *',
-                  validator: _siretValidator,
-                  onChanged: _markAsModified,
-                  keyboardType: TextInputType.number,
-                  digitsOnly: true,
-                  maxLength: 14,
-                ),
-                _EstablishmentField(
-                  controller: _sirenController,
-                  label: 'SIREN calculé depuis le SIRET',
-                  validator: _requiredValidator,
-                  onChanged: _markAsModified,
-                  readOnly: true,
-                ),
-              ],
-            ),
-          ),
-          _EstablishmentCard(
-            iconWidget: SvgPicture.asset(
-              'data/icons/fire_blue_icon.svg',
-              width: 30,
-              height: 30,
-              fit: BoxFit.contain,
-            ),
-            title: 'ADRESSE PUBLIQUE',
-            status: 'INFORMATIONS PUBLIQUES',
-            child: Column(
-              children: [
-                _EstablishmentField(
-                  controller: _addressController,
-                  label: 'Adresse *',
-                  validator: _requiredValidator,
-                  onChanged: _markAsModified,
-                ),
-                _EstablishmentField(
-                  controller: _addressComplementController,
-                  label: 'Complément d’adresse',
-                  onChanged: _markAsModified,
-                ),
-                _EstablishmentField(
-                  controller: _postalCodeController,
-                  label: 'Code postal *',
-                  validator: _requiredValidator,
-                  onChanged: _markAsModified,
-                ),
-                _EstablishmentField(
-                  controller: _cityController,
-                  label: 'Ville *',
-                  validator: _requiredValidator,
-                  onChanged: _markAsModified,
-                ),
-                _EstablishmentField(
-                  controller: _countryController,
-                  label: 'Pays *',
-                  validator: _requiredValidator,
-                  onChanged: _markAsModified,
-                ),
-              ],
-            ),
-          ),
-          _EstablishmentCard(
-            icon: Icons.public_outlined,
-            title: 'COORDONNÉES PUBLIQUES',
-            status: 'VISIBLES PAR LES UTILISATEURS',
-            child: Column(
-              children: [
-                _EstablishmentField(
-                  controller: _publicPhoneController,
-                  label: 'Téléphone public *',
-                  validator: _requiredValidator,
-                  onChanged: _markAsModified,
-                  keyboardType: TextInputType.phone,
-                ),
-                _EstablishmentField(
-                  controller: _publicEmailController,
-                  label: 'Email public *',
-                  validator: _emailValidator,
-                  onChanged: _markAsModified,
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                _EstablishmentField(
-                  controller: _websiteController,
-                  label: 'Site Internet',
-                  validator: _websiteValidator,
-                  onChanged: _markAsModified,
-                  keyboardType: TextInputType.url,
-                ),
-              ],
-            ),
-          ),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                _error!,
-                style: const TextStyle(
-                  color: WebColors.red,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          SizedBox(
-            height: 48,
-            child: FilledButton.icon(
-              onPressed: _saving ? null : _save,
-              style: FilledButton.styleFrom(
-                backgroundColor: _completed ? WebColors.red : WebColors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: _saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
+                if (!widget.readOnly)
+                  SizedBox(
+                    height: 48,
+                    child: FilledButton.icon(
+                      onPressed: _saving ? null : _save,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _completed
+                            ? WebColors.red
+                            : WebColors.blue,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                    )
-                  : Icon(
-                      _completed
-                          ? Icons.check_circle_outline_rounded
-                          : Icons.save_outlined,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Icon(
+                              _completed
+                                  ? Icons.check_circle_outline_rounded
+                                  : Icons.save_outlined,
+                            ),
+                      label: Text(
+                        _saving
+                            ? 'ENREGISTREMENT…'
+                            : _completed
+                            ? 'ÉTABLISSEMENT ENREGISTRÉ'
+                            : 'ENREGISTRER L’ÉTABLISSEMENT',
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
                     ),
-              label: Text(
-                _saving
-                    ? 'ENREGISTREMENT…'
-                    : _completed
-                    ? 'ÉTABLISSEMENT ENREGISTRÉ'
-                    : 'ENREGISTRER L’ÉTABLISSEMENT',
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
+                  ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

@@ -114,6 +114,23 @@ class AdvertisingPricingConfig {
     return (base * visibility * radiusMultiplier).round();
   }
 
+  static int nationalPrice({
+    required Map<String, dynamic> pricing,
+    required String durationLabel,
+    required String visibilityType,
+  }) {
+    final defaults = AdvertisingPricingConfig.defaults();
+    final nationalPrices = _map(pricing['nationalFlatPrices']);
+    final visibilityPrices = _map(nationalPrices[visibilityType]);
+    final configuredPrice = visibilityPrices[durationLabel];
+    if (configuredPrice is num && configuredPrice > 0) {
+      return configuredPrice.round();
+    }
+    final defaultNationalPrices = _map(defaults['nationalFlatPrices']);
+    final defaultVisibilityPrices = _map(defaultNationalPrices[visibilityType]);
+    return _number(defaultVisibilityPrices[durationLabel], 0).round();
+  }
+
   static Map<String, dynamic> _map(dynamic value) {
     if (value is Map<String, dynamic>) return value;
     if (value is Map) {

@@ -5,9 +5,16 @@ import 'package:flutter/material.dart';
 import '../../shared/web_colors.dart';
 
 class IdentityProfessionalSection extends StatefulWidget {
-  const IdentityProfessionalSection({super.key, required this.user});
+  const IdentityProfessionalSection({
+    super.key,
+    required this.user,
+    this.requestId,
+    this.readOnly = false,
+  });
 
   final User? user;
+  final String? requestId;
+  final bool readOnly;
 
   @override
   State<IdentityProfessionalSection> createState() =>
@@ -28,6 +35,16 @@ class _IdentityProfessionalSectionState
   bool _completed = false;
   bool _requestExists = false;
   String? _error;
+  String? _certifiedDisplayName;
+  String? _certifiedEmail;
+  String? _certifiedId;
+  String? _accountLogin;
+
+  String? get _requestId {
+    final value = widget.requestId?.trim() ?? '';
+    if (value.isNotEmpty) return value;
+    return widget.user?.uid;
+  }
 
   @override
   void initState() {
@@ -47,20 +64,33 @@ class _IdentityProfessionalSectionState
 
   Future<void> _initialiseProfile() async {
     final user = widget.user;
+    final requestId = _requestId;
     _professionalEmailController.text = user?.email ?? '';
+    _certifiedDisplayName = user?.displayName;
+    _certifiedEmail = user?.email;
+    _certifiedId = user?.uid ?? requestId;
 
-    if (user != null) {
-      _prefillDisplayName(user.displayName);
+    if (requestId != null) {
+      _prefillDisplayName(user?.displayName);
 
       try {
         final snapshot = await FirebaseFirestore.instance
             .collection('advertiserRequests')
-            .doc(user.uid)
+            .doc(requestId)
             .get();
         final data = snapshot.data();
         _requestExists = snapshot.exists;
 
         if (data != null) {
+          _certifiedDisplayName = _textValue(
+            data['displayName'],
+            _certifiedDisplayName ?? '',
+          );
+          _certifiedEmail = _textValue(
+            data['email'] ?? data['contactEmail'],
+            _certifiedEmail ?? '',
+          );
+          _accountLogin = _textValue(data['accountLogin']);
           _lastNameController.text = _textValue(
             data['contactLastName'],
             _lastNameController.text,
@@ -115,6 +145,7 @@ class _IdentityProfessionalSectionState
   }
 
   Future<void> _save() async {
+    if (widget.readOnly) return;
     FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
@@ -125,26 +156,27 @@ class _IdentityProfessionalSectionState
 
     try {
       final user = widget.user;
+      final requestId = _requestId;
       final lastName = _lastNameController.text.trim();
       final firstName = _firstNameController.text.trim();
       final contactEmail = _professionalEmailController.text.trim();
 
-      if (user != null) {
+      if (requestId != null) {
         final creationData = _requestExists
             ? <String, Object?>{}
             : <String, Object?>{
-                'status': 'pending',
+                'status': 'draft',
                 'createdAt': FieldValue.serverTimestamp(),
               };
 
         await FirebaseFirestore.instance
             .collection('advertiserRequests')
-            .doc(user.uid)
+            .doc(requestId)
             .set({
               ...creationData,
-              'uid': user.uid,
-              'email': user.email ?? '',
-              'displayName': user.displayName ?? '',
+              'uid': requestId,
+              'email': user?.email ?? contactEmail,
+              'displayName': user?.displayName ?? '$firstName $lastName',
               'contactName': '$firstName $lastName'.trim(),
               'contactFirstName': firstName,
               'contactLastName': lastName,
@@ -200,23 +232,42 @@ class _IdentityProfessionalSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (widget.readOnly)
+          const _SectionCard(
+            icon: Icons.lock_outline_rounded,
+            title: 'PROFIL VALIDÉ PAR SPHOT',
+            status: 'LECTURE SEULE',
+            statusColor: Color(0xFF15803D),
+            child: Text(
+              'Ces informations ont servi à valider votre accès annonceur.',
+              style: TextStyle(
+                color: WebColors.blue,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ),
         _SectionCard(
           icon: Icons.verified_user_outlined,
           title: 'IDENTITÉ CERTIFIÉE',
-          status: widget.user == null ? 'EN ATTENTE' : 'CERTIFIÉE PROCONNECT',
-          statusColor: widget.user == null
+          status: widget.readOnly
+              ? 'VALIDÉE PAR SPHOT'
+              : widget.user == null
+              ? 'EN ATTENTE'
+              : 'CERTIFIÉE PROCONNECT',
+          statusColor: widget.user == null && !widget.readOnly
               ? const Color(0xFF6B7280)
               : const Color(0xFF15803D),
           child: Column(
             children: [
               _ReadOnlyLine(
                 label: 'Nom et prénom',
-                value: widget.user?.displayName,
+                value: _certifiedDisplayName,
               ),
-              _ReadOnlyLine(label: 'Email certifié', value: widget.user?.email),
+              _ReadOnlyLine(label: 'Email certifié', value: _certifiedEmail),
               _ReadOnlyLine(
                 label: 'Identifiant',
-                value: widget.user?.uid,
+                value: _certifiedId,
                 isLast: true,
               ),
             ],
@@ -238,18 +289,21 @@ class _IdentityProfessionalSectionState
                   label: 'Nom affiché *',
                   validator: _requiredValidator,
                   onChanged: _profileChanged,
+                  readOnly: widget.readOnly,
                 ),
                 _ProfileField(
                   controller: _firstNameController,
                   label: 'Prénom affiché *',
                   validator: _requiredValidator,
                   onChanged: _profileChanged,
+                  readOnly: widget.readOnly,
                 ),
                 _ProfileField(
                   controller: _functionController,
                   label: 'Fonction *',
                   validator: _requiredValidator,
                   onChanged: _profileChanged,
+                  readOnly: widget.readOnly,
                 ),
                 _ProfileField(
                   controller: _phoneController,
@@ -257,6 +311,7 @@ class _IdentityProfessionalSectionState
                   keyboardType: TextInputType.phone,
                   validator: _requiredValidator,
                   onChanged: _profileChanged,
+                  readOnly: widget.readOnly,
                 ),
                 _ProfileField(
                   controller: _professionalEmailController,
@@ -264,38 +319,40 @@ class _IdentityProfessionalSectionState
                   keyboardType: TextInputType.emailAddress,
                   validator: _emailValidator,
                   onChanged: _profileChanged,
+                  readOnly: widget.readOnly,
                 ),
-                const SizedBox(height: 4),
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: FilledButton.icon(
-                    onPressed: _saving ? null : _save,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: WebColors.blue,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                if (!widget.readOnly) const SizedBox(height: 4),
+                if (!widget.readOnly)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: FilledButton.icon(
+                      onPressed: _saving ? null : _save,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: WebColors.blue,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.save_outlined),
+                      label: Text(
+                        _saving
+                            ? 'ENREGISTREMENT…'
+                            : 'ENREGISTRER L’IDENTITÉ PROFESSIONNELLE',
+                        style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ),
-                    icon: _saving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(Icons.save_outlined),
-                    label: Text(
-                      _saving
-                          ? 'ENREGISTREMENT…'
-                          : 'ENREGISTRER L’IDENTITÉ PROFESSIONNELLE',
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -307,12 +364,18 @@ class _IdentityProfessionalSectionState
           child: Column(
             children: [
               _ReadOnlyLine(
-                label: 'Adresse de connexion',
-                value: widget.user?.email,
+                label: widget.readOnly
+                    ? 'Identifiant de connexion'
+                    : 'Adresse de connexion',
+                value: widget.readOnly ? _accountLogin : _certifiedEmail,
               ),
               _ReadOnlyLine(
                 label: 'Fournisseur',
-                value: widget.user == null ? null : 'ProConnect',
+                value: widget.readOnly
+                    ? 'Compte annonceur SPHOT'
+                    : widget.user == null
+                    ? null
+                    : 'ProConnect',
                 isLast: true,
               ),
             ],
@@ -459,6 +522,7 @@ class _ProfileField extends StatelessWidget {
     required this.validator,
     required this.onChanged,
     this.keyboardType,
+    this.readOnly = false,
   });
 
   final TextEditingController controller;
@@ -466,6 +530,7 @@ class _ProfileField extends StatelessWidget {
   final TextInputType? keyboardType;
   final String? Function(String?) validator;
   final ValueChanged<String> onChanged;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -476,6 +541,7 @@ class _ProfileField extends StatelessWidget {
         keyboardType: keyboardType,
         validator: validator,
         onChanged: onChanged,
+        readOnly: readOnly,
         style: const TextStyle(
           color: WebColors.blue,
           fontWeight: FontWeight.w700,

@@ -4591,3 +4591,528 @@ exports.getPublicClickStats = onRequest(
       }
     },
 );
+
+/**
+ * Transforme un nom en fragment d'identifiant stable et sans accent.
+ *
+ * @param {string} value Valeur à normaliser.
+ * @return {string} Fragment utilisable dans un identifiant.
+ */
+function normalizeAdvertiserLoginPart(value) {
+  return (value || "")
+      .toString()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Réserve le premier identifiant annonceur disponible.
+ *
+ * @param {string} firstName Prénom du responsable.
+ * @param {string} lastName Nom du responsable.
+ * @param {string} requestId Identifiant de la demande.
+ * @return {Promise<string>} Identifiant disponible.
+ */
+async function findAdvertiserLogin(firstName, lastName, requestId) {
+  const normalizedFirstName = normalizeAdvertiserLoginPart(firstName);
+  const normalizedLastName = normalizeAdvertiserLoginPart(lastName);
+  const base = `${normalizedFirstName.substring(0, 1)}${normalizedLastName}` ||
+    `annonceur${normalizeAdvertiserLoginPart(requestId).substring(0, 6)}`;
+
+  for (let suffix = 1; suffix < 1000; suffix++) {
+    const login = suffix === 1 ? base : `${base}${suffix}`;
+    const snapshot = await admin.firestore()
+        .collection("advertiserAccounts")
+        .doc(login)
+        .get();
+    if (!snapshot.exists ||
+        cleanValue((snapshot.data() || {}).requestId, "") === requestId) {
+      return login;
+    }
+  }
+
+  throw new Error("Impossible de générer un identifiant annonceur unique.");
+}
+
+/** Envoie l'accusé de réception d'une candidature annonceur. */
+exports.sendAdvertiserRequestAcknowledgement = onDocumentUpdated(
+    {
+      document: "advertiserRequests/{requestId}",
+      region: "europe-west1",
+      secrets: ["GMAIL_APP_PASSWORD"],
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const beforeData = event.data.before.data() || {};
+      const afterData = event.data.after.data() || {};
+      const acknowledgement = afterData.acknowledgementEmail || {};
+      const previousAcknowledgement = beforeData.acknowledgementEmail || {};
+      const status = cleanValue(afterData.status, "").toLowerCase();
+      const emailStatus = cleanValue(acknowledgement.status, "")
+          .toLowerCase();
+      const previousEmailStatus = cleanValue(
+          previousAcknowledgement.status,
+          "",
+      ).toLowerCase();
+
+      if (status !== "pending" || emailStatus !== "pending" ||
+          ["sending", "sent"].includes(previousEmailStatus)) {
+        return;
+      }
+
+      const requestReference = event.data.after.ref;
+      const recipient = cleanValue(
+          acknowledgement.recipient ||
+          afterData.contactEmail ||
+          afterData.email,
+          "",
+      ).toLowerCase();
+
+      if (!recipient) {
+        await requestReference.set({
+          acknowledgementEmail: {
+            ...acknowledgement,
+            status: "failed",
+            error: "Adresse email absente.",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+        }, {merge: true});
+        return;
+      }
+
+      const claimed = await admin.firestore().runTransaction(
+          async (transaction) => {
+            const snapshot = await transaction.get(requestReference);
+            const freshEmail = (snapshot.data() || {})
+                .acknowledgementEmail || {};
+            if (cleanValue(freshEmail.status, "").toLowerCase() !==
+                "pending") {
+              return false;
+            }
+            transaction.set(requestReference, {
+              acknowledgementEmail: {
+                ...freshEmail,
+                status: "sending",
+                error: null,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+            }, {merge: true});
+            return true;
+          },
+      );
+      if (!claimed) return;
+
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
+      });
+      const firstName = cleanValue(afterData.contactFirstName, "");
+      const company = cleanValue(
+          afterData.advertiserName || afterData.organisation,
+          "votre établissement",
+      );
+
+      try {
+        const mailResult = await transporter.sendMail({
+          from: MAIL_FROM,
+          to: recipient,
+          subject: "SPHOT - Votre demande annonceur est en cours de traitement",
+          text: `Bonjour ${firstName || ""},
+
+Votre demande d'accès annonceur SPHOT pour ${company} a bien été reçue.
+
+Elle est maintenant en cours de vérification par le Super Admin. Votre dossier
+reste consultable mais ne peut plus être modifié pendant ce contrôle.
+
+Vous recevrez un nouveau message dès qu'une décision aura été prise.
+
+À bientôt sur SPHOT,
+
+L'équipe SPHOT`,
+          html: `<div style="font-family:Arial,sans-serif;color:#172033;line-height:1.6">
+<h2 style="color:#1e3a8a">DEMANDE ANNONCEUR SPHOT</h2>
+<p>Bonjour ${escapeHtml(firstName)},</p>
+<p>Votre demande pour <strong>${escapeHtml(company)}</strong> a bien été reçue.</p>
+<p>Elle est maintenant <strong>en cours de vérification</strong> par le Super Admin.
+Votre dossier reste consultable mais ne peut plus être modifié pendant ce contrôle.</p>
+<p>Vous recevrez un nouveau message dès qu'une décision aura été prise.</p>
+<p>À bientôt sur SPHOT,<br><strong>L'équipe SPHOT</strong></p>
+</div>`,
+        });
+        await requestReference.set({
+          acknowledgementEmail: {
+            ...acknowledgement,
+            status: "sent",
+            recipient: recipient,
+            messageId: mailResult.messageId || null,
+            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            error: null,
+          },
+        }, {merge: true});
+      } catch (error) {
+        await requestReference.set({
+          acknowledgementEmail: {
+            ...acknowledgement,
+            status: "failed",
+            recipient: recipient,
+            error: error.message || error.toString(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+        }, {merge: true});
+        throw error;
+      }
+    },
+);
+
+/** Crée le compte annonceur et transmet ses identifiants après validation. */
+exports.sendAdvertiserRequestApprovalEmail = onDocumentUpdated(
+    {
+      document: "advertiserRequests/{requestId}",
+      region: "europe-west1",
+      secrets: ["GMAIL_APP_PASSWORD"],
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const beforeData = event.data.before.data() || {};
+      const afterData = event.data.after.data() || {};
+      const approvalEmail = afterData.approvalEmail || {};
+      const previousApprovalEmail = beforeData.approvalEmail || {};
+      const status = cleanValue(afterData.status, "").toLowerCase();
+      const emailStatus = cleanValue(approvalEmail.status, "").toLowerCase();
+      const previousEmailStatus = cleanValue(
+          previousApprovalEmail.status,
+          "",
+      ).toLowerCase();
+      if (status !== "approved" || emailStatus !== "pending" ||
+          ["sending", "sent"].includes(previousEmailStatus)) {
+        return;
+      }
+
+      const requestReference = event.data.after.ref;
+      const requestId = event.params.requestId;
+      const recipient = cleanValue(
+          approvalEmail.recipient ||
+          afterData.contactEmail ||
+          afterData.email,
+          "",
+      ).toLowerCase();
+      if (!recipient) return;
+
+      const claimed = await admin.firestore().runTransaction(
+          async (transaction) => {
+            const snapshot = await transaction.get(requestReference);
+            const freshEmail = (snapshot.data() || {}).approvalEmail || {};
+            if (cleanValue(freshEmail.status, "").toLowerCase() !==
+                "pending") {
+              return false;
+            }
+            transaction.set(requestReference, {
+              approvalEmail: {
+                ...freshEmail,
+                status: "sending",
+                error: null,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+            }, {merge: true});
+            return true;
+          },
+      );
+      if (!claimed) return;
+
+      const firstName = cleanValue(afterData.contactFirstName, "");
+      const lastName = cleanValue(afterData.contactLastName, "");
+      const company = cleanValue(
+          afterData.advertiserName || afterData.organisation,
+          "votre établissement",
+      );
+      const existingLogin = cleanValue(afterData.accountLogin, "");
+      const login = existingLogin ||
+        await findAdvertiserLogin(firstName, lastName, requestId);
+      const accountReference = admin.firestore()
+          .collection("advertiserAccounts")
+          .doc(login);
+      const existingAccount = await accountReference.get();
+      const accountData = existingAccount.data() || {};
+      const temporaryPassword = cleanValue(
+          accountData.temporaryPassword,
+          "",
+      ) || generateAdminTemporaryPassword();
+
+      await accountReference.set({
+        login: login,
+        email: recipient,
+        temporaryPassword: temporaryPassword,
+        mustChangePassword: accountData.mustChangePassword === false ?
+          false : true,
+        accountStatus: "ACTIVE",
+        role: "ANNONCEUR",
+        advertiserRequestId: requestId,
+        requestId: requestId,
+        prenom: firstName,
+        nom: lastName,
+        organisation: company,
+        createdAt: existingAccount.exists ?
+          accountData.createdAt :
+          admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, {merge: true});
+      await requestReference.set({
+        accountLogin: login,
+        accountStatus: "ACTIVE",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, {merge: true});
+
+      const loginUrl = `${SPHOT_LOGIN_URL}/#/professional-login`;
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
+      });
+
+      try {
+        const mailResult = await transporter.sendMail({
+          from: MAIL_FROM,
+          to: recipient,
+          subject: "SPHOT - Votre accès annonceur est validé",
+          text: `Bonjour ${firstName || ""},
+
+Votre demande annonceur pour ${company} a été validée.
+
+Identifiant : ${login}
+Mot de passe provisoire : ${temporaryPassword}
+
+Vous devrez choisir un nouveau mot de passe lors de votre première connexion.
+
+Connexion : ${loginUrl}
+
+À bientôt sur SPHOT,
+
+L'équipe SPHOT`,
+          html: `<div style="font-family:Arial,sans-serif;color:#172033;line-height:1.6">
+<h2 style="color:#1e3a8a">VOTRE ACCÈS ANNONCEUR EST VALIDÉ</h2>
+<p>Bonjour ${escapeHtml(firstName)},</p>
+<p>Votre demande pour <strong>${escapeHtml(company)}</strong> a été validée.</p>
+<div style="padding:18px;border:2px solid #1e3a8a;border-radius:12px;background:#f5f7fc">
+<p><strong>Identifiant :</strong><br>${escapeHtml(login)}</p>
+<p><strong>Mot de passe provisoire :</strong><br>${escapeHtml(temporaryPassword)}</p>
+</div>
+<p>Vous devrez obligatoirement choisir un nouveau mot de passe lors de votre
+première connexion.</p>
+<p><a href="${loginUrl}" style="color:#dc2626;font-weight:bold">SE CONNECTER À SPHOT</a></p>
+<p>À bientôt sur SPHOT,<br><strong>L'équipe SPHOT</strong></p>
+</div>`,
+        });
+        await requestReference.set({
+          approvalEmail: {
+            ...approvalEmail,
+            status: "sent",
+            recipient: recipient,
+            messageId: mailResult.messageId || null,
+            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            error: null,
+          },
+        }, {merge: true});
+      } catch (error) {
+        await requestReference.set({
+          approvalEmail: {
+            ...approvalEmail,
+            status: "failed",
+            recipient: recipient,
+            error: error.message || error.toString(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+        }, {merge: true});
+        throw error;
+      }
+    },
+);
+
+/** Informe l'annonceur d'une demande de correction ou d'un refus. */
+exports.sendAdvertiserReviewEmail = onDocumentUpdated(
+    {
+      document: "advertiserRequests/{requestId}",
+      region: "europe-west1",
+      secrets: ["GMAIL_APP_PASSWORD"],
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const afterData = event.data.after.data() || {};
+      const status = cleanValue(afterData.status, "").toLowerCase();
+      const assetChangeStatus = cleanValue(
+          (afterData.assetChangeRequest || {}).status,
+          "",
+      ).toLowerCase();
+      const fieldName = status === "changes_requested" ||
+          assetChangeStatus === "authorized" ?
+        "changeRequestEmail" :
+        status === "rejected" || assetChangeStatus === "rejected" ?
+          "rejectionEmail" : "";
+      if (!fieldName) return;
+      const emailData = afterData[fieldName] || {};
+      if (cleanValue(emailData.status, "").toLowerCase() !== "pending") {
+        return;
+      }
+
+      const requestReference = event.data.after.ref;
+      const recipient = cleanValue(
+          emailData.recipient || afterData.contactEmail || afterData.email,
+          "",
+      ).toLowerCase();
+      const reason = cleanValue(
+          emailData.reason || (afterData.review || {}).reason,
+          "",
+      );
+      if (!recipient) return;
+
+      await requestReference.set({
+        [fieldName]: {
+          ...emailData,
+          status: "sending",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      }, {merge: true});
+
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
+      });
+      try {
+        const isCorrection = status === "changes_requested" ||
+          assetChangeStatus === "authorized";
+        const mailResult = await transporter.sendMail({
+          from: MAIL_FROM,
+          to: recipient,
+          subject: isCorrection ?
+            "SPHOT - Une modification de votre demande est nécessaire" :
+            "SPHOT - Décision concernant votre demande annonceur",
+          text: `${isCorrection ?
+            "Une modification est nécessaire avant validation." :
+            "Votre demande annonceur n'a pas été retenue."}
+
+Motif : ${reason}
+
+${isCorrection ?
+  "Connectez-vous à votre espace pour corriger puis renvoyer le dossier." :
+  "Vous pouvez contacter l'équipe SPHOT pour toute précision."}
+
+L'équipe SPHOT`,
+        });
+        await requestReference.set({
+          [fieldName]: {
+            ...emailData,
+            status: "sent",
+            messageId: mailResult.messageId || null,
+            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            error: null,
+          },
+        }, {merge: true});
+      } catch (error) {
+        await requestReference.set({
+          [fieldName]: {
+            ...emailData,
+            status: "failed",
+            error: error.message || error.toString(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+        }, {merge: true});
+        throw error;
+      }
+    },
+);
+
+/** Connexion des comptes annonceurs approuvés. */
+exports.loginAdvertiser = onRequest(
+    {cpu: 1, memory: "256MiB"},
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const login = cleanValue((request.body || {}).login, "")
+            .toLowerCase();
+        const password = cleanValue((request.body || {}).password, "");
+        if (!login || !password) {
+          response.status(400).json({success: false});
+          return;
+        }
+        const snapshot = await admin.firestore()
+            .collection("advertiserAccounts")
+            .doc(login)
+            .get();
+        const data = snapshot.data() || {};
+        if (!snapshot.exists || data.accountStatus !== "ACTIVE" ||
+            cleanValue(data.temporaryPassword, "") !== password) {
+          response.status(401).json({success: false});
+          return;
+        }
+        await snapshot.ref.set({
+          lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {merge: true});
+        response.status(200).json({
+          success: true,
+          advertiserRequestId: cleanValue(
+              data.advertiserRequestId || data.requestId,
+              "",
+          ),
+          userRole: "ANNONCEUR",
+          mustChangePassword: data.mustChangePassword === true,
+          prenom: cleanValue(data.prenom, ""),
+          nom: cleanValue(data.nom, ""),
+        });
+      } catch (error) {
+        console.error("Erreur login annonceur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+/** Changement obligatoire du mot de passe annonceur. */
+exports.changeAdvertiserPassword = onRequest(
+    {cpu: 1, memory: "256MiB"},
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const login = cleanValue((request.body || {}).login, "")
+            .toLowerCase();
+        const newPassword = cleanValue((request.body || {}).newPassword, "");
+        if (!login || !newPassword) {
+          response.status(400).json({success: false});
+          return;
+        }
+        const reference = admin.firestore()
+            .collection("advertiserAccounts")
+            .doc(login);
+        const snapshot = await reference.get();
+        if (!snapshot.exists) {
+          response.status(404).json({success: false});
+          return;
+        }
+        await reference.set({
+          temporaryPassword: newPassword,
+          mustChangePassword: false,
+          passwordUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {merge: true});
+        response.status(200).json({success: true});
+      } catch (error) {
+        console.error("Erreur changement mot de passe annonceur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
