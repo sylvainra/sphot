@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../shared/text_input_formatters.dart';
 import '../../shared/web_colors.dart';
 
 class IdentityProfessionalSection extends StatefulWidget {
@@ -11,14 +12,12 @@ class IdentityProfessionalSection extends StatefulWidget {
     required this.user,
     this.requestId,
     this.readOnly = false,
-    this.developmentBypass = false,
     this.onSaved,
   });
 
   final User? user;
   final String? requestId;
   final bool readOnly;
-  final bool developmentBypass;
   final VoidCallback? onSaved;
 
   @override
@@ -77,46 +76,45 @@ class _IdentityProfessionalSectionState
     if (requestId != null) {
       _prefillDisplayName(user?.displayName);
 
-      if (!widget.developmentBypass) {
-        try {
-          final snapshot = await FirebaseFirestore.instance
-              .collection('advertiserRequests')
-              .doc(requestId)
-              .get();
-          final data = snapshot.data();
-          _requestExists = snapshot.exists;
+      try {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('advertiserRequests')
+            .doc(requestId)
+            .get();
+        final data = snapshot.data();
+        _requestExists = snapshot.exists;
 
-          if (data != null) {
-            _certifiedDisplayName = _textValue(
-              data['displayName'],
-              _certifiedDisplayName ?? '',
-            );
-            _certifiedEmail = _textValue(
-              data['email'] ?? data['contactEmail'],
-              _certifiedEmail ?? '',
-            );
-            _lastNameController.text = _textValue(
-              data['contactLastName'],
-              _lastNameController.text,
-            );
-            _firstNameController.text = _textValue(
-              data['contactFirstName'],
-              _firstNameController.text,
-            );
-            _functionController.text = _textValue(data['contactFunction']);
-            _phoneController.text = _PhoneNumberInputFormatter.format(
-              _textValue(data['contactPhone']),
-            );
-            _professionalEmailController.text = _textValue(
-              data['contactEmail'],
-              _professionalEmailController.text,
-            );
-            _completed = data['profileCompleted'] == true || _fieldsAreComplete;
-          }
-        } catch (error) {
-          _error = 'Impossible de charger les informations enregistrées.';
-          debugPrint('Chargement identité annonceur impossible : $error');
+        if (data != null) {
+          _certifiedDisplayName = _textValue(
+            data['displayName'],
+            _certifiedDisplayName ?? '',
+          );
+          _certifiedEmail = _textValue(
+            data['email'] ?? data['contactEmail'],
+            _certifiedEmail ?? '',
+          );
+          _lastNameController.text = _textValue(
+            data['contactLastName'],
+            _lastNameController.text,
+          ).toUpperCase();
+          _firstNameController.text = capitalizeFirstLetter(
+            _textValue(data['contactFirstName'], _firstNameController.text),
+          );
+          _functionController.text = capitalizeFirstLetter(
+            _textValue(data['contactFunction']),
+          );
+          _phoneController.text = _PhoneNumberInputFormatter.format(
+            _textValue(data['contactPhone']),
+          );
+          _professionalEmailController.text = _textValue(
+            data['contactEmail'],
+            _professionalEmailController.text,
+          );
+          _completed = data['profileCompleted'] == true || _fieldsAreComplete;
         }
+      } catch (error) {
+        _error = 'Impossible de charger les informations enregistrées.';
+        debugPrint('Chargement identité annonceur impossible : $error');
       }
     }
 
@@ -137,9 +135,9 @@ class _IdentityProfessionalSectionState
         .toList();
 
     if (parts.isEmpty) return;
-    _firstNameController.text = parts.first;
+    _firstNameController.text = capitalizeFirstLetter(parts.first);
     if (parts.length > 1) {
-      _lastNameController.text = parts.skip(1).join(' ');
+      _lastNameController.text = parts.skip(1).join(' ').toUpperCase();
     }
   }
 
@@ -164,11 +162,18 @@ class _IdentityProfessionalSectionState
     try {
       final user = widget.user;
       final requestId = _requestId;
-      final lastName = _lastNameController.text.trim();
-      final firstName = _firstNameController.text.trim();
+      final lastName = forceUpperCase(_lastNameController.text.trim());
+      final firstName = capitalizeFirstLetter(_firstNameController.text.trim());
+      final contactFunction = capitalizeFirstLetter(
+        _functionController.text.trim(),
+      );
       final contactEmail = _professionalEmailController.text.trim();
 
-      if (requestId != null && !widget.developmentBypass) {
+      _lastNameController.text = lastName;
+      _firstNameController.text = firstName;
+      _functionController.text = contactFunction;
+
+      if (requestId != null) {
         final creationData = _requestExists
             ? <String, Object?>{}
             : <String, Object?>{
@@ -187,7 +192,7 @@ class _IdentityProfessionalSectionState
               'contactName': '$firstName $lastName'.trim(),
               'contactFirstName': firstName,
               'contactLastName': lastName,
-              'contactFunction': _functionController.text.trim(),
+              'contactFunction': contactFunction,
               'contactPhone': _phoneController.text.trim(),
               'contactEmail': contactEmail,
               'profileCompleted': true,
@@ -285,9 +290,7 @@ class _IdentityProfessionalSectionState
           icon: Icons.badge_outlined,
           title: 'PROFIL PROFESSIONNEL SPHOT',
           status: _completed ? 'COMPLET' : 'À COMPLÉTER',
-          statusColor: _completed
-              ? const Color(0xFF15803D)
-              : const Color(0xFF6B7280),
+          statusColor: _completed ? WebColors.red : const Color(0xFF6B7280),
           child: Form(
             key: _formKey,
             child: Column(
@@ -298,6 +301,8 @@ class _IdentityProfessionalSectionState
                   validator: _requiredValidator,
                   onChanged: _profileChanged,
                   readOnly: widget.readOnly,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: const [UpperCaseTextInputFormatter()],
                 ),
                 _ProfileField(
                   controller: _firstNameController,
@@ -305,6 +310,10 @@ class _IdentityProfessionalSectionState
                   validator: _requiredValidator,
                   onChanged: _profileChanged,
                   readOnly: widget.readOnly,
+                  textCapitalization: TextCapitalization.sentences,
+                  inputFormatters: const [
+                    FirstLetterUpperCaseTextInputFormatter(),
+                  ],
                 ),
                 _ProfileField(
                   controller: _functionController,
@@ -312,6 +321,10 @@ class _IdentityProfessionalSectionState
                   validator: _requiredValidator,
                   onChanged: _profileChanged,
                   readOnly: widget.readOnly,
+                  textCapitalization: TextCapitalization.sentences,
+                  inputFormatters: const [
+                    FirstLetterUpperCaseTextInputFormatter(),
+                  ],
                 ),
                 _ProfileField(
                   controller: _phoneController,
@@ -517,6 +530,7 @@ class _ProfileField extends StatelessWidget {
     this.keyboardType,
     this.inputFormatters,
     this.readOnly = false,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   final TextEditingController controller;
@@ -526,6 +540,7 @@ class _ProfileField extends StatelessWidget {
   final String? Function(String?) validator;
   final ValueChanged<String> onChanged;
   final bool readOnly;
+  final TextCapitalization textCapitalization;
 
   @override
   Widget build(BuildContext context) {
@@ -535,6 +550,7 @@ class _ProfileField extends StatelessWidget {
         controller: controller,
         keyboardType: keyboardType,
         inputFormatters: inputFormatters,
+        textCapitalization: textCapitalization,
         validator: validator,
         onChanged: onChanged,
         readOnly: readOnly,

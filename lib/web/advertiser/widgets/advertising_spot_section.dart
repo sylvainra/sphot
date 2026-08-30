@@ -57,6 +57,8 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   bool _completed = false;
   bool _requestExists = false;
   bool _loadingSavedPosition = false;
+  bool _requestingAssetChange = false;
+  bool _assetChangeRequestedLocally = false;
   double _radiusKm = 0;
   String _scope = 'local';
   Uint8List? _bannerBytes;
@@ -73,6 +75,13 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     final value = widget.requestId?.trim() ?? '';
     if (value.isNotEmpty) return value;
     return widget.user?.uid;
+  }
+
+  bool get _assetChangeRequested {
+    final status = widget.assetChangeRequestStatus.toLowerCase();
+    return _assetChangeRequestedLocally ||
+        status == 'pending' ||
+        status == 'submitted';
   }
 
   @override
@@ -99,6 +108,12 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   @override
   void didUpdateWidget(covariant AdvertisingSpotSection oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.assetChangeRequestStatus != widget.assetChangeRequestStatus) {
+      final status = widget.assetChangeRequestStatus.toLowerCase();
+      if (status != 'pending' && status != 'submitted') {
+        _assetChangeRequestedLocally = false;
+      }
+    }
     if (oldWidget.requestedScope != widget.requestedScope &&
         _scope != widget.requestedScope) {
       _scope = widget.requestedScope;
@@ -391,7 +406,13 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
 
   Future<void> _requestAssetModification() async {
     final requestId = _requestId;
-    if (requestId == null) return;
+    if (requestId == null || _requestingAssetChange || _assetChangeRequested) {
+      return;
+    }
+    setState(() {
+      _requestingAssetChange = true;
+      _error = null;
+    });
     try {
       await FirebaseFirestore.instance
           .collection('advertiserRequests')
@@ -405,6 +426,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
       if (!mounted) return;
+      setState(() => _assetChangeRequestedLocally = true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -417,6 +439,8 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       if (mounted) {
         setState(() => _error = 'La demande de modification a échoué.');
       }
+    } finally {
+      if (mounted) setState(() => _requestingAssetChange = false);
     }
   }
 
@@ -872,31 +896,64 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           ),
         ),
         _buildApprovedScopeCard(),
-        _buildBannerCard(),
+        if (!widget.approvedAssetsLocked) _buildBannerCard(),
         if (widget.approvedAssetsLocked)
           Padding(
             padding: const EdgeInsets.only(bottom: 14),
-            child: OutlinedButton.icon(
-              onPressed:
-                  widget.assetChangeRequestStatus == 'pending' ||
-                      widget.assetChangeRequestStatus == 'submitted'
-                  ? null
-                  : _requestAssetModification,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: WebColors.blue,
-                side: const BorderSide(color: WebColors.blue, width: 1.5),
-                padding: const EdgeInsets.symmetric(vertical: 13),
-              ),
-              icon: const Icon(Icons.edit_location_alt_outlined),
-              label: Text(
-                widget.assetChangeRequestStatus == 'pending'
-                    ? 'DEMANDE DE MODIFICATION EN ATTENTE'
-                    : widget.assetChangeRequestStatus == 'submitted'
-                    ? 'NOUVELLE VERSION EN COURS DE CONTRÔLE'
-                    : 'DEMANDER UNE MODIFICATION DU VISUEL OU DE LA POSITION',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.w900),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _requestingAssetChange || _assetChangeRequested
+                      ? null
+                      : _requestAssetModification,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _assetChangeRequested
+                        ? Colors.white
+                        : WebColors.blue,
+                    disabledForegroundColor: _assetChangeRequested
+                        ? Colors.white
+                        : WebColors.blue,
+                    backgroundColor: _assetChangeRequested
+                        ? WebColors.red
+                        : Colors.white,
+                    disabledBackgroundColor: _assetChangeRequested
+                        ? WebColors.red
+                        : Colors.white,
+                    side: BorderSide(
+                      color: _assetChangeRequested
+                          ? WebColors.red
+                          : WebColors.blue,
+                      width: 1.5,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                  ),
+                  icon: Icon(
+                    _assetChangeRequested
+                        ? Icons.check_circle_outline_rounded
+                        : Icons.edit_location_alt_outlined,
+                  ),
+                  label: Text(
+                    _assetChangeRequested
+                        ? 'MODIFICATION VISUELLE OU DE POSITION DEMANDÉE'
+                        : 'DEMANDER UNE MODIFICATION DU VISUEL OU DE LA POSITION',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+                if (_assetChangeRequested) ...[
+                  const SizedBox(height: 9),
+                  const Text(
+                    'Surveillez votre boîte mail, l’équipe SPHOT vous informera de la marche à suivre.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: WebColors.red,
+                      height: 1.35,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         if (_scope != 'national') ...[

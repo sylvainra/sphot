@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../shared/text_input_formatters.dart';
 import '../../shared/web_colors.dart';
 
 class EstablishmentSection extends StatefulWidget {
@@ -12,14 +13,12 @@ class EstablishmentSection extends StatefulWidget {
     required this.user,
     this.requestId,
     this.readOnly = false,
-    this.developmentBypass = false,
     this.onSaved,
   });
 
   final User? user;
   final String? requestId;
   final bool readOnly;
-  final bool developmentBypass;
   final VoidCallback? onSaved;
 
   @override
@@ -53,7 +52,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   final _addressComplementController = TextEditingController();
   final _postalCodeController = TextEditingController();
   final _cityController = TextEditingController();
-  final _countryController = TextEditingController(text: 'France');
+  final _countryController = TextEditingController(text: 'FRANCE');
   final _publicPhoneController = TextEditingController();
   final _publicEmailController = TextEditingController();
 
@@ -101,7 +100,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
 
   Future<void> _initialiseEstablishment() async {
     final requestId = _requestId;
-    if (requestId != null && !widget.developmentBypass) {
+    if (requestId != null) {
       try {
         final snapshot = await FirebaseFirestore.instance
             .collection('advertiserRequests')
@@ -116,13 +115,11 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
               ? Map<String, dynamic>.from(rawEstablishment)
               : <String, dynamic>{};
 
-          _legalNameController.text = _read(
-            establishment['legalName'],
-            data['organisation'],
+          _legalNameController.text = forceUpperCase(
+            _read(establishment['legalName'], data['organisation']),
           );
-          _businessNameController.text = _read(
-            establishment['businessName'],
-            data['advertiserName'],
+          _businessNameController.text = forceUpperCase(
+            _read(establishment['businessName'], data['advertiserName']),
           );
           _siretController.text = _digits(
             _read(establishment['siret'], data['siret']),
@@ -135,8 +132,10 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
             establishment['addressComplement'],
           );
           _postalCodeController.text = _read(establishment['postalCode']);
-          _cityController.text = _read(establishment['city']);
-          _countryController.text = _read(establishment['country'], 'France');
+          _cityController.text = forceUpperCase(_read(establishment['city']));
+          _countryController.text = forceUpperCase(
+            _read(establishment['country'], 'FRANCE'),
+          );
           _publicPhoneController.text = _read(
             establishment['publicPhone'],
             data['phone'],
@@ -429,12 +428,19 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
       final requestId = _requestId;
       final siret = _digits(_siretController.text);
       final siren = _digits(_sirenController.text);
-      final legalName = _legalNameController.text.trim();
-      final businessName = _businessNameController.text.trim();
+      final legalName = forceUpperCase(_legalNameController.text.trim());
+      final businessName = forceUpperCase(_businessNameController.text.trim());
+      final city = forceUpperCase(_cityController.text.trim());
+      final country = forceUpperCase(_countryController.text.trim());
       final publicPhone = _publicPhoneController.text.trim();
       final publicEmail = _publicEmailController.text.trim();
 
-      if (requestId != null && !widget.developmentBypass) {
+      _legalNameController.text = legalName;
+      _businessNameController.text = businessName;
+      _cityController.text = city;
+      _countryController.text = country;
+
+      if (requestId != null) {
         final creationData = _requestExists
             ? <String, Object?>{}
             : <String, Object?>{
@@ -467,8 +473,8 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                 'address': _addressController.text.trim(),
                 'addressComplement': _addressComplementController.text.trim(),
                 'postalCode': _postalCodeController.text.trim(),
-                'city': _cityController.text.trim(),
-                'country': _countryController.text.trim(),
+                'city': city,
+                'country': country,
                 'publicPhone': publicPhone,
                 'publicEmail': publicEmail,
                 'updatedAt': FieldValue.serverTimestamp(),
@@ -549,7 +555,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                   title: 'INFORMATIONS DE L’ENTREPRISE',
                   status: _completed ? 'COMPLET' : 'À COMPLÉTER',
                   statusColor: _completed
-                      ? const Color(0xFF15803D)
+                      ? WebColors.red
                       : const Color(0xFF6B7280),
                   child: Column(
                     children: [
@@ -558,12 +564,16 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                         label: 'Raison sociale *',
                         validator: _requiredValidator,
                         onChanged: _markAsModified,
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: const [UpperCaseTextInputFormatter()],
                       ),
                       _EstablishmentField(
                         controller: _businessNameController,
                         label: 'Nom commercial / marque *',
                         validator: _requiredValidator,
                         onChanged: _markAsModified,
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: const [UpperCaseTextInputFormatter()],
                       ),
                       FormField<String>(
                         initialValue: _activityType,
@@ -663,12 +673,16 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                         label: 'Ville *',
                         validator: _requiredValidator,
                         onChanged: _markAsModified,
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: const [UpperCaseTextInputFormatter()],
                       ),
                       _EstablishmentField(
                         controller: _countryController,
                         label: 'Pays *',
                         validator: _requiredValidator,
                         onChanged: _markAsModified,
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: const [UpperCaseTextInputFormatter()],
                       ),
                     ],
                   ),
@@ -863,6 +877,8 @@ class _EstablishmentField extends StatelessWidget {
     this.digitsOnly = false,
     this.maxLength,
     this.readOnly = false,
+    this.inputFormatters = const [],
+    this.textCapitalization = TextCapitalization.none,
   });
 
   final TextEditingController controller;
@@ -873,19 +889,23 @@ class _EstablishmentField extends StatelessWidget {
   final bool digitsOnly;
   final int? maxLength;
   final bool readOnly;
+  final List<TextInputFormatter> inputFormatters;
+  final TextCapitalization textCapitalization;
 
   @override
   Widget build(BuildContext context) {
-    final formatters = digitsOnly
-        ? <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly]
-        : null;
+    final formatters = <TextInputFormatter>[
+      if (digitsOnly) FilteringTextInputFormatter.digitsOnly,
+      ...inputFormatters,
+    ];
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextFormField(
         controller: controller,
         keyboardType: keyboardType,
-        inputFormatters: formatters,
+        inputFormatters: formatters.isEmpty ? null : formatters,
+        textCapitalization: textCapitalization,
         maxLength: maxLength,
         readOnly: readOnly,
         validator: validator,

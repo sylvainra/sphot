@@ -21,9 +21,6 @@ class AdvertiserApplicationSection extends StatefulWidget {
     required this.requestStatus,
     required this.onPositionChanged,
     required this.onVisualChanged,
-    this.developmentBypass = false,
-    this.profileCompleted = false,
-    this.establishmentCompleted = false,
     this.onSubmitted,
   });
 
@@ -35,9 +32,6 @@ class AdvertiserApplicationSection extends StatefulWidget {
   final void Function(LatLng point, {required bool centerMap})
   onPositionChanged;
   final ValueChanged<AdvertisingVisualData> onVisualChanged;
-  final bool developmentBypass;
-  final bool profileCompleted;
-  final bool establishmentCompleted;
   final VoidCallback? onSubmitted;
 
   @override
@@ -108,9 +102,7 @@ class _AdvertiserApplicationSectionState
 
   Future<void> _initialise() async {
     final requestId = widget.requestId;
-    if (requestId != null &&
-        requestId.isNotEmpty &&
-        !widget.developmentBypass) {
+    if (requestId != null && requestId.isNotEmpty) {
       try {
         final snapshot = await FirebaseFirestore.instance
             .collection('advertiserRequests')
@@ -314,22 +306,6 @@ class _AdvertiserApplicationSectionState
     });
 
     try {
-      if (widget.developmentBypass) {
-        if (!widget.profileCompleted || !widget.establishmentCompleted) {
-          throw const _ApplicationException(
-            'Enregistrez d’abord toutes les informations de l’étape 1.',
-          );
-        }
-        if (!mounted) return;
-        setState(() {
-          _submitted = true;
-          _success = 'Votre demande a été transmise.';
-        });
-        widget.onSubmitted?.call();
-        _notifyVisual();
-        return;
-      }
-
       final reference = FirebaseFirestore.instance
           .collection('advertiserRequests')
           .doc(requestId);
