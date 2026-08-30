@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../shared/web_colors.dart';
 
@@ -10,11 +11,15 @@ class IdentityProfessionalSection extends StatefulWidget {
     required this.user,
     this.requestId,
     this.readOnly = false,
+    this.developmentBypass = false,
+    this.onSaved,
   });
 
   final User? user;
   final String? requestId;
   final bool readOnly;
+  final bool developmentBypass;
+  final VoidCallback? onSaved;
 
   @override
   State<IdentityProfessionalSection> createState() =>
@@ -72,42 +77,46 @@ class _IdentityProfessionalSectionState
     if (requestId != null) {
       _prefillDisplayName(user?.displayName);
 
-      try {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('advertiserRequests')
-            .doc(requestId)
-            .get();
-        final data = snapshot.data();
-        _requestExists = snapshot.exists;
+      if (!widget.developmentBypass) {
+        try {
+          final snapshot = await FirebaseFirestore.instance
+              .collection('advertiserRequests')
+              .doc(requestId)
+              .get();
+          final data = snapshot.data();
+          _requestExists = snapshot.exists;
 
-        if (data != null) {
-          _certifiedDisplayName = _textValue(
-            data['displayName'],
-            _certifiedDisplayName ?? '',
-          );
-          _certifiedEmail = _textValue(
-            data['email'] ?? data['contactEmail'],
-            _certifiedEmail ?? '',
-          );
-          _lastNameController.text = _textValue(
-            data['contactLastName'],
-            _lastNameController.text,
-          );
-          _firstNameController.text = _textValue(
-            data['contactFirstName'],
-            _firstNameController.text,
-          );
-          _functionController.text = _textValue(data['contactFunction']);
-          _phoneController.text = _textValue(data['contactPhone']);
-          _professionalEmailController.text = _textValue(
-            data['contactEmail'],
-            _professionalEmailController.text,
-          );
-          _completed = data['profileCompleted'] == true || _fieldsAreComplete;
+          if (data != null) {
+            _certifiedDisplayName = _textValue(
+              data['displayName'],
+              _certifiedDisplayName ?? '',
+            );
+            _certifiedEmail = _textValue(
+              data['email'] ?? data['contactEmail'],
+              _certifiedEmail ?? '',
+            );
+            _lastNameController.text = _textValue(
+              data['contactLastName'],
+              _lastNameController.text,
+            );
+            _firstNameController.text = _textValue(
+              data['contactFirstName'],
+              _firstNameController.text,
+            );
+            _functionController.text = _textValue(data['contactFunction']);
+            _phoneController.text = _PhoneNumberInputFormatter.format(
+              _textValue(data['contactPhone']),
+            );
+            _professionalEmailController.text = _textValue(
+              data['contactEmail'],
+              _professionalEmailController.text,
+            );
+            _completed = data['profileCompleted'] == true || _fieldsAreComplete;
+          }
+        } catch (error) {
+          _error = 'Impossible de charger les informations enregistrées.';
+          debugPrint('Chargement identité annonceur impossible : $error');
         }
-      } catch (error) {
-        _error = 'Impossible de charger les informations enregistrées.';
-        debugPrint('Chargement identité annonceur impossible : $error');
       }
     }
 
@@ -159,7 +168,7 @@ class _IdentityProfessionalSectionState
       final firstName = _firstNameController.text.trim();
       final contactEmail = _professionalEmailController.text.trim();
 
-      if (requestId != null) {
+      if (requestId != null && !widget.developmentBypass) {
         final creationData = _requestExists
             ? <String, Object?>{}
             : <String, Object?>{
@@ -189,6 +198,7 @@ class _IdentityProfessionalSectionState
 
       if (!mounted) return;
       setState(() => _completed = true);
+      widget.onSaved?.call();
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = 'L’enregistrement a échoué. Réessayez.');
@@ -307,6 +317,7 @@ class _IdentityProfessionalSectionState
                   controller: _phoneController,
                   label: 'Téléphone professionnel *',
                   keyboardType: TextInputType.phone,
+                  inputFormatters: const [_PhoneNumberInputFormatter()],
                   validator: _requiredValidator,
                   onChanged: _profileChanged,
                   readOnly: widget.readOnly,
@@ -504,12 +515,14 @@ class _ProfileField extends StatelessWidget {
     required this.validator,
     required this.onChanged,
     this.keyboardType,
+    this.inputFormatters,
     this.readOnly = false,
   });
 
   final TextEditingController controller;
   final String label;
   final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
   final String? Function(String?) validator;
   final ValueChanged<String> onChanged;
   final bool readOnly;
@@ -521,6 +534,7 @@ class _ProfileField extends StatelessWidget {
       child: TextFormField(
         controller: controller,
         keyboardType: keyboardType,
+        inputFormatters: inputFormatters,
         validator: validator,
         onChanged: onChanged,
         readOnly: readOnly,
@@ -548,6 +562,38 @@ class _ProfileField extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PhoneNumberInputFormatter extends TextInputFormatter {
+  const _PhoneNumberInputFormatter();
+
+  static String format(String input) {
+    final trimmed = input.trim();
+    final hasInternationalPrefix = trimmed.startsWith('+');
+    var digits = input.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length > 15) digits = digits.substring(0, 15);
+
+    final groups = <String>[];
+    for (var index = 0; index < digits.length; index += 2) {
+      final end = index + 2 < digits.length ? index + 2 : digits.length;
+      groups.add(digits.substring(index, end));
+    }
+    final formatted = groups.join(' ');
+    if (formatted.isEmpty) return hasInternationalPrefix ? '+' : '';
+    return hasInternationalPrefix ? '+$formatted' : formatted;
+  }
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final formatted = format(newValue.text);
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

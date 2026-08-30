@@ -112,6 +112,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   _requestSubscription;
   bool _developmentApprovedPreview = false;
   bool _restoredRequestAssets = false;
+  bool _developmentProfileCompleted = false;
+  bool _developmentEstablishmentCompleted = false;
   String? _requestedScopeOverride;
 
   String? get _requestId {
@@ -172,7 +174,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   void initState() {
     super.initState();
     _loadPricing();
-    _listenToRequest();
+    if (!widget.developmentBypass) _listenToRequest();
   }
 
   @override
@@ -792,12 +794,22 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               user: widget.user,
               requestId: _requestId,
               readOnly: _applicationLocked,
+              developmentBypass: widget.developmentBypass,
+              onSaved: () {
+                if (!mounted) return;
+                setState(() => _developmentProfileCompleted = true);
+              },
             ),
             const SizedBox(height: 8),
             EstablishmentSection(
               user: widget.user,
               requestId: _requestId,
               readOnly: _applicationLocked,
+              developmentBypass: widget.developmentBypass,
+              onSaved: () {
+                if (!mounted) return;
+                setState(() => _developmentEstablishmentCompleted = true);
+              },
             ),
           ];
         default:
@@ -808,8 +820,15 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               position: _advertisingPoint,
               initialVisual: _advertisingVisual,
               requestStatus: _requestStatus,
+              developmentBypass: widget.developmentBypass,
+              profileCompleted: _developmentProfileCompleted,
+              establishmentCompleted: _developmentEstablishmentCompleted,
               onPositionChanged: _setAdvertisingPoint,
               onVisualChanged: _setAdvertisingVisual,
+              onSubmitted: () {
+                if (!mounted) return;
+                setState(() => _requestStatus = 'pending');
+              },
             ),
           ];
       }
@@ -822,12 +841,14 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             user: widget.user,
             requestId: _requestId,
             readOnly: true,
+            developmentBypass: widget.developmentBypass,
           ),
           const SizedBox(height: 8),
           EstablishmentSection(
             user: widget.user,
             requestId: _requestId,
             readOnly: true,
+            developmentBypass: widget.developmentBypass,
           ),
         ];
       case 1:

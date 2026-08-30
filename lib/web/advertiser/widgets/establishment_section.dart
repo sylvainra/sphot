@@ -12,11 +12,15 @@ class EstablishmentSection extends StatefulWidget {
     required this.user,
     this.requestId,
     this.readOnly = false,
+    this.developmentBypass = false,
+    this.onSaved,
   });
 
   final User? user;
   final String? requestId;
   final bool readOnly;
+  final bool developmentBypass;
+  final VoidCallback? onSaved;
 
   @override
   State<EstablishmentSection> createState() => _EstablishmentSectionState();
@@ -97,7 +101,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
 
   Future<void> _initialiseEstablishment() async {
     final requestId = _requestId;
-    if (requestId != null) {
+    if (requestId != null && !widget.developmentBypass) {
       try {
         final snapshot = await FirebaseFirestore.instance
             .collection('advertiserRequests')
@@ -430,7 +434,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
       final publicPhone = _publicPhoneController.text.trim();
       final publicEmail = _publicEmailController.text.trim();
 
-      if (requestId != null) {
+      if (requestId != null && !widget.developmentBypass) {
         final creationData = _requestExists
             ? <String, Object?>{}
             : <String, Object?>{
@@ -476,6 +480,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
 
       if (!mounted) return;
       setState(() => _completed = true);
+      widget.onSaved?.call();
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = 'L’enregistrement a échoué. Réessayez.');

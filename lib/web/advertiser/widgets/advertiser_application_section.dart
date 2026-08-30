@@ -21,6 +21,10 @@ class AdvertiserApplicationSection extends StatefulWidget {
     required this.requestStatus,
     required this.onPositionChanged,
     required this.onVisualChanged,
+    this.developmentBypass = false,
+    this.profileCompleted = false,
+    this.establishmentCompleted = false,
+    this.onSubmitted,
   });
 
   final User? user;
@@ -31,6 +35,10 @@ class AdvertiserApplicationSection extends StatefulWidget {
   final void Function(LatLng point, {required bool centerMap})
   onPositionChanged;
   final ValueChanged<AdvertisingVisualData> onVisualChanged;
+  final bool developmentBypass;
+  final bool profileCompleted;
+  final bool establishmentCompleted;
+  final VoidCallback? onSubmitted;
 
   @override
   State<AdvertiserApplicationSection> createState() =>
@@ -100,7 +108,9 @@ class _AdvertiserApplicationSectionState
 
   Future<void> _initialise() async {
     final requestId = widget.requestId;
-    if (requestId != null && requestId.isNotEmpty) {
+    if (requestId != null &&
+        requestId.isNotEmpty &&
+        !widget.developmentBypass) {
       try {
         final snapshot = await FirebaseFirestore.instance
             .collection('advertiserRequests')
@@ -304,6 +314,22 @@ class _AdvertiserApplicationSectionState
     });
 
     try {
+      if (widget.developmentBypass) {
+        if (!widget.profileCompleted || !widget.establishmentCompleted) {
+          throw const _ApplicationException(
+            'Enregistrez d’abord toutes les informations de l’étape 1.',
+          );
+        }
+        if (!mounted) return;
+        setState(() {
+          _submitted = true;
+          _success = 'Votre demande a été transmise.';
+        });
+        widget.onSubmitted?.call();
+        _notifyVisual();
+        return;
+      }
+
       final reference = FirebaseFirestore.instance
           .collection('advertiserRequests')
           .doc(requestId);
@@ -372,6 +398,7 @@ class _AdvertiserApplicationSectionState
         _submitted = true;
         _success = 'Votre demande a été transmise au Super Admin.';
       });
+      widget.onSubmitted?.call();
       _notifyVisual();
     } on _ApplicationException catch (error) {
       if (mounted) setState(() => _error = error.message);
@@ -531,7 +558,7 @@ class _AdvertiserApplicationSectionState
     return _card(
       icon: Icons.image_outlined,
       title: 'VISUEL PUBLICITAIRE',
-      subtitle: 'FORMAT RECOMMANDÉ : 1200 × 600 PX • MAXI 2 Mo',
+      subtitle: 'FORMAT RECOMMANDÉ\n1200 × 600 px\nMaxi 2 Mo',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
