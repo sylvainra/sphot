@@ -67,6 +67,9 @@ flutter run -d chrome -t lib/main_web_advertiser.dart --web-port 7357 --dart-def
 
 Ce paramètre contourne ProConnect uniquement pour la session de développement.
 Le dashboard affiche alors clairement que les données ne sont pas certifiées.
+Ce mode reste limité à l'écran candidat : il ne permet plus de simuler
+manuellement une validation. Le passage à l'espace validé dépend exclusivement
+du statut `approved` enregistré après la décision du Super Admin.
 
 Sans ce paramètre, le contournement est désactivé et ProConnect reste requis :
 

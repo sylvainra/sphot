@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
@@ -169,6 +170,14 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
       if (userRole.toUpperCase() == 'ANNONCEUR') {
         final advertiserRequestId = (decoded['advertiserRequestId'] ?? '')
             .toString();
+        final firebaseToken = (decoded['firebaseToken'] ?? '').toString();
+        if (advertiserRequestId.isEmpty || firebaseToken.isEmpty) {
+          throw StateError('Session Firebase annonceur absente.');
+        }
+        final credential = await FirebaseAuth.instance.signInWithCustomToken(
+          firebaseToken,
+        );
+        if (!mounted) return;
         if (mustChangePassword) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
@@ -185,10 +194,10 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (_) => AdvertiserDashboardPage(
-              user: null,
+              user: credential.user,
               advertiserRequestId: advertiserRequestId,
               approvedAccess: true,
-              onSignOut: () async {},
+              onSignOut: FirebaseAuth.instance.signOut,
             ),
           ),
           (route) => false,

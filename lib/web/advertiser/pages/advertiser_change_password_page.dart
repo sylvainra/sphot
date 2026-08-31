@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -68,11 +69,19 @@ class _AdvertiserChangePasswordPageState
       _error = null;
     });
     try {
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      final idToken = await firebaseUser?.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
+        throw StateError('Session Firebase annonceur absente.');
+      }
       final response = await http.post(
         Uri.parse(
           'https://us-central1-sphot-ab80b.cloudfunctions.net/changeAdvertiserPassword',
         ),
-        headers: const {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
+        },
         body: jsonEncode({
           'login': widget.login.toLowerCase(),
           'newPassword': password,
@@ -88,10 +97,10 @@ class _AdvertiserChangePasswordPageState
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (_) => AdvertiserDashboardPage(
-            user: null,
+            user: FirebaseAuth.instance.currentUser,
             advertiserRequestId: widget.advertiserRequestId,
             approvedAccess: true,
-            onSignOut: () async {},
+            onSignOut: FirebaseAuth.instance.signOut,
           ),
         ),
         (route) => false,

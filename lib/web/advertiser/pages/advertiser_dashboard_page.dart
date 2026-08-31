@@ -11,6 +11,7 @@ import '../../../map/map_page.dart';
 import '../../../models/advertising_pricing_config.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../../shared/web_colors.dart';
+import '../models/advertiser_request_status.dart';
 import '../models/advertising_visual_data.dart';
 import '../models/diffusion_preview_data.dart';
 import '../models/planning_data.dart';
@@ -110,7 +111,6 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   String _requestStatus = 'draft';
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
   _requestSubscription;
-  bool _developmentApprovedPreview = false;
   bool _restoredRequestAssets = false;
   String? _requestedScopeOverride;
 
@@ -123,12 +123,11 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   }
 
   bool get _approvedFlow {
-    return widget.approvedAccess || _developmentApprovedPreview;
+    return widget.approvedAccess || isAdvertiserRequestApproved(_requestStatus);
   }
 
   bool get _applicationLocked {
-    final status = _requestStatus.toLowerCase();
-    return status == 'pending' || _approvedFlow;
+    return isAdvertiserApplicationLocked(_requestStatus) || _approvedFlow;
   }
 
   bool get _assetChangeAuthorized {
@@ -430,26 +429,37 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               ),
               const SizedBox(height: 18),
               if (widget.developmentBypass) ...[
-                OutlinedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _developmentApprovedPreview =
-                          !_developmentApprovedPreview;
-                      _selectedIndex = 0;
-                    });
-                  },
-                  icon: Icon(
-                    _approvedFlow
-                        ? Icons.lock_open_rounded
-                        : Icons.fact_check_outlined,
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
                   ),
-                  label: Text(
-                    _approvedFlow ? 'APERÇU VALIDÉ' : 'APERÇU CANDIDAT',
-                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  decoration: BoxDecoration(
+                    color: WebColors.blue.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: WebColors.blue),
                   ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: WebColors.blue,
-                    side: const BorderSide(color: WebColors.blue),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.science_outlined,
+                        color: WebColors.blue,
+                        size: 20,
+                      ),
+                      SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'MODE DÉVELOPPEMENT — CANDIDAT',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: WebColors.blue,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 8),

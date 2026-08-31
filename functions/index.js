@@ -7,6 +7,7 @@ const {
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
+const crypto = require("crypto");
 const {getDownloadURL} = require("firebase-admin/storage");
 const nodemailer = require("nodemailer");
 const PDFDocument = require("pdfkit");
@@ -4608,6 +4609,19 @@ function normalizeAdvertiserLoginPart(value) {
 }
 
 /**
+ * Construit un UID Firebase stable sans exposer l'identifiant Firestore.
+ *
+ * @param {string} requestId Identifiant de la demande annonceur.
+ * @return {string} UID réservé au compte Firebase de l'annonceur.
+ */
+function advertiserFirebaseUid(requestId) {
+  const digest = crypto.createHash("sha256")
+      .update(requestId)
+      .digest("hex");
+  return `advertiser_${digest}`;
+}
+
+/**
  * Réserve le premier identifiant annonceur disponible.
  *
  * @param {string} firstName Prénom du responsable.
@@ -4837,6 +4851,8 @@ exports.sendAdvertiserRequestApprovalEmail = onDocumentUpdated(
           .doc(login);
       const existingAccount = await accountReference.get();
       const accountData = existingAccount.data() || {};
+      const firebaseUid = cleanValue(accountData.firebaseUid, "") ||
+        advertiserFirebaseUid(requestId);
       const temporaryPassword = cleanValue(
           accountData.temporaryPassword,
           "",
@@ -4850,6 +4866,7 @@ exports.sendAdvertiserRequestApprovalEmail = onDocumentUpdated(
           false : true,
         accountStatus: "ACTIVE",
         role: "ANNONCEUR",
+        firebaseUid: firebaseUid,
         advertiserRequestId: requestId,
         requestId: requestId,
         prenom: firstName,
@@ -4863,6 +4880,7 @@ exports.sendAdvertiserRequestApprovalEmail = onDocumentUpdated(
       await requestReference.set({
         accountLogin: login,
         accountStatus: "ACTIVE",
+        firebaseUid: firebaseUid,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, {merge: true});
 
@@ -5054,15 +5072,31 @@ exports.loginAdvertiser = onRequest(
           response.status(401).json({success: false});
           return;
         }
+        const advertiserRequestId = cleanValue(
+            data.advertiserRequestId || data.requestId,
+            "",
+        );
+        if (!advertiserRequestId) {
+          response.status(409).json({success: false});
+          return;
+        }
+        const firebaseUid = cleanValue(data.firebaseUid, "") ||
+          advertiserFirebaseUid(advertiserRequestId);
+        const firebaseToken = await admin.auth().createCustomToken(
+            firebaseUid,
+            {
+              role: "ANNONCEUR",
+              advertiserRequestId: advertiserRequestId,
+            },
+        );
         await snapshot.ref.set({
+          firebaseUid: firebaseUid,
           lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
         }, {merge: true});
         response.status(200).json({
           success: true,
-          advertiserRequestId: cleanValue(
-              data.advertiserRequestId || data.requestId,
-              "",
-          ),
+          advertiserRequestId: advertiserRequestId,
+          firebaseToken: firebaseToken,
           userRole: "ANNONCEUR",
           mustChangePassword: data.mustChangePassword === true,
           prenom: cleanValue(data.prenom, ""),
@@ -5081,13 +5115,31 @@ exports.changeAdvertiserPassword = onRequest(
     async (request, response) => {
       response.set("Access-Control-Allow-Origin", "*");
       response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-      response.set("Access-Control-Allow-Headers", "Content-Type");
+      response.set(
+          "Access-Control-Allow-Headers",
+          "Content-Type, Authorization",
+      );
       if (request.method === "OPTIONS") {
         response.status(204).send("");
         return;
       }
 
       try {
+        const authorization = cleanValue(
+            request.get("Authorization"),
+            "",
+        );
+        if (!authorization.startsWith("Bearer ")) {
+          response.status(401).json({success: false});
+          return;
+        }
+        const idToken = authorization.substring("Bearer ".length).trim();
+        const session = await admin.auth().verifyIdToken(idToken);
+        if (session.role !== "ANNONCEUR" ||
+            !cleanValue(session.advertiserRequestId, "")) {
+          response.status(403).json({success: false});
+          return;
+        }
         const login = cleanValue((request.body || {}).login, "")
             .toLowerCase();
         const newPassword = cleanValue((request.body || {}).newPassword, "");
@@ -5101,6 +5153,15 @@ exports.changeAdvertiserPassword = onRequest(
         const snapshot = await reference.get();
         if (!snapshot.exists) {
           response.status(404).json({success: false});
+          return;
+        }
+        const accountData = snapshot.data() || {};
+        const accountRequestId = cleanValue(
+            accountData.advertiserRequestId || accountData.requestId,
+            "",
+        );
+        if (accountRequestId !== session.advertiserRequestId) {
+          response.status(403).json({success: false});
           return;
         }
         await reference.set({
