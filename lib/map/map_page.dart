@@ -22,7 +22,6 @@ import 'public_spot_detail_page.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
-import '../pages/advertiser_access_page.dart';
 
 enum SpotFilter {
   all,
@@ -122,6 +121,21 @@ void initState() {
     if (zoom >= 13.8) return 0.88;
     if (zoom >= 13.0) return 0.72;
     return 0.0;
+  }
+
+  Future<void> _openAdvertiserWebsite() async {
+    final uri = kIsWeb
+        ? Uri.base.replace(fragment: '/advertiser')
+        : Uri.parse('https://sphot.app/#/advertiser');
+
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!opened) {
+      _showMapMessage('Impossible d’ouvrir l’espace annonceur.');
+    }
   }
 
   Future<void> _openCityWebsite(
@@ -1595,11 +1609,7 @@ Widget _buildAdBanner() {
     bottom: 58,
     child: GestureDetector(
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const AdvertiserAccessPage(),
-          ),
-        );
+        unawaited(_openAdvertiserWebsite());
       },
       child: Container(
         height: 90,
