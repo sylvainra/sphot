@@ -131,6 +131,7 @@ void initState() {
     final opened = await launchUrl(
       uri,
       mode: LaunchMode.externalApplication,
+      webOnlyWindowName: kIsWeb ? '_blank' : null,
     );
 
     if (!opened) {
