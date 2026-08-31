@@ -24,21 +24,24 @@ class WebAdvertiserApp extends StatelessWidget {
         colorSchemeSeed: WebColors.blue,
         scaffoldBackgroundColor: const Color(0xFFF3F6FA),
       ),
-      home: const _AdvertiserAccessGate(),
+      home: const WebAdvertiserAccessPage(),
     );
   }
 }
 
-class _AdvertiserAccessGate extends StatefulWidget {
-  const _AdvertiserAccessGate();
+class WebAdvertiserAccessPage extends StatefulWidget {
+  const WebAdvertiserAccessPage({super.key});
 
   @override
-  State<_AdvertiserAccessGate> createState() => _AdvertiserAccessGateState();
+  State<WebAdvertiserAccessPage> createState() =>
+      _WebAdvertiserAccessPageState();
 }
 
-class _AdvertiserAccessGateState extends State<_AdvertiserAccessGate> {
+class _WebAdvertiserAccessPageState
+    extends State<WebAdvertiserAccessPage> {
   bool _checkingRedirect = !_advertiserDevBypassEnabled;
   bool _startingSignIn = false;
+  bool _developmentBypassAccepted = false;
   String? _error;
 
   @override
@@ -70,6 +73,14 @@ class _AdvertiserAccessGateState extends State<_AdvertiserAccessGate> {
   }
 
   Future<void> _signIn() async {
+    if (_advertiserDevBypassEnabled) {
+      setState(() {
+        _error = null;
+        _developmentBypassAccepted = true;
+      });
+      return;
+    }
+
     setState(() {
       _startingSignIn = true;
       _error = null;
@@ -106,7 +117,8 @@ class _AdvertiserAccessGateState extends State<_AdvertiserAccessGate> {
       return const _AdvertiserLoadingPage();
     }
 
-    if (_advertiserDevBypassEnabled) {
+    if (_advertiserDevBypassEnabled &&
+        _developmentBypassAccepted) {
       return AdvertiserDashboardPage(
         user: null,
         developmentBypass: true,
