@@ -428,42 +428,6 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                 ),
               ),
               const SizedBox(height: 18),
-              if (widget.developmentBypass) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: WebColors.blue.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: WebColors.blue),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.science_outlined,
-                        color: WebColors.blue,
-                        size: 20,
-                      ),
-                      SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          'MODE DÉVELOPPEMENT — CANDIDAT',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: WebColors.blue,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.only(top: 10),
