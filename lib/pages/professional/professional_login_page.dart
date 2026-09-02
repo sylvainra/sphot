@@ -8,6 +8,8 @@ import 'package:latlong2/latlong.dart';
 
 import '../../web/admin/pages/admin_change_password_page.dart';
 import '../../web/admin/pages/admin_dashboard_page.dart';
+import '../../pages/sauveteur/change_password_page.dart';
+import '../../web/super_admin/web_super_admin_app.dart';
 import '../../web/advertiser/pages/advertiser_change_password_page.dart';
 import '../../web/advertiser/pages/advertiser_dashboard_page.dart';
 
@@ -144,13 +146,31 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
         login: login,
         password: password,
       );
+      final advertiserSession = adminSession == null
+          ? await _tryLogin(
+              endpoint: 'loginAdvertiser',
+              login: login,
+              password: password,
+            )
+          : null;
+      final potentialSuperAdminSession =
+          adminSession == null && advertiserSession == null
+          ? await _tryLogin(
+              endpoint: 'loginSauveteur',
+              login: login,
+              password: password,
+            )
+          : null;
+      final isSauveteurSuperAdmin =
+          potentialSuperAdminSession != null &&
+          (potentialSuperAdminSession['userRole'] ?? '')
+                  .toString()
+                  .toUpperCase() ==
+              'SUPER_ADMIN';
       final decoded =
           adminSession ??
-          await _tryLogin(
-            endpoint: 'loginAdvertiser',
-            login: login,
-            password: password,
-          );
+          advertiserSession ??
+          (isSauveteurSuperAdmin ? potentialSuperAdminSession : null);
 
       if (decoded == null) {
         if (!mounted) return;
@@ -166,6 +186,47 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
       final nom = (decoded['nom'] ?? '').toString();
 
       if (!mounted) return;
+
+      if (userRole.toUpperCase() == 'SUPER_ADMIN') {
+        final territoireId = (decoded['territoireId'] ?? '').toString();
+
+        if (mustChangePassword) {
+          if (isSauveteurSuperAdmin) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => ChangePasswordPage(
+                  login: login,
+                  territoireId: territoireId,
+                  userRole: userRole,
+                ),
+              ),
+            );
+          } else {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => AdminChangePasswordPage(
+                  login: login,
+                  adminUid: (decoded['adminUid'] ?? '').toString(),
+                  territoireId: territoireId,
+                  userRole: userRole,
+                  civilite: (decoded['civilite'] ?? '').toString(),
+                  prenom: prenom,
+                  nom: nom,
+                ),
+              ),
+            );
+          }
+          return;
+        }
+
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const WebSuperAdminApp(),
+          ),
+          (route) => false,
+        );
+        return;
+      }
 
       if (userRole.toUpperCase() == 'ANNONCEUR') {
         final advertiserRequestId = (decoded['advertiserRequestId'] ?? '')
