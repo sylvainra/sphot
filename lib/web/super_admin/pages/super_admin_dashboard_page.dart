@@ -104,6 +104,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   Map<String, dynamic>? _selectedAdmin;
 
   Map<String, dynamic>? _selectedAdvertiser;
+  bool _ignoreNextMapTap = false;
 
   bool _showLegalDocumentsPanel = false;
   bool _showPricingPanel = false;
@@ -2708,6 +2709,14 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ),
                 const SizedBox(height: 14),
               ],
+              _spotInfoLine(
+                'Civilité',
+                _cleanText(
+                  advertiser['contactCivility'] ??
+                      advertiser['civilite'] ??
+                      'Non renseignée',
+                ),
+              ),
               _spotInfoLine(
                 'Responsable',
                 _cleanText(advertiser['contactName'] ?? 'Non renseigné'),
@@ -5440,7 +5449,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () {
+        onTapDown: (_) {
+          _ignoreNextMapTap = true;
           setState(() {
             _selectedSpot = null;
             _selectedAdmin = null;
@@ -5450,9 +5460,18 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             _selectedLegalDocument = null;
             _selectedLegalChapter = null;
           });
-
           _mapController.move(location, 14);
         },
+        onTap: () {},
+        onTapUp: (_) {
+          Future<void>.delayed(
+            const Duration(milliseconds: 150),
+            () {
+              if (mounted) _ignoreNextMapTap = false;
+            },
+          );
+        },
+        onTapCancel: () => _ignoreNextMapTap = false,
         child: Tooltip(
           message: name,
           child: const SizedBox(
@@ -5644,6 +5663,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                                   minZoom: 2,
                                   maxZoom: 18,
                                   onTap: (_, __) {
+                                    if (_ignoreNextMapTap) {
+                                      _ignoreNextMapTap = false;
+                                      return;
+                                    }
                                     setState(() {
                                       _selectedSpot = null;
                                       _selectedAdmin = null;
