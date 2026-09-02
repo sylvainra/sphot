@@ -4947,6 +4947,7 @@ exports.sendAdvertiserRequestApprovalEmail = onDocumentUpdated(
 
       const firstName = cleanValue(afterData.contactFirstName, "");
       const lastName = cleanValue(afterData.contactLastName, "");
+      const greeting = buildAdvertiserGreeting(afterData);
       const company = cleanValue(
           afterData.advertiserName || afterData.organisation,
           "votre établissement",
@@ -5003,7 +5004,7 @@ exports.sendAdvertiserRequestApprovalEmail = onDocumentUpdated(
           from: MAIL_FROM,
           to: recipient,
           subject: "SPHOT - Votre accès annonceur est validé",
-          text: `Bonjour ${firstName || ""},
+          text: `${greeting}
 
 Votre demande annonceur pour ${company} a été validée.
 
@@ -5021,7 +5022,7 @@ L'équipe SPHOT`,
           html: `<div
 style="font-family:Arial,sans-serif;color:#172033;line-height:1.6">
 <h2 style="color:#1e3a8a">VOTRE ACCÈS ANNONCEUR EST VALIDÉ</h2>
-<p>Bonjour ${escapeHtml(firstName)},</p>
+<p>${escapeHtml(greeting)}</p>
 <p>Votre demande pour
 <strong>${escapeHtml(company)}</strong> a été validée.</p>
 <div
@@ -5136,6 +5137,7 @@ exports.sendAdvertiserReviewEmail = onDocumentUpdated(
         service: "gmail",
         auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
       });
+      const greeting = buildAdvertiserGreeting(afterData);
       try {
         const isCorrection = status === "changes_requested" ||
           assetChangeStatus === "authorized";
@@ -5145,7 +5147,7 @@ exports.sendAdvertiserReviewEmail = onDocumentUpdated(
           subject: isCorrection ?
             "SPHOT - Une modification de votre demande est nécessaire" :
             "SPHOT - Décision concernant votre demande annonceur",
-          text: `${isCorrection ?
+          text: `${greeting}\n\n${isCorrection ?
             "Une modification est nécessaire avant validation." :
             "Votre demande annonceur n'a pas été retenue."}
 
