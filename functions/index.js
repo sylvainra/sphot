@@ -4660,20 +4660,13 @@ exports.sendAdvertiserRequestAcknowledgement = onDocumentUpdated(
       memory: "256MiB",
     },
     async (event) => {
-      const beforeData = event.data.before.data() || {};
       const afterData = event.data.after.data() || {};
       const acknowledgement = afterData.acknowledgementEmail || {};
-      const previousAcknowledgement = beforeData.acknowledgementEmail || {};
       const status = cleanValue(afterData.status, "").toLowerCase();
       const emailStatus = cleanValue(acknowledgement.status, "")
           .toLowerCase();
-      const previousEmailStatus = cleanValue(
-          previousAcknowledgement.status,
-          "",
-      ).toLowerCase();
 
-      if (status !== "pending" || emailStatus !== "pending" ||
-          ["sending", "sent"].includes(previousEmailStatus)) {
+      if (status !== "pending" || emailStatus !== "pending") {
         return;
       }
 
@@ -4795,18 +4788,11 @@ exports.sendAdvertiserRequestApprovalEmail = onDocumentUpdated(
       memory: "256MiB",
     },
     async (event) => {
-      const beforeData = event.data.before.data() || {};
       const afterData = event.data.after.data() || {};
       const approvalEmail = afterData.approvalEmail || {};
-      const previousApprovalEmail = beforeData.approvalEmail || {};
       const status = cleanValue(afterData.status, "").toLowerCase();
       const emailStatus = cleanValue(approvalEmail.status, "").toLowerCase();
-      const previousEmailStatus = cleanValue(
-          previousApprovalEmail.status,
-          "",
-      ).toLowerCase();
-      if (status !== "approved" || emailStatus !== "pending" ||
-          ["sending", "sent"].includes(previousEmailStatus)) {
+      if (status !== "approved" || emailStatus !== "pending") {
         return;
       }
 
@@ -4818,7 +4804,17 @@ exports.sendAdvertiserRequestApprovalEmail = onDocumentUpdated(
           afterData.email,
           "",
       ).toLowerCase();
-      if (!recipient) return;
+      if (!recipient) {
+        await requestReference.set({
+          approvalEmail: {
+            ...approvalEmail,
+            status: "failed",
+            error: "Adresse email absente.",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+        }, {merge: true});
+        return;
+      }
 
       const claimed = await admin.firestore().runTransaction(
           async (transaction) => {
@@ -4995,15 +4991,38 @@ exports.sendAdvertiserReviewEmail = onDocumentUpdated(
           emailData.reason || (afterData.review || {}).reason,
           "",
       );
-      if (!recipient) return;
+      if (!recipient) {
+        await requestReference.set({
+          [fieldName]: {
+            ...emailData,
+            status: "failed",
+            error: "Adresse email absente.",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+        }, {merge: true});
+        return;
+      }
 
-      await requestReference.set({
-        [fieldName]: {
-          ...emailData,
-          status: "sending",
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-      }, {merge: true});
+      const claimed = await admin.firestore().runTransaction(
+          async (transaction) => {
+            const snapshot = await transaction.get(requestReference);
+            const freshEmail = (snapshot.data() || {})[fieldName] || {};
+            if (cleanValue(freshEmail.status, "").toLowerCase() !==
+                "pending") {
+              return false;
+            }
+            transaction.set(requestReference, {
+              [fieldName]: {
+                ...freshEmail,
+                status: "sending",
+                error: null,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+            }, {merge: true});
+            return true;
+          },
+      );
+      if (!claimed) return;
 
       const transporter = nodemailer.createTransport({
         service: "gmail",
