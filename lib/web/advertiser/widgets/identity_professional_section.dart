@@ -33,6 +33,7 @@ class _IdentityProfessionalSectionState
   final _functionController = TextEditingController();
   final _phoneController = TextEditingController();
   final _professionalEmailController = TextEditingController();
+  String? _civility;
 
   bool _loading = true;
   bool _saving = false;
@@ -93,6 +94,12 @@ class _IdentityProfessionalSectionState
             data['email'] ?? data['contactEmail'],
             _certifiedEmail ?? '',
           );
+          final storedCivility = _textValue(
+            data['contactCivility'] ?? data['civilite'],
+          );
+          if (storedCivility.isNotEmpty) {
+            _civility = storedCivility;
+          }
           _lastNameController.text = _textValue(
             data['contactLastName'],
             _lastNameController.text,
@@ -142,7 +149,8 @@ class _IdentityProfessionalSectionState
   }
 
   bool get _fieldsAreComplete {
-    return _lastNameController.text.trim().isNotEmpty &&
+    return (_civility?.trim().isNotEmpty ?? false) &&
+        _lastNameController.text.trim().isNotEmpty &&
         _firstNameController.text.trim().isNotEmpty &&
         _functionController.text.trim().isNotEmpty &&
         _phoneController.text.trim().isNotEmpty &&
@@ -162,6 +170,7 @@ class _IdentityProfessionalSectionState
     try {
       final user = widget.user;
       final requestId = _requestId;
+      final civility = _civility!.trim();
       final lastName = forceUpperCase(_lastNameController.text.trim());
       final firstName = capitalizeFirstLetter(_firstNameController.text.trim());
       final contactFunction = capitalizeFirstLetter(
@@ -190,6 +199,8 @@ class _IdentityProfessionalSectionState
               'email': user?.email ?? contactEmail,
               'displayName': user?.displayName ?? '$firstName $lastName',
               'contactName': '$firstName $lastName'.trim(),
+              'contactCivility': civility,
+              'civilite': civility,
               'contactFirstName': firstName,
               'contactLastName': lastName,
               'contactFunction': contactFunction,
@@ -295,9 +306,65 @@ class _IdentityProfessionalSectionState
             key: _formKey,
             child: Column(
               children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: DropdownButtonFormField<String>(
+                    value: _civility,
+                    validator: (value) => value == null || value.isEmpty
+                        ? 'Champ obligatoire'
+                        : null,
+                    onChanged: widget.readOnly
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _civility = value;
+                              if (_completed) _completed = false;
+                            });
+                          },
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Monsieur',
+                        child: Text('Monsieur'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Madame',
+                        child: Text('Madame'),
+                      ),
+                    ],
+                    style: const TextStyle(
+                      color: WebColors.blue,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Civilité *',
+                      labelStyle: const TextStyle(color: Color(0xFF4B5F97)),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: WebColors.blue,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 _ProfileField(
                   controller: _lastNameController,
-                  label: 'Nom affiché *',
+                  label: 'Nom *',
                   validator: _requiredValidator,
                   onChanged: _profileChanged,
                   readOnly: widget.readOnly,
@@ -306,7 +373,7 @@ class _IdentityProfessionalSectionState
                 ),
                 _ProfileField(
                   controller: _firstNameController,
-                  label: 'Prénom affiché *',
+                  label: 'Prénom *',
                   validator: _requiredValidator,
                   onChanged: _profileChanged,
                   readOnly: widget.readOnly,
