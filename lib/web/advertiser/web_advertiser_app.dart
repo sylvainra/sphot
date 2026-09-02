@@ -42,6 +42,7 @@ class _WebAdvertiserAccessPageState
   bool _checkingRedirect = !_advertiserDevBypassEnabled;
   bool _startingSignIn = false;
   bool _developmentBypassAccepted = false;
+  String? _developmentRequestId;
   String? _error;
 
   @override
@@ -76,6 +77,8 @@ class _WebAdvertiserAccessPageState
     if (_advertiserDevBypassEnabled) {
       setState(() {
         _error = null;
+        _developmentRequestId =
+            'advertiser-dev-${DateTime.now().millisecondsSinceEpoch}';
         _developmentBypassAccepted = true;
       });
       return;
@@ -121,6 +124,7 @@ class _WebAdvertiserAccessPageState
         _developmentBypassAccepted) {
       return AdvertiserDashboardPage(
         user: null,
+        advertiserRequestId: _developmentRequestId,
         developmentBypass: true,
         onSignOut: () async {},
       );
