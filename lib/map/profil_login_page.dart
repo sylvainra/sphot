@@ -1,15 +1,15 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../web/admin/pages/admin_trial_request_page.dart';
 import '../pages/sauveteur/change_password_page.dart';
 import '../pages/sauveteur/sauveteur_menu_page.dart';
-import '../web/super_admin/web_super_admin_app.dart';
-import '../pages/professional/professional_login_page.dart';
 
 class ProfilLoginPage extends StatefulWidget {
   const ProfilLoginPage({super.key});
@@ -175,12 +175,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
       }
 
       if (userRole.toUpperCase() == 'SUPER_ADMIN') {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const WebSuperAdminApp(),
-          ),
-        );
-
+        await _openProLogin();
         return;
       }
 
@@ -232,15 +227,26 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
     );
   }
 
-  void _openProLogin() {
-  FocusScope.of(context).unfocus();
+  Future<void> _openProLogin() async {
+    FocusScope.of(context).unfocus();
 
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => const ProfessionalLoginPage(),
-    ),
-  );
-}
+    final uri = kIsWeb
+        ? Uri.base.replace(fragment: '/professional-login')
+        : Uri.parse('https://sphot.app/#/professional-login');
+
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: kIsWeb ? '_blank' : null,
+    );
+
+    if (!opened && mounted) {
+      setState(() {
+        _loginErrorMessage =
+            'Impossible d’ouvrir le portail professionnel SPHOT.';
+      });
+    }
+  }
 
   void _activateEditingMode() {
     if (_isEditing) return;
@@ -490,7 +496,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
       child: Column(
         children: [
           Text(
-            'ESPACE PRO',
+            'ESPACE ADMIN / SUPER ADMIN',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 18,
