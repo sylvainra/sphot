@@ -1641,7 +1641,7 @@ Widget _buildAdBanner() {
     color: Colors.transparent,
     child: AdaptiveAssetImage(
 
-      'data/icons/fire_black_icon.svg',
+      'data/icons/fire_red_icon.svg',
       fit: BoxFit.contain,
     ),
   ),

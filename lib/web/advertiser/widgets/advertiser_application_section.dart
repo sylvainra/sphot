@@ -370,9 +370,8 @@ class _AdvertiserApplicationSectionState
       if (!mounted) return;
       setState(() {
         _bannerUrl = bannerUrl;
-        _bannerBytes = null;
         _submitted = true;
-        _success = 'Votre demande a été transmise au Super Admin.';
+        _success = 'Votre demande a été transmise à l’équipe SPHOT.';
       });
       widget.onSubmitted?.call();
       _notifyVisual();
@@ -452,52 +451,54 @@ class _AdvertiserApplicationSectionState
   }
 
   Widget _statusCard() {
-    final status = _requestTransmitted
-        ? 'pending'
-        : widget.requestStatus.toLowerCase();
-    final (label, color, message) = switch (status) {
-      'pending' => (
-        'EN COURS DE TRAITEMENT',
-        const Color(0xFFF59E0B),
-        'Votre dossier est verrouillé pendant son contrôle par le Super Admin.',
-      ),
-      'changes_requested' => (
-        'MODIFICATIONS DEMANDÉES',
-        WebColors.red,
-        'Corrigez les éléments signalés puis transmettez à nouveau votre demande.',
-      ),
-      'rejected' => (
-        'DEMANDE REFUSÉE',
-        WebColors.red,
-        'Consultez le motif communiqué par le Super Admin.',
-      ),
-      'approved' => (
-        'DEMANDE APPROUVÉE',
-        const Color(0xFF15803D),
-        'Vos identifiants de connexion ont été envoyés par email. Utilisez-les pour ouvrir votre espace annonceur complet.',
-      ),
-      _ => (
-        'DEMANDE À COMPLÉTER',
-        const Color(0xFF6B7280),
-        'Complétez les deux étapes avant de transmettre votre demande.',
-      ),
-    };
-    return _card(
-      icon: Icons.fact_check_outlined,
-      title: label,
-      subtitle: message,
-      child: Text(
-        status == 'changes_requested' || status == 'rejected'
-            ? 'Les informations approuvées précédemment restent inchangées tant qu’une nouvelle version n’a pas été validée.'
-            : 'Vous recevrez un email de confirmation dès l’enregistrement de la demande, puis un second email après la décision.',
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w800,
-          height: 1.35,
-        ),
-      ),
-    );
-  }
+  final status = _requestTransmitted
+      ? 'pending'
+      : widget.requestStatus.toLowerCase();
+
+  final (label, color, message) = switch (status) {
+    'pending' => (
+      'EN COURS DE TRAITEMENT',
+      const Color(0xFFF59E0B),
+      'Votre dossier est verrouillé pendant son contrôle par l’équipe SPHOT.',
+    ),
+    'changes_requested' => (
+      'MODIFICATIONS DEMANDÉES',
+      WebColors.red,
+      'Corrigez les éléments signalés puis transmettez à nouveau votre demande.',
+    ),
+    'rejected' => (
+      'DEMANDE REFUSÉE',
+      WebColors.red,
+      'Consultez le motif communiqué par l’équipe SPHOT.',
+    ),
+    'approved' => (
+      'DEMANDE APPROUVÉE',
+      const Color(0xFF15803D),
+      'Vos identifiants de connexion ont été envoyés par email. Utilisez-les pour ouvrir votre espace annonceur complet.',
+    ),
+    _ => (
+      'DEMANDE À COMPLÉTER',
+      const Color(0xFF6B7280),
+      'Complétez les deux étapes avant de transmettre votre demande.',
+    ),
+  };
+
+  return _card(
+    icon: Icons.fact_check_outlined,
+    title: label,
+    subtitle: message,
+    child: status == 'changes_requested' || status == 'rejected'
+        ? Text(
+            'Les informations déjà enregistrées restent inchangées tant qu’une nouvelle version n’a pas été validée.',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              height: 1.35,
+            ),
+          )
+        : const SizedBox.shrink(),
+  );
+}
 
   Widget _positionCard() {
     return _card(
@@ -529,8 +530,12 @@ class _AdvertiserApplicationSectionState
     final preview = _bannerBytes != null
         ? Image.memory(_bannerBytes!, fit: BoxFit.contain)
         : _bannerUrl != null
-        ? Image.network(_bannerUrl!, fit: BoxFit.contain)
-        : null;
+? Image.network(
+    _bannerUrl!,
+    fit: BoxFit.contain,
+    webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+  )
+: null;
     return _card(
       icon: Icons.image_outlined,
       title: 'VISUEL PUBLICITAIRE',

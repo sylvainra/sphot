@@ -5351,45 +5351,56 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   }
 
   Marker _buildAdvertiserMarker(Map<String, dynamic> data) {
-    final location = _advertiserLocation(data)!;
+  final location = _advertiserLocation(data)!;
 
-    final name = _cleanText(
-      data['advertiserName'] ??
-          data['companyName'] ??
-          data['businessName'] ??
-          'Annonceur',
-    );
+  final name = _cleanText(
+    data['advertiserName'] ??
+        data['companyName'] ??
+        data['businessName'] ??
+        data['organisation'] ??
+        'Annonceur',
+  );
 
-    return Marker(
-      point: location,
-      width: 48,
-      height: 58,
+  return Marker(
+    point: location,
+    width: 85,
+    height: 85,
+    alignment: Alignment.topCenter,
+    child: MouseRegion(
+      cursor: SystemMouseCursors.click,
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () {
           setState(() {
             _selectedSpot = null;
             _selectedAdmin = null;
-            _selectedAdvertiser = data;
+            _selectedAdvertiser = Map<String, dynamic>.from(data);
             _showPricingPanel = false;
             _showLegalDocumentsPanel = false;
+            _selectedLegalDocument = null;
+            _selectedLegalChapter = null;
           });
 
-          _mapController.move(location, 16);
+          _mapController.move(location, 14);
         },
         child: Tooltip(
           message: name,
-          child: Transform.translate(
-            offset: const Offset(0, -22),
-            child: const AdaptiveAssetImage(
+          child: const SizedBox(
+            width: 85,
+            height: 85,
+            child: AdaptiveAssetImage(
               'data/icons/fire_green_icon.svg',
+              width: 85,
+              height: 85,
               fit: BoxFit.contain,
               filterQuality: FilterQuality.high,
             ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _updateVisibleAdminCount(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> admins,

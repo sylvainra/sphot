@@ -4738,20 +4738,24 @@ exports.sendAdvertiserRequestAcknowledgement = onDocumentUpdated(
 
 Votre demande d'accès annonceur SPHOT pour ${company} a bien été reçue.
 
-Elle est maintenant en cours de vérification par le Super Admin. Votre dossier
-reste consultable mais ne peut plus être modifié pendant ce contrôle.
+Elle est maintenant en cours de vérification par l'équipe SPHOT.
+Votre dossier reste consultable, mais ne peut plus être modifié
+pendant ce contrôle.
 
 Vous recevrez un nouveau message dès qu'une décision aura été prise.
 
 À bientôt sur SPHOT,
 
 L'équipe SPHOT`,
-          html: `<div style="font-family:Arial,sans-serif;color:#172033;line-height:1.6">
+          html: `<div
+style="font-family:Arial,sans-serif;color:#172033;line-height:1.6">
 <h2 style="color:#1e3a8a">DEMANDE ANNONCEUR SPHOT</h2>
 <p>Bonjour ${escapeHtml(firstName)},</p>
-<p>Votre demande pour <strong>${escapeHtml(company)}</strong> a bien été reçue.</p>
-<p>Elle est maintenant <strong>en cours de vérification</strong> par le Super Admin.
-Votre dossier reste consultable mais ne peut plus être modifié pendant ce contrôle.</p>
+<p>Votre demande pour
+<strong>${escapeHtml(company)}</strong> a bien été reçue.</p>
+<p>Elle est maintenant <strong>en cours de vérification</strong>
+par l'équipe SPHOT. Votre dossier reste consultable, mais ne peut plus
+être modifié pendant ce contrôle.</p>
 <p>Vous recevrez un nouveau message dès qu'une décision aura été prise.</p>
 <p>À bientôt sur SPHOT,<br><strong>L'équipe SPHOT</strong></p>
 </div>`,
@@ -4902,24 +4906,31 @@ Votre demande annonceur pour ${company} a été validée.
 Identifiant : ${login}
 Mot de passe provisoire : ${temporaryPassword}
 
-Vous devrez choisir un nouveau mot de passe lors de votre première connexion.
+Vous devrez choisir un nouveau mot de passe lors de votre
+première connexion.
 
 Connexion : ${loginUrl}
 
 À bientôt sur SPHOT,
 
 L'équipe SPHOT`,
-          html: `<div style="font-family:Arial,sans-serif;color:#172033;line-height:1.6">
+          html: `<div
+style="font-family:Arial,sans-serif;color:#172033;line-height:1.6">
 <h2 style="color:#1e3a8a">VOTRE ACCÈS ANNONCEUR EST VALIDÉ</h2>
 <p>Bonjour ${escapeHtml(firstName)},</p>
-<p>Votre demande pour <strong>${escapeHtml(company)}</strong> a été validée.</p>
-<div style="padding:18px;border:2px solid #1e3a8a;border-radius:12px;background:#f5f7fc">
+<p>Votre demande pour
+<strong>${escapeHtml(company)}</strong> a été validée.</p>
+<div
+style="padding:18px;border:2px solid #1e3a8a;
+border-radius:12px;background:#f5f7fc">
 <p><strong>Identifiant :</strong><br>${escapeHtml(login)}</p>
-<p><strong>Mot de passe provisoire :</strong><br>${escapeHtml(temporaryPassword)}</p>
+<p><strong>Mot de passe provisoire :</strong><br>
+${escapeHtml(temporaryPassword)}</p>
 </div>
-<p>Vous devrez obligatoirement choisir un nouveau mot de passe lors de votre
-première connexion.</p>
-<p><a href="${loginUrl}" style="color:#dc2626;font-weight:bold">SE CONNECTER À SPHOT</a></p>
+<p>Vous devrez obligatoirement choisir un nouveau mot de passe lors de
+votre première connexion.</p>
+<p><a href="${loginUrl}"
+style="color:#dc2626;font-weight:bold">SE CONNECTER À SPHOT</a></p>
 <p>À bientôt sur SPHOT,<br><strong>L'équipe SPHOT</strong></p>
 </div>`,
         });

@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "sphot-ab80b"
-  }
+  },
+  "targets": {
+    "sphot-ab80b": {
+      "hosting": {
+        "advertiser": [
+          "sphot-advertiser-test"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
