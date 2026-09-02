@@ -2541,8 +2541,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   fontWeight: FontWeight.w700,
                   color: hasWebsite ? adminColor : Colors.black87,
                   fontSize: 13,
-                  decoration:
-                      hasWebsite ? TextDecoration.underline : TextDecoration.none,
+                  decoration: hasWebsite
+                      ? TextDecoration.underline
+                      : TextDecoration.none,
                 ),
               ),
             ),
