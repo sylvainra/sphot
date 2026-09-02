@@ -2459,28 +2459,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       setState(() {
         _selectedAdvertiser = {...advertiser, ...update};
       });
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              decision == 'approved'
-                  ? 'Demande approuvée. Les identifiants vont être envoyés.'
-                  : decision == 'changes_requested'
-                  ? 'Demande de modification enregistrée.'
-                  : 'Refus enregistré.',
-            ),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Mise à jour impossible : $error'),
-          backgroundColor: redColor,
-        ),
-      );
+    } catch (error, stackTrace) {
+      debugPrint('Mise à jour annonceur impossible : $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 
@@ -2510,12 +2491,65 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           'assetChangeRequest': {...assetChange, 'status': 'authorized'},
         };
       });
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Autorisation impossible : $error')),
-      );
+    } catch (error, stackTrace) {
+      debugPrint('Autorisation annonceur impossible : $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
+  }
+
+  Future<void> _openAdvertiserWebsite(String rawUrl) async {
+    final value = rawUrl.trim();
+    if (value.isEmpty) return;
+    final normalizedUrl = value.contains('://') ? value : 'https://$value';
+    final uri = Uri.tryParse(normalizedUrl);
+    if (uri == null || uri.host.isEmpty) return;
+    await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: '_blank',
+    );
+  }
+
+  Widget _advertiserWebsiteLine(String websiteUrl) {
+    final hasWebsite = websiteUrl.trim().isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(
+            width: 95,
+            child: Text(
+              'Site internet :',
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: Colors.black87,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: hasWebsite
+                  ? () => unawaited(_openAdvertiserWebsite(websiteUrl))
+                  : null,
+              child: Text(
+                hasWebsite ? websiteUrl : 'Non renseigné',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: hasWebsite ? adminColor : Colors.black87,
+                  fontSize: 13,
+                  decoration:
+                      hasWebsite ? TextDecoration.underline : TextDecoration.none,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showAdvertiserVisual(String bannerUrl) {
@@ -2553,7 +2587,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 Flexible(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-                    child: Image.network(bannerUrl, fit: BoxFit.contain),
+                    child: Image.network(
+                      bannerUrl,
+                      fit: BoxFit.contain,
+                      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                    ),
                   ),
                 ),
               ],
@@ -2570,7 +2608,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final establishment = _advertiserMap(advertiser['establishment']);
     final application = _advertiserMap(advertiser['application']);
     final proposedVisual = _advertiserMap(advertiser['proposedVisual']);
-    final location = _advertiserLocation(advertiser);
     final companyName = _cleanText(
       advertiser['advertiserName'] ??
           establishment['businessName'] ??
@@ -2591,6 +2628,20 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       establishment['city'],
       establishment['country'],
     ].map(_cleanText).where((value) => value.isNotEmpty).join(', ');
+    final websiteUrl = _cleanText(
+      advertiser['destinationUrl'] ?? application['destinationUrl'],
+    );
+    final modificationRequested =
+        status == 'changes_requested' || assetChangeStatus == 'authorized';
+    final requestRejected =
+        status == 'rejected' || assetChangeStatus == 'rejected';
+    final requestApproved =
+        status == 'approved' &&
+        assetChangeStatus != 'submitted' &&
+        !modificationRequested &&
+        !requestRejected;
+    final decisionMade =
+        modificationRequested || requestRejected || requestApproved;
 
     return Container(
       width: 470,
@@ -2637,7 +2688,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   aspectRatio: 2,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(14),
-                    child: Image.network(bannerUrl, fit: BoxFit.contain),
+                    child: Image.network(
+                      bannerUrl,
+                      fit: BoxFit.contain,
+                      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -2681,20 +2736,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 _cleanText(establishment['siret'] ?? advertiser['siret']),
               ),
               _spotInfoLine('Adresse', address),
-              _spotInfoLine(
-                'Destination',
-                _cleanText(
-                  advertiser['destinationUrl'] ?? application['destinationUrl'],
-                ),
-              ),
-              if (location != null) ...[
-                _spotInfoLine('Latitude', location.latitude.toStringAsFixed(6)),
-                _spotInfoLine(
-                  'Longitude',
-                  location.longitude.toStringAsFixed(6),
-                ),
-              ],
-              _spotInfoLine('Statut', status.isEmpty ? 'Brouillon' : status),
+              _advertiserWebsiteLine(websiteUrl),
               if (assetChangeStatus.isNotEmpty)
                 _spotInfoLine(
                   'Modification visuel / position',
@@ -2719,8 +2761,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 const SizedBox(height: 10),
               ],
               FilledButton.icon(
-                onPressed:
-                    status == 'approved' && assetChangeStatus != 'submitted'
+                onPressed: decisionMade
                     ? null
                     : () => _reviewAdvertiserRequest(
                         advertiser,
@@ -2728,48 +2769,76 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                       ),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF15803D),
+                  disabledBackgroundColor: requestApproved
+                      ? const Color(0xFF15803D)
+                      : Colors.grey.shade400,
+                  foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 icon: const Icon(Icons.check_circle_outline_rounded),
-                label: const Text(
-                  'APPROUVER LA DEMANDE',
-                  style: TextStyle(fontWeight: FontWeight.w900),
+                label: Text(
+                  requestApproved
+                      ? 'DEMANDE APPROUVÉE'
+                      : 'APPROUVER LA DEMANDE',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
               const SizedBox(height: 10),
               OutlinedButton.icon(
-                onPressed: () => _reviewAdvertiserRequest(
-                  advertiser,
-                  decision: 'changes_requested',
-                ),
+                onPressed: decisionMade
+                    ? null
+                    : () => _reviewAdvertiserRequest(
+                        advertiser,
+                        decision: 'changes_requested',
+                      ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: adminColor,
-                  side: const BorderSide(color: adminColor, width: 1.5),
+                  backgroundColor:
+                      modificationRequested ? redColor : Colors.transparent,
+                  disabledBackgroundColor:
+                      modificationRequested ? redColor : Colors.transparent,
+                  foregroundColor:
+                      modificationRequested ? Colors.white : adminColor,
+                  disabledForegroundColor:
+                      modificationRequested ? Colors.white : Colors.grey,
+                  side: BorderSide(
+                    color: modificationRequested ? redColor : adminColor,
+                    width: 1.5,
+                  ),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 icon: const Icon(Icons.edit_note_rounded),
-                label: const Text(
-                  'DEMANDER UNE MODIFICATION',
-                  style: TextStyle(fontWeight: FontWeight.w900),
+                label: Text(
+                  modificationRequested
+                      ? 'MODIFICATION DEMANDÉE'
+                      : 'DEMANDER UNE MODIFICATION',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
               const SizedBox(height: 10),
               OutlinedButton.icon(
-                onPressed: status == 'rejected'
+                onPressed: decisionMade
                     ? null
                     : () => _reviewAdvertiserRequest(
                         advertiser,
                         decision: 'rejected',
                       ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: redColor,
+                  backgroundColor:
+                      requestRejected ? redColor : Colors.transparent,
+                  disabledBackgroundColor:
+                      requestRejected ? redColor : Colors.transparent,
+                  foregroundColor:
+                      requestRejected ? Colors.white : redColor,
+                  disabledForegroundColor:
+                      requestRejected ? Colors.white : Colors.grey,
                   side: const BorderSide(color: redColor, width: 1.5),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 icon: const Icon(Icons.cancel_outlined),
-                label: const Text(
-                  'REFUSER LA DEMANDE',
-                  style: TextStyle(fontWeight: FontWeight.w900),
+                label: Text(
+                  requestRejected ? 'DEMANDE REFUSÉE' : 'REFUSER LA DEMANDE',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
             ],
