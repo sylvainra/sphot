@@ -440,6 +440,33 @@ function buildAdminGreeting(data) {
 }
 
 /**
+ * Construit la salutation d'un demandeur annonceur.
+ *
+ * @param {Object} data Données de la demande.
+ * @return {string} Salutation complète.
+ */
+function buildAdvertiserGreeting(data) {
+  const civility = cleanValue(
+      data.contactCivility || data.civilite,
+      "",
+  );
+  const lastName = cleanValue(
+      data.contactLastName || data.nomResponsable,
+      "",
+  ).toUpperCase();
+
+  if (civility && lastName) {
+    return `Bonjour ${civility} ${lastName},`;
+  }
+
+  if (lastName) {
+    return `Bonjour ${lastName},`;
+  }
+
+  return "Bonjour,";
+}
+
+/**
  * Retourne la désignation complète de la structure.
  *
  * @param {Object} data Données de la demande.
@@ -4716,7 +4743,7 @@ exports.sendAdvertiserRequestAcknowledgement = onDocumentUpdated(
         service: "gmail",
         auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
       });
-      const firstName = cleanValue(afterData.contactFirstName, "");
+      const greeting = buildAdvertiserGreeting(afterData);
       const company = cleanValue(
           afterData.advertiserName || afterData.organisation,
           "votre établissement",
@@ -4726,8 +4753,9 @@ exports.sendAdvertiserRequestAcknowledgement = onDocumentUpdated(
         const mailResult = await transporter.sendMail({
           from: MAIL_FROM,
           to: recipient,
-          subject: "SPHOT - Votre demande annonceur est en cours de traitement",
-          text: `Bonjour ${firstName || ""},
+          subject:
+              "SPHOT - Votre demande annonceur est en cours de traitement",
+          text: `${greeting}
 
 Votre demande d'accès annonceur SPHOT pour ${company} a bien été reçue.
 
@@ -4740,18 +4768,98 @@ Vous recevrez un nouveau message dès qu'une décision aura été prise.
 À bientôt sur SPHOT,
 
 L'équipe SPHOT`,
-          html: `<div
-style="font-family:Arial,sans-serif;color:#172033;line-height:1.6">
-<h2 style="color:#1e3a8a">DEMANDE ANNONCEUR SPHOT</h2>
-<p>Bonjour ${escapeHtml(firstName)},</p>
-<p>Votre demande pour
-<strong>${escapeHtml(company)}</strong> a bien été reçue.</p>
-<p>Elle est maintenant <strong>en cours de vérification</strong>
-par l'équipe SPHOT. Votre dossier reste consultable, mais ne peut plus
-être modifié pendant ce contrôle.</p>
-<p>Vous recevrez un nouveau message dès qu'une décision aura été prise.</p>
-<p>À bientôt sur SPHOT,<br><strong>L'équipe SPHOT</strong></p>
-</div>`,
+          html: `
+<div style="
+  margin:0;
+  padding:40px 20px;
+  background:#eef3f8;
+  font-family:Arial,Helvetica,sans-serif;
+">
+  <div style="
+    max-width:620px;
+    margin:auto;
+    background:#ffffff;
+    border-radius:18px;
+    overflow:hidden;
+    border:1px solid #d9e2ec;
+    box-shadow:0 4px 12px rgba(0,0,0,.08);
+  ">
+    <div style="padding:30px 30px 18px;text-align:center;">
+      <a href="${SPHOT_LOGIN_URL}">
+        <img
+          src="https://sphot.app/assets/data/icons/title.png"
+          alt="SPHOT"
+          style="max-width:320px;width:100%;height:auto;border:0;"
+        >
+      </a>
+    </div>
+
+    <div style="
+      padding:0 34px 34px;
+      color:#263238;
+      font-size:16px;
+      line-height:1.6;
+    ">
+      <p>${escapeHtml(greeting)}</p>
+
+      <p>
+        Votre demande d'accès annonceur SPHOT pour
+        <strong>${escapeHtml(company)}</strong> a bien été reçue.
+      </p>
+
+      <div style="
+        margin:26px 0;
+        padding:20px;
+        background:#f3f6fb;
+        border:1px solid #1e3a8a;
+        border-radius:14px;
+      ">
+        <div style="
+          color:#607d8b;
+          font-size:12px;
+          font-weight:bold;
+          text-transform:uppercase;
+        ">
+          État de la demande
+        </div>
+        <div style="
+          margin-top:5px;
+          color:#dc2626;
+          font-size:21px;
+          font-weight:bold;
+        ">
+          EN COURS DE VÉRIFICATION
+        </div>
+      </div>
+
+      <p>
+        Votre dossier reste consultable, mais ne peut plus être modifié
+        pendant son contrôle par l'équipe SPHOT.
+      </p>
+
+      <p>
+        Vous recevrez un nouveau message dès qu'une décision aura été prise.
+      </p>
+
+      <p style="
+        margin-top:28px;
+        padding:16px;
+        background:#fff8e1;
+        border-left:5px solid #ff9800;
+        border-radius:8px;
+      ">
+        Ce message confirme le bon enregistrement de votre demande
+        annonceur SPHOT.
+      </p>
+
+      <p style="margin-top:34px;">
+        À bientôt sur SPHOT,<br>
+        <strong>L'équipe SPHOT</strong>
+      </p>
+    </div>
+  </div>
+</div>
+`,
         });
         await requestReference.set({
           acknowledgementEmail: {
