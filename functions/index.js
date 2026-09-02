@@ -5019,25 +5019,125 @@ Connexion : ${loginUrl}
 À bientôt sur SPHOT,
 
 L'équipe SPHOT`,
-          html: `<div
-style="font-family:Arial,sans-serif;color:#172033;line-height:1.6">
-<h2 style="color:#1e3a8a">VOTRE ACCÈS ANNONCEUR EST VALIDÉ</h2>
-<p>${escapeHtml(greeting)}</p>
-<p>Votre demande pour
-<strong>${escapeHtml(company)}</strong> a été validée.</p>
-<div
-style="padding:18px;border:2px solid #1e3a8a;
-border-radius:12px;background:#f5f7fc">
-<p><strong>Identifiant :</strong><br>${escapeHtml(login)}</p>
-<p><strong>Mot de passe provisoire :</strong><br>
-${escapeHtml(temporaryPassword)}</p>
+          html: `
+<div style="
+  margin:0;
+  padding:40px 20px;
+  background:#eef3f8;
+  font-family:Arial,Helvetica,sans-serif;
+">
+  <div style="
+    max-width:620px;
+    margin:auto;
+    background:#ffffff;
+    border-radius:18px;
+    overflow:hidden;
+    border:1px solid #d9e2ec;
+    box-shadow:0 4px 12px rgba(0,0,0,.08);
+  ">
+    <div style="padding:30px 30px 18px;text-align:center;">
+      <a href="${loginUrl}">
+        <img
+          src="https://sphot.app/assets/data/icons/title.png"
+          alt="SPHOT"
+          style="max-width:320px;width:100%;height:auto;border:0;"
+        >
+      </a>
+    </div>
+
+    <div style="
+      padding:0 34px 34px;
+      color:#263238;
+      font-size:16px;
+      line-height:1.6;
+    ">
+      <p>${escapeHtml(greeting)}</p>
+
+      <p>
+        Votre demande de SPHOT PUBLICITAIRE pour
+        <strong>${escapeHtml(company)}</strong> a été validée.
+      </p>
+
+      <div style="
+        margin:26px 0;
+        padding:20px;
+        background:#eefaf2;
+        border:1px solid #15803d;
+        border-radius:14px;
+      ">
+        <div style="
+          color:#607d8b;
+          font-size:12px;
+          font-weight:bold;
+          text-transform:uppercase;
+        ">
+          Décision de l'équipe SPHOT
+        </div>
+        <div style="
+          margin-top:5px;
+          color:#15803d;
+          font-size:21px;
+          font-weight:bold;
+        ">
+          DEMANDE APPROUVÉE
+        </div>
+      </div>
+
+      <div style="
+        margin:26px 0;
+        padding:20px;
+        background:#f3f6fb;
+        border:1px solid #1e3a8a;
+        border-radius:14px;
+      ">
+        <p style="margin-top:0;">
+          <strong>Identifiant :</strong><br>
+          <span style="color:#1e3a8a;font-size:20px;font-weight:bold;">
+            ${escapeHtml(login)}
+          </span>
+        </p>
+        <p style="margin-bottom:0;">
+          <strong>Mot de passe provisoire :</strong><br>
+          <span style="color:#dc2626;font-size:20px;font-weight:bold;">
+            ${escapeHtml(temporaryPassword)}
+          </span>
+        </p>
+      </div>
+
+      <p style="
+        margin-top:28px;
+        padding:16px;
+        background:#fff8e1;
+        border-left:5px solid #ff9800;
+        border-radius:8px;
+      ">
+        Lors de votre première connexion, vous devrez obligatoirement
+        choisir un nouveau mot de passe.
+      </p>
+
+      <div style="text-align:center;margin:35px 0;">
+        <a href="${loginUrl}" style="
+          background:#dc2626;
+          color:#ffffff;
+          text-decoration:none;
+          padding:16px 30px;
+          border-radius:10px;
+          display:inline-block;
+          font-size:17px;
+          font-weight:bold;
+        ">
+          SE CONNECTER À SPHOT
+        </a>
+      </div>
+
+      <p style="margin-top:34px;">
+        À bientôt sur SPHOT,<br>
+        <strong>L'équipe SPHOT</strong>
+      </p>
+    </div>
+  </div>
 </div>
-<p>Vous devrez obligatoirement choisir un nouveau mot de passe lors de
-votre première connexion.</p>
-<p><a href="${loginUrl}"
-style="color:#dc2626;font-weight:bold">SE CONNECTER À SPHOT</a></p>
-<p>À bientôt sur SPHOT,<br><strong>L'équipe SPHOT</strong></p>
-</div>`,
+`,
         });
         await requestReference.set({
           approvalEmail: {
@@ -5138,6 +5238,7 @@ exports.sendAdvertiserReviewEmail = onDocumentUpdated(
         auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
       });
       const greeting = buildAdvertiserGreeting(afterData);
+      const applicantUrl = `${SPHOT_LOGIN_URL}/#/advertiser`;
       try {
         const isCorrection = status === "changes_requested" ||
           assetChangeStatus === "authorized";
@@ -5147,17 +5248,137 @@ exports.sendAdvertiserReviewEmail = onDocumentUpdated(
           subject: isCorrection ?
             "SPHOT - Une modification de votre demande est nécessaire" :
             "SPHOT - Décision concernant votre demande annonceur",
-          text: `${greeting}\n\n${isCorrection ?
-            "Une modification est nécessaire avant validation." :
-            "Votre demande annonceur n'a pas été retenue."}
+          text: `${greeting}
+
+${isCorrection ?
+  "Une modification est nécessaire avant validation." :
+  "Votre demande de SPHOT PUBLICITAIRE n'a pas été retenue."}
 
 Motif : ${reason}
 
 ${isCorrection ?
-  "Connectez-vous à votre espace pour corriger puis renvoyer le dossier." :
+  `Identifiez-vous de nouveau avec ProConnect pour retrouver les
+renseignements déjà enregistrés, effectuer la modification demandée,
+puis transmettre à nouveau votre dossier.
+
+Accéder à votre demande : ${applicantUrl}` :
   "Vous pouvez contacter l'équipe SPHOT pour toute précision."}
 
+À bientôt sur SPHOT,
+
 L'équipe SPHOT`,
+          html: `
+<div style="
+  margin:0;
+  padding:40px 20px;
+  background:#eef3f8;
+  font-family:Arial,Helvetica,sans-serif;
+">
+  <div style="
+    max-width:620px;
+    margin:auto;
+    background:#ffffff;
+    border-radius:18px;
+    overflow:hidden;
+    border:1px solid #d9e2ec;
+    box-shadow:0 4px 12px rgba(0,0,0,.08);
+  ">
+    <div style="padding:30px 30px 18px;text-align:center;">
+      <a href="${applicantUrl}">
+        <img
+          src="https://sphot.app/assets/data/icons/title.png"
+          alt="SPHOT"
+          style="max-width:320px;width:100%;height:auto;border:0;"
+        >
+      </a>
+    </div>
+
+    <div style="
+      padding:0 34px 34px;
+      color:#263238;
+      font-size:16px;
+      line-height:1.6;
+    ">
+      <p>${escapeHtml(greeting)}</p>
+
+      <p>
+        ${isCorrection ?
+          "Une modification est nécessaire avant validation de votre " +
+          "demande de SPHOT PUBLICITAIRE." :
+          "Votre demande de SPHOT PUBLICITAIRE n'a pas été retenue."}
+      </p>
+
+      <div style="
+        margin:26px 0;
+        padding:20px;
+        background:#fff1f2;
+        border:1px solid #dc2626;
+        border-radius:14px;
+      ">
+        <div style="
+          color:#607d8b;
+          font-size:12px;
+          font-weight:bold;
+          text-transform:uppercase;
+        ">
+          Décision de l'équipe SPHOT
+        </div>
+        <div style="
+          margin-top:5px;
+          color:#dc2626;
+          font-size:21px;
+          font-weight:bold;
+        ">
+          ${isCorrection ? "MODIFICATION DEMANDÉE" : "DEMANDE REFUSÉE"}
+        </div>
+      </div>
+
+      <div style="
+        margin:26px 0;
+        padding:18px;
+        background:#f3f6fb;
+        border-left:5px solid #1e3a8a;
+        border-radius:8px;
+      ">
+        <strong>Motif communiqué par l'équipe SPHOT :</strong><br>
+        ${escapeHtml(reason)}
+      </div>
+
+      ${isCorrection ? `
+        <p>
+          Identifiez-vous de nouveau avec ProConnect. Vous retrouverez
+          les renseignements déjà enregistrés afin d'effectuer la
+          modification demandée, puis de transmettre à nouveau le dossier.
+        </p>
+
+        <div style="text-align:center;margin:35px 0;">
+          <a href="${applicantUrl}" style="
+            background:#dc2626;
+            color:#ffffff;
+            text-decoration:none;
+            padding:16px 30px;
+            border-radius:10px;
+            display:inline-block;
+            font-size:17px;
+            font-weight:bold;
+          ">
+            ACCÉDER À MA DEMANDE
+          </a>
+        </div>
+      ` : `
+        <p>
+          Vous pouvez contacter l'équipe SPHOT pour toute précision.
+        </p>
+      `}
+
+      <p style="margin-top:34px;">
+        À bientôt sur SPHOT,<br>
+        <strong>L'équipe SPHOT</strong>
+      </p>
+    </div>
+  </div>
+</div>
+`,
         });
         await requestReference.set({
           [fieldName]: {
