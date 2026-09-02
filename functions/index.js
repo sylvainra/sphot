@@ -429,11 +429,11 @@ function buildAdminGreeting(data) {
   ).toUpperCase();
 
   if (civilite && nom) {
-    return `Bonjour ${civilite} ${nom},`;
+    return `${civilite} ${nom} bonjour,`;
   }
 
   if (nom) {
-    return `Bonjour ${nom},`;
+    return `${nom} bonjour,`;
   }
 
   return "Bonjour,";
@@ -456,11 +456,11 @@ function buildAdvertiserGreeting(data) {
   ).toUpperCase();
 
   if (civility && lastName) {
-    return `Bonjour ${civility} ${lastName},`;
+    return `${civility} ${lastName} bonjour,`;
   }
 
   if (lastName) {
-    return `Bonjour ${lastName},`;
+    return `${lastName} bonjour,`;
   }
 
   return "Bonjour,";
@@ -3399,7 +3399,7 @@ box-shadow:0 4px 12px rgba(0,0,0,.08);">
 font-size:16px;line-height:1.6;">
 
       <p style="font-weight:400 !important;">
-  Bonjour ${destinataireHtml},
+  ${destinataireHtml} bonjour,
 </p>
 
 ${isReset ?
@@ -3530,7 +3530,7 @@ vous devrez modifier votre mot de passe.
 </div>
 `,
           text: isReset ?
-`Bonjour ${destinataire},
+`${destinataire} bonjour,
 
 Votre administrateur SPHOT a réinitialisé votre mot de passe.
 
@@ -3547,7 +3547,7 @@ ${SPHOT_LOGIN_URL}
 À bientôt sur SPHOT,
 
 L'équipe SPHOT` :
-`Bonjour ${destinataire},
+`${destinataire} bonjour,
 
 Votre compte SPHOT a été créé par votre administrateur.
 
@@ -3986,7 +3986,7 @@ box-shadow:0 4px 12px rgba(0,0,0,.08);">
       font-size:16px;line-height:1.6;">
 
       <p style="font-weight:400 !important;">
-        Bonjour ${destinataireHtml},
+        ${destinataireHtml} bonjour,
       </p>
 
       <p>
@@ -4035,7 +4035,7 @@ box-shadow:0 4px 12px rgba(0,0,0,.08);">
 
 </div>
 `,
-              text: `Bonjour ${destinataire},
+              text: `${destinataire} bonjour,
 
 Nous vous confirmons que votre mot de passe SPHOT
 a été modifié avec succès.
@@ -4757,7 +4757,7 @@ exports.sendAdvertiserRequestAcknowledgement = onDocumentUpdated(
               "SPHOT - Votre demande annonceur est en cours de traitement",
           text: `${greeting}
 
-Votre demande d'accès annonceur SPHOT pour ${company} a bien été reçue.
+Votre demande de SPHOT PUBLICITAIRE pour ${company} a bien été reçue.
 
 Elle est maintenant en cours de vérification par l'équipe SPHOT.
 Votre dossier reste consultable, mais ne peut plus être modifié
@@ -4803,7 +4803,7 @@ L'équipe SPHOT`,
       <p>${escapeHtml(greeting)}</p>
 
       <p>
-        Votre demande d'accès annonceur SPHOT pour
+        Votre demande de SPHOT PUBLICITAIRE pour
         <strong>${escapeHtml(company)}</strong> a bien été reçue.
       </p>
 
@@ -4848,8 +4848,8 @@ L'équipe SPHOT`,
         border-left:5px solid #ff9800;
         border-radius:8px;
       ">
-        Ce message confirme le bon enregistrement de votre demande
-        annonceur SPHOT.
+        Ce message confirme le bon enregistrement de votre demande de
+        SPHOT PUBLICITAIRE.
       </p>
 
       <p style="margin-top:34px;">
