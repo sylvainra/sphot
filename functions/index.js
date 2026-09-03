@@ -3645,15 +3645,108 @@ exports.loginSauveteur = onRequest(
             {merge: true},
         );
 
+        let webSessionToken = "";
+
+        if (userRole.toUpperCase() === "SUPER_ADMIN") {
+          webSessionToken = crypto.randomBytes(32).toString("hex");
+          const tokenHash = crypto
+              .createHash("sha256")
+              .update(webSessionToken)
+              .digest("hex");
+
+          await admin.firestore()
+              .collection("superAdminWebSessions")
+              .doc(tokenHash)
+              .set({
+                login: doc.id,
+                createdAt:
+                    admin.firestore.FieldValue.serverTimestamp(),
+                expiresAt: admin.firestore.Timestamp.fromMillis(
+                    Date.now() + 5 * 60 * 1000,
+                ),
+              });
+        }
+
         response.status(200).json({
           success: true,
           sauveteurId: doc.id,
           territoireId: (data.territoireId || "").toString(),
           userRole: userRole,
           mustChangePassword: data.mustChangePassword === true,
+          webSessionToken: webSessionToken,
         });
       } catch (error) {
         console.error("Erreur login sauveteur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+/** Valide et consomme un passage unique vers le dashboard Super Admin. */
+exports.consumeSuperAdminWebSession = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const token = cleanValue(
+            (request.body || {}).token,
+            "",
+        ).toLowerCase();
+
+        if (!/^[a-f0-9]{64}$/.test(token)) {
+          response.status(401).json({success: false});
+          return;
+        }
+
+        const tokenHash = crypto
+            .createHash("sha256")
+            .update(token)
+            .digest("hex");
+        const sessionReference = admin.firestore()
+            .collection("superAdminWebSessions")
+            .doc(tokenHash);
+
+        const accepted = await admin.firestore().runTransaction(
+            async (transaction) => {
+              const snapshot = await transaction.get(sessionReference);
+              if (!snapshot.exists) return false;
+
+              const session = snapshot.data() || {};
+              const expiresAt = session.expiresAt;
+              if (!expiresAt ||
+                  typeof expiresAt.toMillis !== "function" ||
+                  expiresAt.toMillis() < Date.now()) {
+                transaction.delete(sessionReference);
+                return false;
+              }
+
+              transaction.delete(sessionReference);
+              return true;
+            },
+        );
+
+        if (!accepted) {
+          response.status(401).json({success: false});
+          return;
+        }
+
+        response.status(200).json({success: true});
+      } catch (error) {
+        console.error(
+            "Erreur validation session Web Super Admin:",
+            error,
+        );
         response.status(500).json({success: false});
       }
     },
