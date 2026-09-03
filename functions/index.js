@@ -5331,7 +5331,7 @@ exports.sendAdvertiserReviewEmail = onDocumentUpdated(
         auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
       });
       const greeting = buildAdvertiserGreeting(afterData);
-      const applicantUrl = `${SPHOT_LOGIN_URL}/#/advertiser`;
+      const applicantUrl = SPHOT_LOGIN_URL;
       try {
         const isCorrection = status === "changes_requested" ||
           assetChangeStatus === "authorized";
