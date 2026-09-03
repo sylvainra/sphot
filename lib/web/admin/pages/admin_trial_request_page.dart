@@ -2743,7 +2743,7 @@ _textField(
       const SizedBox(height: 11),
       _textField(
         'arretesMunicipaux',
-        'https://règlements-de-baignade',
+        'https://réglements-de-baignade',
         readOnly: !_isFieldEditable('arretesMunicipaux'),
       ),
       const SizedBox(height: 14),

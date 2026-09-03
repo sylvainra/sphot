@@ -9460,7 +9460,7 @@ _sphotWebcamUrlController.clear();
                   keyboardType: TextInputType.url,
                 ),
 
-                const SizedBox(height: 4),
+                const SizedBox(height: 26),
 
                 SizedBox(
                   width: double.infinity,
