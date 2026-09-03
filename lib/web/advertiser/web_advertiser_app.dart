@@ -219,7 +219,7 @@ class _AdvertiserLoginPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'ESPACE ANNONCEUR SPHOT',
+                      'SPHOT PUBLICITAIRE',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: WebColors.blue,
