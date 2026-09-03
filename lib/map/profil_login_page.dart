@@ -7,7 +7,6 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../web/admin/pages/admin_trial_request_page.dart';
 import '../pages/sauveteur/change_password_page.dart';
 import '../pages/sauveteur/sauveteur_menu_page.dart';
 
@@ -157,6 +156,8 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
       final userRole = (result['userRole'] ?? 'Sauveteur').toString();
       final territoireId = (result['territoireId'] ?? '').toString();
       final mustChangePassword = result['mustChangePassword'] == true;
+      final webSessionToken =
+          (result['webSessionToken'] ?? '').toString();
 
       if (!mounted) return;
 
@@ -175,7 +176,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
       }
 
       if (userRole.toUpperCase() == 'SUPER_ADMIN') {
-        await _openProLogin();
+        await _openSuperAdminDashboard(webSessionToken);
         return;
       }
 
@@ -207,24 +208,60 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
     }
   }
 
-  void _createProSpace() {
-    /*
-     * SHUNT TEMPORAIRE PROCONNECT
-     *
-     * ProConnect n'est volontairement pas appelé ici.
-     * flutter_appauth n'est actuellement pas compatible avec
-     * le portail Flutter Web SPHOT dans la configuration actuelle.
-     *
-     * Le bouton ouvre donc directement la demande d'accès.
-     * Cette méthode sera remplacée ultérieurement par le flux
-     * Firebase Authentication OIDC + ProConnect.
-     */
+  Future<void> _createProSpace() async {
+    FocusScope.of(context).unfocus();
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const AdminTrialRequestPage(),
-      ),
+    final uri = kIsWeb
+        ? Uri.base.replace(fragment: '/admin-request')
+        : Uri.parse('https://sphot.app/#/admin-request');
+
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: kIsWeb ? '_blank' : null,
     );
+
+    if (!opened && mounted) {
+      setState(() {
+        _loginErrorMessage =
+            'Impossible d’ouvrir la demande d’accès Admin SPHOT.';
+      });
+    }
+  }
+
+  Future<void> _openSuperAdminDashboard(String token) async {
+    FocusScope.of(context).unfocus();
+
+    if (token.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          _loginErrorMessage =
+              'La session Web Super Admin n’a pas pu être créée.';
+        });
+      }
+      return;
+    }
+
+    final route = Uri(
+      path: '/super-admin',
+      queryParameters: {'token': token},
+    ).toString();
+    final uri = kIsWeb
+        ? Uri.base.replace(fragment: route)
+        : Uri.parse('https://sphot.app/#$route');
+
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: kIsWeb ? '_blank' : null,
+    );
+
+    if (!opened && mounted) {
+      setState(() {
+        _loginErrorMessage =
+            'Impossible d’ouvrir le dashboard Super Admin SPHOT.';
+      });
+    }
   }
 
   Future<void> _openProLogin() async {
