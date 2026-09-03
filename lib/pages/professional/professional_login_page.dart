@@ -390,7 +390,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
       child: Column(
         children: [
           const Text(
-            'ESPACE PRO',
+            'SPHOT ADMIN',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 20,
