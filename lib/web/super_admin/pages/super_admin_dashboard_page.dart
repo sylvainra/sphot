@@ -764,7 +764,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     child: Container(
                       constraints: const BoxConstraints(maxHeight: 245),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.94),
+                        color: Colors.white,
                         border: const Border(
                           left: BorderSide(color: adminColor, width: 1.4),
                           right: BorderSide(color: adminColor, width: 1.4),
@@ -915,7 +915,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 child: Container(
                   constraints: const BoxConstraints(maxHeight: 190),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.94),
+                    color: Colors.white,
                     border: const Border(
                       left: BorderSide(color: adminColor, width: 1.4),
                       right: BorderSide(color: adminColor, width: 1.4),
@@ -1804,7 +1804,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 child: Container(
                   constraints: const BoxConstraints(maxHeight: 190),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.94),
+                    color: Colors.white,
                     border: const Border(
                       left: BorderSide(color: adminColor, width: 1.4),
                       right: BorderSide(color: adminColor, width: 1.4),
