@@ -8,6 +8,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'map/map_page.dart';
 import 'web/advertiser/web_advertiser_app.dart';
+import 'web/admin/pages/admin_proconnect_access_page.dart';
 import 'web/admin/pages/admin_trial_request_page.dart';
 import 'pages/professional/professional_login_page.dart';
 import 'web/admin/pages/admin_dashboard_page.dart';
@@ -94,6 +95,13 @@ class SphotApp extends StatelessWidget {
     }
 
     if (uri.path == '/admin-request') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => const AdminProConnectAccessPage(),
+      );
+    }
+
+    if (uri.path == '/admin-request-form') {
       return MaterialPageRoute(
         settings: settings,
         builder: (_) => const AdminTrialRequestPage(),
