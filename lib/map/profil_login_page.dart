@@ -533,7 +533,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
       child: Column(
         children: [
           Text(
-            'ESPACE ADMIN / SUPER ADMIN',
+            'ESPACE ADMIN',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 18,
@@ -556,7 +556,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
               label: const FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  'CRÉER MON ESPACE SPHOT',
+                  'CRÉER MON SPHOT',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -582,7 +582,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
               label: const FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  'ME CONNECTER À SPHOT',
+                  'ME CONNECTER À MON SPHOT',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
