@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -8,6 +11,7 @@ import 'web/advertiser/web_advertiser_app.dart';
 import 'web/admin/pages/admin_trial_request_page.dart';
 import 'pages/professional/professional_login_page.dart';
 import 'web/admin/pages/admin_dashboard_page.dart';
+import 'web/super_admin/web_super_admin_app.dart';
 import 'services/web_pending_auth_storage.dart';
 
 Future<void> main() async {
@@ -89,6 +93,21 @@ class SphotApp extends StatelessWidget {
       );
     }
 
+    if (uri.path == '/admin-request') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => const AdminTrialRequestPage(),
+      );
+    }
+
+    if (uri.path == '/super-admin') {
+      final token = uri.queryParameters['token']?.trim() ?? '';
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => _SuperAdminSessionGate(token: token),
+      );
+    }
+
     if (uri.path == '/web-admin') {
       final requestId =
           uri.queryParameters['requestId']?.trim() ?? '';
@@ -140,5 +159,78 @@ class SphotApp extends StatelessWidget {
       ),
       onGenerateRoute: _generateRoute,
     );
+  }
+}
+
+class _SuperAdminSessionGate extends StatefulWidget {
+  const _SuperAdminSessionGate({required this.token});
+
+  final String token;
+
+  @override
+  State<_SuperAdminSessionGate> createState() =>
+      _SuperAdminSessionGateState();
+}
+
+class _SuperAdminSessionGateState
+    extends State<_SuperAdminSessionGate> {
+  bool _loading = true;
+  bool _authorized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _consumeSession();
+  }
+
+  Future<void> _consumeSession() async {
+    try {
+      if (widget.token.isEmpty) return;
+
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+          'consumeSuperAdminWebSession',
+        ),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({'token': widget.token}),
+      );
+      if (response.statusCode != 200) return;
+
+      final data = jsonDecode(response.body);
+      if (data is Map<String, dynamic> && data['success'] == true) {
+        _authorized = true;
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Ouverture session Super Admin impossible : $error');
+      debugPrintStack(stackTrace: stackTrace);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (!_authorized) {
+      return const Scaffold(
+        body: Center(
+          child: Text(
+            'SESSION SUPER ADMIN INVALIDE OU EXPIRÉE',
+            style: TextStyle(
+              color: Color(0xFFDC2626),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return const WebSuperAdminApp();
   }
 }
