@@ -1880,7 +1880,7 @@ _rgpdExpansionController.collapse();
               child: Text(
                 _isCorrectionMode
                     ? 'CORRIGER MON DOSSIER ADMIN'
-                    : 'CRÉER MON ESPACE ADMIN',
+                    : 'CRÉER MON SPHOT ADMIN',
                 style: const TextStyle(
                   color: adminColor,
                   fontSize: 20,
@@ -1954,7 +1954,7 @@ _rgpdExpansionController.collapse();
               ),
               const SizedBox(height: 8),
               const Text(
-                'Configurez votre espace admin SPHOT en suivant\n'
+                'Configurez votre SPHOT ADMIN en suivant\n'
                 'les étapes ci-dessous.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -2729,7 +2729,7 @@ Row(
       ),
       _textField(
         'siteInternetVille',
-        'Adresse internet du lieu',
+        'https://www.votre-site.fr',
         readOnly: !_isFieldEditable('siteInternetVille'),
       ),
 
@@ -2737,13 +2737,13 @@ const SizedBox(height: 11),
 
 _textField(
         'logoVille',
-        'Adresse internet du logo',
+        'https://votre-logo',
         readOnly: !_isFieldEditable('logoVille'),
       ),
       const SizedBox(height: 11),
       _textField(
         'arretesMunicipaux',
-        'Adresse internet des règlements de baignade',
+        'https://règlements-de-baignade',
         readOnly: !_isFieldEditable('arretesMunicipaux'),
       ),
       const SizedBox(height: 14),
