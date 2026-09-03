@@ -4544,7 +4544,7 @@ _buildCommercialSection(
             SizedBox(
               width: double.infinity,
               child: Text(
-                'Configurez votre espace admin SPHOT en suivant les étapes ci-dessous.',
+                'Configurez votre SPHOT ADMIN en suivant les étapes ci-dessous.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: adminColor.withOpacity(0.82),
@@ -9177,7 +9177,7 @@ _sphotWebcamUrlController.clear();
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -9456,11 +9456,11 @@ _sphotWebcamUrlController.clear();
 
                 _sphotEditorField(
                   controller: _sphotWebcamUrlController,
-                  label: 'Adresse internet de la webcam si doté',
+                  label: 'https://webcam',
                   keyboardType: TextInputType.url,
                 ),
 
-                const Spacer(),
+                const SizedBox(height: 20),
 
                 SizedBox(
                   width: double.infinity,
