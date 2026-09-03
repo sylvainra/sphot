@@ -9177,7 +9177,7 @@ _sphotWebcamUrlController.clear();
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
-          child: SingleChildScrollView(
+          child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -9460,7 +9460,7 @@ _sphotWebcamUrlController.clear();
                   keyboardType: TextInputType.url,
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 4),
 
                 SizedBox(
                   width: double.infinity,
