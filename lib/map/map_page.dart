@@ -124,14 +124,14 @@ void initState() {
   }
 
   Future<void> _openAdvertiserWebsite() async {
-    final uri = kIsWeb
-        ? Uri.base.replace(fragment: '/advertiser')
-        : Uri.parse('https://sphot.app/#/advertiser');
+    if (kIsWeb) {
+      await Navigator.of(context).pushNamed('/advertiser');
+      return;
+    }
 
     final opened = await launchUrl(
-      uri,
+      Uri.parse('https://sphot.app/#/advertiser'),
       mode: LaunchMode.externalApplication,
-      webOnlyWindowName: kIsWeb ? '_blank' : null,
     );
 
     if (!opened) {
