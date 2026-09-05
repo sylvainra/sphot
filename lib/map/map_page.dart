@@ -1012,6 +1012,33 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
   );
 }
 
+double _bottomMenuLeft({
+  required double menuWidth,
+  required int itemIndex,
+}) {
+  const sideInset = 8.0;
+  const itemWidth = 58.0;
+  const itemCount = 5;
+
+  final screenWidth = MediaQuery.of(context).size.width;
+  final barWidth = screenWidth - (sideInset * 2);
+  final spacing =
+      ((barWidth - (itemWidth * itemCount)) / (itemCount + 1))
+          .clamp(0.0, double.infinity)
+          .toDouble();
+  final itemCenter = sideInset +
+      (spacing * (itemIndex + 1)) +
+      (itemWidth * itemIndex) +
+      (itemWidth / 2);
+  final maxLeft = (screenWidth - menuWidth - sideInset)
+      .clamp(sideInset, double.infinity)
+      .toDouble();
+
+  return (itemCenter - (menuWidth / 2))
+      .clamp(sideInset, maxLeft)
+      .toDouble();
+}
+
 Widget _buildVerticalFilterMenu() {
   final orderedFilters = [
     SpotFilter.all,
@@ -1025,8 +1052,11 @@ Widget _buildVerticalFilterMenu() {
   ];
 
   return Positioned(
-    left: 8,
-    bottom: 120,
+    left: _bottomMenuLeft(
+      menuWidth: 190,
+      itemIndex: 0,
+    ),
+    bottom: 154,
     child: IgnorePointer(
       ignoring: !_isFilterOpen,
       child: SizedBox(
@@ -2035,8 +2065,11 @@ onPositionChanged: (position, hasGesture) {
 
 
 Positioned(
-  left: 8,
-  bottom: 120,
+  left: _bottomMenuLeft(
+    menuWidth: 150,
+    itemIndex: 1,
+  ),
+  bottom: 154,
   child: _buildMapStyleVerticalMenu(),
 ),
 
