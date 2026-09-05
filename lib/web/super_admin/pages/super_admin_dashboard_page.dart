@@ -5429,23 +5429,20 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   }
 
   Marker _buildAdvertiserMarker(Map<String, dynamic> data) {
-  final location = _advertiserLocation(data)!;
+    final location = _advertiserLocation(data)!;
+    final name = _cleanText(
+      data['advertiserName'] ??
+          data['companyName'] ??
+          data['businessName'] ??
+          data['organisation'] ??
+          'Annonceur',
+    );
 
-  final name = _cleanText(
-    data['advertiserName'] ??
-        data['companyName'] ??
-        data['businessName'] ??
-        data['organisation'] ??
-        'Annonceur',
-  );
-
-  return Marker(
-    point: location,
-    width: 85,
-    height: 85,
-    alignment: Alignment.topCenter,
-    child: MouseRegion(
-      cursor: SystemMouseCursors.click,
+    return Marker(
+      point: location,
+      width: 56,
+      height: 56,
+      alignment: Alignment.center,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
@@ -5461,24 +5458,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
           _mapController.move(location, 14);
         },
-        child: Tooltip(
-          message: name,
-          child: const SizedBox(
-            width: 85,
-            height: 85,
-            child: AdaptiveAssetImage(
-              'data/icons/fire_green_icon.svg',
-              width: 85,
-              height: 85,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
-            ),
-          ),
-        ),
+        child: _DashboardAdvertiserMarker(name: name),
       ),
-    ),
-  );
-}
+    );
+  }
 
   void _updateVisibleAdminCount(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> admins,
@@ -5836,6 +5819,71 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           },
         );
       },
+    );
+  }
+}
+
+
+class _DashboardAdvertiserMarker extends StatefulWidget {
+  const _DashboardAdvertiserMarker({required this.name});
+
+  final String name;
+
+  @override
+  State<_DashboardAdvertiserMarker> createState() =>
+      _DashboardAdvertiserMarkerState();
+}
+
+class _DashboardAdvertiserMarkerState
+    extends State<_DashboardAdvertiserMarker> {
+  bool _isHovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovering = true),
+      onExit: (_) => setState(() => _isHovering = false),
+      child: SizedBox(
+        width: 56,
+        height: 56,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            const AdaptiveAssetImage(
+              'data/icons/fire_green_icon.svg',
+              width: 48,
+              height: 48,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+            ),
+            if (_isHovering)
+              Positioned(
+                top: 50,
+                left: -132,
+                child: SizedBox(
+                  width: 320,
+                  child: Text(
+                    widget.name,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF2E7D32),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      shadows: [
+                        Shadow(
+                          color: Colors.white,
+                          blurRadius: 3,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
