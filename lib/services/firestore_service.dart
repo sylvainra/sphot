@@ -16,6 +16,30 @@ class FirestoreService {
     });
   }
 
+  Future<List<Map<String, dynamic>>> getPublicAdvertisingSpots() async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://europe-west1-sphot-ab80b.cloudfunctions.net/'
+              'getPublicAdvertisingSpots',
+            ),
+          )
+          .timeout(const Duration(seconds: 6));
+      if (response.statusCode != 200) return const [];
+
+      final payload = jsonDecode(response.body);
+      if (payload is! Map || payload['spots'] is! List) return const [];
+
+      return (payload['spots'] as List)
+          .whereType<Map>()
+          .map((spot) => Map<String, dynamic>.from(spot))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   Future<void> recordPublicClick({
     required String territoireId,
     required String targetId,
