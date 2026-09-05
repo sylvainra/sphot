@@ -4545,24 +4545,18 @@ exports.getPublicAdvertisingSpots = onRequest(
           const advertisingSpot = data.advertisingSpot || {};
           const application = data.application || {};
 
-          const latitudeValue =
-            applicantLocation.latitude !== undefined ?
-              applicantLocation.latitude :
-              approvedLocation.latitude !== undefined ?
-                approvedLocation.latitude :
-                advertisingSpot.latitude !== undefined ?
-                  advertisingSpot.latitude :
-                  data.centerLat;
-          const longitudeValue =
-            applicantLocation.longitude !== undefined ?
-              applicantLocation.longitude :
-              approvedLocation.longitude !== undefined ?
-                approvedLocation.longitude :
-                advertisingSpot.longitude !== undefined ?
-                  advertisingSpot.longitude :
-                  data.centerLng;
-          const latitude = Number(latitudeValue);
-          const longitude = Number(longitudeValue);
+          const latitude = Number([
+            applicantLocation.latitude,
+            approvedLocation.latitude,
+            advertisingSpot.latitude,
+            data.centerLat,
+          ].find((value) => value !== undefined && value !== null));
+          const longitude = Number([
+            applicantLocation.longitude,
+            approvedLocation.longitude,
+            advertisingSpot.longitude,
+            data.centerLng,
+          ].find((value) => value !== undefined && value !== null));
 
           return {
             id: document.id,
