@@ -61,8 +61,10 @@ class _AdvertiserApplicationSectionState
     return _submitted || status == 'pending' || status == 'approved';
   }
 
-  bool get _requestTransmitted =>
-      _submitted || widget.requestStatus.toLowerCase() == 'pending';
+  bool get _requestTransmitted {
+    final status = widget.requestStatus.toLowerCase();
+    return status == 'pending' || status == 'approved';
+  }
 
   @override
   void initState() {
@@ -111,6 +113,10 @@ class _AdvertiserApplicationSectionState
         final data = snapshot.data();
         if (data != null) {
           final application = _map(data['application']);
+          if (data['applicationCompleted'] == true &&
+              widget.requestStatus.toLowerCase() == 'draft') {
+            _submitted = true;
+          }
           final location = _map(data['applicantLocation']);
           final visual = _map(
             data['proposedVisual'] ?? application['proposedVisual'],
@@ -322,13 +328,9 @@ class _AdvertiserApplicationSectionState
       final normalizedDestination = destination.contains('://')
           ? destination
           : 'https://$destination';
-      final recipient = _text(
-        data['contactEmail'] ?? widget.user?.email ?? data['email'],
-      );
-
       await reference.set({
         'uid': requestId,
-        'status': 'pending',
+        'status': 'draft',
         'requestedScope': FieldValue.delete(),
         'destinationUrl': normalizedDestination,
         'centerLat': FieldValue.delete(),
@@ -350,20 +352,9 @@ class _AdvertiserApplicationSectionState
         'bannerUrl': bannerUrl,
         'application': <String, Object?>{
           'destinationUrl': normalizedDestination,
-          'submittedAt': FieldValue.serverTimestamp(),
+          'savedAt': FieldValue.serverTimestamp(),
         },
         'applicationCompleted': true,
-        'acknowledgementEmail': <String, Object?>{
-          'status': 'pending',
-          'recipient': recipient,
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
-        'review': <String, Object?>{
-          'status': 'pending',
-          'reason': '',
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
-        'submittedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -371,7 +362,9 @@ class _AdvertiserApplicationSectionState
       setState(() {
         _bannerUrl = bannerUrl;
         _submitted = true;
-        _success = 'Votre demande a été transmise à l’équipe SPHOT.';
+        _success =
+            'Informations enregistrées. Validez maintenant les documents '
+            'juridiques de l’étape 3.';
       });
       widget.onSubmitted?.call();
       _notifyVisual();
@@ -603,8 +596,7 @@ class _AdvertiserApplicationSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_submitted ||
-            <String>{
+        if (<String>{
               'pending',
               'changes_requested',
               'rejected',
@@ -696,16 +688,18 @@ class _AdvertiserApplicationSectionState
                     ),
                   )
                 : Icon(
-                    _requestTransmitted
+                    _requestTransmitted || _submitted
                         ? Icons.check_circle_outline_rounded
-                        : Icons.send_rounded,
+                        : Icons.arrow_forward_rounded,
                   ),
             label: Text(
               _submitting
                   ? 'ENVOI EN COURS…'
                   : _requestTransmitted
-                  ? 'DEMANDE TRANSMISE'
-                  : 'TRANSMETTRE LA DEMANDE',
+                      ? 'DEMANDE TRANSMISE'
+                      : _submitted
+                          ? 'INFORMATIONS ENREGISTRÉES'
+                          : 'ENREGISTRER ET CONTINUER',
               style: const TextStyle(fontWeight: FontWeight.w900),
             ),
           ),
