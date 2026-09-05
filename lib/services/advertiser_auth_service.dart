@@ -1,22 +1,19 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
-import 'web_pending_auth_storage.dart';
-
 class AdvertiserAuthService {
   static const String providerId = 'oidc.proconnect';
 
-  static Future<void> signInWithProConnectRedirect() async {
-  final provider = OAuthProvider(providerId)
-    ..addScope('openid')
-    ..addScope('email');
+  static Future<User?> signInWithProConnectPopup() async {
+    final provider = OAuthProvider(providerId)
+      ..addScope('openid')
+      ..addScope('email');
 
-  WebPendingAuthStorage.setPendingAuth('advertiser');
+    debugPrint('AUTH ANNONCEUR : ouverture de ProConnect');
 
-  debugPrint('AUTH ANNONCEUR : lancement de ProConnect par redirection');
-
-  await FirebaseAuth.instance.signInWithRedirect(provider);
-}
+    final credential = await FirebaseAuth.instance.signInWithPopup(provider);
+    return credential.user;
+  }
 
   static Future<User?> handleRedirectResult() async {
     final credential = await FirebaseAuth.instance.getRedirectResult();
