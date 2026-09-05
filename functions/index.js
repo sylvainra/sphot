@@ -4507,6 +4507,87 @@ exports.deleteSauveteurAccount = onRequest(
     },
 );
 
+/**
+ * Retourne uniquement les données nécessaires aux marqueurs publicitaires.
+ */
+exports.getPublicAdvertisingSpots = onRequest(
+    {
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      if (request.method !== "GET") {
+        response.status(405).json({success: false});
+        return;
+      }
+
+      try {
+        const snapshot = await admin.firestore()
+            .collection("advertiserRequests")
+            .where("status", "in", ["approved", "active"])
+            .limit(500)
+            .get();
+
+        const spots = snapshot.docs.map((document) => {
+          const data = document.data() || {};
+          const applicantLocation = data.applicantLocation || {};
+          const approvedApplication = data.approvedApplication || {};
+          const approvedLocation = approvedApplication.location || {};
+          const advertisingSpot = data.advertisingSpot || {};
+          const application = data.application || {};
+
+          const latitude = Number(
+              applicantLocation.latitude ??
+              approvedLocation.latitude ??
+              advertisingSpot.latitude ??
+              data.centerLat,
+          );
+          const longitude = Number(
+              applicantLocation.longitude ??
+              approvedLocation.longitude ??
+              advertisingSpot.longitude ??
+              data.centerLng,
+          );
+
+          return {
+            id: document.id,
+            name: cleanValue(
+                data.advertiserName ||
+                data.companyName ||
+                data.businessName ||
+                data.organisation,
+                "SPHOT PUBLICITAIRE",
+            ),
+            latitude: latitude,
+            longitude: longitude,
+            destinationUrl: cleanValue(
+                data.destinationUrl || application.destinationUrl,
+                "",
+            ),
+          };
+        }).filter((spot) =>
+          Number.isFinite(spot.latitude) &&
+          Number.isFinite(spot.longitude) &&
+          !(spot.latitude === 0 && spot.longitude === 0),
+        );
+
+        response.status(200).json({success: true, spots: spots});
+      } catch (error) {
+        console.error("Erreur chargement SPHOTs publicitaires:", error);
+        response.status(500).json({success: false, spots: []});
+      }
+    },
+);
+
 exports.recordPublicClick = onRequest(
     {
       region: "europe-west1",
