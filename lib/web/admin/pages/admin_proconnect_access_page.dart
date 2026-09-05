@@ -108,7 +108,6 @@ class AdminProConnectAccessPage extends StatelessWidget {
                   border: Border.all(color: WebColors.blue, width: 2),
                 ),
                 child: IconButton(
-                  tooltip: 'Retour',
                   onPressed: () {
                     Navigator.of(context).pushNamedAndRemoveUntil(
                       '/',
