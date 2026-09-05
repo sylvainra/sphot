@@ -419,12 +419,22 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           child: Column(
             children: [
               const Text(
-                'ESPACE ANNONCEUR',
+                'BIENVENUE SUR SPHOT',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: WebColors.red,
                   fontSize: 25,
                   fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Configurez votre SPHOT PUBLICITAIRE en suivant les étapes ci-dessous.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: WebColors.blue,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 18),
