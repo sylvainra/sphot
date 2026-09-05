@@ -2208,56 +2208,84 @@ class _SphotSpinnerIcon extends StatefulWidget {
   State<_SphotSpinnerIcon> createState() => _SphotSpinnerIconState();
 }
 
-class _SphotSpinnerIconState extends State<_SphotSpinnerIcon> {
-  late final Timer _timer;
-  int _step = 0;
-
-  static const List<String> _icons = [
-    'data/icons/fire_red_icon.svg',
-    'data/icons/fire_green_icon.svg',
-    'data/icons/fire_cyan_icon.svg',
-    'data/icons/fire_blue_icon.svg',
-    'data/icons/fire_orange_icon.svg',
-    'data/icons/fire_skin_icon.svg',
-    'data/icons/fire_orange1_icon.svg',
-  ];
+class _SphotSpinnerIconState extends State<_SphotSpinnerIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
 
-    _timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _step = (_step + 1) % _icons.length;
-      });
-    });
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    )..repeat();
   }
 
   @override
   void dispose() {
-    _timer.cancel();
+    _controller.dispose();
     super.dispose();
+  }
+
+  Color _markerColor(double progress) {
+    if (progress < 0.12) {
+      return Color.lerp(
+        Colors.black,
+        const Color(0xFFFF0000),
+        progress / 0.12,
+      )!;
+    }
+
+    if (progress < 0.78) {
+      final hue = ((progress - 0.12) / 0.66) * 360;
+
+      return HSVColor.fromAHSV(1, hue, 1, 1).toColor();
+    }
+
+    if (progress < 0.90) {
+      return Color.lerp(
+        const Color(0xFFFF0000),
+        Colors.white,
+        (progress - 0.78) / 0.12,
+      )!;
+    }
+
+    return Color.lerp(
+      Colors.white,
+      Colors.black,
+      (progress - 0.90) / 0.10,
+    )!;
+  }
+
+  Widget _coloredMarker(Color color, double size) {
+    return SvgPicture.asset(
+      'data/icons/fire_red_icon.svg',
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final path = _icons[_step];
-
     return SizedBox(
       width: 40,
       height: 40,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        child: AdaptiveAssetImage(
-          path,
-          key: ValueKey<String>(path),
-          width: 40,
-          height: 40,
-          fit: BoxFit.contain,
-          filterQuality: FilterQuality.high,
-        ),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          final color = _markerColor(_controller.value);
+
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              _coloredMarker(Colors.black, 40),
+              _coloredMarker(color, 37.5),
+            ],
+          );
+        },
       ),
     );
   }
