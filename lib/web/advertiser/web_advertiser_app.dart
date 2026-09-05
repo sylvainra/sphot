@@ -45,6 +45,14 @@ class _WebAdvertiserAccessPageState
   String? _developmentRequestId;
   String? _error;
 
+  String _firebaseErrorMessage(FirebaseAuthException error) {
+    if (error.code == 'unauthorized-domain') {
+      return 'Le domaine ${Uri.base.host} n’est pas autorisé dans Firebase '
+          'Authentication. Ajoutez-le dans les domaines autorisés, puis '
+          'réessayez.';
+    }
+    return '[${error.code}] ${error.message ?? 'Erreur Firebase'}';
+  }
   @override
   void initState() {
     super.initState();
@@ -57,7 +65,7 @@ class _WebAdvertiserAccessPageState
     try {
       await AdvertiserAuthService.handleRedirectResult();
     } on FirebaseAuthException catch (error) {
-      _error = '[${error.code}] ${error.message ?? 'Erreur Firebase'}';
+      _error = _firebaseErrorMessage(error);
       debugPrint(
         'ERREUR RETOUR PROCONNECT : '
         'code=${error.code}, message=${error.message}',
@@ -96,7 +104,7 @@ class _WebAdvertiserAccessPageState
 
       setState(() {
         _startingSignIn = false;
-        _error = '[${error.code}] ${error.message ?? 'Erreur Firebase'}';
+        _error = _firebaseErrorMessage(error);
       });
     } catch (error) {
       if (!mounted) return;
