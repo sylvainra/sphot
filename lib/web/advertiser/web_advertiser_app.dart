@@ -99,10 +99,7 @@ class _WebAdvertiserAccessPageState
     });
 
     try {
-      await AdvertiserAuthService.signInWithProConnectPopup();
-      if (mounted) {
-        setState(() => _startingSignIn = false);
-      }
+      await AdvertiserAuthService.signInWithProConnectRedirect();
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
 
