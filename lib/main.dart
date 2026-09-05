@@ -165,6 +165,9 @@ class SphotApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
+      onGenerateInitialRoutes: (initialRouteName) => [
+        _generateRoute(RouteSettings(name: initialRouteName)),
+      ],
       onGenerateRoute: _generateRoute,
     );
   }
