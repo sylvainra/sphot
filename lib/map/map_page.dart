@@ -2258,11 +2258,11 @@ class _SphotSpinnerIconState extends State<_SphotSpinnerIcon>
     )!;
   }
 
-  Widget _coloredMarker(Color color, double size) {
+  Widget _colorLayer(Color color) {
     return SvgPicture.asset(
-      'data/icons/fire_red_icon.svg',
-      width: size,
-      height: size,
+      'data/icons/fire_all_sphots_color_layer.svg',
+      width: 40,
+      height: 40,
       fit: BoxFit.contain,
       colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
     );
@@ -2281,8 +2281,13 @@ class _SphotSpinnerIconState extends State<_SphotSpinnerIcon>
           return Stack(
             alignment: Alignment.center,
             children: [
-              _coloredMarker(Colors.black, 40),
-              _coloredMarker(color, 37.5),
+              SvgPicture.asset(
+                'data/icons/fire_green_icon.svg',
+                width: 40,
+                height: 40,
+                fit: BoxFit.contain,
+              ),
+              _colorLayer(color),
             ],
           );
         },
