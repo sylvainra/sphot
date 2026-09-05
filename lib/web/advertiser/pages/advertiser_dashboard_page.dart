@@ -17,6 +17,7 @@ import '../models/diffusion_preview_data.dart';
 import '../models/planning_data.dart';
 import '../widgets/advertising_spot_section.dart';
 import '../widgets/advertiser_application_section.dart';
+import '../widgets/advertiser_legal_acceptance_section.dart';
 import '../widgets/diffusion_central_preview.dart';
 import '../widgets/diffusion_section.dart';
 import '../widgets/establishment_section.dart';
@@ -55,7 +56,12 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'LOCALISATION & DEMANDE',
       Icons.fact_check_outlined,
-      'Positionnez votre entreprise et transmettez votre visuel.',
+      'Positionnez votre entreprise et enregistrez votre visuel.',
+    ),
+    _AdvertiserSection(
+      'VALIDATIONS JURIDIQUES',
+      Icons.gavel_rounded,
+      'Consultez et acceptez les documents avant de transmettre la demande.',
     ),
   ];
 
@@ -784,7 +790,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               readOnly: _applicationLocked,
             ),
           ];
-        default:
+        case 1:
           return [
             AdvertiserApplicationSection(
               user: widget.user,
@@ -794,6 +800,21 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               requestStatus: _requestStatus,
               onPositionChanged: _setAdvertisingPoint,
               onVisualChanged: _setAdvertisingVisual,
+              onSubmitted: () {
+                if (!mounted) return;
+                setState(() => _selectedIndex = 2);
+              },
+            ),
+          ];
+        case 2:
+        default:
+          return [
+            AdvertiserLegalAcceptanceSection(
+              key: ValueKey<String>(
+                'advertiser-legal-${_requestId ?? 'unknown'}',
+              ),
+              requestId: _requestId,
+              requestStatus: _requestStatus,
               onSubmitted: () {
                 if (!mounted) return;
                 setState(() => _requestStatus = 'pending');
