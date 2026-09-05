@@ -53,6 +53,7 @@ class _WebAdvertiserAccessPageState
     }
     return '[${error.code}] ${error.message ?? 'Erreur Firebase'}';
   }
+
   @override
   void initState() {
     super.initState();
