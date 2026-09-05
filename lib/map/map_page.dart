@@ -59,6 +59,8 @@ class _MapPageState extends State<MapPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final FirestoreService _firestoreService = FirestoreService();
   final MapController _mapController = MapController();
+  late final Future<List<Map<String, dynamic>>>
+      _publicAdvertisingSpotsFuture;
 
   SpotFilter _selectedFilter = SpotFilter.all;
 
@@ -102,6 +104,8 @@ static const List<_MapTileStyle> _tileStyles = [
 void initState() {
   super.initState();
   _speech = stt.SpeechToText();
+  _publicAdvertisingSpotsFuture =
+      _firestoreService.getPublicAdvertisingSpots();
 }
 
   bool _showTextForZoom(double zoom) {
@@ -137,6 +141,64 @@ void initState() {
     if (!opened) {
       _showMapMessage('Impossible d’ouvrir l’espace annonceur.');
     }
+  }
+
+  double _publicAdvertisingDouble(Object? value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  Future<void> _openPublicAdvertisingSpot(
+    Map<String, dynamic> advertiser,
+  ) async {
+    var url = advertiser['destinationUrl']?.toString().trim() ?? '';
+    if (url.isEmpty) {
+      _showMapMessage('Site internet de l’annonceur non renseigné.');
+      return;
+    }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://$url';
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      _showMapMessage('Adresse du site annonceur invalide.');
+      return;
+    }
+
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened) {
+      _showMapMessage('Impossible d’ouvrir le site de l’annonceur.');
+    }
+  }
+
+  List<Marker> _buildPublicAdvertisingMarkers(
+    List<Map<String, dynamic>> advertisers,
+    double zoom,
+    double rotation,
+  ) {
+    final showText = _showTextForZoom(zoom);
+    return advertisers.map((advertiser) {
+      final latitude = _publicAdvertisingDouble(advertiser['latitude']);
+      final longitude = _publicAdvertisingDouble(advertiser['longitude']);
+      final name = advertiser['name']?.toString().trim() ?? '';
+
+      return Marker(
+        point: LatLng(latitude, longitude),
+        width: 56,
+        height: 56,
+        alignment: Alignment.center,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _openPublicAdvertisingSpot(advertiser),
+          child: _PublicAdvertisingMarker(
+            name: name.isEmpty ? 'SPHOT PUBLICITAIRE' : name,
+            showTextAllowed: showText,
+            rotation: rotation,
+            labelOpacity: _labelOpacity(zoom),
+          ),
+        ),
+      );
+    }).toList();
   }
 
   Future<void> _openCityWebsite(
@@ -1949,8 +2011,13 @@ final spots = allSpots.where(_matchesFilter).toList();
 debugPrint('SPHOTS CHARGÉS : ${allSpots.length}');
 debugPrint('SPHOTS AFFICHÉS : ${spots.length}');
 
-          return Stack(
-            children: [
+          return FutureBuilder<List<Map<String, dynamic>>>(
+            future: _publicAdvertisingSpotsFuture,
+            builder: (context, advertisingSnapshot) {
+              final publicAdvertisers =
+                  advertisingSnapshot.data ?? const <Map<String, dynamic>>[];
+              return Stack(
+                children: [
               FlutterMap(
                 mapController: _mapController,
                 options: MapOptions(
@@ -2028,6 +2095,19 @@ onPositionChanged: (position, hasGesture) {
                     builder: (context) {
                       final zoom = MapCamera.of(context).zoom;
                       final rotation = MapCamera.of(context).rotation;
+                      return MarkerLayer(
+                        markers: _buildPublicAdvertisingMarkers(
+                          publicAdvertisers,
+                          zoom,
+                          rotation,
+                        ),
+                      );
+                    },
+                  ),
+                  Builder(
+                    builder: (context) {
+                      final zoom = MapCamera.of(context).zoom;
+                      final rotation = MapCamera.of(context).rotation;
                       final otherSpots = spots
                           .where((spot) => !spot.isPosteSecours)
                           .toList();
@@ -2076,7 +2156,9 @@ Positioned(
 _buildVerticalFilterMenu(),
 _buildAdBanner(),
 _buildBottomBar(),
-            ],
+                ],
+              );
+            },
           );
         },
       ),
@@ -2436,6 +2518,84 @@ class MiniWavingFlagPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant MiniWavingFlagPainter oldDelegate) {
     return oldDelegate.phase != phase || oldDelegate.color != color;
+  }
+}
+
+
+class _PublicAdvertisingMarker extends StatefulWidget {
+  const _PublicAdvertisingMarker({
+    required this.name,
+    required this.showTextAllowed,
+    required this.rotation,
+    required this.labelOpacity,
+  });
+
+  final String name;
+  final bool showTextAllowed;
+  final double rotation;
+  final double labelOpacity;
+
+  @override
+  State<_PublicAdvertisingMarker> createState() =>
+      _PublicAdvertisingMarkerState();
+}
+
+class _PublicAdvertisingMarkerState extends State<_PublicAdvertisingMarker> {
+  bool _isHovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isTouchDevice =
+        Theme.of(context).platform == TargetPlatform.android ||
+            Theme.of(context).platform == TargetPlatform.iOS;
+    final showText =
+        widget.showTextAllowed && (isTouchDevice || _isHovering);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovering = true),
+      onExit: (_) => setState(() => _isHovering = false),
+      child: SizedBox(
+        width: 56,
+        height: 56,
+        child: Transform.rotate(
+          angle: -widget.rotation * pi / 180,
+          alignment: Alignment.center,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              const AdaptiveAssetImage(
+                'data/icons/fire_green_icon.svg',
+                width: 48,
+                height: 48,
+                fit: BoxFit.contain,
+              ),
+              if (showText)
+                Positioned(
+                  top: 50,
+                  left: -160,
+                  child: Opacity(
+                    opacity: widget.labelOpacity,
+                    child: SizedBox(
+                      width: 380,
+                      child: Text(
+                        widget.name,
+                        textAlign: TextAlign.center,
+                        style: _mapLabelStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF2E7D32),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
