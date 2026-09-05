@@ -2213,10 +2213,11 @@ class _SphotSpinnerIconState extends State<_SphotSpinnerIcon> {
   int _step = 0;
 
   static const List<String> _icons = [
-    'data/icons/fire_orange_icon.svg',
-    'data/icons/fire_blue_icon.svg',
+    'data/icons/fire_red_icon.svg',
     'data/icons/fire_green_icon.svg',
     'data/icons/fire_cyan_icon.svg',
+    'data/icons/fire_blue_icon.svg',
+    'data/icons/fire_orange_icon.svg',
     'data/icons/fire_skin_icon.svg',
     'data/icons/fire_orange1_icon.svg',
   ];
@@ -2225,9 +2226,12 @@ class _SphotSpinnerIconState extends State<_SphotSpinnerIcon> {
   void initState() {
     super.initState();
 
-    _timer = Timer.periodic(const Duration(milliseconds: 800), (_) {
+    _timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (!mounted) return;
-      setState(() => _step = _step + 1);
+
+      setState(() {
+        _step = (_step + 1) % _icons.length;
+      });
     });
   }
 
@@ -2239,51 +2243,21 @@ class _SphotSpinnerIconState extends State<_SphotSpinnerIcon> {
 
   @override
   Widget build(BuildContext context) {
-    const size = 42.0;
-    const iconSize = 22.0;
-    const radius = 10.0;
-    const count = 6;
-
-    final angles = List.generate(
-      count,
-      (i) => -pi / 2 + (2 * pi * i / count),
-    );
+    final path = _icons[_step];
 
     return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: List.generate(count, (index) {
-          final angle = angles[index];
-          final path = _icons[index % _icons.length];
-
-          final activeIndex = _step % count;
-          final isActive = index == activeIndex;
-
-          return Positioned(
-            left: size / 2 + cos(angle) * radius - iconSize / 2,
-            top: size / 2 + sin(angle) * radius - iconSize / 2,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 500),
-              opacity: isActive ? 1.0 : 0.18,
-              child: AnimatedScale(
-                duration: const Duration(milliseconds: 300),
-                scale: isActive ? 1.18 : 0.78,
-                child: Transform.rotate(
-                  angle: angle + pi / 2,
-                  child: Image.asset(
-                    path,
-                    width: iconSize,
-                    height: iconSize,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
+      width: 40,
+      height: 40,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        child: AdaptiveAssetImage(
+          path,
+          key: ValueKey<String>(path),
+          width: 40,
+          height: 40,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+        ),
       ),
     );
   }
