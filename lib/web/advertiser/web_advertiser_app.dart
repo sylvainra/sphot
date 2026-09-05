@@ -99,7 +99,10 @@ class _WebAdvertiserAccessPageState
     });
 
     try {
-      await AdvertiserAuthService.signInWithProConnectRedirect();
+      await AdvertiserAuthService.signInWithProConnectPopup();
+      if (mounted) {
+        setState(() => _startingSignIn = false);
+      }
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
 
@@ -308,6 +311,35 @@ class _AdvertiserLoginPage extends StatelessWidget {
                       ),
                     ],
                   ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 22,
+            child: Center(
+              child: Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: WebColors.blue, width: 2),
+                ),
+                child: IconButton(
+                  onPressed: () {
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      '/',
+                      (route) => false,
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: WebColors.blue,
+                    size: 28,
+                  ),
                 ),
               ),
             ),
