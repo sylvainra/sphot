@@ -516,7 +516,7 @@ class _AdvertiserApplicationSectionState
           ? const Color(0xFF6B7280)
           : WebColors.red,
       child: Text(
-        _locked ? 'La position de votre entreprise est en cours de contrôle.' : 'Déplacez et zoomez la carte, puis cliquez à l’emplacement exact de votre entreprise ; votre SPHOT sera ainsi défini.',
+        _locked ? 'La position de votre entreprise est en cours de contrôle.' : 'Déplacez et zoomez la carte, puis cliquez à l’emplacement exact de votre entreprise ; votre SPHOT PUBLICITAIRE sera ainsi défini.',
         style: const TextStyle(
           color: Color(0xFF4B5F97),
           fontWeight: FontWeight.w700,
