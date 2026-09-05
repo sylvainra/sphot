@@ -1,11 +1,16 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../shared/text_input_formatters.dart';
 import '../../shared/web_colors.dart';
+import '../../../services/company_registry_service.dart';
 
 class EstablishmentSection extends StatefulWidget {
   const EstablishmentSection({
@@ -26,6 +31,15 @@ class EstablishmentSection extends StatefulWidget {
 }
 
 class _EstablishmentSectionState extends State<EstablishmentSection> {
+  static const _foreignCountries = <String, String>{
+    'AU': 'AUSTRALIE',
+    'ZA': 'AFRIQUE DU SUD',
+    'CA': 'CANADA',
+    'US': 'ÉTATS-UNIS',
+    'NZ': 'NOUVELLE-ZÉLANDE',
+    'GB': 'ROYAUME-UNI',
+    'OTHER': 'AUTRE PAYS',
+  };
   static const _activityTypes = <String>[
     'Cosmétique',
     'Optique / lunettes',
@@ -55,6 +69,17 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   final _countryController = TextEditingController(text: 'FRANCE');
   final _publicPhoneController = TextEditingController();
   final _publicEmailController = TextEditingController();
+  final _foreignRegistrationController = TextEditingController();
+  final _foreignAuthorityController = TextEditingController();
+
+  bool _isFrenchRegistration = true;
+  String _foreignCountryCode = 'US';
+  String _registryStatus = 'unverified';
+  String _registryMessage = '';
+  String _activityCode = '';
+  bool _checkingRegistry = false;
+  PlatformFile? _selectedProof;
+  Map<String, dynamic> _savedForeignProof = {};
 
   String? _activityType;
   final _activityFieldKey = GlobalKey();
@@ -95,6 +120,8 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     _countryController.dispose();
     _publicPhoneController.dispose();
     _publicEmailController.dispose();
+    _foreignRegistrationController.dispose();
+    _foreignAuthorityController.dispose();
     super.dispose();
   }
 
@@ -153,6 +180,28 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
           );
 
           _completed = data['establishmentCompleted'] == true;
+          _isFrenchRegistration =
+              _read(data['registrationMode'], 'france') != 'international';
+          _foreignCountryCode = _read(data['registrationCountryCode'], 'US');
+          if (!_foreignCountries.containsKey(_foreignCountryCode)) {
+            _foreignCountryCode = 'OTHER';
+          }
+          _foreignRegistrationController.text = _read(
+            data['foreignRegistrationNumber'],
+          );
+          _foreignAuthorityController.text = _read(
+            data['foreignRegistrationAuthority'],
+          );
+          final precheck = data['registryPrecheck'];
+          if (precheck is Map) {
+            _registryStatus = _read(precheck['status'], 'unverified');
+            _registryMessage = _read(precheck['message']);
+            _activityCode = _read(precheck['activityCode']);
+          }
+          final proof = data['foreignProof'];
+          if (proof is Map) {
+            _savedForeignProof = Map<String, dynamic>.from(proof);
+          }
         }
       } catch (error) {
         _error = 'Impossible de charger l’établissement enregistré.';
@@ -182,6 +231,95 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
 
   void _markAsModified([Object? _]) {
     if (_completed) setState(() => _completed = false);
+  }
+
+  Future<void> _verifySiret() async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _checkingRegistry = true;
+      _registryMessage = '';
+    });
+    try {
+      final company = await const CompanyRegistryService().findBySiret(
+        _siretController.text,
+      );
+      if (!mounted) return;
+      setState(() {
+        _siretController.text = company.siret;
+        _sirenController.text = company.siren;
+        _legalNameController.text = forceUpperCase(company.legalName);
+        if (company.businessName.isNotEmpty) {
+          _businessNameController.text = forceUpperCase(company.businessName);
+        }
+        _addressController.text = company.address;
+        _postalCodeController.text = company.postalCode;
+        _cityController.text = forceUpperCase(company.city);
+        _countryController.text = 'FRANCE';
+        _activityCode = company.activityCode;
+        _registryStatus = company.isActive ? 'verified' : 'manual_review';
+        _registryMessage = company.isActive
+            ? 'SIRET vérifié dans le registre officiel.'
+            : 'Établissement déclaré fermé : contrôle manuel obligatoire.';
+        _completed = false;
+      });
+    } on CompanyRegistryException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _registryStatus = 'manual_review';
+        _registryMessage = error.message;
+      });
+    } finally {
+      if (mounted) setState(() => _checkingRegistry = false);
+    }
+  }
+
+  Future<void> _pickForeignProof() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf', 'png', 'jpg', 'jpeg', 'webp'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty || !mounted) return;
+    final file = result.files.single;
+    if (file.size > 5 * 1024 * 1024) {
+      setState(() => _error = 'Le justificatif ne doit pas dépasser 5 Mo.');
+      return;
+    }
+    setState(() {
+      _selectedProof = file;
+      _error = null;
+      _completed = false;
+    });
+  }
+
+  Future<Map<String, Object?>> _uploadForeignProof(String requestId) async {
+    final file = _selectedProof;
+    if (file == null) return Map<String, Object?>.from(_savedForeignProof);
+    final Uint8List? bytes = file.bytes;
+    if (bytes == null) {
+      throw const CompanyRegistryException(
+        'Lecture du justificatif impossible.',
+      );
+    }
+    final extension = (file.extension ?? 'pdf').toLowerCase();
+    final reference = FirebaseStorage.instance.ref(
+      'advertiser_requests/$requestId/foreign_registration_proof.$extension',
+    );
+    await reference.putData(
+      bytes,
+      SettableMetadata(
+        contentType: extension == 'pdf'
+            ? 'application/pdf'
+            : 'image/$extension',
+      ),
+    );
+    return <String, Object?>{
+      'url': await reference.getDownloadURL(),
+      'fileName': file.name,
+      'extension': extension,
+      'fileSizeBytes': file.size,
+      'uploadedAt': FieldValue.serverTimestamp(),
+    };
   }
 
   void _closeActivityMenu() {
@@ -414,10 +552,17 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     final otherActivityIsValid =
         _activityType != 'Autre' ||
         _otherActivityController.text.trim().isNotEmpty;
+    final foreignProofIsValid =
+        _isFrenchRegistration ||
+        _selectedProof != null ||
+        (_savedForeignProof['url']?.toString().trim().isNotEmpty ?? false);
     if (!otherActivityIsValid) {
       setState(() => _activityError = 'Précisez le type d’activité');
     }
-    if (!formIsValid || !otherActivityIsValid) return;
+    if (!foreignProofIsValid) {
+      setState(() => _error = 'Joignez un justificatif officiel.');
+    }
+    if (!formIsValid || !otherActivityIsValid || !foreignProofIsValid) return;
 
     setState(() {
       _saving = true;
@@ -434,6 +579,9 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
       final country = forceUpperCase(_countryController.text.trim());
       final publicPhone = _publicPhoneController.text.trim();
       final publicEmail = _publicEmailController.text.trim();
+      final registrationMode = _isFrenchRegistration
+          ? 'france'
+          : 'international';
 
       _legalNameController.text = legalName;
       _businessNameController.text = businessName;
@@ -441,6 +589,9 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
       _countryController.text = country;
 
       if (requestId != null) {
+        final foreignProof = _isFrenchRegistration
+            ? <String, Object?>{}
+            : await _uploadForeignProof(requestId);
         final creationData = _requestExists
             ? <String, Object?>{}
             : <String, Object?>{
@@ -460,6 +611,29 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
               'siren': siren,
               'phone': publicPhone,
               'publicEmail': publicEmail,
+              'registrationMode': registrationMode,
+              'registrationCountryCode': _isFrenchRegistration
+                  ? 'FR'
+                  : _foreignCountryCode,
+              'foreignRegistrationNumber': _isFrenchRegistration
+                  ? ''
+                  : _foreignRegistrationController.text.trim(),
+              'foreignRegistrationAuthority': _isFrenchRegistration
+                  ? ''
+                  : _foreignAuthorityController.text.trim(),
+              'foreignProof': foreignProof,
+              'registryPrecheck': <String, Object?>{
+                'status': _isFrenchRegistration
+                    ? _registryStatus
+                    : 'manual_review',
+                'message': _isFrenchRegistration
+                    ? _registryMessage
+                    : 'Entreprise étrangère : contrôle manuel obligatoire.',
+                'activityCode': _activityCode,
+                'checkedAt': FieldValue.serverTimestamp(),
+              },
+              'submissionLocale': Localizations.localeOf(context)
+                  .toLanguageTag(),
               'establishmentCompleted': true,
               'establishment': <String, Object?>{
                 'legalName': legalName,
@@ -502,6 +676,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   }
 
   String? _siretValidator(String? value) {
+    if (!_isFrenchRegistration) return null;
     final requiredError = _requiredValidator(value);
     if (requiredError != null) return requiredError;
     return _digits(value!).length == 14
@@ -528,6 +703,36 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (!widget.readOnly)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                  value: true,
+                  label: Text('ENTREPRISE FRANÇAISE'),
+                  icon: Icon(Icons.flag_outlined),
+                ),
+                ButtonSegment(
+                  value: false,
+                  label: Text('ENTREPRISE ÉTRANGÈRE'),
+                  icon: Icon(Icons.public),
+                ),
+              ],
+              selected: {_isFrenchRegistration},
+              onSelectionChanged: (selection) {
+                setState(() {
+                  _isFrenchRegistration = selection.first;
+                  _countryController.text = _isFrenchRegistration
+                      ? 'FRANCE'
+                      : (_foreignCountries[_foreignCountryCode] ??
+                            'AUTRE PAYS');
+                  _completed = false;
+                  _error = null;
+                });
+              },
+            ),
+          ),
         if (widget.readOnly)
           _EstablishmentCard(
             icon: Icons.lock_outline_rounded,
@@ -622,22 +827,112 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                           ),
                         ),
                       ),
-                      _EstablishmentField(
-                        controller: _siretController,
-                        label: 'SIRET *',
-                        validator: _siretValidator,
-                        onChanged: _markAsModified,
-                        keyboardType: TextInputType.number,
-                        digitsOnly: true,
-                        maxLength: 14,
-                      ),
-                      _EstablishmentField(
-                        controller: _sirenController,
-                        label: 'SIREN calculé depuis le SIRET',
-                        validator: _requiredValidator,
-                        onChanged: _markAsModified,
-                        readOnly: true,
-                      ),
+                      if (_isFrenchRegistration) ...[
+                        _EstablishmentField(
+                          controller: _siretController,
+                          label: 'SIRET *',
+                          validator: _siretValidator,
+                          onChanged: (value) {
+                            _registryStatus = 'unverified';
+                            _registryMessage = '';
+                            _markAsModified(value);
+                          },
+                          keyboardType: TextInputType.number,
+                          digitsOnly: true,
+                          maxLength: 14,
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: FilledButton.icon(
+                            onPressed: _checkingRegistry ? null : _verifySiret,
+                            icon: _checkingRegistry
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.verified_outlined),
+                            label: const Text('VÉRIFIER ET PRÉREMPLIR'),
+                          ),
+                        ),
+                        if (_registryMessage.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: Text(
+                              _registryMessage,
+                              style: TextStyle(
+                                color: _registryStatus == 'verified'
+                                    ? const Color(0xFF15803D)
+                                    : WebColors.red,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        _EstablishmentField(
+                          controller: _sirenController,
+                          label: 'SIREN calculé depuis le SIRET',
+                          validator: _requiredValidator,
+                          onChanged: _markAsModified,
+                          readOnly: true,
+                        ),
+                      ] else ...[
+                        DropdownButtonFormField<String>(
+                          value: _foreignCountryCode,
+                          decoration: _fieldDecoration(
+                            'Pays d’immatriculation *',
+                          ),
+                          items: _foreignCountries.entries
+                              .map(
+                                (entry) => DropdownMenuItem(
+                                  value: entry.key,
+                                  child: Text(entry.value),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setState(() {
+                              _foreignCountryCode = value;
+                              _countryController.text =
+                                  _foreignCountries[value]!;
+                              _completed = false;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _EstablishmentField(
+                          controller: _foreignRegistrationController,
+                          label: 'Numéro d’enregistrement national *',
+                          validator: _requiredValidator,
+                          onChanged: _markAsModified,
+                        ),
+                        _EstablishmentField(
+                          controller: _foreignAuthorityController,
+                          label: 'Registre ou autorité (EIN, ABN/ACN, CIPC…) *',
+                          validator: _requiredValidator,
+                          onChanged: _markAsModified,
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _pickForeignProof,
+                          icon: const Icon(Icons.upload_file_outlined),
+                          label: Text(
+                            _selectedProof?.name ??
+                                _savedForeignProof['fileName']?.toString() ??
+                                'JOINDRE LE JUSTIFICATIF OFFICIEL *',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'PDF, PNG, JPG ou WEBP — 5 Mo maximum. Le dossier sera contrôlé manuellement.',
+                          style: TextStyle(
+                            color: WebColors.blue,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -676,14 +971,14 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                         textCapitalization: TextCapitalization.characters,
                         inputFormatters: const [UpperCaseTextInputFormatter()],
                       ),
-                      _EstablishmentField(
-                        controller: _countryController,
-                        label: 'Pays *',
-                        validator: _requiredValidator,
-                        onChanged: _markAsModified,
-                        textCapitalization: TextCapitalization.characters,
-                        inputFormatters: const [UpperCaseTextInputFormatter()],
-                      ),
+                      if (_isFrenchRegistration)
+                        _EstablishmentField(
+                          controller: _countryController,
+                          label: 'Pays *',
+                          validator: _requiredValidator,
+                          onChanged: _markAsModified,
+                          readOnly: true,
+                        ),
                     ],
                   ),
                 ),

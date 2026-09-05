@@ -5412,10 +5412,30 @@ exports.sendAdvertiserReviewEmail = onDocumentUpdated(
         auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
       });
       const greeting = buildAdvertiserGreeting(afterData);
-      const applicantUrl = SPHOT_LOGIN_URL;
+      const isCorrection = status === "changes_requested" ||
+        assetChangeStatus === "authorized";
+      let applicantUrl = SPHOT_LOGIN_URL;
+      if (isCorrection) {
+        const accessToken = crypto.randomBytes(32).toString("hex");
+        const tokenHash = crypto
+            .createHash("sha256")
+            .update(accessToken)
+            .digest("hex");
+        const expiresAt = admin.firestore.Timestamp.fromMillis(
+            Date.now() + 30 * 24 * 60 * 60 * 1000,
+        );
+        await requestReference.set({
+          correctionAccess: {
+            tokenHash,
+            expiresAt,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+        }, {merge: true});
+        applicantUrl = `${SPHOT_LOGIN_URL}/#/advertiser-correction` +
+          `?requestId=${encodeURIComponent(event.params.requestId)}` +
+          `&token=${encodeURIComponent(accessToken)}`;
+      }
       try {
-        const isCorrection = status === "changes_requested" ||
-          assetChangeStatus === "authorized";
         const mailResult = await transporter.sendMail({
           from: MAIL_FROM,
           to: recipient,
@@ -5431,9 +5451,9 @@ ${isCorrection ?
 Motif : ${reason}
 
 ${isCorrection ?
-  `Identifiez-vous de nouveau avec ProConnect pour retrouver les
-renseignements déjà enregistrés, effectuer la modification demandée,
-puis transmettre à nouveau votre dossier.
+  `Ce lien personnel vous permet de retrouver les renseignements déjà
+enregistrés, d'effectuer la modification demandée, puis de transmettre
+à nouveau votre dossier. Il reste valable pendant 30 jours.
 
 Accéder à votre demande : ${applicantUrl}` :
   "Vous pouvez contacter l'équipe SPHOT pour toute précision."}
@@ -5520,9 +5540,9 @@ L'équipe SPHOT`,
 
       ${isCorrection ? `
         <p>
-          Identifiez-vous de nouveau avec ProConnect. Vous retrouverez
-          les renseignements déjà enregistrés afin d'effectuer la
-          modification demandée, puis de transmettre à nouveau le dossier.
+          Ce lien personnel vous permet de retrouver les renseignements
+          déjà enregistrés afin d'effectuer la modification demandée, puis
+          de transmettre à nouveau le dossier. Il reste valable 30 jours.
         </p>
 
         <div style="text-align:center;margin:35px 0;">
@@ -5573,6 +5593,72 @@ L'équipe SPHOT`,
           },
         }, {merge: true});
         throw error;
+      }
+    },
+);
+
+/** Échange un lien personnel de correction contre une session Firebase. */
+exports.redeemAdvertiserCorrectionAccess = onRequest(
+    {region: "us-central1", cors: true},
+    async (request, response) => {
+      if (request.method !== "POST") {
+        response.status(405).json({error: "Méthode non autorisée."});
+        return;
+      }
+
+      const requestId = cleanValue(request.body && request.body.requestId, "");
+      const suppliedToken = cleanValue(request.body && request.body.token, "");
+      if (!requestId || !suppliedToken) {
+        response.status(400).json({error: "Lien de correction incomplet."});
+        return;
+      }
+
+      try {
+        const reference = admin.firestore()
+            .collection("advertiserRequests")
+            .doc(requestId);
+        const snapshot = await reference.get();
+        const data = snapshot.data() || {};
+        const access = data.correctionAccess || {};
+        const storedHash = cleanValue(access.tokenHash, "");
+        const suppliedHash = crypto
+            .createHash("sha256")
+            .update(suppliedToken)
+            .digest("hex");
+        const expiresAt = access.expiresAt && access.expiresAt.toMillis ?
+          access.expiresAt.toMillis() : 0;
+        const status = cleanValue(data.status, "").toLowerCase();
+        const assetStatus = cleanValue(
+            (data.assetChangeRequest || {}).status,
+            "",
+        ).toLowerCase();
+        const editable = status === "changes_requested" ||
+          assetStatus === "authorized";
+        const hashesMatch = storedHash.length === suppliedHash.length &&
+          crypto.timingSafeEqual(
+              Buffer.from(storedHash, "utf8"),
+              Buffer.from(suppliedHash, "utf8"),
+          );
+
+        if (!snapshot.exists || !hashesMatch || expiresAt <= Date.now() ||
+            !editable) {
+          response.status(403).json({
+            error: "Ce lien est invalide, expiré ou n'autorise plus " +
+              "la modification.",
+          });
+          return;
+        }
+
+        const firebaseToken = await admin.auth().createCustomToken(requestId, {
+          role: "advertiser_candidate",
+          advertiserRequestId: requestId,
+        });
+        response.status(200).json({token: firebaseToken, requestId});
+      } catch (error) {
+        console.error("Échange accès correction annonceur impossible", error);
+        response.status(500).json({
+          error: "Session temporairement indisponible.",
+        });
       }
     },
 );

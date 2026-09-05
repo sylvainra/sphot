@@ -18,9 +18,7 @@ import 'services/web_pending_auth_storage.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   final pendingAuth = WebPendingAuthStorage.getPendingAuth();
 
@@ -44,23 +42,16 @@ Future<void> main() async {
   final initialRoute = fragment.isEmpty
       ? '/'
       : fragment.startsWith('/')
-          ? fragment
-          : '/$fragment';
+      ? fragment
+      : '/$fragment';
 
-  runApp(
-    SphotApp(
-      initialRoute: initialRoute,
-    ),
-  );
+  runApp(SphotApp(initialRoute: initialRoute));
 }
 
 class SphotApp extends StatelessWidget {
   final String initialRoute;
 
-  const SphotApp({
-    super.key,
-    required this.initialRoute,
-  });
+  const SphotApp({super.key, required this.initialRoute});
 
   Route<dynamic> _generateRoute(RouteSettings settings) {
     String routeName = settings.name?.trim() ?? '/';
@@ -73,9 +64,7 @@ class SphotApp extends StatelessWidget {
     if (routeName == '/' && Uri.base.fragment.trim().isNotEmpty) {
       final fragment = Uri.base.fragment.trim();
 
-      routeName = fragment.startsWith('/')
-          ? fragment
-          : '/$fragment';
+      routeName = fragment.startsWith('/') ? fragment : '/$fragment';
     }
 
     final uri = Uri.parse(routeName);
@@ -84,6 +73,16 @@ class SphotApp extends StatelessWidget {
       return MaterialPageRoute(
         settings: settings,
         builder: (_) => const WebAdvertiserAccessPage(),
+      );
+    }
+
+    if (uri.path == '/advertiser-correction') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => WebAdvertiserAccessPage(
+          correctionRequestId: uri.queryParameters['requestId'],
+          correctionToken: uri.queryParameters['token'],
+        ),
       );
     }
 
@@ -117,8 +116,7 @@ class SphotApp extends StatelessWidget {
     }
 
     if (uri.path == '/web-admin') {
-      final requestId =
-          uri.queryParameters['requestId']?.trim() ?? '';
+      final requestId = uri.queryParameters['requestId']?.trim() ?? '';
 
       if (requestId.isNotEmpty) {
         return MaterialPageRoute(
@@ -129,15 +127,12 @@ class SphotApp extends StatelessWidget {
     }
 
     if (uri.path == '/admin-request-correction') {
-      final requestId =
-          uri.queryParameters['requestId']?.trim() ?? '';
+      final requestId = uri.queryParameters['requestId']?.trim() ?? '';
 
       if (requestId.isNotEmpty) {
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => AdminTrialRequestPage(
-            correctionRequestId: requestId,
-          ),
+          builder: (_) => AdminTrialRequestPage(correctionRequestId: requestId),
         );
       }
     }
@@ -159,12 +154,8 @@ class SphotApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('fr', 'FR'),
-      ],
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
+      supportedLocales: const [Locale('fr', 'FR')],
+      theme: ThemeData(primarySwatch: Colors.blue),
       onGenerateInitialRoutes: (initialRouteName) => [
         _generateRoute(RouteSettings(name: initialRouteName)),
       ],
@@ -179,12 +170,10 @@ class _SuperAdminSessionGate extends StatefulWidget {
   final String token;
 
   @override
-  State<_SuperAdminSessionGate> createState() =>
-      _SuperAdminSessionGateState();
+  State<_SuperAdminSessionGate> createState() => _SuperAdminSessionGateState();
 }
 
-class _SuperAdminSessionGateState
-    extends State<_SuperAdminSessionGate> {
+class _SuperAdminSessionGateState extends State<_SuperAdminSessionGate> {
   bool _loading = true;
   bool _authorized = false;
 
@@ -223,9 +212,7 @@ class _SuperAdminSessionGateState
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (!_authorized) {

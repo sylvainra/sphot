@@ -2609,6 +2609,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final establishment = _advertiserMap(advertiser['establishment']);
     final application = _advertiserMap(advertiser['application']);
     final proposedVisual = _advertiserMap(advertiser['proposedVisual']);
+    final registryPrecheck = _advertiserMap(advertiser['registryPrecheck']);
+    final foreignProof = _advertiserMap(advertiser['foreignProof']);
+    final legalAcceptance = _advertiserMap(advertiser['legalAcceptance']);
+    final registrationMode = _cleanText(advertiser['registrationMode']);
+    final foreignProofUrl = _cleanText(foreignProof['url']);
     final companyName = _cleanText(
       advertiser['advertiserName'] ??
           establishment['businessName'] ??
@@ -2744,6 +2749,48 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 'SIRET',
                 _cleanText(establishment['siret'] ?? advertiser['siret']),
               ),
+              _spotInfoLine(
+                'Mode d’immatriculation',
+                registrationMode == 'international'
+                    ? 'Entreprise étrangère'
+                    : 'Entreprise française',
+              ),
+              _spotInfoLine(
+                'Contrôle du registre',
+                _cleanText(registryPrecheck['status']).isEmpty
+                    ? 'Non effectué'
+                    : _cleanText(registryPrecheck['status']),
+              ),
+              if (registrationMode == 'international') ...[
+                _spotInfoLine(
+                  'Pays d’immatriculation',
+                  _cleanText(advertiser['registrationCountryCode']),
+                ),
+                _spotInfoLine(
+                  'N° d’enregistrement',
+                  _cleanText(advertiser['foreignRegistrationNumber']),
+                ),
+                _spotInfoLine(
+                  'Registre / autorité',
+                  _cleanText(advertiser['foreignRegistrationAuthority']),
+                ),
+                if (foreignProofUrl.isNotEmpty)
+                  OutlinedButton.icon(
+                    onPressed: () => launchUrl(
+                      Uri.parse(foreignProofUrl),
+                      mode: LaunchMode.externalApplication,
+                      webOnlyWindowName: '_blank',
+                    ),
+                    icon: const Icon(Icons.description_outlined),
+                    label: const Text('OUVRIR LE JUSTIFICATIF OFFICIEL'),
+                  ),
+              ],
+              _spotInfoLine(
+                'Version juridique acceptée',
+                _cleanText(legalAcceptance['version']).isEmpty
+                    ? 'Non acceptée'
+                    : _cleanText(legalAcceptance['version']),
+              ),
               _spotInfoLine('Adresse', address),
               _advertiserWebsiteLine(websiteUrl),
               if (assetChangeStatus.isNotEmpty)
@@ -2802,14 +2849,18 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         decision: 'changes_requested',
                       ),
                 style: OutlinedButton.styleFrom(
-                  backgroundColor:
-                      modificationRequested ? redColor : Colors.transparent,
-                  disabledBackgroundColor:
-                      modificationRequested ? redColor : Colors.transparent,
-                  foregroundColor:
-                      modificationRequested ? Colors.white : adminColor,
-                  disabledForegroundColor:
-                      modificationRequested ? Colors.white : Colors.grey,
+                  backgroundColor: modificationRequested
+                      ? redColor
+                      : Colors.transparent,
+                  disabledBackgroundColor: modificationRequested
+                      ? redColor
+                      : Colors.transparent,
+                  foregroundColor: modificationRequested
+                      ? Colors.white
+                      : adminColor,
+                  disabledForegroundColor: modificationRequested
+                      ? Colors.white
+                      : Colors.grey,
                   side: BorderSide(
                     color: modificationRequested ? redColor : adminColor,
                     width: 1.5,
@@ -2833,14 +2884,16 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         decision: 'rejected',
                       ),
                 style: OutlinedButton.styleFrom(
-                  backgroundColor:
-                      requestRejected ? redColor : Colors.transparent,
-                  disabledBackgroundColor:
-                      requestRejected ? redColor : Colors.transparent,
-                  foregroundColor:
-                      requestRejected ? Colors.white : redColor,
-                  disabledForegroundColor:
-                      requestRejected ? Colors.white : Colors.grey,
+                  backgroundColor: requestRejected
+                      ? redColor
+                      : Colors.transparent,
+                  disabledBackgroundColor: requestRejected
+                      ? redColor
+                      : Colors.transparent,
+                  foregroundColor: requestRejected ? Colors.white : redColor,
+                  disabledForegroundColor: requestRejected
+                      ? Colors.white
+                      : Colors.grey,
                   side: const BorderSide(color: redColor, width: 1.5),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
@@ -5812,7 +5865,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   }
 }
 
-
 class _DashboardAdvertiserMarker extends StatefulWidget {
   const _DashboardAdvertiserMarker({required this.name});
 
@@ -5860,12 +5912,7 @@ class _DashboardAdvertiserMarkerState
                       color: Color(0xFF2E7D32),
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
-                      shadows: [
-                        Shadow(
-                          color: Colors.white,
-                          blurRadius: 3,
-                        ),
-                      ],
+                      shadows: [Shadow(color: Colors.white, blurRadius: 3)],
                     ),
                   ),
                 ),

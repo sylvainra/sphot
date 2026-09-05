@@ -36,7 +36,9 @@ class _AdvertiserLegalAcceptanceSectionState
   bool _cguAccepted = false;
   bool _privacyAccepted = false;
   bool _rgpdAccepted = false;
+  bool _representativeAccepted = false;
   String _version = '1.0';
+  String _legalPackPath = '';
   String? _error;
   String? _success;
 
@@ -50,6 +52,7 @@ class _AdvertiserLegalAcceptanceSectionState
       _cguAccepted &&
       _privacyAccepted &&
       _rgpdAccepted &&
+      _representativeAccepted &&
       !_locked &&
       !_submitting;
 
@@ -65,8 +68,10 @@ class _AdvertiserLegalAcceptanceSectionState
 
   Future<Map<String, dynamic>> _loadLegalDocument(String documentId) async {
     final firestore = FirebaseFirestore.instance;
-    final document =
-        await firestore.collection('legalDocuments').doc(documentId).get();
+    final document = await firestore
+        .collection('legalDocuments')
+        .doc(documentId)
+        .get();
     final chapters = await firestore
         .collection('legalDocuments')
         .doc(documentId)
@@ -85,8 +90,10 @@ class _AdvertiserLegalAcceptanceSectionState
       final firestore = FirebaseFirestore.instance;
       final requestId = widget.requestId?.trim() ?? '';
 
-      final metadata =
-          await firestore.collection('legalDocuments').doc('metadata').get();
+      final metadata = await firestore
+          .collection('legalDocuments')
+          .doc('metadata')
+          .get();
       final cgu = await _loadLegalDocument('cgu');
       final privacy = await _loadLegalDocument('privacyPolicy');
       final rgpd = await _loadLegalDocument('rgpdNotice');
@@ -101,17 +108,34 @@ class _AdvertiserLegalAcceptanceSectionState
       }
 
       final acceptedDocuments = _map(request['acceptedDocuments']);
+      final legalAcceptance = _map(request['legalAcceptance']);
+      final metadataData = metadata.data() ?? <String, dynamic>{};
+      final activeVersion =
+          (metadataData['legalVersion'] ??
+                  metadataData['version'] ??
+                  metadataData['activeVersion'] ??
+                  '1.0')
+              .toString();
+      final acceptedVersion =
+          (legalAcceptance['version'] ?? acceptedDocuments['version'] ?? '')
+              .toString();
+      final restoreAcceptance = acceptedVersion == activeVersion;
 
       if (!mounted) return;
       setState(() {
-        _version = (metadata.data()?['version'] ?? '1.0').toString();
+        _version = activeVersion;
+        _legalPackPath = (metadataData['packPath'] ?? '').toString();
         _cguDocument = cgu;
         _privacyDocument = privacy;
         _rgpdDocument = rgpd;
         _applicationCompleted = request['applicationCompleted'] == true;
-        _cguAccepted = acceptedDocuments['cgu'] == true;
-        _privacyAccepted = acceptedDocuments['privacy'] == true;
-        _rgpdAccepted = acceptedDocuments['rgpd'] == true;
+        _cguAccepted = restoreAcceptance && acceptedDocuments['cgu'] == true;
+        _privacyAccepted =
+            restoreAcceptance && acceptedDocuments['privacy'] == true;
+        _rgpdAccepted = restoreAcceptance && acceptedDocuments['rgpd'] == true;
+        _representativeAccepted =
+            restoreAcceptance &&
+            legalAcceptance['representativeDeclaration'] == true;
         _loading = false;
       });
     } catch (error) {
@@ -120,7 +144,9 @@ class _AdvertiserLegalAcceptanceSectionState
         _loading = false;
         _error = 'Impossible de charger les documents juridiques.';
       });
-      debugPrint('Chargement documents juridiques annonceur impossible : $error');
+      debugPrint(
+        'Chargement documents juridiques annonceur impossible : $error',
+      );
     }
   }
 
@@ -156,8 +182,9 @@ class _AdvertiserLegalAcceptanceSectionState
         );
       }
 
-      final recipient =
-          (data['contactEmail'] ?? data['email'] ?? '').toString().trim();
+      final recipient = (data['contactEmail'] ?? data['email'] ?? '')
+          .toString()
+          .trim();
 
       await reference.set({
         'status': 'pending',
@@ -167,6 +194,17 @@ class _AdvertiserLegalAcceptanceSectionState
           'privacy': true,
           'rgpd': true,
           'version': _version,
+          'acceptedAt': FieldValue.serverTimestamp(),
+        },
+        'legalAcceptance': <String, Object?>{
+          'version': _version,
+          'packPath': _legalPackPath,
+          'representativeDeclaration': true,
+          'documents': <String, Object?>{
+            'cgu': true,
+            'privacy': true,
+            'rgpd': true,
+          },
           'acceptedAt': FieldValue.serverTimestamp(),
         },
         'acknowledgementEmail': <String, Object?>{
@@ -285,7 +323,8 @@ class _AdvertiserLegalAcceptanceSectionState
                     ]
                   : chapters.map((chapter) {
                       final chapterTitle =
-                          (chapter['title'] ?? chapter['titre'] ?? '').toString();
+                          (chapter['title'] ?? chapter['titre'] ?? '')
+                              .toString();
                       final chapterContent =
                           (chapter['content'] ?? chapter['texte'] ?? '')
                               .toString();
@@ -348,9 +387,7 @@ class _AdvertiserLegalAcceptanceSectionState
     if (_loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 48),
-        child: Center(
-          child: CircularProgressIndicator(color: WebColors.red),
-        ),
+        child: Center(child: CircularProgressIndicator(color: WebColors.red)),
       );
     }
 
@@ -400,6 +437,14 @@ class _AdvertiserLegalAcceptanceSectionState
             setState(() => _rgpdAccepted = value ?? false);
           },
         ),
+        _acceptanceLine(
+          value: _representativeAccepted,
+          text: 'Je certifie l’exactitude des renseignements transmis et être habilité à représenter l’entreprise.',
+          onChanged: (value) {
+            setState(() => _representativeAccepted = value ?? false);
+          },
+        ),
+        const SizedBox(height: 8),
         if (!_applicationCompleted && !_locked)
           const Padding(
             padding: EdgeInsets.only(bottom: 12),
@@ -469,8 +514,8 @@ class _AdvertiserLegalAcceptanceSectionState
               _submitting
                   ? 'ENVOI EN COURS…'
                   : _locked
-                      ? 'DEMANDE TRANSMISE'
-                      : 'TRANSMETTRE LA DEMANDE',
+                  ? 'DEMANDE TRANSMISE'
+                  : 'TRANSMETTRE LA DEMANDE',
               style: const TextStyle(fontWeight: FontWeight.w900),
             ),
           ),
