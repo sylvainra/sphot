@@ -5417,17 +5417,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     );
   }
 
-  Color _advertiserMarkerColor(Map<String, dynamic> data) {
-    final status = _cleanText(data['status']).toLowerCase();
-
-    if (status == 'active') return const Color(0xFF16A34A);
-    if (status == 'disabled') return const Color(0xFF6B7280);
-    if (status == 'deleted') return const Color(0xFF111827);
-    if (status == 'pending') return const Color(0xFFF59E0B);
-
-    return redColor;
-  }
-
   Marker _buildAdvertiserMarker(Map<String, dynamic> data) {
     final location = _advertiserLocation(data)!;
     final name = _cleanText(
