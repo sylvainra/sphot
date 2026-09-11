@@ -65,6 +65,39 @@ class CompanyRegistryResult {
             ? Map<String, dynamic>.from(address)
             : <String, dynamic>{};
         final state = _text(establishment['etat_administratif']).toUpperCase();
+        final postalCode = _first([
+          establishment['code_postal'],
+          addressMap['code_postal'],
+        ]);
+        final city = _first([
+          establishment['libelle_commune'],
+          addressMap['libelle_commune'],
+          addressMap['commune'],
+        ]);
+        final streetParts =
+            <String>[
+                  'numero_voie',
+                  'indice_repetition',
+                  'type_voie',
+                  'libelle_voie',
+                ]
+                .map((key) => _first([establishment[key], addressMap[key]]))
+                .where((part) => part.isNotEmpty)
+                .toList();
+        String street = streetParts.join(' ');
+        if (street.isEmpty && address is String) {
+          street = address.trim();
+          // Some matching establishments only provide the formatted address.
+          // Remove the exact known postal suffix, never arbitrary digits.
+          final suffix = [
+            postalCode,
+            city,
+          ].where((part) => part.isNotEmpty).join(' ');
+          if (suffix.isNotEmpty &&
+              street.toUpperCase().endsWith(suffix.toUpperCase())) {
+            street = street.substring(0, street.length - suffix.length).trim();
+          }
+        }
 
         return CompanyRegistryResult(
           siret: expectedSiret,
@@ -90,12 +123,9 @@ class CompanyRegistryResult {
             company['nature_juridique'],
             company['libelle_nature_juridique'],
           ]),
-          address: _first([
-            addressMap['libelle_voie'],
-            establishment['adresse'],
-          ]),
-          postalCode: _text(addressMap['code_postal']),
-          city: _first([addressMap['libelle_commune'], addressMap['commune']]),
+          address: street,
+          postalCode: postalCode,
+          city: city,
           isActive: state.isEmpty || state == 'A',
         );
       }

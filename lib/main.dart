@@ -8,6 +8,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'map/map_page.dart';
 import 'web/advertiser/web_advertiser_app.dart';
+import 'web/advertiser/pages/advertiser_first_access_page.dart';
 import 'web/admin/pages/admin_proconnect_access_page.dart';
 import 'web/admin/pages/admin_trial_request_page.dart';
 import 'pages/professional/professional_login_page.dart';
@@ -24,8 +25,10 @@ Future<void> main() async {
 
   if (pendingAuth == 'advertiser') {
     WebPendingAuthStorage.clearPendingAuth();
-    runApp(const SphotApp(initialRoute: '/advertiser'));
-    return;
+    if (Uri.base.fragment.trim().isEmpty) {
+      runApp(const SphotApp(initialRoute: '/advertiser'));
+      return;
+    }
   }
 
   /*
@@ -86,10 +89,22 @@ class SphotApp extends StatelessWidget {
       );
     }
 
+    if (uri.path == '/advertiser-first-access') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => AdvertiserFirstAccessPage(
+          login: uri.queryParameters['login'] ?? '',
+          token: uri.queryParameters['token'] ?? '',
+        ),
+      );
+    }
+
     if (uri.path == '/professional-login') {
       return MaterialPageRoute(
         settings: settings,
-        builder: (_) => const ProfessionalLoginPage(),
+        builder: (_) => ProfessionalLoginPage(
+          advertiserAccess: uri.queryParameters['audience'] == 'advertiser',
+        ),
       );
     }
 

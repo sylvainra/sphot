@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../shared/sphot_access_page.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 
 import '../shared/web_colors.dart';
@@ -172,64 +172,144 @@ class _StartPage extends StatelessWidget {
   final Future<void> Function() onStart;
 
   @override
-  Widget build(BuildContext context) => SphotAccessPage(
-    title: 'SPHOT PUBLICITAIRE',
-    onBack: () => Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
+  Widget build(BuildContext context) => Scaffold(
+    body: Stack(
+      fit: StackFit.expand,
       children: [
-        Text(
-          correction
-              ? (modificationRequested
-                    ? 'Retrouvez votre dossier et effectuez la modification demandée.'
-                    : 'Retrouvez votre dossier et votre demande.')
-              : 'Accès réservé aux professionnels.',
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: WebColors.blue,
-            fontSize: 16,
-            height: 1.35,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        if (!correction) ...[
-          const SizedBox(height: 16),
-          const Text(
-            "Professionnels, créez votre SPHOT PUBLICITAIRE en quelques clics, après validation de votre demande préalable auprès de l'équipe SPHOT.",
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: WebColors.blue,
-              fontSize: 16,
-              height: 1.35,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-        if (error != null) ...[
-          const SizedBox(height: 18),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFEEEE),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: WebColors.red),
-            ),
-            child: Text(
-              error!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: WebColors.red,
-                fontWeight: FontWeight.w700,
+        Image.asset('data/images/map_background.jpg', fit: BoxFit.cover),
+        ColoredBox(color: Colors.white.withOpacity(0.72)),
+        Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Container(
+              width: 540,
+              padding: const EdgeInsets.all(30),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.97),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: WebColors.blue, width: 2),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x26000000),
+                    blurRadius: 24,
+                    offset: Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SvgPicture.asset(
+                    'data/icons/fire_red_icon.svg',
+                    width: 42,
+                    height: 58,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'SPHOT PUBLICITAIRE',
+                    style: TextStyle(
+                      color: WebColors.blue,
+                      fontSize: 25,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    correction
+                        ? (modificationRequested
+                              ? 'Retrouvez votre dossier et effectuez la modification demandée.'
+                              : 'Retrouvez votre dossier et votre demande.')
+                        : 'Accès réservé aux professionnels.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: WebColors.blue,
+                      fontSize: 16,
+                      height: 1.35,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (!correction) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Professionnels, créez votre SPHOT PUBLICITAIRE en quelques clics, après validation de votre demande préalable auprès de l'équipe SPHOT.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: WebColors.blue,
+                        fontSize: 16,
+                        height: 1.35,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  if (error != null) ...[
+                    const SizedBox(height: 18),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEEEE),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: WebColors.red),
+                      ),
+                      child: Text(
+                        error!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: WebColors.red,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton(
+                      onPressed: loading ? null : onStart,
+                      child: Text(
+                        loading
+                            ? 'OUVERTURE DU DOSSIER…'
+                            : correction
+                            ? 'ACCÉDER À MA DEMANDE'
+                            : 'COMMENCER MA DEMANDE',
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: WebColors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-        ],
-        const SizedBox(height: 24),
-        SphotAccessButton(
-          loading: loading,
-          onPressed: onStart,
-          label: correction ? 'ACCÉDER À MA DEMANDE' : 'COMMENCER MA DEMANDE',
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 22,
+          child: Center(
+            child: Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: WebColors.blue, width: 2),
+              ),
+              child: IconButton(
+                onPressed: () =>
+                    Navigator.of(context)
+                        .pushNamedAndRemoveUntil('/', (route) => false),
+                icon: const Icon(
+                  Icons.chevron_left_rounded,
+                  color: WebColors.blue,
+                  size: 36,
+                ),
+              ),
+            ),
+          ),
         ),
       ],
     ),

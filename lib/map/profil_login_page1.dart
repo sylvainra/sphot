@@ -285,38 +285,6 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
     }
   }
 
-  Future<void> _openAdvertiserSpace({required bool create}) async {
-    FocusScope.of(context).unfocus();
-
-    final route = create
-        ? '/advertiser'
-        : '/professional-login?audience=advertiser';
-    final uri = kIsWeb
-        ? Uri.base.replace(fragment: route)
-        : Uri.parse('https://sphot.app/#$route');
-
-    try {
-      final opened = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-        webOnlyWindowName: kIsWeb ? '_blank' : null,
-      );
-
-      if (!opened && mounted) {
-        setState(() {
-          _loginErrorMessage =
-              'Impossible d’ouvrir le portail SPHOT PUBLICITAIRE.';
-        });
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _loginErrorMessage =
-            'Impossible d’ouvrir le portail SPHOT PUBLICITAIRE.';
-      });
-    }
-  }
-
   void _activateEditingMode() {
     if (_isEditing) return;
 
@@ -408,7 +376,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
       child: Column(
         children: [
           Text(
-            'SPHOT SAUVETEUR',
+            'ESPACE SAUVETEUR',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 18,
@@ -565,7 +533,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
       child: Column(
         children: [
           Text(
-            'SPHOT ADMIN',
+            'ESPACE ADMIN',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 18,
@@ -588,7 +556,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
               label: const FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  'CRÉER MON SPHOT ADMIN',
+                  'CRÉER MON SPHOT',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -614,88 +582,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
               label: const FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  'ACCÉDER À MON SPHOT ADMIN',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAdvertiserSpace({
-    required Color proColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: proColor,
-          width: 2.5,
-        ),
-      ),
-      child: Column(
-        children: [
-          Text(
-            'SPHOT PUBLICITAIRE',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: proColor,
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton.icon(
-              onPressed: () => _openAdvertiserSpace(create: true),
-              style: _buildOutlinedButtonStyle(proColor),
-              icon: Icon(
-                Icons.add_business_rounded,
-                color: proColor,
-                size: 23,
-              ),
-              label: const FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  'CRÉER MON SPHOT PUBLICITAIRE',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton.icon(
-              onPressed: () => _openAdvertiserSpace(create: false),
-              style: _buildOutlinedButtonStyle(proColor),
-              icon: Icon(
-                Icons.login_rounded,
-                color: proColor,
-                size: 23,
-              ),
-              label: const FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  'ACCÉDER À MON SPHOT PUBLICITAIRE',
+                  'ME CONNECTER À MON SPHOT',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -791,16 +678,28 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
                                 fit: BoxFit.contain,
                                 filterQuality: FilterQuality.high,
                               ),
+                              const SizedBox(height: 4),
+                              Visibility(
+                                visible: !_isEditing,
+                                maintainSize: true,
+                                maintainAnimation: true,
+                                maintainState: true,
+                                child: const Text(
+                                  'CONNEXION',
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFFEF4444),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
                               const SizedBox(height: 8),
                               _buildSauveteurSpace(
                                 sauveteurColor: sauveteurColor,
                               ),
                               const SizedBox(height: 12),
                               _buildProSpace(
-                                proColor: proColor,
-                              ),
-                              const SizedBox(height: 12),
-                              _buildAdvertiserSpace(
                                 proColor: proColor,
                               ),
                             ],
@@ -824,17 +723,18 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
                       color: Colors.transparent,
                       shape: BoxShape.circle,
                       border: Border.all(
-  color: const Color(0xFFEF4444),
-  width: 2,
-),
+                        color: Colors.white,
+                        width: 2,
+                      ),
                     ),
                     child: IconButton(
+                      tooltip: 'Retour',
                       onPressed: () => Navigator.of(context).pop(),
                       icon: const Icon(
-  Icons.arrow_back,
-  color: Color(0xFF1E3A8A),
-  size: 28,
-),
+                        Icons.arrow_back,
+                        color: Colors.white,
+                        size: 28,
+                      ),
                     ),
                   ),
                 ),

@@ -1,10 +1,10 @@
 import 'dart:convert';
 
+import '../../web/shared/sphot_access_page.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
-import 'package:latlong2/latlong.dart';
 
 import '../../web/admin/pages/admin_change_password_page.dart';
 import '../../web/admin/pages/admin_dashboard_page.dart';
@@ -14,7 +14,9 @@ import '../../web/advertiser/pages/advertiser_change_password_page.dart';
 import '../../web/advertiser/pages/advertiser_dashboard_page.dart';
 
 class ProfessionalLoginPage extends StatefulWidget {
-  const ProfessionalLoginPage({super.key});
+  const ProfessionalLoginPage({super.key, this.advertiserAccess = false});
+
+  final bool advertiserAccess;
 
   @override
   State<ProfessionalLoginPage> createState() => _ProfessionalLoginPageState();
@@ -108,6 +110,13 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({'login': login, 'password': password}),
     );
+    if (widget.advertiserAccess &&
+        response.statusCode != 200 &&
+        response.statusCode != 401) {
+      throw StateError(
+        'Service annonceur indisponible (HTTP ${response.statusCode}).',
+      );
+    }
     if (response.statusCode != 200) return null;
     final decoded = jsonDecode(response.body);
     if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
@@ -141,11 +150,13 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
     });
 
     try {
-      final adminSession = await _tryLogin(
-        endpoint: 'loginAdmin',
-        login: login,
-        password: password,
-      );
+      final adminSession = widget.advertiserAccess
+          ? null
+          : await _tryLogin(
+              endpoint: 'loginAdmin',
+              login: login,
+              password: password,
+            );
       final advertiserSession = adminSession == null
           ? await _tryLogin(
               endpoint: 'loginAdvertiser',
@@ -154,7 +165,9 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
             )
           : null;
       final potentialSuperAdminSession =
-          adminSession == null && advertiserSession == null
+          !widget.advertiserAccess &&
+              adminSession == null &&
+              advertiserSession == null
           ? await _tryLogin(
               endpoint: 'loginSauveteur',
               login: login,
@@ -220,9 +233,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
         }
 
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (_) => const WebSuperAdminApp(),
-          ),
+          MaterialPageRoute(builder: (_) => const WebSuperAdminApp()),
           (route) => false,
         );
         return;
@@ -303,7 +314,9 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = 'Connexion impossible. Vérifiez votre connexion internet et réessayez.';
+        _errorMessage = widget.advertiserAccess
+            ? 'Connexion au service annonceur impossible. Réessayez ou contactez l’équipe SPHOT.'
+            : 'Connexion impossible. Vérifiez votre connexion internet et réessayez.';
       });
     } finally {
       if (mounted) {
@@ -379,311 +392,127 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
   }
 
   Widget _buildProfessionalForm() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _proColor, width: 2.5),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'SPHOT ADMIN',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: _proColor,
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: _emailController,
+          focusNode: _emailFocusNode,
+          autofocus: MediaQuery.of(context).size.width >= 900,
+          enabled: !_isLoggingIn,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          autocorrect: false,
+          enableSuggestions: false,
+          autofillHints: const [AutofillHints.username, AutofillHints.email],
+          onTap: _activateEditingMode,
+          onChanged: (_) {
+            if (_errorMessage != null) {
+              setState(() {
+                _errorMessage = null;
+              });
+            }
+          },
+          onSubmitted: (_) {
+            FocusScope.of(context).requestFocus(_passwordFocusNode);
+          },
+          style: const TextStyle(
+            color: _proColor,
+            fontWeight: FontWeight.w700,
           ),
-          const SizedBox(height: 18),
-          TextField(
-            controller: _emailController,
-            focusNode: _emailFocusNode,
-            autofocus: MediaQuery.of(context).size.width >= 900,
-            enabled: !_isLoggingIn,
-            keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.next,
-            autocorrect: false,
-            enableSuggestions: false,
-            autofillHints: const [AutofillHints.username, AutofillHints.email],
-            onTap: _activateEditingMode,
-            onChanged: (_) {
-              if (_errorMessage != null) {
-                setState(() {
-                  _errorMessage = null;
-                });
-              }
-            },
-            onSubmitted: (_) {
-              FocusScope.of(context).requestFocus(_passwordFocusNode);
-            },
-            style: const TextStyle(
-              color: _proColor,
-              fontWeight: FontWeight.w700,
-            ),
-            decoration: _buildInputDecoration(
-              hintText: 'Identifiant ou adresse email',
-              prefixIcon: Icons.alternate_email_rounded,
-            ),
+          decoration: _buildInputDecoration(
+            hintText: 'Identifiant',
+            prefixIcon: Icons.alternate_email_rounded,
           ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _passwordController,
-            focusNode: _passwordFocusNode,
-            enabled: !_isLoggingIn,
-            obscureText: !_showPassword,
-            textInputAction: TextInputAction.done,
-            autocorrect: false,
-            enableSuggestions: false,
-            autofillHints: const [AutofillHints.password],
-            onTap: _activateEditingMode,
-            onChanged: (_) {
-              if (_errorMessage != null) {
-                setState(() {
-                  _errorMessage = null;
-                });
-              }
-            },
-            onSubmitted: (_) {
-              if (!_isLoggingIn) {
-                _loginProfessional();
-              }
-            },
-            style: const TextStyle(
-              color: _proColor,
-              fontWeight: FontWeight.w700,
-            ),
-            decoration: _buildInputDecoration(
-              hintText: 'Mot de passe',
-              prefixIcon: Icons.lock_outline_rounded,
-              suffixIcon: IconButton(
-                tooltip: _showPassword
-                    ? 'Masquer le mot de passe'
-                    : 'Afficher le mot de passe',
-                onPressed: _isLoggingIn
-                    ? null
-                    : () {
-                        setState(() {
-                          _showPassword = !_showPassword;
-                        });
-                      },
-                icon: Icon(
-                  _showPassword
-                      ? Icons.visibility_off_rounded
-                      : Icons.visibility_rounded,
-                  color: _proColor,
-                ),
+        ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _passwordController,
+          focusNode: _passwordFocusNode,
+          enabled: !_isLoggingIn,
+          obscureText: !_showPassword,
+          textInputAction: TextInputAction.done,
+          autocorrect: false,
+          enableSuggestions: false,
+          autofillHints: const [AutofillHints.password],
+          onTap: _activateEditingMode,
+          onChanged: (_) {
+            if (_errorMessage != null) {
+              setState(() {
+                _errorMessage = null;
+              });
+            }
+          },
+          onSubmitted: (_) {
+            if (!_isLoggingIn) {
+              _loginProfessional();
+            }
+          },
+          style: const TextStyle(
+            color: _proColor,
+            fontWeight: FontWeight.w700,
+          ),
+          decoration: _buildInputDecoration(
+            hintText: 'Mot de passe',
+            prefixIcon: Icons.lock_outline_rounded,
+            suffixIcon: IconButton(
+              onPressed: _isLoggingIn
+                  ? null
+                  : () {
+                      setState(() {
+                        _showPassword = !_showPassword;
+                      });
+                    },
+              icon: Icon(
+                _showPassword
+                    ? Icons.visibility_off_rounded
+                    : Icons.visibility_rounded,
+                color: _proColor,
               ),
             ),
           ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: _isLoggingIn ? null : _forgotPassword,
-              child: const Text(
-                'MOT DE PASSE OUBLIÉ ?',
-                style: TextStyle(
-                  color: _proColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: _isLoggingIn ? null : _forgotPassword,
+            child: const Text(
+              'MOT DE PASSE OUBLIÉ ?',
+              style: TextStyle(
+                color: _proColor,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
               ),
             ),
           ),
-          if (_errorMessage != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                _errorMessage!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.redAccent,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
+        ),
+        if (_errorMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.redAccent,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
               ),
-            ),
-          SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: ElevatedButton(
-              onPressed: _isLoggingIn ? null : _loginProfessional,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                foregroundColor: _proColor,
-                disabledBackgroundColor: Colors.transparent,
-                disabledForegroundColor: _proColor.withValues(alpha: 0.55),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  side: BorderSide(
-                    color: _isLoggingIn
-                        ? _proColor.withValues(alpha: 0.55)
-                        : _proColor,
-                    width: 2,
-                  ),
-                ),
-              ),
-              child: _isLoggingIn
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: _proColor,
-                      ),
-                    )
-                  : const Text(
-                      'SE CONNECTER',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
             ),
           ),
-        ],
-      ),
+        SphotAccessButton(
+          label: 'SE CONNECTER',
+          loading: _isLoggingIn,
+          onPressed: _loginProfessional,
+        ),
+      ],
     );
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false,
-      body: GestureDetector(
-        onTap: _closeKeyboard,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Low-resolution offline fallback. The live map below covers it
-            // whenever map tiles are available.
-            Image.asset('data/images/map_background.jpg', fit: BoxFit.cover),
-            IgnorePointer(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final aspectRatio =
-                      constraints.maxWidth / constraints.maxHeight;
-                  final initialZoom = aspectRatio >= 1.2 ? 17.35 : 16.2;
-
-                  return FlutterMap(
-                    options: MapOptions(
-                      initialCenter: const LatLng(46.3893825, -1.4942598),
-                      initialZoom: initialZoom,
-                      interactionOptions: const InteractionOptions(
-                        flags: InteractiveFlag.none,
-                      ),
-                      backgroundColor: Colors.transparent,
-                    ),
-                    children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        maxZoom: 19,
-                        maxNativeZoom: 19,
-                        userAgentPackageName: 'com.sylvainra.sphot',
-                        keepBuffer: 5,
-                        errorTileCallback: (tile, error, stackTrace) {
-                          debugPrint('ERREUR FOND CARTE CONNEXION : $error');
-                        },
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-            SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.symmetric(horizontal: 26),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
-                      ),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 520),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Image.asset(
-                                'data/icons/title.png',
-                                height: 64,
-                                fit: BoxFit.contain,
-                                filterQuality: FilterQuality.high,
-                              ),
-                              const SizedBox(height: 12),
-                              Visibility(
-                                visible: !_isEditing,
-                                maintainSize: true,
-                                maintainAnimation: true,
-                                maintainState: true,
-                                child: const Text(
-                                  'CONNEXION',
-                                  style: TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFFEF4444),
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 18),
-                              _buildProfessionalForm(),
-                              const SizedBox(height: 20),
-
-                              Padding(
-                                padding: const EdgeInsets.only(top: 180),
-                                child: Container(
-                                  width: 54,
-                                  height: 54,
-                                  decoration: BoxDecoration(
-                                    color: Colors.transparent,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: _proColor,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: IconButton(
-                                    tooltip: 'Retour',
-                                    onPressed: () {
-                                      Navigator.of(context)
-                                          .pushNamedAndRemoveUntil(
-                                            '/',
-                                            (route) => false,
-                                          );
-                                    },
-                                    icon: const Icon(
-                                      Icons.arrow_back,
-                                      color: _proColor,
-                                      size: 28,
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 12),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SphotAccessPage(
+    title: widget.advertiserAccess ? 'SPHOT PUBLICITAIRE' : 'SPHOT ADMIN',
+    onBackgroundTap: _closeKeyboard,
+    onBack: () => Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false),
+    child: _buildProfessionalForm(),
+  );
 }

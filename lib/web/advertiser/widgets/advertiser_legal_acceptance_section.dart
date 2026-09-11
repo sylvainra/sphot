@@ -9,11 +9,13 @@ class AdvertiserLegalAcceptanceSection extends StatefulWidget {
     required this.requestId,
     required this.requestStatus,
     this.onSubmitted,
+    this.readOnly = false,
   });
 
   final String? requestId;
   final String requestStatus;
   final VoidCallback? onSubmitted;
+  final bool readOnly;
 
   @override
   State<AdvertiserLegalAcceptanceSection> createState() =>
@@ -44,7 +46,8 @@ class _AdvertiserLegalAcceptanceSectionState
 
   bool get _locked {
     final status = widget.requestStatus.toLowerCase();
-    return status == 'pending' || status == 'approved';
+    return widget.readOnly ||
+        (status != 'draft' && status != 'changes_requested');
   }
 
   bool get _canSubmit =>

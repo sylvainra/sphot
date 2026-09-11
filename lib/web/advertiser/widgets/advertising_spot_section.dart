@@ -427,14 +427,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           }, SetOptions(merge: true));
       if (!mounted) return;
       setState(() => _assetChangeRequestedLocally = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Votre demande de modification a été transmise au Super Admin.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
     } catch (error) {
       if (mounted) {
         setState(() => _error = 'La demande de modification a échoué.');
@@ -599,6 +591,27 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             ],
           ),
           const SizedBox(height: 14),
+          if (hasBanner) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: AspectRatio(
+                aspectRatio: 2,
+                child: _bannerBytes != null
+                    ? Image.memory(_bannerBytes!, fit: BoxFit.contain)
+                    : Image.network(
+                        _bannerUrl!,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Text(
+                            'Le visuel ne peut pas être affiché.',
+                            style: TextStyle(color: WebColors.red),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
           OutlinedButton.icon(
             onPressed: _saving || widget.approvedAssetsLocked
                 ? null
@@ -867,6 +880,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _buildBannerCard(),
         _SpotCard(
           iconWidget: SvgPicture.asset(
             'data/icons/fire_blue_icon.svg',
@@ -896,7 +910,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           ),
         ),
         _buildApprovedScopeCard(),
-        if (!widget.approvedAssetsLocked) _buildBannerCard(),
         if (widget.approvedAssetsLocked)
           Padding(
             padding: const EdgeInsets.only(bottom: 14),

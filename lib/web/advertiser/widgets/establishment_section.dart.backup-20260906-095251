@@ -245,7 +245,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   }
 
   Future<void> _verifySiret() async {
-    if (widget.readOnly) return;
     FocusScope.of(context).unfocus();
     setState(() {
       _checkingRegistry = true;
@@ -1033,69 +1032,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                       : const Color(0xFF6B7280),
                   child: Column(
                     children: [
-                      if (_isFrenchRegistration) ...[
-                        _EstablishmentField(
-                          readOnly: widget.readOnly,
-                          controller: _siretController,
-                          label: 'SIRET *',
-                          validator: _siretValidator,
-                          onChanged: (value) {
-                            _registryStatus = 'unverified';
-                            _registryMessage = '';
-                            _markAsModified(value);
-                          },
-                          keyboardType: TextInputType.number,
-                          digitsOnly: true,
-                          maxLength: 14,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 14),
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: FilledButton.icon(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: WebColors.blue,
-                                foregroundColor: Colors.white,
-                                textStyle: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              onPressed: widget.readOnly || _checkingRegistry
-                                  ? null
-                                  : _verifySiret,
-                              icon: _checkingRegistry
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.verified_outlined),
-                              label: const Text('VÉRIFIER ET PRÉREMPLIR'),
-                            ),
-                          ),
-                        ),
-                        if (_registryMessage.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            child: Text(
-                              _registryMessage,
-                              style: TextStyle(
-                                color: _registryStatus == 'verified'
-                                    ? const Color(0xFF15803D)
-                                    : WebColors.red,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                      ],
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
                         controller: _legalNameController,
                         label: 'Raison sociale *',
                         validator: _requiredValidator,
@@ -1104,7 +1041,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                         inputFormatters: const [UpperCaseTextInputFormatter()],
                       ),
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
                         controller: _businessNameController,
                         label: 'Nom commercial / marque *',
                         validator: _requiredValidator,
@@ -1161,6 +1097,64 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                       ),
                       if (_isFrenchRegistration) ...[
                         _EstablishmentField(
+                          controller: _siretController,
+                          label: 'SIRET *',
+                          validator: _siretValidator,
+                          onChanged: (value) {
+                            _registryStatus = 'unverified';
+                            _registryMessage = '';
+                            _markAsModified(value);
+                          },
+                          keyboardType: TextInputType.number,
+                          digitsOnly: true,
+                          maxLength: 14,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 14),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: WebColors.blue,
+                                foregroundColor: Colors.white,
+                                textStyle: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: _checkingRegistry
+                                  ? null
+                                  : _verifySiret,
+                              icon: _checkingRegistry
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.verified_outlined),
+                              label: const Text('VÉRIFIER ET PRÉREMPLIR'),
+                            ),
+                          ),
+                        ),
+                        if (_registryMessage.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: Text(
+                              _registryMessage,
+                              style: TextStyle(
+                                color: _registryStatus == 'verified'
+                                    ? const Color(0xFF15803D)
+                                    : WebColors.red,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        _EstablishmentField(
                           controller: _sirenController,
                           label: 'SIREN calculé depuis le SIRET',
                           validator: _requiredValidator,
@@ -1209,21 +1203,19 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                         ),
                         const SizedBox(height: 12),
                         _EstablishmentField(
-                          readOnly: widget.readOnly,
                           controller: _foreignRegistrationController,
                           label: 'Numéro d’enregistrement national *',
                           validator: _requiredValidator,
                           onChanged: _markAsModified,
                         ),
                         _EstablishmentField(
-                          readOnly: widget.readOnly,
                           controller: _foreignAuthorityController,
                           label: 'Registre ou autorité (EIN, ABN/ACN, CIPC…) *',
                           validator: _requiredValidator,
                           onChanged: _markAsModified,
                         ),
                         OutlinedButton.icon(
-                          onPressed: widget.readOnly ? null : _pickForeignProof,
+                          onPressed: _pickForeignProof,
                           icon: const Icon(Icons.upload_file_outlined),
                           label: Text(
                             _selectedProof?.name ??
@@ -1255,27 +1247,23 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                   child: Column(
                     children: [
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
                         controller: _addressController,
                         label: 'Adresse *',
                         validator: _requiredValidator,
                         onChanged: _markAsModified,
                       ),
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
                         controller: _addressComplementController,
                         label: 'Complément d’adresse',
                         onChanged: _markAsModified,
                       ),
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
                         controller: _postalCodeController,
                         label: 'Code postal *',
                         validator: _requiredValidator,
                         onChanged: _markAsModified,
                       ),
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
                         controller: _cityController,
                         label: 'Ville *',
                         validator: _requiredValidator,

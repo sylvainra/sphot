@@ -33,7 +33,6 @@ class AdvertiserDashboardPage extends StatefulWidget {
     this.developmentBypass = false,
     this.advertiserRequestId,
     this.approvedAccess = false,
-    this.existingRequestOnly = false,
   });
 
   final User? user;
@@ -41,7 +40,6 @@ class AdvertiserDashboardPage extends StatefulWidget {
   final bool developmentBypass;
   final String? advertiserRequestId;
   final bool approvedAccess;
-  final bool existingRequestOnly;
 
   @override
   State<AdvertiserDashboardPage> createState() =>
@@ -76,7 +74,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'SPHOT PUBLICITAIRE',
       Icons.location_on_outlined,
-      'Configurez le rayon de votre SPHOT PUBLICITAIRE depuis la position et le visuel approuvés.',
+      'Configurez le rayon de votre SPHOT publicitaire depuis la position et le visuel approuvés.',
     ),
     _AdvertiserSection(
       'DIFFUSION',
@@ -87,7 +85,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'PLANIFICATION',
       Icons.calendar_month_outlined,
-      'Planifiez en exclusivité votre SPHOT PUBLICITAIRE.',
+      'Planifiez en exclusivité votre SPHOT publicitaire.',
     ),
     _AdvertiserSection(
       'DEVIS & COMMANDE',
@@ -116,9 +114,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   PlanningData _planningData = const PlanningData();
   Map<String, dynamic> _pricing = AdvertisingPricingConfig.defaults();
   Map<String, dynamic> _requestData = <String, dynamic>{};
-  String _requestStatus = 'loading';
-  bool _requestReady = false;
-  String? _requestLoadError;
+  String _requestStatus = 'draft';
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
   _requestSubscription;
   bool _restoredRequestAssets = false;
@@ -137,10 +133,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   }
 
   bool get _applicationLocked {
-    return !_requestReady ||
-        _requestLoadError != null ||
-        isAdvertiserApplicationLocked(_requestStatus) ||
-        _approvedFlow;
+    return isAdvertiserApplicationLocked(_requestStatus) || _approvedFlow;
   }
 
   bool get _assetChangeAuthorized {
@@ -196,29 +189,17 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
 
   void _listenToRequest() {
     final requestId = _requestId;
-    if (requestId == null) {
-      _requestLoadError = 'Impossible d’identifier votre dossier.';
-      return;
-    }
+    if (requestId == null) return;
     _requestSubscription = FirebaseFirestore.instance
         .collection('advertiserRequests')
         .doc(requestId)
-        .snapshots(includeMetadataChanges: true)
+        .snapshots()
         .listen(
           (snapshot) {
             if (!mounted) return;
-            if (snapshot.metadata.isFromCache) return;
             final data = snapshot.data() ?? <String, dynamic>{};
-            final missingRequest =
-                !snapshot.exists && widget.existingRequestOnly;
-            final status = snapshot.exists
-                ? (data['status'] ?? 'unknown').toString().trim().toLowerCase()
-                : (missingRequest ? 'unknown' : 'draft');
+            final status = (data['status'] ?? 'draft').toString();
             setState(() {
-              _requestReady = !missingRequest;
-              _requestLoadError = missingRequest
-                  ? 'Votre dossier est introuvable. La saisie reste verrouillée.'
-                  : null;
               _requestData = data;
               _requestStatus = status;
               if (_selectedIndex >= _sections.length) _selectedIndex = 0;
@@ -227,11 +208,6 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           },
           onError: (Object error) {
             debugPrint('Écoute demande annonceur impossible : $error');
-            if (!mounted) return;
-            setState(() {
-              _requestReady = false;
-              _requestLoadError = 'Impossible de vérifier l’état du dossier. Actualisez la page.';
-            });
           },
         );
   }
@@ -608,7 +584,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                     ),
                   ],
                 ),
-                child: Column(
+                child: const Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
@@ -620,7 +596,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Text(
                       'SPHOT ouvre le monde au grand public. Selon le niveau de zoom, les SPHOTS PUBLICITAIRES LOCAUX apparaissent à l’échelle communale, tandis que les SPHOTS PUBLICITAIRES NATIONAUX bénéficient d’une visibilité à plus grande échelle, voire permanente lorsqu’aucune publicité locale n’est diffusée. En plus d’être diffusé en EXCLUSIVITÉ dans la catégorie choisie, selon le rayon géographique et la période définis, votre SPHOT PUBLICITAIRE redirige le grand public vers votre site internet d’un simple clic.',
                       textAlign: TextAlign.center,
@@ -630,19 +606,6 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    if (!_approvedFlow &&
-                        _requestStatus.toLowerCase() != 'pending') ...[
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Dans un premier temps, nous vous invitons à remplir une demande de renseignements préalables. Si votre demande est acceptée par l’équipe SPHOT, vous pourrez accéder à la conception de votre SPHOT PUBLICITAIRE.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: WebColors.blue,
-                          height: 1.4,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -811,31 +774,17 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   }
 
   List<Widget> _buildSectionContent(int index) {
-    if (_requestLoadError != null) {
-      return [
-        Text(_requestLoadError!, style: const TextStyle(color: WebColors.red)),
-      ];
-    }
-    if (!_requestReady) {
-      return [
-        const Center(child: CircularProgressIndicator()),
-        const SizedBox(height: 12),
-        const Text('Vérification de l’état de votre dossier…'),
-      ];
-    }
     if (!_approvedFlow) {
       switch (index) {
         case 0:
           return [
             IdentityProfessionalSection(
-              key: ValueKey('identity-$_requestStatus'),
               user: widget.user,
               requestId: _requestId,
               readOnly: _applicationLocked,
             ),
             const SizedBox(height: 8),
             EstablishmentSection(
-              key: ValueKey('establishment-$_requestStatus'),
               user: widget.user,
               requestId: _requestId,
               readOnly: _applicationLocked,
@@ -844,7 +793,6 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
         case 1:
           return [
             AdvertiserApplicationSection(
-              readOnly: _applicationLocked,
               user: widget.user,
               requestId: _requestId,
               position: _advertisingPoint,
@@ -862,7 +810,6 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
         default:
           return [
             AdvertiserLegalAcceptanceSection(
-              readOnly: _applicationLocked,
               key: ValueKey<String>(
                 'advertiser-legal-${_requestId ?? 'unknown'}',
               ),

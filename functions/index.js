@@ -1477,7 +1477,7 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
     <div style="padding:30px 30px 18px;text-align:center;">
       <a href="${SPHOT_LOGIN_URL}">
         <img
-          src="https://sphot.app/assets/data/icons/title.png"
+          src="cid:sphot-title"
           alt="SPHOT"
           style="max-width:320px;width:100%;height:auto;border:0;"
         >
@@ -1495,7 +1495,7 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
 </p>
 
       <p>
-        Votre demande d'accès au portail d'administration SPHOT
+        Votre demande d'accès à votre SPHOT ADMIN
         pour <strong>${organisation}</strong> a bien été enregistrée.
       </p>
 
@@ -1535,7 +1535,7 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
 
       <p>
         Après validation de votre demande par l'équipe SPHOT,
-vous pourrez accéder au portail d'administration SPHOT
+vous pourrez accéder à votre SPHOT ADMIN
 afin de créer vos SPHOTS, vos sauveteurs et vos périodes
 de surveillance.
 
@@ -1548,10 +1548,6 @@ votre demande.
         La période d'essai gratuite de 8 jours débutera uniquement
 lorsque votre configuration sera complète et que l'essai
 aura été activé.
-      </p>
-
-      <p>
-        Votre accusé de réception est joint à ce message.
       </p>
 
       <p style="
@@ -1569,6 +1565,17 @@ aura été activé.
         À bientôt sur SPHOT,<br>
         <strong>L'équipe SPHOT</strong>
       </p>
+      <div style="text-align:center;margin-top:26px;">
+        <a href="${SPHOT_LOGIN_URL}" style="text-decoration:none;">
+          <img
+            src="cid:sphot-fire-red"
+            alt="SPHOT"
+            width="42"
+            height="65"
+            style="display:block;margin:0 auto;border:0;width:42px;height:65px;"
+          >
+        </a>
+      </div>
     </div>
   </div>
 </div>
@@ -1577,20 +1584,18 @@ aura été activé.
           text:
 `${greeting}
 
-Votre demande d'accès au portail d'administration SPHOT
+Votre demande d'accès à votre SPHOT ADMIN
 pour ${organisation} a bien été enregistrée.
 
 Numéro de demande : ${requestNumber}
 
 Essai gratuit, sans engagement ni facturation.
 
-Après validation de votre demande, vous pourrez accéder au portail
+Après validation de votre demande, vous pourrez accéder à votre SPHOT ADMIN
 afin de créer vos SPHOTS, vos sauveteurs et vos périodes de surveillance.
 
 La période d'essai de 8 jours ne commencera qu'une fois
 ces informations renseignées et l'essai activé.
-
-Votre accusé de réception est joint à ce message.
 
 Ce message confirme l'enregistrement de votre demande.
 Aucun essai ni aucune facturation ne sont en cours à ce stade.
@@ -1601,9 +1606,18 @@ L'équipe SPHOT`,
 
           attachments: [
             {
-              filename: fileName,
-              content: pdfBuffer,
-              contentType: "application/pdf",
+              filename: "sphot_title.png",
+              path: `${__dirname}/email_assets/sphot_title.png`,
+              cid: "sphot-title",
+              contentDisposition: "inline",
+              contentType: "image/png",
+            },
+            {
+              filename: "fire_red_icon.png",
+              path: `${__dirname}/email_assets/fire_red_icon.png`,
+              cid: "sphot-fire-red",
+              contentDisposition: "inline",
+              contentType: "image/png",
             },
           ],
         });
@@ -1637,7 +1651,7 @@ L'équipe SPHOT`,
                 type: "request_acknowledgement_sent",
                 category: "administrative",
                 label:
-                    "Accusé de réception généré et envoyé",
+                    "Confirmation envoyée sans PDF joint ; document archivé",
                 createdAt:
                     admin.firestore.FieldValue.serverTimestamp(),
                 createdByRole: "system",
@@ -1650,7 +1664,7 @@ L'équipe SPHOT`,
         );
 
         console.log(
-            "Accusé de réception généré et envoyé:",
+            "Confirmation envoyée sans PDF joint ; document archivé:",
             requestNumber,
             recipientEmail,
         );
@@ -4851,12 +4865,49 @@ async function findAdvertiserLogin(firstName, lastName, requestId) {
   throw new Error("Impossible de générer un identifiant annonceur unique.");
 }
 
+/**
+ * Conserve un même lien personnel entre réception et correction du dossier.
+ * Le secret reste dans Secret Manager ; seul le hash du jeton est enregistré.
+ * @param {Object} reference Référence Firestore du dossier.
+ * @param {string} recipient Destinataire du mail.
+ * @return {Promise<string>} URL personnelle valable 30 jours après cet envoi.
+ */
+async function advertiserRequestAccessUrl(reference, recipient) {
+  const secret = process.env.ADVERTISER_ACCESS_LINK_SECRET;
+  if (!secret) throw new Error("Secret des liens annonceurs absent.");
+  return admin.firestore().runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    if (!snapshot.exists) throw new Error("Dossier annonceur introuvable.");
+    const access = (snapshot.data() || {}).correctionAccess || {};
+    const email = recipient.trim().toLowerCase();
+    const nonce = access.recipient === email && access.nonce ?
+      access.nonce : crypto.randomBytes(32).toString("hex");
+    const token = crypto.createHmac("sha256", secret)
+        .update(JSON.stringify(["advertiser-request-v1", reference.id, nonce]))
+        .digest("hex");
+    transaction.set(reference, {
+      correctionAccess: {
+        nonce,
+        recipient: email,
+        tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
+        expiresAt: admin.firestore.Timestamp.fromMillis(
+            Date.now() + 30 * 24 * 60 * 60 * 1000,
+        ),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    }, {merge: true});
+    return `${SPHOT_LOGIN_URL}/#/advertiser-correction` +
+      `?requestId=${encodeURIComponent(reference.id)}` +
+      `&token=${encodeURIComponent(token)}`;
+  });
+}
+
 /** Envoie l'accusé de réception d'une candidature annonceur. */
 exports.sendAdvertiserRequestAcknowledgement = onDocumentUpdated(
     {
       document: "advertiserRequests/{requestId}",
       region: "europe-west1",
-      secrets: ["GMAIL_APP_PASSWORD"],
+      secrets: ["GMAIL_APP_PASSWORD", "ADVERTISER_ACCESS_LINK_SECRET"],
       cpu: 1,
       memory: "256MiB",
     },
@@ -4924,6 +4975,9 @@ exports.sendAdvertiserRequestAcknowledgement = onDocumentUpdated(
       );
 
       try {
+        const applicantUrl = await advertiserRequestAccessUrl(
+            requestReference, recipient,
+        );
         const mailResult = await transporter.sendMail({
           from: MAIL_FROM,
           to: recipient,
@@ -4936,6 +4990,9 @@ Votre demande de SPHOT PUBLICITAIRE pour ${company} a bien été reçue.
 Elle est maintenant en cours de vérification par l'équipe SPHOT.
 Votre dossier reste consultable, mais ne peut plus être modifié
 pendant ce contrôle.
+
+Accéder à ma demande : ${applicantUrl}
+Ce lien personnel est valable 30 jours à compter de cet envoi.
 
 Vous recevrez un nouveau message dès qu'une décision aura été prise.
 
@@ -5025,6 +5082,20 @@ L'équipe SPHOT`,
         Ce message confirme le bon enregistrement de votre demande de
         SPHOT PUBLICITAIRE.
       </p>
+
+      <div style="text-align:center;margin:30px 0;">
+        <a href="${applicantUrl}" style="
+          background:#1e3a8a;
+          color:#ffffff;
+          text-decoration:none;
+          padding:16px 30px;
+          border-radius:10px;
+          display:inline-block;
+          font-size:17px;
+          font-weight:bold;
+        ">ACCÉDER À MA DEMANDE</a>
+      </div>
+      <p>Ce lien personnel est valable 30 jours à compter de cet envoi.</p>
 
       <p style="margin-top:34px;">
         À bientôt sur SPHOT,<br>
@@ -5167,26 +5238,45 @@ exports.sendAdvertiserRequestApprovalEmail = onDocumentUpdated(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, {merge: true});
 
-      const loginUrl = `${SPHOT_LOGIN_URL}/#/professional-login`;
+      let loginUrl = `${SPHOT_LOGIN_URL}/#/professional-login` +
+        "?audience=advertiser";
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
       });
 
       try {
+        if (accountData.mustChangePassword !== false) {
+          const firstAccessToken = crypto.randomBytes(32).toString("hex");
+          await accountReference.set({
+            firstAccess: {
+              tokenHash: crypto.createHash("sha256")
+                  .update(firstAccessToken).digest("hex"),
+              expiresAt: admin.firestore.Timestamp.fromMillis(
+                  Date.now() + 30 * 24 * 60 * 60 * 1000,
+              ),
+            },
+          }, {merge: true});
+          loginUrl = `${SPHOT_LOGIN_URL}/#/advertiser-first-access` +
+            `?login=${encodeURIComponent(login)}` +
+            `&token=${encodeURIComponent(firstAccessToken)}`;
+        }
         const mailResult = await transporter.sendMail({
           from: MAIL_FROM,
           to: recipient,
-          subject: "SPHOT - Votre accès annonceur est validé",
+          subject: "SPHOT - Votre accès annonceur est approuvé",
           text: `${greeting}
 
-Votre demande annonceur pour ${company} a été validée.
+Votre demande annonceur pour ${company} a été approuvée.
+
+Votre SPHOT PUBLICITAIRE est désormais accessible. Utilisez l’identifiant
+ci-dessous, il vous permettra de vous connecter à SPHOT avec le mot de passe
+que vous aurez choisi.
 
 Identifiant : ${login}
-Mot de passe provisoire : ${temporaryPassword}
 
-Vous devrez choisir un nouveau mot de passe lors de votre
-première connexion.
+Lors de votre première connexion, vous devrez obligatoirement
+renseigner votre mot de passe.
 
 Connexion : ${loginUrl}
 
@@ -5229,7 +5319,7 @@ L'équipe SPHOT`,
 
       <p>
         Votre demande de SPHOT PUBLICITAIRE pour
-        <strong>${escapeHtml(company)}</strong> a été validée.
+        <strong>${escapeHtml(company)}</strong> a été approuvée.
       </p>
 
       <div style="
@@ -5257,6 +5347,12 @@ L'équipe SPHOT`,
         </div>
       </div>
 
+      <p>
+        Votre SPHOT PUBLICITAIRE est désormais accessible. Utilisez
+        l’identifiant ci-dessous, il vous permettra de vous connecter
+        à SPHOT avec le mot de passe que vous aurez choisi.
+      </p>
+
       <div style="
         margin:26px 0;
         padding:20px;
@@ -5270,12 +5366,6 @@ L'équipe SPHOT`,
             ${escapeHtml(login)}
           </span>
         </p>
-        <p style="margin-bottom:0;">
-          <strong>Mot de passe provisoire :</strong><br>
-          <span style="color:#dc2626;font-size:20px;font-weight:bold;">
-            ${escapeHtml(temporaryPassword)}
-          </span>
-        </p>
       </div>
 
       <p style="
@@ -5286,7 +5376,7 @@ L'équipe SPHOT`,
         border-radius:8px;
       ">
         Lors de votre première connexion, vous devrez obligatoirement
-        choisir un nouveau mot de passe.
+        renseigner votre mot de passe.
       </p>
 
       <div style="text-align:center;margin:35px 0;">
@@ -5343,7 +5433,7 @@ exports.sendAdvertiserReviewEmail = onDocumentUpdated(
     {
       document: "advertiserRequests/{requestId}",
       region: "europe-west1",
-      secrets: ["GMAIL_APP_PASSWORD"],
+      secrets: ["GMAIL_APP_PASSWORD", "ADVERTISER_ACCESS_LINK_SECRET"],
       cpu: 1,
       memory: "256MiB",
     },
@@ -5414,28 +5504,10 @@ exports.sendAdvertiserReviewEmail = onDocumentUpdated(
       const greeting = buildAdvertiserGreeting(afterData);
       const isCorrection = status === "changes_requested" ||
         assetChangeStatus === "authorized";
-      let applicantUrl = SPHOT_LOGIN_URL;
-      if (isCorrection) {
-        const accessToken = crypto.randomBytes(32).toString("hex");
-        const tokenHash = crypto
-            .createHash("sha256")
-            .update(accessToken)
-            .digest("hex");
-        const expiresAt = admin.firestore.Timestamp.fromMillis(
-            Date.now() + 30 * 24 * 60 * 60 * 1000,
-        );
-        await requestReference.set({
-          correctionAccess: {
-            tokenHash,
-            expiresAt,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          },
-        }, {merge: true});
-        applicantUrl = `${SPHOT_LOGIN_URL}/#/advertiser-correction` +
-          `?requestId=${encodeURIComponent(event.params.requestId)}` +
-          `&token=${encodeURIComponent(accessToken)}`;
-      }
       try {
+        const applicantUrl = isCorrection ?
+          await advertiserRequestAccessUrl(requestReference, recipient) :
+          SPHOT_LOGIN_URL;
         const mailResult = await transporter.sendMail({
           from: MAIL_FROM,
           to: recipient,
@@ -5597,7 +5669,7 @@ L'équipe SPHOT`,
     },
 );
 
-/** Échange un lien personnel de correction contre une session Firebase. */
+/** Ouvre un dossier en consultation ou correction selon son statut courant. */
 exports.redeemAdvertiserCorrectionAccess = onRequest(
     {region: "us-central1", cors: true},
     async (request, response) => {
@@ -5613,6 +5685,7 @@ exports.redeemAdvertiserCorrectionAccess = onRequest(
         return;
       }
 
+      let modificationRequested = false;
       try {
         const reference = admin.firestore()
             .collection("advertiserRequests")
@@ -5632,7 +5705,8 @@ exports.redeemAdvertiserCorrectionAccess = onRequest(
             (data.assetChangeRequest || {}).status,
             "",
         ).toLowerCase();
-        const editable = status === "changes_requested" ||
+        const accessible = status === "pending" ||
+          status === "changes_requested" ||
           assetStatus === "authorized";
         const hashesMatch = storedHash.length === suppliedHash.length &&
           crypto.timingSafeEqual(
@@ -5641,21 +5715,97 @@ exports.redeemAdvertiserCorrectionAccess = onRequest(
           );
 
         if (!snapshot.exists || !hashesMatch || expiresAt <= Date.now() ||
-            !editable) {
+            !accessible) {
           response.status(403).json({
             error: "Ce lien est invalide, expiré ou n'autorise plus " +
-              "la modification.",
+              "l'accès au dossier.",
           });
           return;
         }
 
+        modificationRequested = status === "changes_requested" ||
+          assetStatus === "authorized";
         const firebaseToken = await admin.auth().createCustomToken(requestId, {
           role: "advertiser_candidate",
           advertiserRequestId: requestId,
         });
-        response.status(200).json({token: firebaseToken, requestId});
+        response.status(200).json({
+          token: firebaseToken, requestId, modificationRequested,
+        });
       } catch (error) {
         console.error("Échange accès correction annonceur impossible", error);
+        response.status(500).json({
+          error: "Session temporairement indisponible.",
+          modificationRequested,
+        });
+      }
+    },
+);
+
+/** Ouvre la première connexion à partir du lien personnel du mail. */
+exports.redeemAdvertiserFirstAccess = onRequest(
+    {region: "us-central1", cors: true},
+    async (request, response) => {
+      if (request.method !== "POST") {
+        response.status(405).json({error: "Méthode non autorisée."});
+        return;
+      }
+      const login = cleanValue((request.body || {}).login, "").toLowerCase();
+      const token = cleanValue((request.body || {}).token, "");
+      if (!login || login.includes("/") || !token) {
+        response.status(400).json({error: "Lien incomplet ou invalide."});
+        return;
+      }
+      try {
+        const account = await admin.firestore()
+            .collection("advertiserAccounts").doc(login).get();
+        const data = account.data() || {};
+        const access = data.firstAccess || {};
+        const storedHash = cleanValue(access.tokenHash, "");
+        const suppliedHash = crypto.createHash("sha256")
+            .update(token).digest("hex");
+        const matches = storedHash.length === suppliedHash.length &&
+          crypto.timingSafeEqual(Buffer.from(storedHash),
+              Buffer.from(suppliedHash));
+        const expiry = access.expiresAt && access.expiresAt.toMillis ?
+          access.expiresAt.toMillis() : 0;
+        const requestId = cleanValue(
+            data.advertiserRequestId || data.requestId, "",
+        );
+        if (!account.exists || data.accountStatus !== "ACTIVE" ||
+            data.mustChangePassword !== true || !matches ||
+            expiry <= Date.now() || !requestId) {
+          response.status(403).json({
+            error: "Ce lien est expiré, remplacé ou déjà utilisé. " +
+              "Contactez l’équipe SPHOT si nécessaire.",
+          });
+          return;
+        }
+        const dossier = await admin.firestore()
+            .collection("advertiserRequests").doc(requestId).get();
+        const identity = dossier.data() || {};
+        if (cleanValue(identity.status, "").toLowerCase() !== "approved") {
+          response.status(403).json({error: "Demande non approuvée."});
+          return;
+        }
+        const uid = cleanValue(data.firebaseUid, "") ||
+          advertiserFirebaseUid(requestId);
+        const firebaseToken = await admin.auth().createCustomToken(uid, {
+          role: "ANNONCEUR",
+          advertiserRequestId: requestId,
+          firstAccessHash: storedHash,
+        });
+        response.status(200).json({
+          firebaseToken,
+          advertiserRequestId: requestId,
+          login,
+          civilite: cleanValue(
+              identity.contactCivility || identity.civilite, "",
+          ),
+          nom: cleanValue(data.nom, ""),
+        });
+      } catch (error) {
+        console.error("Première connexion annonceur impossible:", error);
         response.status(500).json({
           error: "Session temporairement indisponible.",
         });
@@ -5771,30 +5921,166 @@ exports.changeAdvertiserPassword = onRequest(
         const reference = admin.firestore()
             .collection("advertiserAccounts")
             .doc(login);
-        const snapshot = await reference.get();
-        if (!snapshot.exists) {
-          response.status(404).json({success: false});
-          return;
-        }
-        const accountData = snapshot.data() || {};
-        const accountRequestId = cleanValue(
-            accountData.advertiserRequestId || accountData.requestId,
-            "",
-        );
-        if (accountRequestId !== session.advertiserRequestId) {
+        const changed = await admin.firestore().runTransaction(async (tx) => {
+          const snapshot = await tx.get(reference);
+          const accountData = snapshot.data() || {};
+          const accountRequestId = cleanValue(
+              accountData.advertiserRequestId || accountData.requestId, "",
+          );
+          if (!snapshot.exists || accountData.accountStatus !== "ACTIVE" ||
+              accountRequestId !== session.advertiserRequestId) return false;
+          if (session.firstAccessHash) {
+            const access = accountData.firstAccess || {};
+            const expiry = access.expiresAt && access.expiresAt.toMillis ?
+              access.expiresAt.toMillis() : 0;
+            if (accountData.mustChangePassword !== true ||
+                access.tokenHash !== session.firstAccessHash ||
+                expiry <= Date.now()) return false;
+          }
+          tx.set(reference, {
+            temporaryPassword: newPassword,
+            mustChangePassword: false,
+            firstAccess: admin.firestore.FieldValue.delete(),
+            passwordUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, {merge: true});
+          return true;
+        });
+        if (!changed) {
           response.status(403).json({success: false});
           return;
         }
-        await reference.set({
-          temporaryPassword: newPassword,
-          mustChangePassword: false,
-          passwordUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, {merge: true});
         response.status(200).json({success: true});
       } catch (error) {
         console.error("Erreur changement mot de passe annonceur:", error);
         response.status(500).json({success: false});
+      }
+    },
+);
+
+/** Suit les demandes de modification des éléments approuvés. */
+exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
+    {
+      document: "advertiserRequests/{requestId}",
+      region: "europe-west1",
+      secrets: ["GMAIL_APP_PASSWORD", "ADVERTISER_ACCESS_LINK_SECRET"],
+      retry: true,
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const before = event.data.before.data() || {};
+      const data = event.data.after.data() || {};
+      const previous = (before.assetChangeRequest || {}).status;
+      const status = (data.assetChangeRequest || {}).status;
+      if (data.status !== "approved" || previous === status) return;
+      const messages = {
+        pending: "Votre demande de modification du visuel ou de la position " +
+          "a été reçue. L'équipe SPHOT va l'examiner.",
+        authorized: "L'équipe SPHOT vous autorise à proposer un nouveau " +
+          "visuel ou une nouvelle position. Transmettez vos modifications " +
+          "pour approbation.",
+        submitted: "Votre proposition de modification du visuel ou de la " +
+          "position a été reçue. Elle est en attente d'approbation " +
+          "par l'équipe SPHOT.",
+        approved: "L'équipe SPHOT a approuvé votre modification du visuel " +
+          "ou de la position. Les éléments approuvés sont disponibles " +
+          "dans votre espace annonceur.",
+        rejected: "L'équipe SPHOT n'a pas approuvé votre modification. " +
+          "Les éléments précédemment approuvés sont conservés.",
+      };
+      if (!messages[status]) return;
+      const labels = {
+        pending: "DEMANDE DE MODIFICATION REÇUE",
+        authorized: "MODIFICATION AUTORISÉE",
+        submitted: "PROPOSITION À APPROUVER",
+        approved: "MODIFICATION APPROUVÉE",
+        rejected: "MODIFICATION REFUSÉE",
+      };
+      const recipient = cleanValue(data.contactEmail || data.email, "");
+      // Les décisions détaillées sont déjà envoyées par le circuit existant.
+      const existingReview = status === "authorized" ?
+        data.changeRequestEmail : status === "rejected" ?
+          data.rejectionEmail : null;
+      const reviewQueued = existingReview &&
+        existingReview.status === "pending";
+      const recipients = [{kind: "team", email: SMTP_USER}];
+      if (recipient && !reviewQueued) {
+        recipients.push({kind: "advertiser", email: recipient});
+      }
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
+      });
+      for (const target of recipients) {
+        const key = crypto.createHash("sha256")
+            .update(event.id + ":" + target.kind).digest("hex");
+        const ledger = event.data.after.ref
+            .collection("assetChangeNotifications").doc(key);
+        const claimed = await admin.firestore().runTransaction(async (tx) => {
+          const snapshot = await tx.get(ledger);
+          const saved = snapshot.data() || {};
+          if (saved.status === "sent" || saved.status === "sending") {
+            return false;
+          }
+          tx.set(ledger, {
+            status: "sending",
+            recipient: target.email,
+            decision: status,
+            eventId: event.id,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, {merge: true});
+          return true;
+        });
+        if (!claimed) continue;
+        try {
+          let text;
+          if (target.kind === "team") {
+            text = "Suivi d'une modification annonceur.\n\n" +
+              "Dossier : " + event.params.requestId + "\n" +
+              "Annonceur : " + cleanValue(data.advertiserName, "") + "\n" +
+              "Contact : " + recipient + "\n" +
+              "État : " + labels[status] + "\n\n" +
+              "Consultez le dossier dans votre espace SPHOT pour " +
+              "examiner la demande ou retrouver la décision.";
+          } else {
+            let url = "https://sphot.app/#/professional-login" +
+              "?audience=advertiser";
+            if (status === "authorized") {
+              url = await advertiserRequestAccessUrl(
+                  event.data.after.ref, recipient,
+              );
+            }
+            const reason = cleanValue(
+                (data.assetChangeRequest || {}).reason, "",
+            );
+            text = buildAdvertiserGreeting(data) + "\n\n" +
+              messages[status] + (reason ? "\n\nMotif : " + reason : "") +
+              "\n\nAccéder à votre espace : " + url +
+              "\n\nL'équipe SPHOT";
+          }
+          const result = await transporter.sendMail({
+            from: MAIL_FROM,
+            to: target.email,
+            subject: "SPHOT - " + labels[status],
+            text: text,
+            html: "<div style=\"color:#1e3a8a;font-family:Arial;" +
+              "line-height:1.5;white-space:pre-line\">" +
+              escapeHtml(text) + "</div>",
+          });
+          await ledger.set({
+            status: "sent",
+            messageId: result.messageId || null,
+            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, {merge: true});
+        } catch (error) {
+          await ledger.set({
+            status: "failed",
+            error: error.message || String(error),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, {merge: true});
+          throw error;
+        }
       }
     },
 );

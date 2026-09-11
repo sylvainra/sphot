@@ -180,13 +180,14 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
                   ],
                 ),
               ),
-              TextButton(
-                onPressed: () => widget.onEditStep(step),
-                child: const Text(
-                  'MODIFIER',
-                  style: TextStyle(fontWeight: FontWeight.w900),
+              if (step > 1)
+                TextButton(
+                  onPressed: () => widget.onEditStep(step),
+                  child: const Text(
+                    'MODIFIER',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
                 ),
-              ),
             ],
           ),
           if (child != null) ...[const SizedBox(height: 12), child],

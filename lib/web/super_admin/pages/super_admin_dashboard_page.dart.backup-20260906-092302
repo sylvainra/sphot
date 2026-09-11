@@ -1187,7 +1187,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     String value, {
     double labelWidth = 95,
     double bottomPadding = 4,
-    bool wrapLabel = false,
   }) {
     return Padding(
       padding: EdgeInsets.only(bottom: bottomPadding),
@@ -1198,9 +1197,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             width: labelWidth,
             child: Text(
               '$label :',
-              maxLines: wrapLabel ? null : 1,
-              softWrap: wrapLabel,
-              overflow: wrapLabel ? TextOverflow.clip : TextOverflow.visible,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.visible,
               style: const TextStyle(
                 fontWeight: FontWeight.w800,
                 color: Colors.black87,
@@ -1208,7 +1207,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               ),
             ),
           ),
-          if (wrapLabel) const SizedBox(width: 12),
           Expanded(
             child: Text(
               value,
@@ -1220,18 +1218,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _advertiserRequestInfoLine(String label, String value) {
-    return LayoutBuilder(
-      builder: (context, constraints) => _spotInfoLine(
-        label,
-        value,
-        labelWidth: constraints.maxWidth * 0.38,
-        bottomPadding: 8,
-        wrapLabel: true,
       ),
     );
   }
@@ -2727,7 +2713,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ),
                 const SizedBox(height: 14),
               ],
-              _advertiserRequestInfoLine(
+              _spotInfoLine(
                 'Civilité',
                 _cleanText(
                   advertiser['contactCivility'] ??
@@ -2735,56 +2721,56 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                       'Non renseignée',
                 ),
               ),
-              _advertiserRequestInfoLine(
+              _spotInfoLine(
                 'Responsable',
                 _cleanText(advertiser['contactName'] ?? 'Non renseigné'),
               ),
-              _advertiserRequestInfoLine(
+              _spotInfoLine(
                 'Fonction',
                 _cleanText(advertiser['contactFunction'] ?? 'Non renseignée'),
               ),
-              _advertiserRequestInfoLine(
+              _spotInfoLine(
                 'Email',
                 _cleanText(advertiser['contactEmail'] ?? advertiser['email']),
               ),
-              _advertiserRequestInfoLine(
+              _spotInfoLine(
                 'Téléphone',
                 _cleanText(advertiser['contactPhone'] ?? 'Non renseigné'),
               ),
-              _advertiserRequestInfoLine(
+              _spotInfoLine(
                 'Raison sociale',
                 _cleanText(establishment['legalName'] ?? 'Non renseignée'),
               ),
-              _advertiserRequestInfoLine(
+              _spotInfoLine(
                 'Activité',
                 _cleanText(establishment['activityType'] ?? 'Non renseignée'),
               ),
-              _advertiserRequestInfoLine(
+              _spotInfoLine(
                 'SIRET',
                 _cleanText(establishment['siret'] ?? advertiser['siret']),
               ),
-              _advertiserRequestInfoLine(
+              _spotInfoLine(
                 'Mode d’immatriculation',
                 registrationMode == 'international'
                     ? 'Entreprise étrangère'
                     : 'Entreprise française',
               ),
-              _advertiserRequestInfoLine(
+              _spotInfoLine(
                 'Contrôle du registre',
                 _cleanText(registryPrecheck['status']).isEmpty
                     ? 'Non effectué'
                     : _cleanText(registryPrecheck['status']),
               ),
               if (registrationMode == 'international') ...[
-                _advertiserRequestInfoLine(
+                _spotInfoLine(
                   'Pays d’immatriculation',
                   _cleanText(advertiser['registrationCountryCode']),
                 ),
-                _advertiserRequestInfoLine(
+                _spotInfoLine(
                   'N° d’enregistrement',
                   _cleanText(advertiser['foreignRegistrationNumber']),
                 ),
-                _advertiserRequestInfoLine(
+                _spotInfoLine(
                   'Registre / autorité',
                   _cleanText(advertiser['foreignRegistrationAuthority']),
                 ),
@@ -2799,24 +2785,21 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     label: const Text('OUVRIR LE JUSTIFICATIF OFFICIEL'),
                   ),
               ],
-              _advertiserRequestInfoLine(
+              _spotInfoLine(
                 'Version juridique acceptée',
                 _cleanText(legalAcceptance['version']).isEmpty
                     ? 'Non acceptée'
                     : _cleanText(legalAcceptance['version']),
               ),
-              _advertiserRequestInfoLine('Adresse', address),
+              _spotInfoLine('Adresse', address),
               _advertiserWebsiteLine(websiteUrl),
               if (assetChangeStatus.isNotEmpty)
-                _advertiserRequestInfoLine(
+                _spotInfoLine(
                   'Modification visuel / position',
                   assetChangeStatus,
                 ),
               if (_cleanText(review['reason']).isNotEmpty)
-                _advertiserRequestInfoLine(
-                  'Motif',
-                  _cleanText(review['reason']),
-                ),
+                _spotInfoLine('Motif', _cleanText(review['reason'])),
               const SizedBox(height: 20),
               if (assetChangeStatus == 'pending') ...[
                 FilledButton.icon(
@@ -5393,8 +5376,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           'ADMIN',
     );
 
-    final ville = _cleanText(territoire['ville']);
-    final lieu = (ville.isNotEmpty ? ville : organisation).toUpperCase();
     final logoUrl = _cleanText(territoire['logoVille']);
 
     return Marker(
@@ -5420,21 +5401,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             _mapController.move(LatLng(lat, lng), 14);
           },
           child: Tooltip(
-            message: lieu,
-            preferBelow: true,
-            verticalOffset: 0,
-            waitDuration: Duration.zero,
-            triggerMode: TooltipTriggerMode.manual,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF0000),
-              borderRadius: BorderRadius.circular(5),
-            ),
-            textStyle: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
+            message: organisation,
             child: SizedBox(
               width: 85,
               height: 85,

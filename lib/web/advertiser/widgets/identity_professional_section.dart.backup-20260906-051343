@@ -34,9 +34,6 @@ class _IdentityProfessionalSectionState
   final _phoneController = TextEditingController();
   final _professionalEmailController = TextEditingController();
   String? _civility;
-  final _civilityLink = LayerLink();
-  final _civilityKey = GlobalKey();
-  OverlayEntry? _civilityOverlay;
 
   bool _loading = true;
   bool _saving = false;
@@ -58,7 +55,6 @@ class _IdentityProfessionalSectionState
 
   @override
   void dispose() {
-    _closeCivilityMenu();
     _lastNameController.dispose();
     _firstNameController.dispose();
     _functionController.dispose();
@@ -234,111 +230,6 @@ class _IdentityProfessionalSectionState
     if (_completed) setState(() => _completed = false);
   }
 
-  void _closeCivilityMenu() {
-    _civilityOverlay?.remove();
-    _civilityOverlay = null;
-  }
-
-  void _openCivilityMenu(FormFieldState<String> field) {
-    if (widget.readOnly) return;
-    if (_civilityOverlay != null) {
-      _closeCivilityMenu();
-      return;
-    }
-    final box = _civilityKey.currentContext?.findRenderObject();
-    if (box is! RenderBox) return;
-    final width = box.size.width;
-    _civilityOverlay = OverlayEntry(
-      builder: (_) => Stack(
-        children: [
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _closeCivilityMenu,
-            ),
-          ),
-          CompositedTransformFollower(
-            link: _civilityLink,
-            showWhenUnlinked: false,
-            targetAnchor: Alignment.bottomLeft,
-            followerAnchor: Alignment.topLeft,
-            offset: const Offset(0, -12),
-            child: SizedBox(
-              width: width,
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.97),
-                    border: const Border(
-                      left: BorderSide(color: WebColors.blue, width: 1.4),
-                      right: BorderSide(color: WebColors.blue, width: 1.4),
-                      bottom: BorderSide(color: WebColors.blue, width: 1.4),
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(10),
-                      bottomRight: Radius.circular(10),
-                    ),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 8,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (final choice in ['Monsieur', 'Madame'])
-                        InkWell(
-                          onTap: () {
-                            field.didChange(choice);
-                            setState(() {
-                              _civility = choice;
-                              _completed = false;
-                            });
-                            _closeCivilityMenu();
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    choice,
-                                    style: const TextStyle(
-                                      color: WebColors.blue,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                                if (_civility == choice)
-                                  const Icon(
-                                    Icons.check_rounded,
-                                    color: WebColors.red,
-                                    size: 20,
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-    Overlay.of(context, rootOverlay: true).insert(_civilityOverlay!);
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -377,59 +268,55 @@ class _IdentityProfessionalSectionState
               children: [
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: FormField<String>(
-                    initialValue: _civility,
-                    validator: _requiredValidator,
-                    builder: (field) => CompositedTransformTarget(
-                      link: _civilityLink,
-                      child: GestureDetector(
-                        key: _civilityKey,
-                        onTap: widget.readOnly
-                            ? null
-                            : () => _openCivilityMenu(field),
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: 'Civilité *',
-                            labelStyle: const TextStyle(color: WebColors.blue),
-                            errorText: field.errorText,
-                            filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 16,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: WebColors.blue,
-                                width: 1.6,
-                              ),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: WebColors.blue,
-                                width: 1.6,
-                              ),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  _civility ?? 'Sélectionnez une civilité',
-                                  style: const TextStyle(
-                                    color: WebColors.blue,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                              const Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                color: WebColors.red,
-                              ),
-                            ],
-                          ),
+                  child: DropdownButtonFormField<String>(
+                    value: _civility,
+                    validator: (value) => value == null || value.isEmpty
+                        ? 'Champ obligatoire'
+                        : null,
+                    onChanged: widget.readOnly
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _civility = value;
+                              if (_completed) _completed = false;
+                            });
+                          },
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Monsieur',
+                        child: Text('Monsieur'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Madame',
+                        child: Text('Madame'),
+                      ),
+                    ],
+                    style: const TextStyle(
+                      color: WebColors.blue,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Civilité *',
+                      labelStyle: const TextStyle(color: Color(0xFF4B5F97)),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: WebColors.blue,
+                          width: 2,
                         ),
                       ),
                     ),
@@ -608,6 +495,7 @@ class _SectionCard extends StatelessWidget {
     );
   }
 }
+
 
 class _ProfileField extends StatelessWidget {
   const _ProfileField({

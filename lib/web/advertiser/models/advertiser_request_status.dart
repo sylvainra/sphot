@@ -4,5 +4,5 @@ bool isAdvertiserRequestApproved(String status) {
 
 bool isAdvertiserApplicationLocked(String status) {
   final normalizedStatus = status.trim().toLowerCase();
-  return normalizedStatus == 'pending' || normalizedStatus == 'approved';
+  return normalizedStatus != 'draft' && normalizedStatus != 'changes_requested';
 }

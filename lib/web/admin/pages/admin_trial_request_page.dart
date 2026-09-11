@@ -7,6 +7,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'admin_request_pending_page.dart';
+import '../../../map/map_page.dart';
 
 class AdminTrialRequestPage extends StatefulWidget {
   final String? proConnectUid;
@@ -1133,7 +1134,13 @@ switch (type) {
       _saved = false;
     });
 
-    _mapController.move(point, 14);
+    void _setCityPosition(LatLng point) {
+  setState(() {
+    _controller('villeLat').text = point.latitude.toStringAsFixed(6);
+    _controller('villeLng').text = point.longitude.toStringAsFixed(6);
+    _saved = false;
+  });
+}
   }
 
   void _centerOnCity() {
@@ -3398,9 +3405,15 @@ if (_isLoadingCorrection) {
         ),
       ),
       child: IconButton(
-        tooltip: 'Retour',
         onPressed: () {
-          Navigator.of(context).pop();
+          FocusScope.of(context).unfocus();
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute<void>(
+              settings: const RouteSettings(name: '/'),
+              builder: (_) => const MapPage(),
+            ),
+            (route) => false,
+          );
         },
         icon: const Icon(
           Icons.arrow_back,

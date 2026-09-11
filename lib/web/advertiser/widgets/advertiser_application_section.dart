@@ -22,6 +22,7 @@ class AdvertiserApplicationSection extends StatefulWidget {
     required this.onPositionChanged,
     required this.onVisualChanged,
     this.onSubmitted,
+    this.readOnly = false,
   });
 
   final User? user;
@@ -33,6 +34,7 @@ class AdvertiserApplicationSection extends StatefulWidget {
   onPositionChanged;
   final ValueChanged<AdvertisingVisualData> onVisualChanged;
   final VoidCallback? onSubmitted;
+  final bool readOnly;
 
   @override
   State<AdvertiserApplicationSection> createState() =>
@@ -58,7 +60,9 @@ class _AdvertiserApplicationSectionState
 
   bool get _locked {
     final status = widget.requestStatus.toLowerCase();
-    return _submitted || status == 'pending' || status == 'approved';
+    return widget.readOnly ||
+        _submitted ||
+        (status != 'draft' && status != 'changes_requested');
   }
 
   bool get _requestTransmitted {
@@ -250,7 +254,7 @@ class _AdvertiserApplicationSectionState
 
   String get _visualMessage {
     if (_bannerBytes == null && _bannerUrl == null) {
-      return 'Ajoutez le visuel que le Super Admin devra contrôler.';
+      return "Ajoutez votre visuel que l'équipe SPHOT contrôlera.";
     }
     if (_bannerIsValid) {
       return _bannerWidth == null
@@ -444,54 +448,54 @@ class _AdvertiserApplicationSectionState
   }
 
   Widget _statusCard() {
-  final status = _requestTransmitted
-      ? 'pending'
-      : widget.requestStatus.toLowerCase();
+    final status = _requestTransmitted
+        ? 'pending'
+        : widget.requestStatus.toLowerCase();
 
-  final (label, color, message) = switch (status) {
-    'pending' => (
-      'EN COURS DE TRAITEMENT',
-      const Color(0xFFF59E0B),
-      'Votre dossier est verrouillé pendant son contrôle par l’équipe SPHOT.',
-    ),
-    'changes_requested' => (
-      'MODIFICATIONS DEMANDÉES',
-      WebColors.red,
-      'Corrigez les éléments signalés puis transmettez à nouveau votre demande.',
-    ),
-    'rejected' => (
-      'DEMANDE REFUSÉE',
-      WebColors.red,
-      'Consultez le motif communiqué par l’équipe SPHOT.',
-    ),
-    'approved' => (
-      'DEMANDE APPROUVÉE',
-      const Color(0xFF15803D),
-      'Vos identifiants de connexion ont été envoyés par email. Utilisez-les pour ouvrir votre espace annonceur complet.',
-    ),
-    _ => (
-      'DEMANDE À COMPLÉTER',
-      const Color(0xFF6B7280),
-      'Complétez les deux étapes avant de transmettre votre demande.',
-    ),
-  };
+    final (label, color, message) = switch (status) {
+      'pending' => (
+        'EN COURS DE TRAITEMENT',
+        const Color(0xFFF59E0B),
+        'Votre dossier est verrouillé pendant son contrôle par l’équipe SPHOT.',
+      ),
+      'changes_requested' => (
+        'MODIFICATIONS DEMANDÉES',
+        WebColors.red,
+        'Corrigez les éléments signalés puis transmettez à nouveau votre demande.',
+      ),
+      'rejected' => (
+        'DEMANDE REFUSÉE',
+        WebColors.red,
+        'Consultez le motif communiqué par l’équipe SPHOT.',
+      ),
+      'approved' => (
+        'DEMANDE APPROUVÉE',
+        const Color(0xFF15803D),
+        'Vos identifiants de connexion ont été envoyés par email. Utilisez-les pour ouvrir votre espace annonceur complet.',
+      ),
+      _ => (
+        'DEMANDE À COMPLÉTER',
+        const Color(0xFF6B7280),
+        'Complétez les deux étapes avant de transmettre votre demande.',
+      ),
+    };
 
-  return _card(
-    icon: Icons.fact_check_outlined,
-    title: label,
-    subtitle: message,
-    child: status == 'changes_requested' || status == 'rejected'
-        ? Text(
-            'Les informations déjà enregistrées restent inchangées tant qu’une nouvelle version n’a pas été validée.',
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w800,
-              height: 1.35,
-            ),
-          )
-        : const SizedBox.shrink(),
-  );
-}
+    return _card(
+      icon: Icons.fact_check_outlined,
+      title: label,
+      subtitle: message,
+      child: status == 'changes_requested' || status == 'rejected'
+          ? Text(
+              'Les informations déjà enregistrées restent inchangées tant qu’une nouvelle version n’a pas été validée.',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w800,
+                height: 1.35,
+              ),
+            )
+          : const SizedBox.shrink(),
+    );
+  }
 
   Widget _positionCard() {
     return _card(
@@ -523,12 +527,12 @@ class _AdvertiserApplicationSectionState
     final preview = _bannerBytes != null
         ? Image.memory(_bannerBytes!, fit: BoxFit.contain)
         : _bannerUrl != null
-? Image.network(
-    _bannerUrl!,
-    fit: BoxFit.contain,
-    webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-  )
-: null;
+        ? Image.network(
+            _bannerUrl!,
+            fit: BoxFit.contain,
+            webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+          )
+        : null;
     return _card(
       icon: Icons.image_outlined,
       title: 'VISUEL PUBLICITAIRE',
@@ -597,11 +601,11 @@ class _AdvertiserApplicationSectionState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (<String>{
-              'pending',
-              'changes_requested',
-              'rejected',
-              'approved',
-            }.contains(widget.requestStatus.toLowerCase()))
+          'pending',
+          'changes_requested',
+          'rejected',
+          'approved',
+        }.contains(widget.requestStatus.toLowerCase()))
           _statusCard(),
         _positionCard(),
         _visualCard(),
@@ -696,10 +700,10 @@ class _AdvertiserApplicationSectionState
               _submitting
                   ? 'ENVOI EN COURS…'
                   : _requestTransmitted
-                      ? 'DEMANDE TRANSMISE'
-                      : _submitted
-                          ? 'INFORMATIONS ENREGISTRÉES'
-                          : 'ENREGISTRER ET CONTINUER',
+                  ? 'DEMANDE TRANSMISE'
+                  : _submitted
+                  ? 'INFORMATIONS ENREGISTRÉES'
+                  : 'ENREGISTRER ET CONTINUER',
               style: const TextStyle(fontWeight: FontWeight.w900),
             ),
           ),

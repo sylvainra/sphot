@@ -393,7 +393,7 @@ class _PlanningSectionState extends State<PlanningSection> {
   Future<void> _save() async {
     if (widget.advertisingPosition == null) {
       setState(() {
-        _error = 'Définissez d’abord le SPHOT publicitaire à l’étape 3.';
+        _error = 'Définissez d’abord le SPHOT PUBLICITAIRE à l’étape 3.';
       });
       return;
     }
@@ -634,8 +634,8 @@ class _PlanningSectionState extends State<PlanningSection> {
                     const SizedBox(height: 7),
                     Text(
                       widget.requestedScope == 'national'
-                          ? 'Une seule campagne de la même catégorie d’activité peut être active à l’échelle nationale pendant la période choisie. Votre SPHOT publicitaire bénéficie ainsi d’une exclusivité d’affichage dans sa catégorie pendant toute la période réservée.'
-                          : 'Une seule campagne de la même catégorie d’activité peut être active dans le rayon et durant la période choisis. Votre SPHOT publicitaire bénéficie ainsi d’une exclusivité d’affichage dans sa catégorie, dans toute la zone sélectionnée et pendant toute la période réservée.',
+                          ? 'Une seule campagne de la même catégorie d’activité peut être active à l’échelle nationale pendant la période choisie. Votre SPHOT PUBLICITAIRE bénéficie ainsi d’une exclusivité d’affichage dans sa catégorie pendant toute la période réservée.'
+                          : 'Une seule campagne de la même catégorie d’activité peut être active dans le rayon et durant la période choisis. Votre SPHOT PUBLICITAIRE bénéficie ainsi d’une exclusivité d’affichage dans sa catégorie, dans toute la zone sélectionnée et pendant toute la période réservée.',
                       style: const TextStyle(
                         color: Color(0xFF4B5F97),
                         height: 1.4,

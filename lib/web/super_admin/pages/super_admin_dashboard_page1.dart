@@ -5393,8 +5393,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           'ADMIN',
     );
 
-    final ville = _cleanText(territoire['ville']);
-    final lieu = (ville.isNotEmpty ? ville : organisation).toUpperCase();
     final logoUrl = _cleanText(territoire['logoVille']);
 
     return Marker(
@@ -5420,21 +5418,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             _mapController.move(LatLng(lat, lng), 14);
           },
           child: Tooltip(
-            message: lieu,
-            preferBelow: true,
-            verticalOffset: 0,
-            waitDuration: Duration.zero,
-            triggerMode: TooltipTriggerMode.manual,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF0000),
-              borderRadius: BorderRadius.circular(5),
-            ),
-            textStyle: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
+            message: organisation,
             child: SizedBox(
               width: 85,
               height: 85,
