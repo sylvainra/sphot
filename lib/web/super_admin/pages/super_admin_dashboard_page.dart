@@ -5422,7 +5422,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           child: Tooltip(
             message: lieu,
             preferBelow: true,
-            verticalOffset: 0,
+            verticalOffset: 42.5,
             waitDuration: Duration.zero,
             triggerMode: TooltipTriggerMode.manual,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),

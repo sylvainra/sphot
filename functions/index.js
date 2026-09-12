@@ -2016,7 +2016,7 @@ exports.sendAdminRequestApprovalEmail = onDocumentUpdated(
           text:
 `${greeting}
 
-Votre demande d'accès au portail d'administration SPHOT
+Votre demande d'accès à votre SPHOT ADMIN
 pour ${organisation} a été acceptée.
 
 Référence administrative : ${requestNumber}
@@ -2032,7 +2032,7 @@ ${temporaryPassword}
 Lors de votre première connexion, vous devrez obligatoirement
 choisir un nouveau mot de passe.
 
-Accéder à la page de connexion :
+SE CONNECTER À VOTRE SPHOT ADMIN :
 ${loginUrl}
 
 Vous pourrez ensuite renseigner vos SPHOTS, vos sauveteurs
@@ -2066,22 +2066,13 @@ L'équipe SPHOT`,
     <div style="padding:0 0 18px;text-align:center;">
       <a href="${SPHOT_LOGIN_URL}">
         <img
-          src="https://sphot.app/assets/data/icons/title.png"
+          src="cid:sphot-title"
           alt="SPHOT"
           style="max-width:320px;width:100%;height:auto;border:0;"
         >
       </a>
 
-      <div style="
-        margin-top:18px;
-        color:#1e3a8a;
-        font-size:18px;
-        font-weight:900;
-        line-height:1.35;
-        text-transform:uppercase;
-      ">
-        DEMANDE D’ACCÈS AU PORTAIL SPHOT
-      </div>
+
     </div>
 
     <p style="font-size:16px;line-height:1.6;">
@@ -2089,7 +2080,7 @@ L'équipe SPHOT`,
     </p>
 
     <p style="font-size:16px;line-height:1.6;">
-      Votre demande d'accès au portail d'administration SPHOT
+      Votre demande d'accès à votre SPHOT ADMIN
       pour <strong>${escapeHtml(organisation)}</strong>
       a été acceptée.
     </p>
@@ -2214,7 +2205,7 @@ L'équipe SPHOT`,
           font-weight:900;
         "
       >
-        SE CONNECTER À SPHOT
+        SE CONNECTER À VOTRE SPHOT ADMIN
       </a>
     </div>
 
@@ -2250,9 +2241,36 @@ L'équipe SPHOT`,
       À bientôt sur SPHOT,<br>
       <strong>L'équipe SPHOT</strong>
     </p>
+    <div style="text-align:center;margin-top:26px;">
+      <a href="${SPHOT_LOGIN_URL}" style="text-decoration:none;">
+        <img
+          src="cid:sphot-fire-red"
+          alt="SPHOT"
+          width="42"
+          height="65"
+          style="display:block;margin:0 auto;border:0;width:42px;height:65px;"
+        >
+      </a>
+    </div>
   </div>
 </div>
 `,
+          attachments: [
+            {
+              filename: "sphot_title.png",
+              path: `${__dirname}/email_assets/sphot_title.png`,
+              cid: "sphot-title",
+              contentDisposition: "inline",
+              contentType: "image/png",
+            },
+            {
+              filename: "fire_red_icon.png",
+              path: `${__dirname}/email_assets/fire_red_icon.png`,
+              cid: "sphot-fire-red",
+              contentDisposition: "inline",
+              contentType: "image/png",
+            },
+          ],
         });
 
         await requestReference.set(
@@ -6084,3 +6102,4 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
       }
     },
 );
+
