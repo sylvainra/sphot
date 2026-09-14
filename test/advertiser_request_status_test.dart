@@ -14,4 +14,12 @@ void main() {
     expect(isAdvertiserApplicationLocked('pending'), isTrue);
     expect(isAdvertiserApplicationLocked('APPROVED'), isTrue);
   });
+
+  test('un statut absent ou inconnu ne permet pas la saisie', () {
+    for (final status in ['', 'loading', 'unknown', 'submitted', 'rejected']) {
+      expect(isAdvertiserApplicationLocked(status), isTrue);
+    }
+    expect(isAdvertiserApplicationLocked(' pending '), isTrue);
+    expect(isAdvertiserApplicationLocked(' changes_requested '), isFalse);
+  });
 }
