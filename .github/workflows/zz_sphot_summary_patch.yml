@@ -1,0 +1,140 @@
+name: Apply SPHOT ADMIN summary wiring
+on:
+  push:
+    branches: [feature/sphot-admin-summary]
+    paths: [.github/workflows/zz_sphot_summary_patch.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/sphot-admin-summary
+      - name: Patch dashboard
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+          p=Path('lib/web/admin/pages/admin_dashboard_page.dart')
+          s=p.read_text(encoding='utf-8')
+          anchor="import 'package:flutter/services.dart';\n"
+          if "import 'sphot_admin_summary_page.dart';" not in s:
+              assert s.count(anchor)==1
+              s=s.replace(anchor,anchor+"import 'sphot_admin_summary_page.dart';\n",1)
+          s=s.replace("'ESPACE ADMIN SPHOT'","'ESPACE SPHOT ADMIN'")
+          s=s.replace("'Configurez votre espace admin SPHOT en suivant les étapes ci-dessous.'","'Configurez votre SPHOT ADMIN en suivant les étapes ci-dessous.'")
+          anchor='''void _closeTrialSummaryPanel() {
+  setState(() {
+    _showTrialSummaryPanel = false;
+    _trialSummaryPanelFuture = null;
+  });
+}
+'''
+          addition=anchor+'''
+Future<void> _openSphotAdminSummaryPage() async {
+  if (_resolvedTerritoireId.isEmpty) return;
+  try {
+    final summary = await _loadTrialSummaryData();
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => SphotAdminSummaryPage(summary: summary),
+      ),
+    );
+  } catch (error) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Ouverture de la fiche récapitulative impossible : $error'),
+        backgroundColor: redColor,
+      ),
+    );
+  }
+}
+
+Widget _buildSphotAdminSummaryBanner() {
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: _openSphotAdminSummaryPage,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: adminColor.withOpacity(0.055),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: adminColor.withOpacity(0.35), width: 1.2),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.description_outlined, color: adminColor, size: 28),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'FICHE RÉCAPITULATIVE',
+                    style: TextStyle(color: adminColor, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Consulter et imprimer la synthèse des SPHOTS, périodes et sauveteurs.',
+                    style: TextStyle(color: adminColor, fontSize: 11.5, fontWeight: FontWeight.w600, height: 1.25),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 8),
+            Icon(Icons.chevron_right_rounded, color: adminColor),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+'''
+          if 'Future<void> _openSphotAdminSummaryPage() async {' not in s:
+              assert s.count(anchor)==1
+              s=s.replace(anchor,addition,1)
+          trial='''                    children: [
+                      const Text(
+                        'SPHOTS SURVEILLÉS',
+'''
+          trial_new='''                    children: [
+                      if (isSidePanel) ...[
+                        _buildSphotAdminSummaryBanner(),
+                        const SizedBox(height: 18),
+                      ],
+                      const Text(
+                        'SPHOTS SURVEILLÉS',
+'''
+          if trial_new not in s:
+              assert s.count(trial)==1
+              s=s.replace(trial,trial_new,1)
+          docs='''                  children: [
+                    _buildCommercialSection(
+                      icon: Icons.request_quote_outlined,
+'''
+          docs_new='''                  children: [
+                    _buildSphotAdminSummaryBanner(),
+                    const SizedBox(height: 18),
+                    _buildCommercialSection(
+                      icon: Icons.request_quote_outlined,
+'''
+          if docs_new not in s:
+              assert s.count(docs)==1
+              s=s.replace(docs,docs_new,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+          dart format lib/web/admin/pages/admin_dashboard_page.dart lib/web/admin/pages/sphot_admin_summary_page.dart
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lib/web/admin/pages/admin_dashboard_page.dart lib/web/admin/pages/sphot_admin_summary_page.dart
+          git rm .github/workflows/zz_sphot_summary_patch.yml
+          git commit -m 'Wire SPHOT ADMIN printable summary page'
+          git push origin HEAD:feature/sphot-admin-summary
