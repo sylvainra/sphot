@@ -4,16 +4,24 @@ module.exports = {
     node: true,
   },
   parserOptions: {
-    "ecmaVersion": 2018,
+    "ecmaVersion": 2022,
   },
   extends: [
     "eslint:recommended",
     "google",
   ],
   rules: {
-    "no-restricted-globals": ["error", "name", "length"],
+    "no-restricted-globals": [
+      "error",
+      "name",
+      "length",
+    ],
     "prefer-arrow-callback": "error",
-    "quotes": ["error", "double", {"allowTemplateLiterals": true}],
+    "quotes": [
+      "error",
+      "double",
+      {"allowTemplateLiterals": true},
+    ],
   },
   overrides: [
     {
@@ -22,6 +30,14 @@ module.exports = {
         mocha: true,
       },
       rules: {},
+    },
+    {
+      files: ["admin_workflow.js"],
+      rules: {
+        "require-jsdoc": "off",
+        "max-len": "off",
+        "quote-props": "off",
+      },
     },
   ],
   globals: {},

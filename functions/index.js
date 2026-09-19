@@ -1294,6 +1294,142 @@ function createAdminRequestPdf({
   });
 }
 
+/**
+ * Envoie l'email standard de confirmation d'une demande d'accès Admin.
+ *
+ * Utilisé aussi bien lors de la première demande que lors d'un renvoi
+ * après correction.
+ *
+ * @param {Object} data Données de la demande.
+ * @param {string} recipientEmail Adresse du destinataire.
+ * @param {string} requestNumber Référence administrative.
+ * @return {Promise<Object>} Résultat Nodemailer.
+ */
+async function sendAdminAccessAcknowledgementEmail(
+    data,
+    recipientEmail,
+    requestNumber,
+) {
+  const greeting = buildAdminGreeting(data);
+  const organisation = buildOrganisationDisplay(data);
+
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: SMTP_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
+
+  return sendSphotMail(transporter, {
+    from: MAIL_FROM,
+    to: recipientEmail,
+    subject:
+        "SPHOT - Confirmation de votre demande d'accès administrateur",
+
+    html: `
+<p>
+  ${escapeHtml(greeting)}
+</p>
+
+<p>
+  Votre demande d'accès à votre SPHOT ADMIN
+  pour <strong>${organisation}</strong> a bien été enregistrée.
+</p>
+
+<div style="
+  margin:26px 0;
+  padding:20px;
+  background:#f3f6fb;
+  border:1px solid #1e3a8a;
+  border-radius:14px;
+">
+  <div style="
+    color:#607d8b;
+    font-size:12px;
+    font-weight:bold;
+    text-transform:uppercase;
+  ">
+    Numéro de demande
+  </div>
+
+  <div style="
+    margin-top:5px;
+    color:#dc2626;
+    font-size:21px;
+    font-weight:bold;
+  ">
+    ${requestNumber}
+  </div>
+</div>
+
+<p style="
+  color:#dc2626;
+  font-size:18px;
+  font-weight:bold;
+">
+  Essai gratuit, sans engagement ni facturation.
+</p>
+
+<p>
+  Après validation de votre demande par l'équipe SPHOT,
+  vous pourrez accéder à votre SPHOT ADMIN
+  afin de créer vos SPHOTS, vos sauveteurs et vos périodes
+  de surveillance.
+
+  Vous recevrez prochainement, par courrier électronique,
+  une réponse vous informant de la décision prise concernant
+  votre demande.
+</p>
+
+<p>
+  La période d'essai gratuite de 8 jours débutera uniquement
+  lorsque votre configuration sera complète et que l'essai
+  aura été activé.
+</p>
+
+<p style="
+  margin-top:28px;
+  padding:16px;
+  background:#fff8e1;
+  border-left:5px solid #ff9800;
+  border-radius:8px;
+">
+  Ce message confirme l'enregistrement de votre demande.
+  Aucun essai ni aucune facturation ne sont en cours à ce stade.
+</p>
+
+<p style="margin-top:34px;">
+  À bientôt sur SPHOT,<br>
+  <strong>L'équipe SPHOT</strong>
+</p>
+`,
+
+    text:
+`${greeting}
+
+Votre demande d'accès à votre SPHOT ADMIN
+pour ${organisation} a bien été enregistrée.
+
+Numéro de demande : ${requestNumber}
+
+Essai gratuit, sans engagement ni facturation.
+
+Après validation de votre demande, vous pourrez accéder à votre SPHOT ADMIN
+afin de créer vos SPHOTS, vos sauveteurs et vos périodes de surveillance.
+
+La période d'essai de 8 jours ne commencera qu'une fois
+ces informations renseignées et l'essai activé.
+
+Ce message confirme l'enregistrement de votre demande.
+Aucun essai ni aucune facturation ne sont en cours à ce stade.
+
+À bientôt sur SPHOT,
+
+L'équipe SPHOT`,
+  });
+}
+
 exports.generateAdminRequestAcknowledgement = onDocumentCreated(
     {
       document: "adminRequests/{requestId}",
@@ -1440,128 +1576,11 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
 
         const downloadUrl = await getDownloadURL(file);
 
-        const greeting = buildAdminGreeting(data);
-
-        const organisation =
-            buildOrganisationDisplay(data);
-
-        const transporter = nodemailer.createTransport({
-          service: "gmail",
-          auth: {
-            user: SMTP_USER,
-            pass: process.env.GMAIL_APP_PASSWORD,
-          },
-        });
-
-        const mailResult = await sendSphotMail(transporter, {
-          from: MAIL_FROM,
-          to: recipientEmail,
-          subject:
-              "SPHOT - Confirmation de votre demande d'accès administrateur",
-
-          html: `
-<p>
-  ${escapeHtml(greeting)}
-</p>
-
-      <p>
-        Votre demande d'accès à votre SPHOT ADMIN
-        pour <strong>${organisation}</strong> a bien été enregistrée.
-      </p>
-
-      <div style="
-        margin:26px 0;
-        padding:20px;
-        background:#f3f6fb;
-        border:1px solid #1e3a8a;
-        border-radius:14px;
-      ">
-        <div style="
-          color:#607d8b;
-          font-size:12px;
-          font-weight:bold;
-          text-transform:uppercase;
-        ">
-          Numéro de demande
-        </div>
-
-        <div style="
-          margin-top:5px;
-          color:#dc2626;
-          font-size:21px;
-          font-weight:bold;
-        ">
-          ${requestNumber}
-        </div>
-      </div>
-
-      <p style="
-        color:#dc2626;
-        font-size:18px;
-        font-weight:bold;
-      ">
-        Essai gratuit, sans engagement ni facturation.
-      </p>
-
-      <p>
-        Après validation de votre demande par l'équipe SPHOT,
-vous pourrez accéder à votre SPHOT ADMIN
-afin de créer vos SPHOTS, vos sauveteurs et vos périodes
-de surveillance.
-
-Vous recevrez prochainement, par courrier électronique,
-une réponse vous informant de la décision prise concernant
-votre demande.
-      </p>
-
-      <p>
-        La période d'essai gratuite de 8 jours débutera uniquement
-lorsque votre configuration sera complète et que l'essai
-aura été activé.
-      </p>
-
-      <p style="
-        margin-top:28px;
-        padding:16px;
-        background:#fff8e1;
-        border-left:5px solid #ff9800;
-        border-radius:8px;
-      ">
-        Ce message confirme l'enregistrement de votre demande.
-        Aucun essai ni aucune facturation ne sont en cours à ce stade.
-      </p>
-
-      <p style="margin-top:34px;">
-        À bientôt sur SPHOT,<br>
-        <strong>L'équipe SPHOT</strong>
-      </p>
-`,
-
-          text:
-`${greeting}
-
-Votre demande d'accès à votre SPHOT ADMIN
-pour ${organisation} a bien été enregistrée.
-
-Numéro de demande : ${requestNumber}
-
-Essai gratuit, sans engagement ni facturation.
-
-Après validation de votre demande, vous pourrez accéder à votre SPHOT ADMIN
-afin de créer vos SPHOTS, vos sauveteurs et vos périodes de surveillance.
-
-La période d'essai de 8 jours ne commencera qu'une fois
-ces informations renseignées et l'essai activé.
-
-Ce message confirme l'enregistrement de votre demande.
-Aucun essai ni aucune facturation ne sont en cours à ce stade.
-
-À bientôt sur SPHOT,
-
-L'équipe SPHOT`,
-
-
-        });
+        const mailResult = await sendAdminAccessAcknowledgementEmail(
+            data,
+            recipientEmail,
+            requestNumber,
+        );
 
         await requestReference.set(
             {
@@ -1647,6 +1666,179 @@ L'équipe SPHOT`,
             },
             {merge: true},
         );
+      }
+    },
+);
+
+/**
+ * Renvoie l'email standard de confirmation lorsque l'administrateur
+ * renvoie son dossier après une demande de correction.
+ */
+exports.sendAdminRequestResubmissionAcknowledgement = onDocumentUpdated(
+    {
+      document: "adminRequests/{requestId}",
+      region: "europe-west1",
+      secrets: ["GMAIL_APP_PASSWORD"],
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const beforeData = event.data.before.data() || {};
+      const afterData = event.data.after.data() || {};
+
+      const beforeCount = Number(
+          beforeData.resubmissionCount || 0,
+      );
+
+      const afterCount = Number(
+          afterData.resubmissionCount || 0,
+      );
+
+      // Aucun nouveau renvoi après correction.
+      if (afterCount <= beforeCount) {
+        return;
+      }
+
+      const requestReference = event.data.after.ref;
+
+      /*
+       * Protection contre les doubles envois en cas de nouvelle
+       * exécution automatique de la Cloud Function.
+       */
+      const claimed = await admin.firestore().runTransaction(
+          async (transaction) => {
+            const freshSnapshot =
+                await transaction.get(requestReference);
+
+            const freshData = freshSnapshot.data() || {};
+
+            const freshCount = Number(
+                freshData.resubmissionCount || 0,
+            );
+
+            const acknowledgementEmail =
+                freshData.acknowledgementEmail || {};
+
+            const lastAcknowledgedCount = Number(
+                acknowledgementEmail.resubmissionCount || 0,
+            );
+
+            if (freshCount <= lastAcknowledgedCount) {
+              return false;
+            }
+
+            transaction.set(
+                requestReference,
+                {
+                  acknowledgementEmail: {
+                    ...acknowledgementEmail,
+                    status: "sending",
+                    resubmissionCount: freshCount,
+                    sentAt: null,
+                    messageId: null,
+                    error: null,
+                    updatedAt:
+                        admin.firestore.FieldValue.serverTimestamp(),
+                  },
+                },
+                {merge: true},
+            );
+
+            return true;
+          },
+      );
+
+      if (!claimed) {
+        return;
+      }
+
+      const profile = afterData.profile || {};
+      const proConnect = afterData.proConnect || {};
+
+      const recipientEmail = cleanValue(
+          profile.email || proConnect.email,
+          "",
+      ).toLowerCase();
+
+      const requestNumber = cleanValue(
+          afterData.requestNumber || event.params.requestId,
+          event.params.requestId,
+      );
+
+      if (!recipientEmail) {
+        await requestReference.set(
+            {
+              acknowledgementEmail: {
+                status: "failed",
+                resubmissionCount: afterCount,
+                sentAt: null,
+                messageId: null,
+                error: "Adresse email du demandeur absente.",
+                updatedAt:
+                    admin.firestore.FieldValue.serverTimestamp(),
+              },
+            },
+            {merge: true},
+        );
+
+        return;
+      }
+
+      try {
+        const mailResult =
+            await sendAdminAccessAcknowledgementEmail(
+                afterData,
+                recipientEmail,
+                requestNumber,
+            );
+
+        await requestReference.set(
+            {
+              acknowledgementEmail: {
+                status: "sent",
+                recipient: recipientEmail,
+                resubmissionCount: afterCount,
+                messageId: mailResult.messageId || null,
+                sentAt:
+                    admin.firestore.FieldValue.serverTimestamp(),
+                error: null,
+                updatedAt:
+                    admin.firestore.FieldValue.serverTimestamp(),
+              },
+
+              lastEvent: {
+                type: "admin_request_resubmission_acknowledgement_sent",
+                category: "administrative",
+                label:
+                    "Confirmation de renvoi de la demande envoyée",
+                createdAt:
+                    admin.firestore.FieldValue.serverTimestamp(),
+                createdByRole: "system",
+              },
+
+              updatedAt:
+                  admin.firestore.FieldValue.serverTimestamp(),
+            },
+            {merge: true},
+        );
+      } catch (error) {
+        await requestReference.set(
+            {
+              acknowledgementEmail: {
+                status: "failed",
+                recipient: recipientEmail,
+                resubmissionCount: afterCount,
+                sentAt: null,
+                messageId: null,
+                error: error.message || error.toString(),
+                updatedAt:
+                    admin.firestore.FieldValue.serverTimestamp(),
+              },
+            },
+            {merge: true},
+        );
+
+        throw error;
       }
     },
 );
@@ -2400,6 +2592,9 @@ exports.sendAdminRequestRejectionEmail = onDocumentUpdated(
           "Des informations doivent être corrigées.",
       );
 
+      const rejectionReasonHtml = escapeHtml(rejectionReason)
+          .replace(/\r\n|\r|\n/g, "<br>");
+
       const correctionUrl =
           `${SPHOT_LOGIN_URL}/#/admin-request-correction` +
           `?requestId=${encodeURIComponent(event.params.requestId)}`;
@@ -2491,7 +2686,7 @@ L'équipe SPHOT`,
       line-height:1.6;
     ">
       <strong>Motif :</strong><br><br>
-      ${rejectionReason}
+      ${rejectionReasonHtml}
     </div>
 
     <p style="font-size:16px;line-height:1.6;">
@@ -3613,8 +3808,614 @@ exports.consumeSuperAdminWebSession = onRequest(
     },
 );
 
+exports.requestAdminReplacement = onRequest(
+    {
+      secrets: ["GMAIL_APP_PASSWORD"],
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      if (request.method !== "POST") {
+        response.status(405).json({
+          success: false,
+          error: "method_not_allowed",
+        });
+        return;
+      }
+
+      try {
+        const body = request.body || {};
+
+        const adminUid = cleanValue(
+            body.adminUid,
+            "",
+        );
+
+        const currentEmail = cleanValue(
+            body.currentEmail,
+            "",
+        ).toLowerCase();
+
+        const currentPassword = cleanValue(
+            body.currentPassword,
+            "",
+        );
+
+        const newCivilite = cleanValue(
+            body.newCivilite,
+            "",
+        );
+
+        const newPrenom = cleanValue(
+            body.newPrenom,
+            "",
+        );
+
+        const newNom = cleanValue(
+            body.newNom,
+            "",
+        ).toUpperCase();
+
+        const newFonction = cleanValue(
+            body.newFonction,
+            "",
+        );
+
+        const newEmail = cleanValue(
+            body.newEmail,
+            "",
+        ).toLowerCase();
+
+        const newTelephone = cleanValue(
+            body.newTelephone,
+            "",
+        );
+
+        if (
+          !adminUid ||
+          !currentEmail ||
+          !currentPassword ||
+          !newPrenom ||
+          !newNom ||
+          !newEmail
+        ) {
+          response.status(400).json({
+            success: false,
+            error: "missing_fields",
+          });
+          return;
+        }
+
+        if (currentEmail === newEmail) {
+          response.status(400).json({
+            success: false,
+            error: "same_email",
+          });
+          return;
+        }
+
+        const db = admin.firestore();
+
+        const currentAccountReference = db
+            .collection("adminAccounts")
+            .doc(currentEmail);
+
+        const newAccountReference = db
+            .collection("adminAccounts")
+            .doc(newEmail);
+
+        const currentAccountSnapshot =
+            await currentAccountReference.get();
+
+        if (!currentAccountSnapshot.exists) {
+          response.status(401).json({
+            success: false,
+            error: "invalid_credentials",
+          });
+          return;
+        }
+
+        const currentAccountData =
+            currentAccountSnapshot.data() || {};
+
+        const currentAccountStatus = cleanValue(
+            currentAccountData.accountStatus,
+            "",
+        ).toUpperCase();
+
+        const storedPassword = cleanValue(
+            currentAccountData.temporaryPassword,
+            "",
+        );
+
+        if (
+          currentAccountStatus !== "ACTIVE" ||
+          storedPassword !== currentPassword
+        ) {
+          response.status(401).json({
+            success: false,
+            error: "invalid_credentials",
+          });
+          return;
+        }
+
+        const storedAdminUid = cleanValue(
+            currentAccountData.adminUid,
+            "",
+        );
+
+        if (
+          storedAdminUid &&
+          storedAdminUid !== adminUid
+        ) {
+          response.status(403).json({
+            success: false,
+            error: "admin_mismatch",
+          });
+          return;
+        }
+
+        const newAccountSnapshot =
+    await newAccountReference.get();
+
+        const newAccountData =
+    newAccountSnapshot.data() || {};
+
+        const newAccountStatus = cleanValue(
+            newAccountData.accountStatus,
+            "",
+        ).toUpperCase();
+
+        const newAccountAdminUid = cleanValue(
+            newAccountData.adminUid,
+            "",
+        );
+
+        const reusableFormerAdmin =
+    newAccountSnapshot.exists &&
+    newAccountStatus === "REPLACED" &&
+    newAccountAdminUid === adminUid;
+
+        if (
+          newAccountSnapshot.exists &&
+  !reusableFormerAdmin
+        ) {
+          response.status(409).json({
+            success: false,
+            error: "email_already_used",
+          });
+          return;
+        }
+
+        const requestId = cleanValue(
+            currentAccountData.requestId || adminUid,
+            adminUid,
+        );
+
+        const territoireId = cleanValue(
+            currentAccountData.territoireId,
+            "",
+        );
+
+        const organisation = cleanValue(
+            currentAccountData.organisation,
+            "votre organisme",
+        );
+
+        const requestNumber = cleanValue(
+            currentAccountData.requestNumber,
+            "",
+        );
+
+        const temporaryPassword =
+            generateAdminTemporaryPassword();
+
+        const now = admin.firestore.Timestamp.now();
+
+        const adminReference = db
+            .collection("admins")
+            .doc(adminUid);
+
+        const requestReference = db
+            .collection("adminRequests")
+            .doc(requestId);
+
+        const [
+          adminSnapshot,
+          requestSnapshot,
+        ] = await Promise.all([
+          adminReference.get(),
+          requestReference.get(),
+        ]);
+
+        const replacementData = {
+          status: "pending_activation",
+          previousEmail: currentEmail,
+          newEmail: newEmail,
+          newCivilite: newCivilite,
+          newPrenom: newPrenom,
+          newNom: newNom,
+          newFonction: newFonction,
+          newTelephone: newTelephone,
+          requestedAt: now,
+          activatedAt: null,
+        };
+
+        const batch = db.batch();
+
+        batch.set(
+            newAccountReference,
+            {
+              login: newEmail,
+              email: newEmail,
+              temporaryPassword: temporaryPassword,
+              mustChangePassword: true,
+              accountStatus: "ACTIVE",
+              role: "ADMIN",
+              adminUid: adminUid,
+              territoireId: territoireId,
+              civilite: newCivilite,
+              prenom: newPrenom,
+              nom: newNom,
+              fonction: newFonction,
+              telephone: newTelephone,
+              organisation: organisation,
+              requestId: requestId,
+              requestNumber: requestNumber,
+
+              replacementPending: true,
+              replacesLogin: currentEmail,
+
+              createdAt:
+    reusableFormerAdmin &&
+    newAccountData.createdAt ?
+      newAccountData.createdAt :
+      now,
+
+              reactivatedAt:
+    reusableFormerAdmin ?
+      now :
+      null,
+
+              reactivatedFormerAdmin:
+    reusableFormerAdmin,
+
+              updatedAt: now,
+            },
+        );
+
+        batch.set(
+            currentAccountReference,
+            {
+              replacementPending: true,
+              replacementTargetLogin: newEmail,
+              replacementRequestedAt: now,
+              updatedAt: now,
+            },
+            {merge: true},
+        );
+
+        if (adminSnapshot.exists) {
+          batch.set(
+              adminReference,
+              {
+                administratorReplacement:
+                    replacementData,
+                updatedAt: now,
+              },
+              {merge: true},
+          );
+        }
+
+        if (requestSnapshot.exists) {
+          batch.set(
+              requestReference,
+              {
+                administratorReplacement:
+                    replacementData,
+                updatedAt: now,
+              },
+              {merge: true},
+          );
+        }
+
+        await batch.commit();
+
+        const transporter =
+            nodemailer.createTransport({
+              service: "gmail",
+              auth: {
+                user: SMTP_USER,
+                pass:
+                    process.env.GMAIL_APP_PASSWORD,
+              },
+            });
+
+        const loginUrl =
+            `${SPHOT_LOGIN_URL}/#/professional-login`;
+
+        try {
+          await sendSphotMail(
+              transporter,
+              {
+                from: MAIL_FROM,
+                to: newEmail,
+                replyTo: "contact@sphot.app",
+                subject:
+                    "SPHOT - Vous devenez administrateur SPHOT",
+
+                text:
+`${newCivilite} ${newNom} bonjour,
+
+Vous avez été désigné(e) comme nouvel administrateur
+du SPHOT ADMIN de ${organisation}.
+
+VOS IDENTIFIANTS DE CONNEXION
+
+Adresse email :
+${newEmail}
+
+Mot de passe provisoire :
+${temporaryPassword}
+
+Lors de votre première connexion, vous devrez
+obligatoirement choisir un nouveau mot de passe.
+
+SE CONNECTER À VOTRE SPHOT ADMIN :
+${loginUrl}
+
+La configuration existante du SPHOT ADMIN,
+ses SPHOTS, ses sauveteurs, ses périodes de surveillance
+et ses informations administratives seront conservés.
+
+À bientôt sur SPHOT,
+
+L'équipe SPHOT`,
+
+                html: `
+<p>
+  ${escapeHtml(newCivilite)}
+  <strong>${escapeHtml(newNom)}</strong> bonjour,
+</p>
+
+<p>
+  Vous avez été désigné(e) comme
+  <strong>nouvel administrateur</strong>
+  du SPHOT ADMIN de
+  <strong>${escapeHtml(organisation)}</strong>.
+</p>
+
+<div style="
+  margin:24px 0;
+  padding:18px;
+  background:#f3f6fb;
+  border:1px solid #1e3a8a;
+  border-radius:12px;
+">
+  <strong>VOS IDENTIFIANTS DE CONNEXION</strong>
+  <br><br>
+
+  Adresse email :<br>
+  <strong>${escapeHtml(newEmail)}</strong>
+  <br><br>
+
+  Mot de passe provisoire :<br>
+  <strong>${escapeHtml(temporaryPassword)}</strong>
+</div>
+
+<p>
+  Lors de votre première connexion,
+  vous devrez obligatoirement choisir
+  un nouveau mot de passe.
+</p>
+
+<div style="text-align:center;margin:30px 0;">
+  <a
+    href="${loginUrl}"
+    style="
+      display:inline-block;
+      padding:15px 28px;
+      border-radius:14px;
+      background:#1e3a8a;
+      color:#ffffff;
+      text-decoration:none;
+      font-weight:900;
+    "
+  >
+    SE CONNECTER À VOTRE SPHOT ADMIN
+  </a>
+</div>
+
+<p>
+  La configuration existante du SPHOT ADMIN,
+  ses SPHOTS, ses sauveteurs,
+  ses périodes de surveillance et ses informations
+  administratives seront conservés.
+</p>
+
+<p>
+  À bientôt sur SPHOT,<br>
+  <strong>L'équipe SPHOT</strong>
+</p>
+`,
+              },
+          );
+        } catch (mailError) {
+          /*
+           * Si l'invitation ne peut pas partir,
+           * on annule la création du successeur.
+           * L'ancien administrateur reste donc actif.
+           */
+          const rollbackBatch = db.batch();
+
+          rollbackBatch.delete(
+              newAccountReference,
+          );
+
+          rollbackBatch.set(
+              currentAccountReference,
+              {
+                replacementPending: false,
+                replacementTargetLogin: null,
+                replacementRequestedAt: null,
+                updatedAt:
+                    admin.firestore.Timestamp.now(),
+              },
+              {merge: true},
+          );
+
+          if (adminSnapshot.exists) {
+            rollbackBatch.set(
+                adminReference,
+                {
+                  administratorReplacement: {
+                    ...replacementData,
+                    status: "invitation_failed",
+                  },
+                  updatedAt:
+                      admin.firestore.Timestamp.now(),
+                },
+                {merge: true},
+            );
+          }
+
+          if (requestSnapshot.exists) {
+            rollbackBatch.set(
+                requestReference,
+                {
+                  administratorReplacement: {
+                    ...replacementData,
+                    status: "invitation_failed",
+                  },
+                  updatedAt:
+                      admin.firestore.Timestamp.now(),
+                },
+                {merge: true},
+            );
+          }
+
+          await rollbackBatch.commit();
+
+          console.error(
+              "Erreur invitation nouvel administrateur:",
+              mailError,
+          );
+
+          response.status(500).json({
+            success: false,
+            error: "invitation_email_failed",
+          });
+          return;
+        }
+
+        /*
+         * Confirmation à l'administrateur actuel.
+         * Une erreur sur ce second mail ne bloque pas
+         * le changement déjà préparé.
+         */
+        try {
+          await sendSphotMail(
+              transporter,
+              {
+                from: MAIL_FROM,
+                to: currentEmail,
+                replyTo: "contact@sphot.app",
+                subject:
+                    "SPHOT - Changement d'administrateur enregistré",
+
+                text:
+`Bonjour,
+
+Votre demande de changement d'administrateur
+pour ${organisation} a bien été enregistrée.
+
+Le nouvel administrateur invité est :
+${newPrenom} ${newNom}
+${newEmail}
+
+Votre accès SPHOT ADMIN reste actif
+jusqu'à l'activation du compte du nouvel administrateur.
+
+Aucune configuration, aucun SPHOT,
+aucun sauveteur ni aucune période de surveillance
+ne sera supprimé lors du transfert.
+
+Cordialement,
+
+L'équipe SPHOT`,
+              },
+          );
+        } catch (confirmationError) {
+          console.error(
+              "Erreur confirmation ancien administrateur:",
+              confirmationError,
+          );
+        }
+
+        const sentAt =
+            admin.firestore.Timestamp.now();
+
+        await newAccountReference.set(
+            {
+              invitationEmailStatus: "sent",
+              invitationEmailSentAt: sentAt,
+              updatedAt: sentAt,
+            },
+            {merge: true},
+        );
+
+        response.status(200).json({
+          success: true,
+          newEmail: newEmail,
+        });
+      } catch (error) {
+        console.error(
+            "Erreur changement administrateur:",
+            error,
+        );
+
+        response.status(500).json({
+          success: false,
+          error: "internal_error",
+        });
+      }
+    },
+);
+
+/**
+ * Met à jour le profil administrateur dans une transaction Firestore.
+ *
+ * @param {Object} transaction Transaction Firestore en cours.
+ * @param {Object|null} reference Référence du document à modifier.
+ * @param {Object|null} snapshot Snapshot du document.
+ * @param {Object} data Données à enregistrer.
+ * @return {void}
+ */
+function finaliseAdministratorProfile(
+    transaction,
+    reference,
+    snapshot,
+    data,
+) {
+  if (!reference || !snapshot || !snapshot.exists) {
+    return;
+  }
+
+  transaction.update(reference, data);
+}
+
 exports.loginAdmin = onRequest(
     {
+      secrets: ["GMAIL_APP_PASSWORD"],
       cpu: 1,
       memory: "256MiB",
     },
@@ -3663,6 +4464,464 @@ exports.loginAdmin = onRequest(
         if (data.temporaryPassword !== password) {
           response.status(401).json({success: false});
           return;
+        }
+
+        /*
+         * Si ce compte est celui d'un administrateur successeur,
+         * sa première connexion valide définitivement le transfert.
+         */
+        if (data.replacementPending === true) {
+          const replacesLogin = cleanValue(
+              data.replacesLogin,
+              "",
+          ).toLowerCase();
+
+          if (replacesLogin) {
+            const db = admin.firestore();
+
+            const currentAccountReference =
+                accountDoc.ref;
+
+            const previousAccountReference = db
+                .collection("adminAccounts")
+                .doc(replacesLogin);
+
+            const adminUid = cleanValue(
+                data.adminUid,
+                "",
+            );
+
+            const requestId = cleanValue(
+                data.requestId || adminUid,
+                adminUid,
+            );
+
+            const adminReference = adminUid ?
+              db.collection("admins").doc(adminUid) :
+              null;
+
+            const requestReference = requestId ?
+              db.collection("adminRequests").doc(requestId) :
+              null;
+
+            const historyReference = db
+                .collection("adminReplacementHistory")
+                .doc();
+
+            const replacementResult = await db.runTransaction(
+                async (transaction) => {
+                  /*
+                   * On relit le compte successeur dans la transaction
+                   * afin d'éviter une double activation.
+                   */
+                  const freshCurrentSnapshot =
+                      await transaction.get(
+                          currentAccountReference,
+                      );
+
+                  if (!freshCurrentSnapshot.exists) {
+                    throw new Error(
+                        "Compte successeur introuvable.",
+                    );
+                  }
+
+                  const freshCurrentData =
+                      freshCurrentSnapshot.data() || {};
+
+                  if (
+                    freshCurrentData.replacementPending !== true
+                  ) {
+                    return {
+                      activated: false,
+                    };
+                  }
+
+                  const previousAccountSnapshot =
+                      await transaction.get(
+                          previousAccountReference,
+                      );
+
+                  let adminSnapshot = null;
+                  let requestSnapshot = null;
+
+                  if (adminReference) {
+                    adminSnapshot =
+                        await transaction.get(
+                            adminReference,
+                        );
+                  }
+
+                  if (requestReference) {
+                    requestSnapshot =
+                        await transaction.get(
+                            requestReference,
+                        );
+                  }
+
+                  const activatedAt =
+                      admin.firestore.Timestamp.now();
+
+                  const newCivilite = cleanValue(
+                      freshCurrentData.civilite,
+                      "",
+                  );
+
+                  const newPrenom = cleanValue(
+                      freshCurrentData.prenom,
+                      "",
+                  );
+
+                  const newNom = cleanValue(
+                      freshCurrentData.nom,
+                      "",
+                  ).toUpperCase();
+
+                  const newFonction = cleanValue(
+                      freshCurrentData.fonction,
+                      "",
+                  );
+
+                  const newTelephone = cleanValue(
+                      freshCurrentData.telephone,
+                      "",
+                  );
+
+                  const newEmail = cleanValue(
+                      freshCurrentData.email ||
+                      freshCurrentData.login,
+                      login,
+                  ).toLowerCase();
+
+                  /*
+                   * Le nouveau compte devient définitivement
+                   * l'administrateur actif.
+                   */
+                  transaction.set(
+                      currentAccountReference,
+                      {
+                        replacementPending: false,
+                        replacementActivatedAt:
+                            activatedAt,
+                        replacementActivatedBy:
+                            "first_login",
+                        updatedAt: activatedAt,
+                      },
+                      {merge: true},
+                  );
+
+                  /*
+                   * L'ancien compte est désactivé.
+                   * Il reste conservé pour la traçabilité.
+                   */
+                  if (previousAccountSnapshot.exists) {
+                    transaction.set(
+                        previousAccountReference,
+                        {
+                          accountStatus: "REPLACED",
+                          replacementPending: false,
+                          replacedByLogin: newEmail,
+                          replacedAt: activatedAt,
+                          updatedAt: activatedAt,
+                        },
+                        {merge: true},
+                    );
+                  }
+
+                  finaliseAdministratorProfile(
+                      transaction,
+                      adminReference,
+                      adminSnapshot,
+                      {
+                        "profile.civilite":
+                            newCivilite,
+                        "profile.prenom":
+                            newPrenom,
+                        "profile.prenomAffiche":
+                            newPrenom,
+                        "profile.nom":
+                            newNom,
+                        "profile.nomAffiche":
+                            newNom,
+                        "profile.fonction":
+                            newFonction,
+                        "profile.email":
+                            newEmail,
+                        "profile.telephone":
+                            newTelephone,
+                        "civilite":
+                            newCivilite,
+                        "prenomResponsable":
+                            newPrenom,
+                        "nomResponsable":
+                            newNom,
+                        "fonction":
+                            newFonction,
+                        "email":
+                            newEmail,
+                        "telephone":
+                            newTelephone,
+                        "administratorReplacement.status":
+                            "activated",
+                        "administratorReplacement.activatedAt":
+                            activatedAt,
+                        "updatedAt":
+                            activatedAt,
+                      },
+                  );
+
+                  finaliseAdministratorProfile(
+                      transaction,
+                      requestReference,
+                      requestSnapshot,
+                      {
+                        "profile.civilite":
+                            newCivilite,
+                        "profile.prenom":
+                            newPrenom,
+                        "profile.prenomAffiche":
+                            newPrenom,
+                        "profile.nom":
+                            newNom,
+                        "profile.nomAffiche":
+                            newNom,
+                        "profile.fonction":
+                            newFonction,
+                        "profile.email":
+                            newEmail,
+                        "profile.telephone":
+                            newTelephone,
+                        "civilite":
+                            newCivilite,
+                        "prenomResponsable":
+                            newPrenom,
+                        "nomResponsable":
+                            newNom,
+                        "fonction":
+                            newFonction,
+                        "email":
+                            newEmail,
+                        "telephone":
+                            newTelephone,
+                        "administratorReplacement.status":
+                            "activated",
+                        "administratorReplacement.activatedAt":
+                            activatedAt,
+                        "updatedAt":
+                            activatedAt,
+                      },
+                  );
+
+                  /*
+                   * Historique indépendant : aucune ancienne
+                   * information n'est écrasée.
+                   */
+                  transaction.set(
+                      historyReference,
+                      {
+                        adminUid: adminUid,
+                        requestId: requestId,
+                        previousEmail:
+                            replacesLogin,
+                        newEmail:
+                            newEmail,
+                        newCivilite:
+                            newCivilite,
+                        newPrenom:
+                            newPrenom,
+                        newNom:
+                            newNom,
+                        newFonction:
+                            newFonction,
+                        newTelephone:
+                            newTelephone,
+                        activatedAt:
+                            activatedAt,
+                        activationMode:
+                            "first_login",
+                      },
+                  );
+                  return {
+                    activated: true,
+                    previousEmail: replacesLogin,
+                    organisation: cleanValue(
+                        freshCurrentData.organisation,
+                        "votre organisme",
+                    ),
+                    newPrenom: newPrenom,
+                    newNom: newNom,
+                    newEmail: newEmail,
+                  };
+                },
+            );
+            if (
+              replacementResult &&
+  replacementResult.activated === true &&
+  replacementResult.previousEmail
+            ) {
+              try {
+                const transporter = nodemailer.createTransport({
+                  service: "gmail",
+                  auth: {
+                    user: SMTP_USER,
+                    pass: process.env.GMAIL_APP_PASSWORD,
+                  },
+                });
+
+                const organisation = cleanValue(
+                    replacementResult.organisation,
+                    "votre organisme",
+                );
+
+                const newPrenom = cleanValue(
+                    replacementResult.newPrenom,
+                    "",
+                );
+
+                const newNom = cleanValue(
+                    replacementResult.newNom,
+                    "",
+                ).toUpperCase();
+
+                const newEmail = cleanValue(
+                    replacementResult.newEmail,
+                    "",
+                );
+
+                await sendSphotMail(transporter, {
+                  from: MAIL_FROM,
+                  to: replacementResult.previousEmail,
+                  replyTo: "contact@sphot.app",
+                  subject:
+          "SPHOT - Changement d'administrateur finalisé",
+
+                  text:
+`Bonjour,
+
+Nous vous confirmons que le changement d'administrateur
+du SPHOT ADMIN de ${organisation} est désormais effectif.
+
+Le nouvel administrateur :
+
+${newPrenom} ${newNom}
+${newEmail}
+
+a activé son accès à SPHOT ADMIN.
+
+Votre accès administrateur est désormais désactivé.
+Vos anciens identifiants ne permettent plus de vous connecter
+à ce SPHOT ADMIN.
+
+L'ensemble de la configuration, des SPHOTS, des sauveteurs,
+des périodes de surveillance et des informations administratives
+a été conservé et reste accessible au nouvel administrateur.
+
+Si vous n'êtes pas à l'origine de cette demande,
+contactez immédiatement l'équipe SPHOT :
+contact@sphot.app
+
+Cordialement,
+
+L'équipe SPHOT`,
+
+                  html: `
+<p>
+  Bonjour,
+</p>
+
+<p>
+  Nous vous confirmons que le changement d'administrateur
+  du SPHOT ADMIN de
+  <strong>${escapeHtml(organisation)}</strong>
+  est désormais <strong>effectif</strong>.
+</p>
+
+<p>
+  Le nouvel administrateur :
+</p>
+
+<div style="
+  margin:20px 0;
+  padding:16px;
+  border-left:4px solid #1e3a8a;
+  border-radius:8px;
+  background:#f3f6fb;
+">
+  <strong>
+    ${escapeHtml(newPrenom)}
+    ${escapeHtml(newNom)}
+  </strong>
+  <br>
+  ${escapeHtml(newEmail)}
+</div>
+
+<p>
+  a activé son accès à SPHOT ADMIN.
+</p>
+
+<div style="
+  margin:20px 0;
+  padding:16px;
+  border-left:4px solid #dc2626;
+  border-radius:8px;
+  background:#fff1f1;
+">
+  <strong>Votre accès administrateur est désormais désactivé.</strong>
+  <br><br>
+  Vos anciens identifiants ne permettent plus de vous connecter
+  à ce SPHOT ADMIN.
+</div>
+
+<p>
+  L'ensemble de la configuration, des SPHOTS, des sauveteurs,
+  des périodes de surveillance et des informations administratives
+  a été conservé et reste accessible au nouvel administrateur.
+</p>
+
+<p>
+  Si vous n'êtes pas à l'origine de cette demande,
+  contactez immédiatement l'équipe SPHOT à l'adresse
+  <a
+    href="mailto:contact@sphot.app"
+    style="color:#1e3a8a;font-weight:700;"
+  >
+    contact@sphot.app
+  </a>.
+</p>
+
+<p>
+  Cordialement,<br>
+  <strong>L'équipe SPHOT</strong>
+</p>
+`,
+                });
+
+                await currentAccountReference.set(
+                    {
+                      replacementCompletionEmailStatus: "sent",
+                      replacementCompletionEmailSentAt:
+              admin.firestore.FieldValue.serverTimestamp(),
+                    },
+                    {merge: true},
+                );
+              } catch (mailError) {
+                console.error(
+                    "Erreur email clôture changement administrateur:",
+                    mailError,
+                );
+
+                await currentAccountReference.set(
+                    {
+                      replacementCompletionEmailStatus: "error",
+                      replacementCompletionEmailError:
+              mailError.toString(),
+                      updatedAt:
+              admin.firestore.FieldValue.serverTimestamp(),
+                    },
+                    {merge: true},
+                );
+              }
+            }
+          }
         }
 
         await accountDoc.ref.set(
@@ -5752,4 +7011,5 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
     },
 );
 
+Object.assign(exports, require("./admin_workflow"));
 

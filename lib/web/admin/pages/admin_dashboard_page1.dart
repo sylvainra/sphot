@@ -13,7 +13,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../../map/map_page.dart';
 import 'package:flutter/services.dart';
-import 'sphot_admin_summary_page.dart';
 import 'admin_subscription_panel.dart';
 import 'admin_statistics_panel.dart';
 
@@ -1884,22 +1883,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       Expanded(
                         child: TextField(
                           controller: firstNameController,
-                          textCapitalization: TextCapitalization.sentences,
-                          onChanged: (value) {
-                            if (value.isEmpty) return;
-
-                            final formattedValue =
-                                value[0].toUpperCase() + value.substring(1);
-
-                            if (formattedValue != value) {
-                              firstNameController.value = TextEditingValue(
-                                text: formattedValue,
-                                selection: TextSelection.collapsed(
-                                  offset: formattedValue.length,
-                                ),
-                              );
-                            }
-                          },
                           style: const TextStyle(color: adminColor),
                           decoration: const InputDecoration(
                             labelText: 'Prénom',
@@ -1913,19 +1896,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       Expanded(
                         child: TextField(
                           controller: lastNameController,
-                          textCapitalization: TextCapitalization.characters,
-                          onChanged: (value) {
-                            final upperValue = value.toUpperCase();
-
-                            if (upperValue != value) {
-                              lastNameController.value = TextEditingValue(
-                                text: upperValue,
-                                selection: TextSelection.collapsed(
-                                  offset: upperValue.length,
-                                ),
-                              );
-                            }
-                          },
                           style: const TextStyle(color: adminColor),
                           decoration: const InputDecoration(
                             labelText: 'Nom',
@@ -1951,20 +1921,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: emailController,
-                    readOnly: true,
-                    enableInteractiveSelection: true,
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: const TextStyle(color: adminColor),
                     decoration: const InputDecoration(
-                      labelText: 'Email de connexion',
+                      labelText: 'Email',
                       labelStyle: TextStyle(color: adminColor),
                       floatingLabelStyle: TextStyle(color: adminColor),
                       prefixIcon: Icon(Icons.email_outlined),
-                      suffixIcon: Icon(Icons.lock_outline_rounded),
-                      helperText:
-                          'L’adresse email est l’identifiant de connexion.',
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1989,20 +1951,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               },
               child: const Text('ANNULER'),
             ),
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(dialogContext).pop({'action': 'replace'});
-              },
-              icon: const Icon(Icons.manage_accounts_outlined),
-              label: const Text(
-                "CHANGER D'ADMINISTRATEUR",
-                style: TextStyle(fontWeight: FontWeight.w900),
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: redColor,
-                side: const BorderSide(color: redColor, width: 1.5),
-              ),
-            ),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: adminColor,
@@ -2010,10 +1958,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ),
               onPressed: () {
                 Navigator.of(dialogContext).pop({
-                  'action': 'save',
                   'prenom': firstNameController.text.trim(),
                   'nom': lastNameController.text.trim(),
                   'fonction': functionController.text.trim(),
+                  'email': emailController.text.trim(),
                   'telephone': phoneController.text.trim(),
                 });
               },
@@ -2038,11 +1986,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       return;
     }
 
-    if (result['action'] == 'replace') {
-      await _openAdminReplacementDialog(currentEmail: currentEmail);
-      return;
-    }
-
     final uid = widget.adminUid.trim();
 
     if (uid.isEmpty) {
@@ -2055,12 +1998,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'profile.nom': result['nom'],
       'profile.nomAffiche': result['nom'],
       'profile.fonction': result['fonction'],
-
+      'profile.email': result['email'],
       'profile.telephone': result['telephone'],
       'prenomResponsable': result['prenom'],
       'nomResponsable': result['nom'],
       'fonction': result['fonction'],
-
+      'email': result['email'],
       'telephone': result['telephone'],
       'updatedAt': FieldValue.serverTimestamp(),
     };
@@ -2099,14 +2042,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           updatedProfile['nom'] = result['nom'];
           updatedProfile['nomAffiche'] = result['nom'];
           updatedProfile['fonction'] = result['fonction'];
-
+          updatedProfile['email'] = result['email'];
           updatedProfile['telephone'] = result['telephone'];
 
           source['profile'] = updatedProfile;
           source['prenomResponsable'] = result['prenom'];
           source['nomResponsable'] = result['nom'];
           source['fonction'] = result['fonction'];
-
+          source['email'] = result['email'];
           source['telephone'] = result['telephone'];
         }
 
@@ -2138,415 +2081,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Impossible d’enregistrer : $error')),
-      );
-    }
-  }
-
-  Future<void> _openAdminReplacementDialog({
-    required String currentEmail,
-  }) async {
-    final firstNameController = TextEditingController();
-    final lastNameController = TextEditingController();
-    final functionController = TextEditingController();
-    final emailController = TextEditingController();
-    final phoneController = TextEditingController();
-    final passwordController = TextEditingController();
-
-    String civilite = 'Monsieur';
-    bool obscurePassword = true;
-
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text(
-                "CHANGER D'ADMINISTRATEUR",
-                style: TextStyle(color: redColor, fontWeight: FontWeight.w900),
-              ),
-              content: SizedBox(
-                width: 560,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: adminColor.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: adminColor.withValues(alpha: 0.30),
-                          ),
-                        ),
-                        child: const Text(
-                          'Le nouvel administrateur recevra '
-                          'ses propres identifiants.\n\n'
-                          'Votre accès actuel restera actif '
-                          'jusqu’à la première connexion du '
-                          'nouvel administrateur.',
-                          style: TextStyle(
-                            color: adminColor,
-                            fontWeight: FontWeight.w700,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-
-                      DropdownButtonFormField<String>(
-                        initialValue: civilite,
-                        decoration: const InputDecoration(
-                          labelText: 'Civilité',
-                          prefixIcon: Icon(Icons.person_outline_rounded),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'Monsieur',
-                            child: Text('Monsieur'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'Madame',
-                            child: Text('Madame'),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          if (value == null) return;
-
-                          setDialogState(() {
-                            civilite = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 12),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: firstNameController,
-                              textCapitalization: TextCapitalization.sentences,
-                              onChanged: (value) {
-                                if (value.isEmpty) return;
-
-                                final formattedValue =
-                                    value[0].toUpperCase() + value.substring(1);
-
-                                if (formattedValue != value) {
-                                  firstNameController.value = TextEditingValue(
-                                    text: formattedValue,
-                                    selection: TextSelection.collapsed(
-                                      offset: formattedValue.length,
-                                    ),
-                                  );
-                                }
-                              },
-                              decoration: const InputDecoration(
-                                labelText: 'Prénom',
-                                prefixIcon: Icon(Icons.person_outline_rounded),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: lastNameController,
-                              textCapitalization: TextCapitalization.characters,
-                              onChanged: (value) {
-                                final upperValue = value.toUpperCase();
-
-                                if (upperValue != value) {
-                                  lastNameController.value = TextEditingValue(
-                                    text: upperValue,
-                                    selection: TextSelection.collapsed(
-                                      offset: upperValue.length,
-                                    ),
-                                  );
-                                }
-                              },
-                              decoration: const InputDecoration(
-                                labelText: 'Nom',
-                                prefixIcon: Icon(Icons.person_outline_rounded),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      TextField(
-                        controller: functionController,
-                        textCapitalization: TextCapitalization.sentences,
-                        onChanged: (value) {
-                          if (value.isEmpty) return;
-
-                          final formattedValue =
-                              value[0].toUpperCase() + value.substring(1);
-
-                          if (formattedValue != value) {
-                            functionController.value = TextEditingValue(
-                              text: formattedValue,
-                              selection: TextSelection.collapsed(
-                                offset: formattedValue.length,
-                              ),
-                            );
-                          }
-                        },
-                        decoration: const InputDecoration(
-                          labelText: 'Fonction',
-                          prefixIcon: Icon(Icons.work_outline_rounded),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      TextField(
-                        controller: emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Nouvelle adresse email',
-                          prefixIcon: Icon(Icons.email_outlined),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      TextField(
-                        controller: phoneController,
-                        keyboardType: TextInputType.phone,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(10),
-                          TextInputFormatter.withFunction((oldValue, newValue) {
-                            final digits = newValue.text.replaceAll(
-                              RegExp(r'\D'),
-                              '',
-                            );
-
-                            final buffer = StringBuffer();
-
-                            for (int i = 0; i < digits.length; i++) {
-                              if (i > 0 && i % 2 == 0) {
-                                buffer.write(' ');
-                              }
-
-                              buffer.write(digits[i]);
-                            }
-
-                            final formatted = buffer.toString();
-
-                            return TextEditingValue(
-                              text: formatted,
-                              selection: TextSelection.collapsed(
-                                offset: formatted.length,
-                              ),
-                            );
-                          }),
-                        ],
-                        decoration: const InputDecoration(
-                          labelText: 'Téléphone',
-                          hintText: '01 02 03 04 05',
-                          prefixIcon: Icon(Icons.phone_outlined),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      const Text(
-                        'CONFIRMATION DU TRANSFERT',
-                        style: TextStyle(
-                          color: redColor,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      TextField(
-                        controller: passwordController,
-                        obscureText: obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: 'Votre mot de passe actuel',
-                          prefixIcon: const Icon(Icons.lock_outline_rounded),
-                          suffixIcon: IconButton(
-                            onPressed: () {
-                              setDialogState(() {
-                                obscurePassword = !obscurePassword;
-                              });
-                            },
-                            icon: Icon(
-                              obscurePassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                  },
-                  child: const Text('ANNULER'),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop({
-                      'civilite': civilite,
-                      'prenom': firstNameController.text.trim(),
-                      'nom': lastNameController.text.trim(),
-                      'fonction': functionController.text.trim(),
-                      'email': emailController.text.trim().toLowerCase(),
-                      'telephone': phoneController.text.trim(),
-                      'password': passwordController.text,
-                    });
-                  },
-                  icon: const Icon(Icons.send_rounded),
-                  label: const Text(
-                    'ENVOYER L’INVITATION',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: redColor,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    firstNameController.dispose();
-    lastNameController.dispose();
-    functionController.dispose();
-    emailController.dispose();
-    phoneController.dispose();
-    passwordController.dispose();
-
-    if (result == null) {
-      return;
-    }
-
-    final newEmail = (result['email'] ?? '').trim().toLowerCase();
-
-    final currentPassword = result['password'] ?? '';
-
-    final emailValid = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(newEmail);
-
-    if ((result['prenom'] ?? '').trim().isEmpty ||
-        (result['nom'] ?? '').trim().isEmpty ||
-        newEmail.isEmpty ||
-        !emailValid ||
-        currentPassword.isEmpty) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Veuillez renseigner le prénom, le nom, '
-            'une adresse email valide et votre mot de passe.',
-          ),
-          backgroundColor: redColor,
-        ),
-      );
-
-      return;
-    }
-
-    if (newEmail == currentEmail.trim().toLowerCase()) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'La nouvelle adresse email doit être différente '
-            'de l’adresse actuelle.',
-          ),
-          backgroundColor: redColor,
-        ),
-      );
-
-      return;
-    }
-
-    try {
-      final response = await http.post(
-        Uri.parse(
-          'https://us-central1-sphot-ab80b.cloudfunctions.net/'
-          'requestAdminReplacement',
-        ),
-        headers: const {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'adminUid': widget.adminUid.trim(),
-          'currentEmail': currentEmail.trim().toLowerCase(),
-          'currentPassword': currentPassword,
-          'newCivilite': result['civilite'],
-          'newPrenom': result['prenom'],
-          'newNom': result['nom'],
-          'newFonction': result['fonction'],
-          'newEmail': newEmail,
-          'newTelephone': result['telephone'],
-        }),
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      if (response.statusCode == 401) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Mot de passe actuel incorrect.'),
-            backgroundColor: redColor,
-          ),
-        );
-        return;
-      }
-
-      if (response.statusCode == 409) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Cette adresse email est déjà utilisée '
-              'par un compte SPHOT.',
-            ),
-            backgroundColor: redColor,
-          ),
-        );
-        return;
-      }
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('Erreur serveur ${response.statusCode}');
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Invitation envoyée à $newEmail. '
-            'Votre accès reste actif jusqu’à sa '
-            'première connexion.',
-          ),
-        ),
-      );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Impossible de préparer le changement '
-            'd’administrateur : $error',
-          ),
-          backgroundColor: redColor,
-        ),
       );
     }
   }
@@ -2739,469 +2273,467 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     return Material(
-      color: Colors.transparent,
-      child: Container(
-        width: 420,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.98),
-          border: Border(
-            left: BorderSide(color: adminColor.withOpacity(0.40), width: 1.5),
-          ),
+  color: Colors.transparent,
+  child: Container(
+    width: 420,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.98),
+        border: Border(
+          left: BorderSide(color: adminColor.withOpacity(0.40), width: 1.5),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // ============================================================
-              // EN-TÊTE
-              // ============================================================
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(20, 18, 12, 18),
-                decoration: BoxDecoration(
-                  color: adminColor.withOpacity(0.07),
-                  border: Border(
-                    bottom: BorderSide(color: adminColor.withOpacity(0.20)),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 62,
-                      height: 62,
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: adminColor, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.10),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: logoUrl.isEmpty
-                            ? const Icon(
-                                Icons.account_balance_rounded,
-                                color: adminColor,
-                                size: 34,
-                              )
-                            : Image.network(
-                                logoUrl,
-                                key: ValueKey<String>(
-                                  'admin-detail-logo-$logoUrl',
-                                ),
-                                width: 52,
-                                height: 52,
-                                fit: BoxFit.contain,
-                                gaplessPlayback: true,
-                                webHtmlElementStrategy:
-                                    WebHtmlElementStrategy.prefer,
-                                errorBuilder:
-                                    (
-                                      BuildContext context,
-                                      Object error,
-                                      StackTrace? stackTrace,
-                                    ) {
-                                      return const Icon(
-                                        Icons.account_balance_rounded,
-                                        color: adminColor,
-                                        size: 34,
-                                      );
-                                    },
-                              ),
-                      ),
-                    ),
-
-                    const SizedBox(width: 14),
-
-                    Expanded(
-                      child: Text(
-                        organisationName.toUpperCase(),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: redColor,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          height: 1.10,
-                        ),
-                      ),
-                    ),
-
-                    IconButton(
-                      tooltip: 'Fermer',
-                      onPressed: () {
-                        setState(() {
-                          _selectedAdmin = null;
-                        });
-                      },
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: adminColor,
-                        size: 27,
-                      ),
-                    ),
-                  ],
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // ============================================================
+            // EN-TÊTE
+            // ============================================================
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 18, 12, 18),
+              decoration: BoxDecoration(
+                color: adminColor.withOpacity(0.07),
+                border: Border(
+                  bottom: BorderSide(color: adminColor.withOpacity(0.20)),
                 ),
               ),
-
-              // ============================================================
-              // CONTENU
-              // ============================================================
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ====================================================
-                      // ADMINISTRATION
-                      // ====================================================
-                      _adminPanelSectionTitle(
-                        icon: Icons.account_balance_rounded,
-                        title: 'ADMINISTRATION',
-                      ),
-
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.fromLTRB(16, 17, 16, 17),
-                        decoration: BoxDecoration(
-                          color: adminColor.withOpacity(0.055),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: adminColor.withOpacity(0.24),
-                            width: 1.2,
-                          ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 62,
+                    height: 62,
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: adminColor, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.10),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
                         ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 46,
-                              height: 46,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: adminColor.withOpacity(0.30),
-                                ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: logoUrl.isEmpty
+                          ? const Icon(
+                              Icons.account_balance_rounded,
+                              color: adminColor,
+                              size: 34,
+                            )
+                          : Image.network(
+                              logoUrl,
+                              key: ValueKey<String>(
+                                'admin-detail-logo-$logoUrl',
                               ),
-                              child: const Icon(
-                                Icons.account_balance_rounded,
-                                color: adminColor,
-                                size: 25,
+                              width: 52,
+                              height: 52,
+                              fit: BoxFit.contain,
+                              gaplessPlayback: true,
+                              webHtmlElementStrategy:
+                                  WebHtmlElementStrategy.prefer,
+                              errorBuilder:
+                                  (
+                                    BuildContext context,
+                                    Object error,
+                                    StackTrace? stackTrace,
+                                  ) {
+                                    return const Icon(
+                                      Icons.account_balance_rounded,
+                                      color: adminColor,
+                                      size: 34,
+                                    );
+                                  },
+                            ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 14),
+
+                  Expanded(
+                    child: Text(
+                      organisationName.toUpperCase(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: redColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        height: 1.10,
+                      ),
+                    ),
+                  ),
+
+                  IconButton(
+                    tooltip: 'Fermer',
+                    onPressed: () {
+                      setState(() {
+                        _selectedAdmin = null;
+                      });
+                    },
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: adminColor,
+                      size: 27,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ============================================================
+            // CONTENU
+            // ============================================================
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ====================================================
+                    // ADMINISTRATION
+                    // ====================================================
+                    _adminPanelSectionTitle(
+                      icon: Icons.account_balance_rounded,
+                      title: 'ADMINISTRATION',
+                    ),
+
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(16, 17, 16, 17),
+                      decoration: BoxDecoration(
+                        color: adminColor.withOpacity(0.055),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: adminColor.withOpacity(0.24),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: adminColor.withOpacity(0.30),
                               ),
                             ),
+                            child: const Icon(
+                              Icons.account_balance_rounded,
+                              color: adminColor,
+                              size: 25,
+                            ),
+                          ),
 
-                            const SizedBox(width: 16),
+                          const SizedBox(width: 16),
 
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (structureType.isNotEmpty) ...[
-                                    Text(
-                                      structureType.toUpperCase(),
-                                      style: const TextStyle(
-                                        color: adminColor,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w900,
-                                        height: 1.15,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                  ],
-
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (structureType.isNotEmpty) ...[
                                   Text(
-                                    organisationName.toUpperCase(),
+                                    structureType.toUpperCase(),
                                     style: const TextStyle(
                                       color: adminColor,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
                                       height: 1.15,
                                     ),
                                   ),
-
-                                  if (siren.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      children: [
-                                        const SizedBox(
-                                          width: 58,
-                                          child: Text(
-                                            'SIREN',
-                                            style: TextStyle(
-                                              color: adminColor,
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w800,
-                                              height: 1.2,
-                                            ),
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: Text(
-                                            siren,
-                                            style: const TextStyle(
-                                              color: adminColor,
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              height: 1.2,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-
-                                  if (siret.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      children: [
-                                        const SizedBox(
-                                          width: 58,
-                                          child: Text(
-                                            'SIRET',
-                                            style: TextStyle(
-                                              color: adminColor,
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w800,
-                                              height: 1.2,
-                                            ),
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: Text(
-                                            siret,
-                                            style: const TextStyle(
-                                              color: adminColor,
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              height: 1.2,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                                  const SizedBox(height: 8),
                                 ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
 
-                      const SizedBox(height: 18),
-
-                      // ====================================================
-                      // ADMINISTRATEUR
-                      // ====================================================
-                      _adminPanelSectionTitle(
-                        icon: Icons.person_outline_rounded,
-                        title: 'ADMINISTRATEUR',
-                      ),
-
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: adminColor.withOpacity(0.055),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: adminColor.withOpacity(0.20),
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: adminColor.withOpacity(0.35),
+                                Text(
+                                  organisationName.toUpperCase(),
+                                  style: const TextStyle(
+                                    color: adminColor,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.15,
+                                  ),
                                 ),
-                              ),
-                              child: const Icon(
-                                Icons.person_rounded,
-                                color: adminColor,
-                                size: 24,
-                              ),
-                            ),
 
-                            const SizedBox(width: 12),
-
-                            Expanded(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
+                                if (siren.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
                                   Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
-                                      Expanded(
+                                      const SizedBox(
+                                        width: 58,
                                         child: Text(
-                                          identiteAdministrateur.isNotEmpty
-                                              ? identiteAdministrateur
-                                              : 'Nom et prénom non renseignés',
-                                          style: const TextStyle(
+                                          'SIREN',
+                                          style: TextStyle(
                                             color: adminColor,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w900,
-                                            height: 1.15,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                            height: 1.2,
                                           ),
                                         ),
                                       ),
-
-                                      IconButton(
-                                        tooltip: 'Modifier l’administrateur',
-                                        visualDensity: VisualDensity.compact,
-                                        onPressed: () {
-                                          _editAdminReferent(
-                                            currentFirstName: prenom,
-                                            currentLastName: nom,
-                                            currentFunction: fonction,
-                                            currentEmail: email,
-                                            currentPhone: telephone,
-                                          );
-                                        },
-                                        icon: const Icon(
-                                          Icons.edit_rounded,
-                                          color: redColor,
-                                          size: 19,
+                                      Expanded(
+                                        child: Text(
+                                          siren,
+                                          style: const TextStyle(
+                                            color: adminColor,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1.2,
+                                          ),
                                         ),
                                       ),
                                     ],
                                   ),
+                                ],
 
-                                  if (fonction.isNotEmpty) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      fonction,
-                                      style: const TextStyle(
-                                        color: adminColor,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        height: 1.2,
+                                if (siret.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      const SizedBox(
+                                        width: 58,
+                                        child: Text(
+                                          'SIRET',
+                                          style: TextStyle(
+                                            color: adminColor,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                            height: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Text(
+                                          siret,
+                                          style: const TextStyle(
+                                            color: adminColor,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    // ====================================================
+                    // ADMINISTRATEUR
+                    // ====================================================
+                    _adminPanelSectionTitle(
+                      icon: Icons.person_outline_rounded,
+                      title: 'ADMINISTRATEUR',
+                    ),
+
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: adminColor.withOpacity(0.055),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: adminColor.withOpacity(0.20)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: adminColor.withOpacity(0.35),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.person_rounded,
+                              color: adminColor,
+                              size: 24,
+                            ),
+                          ),
+
+                          const SizedBox(width: 12),
+
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        identiteAdministrateur.isNotEmpty
+                                            ? identiteAdministrateur
+                                            : 'Nom et prénom non renseignés',
+                                        style: const TextStyle(
+                                          color: adminColor,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w900,
+                                          height: 1.15,
+                                        ),
+                                      ),
+                                    ),
+
+                                    IconButton(
+                                      tooltip: 'Modifier l’administrateur',
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: () {
+                                        _editAdminReferent(
+                                          currentFirstName: prenom,
+                                          currentLastName: nom,
+                                          currentFunction: fonction,
+                                          currentEmail: email,
+                                          currentPhone: telephone,
+                                        );
+                                      },
+                                      icon: const Icon(
+                                        Icons.edit_rounded,
+                                        color: redColor,
+                                        size: 19,
                                       ),
                                     ),
                                   ],
+                                ),
 
-                                  if (email.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.email_outlined,
-                                          color: adminColor,
-                                          size: 17,
-                                        ),
-                                        const SizedBox(width: 7),
-                                        Expanded(
-                                          child: Text(
-                                            email,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              color: adminColor,
-                                              decoration: TextDecoration.none,
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              height: 1.2,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                if (fonction.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    fonction,
+                                    style: const TextStyle(
+                                      color: adminColor,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.2,
                                     ),
-                                  ],
-
-                                  if (telephone.isNotEmpty) ...[
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.phone_outlined,
-                                          color: adminColor,
-                                          size: 17,
-                                        ),
-                                        const SizedBox(width: 7),
-                                        Expanded(
-                                          child: Text(
-                                            telephone,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              color: adminColor,
-                                              decoration: TextDecoration.none,
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              height: 1.2,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                                  ),
                                 ],
-                              ),
+
+                                if (email.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.email_outlined,
+                                        color: adminColor,
+                                        size: 17,
+                                      ),
+                                      const SizedBox(width: 7),
+                                      Expanded(
+                                        child: Text(
+                                          email,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: adminColor,
+                                            decoration: TextDecoration.none,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+
+                                if (telephone.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.phone_outlined,
+                                        color: adminColor,
+                                        size: 17,
+                                      ),
+                                      const SizedBox(width: 7),
+                                      Expanded(
+                                        child: Text(
+                                          telephone,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: adminColor,
+                                            decoration: TextDecoration.none,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
+                    ),
 
-                      const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                      // ====================================================
-                      // ADRESSES INTERNET
-                      // ====================================================
-                      _adminPanelSectionTitle(
-                        icon: Icons.public_rounded,
-                        title: 'ADRESSES INTERNET',
-                      ),
+                    // ====================================================
+                    // ADRESSES INTERNET
+                    // ====================================================
+                    _adminPanelSectionTitle(
+                      icon: Icons.public_rounded,
+                      title: 'ADRESSES INTERNET',
+                    ),
 
-                      buildInternetTile(
-                        icon: Icons.language_rounded,
-                        label: 'SITE OFFICIEL',
-                        url: siteInternetVille,
-                        onEdit: () {
-                          _editAdminTerritoryLink(
-                            fieldName: 'siteInternetVille',
-                            dialogTitle:
-                                "Modifier l'adresse internet du site officiel",
-                            currentValue: siteInternetVille,
-                          );
-                        },
-                      ),
+                    buildInternetTile(
+                      icon: Icons.language_rounded,
+                      label: 'SITE OFFICIEL',
+                      url: siteInternetVille,
+                      onEdit: () {
+                        _editAdminTerritoryLink(
+                          fieldName: 'siteInternetVille',
+                          dialogTitle:
+                              "Modifier l'adresse internet du site officiel",
+                          currentValue: siteInternetVille,
+                        );
+                      },
+                    ),
 
-                      buildInternetTile(
-                        icon: Icons.menu_book_rounded,
-                        label: 'RÈGLEMENT DE BAIGNADE',
-                        url: regulatoryDocumentUrl,
-                        onEdit: () {
-                          _editAdminTerritoryLink(
-                            fieldName: 'reglementsBaignade',
-                            dialogTitle:
-                                "Modifier l'adresse internet du règlement de baignade",
-                            currentValue: regulatoryDocumentUrl,
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                    buildInternetTile(
+                      icon: Icons.menu_book_rounded,
+                      label: 'RÈGLEMENT DE BAIGNADE',
+                      url: regulatoryDocumentUrl,
+                      onEdit: () {
+                        _editAdminTerritoryLink(
+                          fieldName: 'reglementsBaignade',
+                          dialogTitle:
+                              "Modifier l'adresse internet du règlement de baignade",
+                          currentValue: regulatoryDocumentUrl,
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+            ),
+          ],
+              ),
+    ),
+  ),
+);
+}
 
   Future<Map<String, dynamic>> _loadTrialSummaryData() async {
     final territoireId = _resolvedTerritoireId;
@@ -4046,9 +3578,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Votre demande de période d’essai gratuite SPHOT ADMIN a été envoyée. Un email de confirmation vous a été adressé.',
-          ),
+          content: Text('Votre demande d’essai gratuit a été envoyée.'),
           backgroundColor: adminColor,
         ),
       );
@@ -4171,7 +3701,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       children: [
                         Text(
                           isSidePanel
-                              ? 'ESPACE SPHOT ADMIN'
+                              ? 'ESPACE ADMIN SPHOT'
                               : 'ESSAI GRATUIT 8 JOURS',
                           style: const TextStyle(
                             color: adminColor,
@@ -4293,10 +3823,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           );
                         }).toList(),
                       ),
-                    if (isSidePanel) ...[
-                      const SizedBox(height: 22),
-                      _buildSphotAdminSummaryAccess(),
-                    ],
                   ],
                 ),
               ),
@@ -4508,91 +4034,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
     });
-  }
-
-  Future<void> _openSphotAdminSummaryPage() async {
-    if (_resolvedTerritoireId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Le territoire doit être chargé avant d’ouvrir la fiche récapitulative.',
-          ),
-          backgroundColor: redColor,
-        ),
-      );
-      return;
-    }
-
-    try {
-      final summary = await _loadTrialSummaryData();
-      if (!mounted) return;
-
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (context) => SphotAdminSummaryPage(summary: summary),
-        ),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Ouverture de la fiche récapitulative impossible : $error',
-          ),
-          backgroundColor: redColor,
-        ),
-      );
-    }
-  }
-
-  Widget _buildSphotAdminSummaryAccess() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: _openSphotAdminSummaryPage,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: adminColor.withOpacity(0.055),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: adminColor.withOpacity(0.32), width: 1.2),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.description_outlined, color: adminColor, size: 26),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'SPHOT ADMIN – FICHE RÉCAPITULATIVE',
-                      style: TextStyle(
-                        color: adminColor,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    SizedBox(height: 3),
-                    Text(
-                      'Consulter et imprimer le récapitulatif du SPHOT.',
-                      style: TextStyle(
-                        color: adminColor,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right_rounded, color: adminColor),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   void _closeTrialSummaryDialogBeforeEditing() {
@@ -4954,9 +4395,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Widget _buildBillingDocumentsPanel() {
-    final administrativeReference = _currentAdministrativeReference();
+  final administrativeReference =
+      _currentAdministrativeReference();
 
-    return Container(
+  return Container(
       width: 430,
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.98),
@@ -4980,51 +4422,49 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   child: ListView(
                     padding: const EdgeInsets.all(20),
                     children: [
-                      _buildSphotAdminSummaryAccess(),
-                      const SizedBox(height: 12),
                       if (administrativeReference.isNotEmpty) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: adminColor.withOpacity(0.06),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: adminColor.withOpacity(0.30),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'RÉFÉRENCE ADMINISTRATIVE',
-                                style: TextStyle(
-                                  color: pendingColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                administrativeReference,
-                                style: const TextStyle(
-                                  color: redColor,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
+  Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 12,
+    ),
+    decoration: BoxDecoration(
+      color: adminColor.withOpacity(0.06),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(
+        color: adminColor.withOpacity(0.30),
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'RÉFÉRENCE ADMINISTRATIVE',
+          style: TextStyle(
+            color: pendingColor,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          administrativeReference,
+          style: const TextStyle(
+            color: redColor,
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    ),
+  ),
+  const SizedBox(height: 12),
+],
 
-                      _buildCommercialSection(
-                        icon: Icons.request_quote_outlined,
-                        title: 'DEVIS',
+_buildCommercialSection(
+  icon: Icons.request_quote_outlined,
+  title: 'DEVIS',
                         description:
                             'Les devis générés pour votre organisme apparaîtront ici.',
                         status: 'AUCUN DOCUMENT',
@@ -5070,7 +4510,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }) {
     return Container(
       width: 360,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: 14,
+      ),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.96),
         border: Border(
@@ -5160,13 +4603,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             titleFontSize: 17,
                             titleLetterSpacing: 0.8,
                             showValue: false,
-                            isActive:
-                                _showSauveteurEditorPanel ||
+                            isActive: _showSauveteurEditorPanel ||
                                 _showSauveteursManagementPanel,
                             onTap: _openNewSauveteurEditor,
                           ),
                           _summaryCard(
-                            title: 'ESPACE SPHOT ADMIN',
+                            title: 'ESPACE ADMIN SPHOT',
                             value: '',
                             color: adminColor,
                             iconPath: 'data/icons/fire_red_icon.svg',
@@ -5187,8 +4629,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             titleLetterSpacing: 0.8,
                             showValue: false,
                             grayscaleIcon: !canRequestTrial,
-                            isActive:
-                                canRequestTrial && _trialSummaryDialogOpen,
+                            isActive: canRequestTrial &&
+                                _trialSummaryDialogOpen,
                             onTap: canRequestTrial
                                 ? _openTrialSummaryDialog
                                 : null,
@@ -6486,7 +5928,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _clearSauveteurEditor();
       });
 
-      // Ferme MODIFIER LE SAUVETEUR et ouvre ESPACE SPHOT ADMIN.
+      // Ferme MODIFIER LE SAUVETEUR et ouvre ESPACE ADMIN SPHOT.
       _openTrialSummaryPanel();
     } catch (error) {
       if (!mounted) {
@@ -6509,13 +5951,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _selectedSphotLabels.clear();
 
     _sphotIdController.clear();
-    _sphotNameController.clear();
-    _sphotLatController.clear();
-    _sphotLngController.clear();
-    _sphotOtherTypeController.clear();
-    _sphotOtherEquipmentController.clear();
-    _sphotOtherLabelController.clear();
-    _sphotWebcamUrlController.clear();
+_sphotNameController.clear();
+_sphotLatController.clear();
+_sphotLngController.clear();
+_sphotOtherTypeController.clear();
+_sphotOtherEquipmentController.clear();
+_sphotOtherLabelController.clear();
+_sphotWebcamUrlController.clear();
   }
 
   void _openNewSphotEditor() {
@@ -6817,8 +6259,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _selectedSphotType = _cleanText(data['typeSphot']);
 
       _sphotOtherTypeController.text = _cleanText(
-        data['autreTypeSphot'] ?? data['typeSphotAutre'],
-      );
+  data['autreTypeSphot'] ??
+      data['typeSphotAutre'],
+);
 
       _selectedSphotEquipments
         ..clear()
@@ -6918,11 +6361,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         (lat == 0 && lng == 0)) {
       errorMessage = 'Positionnez le SPHOT sur la carte.';
     } else if (_selectedSphotType.isEmpty) {
-      errorMessage = 'Sélectionnez le type de SPHOT.';
-    } else if (_selectedSphotType == 'AUTRE' &&
-        _sphotOtherTypeController.text.trim().isEmpty) {
-      errorMessage = 'Précisez l’autre type de SPHOT.';
-    } else if (_selectedSphotEquipments.contains('AUTRE') &&
+  errorMessage = 'Sélectionnez le type de SPHOT.';
+} else if (_selectedSphotType == 'AUTRE' &&
+    _sphotOtherTypeController.text.trim().isEmpty) {
+  errorMessage =
+      'Précisez l’autre type de SPHOT.';
+} else if (_selectedSphotEquipments.contains('AUTRE') &&
         _sphotOtherEquipmentController.text.trim().isEmpty) {
       errorMessage = 'Précisez l’autre équipement du SPHOT.';
     } else if (_selectedSphotLabels.contains('AUTRE') &&
@@ -6968,11 +6412,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         'nomSphot': _sphotNameController.text.trim(),
         'typeSphot': _selectedSphotType,
 
-        'autreTypeSphot': _selectedSphotType == 'AUTRE'
-            ? _sphotOtherTypeController.text.trim()
-            : '',
+'autreTypeSphot':
+    _selectedSphotType == 'AUTRE'
+        ? _sphotOtherTypeController.text.trim()
+        : '',
 
-        'isPosteSecours': _selectedSphotType == '🚨 POSTE DE SECOURS 🚨',
+'isPosteSecours':
+    _selectedSphotType == '🚨 POSTE DE SECOURS 🚨',
         'sphotLat': lat,
         'sphotLng': lng,
         'equipement': _selectedSphotEquipments.join(' | '),
@@ -7355,36 +6801,39 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _sphotTypeLabel(String type, {double fontSize = 14}) {
+  Widget _sphotTypeLabel(
+    String type, {
+    double fontSize = 14,
+  }) {
     if (type == _rescueStationType) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Transform.scale(
-            scaleX: 0.4,
-            scaleY: 0.7,
-            alignment: Alignment.centerLeft,
-            child: AdaptiveAssetImage(
-              _rescueStationFlagAsset,
-              width: 13,
-              height: 20,
-              fit: BoxFit.contain,
-            ),
-          ),
+  scaleX: 0.4,
+  scaleY: 0.7,
+  alignment: Alignment.centerLeft,
+  child: AdaptiveAssetImage(
+    _rescueStationFlagAsset,
+    width: 13,
+    height: 20,
+    fit: BoxFit.contain,
+  ),
+),
           Flexible(
-            child: Transform.translate(
-              offset: const Offset(-13, 0),
-              child: Text(
-                'POSTE DE SECOURS',
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: adminColor,
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
+  child: Transform.translate(
+    offset: const Offset(-13, 0),
+    child: Text(
+      'POSTE DE SECOURS',
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: adminColor,
+        fontSize: fontSize,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  ),
+),
         ],
       );
     }
@@ -7401,24 +6850,27 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   void _openSphotTypeMenu() {
+  _dropdownOverlay?.remove();
+  _dropdownOverlay = null;
+
+  final renderBox =
+      _sphotTypeKey.currentContext!.findRenderObject()
+          as RenderBox;
+
+  final position =
+      renderBox.localToGlobal(Offset.zero);
+
+  final size = renderBox.size;
+  final scrollController = ScrollController();
+
+  void closeMenu() {
     _dropdownOverlay?.remove();
     _dropdownOverlay = null;
+  }
 
-    final renderBox =
-        _sphotTypeKey.currentContext!.findRenderObject() as RenderBox;
-
-    final position = renderBox.localToGlobal(Offset.zero);
-
-    final size = renderBox.size;
-    final scrollController = ScrollController();
-
-    void closeMenu() {
-      _dropdownOverlay?.remove();
-      _dropdownOverlay = null;
-    }
-
-    void scrollToOtherField() {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+  void scrollToOtherField() {
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) {
         if (!scrollController.hasClients) {
           return;
         }
@@ -7428,198 +6880,241 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
-      });
-    }
+      },
+    );
+  }
 
-    _dropdownOverlay = OverlayEntry(
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, overlaySetState) {
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: closeMenu,
-                    child: Container(color: Colors.transparent),
+  _dropdownOverlay = OverlayEntry(
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, overlaySetState) {
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: closeMenu,
+                  child: Container(
+                    color: Colors.transparent,
                   ),
                 ),
-                Positioned(
-                  left: position.dx,
-                  top: position.dy + size.height - 12,
-                  width: size.width,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: Container(
-                      constraints: const BoxConstraints(maxHeight: 290),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.97),
-                        border: const Border(
-                          left: BorderSide(color: adminColor, width: 1.4),
-                          right: BorderSide(color: adminColor, width: 1.4),
-                          bottom: BorderSide(color: adminColor, width: 1.4),
+              ),
+              Positioned(
+                left: position.dx,
+                top: position.dy + size.height - 12,
+                width: size.width,
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    constraints: const BoxConstraints(
+                      maxHeight: 290,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.97),
+                      border: const Border(
+                        left: BorderSide(
+                          color: adminColor,
+                          width: 1.4,
                         ),
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(10),
-                          bottomRight: Radius.circular(10),
+                        right: BorderSide(
+                          color: adminColor,
+                          width: 1.4,
                         ),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 8,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
+                        bottom: BorderSide(
+                          color: adminColor,
+                          width: 1.4,
+                        ),
                       ),
-                      child: ScrollbarTheme(
-                        data: const ScrollbarThemeData(
-                          thumbColor: MaterialStatePropertyAll<Color>(
-                            adminColor,
-                          ),
-                          thumbVisibility: MaterialStatePropertyAll<bool>(true),
-                          thickness: MaterialStatePropertyAll<double>(9),
-                          radius: Radius.circular(10),
+                      borderRadius:
+                          const BorderRadius.only(
+                        bottomLeft: Radius.circular(10),
+                        bottomRight: Radius.circular(10),
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 8,
+                          offset: Offset(0, 4),
                         ),
-                        child: Scrollbar(
+                      ],
+                    ),
+                    child: ScrollbarTheme(
+                      data: const ScrollbarThemeData(
+                        thumbColor:
+                            MaterialStatePropertyAll<Color>(
+                          adminColor,
+                        ),
+                        thumbVisibility:
+                            MaterialStatePropertyAll<bool>(
+                          true,
+                        ),
+                        thickness:
+                            MaterialStatePropertyAll<double>(
+                          9,
+                        ),
+                        radius: Radius.circular(10),
+                      ),
+                      child: Scrollbar(
+                        controller: scrollController,
+                        thumbVisibility: true,
+                        thickness: 9,
+                        radius: const Radius.circular(10),
+                        child: ListView.builder(
                           controller: scrollController,
-                          thumbVisibility: true,
-                          thickness: 9,
-                          radius: const Radius.circular(10),
-                          child: ListView.builder(
-                            controller: scrollController,
-                            primary: false,
-                            padding: EdgeInsets.zero,
-                            shrinkWrap: true,
-                            itemCount: _sphotTypeChoices.length,
-                            itemBuilder: (context, index) {
-                              final choice = _sphotTypeChoices[index];
+                          primary: false,
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount:
+                              _sphotTypeChoices.length,
+                          itemBuilder: (context, index) {
+                            final choice =
+                                _sphotTypeChoices[index];
 
-                              final selected = _selectedSphotType == choice;
+                            final selected =
+                                _selectedSphotType ==
+                                    choice;
 
-                              final showOtherField =
-                                  choice == 'AUTRE' && selected;
+                            final showOtherField =
+                                choice == 'AUTRE' &&
+                                    selected;
 
-                              return Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  InkWell(
-                                    onTap: () {
-                                      if (choice == 'AUTRE') {
-                                        setState(() {
-                                          _selectedSphotType = 'AUTRE';
-                                        });
-
-                                        overlaySetState(() {});
-                                        scrollToOtherField();
-                                        return;
-                                      }
-
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                InkWell(
+                                  onTap: () {
+                                    if (choice ==
+                                        'AUTRE') {
                                       setState(() {
-                                        _selectedSphotType = choice;
-
-                                        _sphotOtherTypeController.clear();
+                                        _selectedSphotType =
+                                            'AUTRE';
                                       });
 
-                                      closeMenu();
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 14,
-                                        vertical: 9,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: _sphotTypeLabel(
-                                              choice,
-                                              fontSize: 13,
-                                            ),
+                                      overlaySetState(() {});
+                                      scrollToOtherField();
+                                      return;
+                                    }
+
+                                    setState(() {
+                                      _selectedSphotType =
+                                          choice;
+
+                                      _sphotOtherTypeController
+                                          .clear();
+                                    });
+
+                                    closeMenu();
+                                  },
+                                  child: Padding(
+                                    padding:
+                                        const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 9,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: _sphotTypeLabel(
+                                            choice,
+                                            fontSize: 13,
                                           ),
-                                          if (selected)
-                                            const Icon(
-                                              Icons.check_rounded,
-                                              color: redColor,
-                                              size: 20,
-                                            ),
-                                        ],
-                                      ),
+                                        ),
+                                        if (selected)
+                                          const Icon(
+                                            Icons
+                                                .check_rounded,
+                                            color: redColor,
+                                            size: 20,
+                                          ),
+                                      ],
                                     ),
                                   ),
+                                ),
 
-                                  // Champ placé dans le menu,
-                                  // directement sous AUTRE.
-                                  if (showOtherField)
-                                    Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        14,
-                                        0,
-                                        16,
-                                        10,
-                                      ),
-                                      child: TextField(
-                                        controller: _sphotOtherTypeController,
-                                        autofocus: true,
-                                        textCapitalization:
-                                            TextCapitalization.sentences,
-                                        onSubmitted: (_) {
-                                          closeMenu();
-                                        },
-                                        decoration: InputDecoration(
-                                          labelText: 'Précisez :',
-                                          isDense: true,
-                                          filled: true,
-                                          fillColor: adminColor.withOpacity(
-                                            0.035,
+                                // Champ placé dans le menu,
+                                // directement sous AUTRE.
+                                if (showOtherField)
+                                  Padding(
+                                    padding:
+                                        const EdgeInsets.fromLTRB(
+                                      14,
+                                      0,
+                                      16,
+                                      10,
+                                    ),
+                                    child: TextField(
+                                      controller:
+                                          _sphotOtherTypeController,
+                                      autofocus: true,
+                                      textCapitalization:
+                                          TextCapitalization
+                                              .sentences,
+                                      onSubmitted: (_) {
+                                        closeMenu();
+                                      },
+                                      decoration:
+                                          InputDecoration(
+                                        labelText:
+                                            'Précisez :',
+                                        isDense: true,
+                                        filled: true,
+                                        fillColor: adminColor
+                                            .withOpacity(0.035),
+                                        contentPadding:
+                                            const EdgeInsets
+                                                .symmetric(
+                                          horizontal: 12,
+                                          vertical: 10,
+                                        ),
+                                        enabledBorder:
+                                            OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius
+                                                  .circular(10),
+                                          borderSide:
+                                              BorderSide(
+                                            color: adminColor
+                                                .withOpacity(
+                                              0.55,
+                                            ),
                                           ),
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                horizontal: 12,
-                                                vertical: 10,
-                                              ),
-                                          enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                            borderSide: BorderSide(
-                                              color: adminColor.withOpacity(
-                                                0.55,
-                                              ),
-                                            ),
-                                          ),
-                                          focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                            borderSide: const BorderSide(
-                                              color: adminColor,
-                                              width: 1.7,
-                                            ),
+                                        ),
+                                        focusedBorder:
+                                            OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius
+                                                  .circular(10),
+                                          borderSide:
+                                              const BorderSide(
+                                            color: adminColor,
+                                            width: 1.7,
                                           ),
                                         ),
                                       ),
                                     ),
-                                ],
-                              );
-                            },
-                          ),
+                                  ),
+                              ],
+                            );
+                          },
                         ),
                       ),
                     ),
                   ),
                 ),
-              ],
-            );
-          },
-        );
-      },
-    );
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
 
-    Overlay.of(context).insert(_dropdownOverlay!);
+  Overlay.of(context).insert(_dropdownOverlay!);
 
-    if (_selectedSphotType == 'AUTRE') {
-      scrollToOtherField();
-    }
+  if (_selectedSphotType == 'AUTRE') {
+    scrollToOtherField();
   }
+}
 
   void _openSphotMultiChoiceMenu({
     required GlobalKey fieldKey,
@@ -9670,7 +9165,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final lat = double.tryParse(_sphotLatController.text.trim());
     final lng = double.tryParse(_sphotLngController.text.trim());
     final hasPosition = lat != null && lng != null;
-
+    
     return Container(
       width: 430,
       decoration: BoxDecoration(
@@ -9910,7 +9405,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
                       child: Row(
                         children: [
-                          Expanded(child: _sphotTypeLabel(_selectedSphotType)),
+                          Expanded(
+                            child: _sphotTypeLabel(_selectedSphotType),
+                          ),
 
                           const Icon(
                             Icons.keyboard_arrow_down_rounded,
@@ -13108,32 +12605,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         trialRequest['requestedAt'] != null ||
                         trialRequestStatus.isNotEmpty;
 
-                    final subscriptionStatus = _cleanText(
-                      currentSubscription?['status'],
-                    ).toLowerCase();
-
-                    final administrativeStatus = _cleanText(
-                      currentAdminRequest?['status'],
-                    ).toLowerCase();
-
-                    final accessPhase = _cleanText(
-                      currentAdminRequest?['accessPhase'],
-                    ).toLowerCase();
-
-                    final hasConfigurationAccess =
-                        administrativeStatus == 'approved' &&
-                        (accessPhase.isEmpty ||
-                            accessPhase == 'configuration_access');
-
-                    final subscriptionAllowsTrialRequest =
-                        currentSubscription == null ||
-                        subscriptionStatus.isEmpty ||
-                        subscriptionStatus == 'awaiting_configuration';
-
+                    // Une demande antérieure ou n’importe quel abonnement existant
+                    // interdit définitivement une nouvelle période d’essai.
                     final canRequestTrial =
-                        hasConfigurationAccess &&
                         !hasAlreadyRequestedTrial &&
-                        subscriptionAllowsTrialRequest;
+                        currentSubscription == null;
 
                     // Conservation du suivi temporel déjà présent dans le dashboard.
                     final rawTrialEndDate =

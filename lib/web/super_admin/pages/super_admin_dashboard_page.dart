@@ -16,6 +16,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'dart:async';
 
+import '../widgets/super_admin_admin_workflow_panel.dart';
+
 enum DashboardSpotFilter {
   none,
   all,
@@ -70,13 +72,25 @@ class SuperAdminDashboardPage extends StatefulWidget {
       _SuperAdminDashboardPageState();
 }
 
-class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
-  static const Color adminColor = Color(0xFF1E3A8A);
-  static const Color redColor = Color(0xFFDC2626);
+class _SuperAdminDashboardPageState
+    extends State<SuperAdminDashboardPage> {
 
-  final MapController _mapController = MapController();
+  static const Color adminColor =
+      Color(0xFF1E3A8A);
+
+  static const Color redColor =
+      Color(0xFFDC2626);
+
+  static const String _rescueStationTypeAsset =
+      'data/icons/flag_red_yellow_5x3.svg';
+
+  final MapController _mapController =
+      MapController();
   final ScrollController _leftPanelScrollController = ScrollController();
   Timer? _mapMovementTimer;
+  DateTime? _lastSpotMarkerInteraction;
+  final Map<String, Future<Map<String, dynamic>>>
+    _spotSupervisionFutures = {};
 
   int _selectedTileStyle = 0;
 
@@ -1072,40 +1086,55 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   }
 
   Marker _buildSpotMarker(Map<String, dynamic> data) {
-    final lat = _toDouble(data['sphotLat']);
-    final lng = _toDouble(data['sphotLng']);
-    final name = _spotName(data);
-    final iconPath = _getMarkerIconPath(data);
+  final lat = _toDouble(data['sphotLat']);
+  final lng = _toDouble(data['sphotLng']);
+  final name = _spotName(data);
+  final iconPath = _getMarkerIconPath(data);
+  final typeColor = _spotTypeColor(data);
 
-    return Marker(
-      point: LatLng(lat, lng),
-      width: 90,
-      height: 90,
-      alignment: Alignment.center,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          setState(() {
-            _selectedSpot = data;
-            _selectedAdmin = null;
-            _selectedAdvertiser = null;
-            _showLegalDocumentsPanel = false;
-            _showPricingPanel = false;
-          });
+  return Marker(
+    point: LatLng(lat, lng),
+    width: 180,
+    height: 86,
+    alignment: Alignment.center,
+    child: DashboardSpotMarker(
+      data: data,
+      name: name,
+      iconPath: iconPath,
+      typeColor: typeColor,
+      onTap: () {
+        // Permet de distinguer le clic sur un SPHOT
+        // du clic général sur la carte.
+        _lastSpotMarkerInteraction = DateTime.now();
 
-          _mapController.move(LatLng(lat, lng), 18);
-        },
-        child: Center(
-          child: DashboardSpotMarker(
-            data: data,
-            name: name,
-            iconPath: iconPath,
-            typeColor: _spotTypeColor(data),
-          ),
-        ),
-      ),
-    );
-  }
+        final supervisionKey =
+    _spotSupervisionKey(data);
+
+_spotSupervisionFutures.remove(
+  supervisionKey,
+);
+
+        setState(() {
+          _selectedSpot = Map<String, dynamic>.from(data);
+
+          _selectedAdmin = null;
+          _selectedAdvertiser = null;
+
+          _showLegalDocumentsPanel = false;
+          _showPricingPanel = false;
+
+          _selectedLegalDocument = null;
+          _selectedLegalChapter = null;
+        });
+
+        _mapController.move(
+          LatLng(lat, lng),
+          18,
+        );
+      },
+    ),
+  );
+}
 
   Widget _selectedSpotCard() {
     final spot = _selectedSpot;
@@ -1979,77 +2008,1191 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     );
   }
 
-  Widget _buildSpotDetailPanel() {
-    final spot = _selectedSpot;
-    if (spot == null) return const SizedBox.shrink();
+static const Map<String, String> _superAdminLabelIconPaths = {
+  '🟦 PAVILLON BLEU': 'data/icons/pavillon_bleu.png',
+  '♿ HANDIPLAGE NIVEAU I': 'data/icons/handiplage1.png',
+  '♿ HANDIPLAGE NIVEAU II': 'data/icons/handiplage2.png',
+  '♿ HANDIPLAGE NIVEAU III': 'data/icons/handiplage3.png',
+  '♿ HANDIPLAGE NIVEAU IV': 'data/icons/handiplage4.png',
+  '🚭 PLAGE SANS TABAC': 'data/icons/plage_sans_tabac.png',
 
-    final name = _spotName(spot);
-    final type = _cleanText(spot['typeSphot'] ?? 'Non renseigné');
-    final nature = _cleanText(spot['natureSphot'] ?? 'Non renseignée');
-    final label = _cleanText(spot['labelSphot'] ?? 'Non renseigné');
-    final ville = _cleanText(spot['ville'] ?? 'Non renseignée');
-    final departement = _cleanText(spot['departement'] ?? 'Non renseigné');
-    final region = _cleanText(spot['region'] ?? 'Non renseignée');
-    final telephone = _cleanText(spot['telephonePoste'] ?? 'Non renseigné');
-    final lat = _toDouble(spot['sphotLat']);
-    final lng = _toDouble(spot['sphotLng']);
+  'QUALITÉ DES EAUX : EXCELLENTE':
+      'data/icons/qualite_eau_excellente.png',
 
-    return Container(
-      width: 420,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.98),
-        border: Border(
-          left: BorderSide(
-            color: _spotTypeColor(spot).withOpacity(0.45),
-            width: 1.5,
+  'QUALITÉ DES EAUX : BONNE':
+      'data/icons/qualite_eau_bonne.png',
+
+  'QUALITÉ DES EAUX : SUFFISANTE':
+      'data/icons/qualite_eau_suffisante.png',
+
+  'QUALITÉ DES EAUX : INSUFFISANTE':
+      'data/icons/qualite_eau_insuffisante.png',
+};
+
+static const Map<String, String> _superAdminLabelDisplayNames = {
+  '🟦 PAVILLON BLEU': 'PAVILLON BLEU',
+  '♿ HANDIPLAGE NIVEAU I': 'HANDIPLAGE NIVEAU I',
+  '♿ HANDIPLAGE NIVEAU II': 'HANDIPLAGE NIVEAU II',
+  '♿ HANDIPLAGE NIVEAU III': 'HANDIPLAGE NIVEAU III',
+  '♿ HANDIPLAGE NIVEAU IV': 'HANDIPLAGE NIVEAU IV',
+  '🚭 PLAGE SANS TABAC': 'PLAGE SANS TABAC',
+};
+
+List<String> _splitSphotValues(dynamic value) {
+  if (value is Iterable) {
+    return value
+        .map((item) => _cleanText(item))
+        .where(
+          (item) =>
+              item.isNotEmpty &&
+              _normalizeType(item) != 'AUCUN',
+        )
+        .toList();
+  }
+
+  final raw = _cleanText(value);
+
+  if (raw.isEmpty) {
+    return <String>[];
+  }
+
+  final parts = raw.contains('|')
+      ? raw.split('|')
+      : raw.split(',');
+
+  return parts
+      .map((item) => item.trim())
+      .where(
+        (item) =>
+            item.isNotEmpty &&
+            _normalizeType(item) != 'AUCUN',
+      )
+      .toList();
+}
+
+String _spotTypeDisplayName(Map<String, dynamic> spot) {
+  final raw = _cleanText(spot['typeSphot']);
+
+  final normalized = _normalizeType(raw);
+
+  if (normalized.contains('POSTE DE SECOURS')) {
+    return 'POSTE DE SECOURS';
+  }
+
+  if (normalized.contains('ACCES PLAGE')) {
+    return 'ACCÈS PLAGE';
+  }
+
+  if (normalized.contains('NATURISME')) {
+    return 'NATURISME';
+  }
+
+  if (normalized.contains('PISCINE NATURELLE')) {
+    return 'PISCINE NATURELLE';
+  }
+
+  if (normalized.contains('BASE DE LOISIRS')) {
+    return 'BASE DE LOISIRS';
+  }
+
+  if (normalized.contains('PLAN D')) {
+    return 'PLAN D’EAU';
+  }
+
+  if (normalized.contains('LAGON')) {
+    return 'LAGON';
+  }
+
+  if (normalized.contains('BARRAGE')) {
+    return 'BARRAGE';
+  }
+
+  if (normalized.contains('RIVIERE')) {
+    return 'RIVIÈRE';
+  }
+
+  if (normalized.contains('FLEUVE')) {
+    return 'FLEUVE';
+  }
+
+  if (normalized.contains('CASCADE')) {
+    return 'CASCADE';
+  }
+
+  if (normalized.contains('ETANG')) {
+    return 'ÉTANG';
+  }
+
+  if (normalized.contains('LAC')) {
+    return 'LAC';
+  }
+
+  if (normalized.contains('PLAGE')) {
+    return 'PLAGE';
+  }
+
+  if (normalized.contains('PARC')) {
+    return 'PARC';
+  }
+
+  return raw.isEmpty ? 'Non renseigné' : raw;
+}
+
+Map<String, dynamic>? _adminForSpot(
+  Map<String, dynamic> spot,
+) {
+  final spotTerritoryId = _cleanText(
+    spot['territoireId'],
+  );
+
+  if (spotTerritoryId.isEmpty) {
+    return null;
+  }
+
+  for (final doc in _latestAdminDocs) {
+    final data = Map<String, dynamic>.from(
+      doc.data(),
+    );
+
+    final territoireValue = data['territoire'];
+
+    final territoire = territoireValue is Map
+        ? Map<String, dynamic>.from(territoireValue)
+        : <String, dynamic>{};
+
+    final adminTerritoryId = _cleanText(
+      territoire['territoireId'] ??
+          data['territoireId'] ??
+          data['organisationId'],
+    );
+
+    if (adminTerritoryId == spotTerritoryId) {
+      return {
+        ...data,
+        '_docId': doc.id,
+      };
+    }
+  }
+
+  return null;
+}
+
+Widget _spotPanelSectionTitle(String title) {
+  return Padding(
+    padding: const EdgeInsets.only(
+      top: 16,
+      bottom: 9,
+    ),
+    child: Text(
+      title,
+      style: const TextStyle(
+        color: adminColor,
+        fontSize: 13,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 0.35,
+      ),
+    ),
+  );
+}
+
+Widget _spotVerticalField(
+  String label,
+  String value,
+) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label :',
+          style: const TextStyle(
+            color: Colors.black87,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
           ),
         ),
-      ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      name,
-                      style: TextStyle(
-                        color: _spotTypeColor(spot),
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      setState(() {
-                        _selectedSpot = null;
-                      });
-                    },
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-
-              _spotInfoLine('Type', type),
-              _spotInfoLine('Nature', nature),
-              _spotInfoLine('Label', label),
-              _spotInfoLine('Ville', ville),
-              _spotInfoLine('Département', departement),
-              _spotInfoLine('Région', region),
-              _spotInfoLine('Téléphone', telephone),
-              _spotInfoLine('Latitude', lat.toStringAsFixed(6)),
-              _spotInfoLine('Longitude', lng.toStringAsFixed(6)),
-            ],
+        const SizedBox(height: 2),
+        Text(
+          value.isEmpty ? 'Non renseigné' : value,
+          style: const TextStyle(
+            color: Colors.black87,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            height: 1.25,
           ),
         ),
-      ),
+      ],
+    ),
+  );
+}
+
+Widget _spotAssetValueLine({
+  required String assetPath,
+  required String text,
+  double iconSize = 22,
+}) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 30,
+          child: Center(
+            child: AdaptiveAssetImage(
+              assetPath,
+              width: iconSize,
+              height: iconSize,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _spotCsvValueLine(String rawValue) {
+  final value = rawValue.trim();
+
+  if (value.isEmpty) {
+    return const SizedBox.shrink();
+  }
+
+  final parts = value.split(
+    RegExp(r'\s+'),
+  );
+
+  final firstPart =
+      parts.isEmpty ? '' : parts.first;
+
+  final hasPictogram = firstPart.runes.any(
+    (rune) => rune >= 0x2300,
+  );
+
+  final displayText =
+      hasPictogram && parts.length > 1
+          ? parts.skip(1).join(' ')
+          : value;
+
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 30,
+          child: Text(
+            hasPictogram ? firstPart : '•',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 18,
+              height: 1.1,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            displayText,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _spotLabelValueLine(String label) {
+  final iconPath =
+      _superAdminLabelIconPaths[label];
+
+  final displayName =
+      _superAdminLabelDisplayNames[label] ??
+      label;
+
+  if (iconPath == null) {
+    return _spotCsvValueLine(displayName);
+  }
+
+  return _spotAssetValueLine(
+    assetPath: iconPath,
+    text: displayName,
+    iconSize: 22,
+  );
+}
+
+String _periodHour(dynamic value) {
+  final raw = _cleanText(value);
+
+  if (raw.isEmpty) {
+    return '';
+  }
+
+  return raw.replaceFirst(':', 'h');
+}
+
+String _periodDescription(
+  Map<String, dynamic> period,
+) {
+  final name = _cleanText(
+    period['name'] ??
+        period['nom'] ??
+        period['_docId'],
+  );
+
+  final start = period['startDate'];
+  final end = period['endDate'];
+
+  final startHour =
+      _periodHour(period['startHour']);
+
+  final endHour =
+      _periodHour(period['endHour']);
+
+  final lines = <String>[];
+
+  if (name.isNotEmpty) {
+    lines.add(name.toUpperCase());
+  }
+
+  if (start != null || end != null) {
+    lines.add(
+      'DU ${_formatDate(start)} AU ${_formatDate(end)}',
     );
   }
+
+  if (startHour.isNotEmpty &&
+      endHour.isNotEmpty) {
+    lines.add(
+      'DE $startHour À $endHour',
+    );
+  }
+
+  return lines.join('\n');
+}
+
+String _spotSupervisionKey(
+  Map<String, dynamic> spot,
+) {
+  final territoireId = _cleanText(
+    spot['territoireId'],
+  );
+
+  final spotId = _cleanText(
+    spot['_docId'] ??
+        spot['idSphot'],
+  );
+
+  return '$territoireId::$spotId';
+}
+
+Future<Map<String, dynamic>>
+    _spotSupervisionFuture(
+  Map<String, dynamic> spot,
+) {
+  final key = _spotSupervisionKey(
+    spot,
+  );
+
+  return _spotSupervisionFutures.putIfAbsent(
+    key,
+    () => _loadSpotSupervision(
+      spot,
+    ),
+  );
+}
+
+Future<Map<String, dynamic>> _loadSpotSupervision(
+  Map<String, dynamic> spot,
+) async {
+  final territoireId = _cleanText(
+    spot['territoireId'],
+  );
+
+  final spotDocId = _cleanText(
+    spot['_docId'] ??
+        spot['idSphot'],
+  );
+
+  // SOURCE UNIQUE DES PÉRIODES :
+  // celles réellement attribuées au SPHOT.
+  final periodLabels = _splitSphotValues(
+    spot['periodesSurveillance'],
+  );
+
+  if (territoireId.isEmpty ||
+      spotDocId.isEmpty) {
+    return {
+      'periodLabels': periodLabels,
+      'sauveteurs':
+          <Map<String, dynamic>>[],
+    };
+  }
+
+  final sauveteursSnapshot =
+      await FirebaseFirestore.instance
+          .collection('territoires')
+          .doc(territoireId)
+          .collection('spots')
+          .doc(spotDocId)
+          .collection('sauveteursAffectes')
+          .get()
+          .timeout(
+            const Duration(seconds: 8),
+          );
+
+  final sauveteurs =
+      sauveteursSnapshot.docs.map((doc) {
+    return <String, dynamic>{
+      ...doc.data(),
+      '_docId': doc.id,
+    };
+  }).toList();
+
+  return {
+    'periodLabels': periodLabels,
+    'sauveteurs': sauveteurs,
+  };
+}
+
+int _sauveteurRolePriority(
+  Map<String, dynamic> sauveteur,
+) {
+  final fonctions = _splitSphotValues(
+    sauveteur['fonctions'],
+  ).map(_normalizeType).toList();
+
+  if (fonctions.any(
+    (fonction) =>
+        fonction == 'CHEF DE POSTE',
+  )) {
+    return 0;
+  }
+
+  if (fonctions.any(
+    (fonction) =>
+        fonction.contains(
+          'ADJOINT CHEF DE POSTE',
+        ),
+  )) {
+    return 1;
+  }
+
+  if (fonctions.any(
+    (fonction) =>
+        fonction.contains('SAUVETEUR'),
+  )) {
+    return 2;
+  }
+
+  return 3;
+}
+
+String _sauveteurRoleLabel(
+  Map<String, dynamic> sauveteur,
+) {
+  final fonctions = _splitSphotValues(
+    sauveteur['fonctions'],
+  );
+
+  final normalized =
+      fonctions.map(_normalizeType).toList();
+
+  if (normalized.any(
+    (fonction) =>
+        fonction == 'CHEF DE POSTE',
+  )) {
+    return 'CHEF DE POSTE';
+  }
+
+  if (normalized.any(
+    (fonction) =>
+        fonction.contains(
+          'ADJOINT CHEF DE POSTE',
+        ),
+  )) {
+    return 'ADJOINT CHEF DE POSTE';
+  }
+
+  if (normalized.any(
+    (fonction) =>
+        fonction.contains('SAUVETEUR'),
+  )) {
+    return 'SAUVETEUR';
+  }
+
+  return fonctions.isEmpty
+      ? 'SAUVETEUR'
+      : fonctions.first;
+}
+
+String _formatAssignedPeriodLabel(
+  String value,
+) {
+  final raw = value.trim();
+
+  if (raw.isEmpty) {
+    return '';
+  }
+
+  final parts = raw
+      .split(' — ')
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList();
+
+  if (parts.isEmpty) {
+    return raw;
+  }
+
+  return parts.join('\n');
+}
+
+Widget _buildSpotSupervisionSection(
+  Map<String, dynamic> spot,
+) {
+  return FutureBuilder<Map<String, dynamic>>(
+    future: _spotSupervisionFuture(spot),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState ==
+          ConnectionState.waiting) {
+        return const Padding(
+          padding: EdgeInsets.symmetric(
+            vertical: 20,
+          ),
+          child: Center(
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+              ),
+            ),
+          ),
+        );
+      }
+
+if (snapshot.hasError) {
+  debugPrint(
+    'ERREUR CHARGEMENT SURVEILLANCE : '
+    '${snapshot.error}',
+  );
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(
+      vertical: 12,
+    ),
+    child: Text(
+      'Impossible de charger '
+      'l’équipe de surveillance.',
+      style: TextStyle(
+        color: Colors.red.shade700,
+        fontSize: 12.5,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
+}
+
+      final data =
+          snapshot.data ??
+          <String, dynamic>{};
+
+      final periodLabels =
+    List<String>.from(
+  data['periodLabels'] ?? const [],
+);
+
+final sauveteurs =
+    List<Map<String, dynamic>>.from(
+  data['sauveteurs'] ?? const [],
+);
+
+      // ==================================================
+      // CLASSEMENT HIÉRARCHIQUE
+      // 1 - CHEF DE POSTE
+      // 2 - ADJOINT CHEF DE POSTE
+      // 3 - SAUVETEUR
+      // ==================================================
+      sauveteurs.sort((a, b) {
+        final rankA =
+            _sauveteurRolePriority(a);
+
+        final rankB =
+            _sauveteurRolePriority(b);
+
+        if (rankA != rankB) {
+          return rankA.compareTo(rankB);
+        }
+
+        final nomA =
+            '${_cleanText(a['nom'])} '
+            '${_cleanText(a['prenom'])}'
+                .toUpperCase();
+
+        final nomB =
+            '${_cleanText(b['nom'])} '
+            '${_cleanText(b['prenom'])}'
+                .toUpperCase();
+
+        return nomA.compareTo(nomB);
+      });
+
+      // Les périodes sont actuellement enregistrées
+      // sur le SPHOT et non individuellement
+      // sur chaque sauveteur.
+      final spotPeriodDescriptions =
+    periodLabels
+        .map(_formatAssignedPeriodLabel)
+        .where(
+          (value) =>
+              value.trim().isNotEmpty,
+        )
+        .toList();
+
+      return Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          _spotPanelSectionTitle(
+            'ÉQUIPE DE SURVEILLANCE',
+          ),
+
+          if (sauveteurs.isEmpty)
+            const Text(
+              'Aucun sauveteur affecté à ce poste.',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            )
+          else
+            ...sauveteurs.map((sauveteur) {
+              final nom = _cleanText(
+                sauveteur['nom'],
+              ).toUpperCase();
+
+              final prenom = _cleanText(
+                sauveteur['prenom'],
+              );
+
+              final identity = [
+                prenom,
+                nom,
+              ].where(
+                (value) => value.isNotEmpty,
+              ).join(' ');
+
+              final fonctions =
+                  _splitSphotValues(
+                sauveteur['fonctions'],
+              );
+
+              final role =
+                  _sauveteurRoleLabel(
+                sauveteur,
+              );
+
+              final priority =
+                  _sauveteurRolePriority(
+                sauveteur,
+              );
+
+              final Color roleColor;
+
+              switch (priority) {
+                case 0:
+                  roleColor =
+                      const Color(0xFFDC2626);
+                  break;
+
+                case 1:
+                  roleColor =
+                      const Color(0xFFF59E0B);
+                  break;
+
+                default:
+                  roleColor = adminColor;
+              }
+
+              // Les périodes affichées sont celles
+// attribuées au poste de secours.
+final displayedPeriods =
+    List<String>.from(
+  spotPeriodDescriptions,
+);
+
+return Container(
+                width: double.infinity,
+                margin:
+                    const EdgeInsets.only(
+                  bottom: 12,
+                ),
+                padding:
+                    const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color:
+                      roleColor.withOpacity(
+                    0.05,
+                  ),
+                  borderRadius:
+                      BorderRadius.circular(12),
+                  border: Border.all(
+                    color:
+                        roleColor.withOpacity(
+                      0.35,
+                    ),
+                    width: 1.2,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.center,
+                      children: [
+                        Icon(
+                          priority == 0
+                              ? Icons
+                                  .supervisor_account_rounded
+                              : priority == 1
+                                  ? Icons
+                                      .person_pin_rounded
+                                  : Icons
+                                      .person_rounded,
+                          color: roleColor,
+                          size: 22,
+                        ),
+
+                        const SizedBox(
+                          width: 8,
+                        ),
+
+                        Expanded(
+                          child: Text(
+                            identity.isEmpty
+                                ? 'Sauveteur'
+                                : identity,
+                            style: TextStyle(
+                              color: roleColor,
+                              fontSize: 14,
+                              fontWeight:
+                                  FontWeight
+                                      .w900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 7),
+
+                    Container(
+                      padding:
+                          const EdgeInsets
+                              .symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration:
+                          BoxDecoration(
+                        color: roleColor
+                            .withOpacity(
+                          0.10,
+                        ),
+                        borderRadius:
+                            BorderRadius
+                                .circular(6),
+                      ),
+                      child: Text(
+                        role,
+                        style: TextStyle(
+                          color: roleColor,
+                          fontSize: 11.5,
+                          fontWeight:
+                              FontWeight.w900,
+                        ),
+                      ),
+                    ),
+
+                    if (fonctions.length >
+                        1) ...[
+                      const SizedBox(
+                        height: 7,
+                      ),
+                      Text(
+                        'Fonctions : '
+                        '${fonctions.join(' • ')}',
+                        style:
+                            const TextStyle(
+                          color:
+                              Colors.black87,
+                          fontSize: 12.5,
+                          fontWeight:
+                              FontWeight.w700,
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 9),
+
+                    const Text(
+                      'PÉRIODE(S)',
+                      style: TextStyle(
+                        color: adminColor,
+                        fontSize: 11.5,
+                        fontWeight:
+                            FontWeight.w900,
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    if (displayedPeriods
+                        .isEmpty)
+                      const Text(
+                        'Aucune période renseignée.',
+                        style: TextStyle(
+                          color:
+                              Colors.black54,
+                          fontSize: 12,
+                          fontWeight:
+                              FontWeight.w600,
+                        ),
+                      )
+                    else
+                      ...displayedPeriods.map(
+                        (period) => Padding(
+                          padding:
+                              const EdgeInsets
+                                  .only(
+                            bottom: 5,
+                          ),
+                          child: Text(
+                            '• $period',
+                            style:
+                                const TextStyle(
+                              color:
+                                  Colors.black87,
+                              fontSize: 12,
+                              fontWeight:
+                                  FontWeight
+                                      .w600,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      );
+    },
+  );
+}
+
+  Widget _buildSpotDetailPanel() {
+  final spot = _selectedSpot;
+
+  if (spot == null) {
+    return const SizedBox.shrink();
+  }
+
+  final color = _spotTypeColor(spot);
+
+  final name = _spotName(spot);
+
+  final idSphot = _cleanText(
+    spot['idSphot'] ??
+        spot['_docId'] ??
+        'Non renseigné',
+  );
+
+  final type =
+      _spotTypeDisplayName(spot);
+
+  final equipments =
+      _splitSphotValues(
+    spot['equipement'],
+  );
+
+  final labels =
+      _splitSphotValues(
+    spot['labelSphot'],
+  );
+
+  final ville = _cleanText(
+    spot['ville'],
+  );
+
+  final departement = _cleanText(
+    spot['departement'],
+  );
+
+  final region = _cleanText(
+    spot['region'],
+  );
+
+  final pays = _cleanText(
+    spot['pays'],
+  );
+
+  final isValidated =
+      spot['sphotValide'] == true;
+
+  final isRescueStation =
+      _normalizeType(
+        _cleanText(spot['typeSphot']),
+      ).contains(
+        'POSTE DE SECOURS',
+      );
+
+  final admin =
+      _adminForSpot(spot);
+
+  final profileValue =
+      admin?['profile'];
+
+  final profile =
+      profileValue is Map
+          ? Map<String, dynamic>.from(
+              profileValue,
+            )
+          : <String, dynamic>{};
+
+  final adminNom = _cleanText(
+    profile['nom'] ??
+        profile['nomAffiche'] ??
+        admin?['nomResponsable'] ??
+        admin?['nom'],
+  );
+
+  final adminPrenom = _cleanText(
+    profile['prenom'] ??
+        profile['prenomAffiche'] ??
+        admin?['prenomResponsable'] ??
+        admin?['prenom'],
+  );
+
+  final adminIdentity = [
+    adminPrenom,
+    adminNom.toUpperCase(),
+  ].where(
+    (value) => value.isNotEmpty,
+  ).join(' ');
+
+  final adminEmail = _cleanText(
+    profile['email'] ??
+        admin?['email'],
+  );
+
+  final adminTelephone = _cleanText(
+    profile['telephone'] ??
+        admin?['telephone'],
+  );
+
+  return Container(
+    width: 445,
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.98),
+      border: Border(
+        left: BorderSide(
+          color: color.withOpacity(0.45),
+          width: 1.5,
+        ),
+      ),
+    ),
+    child: SafeArea(
+      child: SingleChildScrollView(
+        padding:
+            const EdgeInsets.fromLTRB(
+          22,
+          18,
+          22,
+          24,
+        ),
+        child: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment:
+                  CrossAxisAlignment.center,
+              children: [
+                AdaptiveAssetImage(
+                  _getMarkerIconPath(spot),
+                  width: 38,
+                  height: 38,
+                  fit: BoxFit.contain,
+                  filterQuality:
+                      FilterQuality.high,
+                  errorBuilder:
+                      (_, __, ___) {
+                    return Icon(
+                      Icons.place,
+                      color: color,
+                      size: 36,
+                    );
+                  },
+                ),
+
+                const SizedBox(width: 10),
+
+                Expanded(
+                  child: Text(
+                    name,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 20,
+                      fontWeight:
+                          FontWeight.w900,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+
+                IconButton(
+                  tooltip: 'Fermer',
+                  onPressed: () {
+                    setState(() {
+                      _selectedSpot = null;
+                    });
+                  },
+                  icon: const Icon(
+                    Icons.close_rounded,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 18),
+
+            _spotVerticalField(
+              'ID SPHOT',
+              idSphot,
+            ),
+
+            _spotPanelSectionTitle(
+              'TYPE',
+            ),
+
+            _spotAssetValueLine(
+  assetPath: isRescueStation
+      ? _rescueStationTypeAsset
+      : _getMarkerIconPath(spot),
+  text: type,
+  iconSize: isRescueStation ? 30 : 24,
+),
+
+            if (equipments.isNotEmpty) ...[
+              _spotPanelSectionTitle(
+                'ÉQUIPEMENTS',
+              ),
+
+              ...equipments.map(
+                _spotCsvValueLine,
+              ),
+            ],
+
+            if (labels.isNotEmpty) ...[
+              _spotPanelSectionTitle(
+                'LABELS',
+              ),
+
+              ...labels.map(
+                _spotLabelValueLine,
+              ),
+            ],
+
+            _spotPanelSectionTitle(
+              'LOCALISATION',
+            ),
+
+            _spotVerticalField(
+              'Ville',
+              ville,
+            ),
+
+            _spotVerticalField(
+              'Département',
+              departement,
+            ),
+
+            _spotVerticalField(
+              'Région',
+              region,
+            ),
+
+            _spotVerticalField(
+              'Pays',
+              pays,
+            ),
+
+            if (isRescueStation)
+  _buildSpotSupervisionSection(
+    spot,
+  ),
+
+            _spotPanelSectionTitle(
+              'ADMINISTRATION',
+            ),
+
+            _spotVerticalField(
+              'Validation',
+              isValidated
+                  ? 'Validé'
+                  : 'Non validé',
+            ),
+
+            _spotVerticalField(
+              'Admin',
+              adminIdentity.isEmpty
+                  ? 'Non renseigné'
+                  : adminIdentity,
+            ),
+
+            _spotVerticalField(
+              'Email',
+              adminEmail,
+            ),
+
+            _spotVerticalField(
+              'Téléphone',
+              adminTelephone,
+            ),
+
+            
+          ],
+        ),
+      ),
+    ),
+  );
+}
 
   Widget _buildAdvertiserDetailPanel() {
     final advertiser = _selectedAdvertiser;
@@ -3002,9 +4145,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   }
 
   Future<void> _rejectAdminRequest(
-    Map<String, dynamic> adminData,
-    String rejectionReason,
-  ) async {
+  Map<String, dynamic> adminData,
+  String rejectionReason,
+  List<String> fieldsToCorrect,
+) async {
     final requestId = _cleanText(adminData['requestId'] ?? adminData['uid']);
 
     if (requestId.isEmpty) {
@@ -3047,6 +4191,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             'reviewStartedAt': administrativeTracking['reviewStartedAt'] ?? now,
             'rejectedAt': now,
             'rejectionReason': rejectionReason,
+            'fieldsToCorrect': fieldsToCorrect,
             'previousRejectionReason': previousRejectionReason.isEmpty
                 ? null
                 : previousRejectionReason,
@@ -3089,91 +4234,290 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           ...administrativeTracking,
           'status': 'rejected',
           'rejectionReason': rejectionReason,
+          'fieldsToCorrect': fieldsToCorrect,
         },
         'rejectionEmail': {'status': 'pending', 'recipient': recipientEmail},
       };
     });
   }
 
-  Future<void> _openAdminRejectionDialog(Map<String, dynamic> adminData) async {
-    final reason = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        String rejectionReason = '';
+  Future<void> _openAdminRejectionDialog(
+  Map<String, dynamic> adminData,
+) async {
+  const fieldGroups = <String, List<Map<String, String>>>{
+    'STRUCTURE': [
+      {
+        'value': 'structure.type',
+        'label': 'Type de structure',
+      },
+      {
+        'value': 'structure.nom',
+        'label': 'Nom de la structure',
+      },
+      {
+        'value': 'structure.siret',
+        'label': 'SIRET',
+      },
+      {
+        'value': 'structure.siren',
+        'label': 'SIREN',
+      },
+    ],
+    'RESPONSABLE': [
+      {
+        'value': 'profile.civilite',
+        'label': 'Civilité',
+      },
+      {
+        'value': 'profile.nomAffiche',
+        'label': 'Nom',
+      },
+      {
+        'value': 'profile.prenomAffiche',
+        'label': 'Prénom',
+      },
+      {
+        'value': 'profile.fonction',
+        'label': 'Fonction',
+      },
+      {
+        'value': 'profile.telephone',
+        'label': 'Téléphone',
+      },
+      {
+        'value': 'profile.email',
+        'label': 'Email',
+      },
+    ],
+    'TERRITOIRE': [
+      {
+        'value': 'territoire.pays',
+        'label': 'Pays',
+      },
+      {
+        'value': 'territoire.region',
+        'label': 'Région',
+      },
+      {
+        'value': 'territoire.departement',
+        'label': 'Département',
+      },
+      {
+        'value': 'territoire.ville',
+        'label': 'Commune',
+      },
+      {
+        'value': 'territoire.adresse',
+        'label': 'Adresse',
+      },
+      {
+        'value': 'territoire.codePostal',
+        'label': 'Code postal',
+      },
+    ],
+    'LIEU': [
+      {
+        'value': 'territoire.logoVille',
+        'label': 'Logo',
+      },
+      {
+        'value': 'territoire.siteInternetVille',
+        'label': 'Site internet',
+      },
+      {
+        'value': 'territoire.arretesMunicipaux',
+        'label': 'Réglementation / arrêtés',
+      },
+      {
+        'value': 'territoire.villeLat',
+        'label': 'Position sur la carte',
+      },
+      {
+        'value': 'territoire.villeLng',
+        'label': 'Position sur la carte',
+      },
+    ],
+  };
 
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text(
-                'REFUSER LA DEMANDE',
-                style: TextStyle(color: redColor, fontWeight: FontWeight.w900),
+  final result = await showDialog<Map<String, dynamic>>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      String rejectionReason = '';
+      final selectedFields = <String>{};
+
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          final canSubmit =
+              rejectionReason.trim().isNotEmpty &&
+              selectedFields.isNotEmpty;
+
+          return AlertDialog(
+            title: const Text(
+              'DEMANDER UNE CORRECTION',
+              style: TextStyle(
+                color: redColor,
+                fontWeight: FontWeight.w900,
               ),
-              content: SizedBox(
-                width: 480,
-                child: TextField(
-                  minLines: 4,
-                  maxLines: 8,
-                  autofocus: true,
-                  onChanged: (value) {
-                    rejectionReason = value.trim();
-                    setDialogState(() {});
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Motif du refus',
-                    hintText:
-                        'Indiquez clairement la raison du refus au demandeur.',
-                    alignLabelWithHint: true,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(
+            ),
+            content: SizedBox(
+              width: 560,
+              height: 620,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Sélectionnez les informations '
+                      'que l’administrateur doit corriger.',
+                      style: TextStyle(
                         color: adminColor,
-                        width: 1.5,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: redColor, width: 2),
+                    const SizedBox(height: 14),
+
+                    for (final group in fieldGroups.entries) ...[
+                      Text(
+                        group.key,
+                        style: const TextStyle(
+                          color: redColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+
+                      for (final field in group.value)
+                        CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          value: selectedFields.contains(
+                            field['value'],
+                          ),
+                          activeColor: adminColor,
+                          title: Text(
+                            field['label']!,
+                            style: const TextStyle(
+                              color: adminColor,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          onChanged: (checked) {
+                            setDialogState(() {
+                              if (checked == true) {
+                                selectedFields.add(
+                                  field['value']!,
+                                );
+                              } else {
+                                selectedFields.remove(
+                                  field['value']!,
+                                );
+                              }
+                            });
+                          },
+                        ),
+
+                      const SizedBox(height: 10),
+                    ],
+
+                    TextField(
+                      minLines: 4,
+                      maxLines: 8,
+                      onChanged: (value) {
+                        rejectionReason = value.trim();
+                        setDialogState(() {});
+                      },
+                      decoration: InputDecoration(
+                        labelText:
+                            'Message adressé au demandeur',
+                        hintText:
+                            'Expliquez précisément la correction attendue.',
+                        alignLabelWithHint: true,
+                        border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(14),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: adminColor,
+                            width: 1.5,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: redColor,
+                            width: 2,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                  },
-                  child: const Text('ANNULER'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                },
+                child: const Text('ANNULER'),
+              ),
+              ElevatedButton(
+                onPressed: canSubmit
+                    ? () {
+                        Navigator.of(dialogContext).pop({
+                          'reason': rejectionReason.trim(),
+                          'fieldsToCorrect':
+                              selectedFields.toList(),
+                        });
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: redColor,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor:
+                      Colors.grey.shade400,
                 ),
-                ElevatedButton(
-                  onPressed: rejectionReason.isEmpty
-                      ? null
-                      : () {
-                          Navigator.of(dialogContext).pop(rejectionReason);
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: redColor,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey.shade400,
-                  ),
-                  child: const Text('CONFIRMER LE REFUS'),
+                child: const Text(
+                  'ENVOYER LA DEMANDE DE CORRECTION',
                 ),
-              ],
-            );
-          },
-        );
-      },
-    );
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
 
-    if (!mounted || reason == null || reason.isEmpty) {
-      return;
-    }
-
-    await _rejectAdminRequest(adminData, reason);
+  if (!mounted || result == null) {
+    return;
   }
+
+  final reason =
+      (result['reason'] ?? '').toString().trim();
+
+  final fieldsToCorrect =
+      ((result['fieldsToCorrect'] as List?) ?? const [])
+          .map((value) => value.toString())
+          .where((value) => value.isNotEmpty)
+          .toList();
+
+  if (reason.isEmpty || fieldsToCorrect.isEmpty) {
+    return;
+  }
+
+  await _rejectAdminRequest(
+    adminData,
+    reason,
+    fieldsToCorrect,
+  );
+}
 
   Widget _buildAdminDetailPanel() {
     final admin = _selectedAdmin;
@@ -3400,29 +4744,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ],
               ),
               const SizedBox(height: 10),
-              _adminDetailSection(
-                title: 'INSTRUCTION',
-                children: [
-                  _spotInfoLine(
-                    'Référence',
-                    requestNumber.isEmpty ? 'Non renseignée' : requestNumber,
-                    labelWidth: 105,
-                    bottomPadding: 3,
-                  ),
-                  _spotInfoLine(
-                    'Statut',
-                    adminStatus,
-                    labelWidth: 105,
-                    bottomPadding: 3,
-                  ),
-                  _spotInfoLine(
-                    'Demande reçue',
-                    _formatDate(admin['requestedAt']),
-                    labelWidth: 105,
-                    bottomPadding: 0,
-                  ),
-                ],
-              ),
+              SuperAdminAdminWorkflowPanel(
+  adminData: admin,
+),
               const SizedBox(height: 18),
 
               if (rawStatus.toLowerCase() == 'pending')
@@ -5256,126 +6580,189 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   }
 
   void _centerOnFirstCurrentResult() {
-    final results = <Map<String, dynamic>>[];
+  final results = <Map<String, dynamic>>[];
 
-    for (final doc in _latestSpotDocs) {
-      final data = doc.data();
-      final lat = _toDouble(data['sphotLat']);
-      final lng = _toDouble(data['sphotLng']);
+  // =========================
+  // SPHOTS
+  // =========================
+  for (final doc in _latestSpotDocs) {
+    final data = <String, dynamic>{
+      ...doc.data(),
+      '_docId': doc.id,
+    };
 
-      final score = _searchScore([
-        data['nomSphot'],
-        data['nomSecours'],
-        data['typeSphot'],
-        data['natureSphot'],
-        data['labelSphot'],
-        data['ville'],
-        data['departement'],
-      ]);
+    final lat = _toDouble(data['sphotLat']);
+    final lng = _toDouble(data['sphotLng']);
 
-      if (lat != 0 && lng != 0 && score > 0) {
-        results.add({
-          'type': 'spot',
-          'score': score,
-          'data': data,
-          'lat': lat,
-          'lng': lng,
-          'zoom': 16.0,
-        });
-      }
+    final score = _searchScore([
+      data['nomSphot'],
+      data['nomSecours'],
+      data['typeSphot'],
+      data['natureSphot'],
+      data['labelSphot'],
+      data['ville'],
+      data['departement'],
+    ]);
+
+    if (lat != 0 && lng != 0 && score > 0) {
+      results.add({
+        'type': 'spot',
+        'score': score,
+        'data': data,
+        'lat': lat,
+        'lng': lng,
+        'zoom': 16.0,
+      });
     }
-
-    for (final doc in _latestAdminDocs) {
-      final data = doc.data();
-      final territoire = Map<String, dynamic>.from(data['territoire'] ?? {});
-      final structure = Map<String, dynamic>.from(data['structure'] ?? {});
-      final profile = Map<String, dynamic>.from(data['profile'] ?? {});
-
-      final lat = _toDouble(territoire['villeLat']);
-      final lng = _toDouble(territoire['villeLng']);
-
-      final score = _searchScore([
-        data['nomStructure'],
-        data['organisation'],
-        data['email'],
-        data['siret'],
-        data['nomResponsable'],
-        structure['nom'],
-        structure['siret'],
-        profile['email'],
-        profile['nomAffiche'],
-        territoire['ville'],
-        territoire['departement'],
-        territoire['region'],
-      ]);
-
-      if (lat != 0 && lng != 0 && score > 0) {
-        results.add({
-          'type': 'admin',
-          'score': score,
-          'data': data,
-          'lat': lat,
-          'lng': lng,
-          'zoom': 18.0,
-        });
-      }
-    }
-
-    for (final doc in _latestAdDocs) {
-      final data = {...doc.data(), 'id': doc.id};
-
-      final lat = _toDouble(data['centerLat']);
-      final lng = _toDouble(data['centerLng']);
-
-      final score = _searchScore([
-        data['advertiserName'],
-        data['contactName'],
-        data['email'],
-        data['phone'],
-        data['siret'],
-        data['city'],
-        data['department'],
-        data['region'],
-        data['status'],
-        data['broadcastType'],
-        data['visibilityLabel'],
-        data['campaignTitle'],
-        data['companyName'],
-        data['businessName'],
-        data['organisation'],
-      ]);
-
-      if (lat != 0 && lng != 0 && score > 0) {
-        results.add({
-          'type': 'advertiser',
-          'score': score,
-          'data': data,
-          'lat': lat,
-          'lng': lng,
-          'zoom': 16.0,
-        });
-      }
-    }
-
-    if (results.isEmpty) return;
-
-    results.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
-
-    final best = results.first;
-    final type = best['type'];
-    final data = Map<String, dynamic>.from(best['data']);
-
-    setState(() {
-      _selectedSpot = type == 'spot' ? data : null;
-      _selectedAdmin = type == 'admin' ? data : null;
-      _selectedAdvertiser = type == 'advertiser' ? data : null;
-    });
-
-    _mapController.move(
-      LatLng(best['lat'] as double, best['lng'] as double),
-      best['zoom'] as double,
-    );
   }
+
+  // =========================
+  // ADMINS
+  // =========================
+  for (final doc in _latestAdminDocs) {
+    final data = doc.data();
+
+    final territoire = Map<String, dynamic>.from(
+      data['territoire'] ?? {},
+    );
+
+    final structure = Map<String, dynamic>.from(
+      data['structure'] ?? {},
+    );
+
+    final profile = Map<String, dynamic>.from(
+      data['profile'] ?? {},
+    );
+
+    final lat = _toDouble(
+      territoire['villeLat'],
+    );
+
+    final lng = _toDouble(
+      territoire['villeLng'],
+    );
+
+    final score = _searchScore([
+      data['nomStructure'],
+      data['organisation'],
+      data['email'],
+      data['siret'],
+      data['nomResponsable'],
+      structure['nom'],
+      structure['siret'],
+      profile['email'],
+      profile['nomAffiche'],
+      territoire['ville'],
+      territoire['departement'],
+      territoire['region'],
+    ]);
+
+    if (lat != 0 && lng != 0 && score > 0) {
+      results.add({
+        'type': 'admin',
+        'score': score,
+        'data': data,
+        'lat': lat,
+        'lng': lng,
+        'zoom': 18.0,
+      });
+    }
+  }
+
+  // =========================
+  // ANNONCEURS
+  // =========================
+  for (final doc in _latestAdDocs) {
+    final data = <String, dynamic>{
+      ...doc.data(),
+      'id': doc.id,
+    };
+
+    final location = _advertiserLocation(
+      data,
+    );
+
+    if (location == null) {
+      continue;
+    }
+
+    final score = _searchScore([
+      data['advertiserName'],
+      data['contactName'],
+      data['email'],
+      data['phone'],
+      data['siret'],
+      data['city'],
+      data['department'],
+      data['region'],
+      data['status'],
+      data['broadcastType'],
+      data['visibilityLabel'],
+      data['campaignTitle'],
+      data['companyName'],
+      data['businessName'],
+      data['organisation'],
+    ]);
+
+    if (score > 0) {
+      results.add({
+        'type': 'advertiser',
+        'score': score,
+        'data': data,
+        'lat': location.latitude,
+        'lng': location.longitude,
+        'zoom': 16.0,
+      });
+    }
+  }
+
+  if (results.isEmpty) {
+    return;
+  }
+
+  results.sort(
+    (a, b) => (b['score'] as int).compareTo(
+      a['score'] as int,
+    ),
+  );
+
+  final best = results.first;
+
+  final type = best['type'];
+
+  final selectedData =
+      Map<String, dynamic>.from(
+    best['data'],
+  );
+
+  setState(() {
+    _selectedSpot =
+        type == 'spot'
+            ? selectedData
+            : null;
+
+    _selectedAdmin =
+        type == 'admin'
+            ? selectedData
+            : null;
+
+    _selectedAdvertiser =
+        type == 'advertiser'
+            ? selectedData
+            : null;
+
+    _showPricingPanel = false;
+    _showLegalDocumentsPanel = false;
+  });
+
+  _mapController.move(
+    LatLng(
+      best['lat'] as double,
+      best['lng'] as double,
+    ),
+    best['zoom'] as double,
+  );
+}
 
   Marker _buildAdminMarker(Map<String, dynamic> data) {
     final territoire = Map<String, dynamic>.from(data['territoire'] ?? {});
@@ -5515,8 +6902,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
     return Marker(
       point: location,
-      width: 56,
-      height: 56,
+      width: 180,
+      height: 86,
       alignment: Alignment.center,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -5680,8 +7067,13 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     });
 
                     final clusteredMarkers = <Marker>[
-                      ...validSpots.map((doc) => _buildSpotMarker(doc.data())),
-                    ];
+  ...validSpots.map(
+    (doc) => _buildSpotMarker({
+      ...doc.data(),
+      '_docId': doc.id,
+    }),
+  ),
+];
 
                     final advertiserMarkers = <Marker>[
                       ...validAdvertisers.map((doc) {
@@ -5713,16 +7105,32 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                                   minZoom: 2,
                                   maxZoom: 18,
                                   onTap: (_, __) {
-                                    setState(() {
-                                      _selectedSpot = null;
-                                      _selectedAdmin = null;
-                                      _selectedAdvertiser = null;
-                                      _showLegalDocumentsPanel = false;
-                                      _showPricingPanel = false;
-                                      _selectedLegalDocument = null;
-                                      _selectedLegalChapter = null;
-                                    });
-                                  },
+  final lastSpotInteraction = _lastSpotMarkerInteraction;
+
+  // Si ce clic vient juste d'un marqueur SPHOT,
+  // on ne laisse pas la carte effacer la sélection.
+  if (lastSpotInteraction != null) {
+    final elapsed = DateTime.now().difference(
+      lastSpotInteraction,
+    );
+
+    if (elapsed < const Duration(milliseconds: 600)) {
+      return;
+    }
+  }
+
+  setState(() {
+    _selectedSpot = null;
+    _selectedAdmin = null;
+    _selectedAdvertiser = null;
+
+    _showLegalDocumentsPanel = false;
+    _showPricingPanel = false;
+
+    _selectedLegalDocument = null;
+    _selectedLegalChapter = null;
+  });
+},
                                   onPositionChanged: (_, __) {
                                     _mapMovementTimer?.cancel();
 
@@ -5898,58 +7306,73 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   }
 }
 
-class _DashboardAdvertiserMarker extends StatefulWidget {
-  const _DashboardAdvertiserMarker({required this.name});
+class _DashboardAdvertiserMarker
+    extends StatelessWidget {
+  const _DashboardAdvertiserMarker({
+    required this.name,
+  });
 
   final String name;
-
-  @override
-  State<_DashboardAdvertiserMarker> createState() =>
-      _DashboardAdvertiserMarkerState();
-}
-
-class _DashboardAdvertiserMarkerState
-    extends State<_DashboardAdvertiserMarker> {
-  bool _isHovering = false;
 
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _isHovering = true),
-      onExit: (_) => setState(() => _isHovering = false),
       child: SizedBox(
-        width: 56,
-        height: 56,
+        width: 180,
+        height: 86,
         child: Stack(
           clipBehavior: Clip.none,
-          alignment: Alignment.center,
+          alignment: Alignment.topCenter,
           children: [
-            const AdaptiveAssetImage(
-              'data/icons/fire_green_icon.svg',
-              width: 48,
-              height: 48,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
+            const Positioned(
+              top: 0,
+              child: AdaptiveAssetImage(
+                'data/icons/fire_green_icon.svg',
+                width: 48,
+                height: 48,
+                fit: BoxFit.contain,
+                filterQuality:
+                    FilterQuality.high,
+              ),
             ),
-            if (_isHovering)
-              Positioned(
-                top: 50,
-                left: -132,
-                child: SizedBox(
-                  width: 320,
-                  child: Text(
-                    widget.name,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Color(0xFF2E7D32),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      shadows: [Shadow(color: Colors.white, blurRadius: 3)],
+
+            Positioned(
+              top: 49,
+              left: 2,
+              right: 2,
+              child: Text(
+                name,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow:
+                    TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF2E7D32),
+                  fontSize: 12,
+                  fontWeight:
+                      FontWeight.w900,
+                  height: 1.05,
+                  shadows: [
+                    Shadow(
+                      color: Colors.white,
+                      blurRadius: 4,
                     ),
-                  ),
+                    Shadow(
+                      color: Colors.white,
+                      blurRadius: 4,
+                      offset: Offset(1, 1),
+                    ),
+                    Shadow(
+                      color: Colors.white,
+                      blurRadius: 4,
+                      offset:
+                          Offset(-1, -1),
+                    ),
+                  ],
                 ),
               ),
+            ),
           ],
         ),
       ),
@@ -5962,6 +7385,7 @@ class DashboardSpotMarker extends StatelessWidget {
   final String name;
   final String iconPath;
   final Color typeColor;
+  final VoidCallback onTap;
 
   const DashboardSpotMarker({
     super.key,
@@ -5969,19 +7393,84 @@ class DashboardSpotMarker extends StatelessWidget {
     required this.name,
     required this.iconPath,
     required this.typeColor,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AdaptiveAssetImage(
-      iconPath,
-      width: 46,
-      height: 46,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-      errorBuilder: (_, __, ___) {
-        return Icon(Icons.place, color: typeColor, size: 34);
-      },
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Listener(
+        behavior: HitTestBehavior.opaque,
+
+        // Plus fiable que GestureDetector.onTap
+        // à l'intérieur de FlutterMap.
+        onPointerDown: (_) {
+          onTap();
+        },
+
+        child: SizedBox(
+          width: 180,
+          height: 86,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.topCenter,
+            children: [
+              Positioned(
+                top: 0,
+                child: AdaptiveAssetImage(
+                  iconPath,
+                  width: 46,
+                  height: 46,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                  errorBuilder: (_, __, ___) {
+                    return Icon(
+                      Icons.place,
+                      color: typeColor,
+                      size: 38,
+                    );
+                  },
+                ),
+              ),
+
+              Positioned(
+                top: 47,
+                left: 2,
+                right: 2,
+                child: Text(
+                  name,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: typeColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    height: 1.05,
+                    shadows: const [
+                      Shadow(
+                        color: Colors.white,
+                        blurRadius: 4,
+                      ),
+                      Shadow(
+                        color: Colors.white,
+                        blurRadius: 4,
+                        offset: Offset(1, 1),
+                      ),
+                      Shadow(
+                        color: Colors.white,
+                        blurRadius: 4,
+                        offset: Offset(-1, -1),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

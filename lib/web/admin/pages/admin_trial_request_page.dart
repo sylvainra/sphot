@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'admin_request_pending_page.dart';
 import '../../../map/map_page.dart';
 
 class AdminTrialRequestPage extends StatefulWidget {
@@ -36,13 +35,7 @@ class AdminTrialRequestPage extends StatefulWidget {
   State<AdminTrialRequestPage> createState() => _AdminTrialRequestPageState();
 }
 
-enum _TrialRequestSection {
-  structure,
-  responsable,
-  territoire,
-  ville,
-  essai,
-}
+enum _TrialRequestSection { structure, responsable, territoire, ville, essai }
 
 class _TrialMapStyle {
   final String name;
@@ -93,11 +86,11 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   final stt.SpeechToText _speech = stt.SpeechToText();
   final Map<String, TextEditingController> _controllers = {};
   final ExpansionTileController _cguExpansionController =
-        ExpansionTileController();
+      ExpansionTileController();
   final ExpansionTileController _privacyExpansionController =
-        ExpansionTileController();
+      ExpansionTileController();
   final ExpansionTileController _rgpdExpansionController =
-        ExpansionTileController();
+      ExpansionTileController();
 
   _TrialRequestSection _selectedSection = _TrialRequestSection.structure;
   int _selectedMapStyleIndex = 0;
@@ -116,76 +109,67 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   String? _createdRequestId;
 
   bool _isLoadingCorrection = false;
-bool _isCorrectionMode = false;
+  bool _isCorrectionMode = false;
 
-String? _correctionRequestNumber;
-String? _correctionReason;
+  String? _correctionRequestNumber;
+  String? _correctionReason;
 
-Map<String, dynamic> _originalRequestData = {};
-final Map<String, String> _correctionBaseline = {};
-final Set<String> _fieldsToCorrect = <String>{};
+  Map<String, dynamic> _originalRequestData = {};
+  final Map<String, String> _correctionBaseline = {};
+  final Set<String> _fieldsToCorrect = <String>{};
 
-Map<String, dynamic>? _cguDoc;
-Map<String, dynamic>? _privacyDoc;
-Map<String, dynamic>? _rgpdDoc;
+  Map<String, dynamic>? _cguDoc;
+  Map<String, dynamic>? _privacyDoc;
+  Map<String, dynamic>? _rgpdDoc;
 
-String _sphotVersion = '1.0';
-dynamic _sphotPublishedAt;
-String _sphotChangeLog = '';
+  String _sphotVersion = '1.0';
+  dynamic _sphotPublishedAt;
+  String _sphotChangeLog = '';
 
-  final List<String> civiliteChoices = const [
-  'Monsieur',
-  'Madame',
-];
+  final List<String> civiliteChoices = const ['Monsieur', 'Madame'];
 
-final List<String> structureTypes = const [
-  'MAIRIE',
-  'COMMUNAUTÉ DE COMMUNES',
-  'MÉTROPOLE',
-  'DÉPARTEMENT',
-  'RÉGION',
-  'OFFICE DE TOURISME',
-  'ASSOCIATION',
-  'BASE DE LOISIRS',
-  'PARC',
-  'GESTIONNAIRE PRIVÉ',
-  'AUTRE',
-];
+  final List<String> structureTypes = const [
+    'MAIRIE',
+    'COMMUNAUTÉ DE COMMUNES',
+    'MÉTROPOLE',
+    'DÉPARTEMENT',
+    'RÉGION',
+    'OFFICE DE TOURISME',
+    'ASSOCIATION',
+    'BASE DE LOISIRS',
+    'PARC',
+    'GESTIONNAIRE PRIVÉ',
+    'AUTRE',
+  ];
 
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
-  _isCorrectionMode =
-      widget.correctionRequestId != null &&
-      widget.correctionRequestId!.trim().isNotEmpty;
+    _isCorrectionMode =
+        widget.correctionRequestId != null &&
+        widget.correctionRequestId!.trim().isNotEmpty;
 
-  if (_isCorrectionMode) {
-    _loadExistingRequest();
-  } else {
-    _controller('nomStructure').text =
-        widget.proConnectOrganisation ?? '';
+    if (_isCorrectionMode) {
+      _loadExistingRequest();
+    } else {
+      _controller('nomStructure').text = widget.proConnectOrganisation ?? '';
 
-    _controller('typeStructure').text = 'MAIRIE';
+      _controller('typeStructure').text = 'MAIRIE';
 
-    _controller('siretStructure').text =
-        widget.proConnectSiret ?? '';
+      _controller('siretStructure').text = widget.proConnectSiret ?? '';
 
-    _controller('sirenStructure').text =
-        widget.proConnectSiren ?? '';
+      _controller('sirenStructure').text = widget.proConnectSiren ?? '';
 
-    _controller('nomResponsable').text =
-        widget.proConnectNom ?? '';
+      _controller('nomResponsable').text = widget.proConnectNom ?? '';
 
-    _controller('prenomResponsable').text =
-        widget.proConnectPrenom ?? '';
+      _controller('prenomResponsable').text = widget.proConnectPrenom ?? '';
 
-    _controller('emailResponsable').text =
-        widget.proConnectEmail ?? '';
+      _controller('emailResponsable').text = widget.proConnectEmail ?? '';
+    }
+
+    _loadLegalDocuments();
   }
-
-  _loadLegalDocuments();
-}
 
   @override
   void dispose() {
@@ -234,213 +218,201 @@ void initState() {
 
     _correctionBaseline
       ..clear()
-      ..addEntries(
-        keys.map((key) => MapEntry(key, _value(key))),
-      );
+      ..addEntries(keys.map((key) => MapEntry(key, _value(key))));
   }
 
   bool _fieldChangedSinceLoad(String key) {
     return _value(key) != (_correctionBaseline[key] ?? '');
   }
 
-Future<void> _loadExistingRequest() async {
-  final requestId = widget.correctionRequestId?.trim() ?? '';
+  Future<void> _loadExistingRequest() async {
+    final requestId = widget.correctionRequestId?.trim() ?? '';
 
-  if (requestId.isEmpty) {
-    return;
-  }
-
-  setState(() {
-    _isLoadingCorrection = true;
-  });
-
-  try {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('adminRequests')
-        .doc(requestId)
-        .get();
-
-    if (!snapshot.exists) {
-      throw Exception('La demande à corriger est introuvable.');
+    if (requestId.isEmpty) {
+      return;
     }
 
-    final data = snapshot.data() ?? {};
-
-    final profile = Map<String, dynamic>.from(
-      data['profile'] ?? {},
-    );
-
-    final structure = Map<String, dynamic>.from(
-      data['structure'] ?? {},
-    );
-
-    final territoire = Map<String, dynamic>.from(
-      data['territoire'] ?? {},
-    );
-
-    final trialRequest = Map<String, dynamic>.from(
-      data['trialRequest'] ?? {},
-    );
-
-    final acceptedDocuments = Map<String, dynamic>.from(
-      trialRequest['acceptedDocuments'] ?? {},
-    );
-
-    final administrativeTracking = Map<String, dynamic>.from(
-      data['administrativeTracking'] ?? {},
-    );
-
-    final loadedStructureType =
-    (structure['type'] ?? 'MAIRIE')
-        .toString()
-        .trim()
-        .toUpperCase();
-
-final normalizedStructureType =
-    loadedStructureType == 'COMMUNE'
-        ? 'MAIRIE'
-        : loadedStructureType;
-
-_controller('typeStructure').text =
-    normalizedStructureType;
-
-_controller('nomStructure').text =
-    normalizedStructureType == 'MAIRIE'
-        ? ''
-        : (structure['nom'] ?? '').toString();
-
-    _controller('siretStructure').text =
-        (structure['siret'] ?? '').toString();
-
-    _controller('sirenStructure').text =
-        (structure['siren'] ?? '').toString();
-
-    _controller('nomResponsable').text =
-    (profile['nomAffiche'] ?? '').toString();
-
-    _controller('prenomResponsable').text =
-    (profile['prenomAffiche'] ?? '').toString();
-
-    _controller('civiliteResponsable').text =
-    (profile['civilite'] ?? '').toString();
-
-    _controller('fonctionResponsable').text =
-    (profile['fonction'] ?? '').toString();
-
-    _controller('telephoneResponsable').text =
-        (profile['telephone'] ?? '').toString();
-
-    _controller('emailResponsable').text =
-        (profile['email'] ?? '').toString();
-
-    _controller('pays').text =
-        (territoire['pays'] ?? '').toString();
-
-    _controller('region').text =
-        (territoire['region'] ?? '').toString();
-
-    _controller('departement').text =
-        (territoire['departement'] ?? '').toString();
-
-    _controller('ville').text =
-        (territoire['ville'] ?? '').toString();
-
-    _controller('adresse').text =
-        (territoire['adresse'] ?? '').toString();
-
-    _controller('codePostal').text =
-        (territoire['codePostal'] ?? '').toString();
-
-    _controller('logoVille').text =
-        (territoire['logoVille'] ?? '').toString();
-
-    _controller('siteInternetVille').text =
-        (territoire['siteInternetVille'] ?? '').toString();
-
-    _controller('arretesMunicipaux').text =
-        (territoire['arretesMunicipaux'] ?? '').toString();
-
-    _controller('villeLat').text =
-        (territoire['villeLat'] ?? '').toString();
-
-    _controller('villeLng').text =
-        (territoire['villeLng'] ?? '').toString();
-
-    _certifyRepresentative =
-        trialRequest['certifyRepresentative'] == true;
-
-    _legalReadConfirmed =
-        trialRequest['legalReadConfirmed'] == true ||
-        acceptedDocuments['cgu'] == true;
-
-    _privacyReadConfirmed =
-        trialRequest['privacyReadConfirmed'] == true ||
-        acceptedDocuments['privacy'] == true;
-
-    _rgpdAccepted =
-        trialRequest['rgpdAccepted'] == true ||
-        acceptedDocuments['rgpd'] == true;
-        _acceptTerms = true;
-
-    if (!mounted) return;
-    
-setState(() {
-  _originalRequestData = data;
-
-  _correctionRequestNumber =
-      (data['requestNumber'] ?? requestId).toString();
-
-  _correctionReason =
-      (administrativeTracking['rejectionReason'] ??
-              'Des informations doivent être corrigées.')
-          .toString();
-
-  _fieldsToCorrect
-    ..clear()
-    ..addAll(
-      _fieldsToCorrectFromReason(_correctionReason ?? ''),
-    );
-
-  // La comparaison des corrections part exactement des valeurs affichées,
-  // après leur normalisation pour l'interface.
-  _captureCorrectionBaseline();
-
-  // En correction, on ouvre directement la section refusée.
-  _selectedSection =
-      _firstCorrectionSection ?? _TrialRequestSection.structure;
-
-  // La carte se monte d'abord sur Satellite.
-  _selectedMapStyleIndex = 1;
-
-  _isLoadingCorrection = false;
-  _saved = false;
-});
-
-WidgetsBinding.instance.addPostFrameCallback((_) {
-  if (!mounted) return;
-
-  setState(() {
-    // Retour immédiat sur le style Plan.
-    _selectedMapStyleIndex = 0;
-  });
-});
-    
-  } catch (error) {
-    if (!mounted) return;
-
     setState(() {
-      _isLoadingCorrection = false;
+      _isLoadingCorrection = true;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Erreur lors du chargement de la demande : $error',
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('adminRequests')
+          .doc(requestId)
+          .get();
+
+      if (!snapshot.exists) {
+        throw Exception('La demande à corriger est introuvable.');
+      }
+
+      final data = snapshot.data() ?? {};
+
+      final profile = Map<String, dynamic>.from(data['profile'] ?? {});
+
+      final structure = Map<String, dynamic>.from(data['structure'] ?? {});
+
+      final territoire = Map<String, dynamic>.from(data['territoire'] ?? {});
+
+      final trialRequest = Map<String, dynamic>.from(
+        data['trialRequest'] ?? {},
+      );
+
+      final acceptedDocuments = Map<String, dynamic>.from(
+        trialRequest['acceptedDocuments'] ?? {},
+      );
+
+      final administrativeTracking = Map<String, dynamic>.from(
+        data['administrativeTracking'] ?? {},
+      );
+
+      final loadedStructureType = (structure['type'] ?? 'MAIRIE')
+          .toString()
+          .trim()
+          .toUpperCase();
+
+      final normalizedStructureType = loadedStructureType == 'COMMUNE'
+          ? 'MAIRIE'
+          : loadedStructureType;
+
+      _controller('typeStructure').text = normalizedStructureType;
+
+      _controller('nomStructure').text = normalizedStructureType == 'MAIRIE'
+          ? ''
+          : (structure['nom'] ?? '').toString();
+
+      _controller('siretStructure').text = (structure['siret'] ?? '')
+          .toString();
+
+      _controller('sirenStructure').text = (structure['siren'] ?? '')
+          .toString();
+
+      _controller('nomResponsable').text = (profile['nomAffiche'] ?? '')
+          .toString();
+
+      _controller('prenomResponsable').text = (profile['prenomAffiche'] ?? '')
+          .toString();
+
+      _controller('civiliteResponsable').text = (profile['civilite'] ?? '')
+          .toString();
+
+      _controller('fonctionResponsable').text = (profile['fonction'] ?? '')
+          .toString();
+
+      _controller('telephoneResponsable').text = (profile['telephone'] ?? '')
+          .toString();
+
+      _controller('emailResponsable').text = (profile['email'] ?? '')
+          .toString();
+
+      _controller('pays').text = (territoire['pays'] ?? '').toString();
+
+      _controller('region').text = (territoire['region'] ?? '').toString();
+
+      _controller('departement').text = (territoire['departement'] ?? '')
+          .toString();
+
+      _controller('ville').text = (territoire['ville'] ?? '').toString();
+
+      _controller('adresse').text = (territoire['adresse'] ?? '').toString();
+
+      _controller('codePostal').text = (territoire['codePostal'] ?? '')
+          .toString();
+
+      _controller('logoVille').text = (territoire['logoVille'] ?? '')
+          .toString();
+
+      _controller('siteInternetVille').text =
+          (territoire['siteInternetVille'] ?? '').toString();
+
+      _controller('arretesMunicipaux').text =
+          (territoire['arretesMunicipaux'] ?? '').toString();
+
+      _controller('villeLat').text = (territoire['villeLat'] ?? '').toString();
+
+      _controller('villeLng').text = (territoire['villeLng'] ?? '').toString();
+
+      _certifyRepresentative = trialRequest['certifyRepresentative'] == true;
+
+      _legalReadConfirmed =
+          trialRequest['legalReadConfirmed'] == true ||
+          acceptedDocuments['cgu'] == true;
+
+      _privacyReadConfirmed =
+          trialRequest['privacyReadConfirmed'] == true ||
+          acceptedDocuments['privacy'] == true;
+
+      _rgpdAccepted =
+          trialRequest['rgpdAccepted'] == true ||
+          acceptedDocuments['rgpd'] == true;
+      _acceptTerms = true;
+
+      if (!mounted) return;
+
+      setState(() {
+        _originalRequestData = data;
+
+        _correctionRequestNumber = (data['requestNumber'] ?? requestId)
+            .toString();
+
+        _correctionReason =
+            (administrativeTracking['rejectionReason'] ??
+                    'Des informations doivent être corrigées.')
+                .toString();
+
+        final structuredFields =
+            ((administrativeTracking['fieldsToCorrect'] as List?) ?? const [])
+                .map(
+                  (value) => _controllerKeyForFirestoreField(value.toString()),
+                )
+                .whereType<String>()
+                .toSet();
+
+        _fieldsToCorrect
+          ..clear()
+          ..addAll(
+            structuredFields.isNotEmpty
+                ? structuredFields
+                : _fieldsToCorrectFromReason(_correctionReason ?? ''),
+          );
+
+        // La comparaison des corrections part exactement des valeurs affichées,
+        // après leur normalisation pour l'interface.
+        _captureCorrectionBaseline();
+
+        // En correction, on ouvre directement la section refusée.
+        _selectedSection =
+            _firstCorrectionSection ?? _TrialRequestSection.structure;
+
+        // La carte se monte d'abord sur Satellite.
+        _selectedMapStyleIndex = 1;
+
+        _isLoadingCorrection = false;
+        _saved = false;
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+
+        setState(() {
+          // Retour immédiat sur le style Plan.
+          _selectedMapStyleIndex = 0;
+        });
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingCorrection = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du chargement de la demande : $error'),
         ),
-      ),
-    );
+      );
+    }
   }
-}
 
   double _toDouble(String value) {
     return double.tryParse(value.replaceAll(',', '.')) ?? 0.0;
@@ -469,12 +441,12 @@ WidgetsBinding.instance.addPostFrameCallback((_) {
   }
 
   bool get _responsableComplete {
-  return _value('civiliteResponsable').isNotEmpty &&
-      _value('nomResponsable').isNotEmpty &&
-      _value('prenomResponsable').isNotEmpty &&
-      _value('fonctionResponsable').isNotEmpty &&
-      _value('emailResponsable').isNotEmpty;
-}
+    return _value('civiliteResponsable').isNotEmpty &&
+        _value('nomResponsable').isNotEmpty &&
+        _value('prenomResponsable').isNotEmpty &&
+        _value('fonctionResponsable').isNotEmpty &&
+        _value('emailResponsable').isNotEmpty;
+  }
 
   bool get _territoireComplete {
     return _value('pays').isNotEmpty &&
@@ -486,17 +458,15 @@ WidgetsBinding.instance.addPostFrameCallback((_) {
   }
 
   bool get _villeComplete {
-  return _value('logoVille').isNotEmpty &&
-      _value('siteInternetVille').isNotEmpty &&
-      _value('arretesMunicipaux').isNotEmpty &&
-      _hasCityPosition;
-}
+    return _value('logoVille').isNotEmpty &&
+        _value('siteInternetVille').isNotEmpty &&
+        _hasCityPosition;
+  }
 
-bool get _cityInfoComplete {
-  return _value('logoVille').isNotEmpty &&
-      _value('siteInternetVille').isNotEmpty &&
-      _value('arretesMunicipaux').isNotEmpty;
-}
+  bool get _cityInfoComplete {
+    return _value('logoVille').isNotEmpty &&
+        _value('siteInternetVille').isNotEmpty;
+  }
 
   bool get _canOpenTrialRequest {
     return _structureComplete &&
@@ -506,350 +476,339 @@ bool get _cityInfoComplete {
   }
 
   bool get _canSubmitTrialRequest {
-  final formValid =
-      _canOpenTrialRequest &&
-      _certifyRepresentative &&
-      _legalReadConfirmed &&
-      _privacyReadConfirmed &&
-      _rgpdAccepted;
+    // En mode correction, on ne redemande pas la validation complète
+    // du dossier initial : seuls les champs signalés par le Super Admin
+    // doivent avoir été corrigés et être valides.
+    if (_isCorrectionMode) {
+      return _allRequestedCorrectionsCompleted;
+    }
 
-  if (!formValid) {
-    return false;
+    // Première demande d'accès.
+    return _canOpenTrialRequest &&
+        _certifyRepresentative &&
+        _legalReadConfirmed &&
+        _privacyReadConfirmed &&
+        _rgpdAccepted;
   }
 
-  if (_isCorrectionMode && !_allRequestedCorrectionsCompleted) {
-    return false;
+  String _normalizeCorrectionReason(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll(RegExp(r'[àáâäãå]'), 'a')
+        .replaceAll(RegExp(r'[ç]'), 'c')
+        .replaceAll(RegExp(r'[èéêë]'), 'e')
+        .replaceAll(RegExp(r'[ìíîï]'), 'i')
+        .replaceAll(RegExp(r'[ñ]'), 'n')
+        .replaceAll(RegExp(r'[òóôöõ]'), 'o')
+        .replaceAll(RegExp(r'[ùúûü]'), 'u')
+        .replaceAll(RegExp(r'[ýÿ]'), 'y')
+        .replaceAll('æ', 'ae')
+        .replaceAll('œ', 'oe')
+        .replaceAll(RegExp(r'[^a-z0-9.]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
-  return true;
-}
+  Set<String> _fieldsToCorrectFromReason(String reason) {
+    final normalized = _normalizeCorrectionReason(reason);
+    final result = <String>{};
 
-String _normalizeCorrectionReason(String value) {
-  return value
-      .toLowerCase()
-      .replaceAll(RegExp(r'[àáâäãå]'), 'a')
-      .replaceAll(RegExp(r'[ç]'), 'c')
-      .replaceAll(RegExp(r'[èéêë]'), 'e')
-      .replaceAll(RegExp(r'[ìíîï]'), 'i')
-      .replaceAll(RegExp(r'[ñ]'), 'n')
-      .replaceAll(RegExp(r'[òóôöõ]'), 'o')
-      .replaceAll(RegExp(r'[ùúûü]'), 'u')
-      .replaceAll(RegExp(r'[ýÿ]'), 'y')
-      .replaceAll('æ', 'ae')
-      .replaceAll('œ', 'oe')
-      .replaceAll(RegExp(r'[^a-z0-9.]+'), ' ')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim();
-}
+    bool containsAny(Iterable<String> aliases) {
+      return aliases.any(
+        (alias) => normalized.contains(_normalizeCorrectionReason(alias)),
+      );
+    }
 
-Set<String> _fieldsToCorrectFromReason(String reason) {
-  final normalized = _normalizeCorrectionReason(reason);
-  final result = <String>{};
+    void add(String controllerKey, List<String> aliases) {
+      if (containsAny(aliases)) {
+        result.add(controllerKey);
+      }
+    }
 
-  bool containsAny(Iterable<String> aliases) {
-    return aliases.any(
-      (alias) => normalized.contains(_normalizeCorrectionReason(alias)),
-    );
+    // STRUCTURE
+    add('typeStructure', [
+      'type de structure',
+      'type structure',
+      'structure.type',
+      'typeStructure',
+    ]);
+    add('nomStructure', [
+      'nom de la structure',
+      'nom structure',
+      'structure.nom',
+      'nomStructure',
+      'organisation',
+    ]);
+    add('siretStructure', ['siret', 'structure.siret', 'siretStructure']);
+    add('sirenStructure', ['siren', 'structure.siren', 'sirenStructure']);
+
+    // RESPONSABLE
+    add('civiliteResponsable', [
+      'civilite du responsable',
+      'civilite responsable',
+      'profile.civilite',
+      'civiliteResponsable',
+      'civilite',
+    ]);
+    add('nomResponsable', [
+      'nom du responsable',
+      'nom responsable',
+      'profile.nomAffiche',
+      'nomResponsable',
+    ]);
+    add('prenomResponsable', [
+      'prenom du responsable',
+      'prenom responsable',
+      'profile.prenomAffiche',
+      'prenomResponsable',
+      'prenom',
+    ]);
+    add('fonctionResponsable', [
+      'fonction du responsable',
+      'fonction responsable',
+      'profile.fonction',
+      'fonctionResponsable',
+      'fonction',
+    ]);
+    add('telephoneResponsable', [
+      'telephone du responsable',
+      'telephone responsable',
+      'profile.telephone',
+      'telephoneResponsable',
+      'telephone',
+    ]);
+    add('emailResponsable', [
+      'email du responsable',
+      'e mail du responsable',
+      'email responsable',
+      'profile.email',
+      'emailResponsable',
+      'courriel',
+      'email',
+    ]);
+
+    // TERRITOIRE
+    add('pays', ['territoire.pays', 'pays']);
+    add('region', ['territoire.region', 'region']);
+    add('departement', ['territoire.departement', 'departement']);
+    add('ville', ['territoire.ville', 'commune', 'nom de la ville', 'ville']);
+    add('adresse', [
+      'territoire.adresse',
+      'adresse de la mairie',
+      'adresse postale',
+      'adresse',
+    ]);
+    add('codePostal', ['territoire.codePostal', 'code postal', 'codePostal']);
+
+    // LIEU
+    add('logoVille', [
+      'adresse internet du logo',
+      'url du logo',
+      'logo de la ville',
+      'territoire.logoVille',
+      'logoVille',
+      'logo',
+    ]);
+    add('siteInternetVille', [
+      'site internet de la ville',
+      'site internet',
+      'territoire.siteInternetVille',
+      'siteInternetVille',
+    ]);
+    add('arretesMunicipaux', [
+      'arretes municipaux',
+      'arrete municipal',
+      'territoire.arretesMunicipaux',
+      'arretesMunicipaux',
+      'arrete',
+    ]);
+    add('villeLat', ['latitude', 'territoire.villeLat', 'villeLat']);
+    add('villeLng', ['longitude', 'territoire.villeLng', 'villeLng']);
+
+    // Une demande de correction de position concerne les deux coordonnées.
+    if (containsAny([
+      'position sur la carte',
+      'position de la ville',
+      'coordonnees',
+    ])) {
+      result
+        ..add('villeLat')
+        ..add('villeLng');
+    }
+
+    return result;
   }
 
-  void add(String controllerKey, List<String> aliases) {
-    if (containsAny(aliases)) {
-      result.add(controllerKey);
+  String? _controllerKeyForFirestoreField(String rawField) {
+    final field = rawField.trim();
+
+    const mapping = <String, String>{
+      'structure.type': 'typeStructure',
+      'structure.nom': 'nomStructure',
+      'structure.siret': 'siretStructure',
+      'structure.siren': 'sirenStructure',
+      'profile.civilite': 'civiliteResponsable',
+      'profile.nomAffiche': 'nomResponsable',
+      'profile.prenomAffiche': 'prenomResponsable',
+      'profile.fonction': 'fonctionResponsable',
+      'profile.telephone': 'telephoneResponsable',
+      'profile.email': 'emailResponsable',
+      'territoire.pays': 'pays',
+      'territoire.region': 'region',
+      'territoire.departement': 'departement',
+      'territoire.ville': 'ville',
+      'territoire.adresse': 'adresse',
+      'territoire.codePostal': 'codePostal',
+      'territoire.logoVille': 'logoVille',
+      'territoire.siteInternetVille': 'siteInternetVille',
+      'territoire.arretesMunicipaux': 'arretesMunicipaux',
+      'territoire.villeLat': 'villeLat',
+      'territoire.villeLng': 'villeLng',
+    };
+
+    if (mapping.containsKey(field)) {
+      return mapping[field];
+    }
+
+    if (_controllers.containsKey(field) ||
+        const <String>{
+          'typeStructure',
+          'nomStructure',
+          'siretStructure',
+          'sirenStructure',
+          'civiliteResponsable',
+          'nomResponsable',
+          'prenomResponsable',
+          'fonctionResponsable',
+          'telephoneResponsable',
+          'emailResponsable',
+          'pays',
+          'region',
+          'departement',
+          'ville',
+          'adresse',
+          'codePostal',
+          'logoVille',
+          'siteInternetVille',
+          'arretesMunicipaux',
+          'villeLat',
+          'villeLng',
+        }.contains(field)) {
+      return field;
+    }
+
+    return null;
+  }
+
+  Set<String> _fieldsForSection(_TrialRequestSection section) {
+    switch (section) {
+      case _TrialRequestSection.structure:
+        return const {
+          'typeStructure',
+          'nomStructure',
+          'siretStructure',
+          'sirenStructure',
+        };
+      case _TrialRequestSection.responsable:
+        return const {
+          'civiliteResponsable',
+          'nomResponsable',
+          'prenomResponsable',
+          'fonctionResponsable',
+          'telephoneResponsable',
+          'emailResponsable',
+        };
+      case _TrialRequestSection.territoire:
+        return const {
+          'pays',
+          'region',
+          'departement',
+          'ville',
+          'adresse',
+          'codePostal',
+        };
+      case _TrialRequestSection.ville:
+        return const {
+          'logoVille',
+          'siteInternetVille',
+          'arretesMunicipaux',
+          'villeLat',
+          'villeLng',
+        };
+      case _TrialRequestSection.essai:
+        return const {};
     }
   }
 
-  // STRUCTURE
-  add('typeStructure', [
-    'type de structure',
-    'type structure',
-    'structure.type',
-    'typeStructure',
-  ]);
-  add('nomStructure', [
-    'nom de la structure',
-    'nom structure',
-    'structure.nom',
-    'nomStructure',
-    'organisation',
-  ]);
-  add('siretStructure', [
-    'siret',
-    'structure.siret',
-    'siretStructure',
-  ]);
-  add('sirenStructure', [
-    'siren',
-    'structure.siren',
-    'sirenStructure',
-  ]);
-
-  // RESPONSABLE
-  add('civiliteResponsable', [
-    'civilite du responsable',
-    'civilite responsable',
-    'profile.civilite',
-    'civiliteResponsable',
-    'civilite',
-  ]);
-  add('nomResponsable', [
-    'nom du responsable',
-    'nom responsable',
-    'profile.nomAffiche',
-    'nomResponsable',
-  ]);
-  add('prenomResponsable', [
-    'prenom du responsable',
-    'prenom responsable',
-    'profile.prenomAffiche',
-    'prenomResponsable',
-    'prenom',
-  ]);
-  add('fonctionResponsable', [
-    'fonction du responsable',
-    'fonction responsable',
-    'profile.fonction',
-    'fonctionResponsable',
-    'fonction',
-  ]);
-  add('telephoneResponsable', [
-    'telephone du responsable',
-    'telephone responsable',
-    'profile.telephone',
-    'telephoneResponsable',
-    'telephone',
-  ]);
-  add('emailResponsable', [
-    'email du responsable',
-    'e mail du responsable',
-    'email responsable',
-    'profile.email',
-    'emailResponsable',
-    'courriel',
-    'email',
-  ]);
-
-  // TERRITOIRE
-  add('pays', ['territoire.pays', 'pays']);
-  add('region', ['territoire.region', 'region']);
-  add('departement', ['territoire.departement', 'departement']);
-  add('ville', [
-    'territoire.ville',
-    'commune',
-    'nom de la ville',
-    'ville',
-  ]);
-  add('adresse', [
-    'territoire.adresse',
-    'adresse de la mairie',
-    'adresse postale',
-    'adresse',
-  ]);
-  add('codePostal', [
-    'territoire.codePostal',
-    'code postal',
-    'codePostal',
-  ]);
-
-  // LIEU
-  add('logoVille', [
-    'adresse internet du logo',
-    'url du logo',
-    'logo de la ville',
-    'territoire.logoVille',
-    'logoVille',
-    'logo',
-  ]);
-  add('siteInternetVille', [
-    'site internet de la ville',
-    'site internet',
-    'territoire.siteInternetVille',
-    'siteInternetVille',
-  ]);
-  add('arretesMunicipaux', [
-    'arretes municipaux',
-    'arrete municipal',
-    'territoire.arretesMunicipaux',
-    'arretesMunicipaux',
-    'arrete',
-  ]);
-  add('villeLat', [
-    'latitude',
-    'territoire.villeLat',
-    'villeLat',
-  ]);
-  add('villeLng', [
-    'longitude',
-    'territoire.villeLng',
-    'villeLng',
-  ]);
-
-  // Une demande de correction de position concerne les deux coordonnées.
-  if (containsAny(['position sur la carte', 'position de la ville', 'coordonnees'])) {
-    result
-      ..add('villeLat')
-      ..add('villeLng');
+  bool _sectionHasFieldsToCorrect(_TrialRequestSection section) {
+    return _fieldsForSection(section).any(_fieldsToCorrect.contains);
   }
 
-  return result;
-}
-
-String? _controllerKeyForFirestoreField(String rawField) {
-  final field = rawField.trim();
-
-  const mapping = <String, String>{
-    'structure.type': 'typeStructure',
-    'structure.nom': 'nomStructure',
-    'structure.siret': 'siretStructure',
-    'structure.siren': 'sirenStructure',
-    'profile.civilite': 'civiliteResponsable',
-    'profile.nomAffiche': 'nomResponsable',
-    'profile.prenomAffiche': 'prenomResponsable',
-    'profile.fonction': 'fonctionResponsable',
-    'profile.telephone': 'telephoneResponsable',
-    'profile.email': 'emailResponsable',
-    'territoire.pays': 'pays',
-    'territoire.region': 'region',
-    'territoire.departement': 'departement',
-    'territoire.ville': 'ville',
-    'territoire.adresse': 'adresse',
-    'territoire.codePostal': 'codePostal',
-    'territoire.logoVille': 'logoVille',
-    'territoire.siteInternetVille': 'siteInternetVille',
-    'territoire.arretesMunicipaux': 'arretesMunicipaux',
-    'territoire.villeLat': 'villeLat',
-    'territoire.villeLng': 'villeLng',
-  };
-
-  if (mapping.containsKey(field)) {
-    return mapping[field];
+  bool _isFieldEditable(String key) {
+    return !_isCorrectionMode || _fieldsToCorrect.contains(key);
   }
 
-  if (_controllers.containsKey(field) || const <String>{
-    'typeStructure',
-    'nomStructure',
-    'siretStructure',
-    'sirenStructure',
-    'civiliteResponsable',
-    'nomResponsable',
-    'prenomResponsable',
-    'fonctionResponsable',
-    'telephoneResponsable',
-    'emailResponsable',
-    'pays',
-    'region',
-    'departement',
-    'ville',
-    'adresse',
-    'codePostal',
-    'logoVille',
-    'siteInternetVille',
-    'arretesMunicipaux',
-    'villeLat',
-    'villeLng',
-  }.contains(field)) {
-    return field;
+  bool _correctedFieldIsValid(String key) {
+    final value = _value(key);
+    if (value.isEmpty) return false;
+
+    switch (key) {
+      case 'siretStructure':
+        return RegExp(
+          r'^\d{14}$',
+        ).hasMatch(value.replaceAll(RegExp(r'\D'), ''));
+      case 'sirenStructure':
+        return RegExp(r'^\d{9}$').hasMatch(value.replaceAll(RegExp(r'\D'), ''));
+      case 'emailResponsable':
+        return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value);
+      case 'telephoneResponsable':
+        return value.replaceAll(RegExp(r'\D'), '').length >= 10;
+      case 'villeLat':
+        final latitude = double.tryParse(value.replaceAll(',', '.'));
+        return latitude != null && latitude >= -90 && latitude <= 90;
+      case 'villeLng':
+        final longitude = double.tryParse(value.replaceAll(',', '.'));
+        return longitude != null && longitude >= -180 && longitude <= 180;
+      case 'nomStructure':
+        return _value('typeStructure') == 'MAIRIE' || value.isNotEmpty;
+      default:
+        return true;
+    }
   }
 
-  return null;
-}
+  bool get _allRequestedCorrectionsCompleted {
+    if (!_isCorrectionMode || _fieldsToCorrect.isEmpty) return false;
 
-Set<String> _fieldsForSection(_TrialRequestSection section) {
-  switch (section) {
-    case _TrialRequestSection.structure:
-      return const {
-        'typeStructure', 'nomStructure', 'siretStructure', 'sirenStructure',
-      };
-    case _TrialRequestSection.responsable:
-      return const {
-        'civiliteResponsable', 'nomResponsable', 'prenomResponsable',
-        'fonctionResponsable', 'telephoneResponsable', 'emailResponsable',
-      };
-    case _TrialRequestSection.territoire:
-      return const {
-        'pays',
-        'region',
-        'departement',
-        'ville',
-        'adresse',
-        'codePostal',
-      };
-    case _TrialRequestSection.ville:
-      return const {
-        'logoVille', 'siteInternetVille', 'arretesMunicipaux',
-        'villeLat', 'villeLng',
-      };
-    case _TrialRequestSection.essai:
-      return const {};
-  }
-}
-
-bool _sectionHasFieldsToCorrect(_TrialRequestSection section) {
-  return _fieldsForSection(section).any(_fieldsToCorrect.contains);
-}
-
-bool _isFieldEditable(String key) {
-  return !_isCorrectionMode || _fieldsToCorrect.contains(key);
-}
-
-bool _correctedFieldIsValid(String key) {
-  final value = _value(key);
-  if (value.isEmpty) return false;
-
-  switch (key) {
-    case 'siretStructure':
-      return RegExp(r'^\d{14}$').hasMatch(value.replaceAll(RegExp(r'\D'), ''));
-    case 'sirenStructure':
-      return RegExp(r'^\d{9}$').hasMatch(value.replaceAll(RegExp(r'\D'), ''));
-    case 'emailResponsable':
-      return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value);
-    case 'telephoneResponsable':
-      return value.replaceAll(RegExp(r'\D'), '').length >= 10;
-    case 'villeLat':
-      final latitude = double.tryParse(value.replaceAll(',', '.'));
-      return latitude != null && latitude >= -90 && latitude <= 90;
-    case 'villeLng':
-      final longitude = double.tryParse(value.replaceAll(',', '.'));
-      return longitude != null && longitude >= -180 && longitude <= 180;
-    case 'nomStructure':
-      return _value('typeStructure') == 'MAIRIE' || value.isNotEmpty;
-    default:
-      return true;
-  }
-}
-
-bool get _allRequestedCorrectionsCompleted {
-  if (!_isCorrectionMode || _fieldsToCorrect.isEmpty) return false;
-
-  return _fieldsToCorrect.every(
-    (key) => _fieldChangedSinceLoad(key) && _correctedFieldIsValid(key),
-  );
-}
-
-bool get _hasCorrectionChanges => _allRequestedCorrectionsCompleted;
-
-_TrialRequestSection? get _firstCorrectionSection {
-  for (final section in const [
-    _TrialRequestSection.structure,
-    _TrialRequestSection.responsable,
-    _TrialRequestSection.territoire,
-    _TrialRequestSection.ville,
-  ]) {
-    if (_sectionHasFieldsToCorrect(section)) return section;
-  }
-  return null;
-}
-
-bool _correctionSectionEnabled(_TrialRequestSection section) {
-  if (!_isCorrectionMode) {
-    return section != _TrialRequestSection.essai || _canOpenTrialRequest;
+    return _fieldsToCorrect.every(
+      (key) => _fieldChangedSinceLoad(key) && _correctedFieldIsValid(key),
+    );
   }
 
-  if (section == _TrialRequestSection.essai) {
-    return _allRequestedCorrectionsCompleted;
+  bool get _hasCorrectionChanges => _allRequestedCorrectionsCompleted;
+
+  _TrialRequestSection? get _firstCorrectionSection {
+    for (final section in const [
+      _TrialRequestSection.structure,
+      _TrialRequestSection.responsable,
+      _TrialRequestSection.territoire,
+      _TrialRequestSection.ville,
+    ]) {
+      if (_sectionHasFieldsToCorrect(section)) return section;
+    }
+    return null;
   }
 
-  return _sectionHasFieldsToCorrect(section);
-}
+  bool _correctionSectionEnabled(_TrialRequestSection section) {
+    if (!_isCorrectionMode) {
+      return section != _TrialRequestSection.essai || _canOpenTrialRequest;
+    }
+
+    if (section == _TrialRequestSection.essai) {
+      return _allRequestedCorrectionsCompleted;
+    }
+
+    return _sectionHasFieldsToCorrect(section);
+  }
 
   String _normalizeIdPart(String value) {
     return value
@@ -879,181 +838,137 @@ bool _correctionSectionEnabled(_TrialRequestSection section) {
   }
 
   String _capitalizeWords(String value) {
-  return value.replaceAllMapped(
-    RegExp(
-      r"(^|[\s\-'])([A-Za-zÀ-ÖØ-öø-ÿ])([A-Za-zÀ-ÖØ-öø-ÿ]*)",
-    ),
-    (match) {
-      final separator = match.group(1) ?? '';
-      final firstLetter = match.group(2) ?? '';
-      final remainingLetters = match.group(3) ?? '';
+    return value.replaceAllMapped(
+      RegExp(r"(^|[\s\-'])([A-Za-zÀ-ÖØ-öø-ÿ])([A-Za-zÀ-ÖØ-öø-ÿ]*)"),
+      (match) {
+        final separator = match.group(1) ?? '';
+        final firstLetter = match.group(2) ?? '';
+        final remainingLetters = match.group(3) ?? '';
 
-      return separator +
-          firstLetter.toUpperCase() +
-          remainingLetters;
-    },
-  );
-}
-
-String _structureNameForStorage() {
-  final type =
-      _value('typeStructure').trim().toUpperCase();
-
-  if (type == 'MAIRIE') {
-    return _value('ville').trim();
+        return separator + firstLetter.toUpperCase() + remainingLetters;
+      },
+    );
   }
 
-  return _value('nomStructure').trim();
-}
+  String _structureNameForStorage() {
+    final type = _value('typeStructure').trim().toUpperCase();
 
-String _buildOrganisationDisplay() {
-  final type = _value('typeStructure').trim().toUpperCase();
-  final nomBrut = _value('nomStructure').trim();
-
-  String retirerPrefixe(
-    String valeur,
-    List<String> prefixes,
-  ) {
-    var resultat = valeur.trim();
-
-    for (final prefixe in prefixes) {
-      final expression = RegExp(
-        '^${RegExp.escape(prefixe)}\\s*',
-        caseSensitive: false,
-      );
-
-      if (expression.hasMatch(resultat)) {
-        resultat = resultat.replaceFirst(expression, '').trim();
-        break;
-      }
+    if (type == 'MAIRIE') {
+      return _value('ville').trim();
     }
 
-    return resultat;
+    return _value('nomStructure').trim();
   }
 
-switch (type) {
+  String _buildOrganisationDisplay() {
+    final type = _value('typeStructure').trim().toUpperCase();
+    final nomBrut = _value('nomStructure').trim();
 
-  case 'MAIRIE':
-  final ville = _value('ville').trim();
+    String retirerPrefixe(String valeur, List<String> prefixes) {
+      var resultat = valeur.trim();
 
-  if (ville.isEmpty) {
-    return 'la Mairie';
-  }
+      for (final prefixe in prefixes) {
+        final expression = RegExp(
+          '^${RegExp.escape(prefixe)}\\s*',
+          caseSensitive: false,
+        );
 
-  return 'la Mairie de $ville';
+        if (expression.hasMatch(resultat)) {
+          resultat = resultat.replaceFirst(expression, '').trim();
+          break;
+        }
+      }
 
-    case 'COMMUNAUTÉ DE COMMUNES':
-      final nom = retirerPrefixe(
-        nomBrut,
-        [
+      return resultat;
+    }
+
+    switch (type) {
+      case 'MAIRIE':
+        final ville = _value('ville').trim();
+
+        if (ville.isEmpty) {
+          return 'la Mairie';
+        }
+
+        return 'la Mairie de $ville';
+
+      case 'COMMUNAUTÉ DE COMMUNES':
+        final nom = retirerPrefixe(nomBrut, [
           'COMMUNAUTÉ DE COMMUNES DE ',
           'COMMUNAUTÉ DE COMMUNES DU ',
           'COMMUNAUTÉ DE COMMUNES ',
-        ],
-      );
+        ]);
 
-      return 'la Communauté de communes $nom';
+        return 'la Communauté de communes $nom';
 
-    case 'MÉTROPOLE':
-      final nom = retirerPrefixe(
-        nomBrut,
-        [
+      case 'MÉTROPOLE':
+        final nom = retirerPrefixe(nomBrut, [
           'MÉTROPOLE DE ',
           'MÉTROPOLE DU ',
           'MÉTROPOLE ',
-        ],
-      );
+        ]);
 
-      return 'la Métropole $nom';
+        return 'la Métropole $nom';
 
-    case 'DÉPARTEMENT':
-      final nom = retirerPrefixe(
-        nomBrut,
-        [
+      case 'DÉPARTEMENT':
+        final nom = retirerPrefixe(nomBrut, [
           'DÉPARTEMENT DE ',
           'DÉPARTEMENT DU ',
           'DÉPARTEMENT DE LA ',
           "DÉPARTEMENT DE L'",
           'DÉPARTEMENT ',
-        ],
-      );
+        ]);
 
-      return 'le Département $nom';
+        return 'le Département $nom';
 
-    case 'RÉGION':
-      final nom = retirerPrefixe(
-        nomBrut,
-        [
+      case 'RÉGION':
+        final nom = retirerPrefixe(nomBrut, [
           'RÉGION DE ',
           'RÉGION DU ',
           'RÉGION DE LA ',
           "RÉGION DE L'",
           'RÉGION ',
-        ],
-      );
+        ]);
 
-      return 'la Région $nom';
+        return 'la Région $nom';
 
-    case 'OFFICE DE TOURISME':
-      final nom = retirerPrefixe(
-        nomBrut,
-        [
+      case 'OFFICE DE TOURISME':
+        final nom = retirerPrefixe(nomBrut, [
           'OFFICE DE TOURISME DE ',
           'OFFICE DE TOURISME DU ',
           'OFFICE DE TOURISME ',
-        ],
-      );
+        ]);
 
-      return "l'Office de tourisme $nom";
+        return "l'Office de tourisme $nom";
 
-    case 'ASSOCIATION':
-      final nom = retirerPrefixe(
-        nomBrut,
-        [
-          'ASSOCIATION ',
-        ],
-      );
+      case 'ASSOCIATION':
+        final nom = retirerPrefixe(nomBrut, ['ASSOCIATION ']);
 
-      return "l'association $nom";
+        return "l'association $nom";
 
-    case 'BASE DE LOISIRS':
-      final nom = retirerPrefixe(
-        nomBrut,
-        [
+      case 'BASE DE LOISIRS':
+        final nom = retirerPrefixe(nomBrut, [
           'BASE DE LOISIRS DE ',
           'BASE DE LOISIRS DU ',
           'BASE DE LOISIRS ',
-        ],
-      );
+        ]);
 
-      return 'la Base de loisirs $nom';
+        return 'la Base de loisirs $nom';
 
-    case 'PARC':
-      final nom = retirerPrefixe(
-        nomBrut,
-        [
-          'PARC DE ',
-          'PARC DU ',
-          'PARC ',
-        ],
-      );
+      case 'PARC':
+        final nom = retirerPrefixe(nomBrut, ['PARC DE ', 'PARC DU ', 'PARC ']);
 
-      return 'le Parc $nom';
+        return 'le Parc $nom';
 
-    case 'GESTIONNAIRE PRIVÉ':
-      final nom = retirerPrefixe(
-        nomBrut,
-        [
-          'GESTIONNAIRE PRIVÉ ',
-        ],
-      );
+      case 'GESTIONNAIRE PRIVÉ':
+        final nom = retirerPrefixe(nomBrut, ['GESTIONNAIRE PRIVÉ ']);
 
-      return 'le gestionnaire privé $nom';
+        return 'le gestionnaire privé $nom';
 
-    default:
-      return nomBrut;
+      default:
+        return nomBrut;
+    }
   }
-}
 
   String _formatText(
     String value, {
@@ -1069,8 +984,8 @@ switch (type) {
     if (!_correctionSectionEnabled(section)) {
       setState(() {
         _trialRequestMessage = _isCorrectionMode
-            ? 'Corrigez d’abord la rubrique refusée avant d’accéder à la demande d’essai.'
-            : 'Complétez Structure, Responsable, Territoire et Lieu avant la demande d’essai.';
+            ? 'Corrigez d’abord la rubrique refusée avant de pouvoir renvoyer votre demande d’accès.'
+            : 'Complétez Structure, Responsable, Territoire et Lieu avant la demande d’accès.';
       });
       return;
     }
@@ -1102,7 +1017,9 @@ switch (type) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Reconnaissance vocale non disponible ou micro non autorisé.'),
+          content: Text(
+            'Reconnaissance vocale non disponible ou micro non autorisé.',
+          ),
           duration: Duration(seconds: 3),
         ),
       );
@@ -1133,167 +1050,144 @@ switch (type) {
       _controller('villeLng').text = point.longitude.toStringAsFixed(6);
       _saved = false;
     });
-
-    void _setCityPosition(LatLng point) {
-  setState(() {
-    _controller('villeLat').text = point.latitude.toStringAsFixed(6);
-    _controller('villeLng').text = point.longitude.toStringAsFixed(6);
-    _saved = false;
-  });
-}
   }
 
   void _centerOnCity() {
-  if (!_hasCityPosition) return;
+    if (!_hasCityPosition) return;
 
-  _mapController.move(
-    LatLng(
-      _toDouble(_value('villeLat')),
-      _toDouble(_value('villeLng')),
-    ),
-    14,
-  );
-}
+    _mapController.move(
+      LatLng(_toDouble(_value('villeLat')), _toDouble(_value('villeLng'))),
+      14,
+    );
+  }
 
-Future<void> _loadLegalDocuments() async {
-  try {
-    final firestore = FirebaseFirestore.instance;
+  Future<void> _loadLegalDocuments() async {
+    try {
+      final firestore = FirebaseFirestore.instance;
 
-    final metadata =
-    await firestore.collection('legalDocuments').doc('metadata').get();
-
-    final metadataData = metadata.data() ?? {};
-
-    Future<Map<String, dynamic>> loadLegalDoc(String docId) async {
-      final doc = await firestore.collection('legalDocuments').doc(docId).get();
-
-      final chapters = await firestore
+      final metadata = await firestore
           .collection('legalDocuments')
-          .doc(docId)
-          .collection('chapters')
-          .orderBy(FieldPath.documentId)
+          .doc('metadata')
           .get();
 
-      return {
-        ...?doc.data(),
-        'chapters': chapters.docs.map((e) => e.data()).toList(),
-      };
+      final metadataData = metadata.data() ?? {};
+
+      Future<Map<String, dynamic>> loadLegalDoc(String docId) async {
+        final doc = await firestore
+            .collection('legalDocuments')
+            .doc(docId)
+            .get();
+
+        final chapters = await firestore
+            .collection('legalDocuments')
+            .doc(docId)
+            .collection('chapters')
+            .orderBy(FieldPath.documentId)
+            .get();
+
+        return {
+          ...?doc.data(),
+          'chapters': chapters.docs.map((e) => e.data()).toList(),
+        };
+      }
+
+      final cgu = await loadLegalDoc('cgu');
+      final privacy = await loadLegalDoc('privacyPolicy');
+      final rgpd = await loadLegalDoc('rgpdNotice');
+
+      if (!mounted) return;
+
+      setState(() {
+        _cguDoc = cgu;
+        _privacyDoc = privacy;
+        _rgpdDoc = rgpd;
+
+        _sphotVersion = (metadataData['version'] ?? '1.0').toString();
+        _sphotPublishedAt = metadataData['publishedAt'];
+        _sphotChangeLog = (metadataData['changeLog'] ?? '').toString();
+
+        _legalLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() => _legalLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur chargement documents légaux : $error')),
+      );
     }
-
-    final cgu = await loadLegalDoc('cgu');
-    final privacy = await loadLegalDoc('privacyPolicy');
-    final rgpd = await loadLegalDoc('rgpdNotice');
-
-    if (!mounted) return;
-
-    setState(() {
-      _cguDoc = cgu;
-      _privacyDoc = privacy;
-      _rgpdDoc = rgpd;
-
-_sphotVersion = (metadataData['version'] ?? '1.0').toString();
-_sphotPublishedAt = metadataData['publishedAt'];
-_sphotChangeLog = (metadataData['changeLog'] ?? '').toString();
-
-      _legalLoading = false;
-    });
-  } catch (error) {
-    if (!mounted) return;
-
-    setState(() => _legalLoading = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Erreur chargement documents légaux : $error')),
-    );
   }
-}
 
   Future<void> _saveRegistration() async {
-  if (_isSaving || _saved || !_canSubmitTrialRequest) {
-    return;
-  }
+    if (_isSaving || _saved || !_canSubmitTrialRequest) {
+      return;
+    }
 
-  setState(() {
-    _isSaving = true;
-  });
+    setState(() {
+      _isSaving = true;
+    });
 
-  try {
-    final territoryId = _territoryId();
-    final user = FirebaseAuth.instance.currentUser;
+    try {
+      final territoryId = _territoryId();
+      final user = FirebaseAuth.instance.currentUser;
 
-    final adminRequestsCollection =
-    FirebaseFirestore.instance.collection('adminRequests');
-
-late final DocumentReference<Map<String, dynamic>>
-    requestReference;
-
-late final String requestId;
-
-if (_isCorrectionMode) {
-  requestId = widget.correctionRequestId!.trim();
-
-  if (requestId.isEmpty) {
-    throw Exception(
-      'Identifiant de la demande à corriger introuvable.',
-    );
-  }
-
-  requestReference =
-      adminRequestsCollection.doc(requestId);
-} else {
-  if (_createdRequestId != null &&
-      _createdRequestId!.trim().isNotEmpty) {
-    requestId = _createdRequestId!;
-    requestReference =
-        adminRequestsCollection.doc(requestId);
-  } else {
-    requestReference = adminRequestsCollection.doc();
-    requestId = requestReference.id;
-    _createdRequestId = requestId;
-  }
-}
-
-    if (_isCorrectionMode) {
-      final administrativeTracking =
-          Map<String, dynamic>.from(
-        _originalRequestData['administrativeTracking'] ?? {},
+      final adminRequestsCollection = FirebaseFirestore.instance.collection(
+        'adminRequests',
       );
 
-      final previousCount =
-          (_originalRequestData['resubmissionCount'] is num)
-              ? (_originalRequestData['resubmissionCount'] as num)
-                  .toInt()
-              : 0;
+      late final DocumentReference<Map<String, dynamic>> requestReference;
 
-      final currentReason =
-          (administrativeTracking['rejectionReason'] ?? '')
-              .toString();
+      late final String requestId;
 
-      await requestReference.set(
-        {
+      if (_isCorrectionMode) {
+        requestId = widget.correctionRequestId!.trim();
+
+        if (requestId.isEmpty) {
+          throw Exception('Identifiant de la demande à corriger introuvable.');
+        }
+
+        requestReference = adminRequestsCollection.doc(requestId);
+      } else {
+        if (_createdRequestId != null && _createdRequestId!.trim().isNotEmpty) {
+          requestId = _createdRequestId!;
+          requestReference = adminRequestsCollection.doc(requestId);
+        } else {
+          requestReference = adminRequestsCollection.doc();
+          requestId = requestReference.id;
+          _createdRequestId = requestId;
+        }
+      }
+
+      if (_isCorrectionMode) {
+        final administrativeTracking = Map<String, dynamic>.from(
+          _originalRequestData['administrativeTracking'] ?? {},
+        );
+
+        final previousCount = (_originalRequestData['resubmissionCount'] is num)
+            ? (_originalRequestData['resubmissionCount'] as num).toInt()
+            : 0;
+
+        final currentReason = (administrativeTracking['rejectionReason'] ?? '')
+            .toString();
+
+        await requestReference.set({
           'profile': {
-  'civilite':
-      _value('civiliteResponsable'),
-  'nomAffiche':
-      _value('nomResponsable'),
-  'prenomAffiche':
-      _value('prenomResponsable'),
-  'fonction':
-      _value('fonctionResponsable'),
-  'telephone':
-      _value('telephoneResponsable'),
-  'email':
-      _value('emailResponsable'),
-},
+            'civilite': _value('civiliteResponsable'),
+            'nomAffiche': _value('nomResponsable'),
+            'prenomAffiche': _value('prenomResponsable'),
+            'fonction': _value('fonctionResponsable'),
+            'telephone': _value('telephoneResponsable'),
+            'email': _value('emailResponsable'),
+          },
 
           'structure': {
-  'nom': _structureNameForStorage(),
-  'type': _value('typeStructure'),
-  'organisationDisplay':
-      _buildOrganisationDisplay(),
-  'siret': _value('siretStructure'),
-  'siren': _value('sirenStructure'),
-},
+            'nom': _structureNameForStorage(),
+            'type': _value('typeStructure'),
+            'organisationDisplay': _buildOrganisationDisplay(),
+            'siret': _value('siretStructure'),
+            'siren': _value('sirenStructure'),
+          },
 
           'territoire': {
             'territoireId': territoryId,
@@ -1305,93 +1199,70 @@ if (_isCorrectionMode) {
             'codePostal': _value('codePostal'),
             'logoVille': _value('logoVille'),
             'siteInternetVille': _value('siteInternetVille'),
-            'arretesMunicipaux':
-                _value('arretesMunicipaux'),
-            'villeLat':
-                _toDouble(_value('villeLat')),
-            'villeLng':
-                _toDouble(_value('villeLng')),
+            'arretesMunicipaux': _value('arretesMunicipaux'),
+            'villeLat': _toDouble(_value('villeLat')),
+            'villeLng': _toDouble(_value('villeLng')),
           },
 
-          'trialRequest.certifyRepresentative':
-              _certifyRepresentative,
+          'trialRequest.certifyRepresentative': _certifyRepresentative,
 
-          'trialRequest.legalReadConfirmed':
-              _legalReadConfirmed,
+          'trialRequest.legalReadConfirmed': _legalReadConfirmed,
 
-          'trialRequest.privacyReadConfirmed':
-              _privacyReadConfirmed,
+          'trialRequest.privacyReadConfirmed': _privacyReadConfirmed,
 
-          'trialRequest.rgpdAccepted':
-              _rgpdAccepted,
+          'trialRequest.rgpdAccepted': _rgpdAccepted,
 
           'status': 'pending',
           'accessPhase': 'awaiting_approval',
 
-          'resubmittedAt':
-              FieldValue.serverTimestamp(),
+          'resubmittedAt': FieldValue.serverTimestamp(),
 
-          'resubmissionCount':
-              previousCount + 1,
+          'resubmissionCount': previousCount + 1,
 
-          'previousRejectionReason':
-              currentReason.isEmpty
-                  ? null
-                  : currentReason,
+          'previousRejectionReason': currentReason.isEmpty
+              ? null
+              : currentReason,
 
-          'administrativeTracking.status':
-              'pending',
+          'administrativeTracking.status': 'pending',
 
           'administrativeTracking.previousRejectionReason':
-              currentReason.isEmpty
-                  ? null
-                  : currentReason,
+              currentReason.isEmpty ? null : currentReason,
 
-          'administrativeTracking.rejectionReason':
-              null,
+          'administrativeTracking.rejectionReason': null,
 
-          'administrativeTracking.fieldsToCorrect':
-              FieldValue.delete(),
+          'administrativeTracking.fieldsToCorrect': FieldValue.delete(),
 
-          'administrativeTracking.rejectedAt':
-              null,
+          'administrativeTracking.rejectedAt': null,
 
-          'administrativeTracking.reviewStartedAt':
-              null,
+          'administrativeTracking.reviewStartedAt': null,
 
-          'commercialTracking.status':
-              'awaiting_validation',
+          'commercialTracking.status': 'awaiting_validation',
 
           'setupProgress.accessGranted': false,
-'setupProgress.updatedAt':
-    FieldValue.serverTimestamp(),
+          'setupProgress.updatedAt': FieldValue.serverTimestamp(),
 
-'rejectionEmail': {
-  'status': 'corrected',
-  'recipient': _value('emailResponsable'),
-  'correctedAt': FieldValue.serverTimestamp(),
-  'updatedAt': FieldValue.serverTimestamp(),
-},
+          'rejectionEmail': {
+            'status': 'corrected',
+            'recipient': _value('emailResponsable'),
+            'correctedAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
 
-'lastUpdatedBy': 'applicant',
+          'lastUpdatedBy': 'applicant',
 
-'lastEvent': {
-  'type': 'admin_request_resubmitted',
-  'category': 'administrative',
-  'label':
-      'Demande corrigée et renvoyée par le demandeur',
-  'createdAt': FieldValue.serverTimestamp(),
-  'createdByRole': 'applicant',
-  'createdByUid': user?.uid,
-},
+          'lastEvent': {
+            'type': 'admin_request_resubmitted',
+            'category': 'administrative',
+            'label': 'Demande corrigée et renvoyée par le demandeur',
+            'createdAt': FieldValue.serverTimestamp(),
+            'createdByRole': 'applicant',
+            'createdByUid': user?.uid,
+          },
 
-'updatedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
-    } else {
-      await requestReference.set(
-        {
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } else {
+        await requestReference.set({
           'uid': requestId,
 
           'proConnect': {
@@ -1399,29 +1270,27 @@ if (_isCorrectionMode) {
             'email': widget.proConnectEmail,
             'nom': widget.proConnectNom,
             'prenom': widget.proConnectPrenom,
-            'organisation':
-                widget.proConnectOrganisation,
+            'organisation': widget.proConnectOrganisation,
             'siret': widget.proConnectSiret,
             'siren': widget.proConnectSiren,
           },
 
           'profile': {
-  'civilite': _value('civiliteResponsable'),
-  'nomAffiche': _value('nomResponsable'),
-  'prenomAffiche': _value('prenomResponsable'),
-  'fonction': _value('fonctionResponsable'),
-  'telephone': _value('telephoneResponsable'),
-  'email': _value('emailResponsable'),
-},
+            'civilite': _value('civiliteResponsable'),
+            'nomAffiche': _value('nomResponsable'),
+            'prenomAffiche': _value('prenomResponsable'),
+            'fonction': _value('fonctionResponsable'),
+            'telephone': _value('telephoneResponsable'),
+            'email': _value('emailResponsable'),
+          },
 
           'structure': {
-  'nom': _structureNameForStorage(),
-  'type': _value('typeStructure'),
-  'organisationDisplay':
-      _buildOrganisationDisplay(),
-  'siret': _value('siretStructure'),
-  'siren': _value('sirenStructure'),
-},
+            'nom': _structureNameForStorage(),
+            'type': _value('typeStructure'),
+            'organisationDisplay': _buildOrganisationDisplay(),
+            'siret': _value('siretStructure'),
+            'siren': _value('sirenStructure'),
+          },
 
           'territoire': {
             'territoireId': territoryId,
@@ -1432,38 +1301,27 @@ if (_isCorrectionMode) {
             'adresse': _value('adresse'),
             'codePostal': _value('codePostal'),
             'logoVille': _value('logoVille'),
-            'siteInternetVille':
-                _value('siteInternetVille'),
-            'arretesMunicipaux':
-                _value('arretesMunicipaux'),
-            'villeLat':
-                _toDouble(_value('villeLat')),
-            'villeLng':
-                _toDouble(_value('villeLng')),
+            'siteInternetVille': _value('siteInternetVille'),
+            'arretesMunicipaux': _value('arretesMunicipaux'),
+            'villeLat': _toDouble(_value('villeLat')),
+            'villeLng': _toDouble(_value('villeLng')),
           },
 
           'trialRequest': {
             'trialDurationDays': 8,
-            'certifyRepresentative':
-                _certifyRepresentative,
-            'legalReadConfirmed':
-                _legalReadConfirmed,
-            'privacyReadConfirmed':
-                _privacyReadConfirmed,
-            'rgpdAccepted':
-                _rgpdAccepted,
+            'certifyRepresentative': _certifyRepresentative,
+            'legalReadConfirmed': _legalReadConfirmed,
+            'privacyReadConfirmed': _privacyReadConfirmed,
+            'rgpdAccepted': _rgpdAccepted,
             'acceptedDocuments': {
               'version': _sphotVersion,
-              'publishedAt':
-                  _sphotPublishedAt,
-              'acceptedAt':
-                  FieldValue.serverTimestamp(),
+              'publishedAt': _sphotPublishedAt,
+              'acceptedAt': FieldValue.serverTimestamp(),
               'cgu': true,
               'privacy': true,
               'rgpd': true,
             },
-            'commercialLabel':
-                'Demande d’essai gratuit SPHOT',
+            'commercialLabel': 'Demande d’accès SPHOT ADMIN',
           },
 
           'subscriptionPreview': {
@@ -1475,48 +1333,42 @@ if (_isCorrectionMode) {
           },
 
           'status': 'pending',
-          'requestedAt':
-              FieldValue.serverTimestamp(),
-          'updatedAt':
-              FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
+          'requestedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      if (!mounted) return;
+
+      _cguExpansionController.collapse();
+      _privacyExpansionController.collapse();
+      _rgpdExpansionController.collapse();
+
+      setState(() {
+        _saved = true;
+        _isSaving = false;
+
+        _trialRequestMessage = _isCorrectionMode
+            ? 'Votre demande corrigée a bien été renvoyée.\n\n'
+                  'Un email de confirmation vous a été envoyé.'
+            : 'Votre demande a bien été enregistrée.\n\n'
+                  'Un email de confirmation vous a été envoyé.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _isSaving = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur enregistrement : $error'),
+          duration: const Duration(seconds: 6),
+        ),
       );
     }
-
-    if (!mounted) return;
-
-_cguExpansionController.collapse();
-_privacyExpansionController.collapse();
-_rgpdExpansionController.collapse();
-
-    setState(() {
-      _saved = true;
-      _isSaving = false;
-
-      _trialRequestMessage = _isCorrectionMode
-    ? 'Votre demande corrigée a bien été renvoyée.\n\n'
-      'Un email de confirmation vous a été envoyé.'
-    : 'Votre demande a bien été enregistrée.\n\n'
-      'Un email de confirmation vous a été envoyé.';
-    });
-  } catch (error) {
-    if (!mounted) return;
-
-    setState(() {
-      _isSaving = false;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Erreur enregistrement : $error',
-        ),
-        duration: const Duration(seconds: 6),
-      ),
-    );
   }
-}
 
   Widget _textField(
     String key,
@@ -1532,8 +1384,9 @@ _rgpdExpansionController.collapse();
       readOnly: readOnly,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
-      textCapitalization:
-          uppercase ? TextCapitalization.characters : TextCapitalization.words,
+      textCapitalization: uppercase
+          ? TextCapitalization.characters
+          : TextCapitalization.words,
       onChanged: (value) {
         final formatted = _formatText(
           value,
@@ -1577,9 +1430,7 @@ _rgpdExpansionController.collapse();
           horizontal: 12,
           vertical: 11,
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: adminColor, width: 1.4),
@@ -1593,184 +1444,178 @@ _rgpdExpansionController.collapse();
   }
 
   Widget _dropdownField(
-  String key,
-  String label,
-  List<String> choices, {
-  double maxMenuHeight = 220,
-  bool enabled = true,
-}) {
-  final current = _value(key);
-  final fieldKey = GlobalKey();
+    String key,
+    String label,
+    List<String> choices, {
+    double maxMenuHeight = 220,
+    bool enabled = true,
+  }) {
+    final current = _value(key);
+    final fieldKey = GlobalKey();
 
-  void closeMenu() {
-    _dropdownOverlay?.remove();
-    _dropdownOverlay = null;
-  }
+    void closeMenu() {
+      _dropdownOverlay?.remove();
+      _dropdownOverlay = null;
+    }
 
-  void openMenu() {
-    if (!enabled) return;
-    closeMenu();
+    void openMenu() {
+      if (!enabled) return;
+      closeMenu();
 
-    final renderBox =
-        fieldKey.currentContext!.findRenderObject() as RenderBox;
-    final position = renderBox.localToGlobal(Offset.zero);
-    final size = renderBox.size;
-    final scrollController = ScrollController();
+      final renderBox =
+          fieldKey.currentContext!.findRenderObject() as RenderBox;
+      final position = renderBox.localToGlobal(Offset.zero);
+      final size = renderBox.size;
+      final scrollController = ScrollController();
 
-    _dropdownOverlay = OverlayEntry(
-      builder: (context) {
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: closeMenu,
-                child: Container(color: Colors.transparent),
+      _dropdownOverlay = OverlayEntry(
+        builder: (context) {
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: closeMenu,
+                  child: Container(color: Colors.transparent),
+                ),
               ),
-            ),
-            Positioned(
-              left: position.dx,
-              top: position.dy + size.height - 14,
-              width: size.width,
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  constraints: BoxConstraints(maxHeight: maxMenuHeight),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.97),
-                    border: const Border(
-                      left: BorderSide(color: adminColor, width: 1.4),
-                      right: BorderSide(color: adminColor, width: 1.4),
-                      bottom: BorderSide(color: adminColor, width: 1.4),
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(10),
-                      bottomRight: Radius.circular(10),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.18),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
+              Positioned(
+                left: position.dx,
+                top: position.dy + size.height - 14,
+                width: size.width,
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    constraints: BoxConstraints(maxHeight: maxMenuHeight),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.97),
+                      border: const Border(
+                        left: BorderSide(color: adminColor, width: 1.4),
+                        right: BorderSide(color: adminColor, width: 1.4),
+                        bottom: BorderSide(color: adminColor, width: 1.4),
                       ),
-                    ],
-                  ),
-                  child: ScrollbarTheme(
-  data: ScrollbarThemeData(
-    thumbColor: WidgetStateProperty.all(adminColor),
-    trackColor: WidgetStateProperty.all(
-      adminColor.withOpacity(0.12),
-    ),
-    trackBorderColor: WidgetStateProperty.all(
-      adminColor.withOpacity(0.20),
-    ),
-    thickness: WidgetStateProperty.all(10),
-    radius: const Radius.circular(10),
-  ),
-  child: Scrollbar(
-    controller: scrollController,
-    thumbVisibility: true,
-    trackVisibility: true,
-    child: ListView.builder(
-                      controller: scrollController,
-                      primary: false,
-                      padding: EdgeInsets.zero,
-                      shrinkWrap: true,
-                      itemCount: choices.length,
-                      itemBuilder: (context, index) {
-                        final choice = choices[index];
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(10),
+                        bottomRight: Radius.circular(10),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.18),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ScrollbarTheme(
+                      data: ScrollbarThemeData(
+                        thumbColor: WidgetStateProperty.all(adminColor),
+                        trackColor: WidgetStateProperty.all(
+                          adminColor.withOpacity(0.12),
+                        ),
+                        trackBorderColor: WidgetStateProperty.all(
+                          adminColor.withOpacity(0.20),
+                        ),
+                        thickness: WidgetStateProperty.all(10),
+                        radius: const Radius.circular(10),
+                      ),
+                      child: Scrollbar(
+                        controller: scrollController,
+                        thumbVisibility: true,
+                        trackVisibility: true,
+                        child: ListView.builder(
+                          controller: scrollController,
+                          primary: false,
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: choices.length,
+                          itemBuilder: (context, index) {
+                            final choice = choices[index];
 
-                        return InkWell(
-                          onTap: () {
-                            setState(() {
-                              _controller(key).text = choice;
-                              _saved = false;
-                            });
-                            closeMenu();
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-                            child: Text(
-                              choice,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: adminColor,
+                            return InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _controller(key).text = choice;
+                                  _saved = false;
+                                });
+                                closeMenu();
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                child: Text(
+                                  choice,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: adminColor,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        );
-                                            },
+                            );
+                          },
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
+            ],
+          );
+        },
+      );
+
+      Overlay.of(context).insert(_dropdownOverlay!);
+    }
+
+    return GestureDetector(
+      key: fieldKey,
+      onTap: enabled ? openMenu : null,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: current.isEmpty ? null : label,
+          labelStyle: const TextStyle(
+            color: adminColor,
+            fontWeight: FontWeight.w700,
+          ),
+          filled: true,
+          fillColor: Colors.transparent,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 12,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: adminColor, width: 1.6),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: adminColor, width: 1.6),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                current.isEmpty ? label : current,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: adminColor,
+                ),
+              ),
             ),
-          ),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: redColor,
+              size: 26,
+            ),
           ],
-        );
-      },
+        ),
+      ),
     );
-
-    Overlay.of(context).insert(_dropdownOverlay!);
   }
-
-  return GestureDetector(
-    key: fieldKey,
-    onTap: enabled ? openMenu : null,
-    child: InputDecorator(
-      decoration: InputDecoration(
-        labelText: current.isEmpty ? null : label,
-        labelStyle: const TextStyle(
-          color: adminColor,
-          fontWeight: FontWeight.w700,
-        ),
-        filled: true,
-        fillColor: Colors.transparent,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 12,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(
-            color: adminColor,
-            width: 1.6,
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(
-            color: adminColor,
-            width: 1.6,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-  current.isEmpty ? label : current,
-  overflow: TextOverflow.ellipsis,
-  style: TextStyle(
-    fontSize: 16,
-    fontWeight: FontWeight.w700,
-    color: adminColor,
-  ),
-),
-          ),
-          const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: redColor,
-            size: 26,
-          ),
-        ],
-      ),
-    ),
-  );
-}
 
   Widget _certifiedBlock() {
     final hasCertifiedData =
@@ -1792,10 +1637,7 @@ _rgpdExpansionController.collapse();
       decoration: BoxDecoration(
         color: adminColor.withOpacity(0.055),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: adminColor.withOpacity(0.35),
-          width: 1.3,
-        ),
+        border: Border.all(color: adminColor.withOpacity(0.35), width: 1.3),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1912,10 +1754,7 @@ _rgpdExpansionController.collapse();
               ),
             ],
           ),
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 6),
         Text(
@@ -1938,10 +1777,7 @@ _rgpdExpansionController.collapse();
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.98),
         border: Border(
-          right: BorderSide(
-            color: adminColor.withOpacity(0.25),
-            width: 1.5,
-          ),
+          right: BorderSide(color: adminColor.withOpacity(0.25), width: 1.5),
         ),
       ),
       child: SafeArea(
@@ -1961,8 +1797,9 @@ _rgpdExpansionController.collapse();
               ),
               const SizedBox(height: 8),
               const Text(
-                'Configurez votre SPHOT ADMIN en suivant\n'
-                'les étapes ci-dessous.',
+                'Configurez au préalable votre SPHOT ADMIN en suivant\n'
+                'les étapes ci-dessous pour effectuer votre demande d’accès\n'
+                'auprès de l’équipe SPHOT.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: adminColor,
@@ -2037,9 +1874,7 @@ _rgpdExpansionController.collapse();
                 icon: Icons.place_rounded,
                 label: 'LIEU',
                 completed: _isCorrectionMode
-                    ? (_sectionHasFieldsToCorrect(
-                            _TrialRequestSection.ville,
-                          ) &&
+                    ? (_sectionHasFieldsToCorrect(_TrialRequestSection.ville) &&
                           _fieldsForSection(_TrialRequestSection.ville)
                               .where(_fieldsToCorrect.contains)
                               .every(
@@ -2048,18 +1883,16 @@ _rgpdExpansionController.collapse();
                                     _correctedFieldIsValid(key),
                               ))
                     : _villeComplete,
-                enabled: _correctionSectionEnabled(
-                  _TrialRequestSection.ville,
-                ),
+                enabled: _correctionSectionEnabled(_TrialRequestSection.ville),
               ),
               _menuButton(
                 section: _TrialRequestSection.essai,
-                icon: Icons.rocket_launch_rounded,
-                label: 'ESSAI GRATUIT 8 JOURS',
-                completed: _canSubmitTrialRequest,
-                enabled: _correctionSectionEnabled(
-                  _TrialRequestSection.essai,
-                ),
+                icon: Icons.fact_check_outlined,
+                label: 'DEMANDE D’ACCÈS',
+                completed: _saved || _canSubmitTrialRequest,
+                enabled:
+                    !_saved &&
+                    _correctionSectionEnabled(_TrialRequestSection.essai),
               ),
               const Spacer(),
               _statusCard(),
@@ -2077,9 +1910,12 @@ _rgpdExpansionController.collapse();
     required bool completed,
     bool enabled = true,
   }) {
+    final isEnabled = enabled && !_saved;
     final selected = _selectedSection == section;
-    final effectiveColor =
-        !enabled ? Colors.grey : (selected ? redColor : adminColor);
+
+    final effectiveColor = !isEnabled
+        ? Colors.grey
+        : (selected ? redColor : adminColor);
     final stepNumber = section.index + 1;
 
     return Padding(
@@ -2087,17 +1923,15 @@ _rgpdExpansionController.collapse();
       child: SizedBox(
         height: 72,
         child: OutlinedButton(
-          onPressed: enabled ? () => _selectSection(section) : null,
+          onPressed: isEnabled ? () => _selectSection(section) : null,
           style: OutlinedButton.styleFrom(
             elevation: 0,
-            backgroundColor:
-                selected ? redColor.withOpacity(0.04) : Colors.transparent,
+            backgroundColor: isEnabled && selected
+                ? redColor.withOpacity(0.04)
+                : Colors.transparent,
             foregroundColor: effectiveColor,
             disabledForegroundColor: Colors.grey,
-            side: BorderSide(
-              color: effectiveColor,
-              width: selected ? 2 : 1.6,
-            ),
+            side: BorderSide(color: effectiveColor, width: selected ? 2 : 1.6),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
             ),
@@ -2112,16 +1946,32 @@ _rgpdExpansionController.collapse();
                   alignment: Alignment.center,
                   children: [
                     ColorFiltered(
-                      colorFilter: enabled
+                      colorFilter: isEnabled
                           ? const ColorFilter.mode(
                               Colors.transparent,
                               BlendMode.dst,
                             )
                           : const ColorFilter.matrix(<double>[
-                              0.2126, 0.7152, 0.0722, 0, 0,
-                              0.2126, 0.7152, 0.0722, 0, 0,
-                              0.2126, 0.7152, 0.0722, 0, 0,
-                              0, 0, 0, 1, 0,
+                              0.2126,
+                              0.7152,
+                              0.0722,
+                              0,
+                              0,
+                              0.2126,
+                              0.7152,
+                              0.0722,
+                              0,
+                              0,
+                              0.2126,
+                              0.7152,
+                              0.0722,
+                              0,
+                              0,
+                              0,
+                              0,
+                              0,
+                              1,
+                              0,
                             ]),
                       child: AdaptiveAssetImage(
                         'data/icons/fire_red_icon.svg',
@@ -2166,229 +2016,215 @@ _rgpdExpansionController.collapse();
   }
 
   Widget _statusCard() {
-  final correctionReady = _allRequestedCorrectionsCompleted;
-  final normalReady = _canOpenTrialRequest;
+    final correctionReady = _allRequestedCorrectionsCompleted;
+    final normalReady = _canOpenTrialRequest;
 
-  final bool ready =
-      _isCorrectionMode ? correctionReady : normalReady;
+    final bool ready = _isCorrectionMode ? correctionReady : normalReady;
 
-  final String text;
+    final String text;
 
-  if (_saved) {
-    text = _isCorrectionMode
-        ? 'Corrections envoyées.\nVotre dossier est en attente de validation.'
-        : 'Demande envoyée.\nVotre dossier est en attente de validation.';
-  } else if (_isCorrectionMode) {
-    if (_fieldsToCorrect.isEmpty) {
-      text =
-          'Correction bloquée.\n'
-          'Aucun nom de champ n’a été reconnu dans le motif du refus.';
-    } else if (correctionReady) {
-      text =
-          'Corrections terminées.\n'
-          'Vous pouvez renvoyer votre demande.';
+    if (_saved) {
+      text = _isCorrectionMode
+          ? 'Corrections envoyées.\nVotre dossier est en attente de validation.'
+          : 'Demande envoyée.\nVotre dossier est en attente de validation.';
+    } else if (_isCorrectionMode) {
+      if (_fieldsToCorrect.isEmpty) {
+        text =
+            'Correction bloquée.\n'
+            'Aucun nom de champ n’a été reconnu dans le motif du refus.';
+      } else if (correctionReady) {
+        text =
+            'Corrections terminées.\n'
+            'Vous pouvez renvoyer votre demande d’accès.';
+      } else {
+        text =
+            'Modifiez tous les champs signalés\n'
+            'pour débloquer le renvoi.';
+      }
     } else {
-      text =
-          'Modifiez tous les champs signalés\n'
-          'pour débloquer le renvoi.';
+      text = normalReady
+          ? 'Dossier complet.\n'
+                'Vous pouvez envoyer votre demande d’accès.'
+          : 'Complétez les étapes pour débloquer la demande d’accès.';
     }
-  } else {
-    text = normalReady
-        ? 'Dossier complet.\n'
-            'Vous pouvez demander votre essai gratuit.'
-        : 'Complétez les étapes pour débloquer la demande d’essai.';
+
+    final Color statusColor = _saved
+        ? redColor
+        : ready
+        ? adminColor
+        : Colors.grey;
+
+    final IconData statusIcon = _saved
+        ? Icons.check_circle_rounded
+        : ready
+        ? Icons.lock_open_rounded
+        : Icons.lock_outline_rounded;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: statusColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: statusColor, width: 1.4),
+      ),
+      child: Column(
+        children: [
+          Icon(statusIcon, color: statusColor, size: 26),
+          const SizedBox(height: 8),
+          Text(
+            text,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: statusColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              height: 1.25,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  final Color statusColor = _saved
-      ? redColor
-      : ready
-          ? adminColor
-          : Colors.grey;
-
-  final IconData statusIcon = _saved
-      ? Icons.check_circle_rounded
-      : ready
-          ? Icons.lock_open_rounded
-          : Icons.lock_outline_rounded;
-
-  return Container(
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: statusColor.withOpacity(0.08),
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(
-        color: statusColor,
-        width: 1.4,
-      ),
-    ),
-    child: Column(
-      children: [
-        Icon(
-          statusIcon,
-          color: statusColor,
-          size: 26,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          text,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: statusColor,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            height: 1.25,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
   Widget _mapCenter() {
-  
-  final style = _mapStyles[_selectedMapStyleIndex];
+    final style = _mapStyles[_selectedMapStyleIndex];
 
-  final cityLat = _toDouble(_value('villeLat'));
-  final cityLng = _toDouble(_value('villeLng'));
+    final cityLat = _toDouble(_value('villeLat'));
+    final cityLng = _toDouble(_value('villeLng'));
 
-  final cityPoint = _hasCityPosition
-      ? LatLng(cityLat, cityLng)
-      : const LatLng(20, 0);
+    final cityPoint = _hasCityPosition
+        ? LatLng(cityLat, cityLng)
+        : const LatLng(20, 0);
 
-  return Expanded(
-    child: Stack(
-      children: [
-        FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCenter: cityPoint,
-            initialZoom: _hasCityPosition ? 14.0 : 2.2,
-            minZoom: 2,
-            maxZoom: style.maxZoom.toDouble(),
-            onTap: (tapPosition, point) {
-              if (_selectedSection != _TrialRequestSection.ville ||
-                  (_isCorrectionMode &&
-                      !_isFieldEditable('villeLat') &&
-                      !_isFieldEditable('villeLng'))) {
-                return;
-              }
-
-              _setCityPosition(point);
-            },
-          ),
-          children: [
-            TileLayer(
-              key: ValueKey<String>(
-                'admin_trial_tile_$_selectedMapStyleIndex',
-              ),
-              urlTemplate: style.url,
-              subdomains: style.subdomains,
+    return Expanded(
+      child: Stack(
+        children: [
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: cityPoint,
+              initialZoom: _hasCityPosition ? 14.0 : 2.2,
+              minZoom: 2,
               maxZoom: style.maxZoom.toDouble(),
-              maxNativeZoom: style.maxZoom,
-              userAgentPackageName: 'com.sylvainra.sphot',
+              onTap: (tapPosition, point) {
+                if (_selectedSection != _TrialRequestSection.ville ||
+                    (_isCorrectionMode &&
+                        !_isFieldEditable('villeLat') &&
+                        !_isFieldEditable('villeLng'))) {
+                  return;
+                }
+
+                _setCityPosition(point);
+              },
             ),
-            if (_hasCityPosition)
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: cityPoint,
-                    width: 62,
-                    height: 62,
-                    alignment: Alignment.topCenter,
-                    child: AdaptiveAssetImage(
-                      'data/icons/fire_red_icon.svg',
-                      filterQuality: FilterQuality.high,
-                    ),
-                  ),
-                ],
+            children: [
+              TileLayer(
+                key: ValueKey<String>(
+                  'admin_trial_tile_$_selectedMapStyleIndex',
+                ),
+                urlTemplate: style.url,
+                subdomains: style.subdomains,
+                maxZoom: style.maxZoom.toDouble(),
+                maxNativeZoom: style.maxZoom,
+                userAgentPackageName: 'com.sylvainra.sphot',
               ),
+              if (_hasCityPosition)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: cityPoint,
+                      width: 62,
+                      height: 62,
+                      alignment: Alignment.topCenter,
+                      child: AdaptiveAssetImage(
+                        'data/icons/fire_red_icon.svg',
+                        filterQuality: FilterQuality.high,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          Positioned(
+            top: 14,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Image.asset(
+                'data/icons/title.png',
+                height: 48,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+              ),
+            ),
+          ),
+          _mapTopBanner(),
+          _mapStyleControls(),
+
+          if (_isCorrectionMode && _isLoadingCorrection)
+            const Positioned.fill(
+              child: ColoredBox(
+                color: Color(0xFFF2F4F8),
+                child: Center(
+                  child: CircularProgressIndicator(color: adminColor),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _mapTopBanner() {
+    final isVille = _selectedSection == _TrialRequestSection.ville;
+
+    if (!isVille || !_cityInfoComplete) {
+      return const SizedBox.shrink();
+    }
+
+    return Positioned(
+      top: 76,
+      left: 18,
+      right: 18,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.95),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: Colors.black.withOpacity(0.26), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
-        Positioned(
-          top: 14,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Image.asset(
-              'data/icons/title.png',
-              height: 48,
-              fit: BoxFit.contain,
+        child: Row(
+          children: [
+            AdaptiveAssetImage(
+              'data/icons/fire_red_icon.svg',
+              width: 24,
+              height: 24,
               filterQuality: FilterQuality.high,
             ),
-          ),
-        ),
-         _mapTopBanner(),
-      _mapStyleControls(),
-
-      if (_isCorrectionMode && _isLoadingCorrection)
-        const Positioned.fill(
-          child: ColoredBox(
-            color: Color(0xFFF2F4F8),
-            child: Center(
-              child: CircularProgressIndicator(
-                color: adminColor,
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Cliquez sur la carte pour positionner le lieu du SPHOT ADMIN.',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: redColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
-          ),
+          ],
         ),
-    ],
-  ),
-);
-}
-  
-  Widget _mapTopBanner() {
-  final isVille = _selectedSection == _TrialRequestSection.ville;
-
-if (!isVille || !_cityInfoComplete) {
-  return const SizedBox.shrink();
-}
-
-  return Positioned(
-    top: 76,
-    left: 18,
-    right: 18,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(
-          color: Colors.black.withOpacity(0.26),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.12),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
-      child: Row(
-        children: [
-          AdaptiveAssetImage(
-            'data/icons/fire_red_icon.svg',
-            width: 24,
-            height: 24,
-            filterQuality: FilterQuality.high,
-          ),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Text(
-              'Cliquez sur la carte pour positionner le lieu.',
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: redColor,
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _mapStyleControls() {
     final style = _mapStyles[_selectedMapStyleIndex];
@@ -2429,82 +2265,71 @@ if (!isVille || !_cityInfoComplete) {
     );
   }
 
-Widget _correctionNotice() {
-  return Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: redColor.withOpacity(0.06),
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(
-        color: redColor,
-        width: 1.5,
+  Widget _correctionNotice() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: redColor.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: redColor, width: 1.5),
       ),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            Icon(
-              Icons.edit_document,
-              color: redColor,
-              size: 22,
-            ),
-            SizedBox(width: 9),
-            Expanded(
-              child: Text(
-                'CORRECTION DE VOTRE DEMANDE',
-                style: TextStyle(
-                  color: redColor,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.edit_document, color: redColor, size: 22),
+              SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  'CORRECTION DE VOTRE DEMANDE',
+                  style: TextStyle(
+                    color: redColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            _correctionRequestNumber ?? '',
+            style: const TextStyle(
+              color: adminColor,
+              fontWeight: FontWeight.w900,
             ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Text(
-          _correctionRequestNumber ?? '',
-          style: const TextStyle(
-            color: adminColor,
-            fontWeight: FontWeight.w900,
           ),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          "Motif communiqué par l'équipe SPHOT :",
-          style: TextStyle(
-            color: adminColor,
-            fontWeight: FontWeight.w900,
+          const SizedBox(height: 12),
+          const Text(
+            "Motif communiqué par l'équipe SPHOT :",
+            style: TextStyle(color: adminColor, fontWeight: FontWeight.w900),
           ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          _correctionReason ??
-              'Des informations doivent être corrigées.',
-          style: const TextStyle(
-            color: adminColor,
-            fontWeight: FontWeight.w700,
-            height: 1.35,
+          const SizedBox(height: 6),
+          Text(
+            _correctionReason ?? 'Des informations doivent être corrigées.',
+            style: const TextStyle(
+              color: adminColor,
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'Corrigez uniquement les informations concernées, '
-          'puis renvoyez votre demande. Votre référence '
-          'administrative sera conservée.',
-          style: TextStyle(
-            color: adminColor,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            height: 1.35,
+          const SizedBox(height: 12),
+          const Text(
+            'Corrigez uniquement les informations concernées, '
+            'puis renvoyez votre demande. Votre référence '
+            'administrative sera conservée.',
+            style: TextStyle(
+              color: adminColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
   Widget _rightPanel() {
     return Container(
@@ -2512,30 +2337,27 @@ Widget _correctionNotice() {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.985),
         border: Border(
-          left: BorderSide(
-            color: adminColor.withOpacity(0.25),
-            width: 1.5,
-          ),
+          left: BorderSide(color: adminColor.withOpacity(0.25), width: 1.5),
         ),
       ),
       child: SafeArea(
-  child: Align(
-    alignment: Alignment.topCenter,
-    child: SingleChildScrollView(
-      padding: const EdgeInsets.all(22),
-      child: Column(
-  crossAxisAlignment: CrossAxisAlignment.stretch,
-  children: [
-    if (_isCorrectionMode) ...[
-      _correctionNotice(),
-      const SizedBox(height: 14),
-    ],
-    _selectedPanel(),
-  ],
-),
-    ),
-  ),
-),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_isCorrectionMode) ...[
+                  _correctionNotice(),
+                  const SizedBox(height: 14),
+                ],
+                _selectedPanel(),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -2555,50 +2377,52 @@ Widget _correctionNotice() {
   }
 
   Widget _structurePanel() {
-  final typeStructure =
-      _value('typeStructure').trim().toUpperCase();
+    final typeStructure = _value('typeStructure').trim().toUpperCase();
 
-  return Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _pageHeader(
           'STRUCTURE',
-          'Renseignez l’organisme qui utilisera SPHOT.',
+          'Renseignez l’organisme qui utilisera SPHOT ADMIN.',
         ),
         _dropdownField(
-  'typeStructure',
-  'Type de structure',
-  structureTypes,
-  enabled: _isFieldEditable('typeStructure'),
-),
+          'typeStructure',
+          'Type de structure',
+          structureTypes,
+          enabled: _isFieldEditable('typeStructure'),
+        ),
 
-if (typeStructure != 'MAIRIE') ...[
-  const SizedBox(height: 11),
+        if (typeStructure != 'MAIRIE') ...[
+          const SizedBox(height: 11),
 
-  _textField(
-    'nomStructure',
-    'Nom de la structure',
-    uppercase: true,
-    readOnly: !_isFieldEditable('nomStructure') ||
-        (!_isCorrectionMode && widget.proConnectOrganisation != null),
-  ),
-],
+          _textField(
+            'nomStructure',
+            'Nom de la structure',
+            uppercase: true,
+            readOnly:
+                !_isFieldEditable('nomStructure') ||
+                (!_isCorrectionMode && widget.proConnectOrganisation != null),
+          ),
+        ],
         const SizedBox(height: 11),
         _textField(
           'siretStructure',
           'SIRET',
           keyboardType: TextInputType.number,
-          readOnly: !_isFieldEditable('siretStructure') ||
-          (!_isCorrectionMode && widget.proConnectSiret != null),
+          readOnly:
+              !_isFieldEditable('siretStructure') ||
+              (!_isCorrectionMode && widget.proConnectSiret != null),
         ),
         const SizedBox(height: 11),
-_textField(
-  'sirenStructure',
-  'SIREN',
-  keyboardType: TextInputType.number,
-  readOnly: !_isFieldEditable('sirenStructure') ||
-      (!_isCorrectionMode && widget.proConnectSiren != null),
-),
+        _textField(
+          'sirenStructure',
+          'SIREN',
+          keyboardType: TextInputType.number,
+          readOnly:
+              !_isFieldEditable('sirenStructure') ||
+              (!_isCorrectionMode && widget.proConnectSiren != null),
+        ),
         const SizedBox(height: 22),
         _nextButton(_TrialRequestSection.responsable),
       ],
@@ -2609,20 +2433,17 @@ _textField(
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _pageHeader(
-          'RESPONSABLE',
-          'Identité du référent admin SPHOT.',
-        ),
+        _pageHeader('RESPONSABLE', 'Identité du référent SPHOT ADMIN.'),
         _certifiedBlock(),
 
-_dropdownField(
-  'civiliteResponsable',
-  'Civilité',
-  civiliteChoices,
-  enabled: _isFieldEditable('civiliteResponsable'),
-),
+        _dropdownField(
+          'civiliteResponsable',
+          'Civilité',
+          civiliteChoices,
+          enabled: _isFieldEditable('civiliteResponsable'),
+        ),
 
-const SizedBox(height: 11),
+        const SizedBox(height: 11),
 
         _textField(
           'nomResponsable',
@@ -2664,18 +2485,22 @@ const SizedBox(height: 11),
         ),
         const SizedBox(height: 22),
 
-const SizedBox(height: 22),
+        const SizedBox(height: 22),
 
-Row(
-  mainAxisAlignment: MainAxisAlignment.center,
-  children: [
-    _previousButton(_TrialRequestSection.structure), // adapter selon la page
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _previousButton(
+              _TrialRequestSection.structure,
+            ), // adapter selon la page
 
-    const SizedBox(width: 20),
+            const SizedBox(width: 20),
 
-    _nextButton(_TrialRequestSection.territoire), // adapter selon la page
-  ],
-),
+            _nextButton(
+              _TrialRequestSection.territoire,
+            ), // adapter selon la page
+          ],
+        ),
       ],
     );
   }
@@ -2686,13 +2511,28 @@ Row(
       children: [
         _pageHeader(
           'TERRITOIRE',
-          'Un accès admin SPHOT est rattaché à une ville.',
+          'Un accès SPHOT ADMIN est rattaché à une ville.',
         ),
-        _textField('pays', 'Pays', uppercase: true, readOnly: !_isFieldEditable('pays')),
+        _textField(
+          'pays',
+          'Pays',
+          uppercase: true,
+          readOnly: !_isFieldEditable('pays'),
+        ),
         const SizedBox(height: 11),
-        _textField('region', 'Région', uppercase: true, readOnly: !_isFieldEditable('region')),
+        _textField(
+          'region',
+          'Région',
+          uppercase: true,
+          readOnly: !_isFieldEditable('region'),
+        ),
         const SizedBox(height: 11),
-        _textField('departement', 'Département', uppercase: true, readOnly: !_isFieldEditable('departement')),
+        _textField(
+          'departement',
+          'Département',
+          uppercase: true,
+          readOnly: !_isFieldEditable('departement'),
+        ),
         const SizedBox(height: 11),
         _textField(
           'adresse',
@@ -2707,375 +2547,371 @@ Row(
           readOnly: !_isFieldEditable('codePostal'),
         ),
         const SizedBox(height: 11),
-        _textField('ville', 'Ville', uppercase: true, readOnly: !_isFieldEditable('ville')),
+        _textField(
+          'ville',
+          'Ville',
+          uppercase: true,
+          readOnly: !_isFieldEditable('ville'),
+        ),
         const SizedBox(height: 22),
-const SizedBox(height: 22),
+        const SizedBox(height: 22),
 
-Row(
-  mainAxisAlignment: MainAxisAlignment.center,
-  children: [
-    _previousButton(_TrialRequestSection.responsable), // adapter selon la page
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _previousButton(
+              _TrialRequestSection.responsable,
+            ), // adapter selon la page
 
-    const SizedBox(width: 20),
+            const SizedBox(width: 20),
 
-    _nextButton(_TrialRequestSection.ville), // adapter selon la page
-  ],
-),
-
+            _nextButton(_TrialRequestSection.ville), // adapter selon la page
+          ],
+        ),
       ],
     );
   }
 
   Widget _villePanel() {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      _pageHeader(
-        'LIEU',
-        'Positionnez le lieu sur la carte centrale.',
-      ),
-      _textField(
-        'siteInternetVille',
-        'https://www.votre-site.fr',
-        readOnly: !_isFieldEditable('siteInternetVille'),
-      ),
-
-const SizedBox(height: 11),
-
-_textField(
-        'logoVille',
-        'https://votre-logo',
-        readOnly: !_isFieldEditable('logoVille'),
-      ),
-      const SizedBox(height: 11),
-      _textField(
-        'arretesMunicipaux',
-        'https://réglements-de-baignade',
-        readOnly: !_isFieldEditable('arretesMunicipaux'),
-      ),
-      const SizedBox(height: 14),
-      Container(
-  padding: const EdgeInsets.all(12),
-  decoration: BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(14),
-    border: Border.all(
-      color: adminColor,
-      width: 1.4,
-    ),
-  ),
-  child: const Text(
-    'Cliquez sur la carte pour positionner le lieu.\n\nAstuce : les coordonnées GPS seront enregistrées automatiquement.',
-    style: TextStyle(
-      color: adminColor,
-      fontSize: 12,
-      fontWeight: FontWeight.w700,
-      height: 1.25,
-    ),
-  ),
-),
-      const SizedBox(height: 10),
-      SizedBox(
-        height: 48,
-        child: OutlinedButton.icon(
-          onPressed: _hasCityPosition ? _centerOnCity : null,
-          icon: const Icon(Icons.center_focus_strong_rounded),
-          label: const Text(
-            'CENTRER SUR LE LIEU',
-            style: TextStyle(fontWeight: FontWeight.w900),
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: adminColor,
-            disabledForegroundColor: Colors.grey,
-            side: BorderSide(
-              color: _hasCityPosition ? adminColor : Colors.grey,
-              width: 1.6,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 14),
-      Row(
-        children: [
-          Expanded(
-            child: _textField(
-              'villeLat',
-              'Latitude',
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-                signed: true,
-              ),
-              readOnly: !_isFieldEditable('villeLat'),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _textField(
-              'villeLng',
-              'Longitude',
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-                signed: true,
-              ),
-              readOnly: !_isFieldEditable('villeLng'),
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 22),
-      Row(
-  mainAxisAlignment: MainAxisAlignment.center,
-  children: [
-    _previousButton(_TrialRequestSection.territoire),
-
-    const SizedBox(width: 20),
-
-    _nextButton(
-      _TrialRequestSection.essai,
-      enabled: _villeComplete,
-    ),
-  ],
-),
-    ],
-  );
-}
-
-Widget _legalDropdown({
-  required String title,
-  required Map<String, dynamic>? document,
-  required bool checked,
-  required String checkText,
-  required ValueChanged<bool?> onChanged,
-  required ExpansionTileController controller,
-}) {
-  final chapters = List<Map<String, dynamic>>.from(
-    document?['chapters'] ?? [],
-  );
-
-  return Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: adminColor, width: 1.4),
-    ),
-    child: ExpansionTile(
-      controller: controller,
-      shape: const Border(),
-      collapsedShape: const Border(),
-      tilePadding: const EdgeInsets.symmetric(horizontal: 14),
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: adminColor,
-          fontSize: 14,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-      iconColor: redColor,
-      collapsedIconColor: redColor,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: chapters.isEmpty
-                ? const [
-                    Text(
-                      'Aucun chapitre renseigné.',
-                      style: TextStyle(
-                        color: adminColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ]
-                : chapters.map((chapter) {
-                    final chapterTitle =
-                        (chapter['title'] ?? chapter['titre'] ?? '').toString();
-                    final content =
-                        (chapter['content'] ?? chapter['texte'] ?? '').toString();
+        _pageHeader(
+          'LIEU',
+          'Positionnez le lieu du SPHOT ADMIN sur la carte centrale.',
+        ),
+        _textField(
+          'siteInternetVille',
+          'https://www.votre-site.fr',
+          readOnly: !_isFieldEditable('siteInternetVille'),
+        ),
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (chapterTitle.isNotEmpty)
-                            Text(
-                              chapterTitle,
-                              style: const TextStyle(
-                                color: redColor,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          const SizedBox(height: 4),
-                          Text(
-                            content,
-                            style: const TextStyle(
-                              color: adminColor,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
+        const SizedBox(height: 11),
+
+        _textField(
+          'logoVille',
+          'https://votre-logo',
+          readOnly: !_isFieldEditable('logoVille'),
+        ),
+        const SizedBox(height: 11),
+        _textField(
+          'arretesMunicipaux',
+          'https://réglements-de-baignade',
+          readOnly: !_isFieldEditable('arretesMunicipaux'),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: adminColor, width: 1.4),
+          ),
+          child: const Text(
+            'Cliquez sur la carte pour positionner le lieu du SPHOT ADMIN.\n\nAstuce : les coordonnées GPS seront enregistrées automatiquement.',
+            style: TextStyle(
+              color: adminColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+            ),
           ),
         ),
-        Padding(
-  padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-  child: SizedBox(
-    width: double.infinity,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Version SPHOT',
-          style: TextStyle(
-            color: redColor,
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 48,
+          child: OutlinedButton.icon(
+            onPressed: _hasCityPosition ? _centerOnCity : null,
+            icon: const Icon(Icons.center_focus_strong_rounded),
+            label: const Text(
+              'CENTRER SUR LE LIEU',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: adminColor,
+              disabledForegroundColor: Colors.grey,
+              side: BorderSide(
+                color: _hasCityPosition ? adminColor : Colors.grey,
+                width: 1.6,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: _textField(
+                'villeLat',
+                'Latitude',
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
+                ),
+                readOnly: !_isFieldEditable('villeLat'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _textField(
+                'villeLng',
+                'Longitude',
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
+                ),
+                readOnly: !_isFieldEditable('villeLng'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 22),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _previousButton(_TrialRequestSection.territoire),
+
+            const SizedBox(width: 20),
+
+            _nextButton(_TrialRequestSection.essai, enabled: _villeComplete),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _legalDropdown({
+    required String title,
+    required Map<String, dynamic>? document,
+    required bool checked,
+    required String checkText,
+    required ValueChanged<bool?> onChanged,
+    required ExpansionTileController controller,
+  }) {
+    final chapters = List<Map<String, dynamic>>.from(
+      document?['chapters'] ?? [],
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: adminColor, width: 1.4),
+      ),
+      child: ExpansionTile(
+        controller: controller,
+        shape: const Border(),
+        collapsedShape: const Border(),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: adminColor,
             fontSize: 14,
             fontWeight: FontWeight.w900,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          _sphotVersion,
-          style: const TextStyle(
-            color: adminColor,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
+        iconColor: redColor,
+        collapsedIconColor: redColor,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: chapters.isEmpty
+                  ? const [
+                      Text(
+                        'Aucun chapitre renseigné.',
+                        style: TextStyle(
+                          color: adminColor,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ]
+                  : chapters.map((chapter) {
+                      final chapterTitle =
+                          (chapter['title'] ?? chapter['titre'] ?? '')
+                              .toString();
+                      final content =
+                          (chapter['content'] ?? chapter['texte'] ?? '')
+                              .toString();
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (chapterTitle.isNotEmpty)
+                              Text(
+                                chapterTitle,
+                                style: const TextStyle(
+                                  color: redColor,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            const SizedBox(height: 4),
+                            Text(
+                              content,
+                              style: const TextStyle(
+                                color: adminColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+            ),
           ),
-        ),
-      ],
-    ),
-  ),
-),
-        _checkLine(
-          value: checked,
-          text: checkText,
-          onChanged: onChanged,
-        ),
-      ],
-    ),
-  );
-}
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+            child: SizedBox(
+              width: double.infinity,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Version SPHOT',
+                    style: TextStyle(
+                      color: redColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _sphotVersion,
+                    style: const TextStyle(
+                      color: adminColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          _checkLine(value: checked, text: checkText, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
 
   Widget _trialRequestPanel() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _pageHeader(
-          'ESSAI GRATUIT',
-          'Découvrez gratuitement SPHOT pendant 8 jours.',
+        _pageHeader('DEMANDE D’ACCÈS', 'Demandez l’accès à votre SPHOT ADMIN.'),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: adminColor.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: adminColor.withOpacity(0.35), width: 1.3),
+          ),
+          child: const Text(
+            'Votre demande sera transmise à l’équipe SPHOT pour vérification '
+            'et validation.\n\n'
+            'Cette démarche ne déclenche ni période d’essai ni facturation.\n\n'
+            'Après validation, vous pourrez accéder à votre SPHOT ADMIN, '
+            'finaliser sa configuration puis demander votre période d’essai '
+            'gratuite de 8 jours.',
+            style: TextStyle(
+              color: adminColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              height: 1.4,
+            ),
+          ),
         ),
-        const Text(
-  'Découvrez les services de SPHOT :',
-  style: TextStyle(
-    color: adminColor,
-    fontSize: 16,
-    fontWeight: FontWeight.w800,
-    height: 1.3,
-  ),
-),
-const SizedBox(height: 18),
+        const SizedBox(height: 16),
         _trialFeature(
-  'Centralisez la gestion de vos SPHOTS et de vos sauveteurs',
-),
+          'Centralisez la gestion de vos SPHOTS et de vos sauveteurs',
+        ),
 
-_trialFeature(
-  'Valorisez vos SPHOTS auprès du public',
-),
+        _trialFeature('Valorisez vos SPHOTS auprès du public'),
 
-_trialFeature(
-  'Analysez la fréquentation de vos SPHOTS',
-),
+        _trialFeature('Analysez la fréquentation de vos SPHOTS'),
 
-_trialFeature(
-  'Informez en temps réel sur les conditions de baignade',
-),
+        _trialFeature('Informez en temps réel sur les conditions de baignade'),
 
-_trialFeature(
-  'Partagez les conditions météo et maritimes',
-),
+        _trialFeature('Partagez les conditions météo et maritimes'),
 
-_trialFeature(
-  'Diffusez la couleur du drapeau et les dangers du jour',
-),
-        
-        const SizedBox(height: 8),
-        _trialSummaryCard(),
+        _trialFeature('Diffusez la couleur du drapeau et les dangers du jour'),
+
         _checkLine(
-  value: _certifyRepresentative,
-  text: 'Je certifie être habilité à représenter cette structure.',
-  onChanged: (value) {
-    setState(() {
-      _certifyRepresentative = value ?? false;
-      _saved = false;
-    });
-  },
-),
+          value: _certifyRepresentative,
+          text: 'Je certifie être habilité à représenter cette structure.',
+          onChanged: (value) {
+            setState(() {
+              _certifyRepresentative = value ?? false;
+              _saved = false;
+            });
+          },
+        ),
 
-if (_legalLoading)
-  const Center(child: CircularProgressIndicator())
-else ...[
-  _legalDropdown(
-  title: 'Conditions Générales d’Utilisation',
-  document: _cguDoc,
-  checked: _legalReadConfirmed,
-  checkText: 'J’ai lu et j’accepte les CGU de SPHOT.',
-  controller: _cguExpansionController,
-  onChanged: (value) {
-    setState(() {
-      _legalReadConfirmed = value ?? false;
-      _saved = false;
-    });
-  },
-),
+        if (_legalLoading)
+          const Center(child: CircularProgressIndicator())
+        else ...[
+          _legalDropdown(
+            title: 'Conditions Générales d’Utilisation',
+            document: _cguDoc,
+            checked: _legalReadConfirmed,
+            checkText: 'J’ai lu et j’accepte les CGU de SPHOT.',
+            controller: _cguExpansionController,
+            onChanged: (value) {
+              setState(() {
+                _legalReadConfirmed = value ?? false;
+                _saved = false;
+              });
+            },
+          ),
 
-  _legalDropdown(
-  title: 'Politique de confidentialité',
-  document: _privacyDoc,
-  checked: _privacyReadConfirmed,
-  checkText:
-      'J’ai lu et j’accepte la Politique de confidentialité de SPHOT.',
-  controller: _privacyExpansionController,
-  onChanged: (value) {
-    setState(() {
-      _privacyReadConfirmed = value ?? false;
-      _saved = false;
-    });
-  },
-),
+          _legalDropdown(
+            title: 'Politique de confidentialité',
+            document: _privacyDoc,
+            checked: _privacyReadConfirmed,
+            checkText:
+                'J’ai lu et j’accepte la Politique de confidentialité de SPHOT.',
+            controller: _privacyExpansionController,
+            onChanged: (value) {
+              setState(() {
+                _privacyReadConfirmed = value ?? false;
+                _saved = false;
+              });
+            },
+          ),
 
-  _legalDropdown(
-  title: 'RGPD',
-  document: _rgpdDoc,
-  checked: _rgpdAccepted,
-  checkText:
-      'J’accepte le traitement des données conformément au RGPD.',
-  controller: _rgpdExpansionController,
-  onChanged: (value) {
-    setState(() {
-      _rgpdAccepted = value ?? false;
-      _saved = false;
-    });
-  },
-),
-],
+          _legalDropdown(
+            title: 'RGPD',
+            document: _rgpdDoc,
+            checked: _rgpdAccepted,
+            checkText:
+                'J’accepte le traitement des données conformément au RGPD.',
+            controller: _rgpdExpansionController,
+            onChanged: (value) {
+              setState(() {
+                _rgpdAccepted = value ?? false;
+                _saved = false;
+              });
+            },
+          ),
+        ],
         const SizedBox(height: 18),
-        
+
         SizedBox(
           height: 56,
           child: ElevatedButton.icon(
-            onPressed:
-    _canSubmitTrialRequest && !_isSaving && !_saved
-        ? _saveRegistration
-        : null,
+            onPressed: _canSubmitTrialRequest && !_isSaving && !_saved
+                ? _saveRegistration
+                : null,
             icon: _isSaving
                 ? const SizedBox(
                     width: 18,
@@ -3090,8 +2926,12 @@ else ...[
               _isSaving
                   ? 'ENVOI EN COURS'
                   : (_saved
-                      ? 'DEMANDE ENVOYÉE'
-                      : 'DEMANDE D’ESSAI GRATUIT'),
+                        ? (_isCorrectionMode
+                              ? 'DEMANDE D’ACCÈS RENVOYÉE'
+                              : 'DEMANDE D’ACCÈS ENVOYÉE')
+                        : (_isCorrectionMode
+                              ? 'RENVOYER MA DEMANDE D’ACCÈS'
+                              : 'ENVOYER MA DEMANDE D’ACCÈS')),
               style: const TextStyle(
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.2,
@@ -3109,70 +2949,63 @@ else ...[
           ),
         ),
         if (_trialRequestMessage != null) ...[
-  const SizedBox(height: 16),
-  Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: adminColor.withOpacity(0.07),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(
-        color: adminColor,
-        width: 1.4,
-      ),
-    ),
-    child: Column(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-    const Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Icon(
-          Icons.check_circle_rounded,
-          color: redColor,
-          size: 24,
-        ),
-        SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            'Votre demande a bien été enregistrée.',
-            style: TextStyle(
-              color: adminColor,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              height: 1.35,
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: adminColor.withOpacity(0.07),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: adminColor, width: 1.4),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle_rounded, color: redColor, size: 24),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Votre demande a bien été enregistrée.',
+                        style: TextStyle(
+                          color: adminColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.mark_email_read_rounded,
+                      color: redColor,
+                      size: 24,
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Un email de confirmation vous a été envoyé.',
+                        style: TextStyle(
+                          color: adminColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ),
-      ],
-    ),
-    const SizedBox(height: 14),
-    const Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Icon(
-          Icons.mark_email_read_rounded,
-          color: redColor,
-          size: 24,
-        ),
-        SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            'Un email de confirmation vous a été envoyé.',
-            style: TextStyle(
-              color: adminColor,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              height: 1.35,
-            ),
-          ),
-        ),
-      ],
-    ),
-  ],
-),
-  ),
-],
+        ],
       ],
     );
   }
@@ -3183,11 +3016,7 @@ else ...[
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.check_circle_rounded,
-            color: adminColor,
-            size: 20,
-          ),
+          const Icon(Icons.check_circle_rounded, color: adminColor, size: 20),
           const SizedBox(width: 9),
           Expanded(
             child: Text(
@@ -3205,229 +3034,154 @@ else ...[
     );
   }
 
-  Widget _trialSummaryCard() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: redColor.withOpacity(0.055),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: redColor.withOpacity(0.55),
-          width: 1.3,
+  Widget _checkLine({
+    required bool value,
+    required String text,
+    required ValueChanged<bool?> onChanged,
+  }) {
+    return CheckboxListTile(
+      value: value,
+      onChanged: onChanged,
+      activeColor: adminColor,
+      checkColor: Colors.white,
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: EdgeInsets.zero,
+      horizontalTitleGap: 0,
+      minLeadingWidth: 32,
+      visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
+      title: Text(
+        text,
+        style: const TextStyle(
+          color: adminColor,
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+          height: 1.25,
         ),
-      ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Essai gratuit de 8 jours',
-            style: TextStyle(
-              color: redColor,
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          SizedBox(height: 5),
-          Text(
-            'Sans engagement ni facturation.',
-            style: TextStyle(
-              color: adminColor,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              height: 1.25,
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  Widget _checkLine({
-  required bool value,
-  required String text,
-  required ValueChanged<bool?> onChanged,
-}) {
-  return CheckboxListTile(
-    value: value,
-    onChanged: onChanged,
-    activeColor: adminColor,
-    checkColor: Colors.white,
-    controlAffinity: ListTileControlAffinity.leading,
-    contentPadding: EdgeInsets.zero,
-    horizontalTitleGap: 0,
-    minLeadingWidth: 32,
-    visualDensity: const VisualDensity(
-      horizontal: -4,
-      vertical: -2,
-    ),
-    title: Text(
-      text,
-      style: const TextStyle(
-        color: adminColor,
-        fontSize: 13,
-        fontWeight: FontWeight.w800,
-        height: 1.25,
-      ),
-    ),
-  );
-}
-
-  Widget _nextButton(
-  _TrialRequestSection nextSection, {
-  bool enabled = true,
-}) {
-  return SizedBox(
-    width: 180,
-    height: 48,
-    child: OutlinedButton(
-      onPressed: enabled ? () => _selectSection(nextSection) : null,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: adminColor,
-        disabledForegroundColor: Colors.grey,
-        side: BorderSide(
-          color: enabled ? adminColor : Colors.grey,
-          width: 1.6,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            'SUIVANT',
-            style: TextStyle(fontWeight: FontWeight.w900),
+  Widget _nextButton(_TrialRequestSection nextSection, {bool enabled = true}) {
+    return SizedBox(
+      width: 180,
+      height: 48,
+      child: OutlinedButton(
+        onPressed: enabled ? () => _selectSection(nextSection) : null,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: adminColor,
+          disabledForegroundColor: Colors.grey,
+          side: BorderSide(
+            color: enabled ? adminColor : Colors.grey,
+            width: 1.6,
           ),
-          SizedBox(width: 8),
-          Icon(Icons.arrow_forward_rounded),
-        ],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('SUIVANT', style: TextStyle(fontWeight: FontWeight.w900)),
+            SizedBox(width: 8),
+            Icon(Icons.arrow_forward_rounded),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _desktopLayout() {
-    return Row(
-      children: [
-        _leftMenu(),
-        _mapCenter(),
-        _rightPanel(),
-      ],
-    );
+    return Row(children: [_leftMenu(), _mapCenter(), _rightPanel()]);
   }
 
   Widget _mobileLayout() {
     return Column(
       children: [
-        SizedBox(
-          height: 360,
-          child: _mapCenter(),
-        ),
-        Expanded(
-          child: Row(
-            children: [
-              _leftMenu(),
-              _rightPanel(),
-            ],
-          ),
-        ),
+        SizedBox(height: 360, child: _mapCenter()),
+        Expanded(child: Row(children: [_leftMenu(), _rightPanel()])),
       ],
     );
   }
 
-Widget _previousButton(_TrialRequestSection previousSection) {
-  return SizedBox(
-    width: 180,
-    height: 48,
-    child: OutlinedButton(
-      onPressed: () => _selectSection(previousSection),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: adminColor,
-        side: const BorderSide(
-          color: adminColor,
-          width: 1.6,
+  Widget _previousButton(_TrialRequestSection previousSection) {
+    return SizedBox(
+      width: 180,
+      height: 48,
+      child: OutlinedButton(
+        onPressed: () => _selectSection(previousSection),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: adminColor,
+          side: const BorderSide(color: adminColor, width: 1.6),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.arrow_back_rounded),
+            SizedBox(width: 8),
+            Text('PRÉCÉDENT', style: TextStyle(fontWeight: FontWeight.w900)),
+          ],
         ),
       ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+
+    if (_isLoadingCorrection) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: CircularProgressIndicator(color: adminColor)),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Stack(
         children: [
-          Icon(Icons.arrow_back_rounded),
-          SizedBox(width: 8),
-          Text(
-            'PRÉCÉDENT',
-            style: TextStyle(fontWeight: FontWeight.w900),
+          width < 1000 ? _mobileLayout() : _desktopLayout(),
+
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 22,
+            child: Center(
+              child: Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.transparent,
+                  border: Border.all(color: adminColor, width: 2),
+                ),
+                child: IconButton(
+                  onPressed: () {
+                    FocusScope.of(context).unfocus();
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute<void>(
+                        settings: const RouteSettings(name: '/'),
+                        builder: (_) => const MapPage(),
+                      ),
+                      (route) => false,
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: adminColor,
+                    size: 28,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
-    ),
-  );
-}
-
-  @override
-Widget build(BuildContext context) {
-  final width = MediaQuery.of(context).size.width;
-
-if (_isLoadingCorrection) {
-  return const Scaffold(
-    backgroundColor: Colors.white,
-    body: Center(
-      child: CircularProgressIndicator(
-        color: adminColor,
-      ),
-    ),
-  );
-}
-
-  return Scaffold(
-    backgroundColor: Colors.white,
-    body: Stack(
-      children: [
-        width < 1000 ? _mobileLayout() : _desktopLayout(),
-
-        Positioned(
-  left: 0,
-  right: 0,
-  bottom: 22,
-  child: Center(
-    child: Container(
-      width: 54,
-      height: 54,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.transparent,
-        border: Border.all(
-          color: adminColor,
-          width: 2,
-        ),
-      ),
-      child: IconButton(
-        onPressed: () {
-          FocusScope.of(context).unfocus();
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute<void>(
-              settings: const RouteSettings(name: '/'),
-              builder: (_) => const MapPage(),
-            ),
-            (route) => false,
-          );
-        },
-        icon: const Icon(
-          Icons.arrow_back,
-          color: adminColor,
-          size: 28,
-        ),
-      ),
-    ),
-  ),
-),
-      ],
-    ),
-  );
-}
+    );
+  }
 }
 
 class PhoneNumberFormatter extends TextInputFormatter {

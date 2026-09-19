@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../widgets/adaptive_asset_image.dart';
+import '../services/admin_subscription_order_service.dart';
 
 class AdminSubscriptionPanel extends StatefulWidget {
   final String adminUid;
@@ -1193,7 +1194,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         ] else ...[
           Text(
             canActivate
-                ? 'Le dossier est complet. L\'activation ouvre immédiatement les droits d\'exploitation.'
+                ? 'Le dossier est complet. Vous pouvez valider la commande d’abonnement annuel SPHOT ADMIN.'
                 : 'Complétez les trois rubriques ci-dessus pour pouvoir activer l\'abonnement.',
             style: const TextStyle(
               color: _grey,
@@ -1208,8 +1209,12 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
             height: 44,
             child: ElevatedButton.icon(
               onPressed: canActivate && _savingSection == null
-                  ? _activateSubscription
-                  : null,
+    ? () => AdminSubscriptionOrderService.showAndSubmit(
+          context: context,
+          adminUid: _uid,
+          data: data,
+        )
+    : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _red,
                 foregroundColor: Colors.white,
@@ -1231,7 +1236,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                     )
                   : const Icon(Icons.verified_rounded, size: 20),
               label: const Text(
-                'ACTIVER MON ABONNEMENT',
+                'VALIDER LA COMMANDE D’ABONNEMENT',
                 style: TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
