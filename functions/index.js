@@ -3663,6 +3663,32 @@ vous devrez modifier votre mot de passe.
 `
 }
 
+      ${isReset ? "" : `
+<div style="
+    background:#f3f6fb;
+    border-left:5px solid #1e3a8a;
+    padding:16px;
+    border-radius:8px;
+    margin-bottom:28px;">
+
+<strong>SPHOT OFF / SPHOT ON</strong><br><br>
+
+Vous pouvez vous connecter à SPHOT SAUVETEUR dès maintenant,
+même si votre administration n'a pas encore ouvert ses droits de diffusion.
+<br><br>
+
+En <strong>SPHOT OFF</strong>, vous pouvez découvrir et tester l'application,
+mais vos actions ne modifient ni l'état opérationnel réel du poste
+ni les informations des sauveteurs actuellement en <strong>SPHOT ON</strong>.
+<br><br>
+
+Lorsque votre administration de tutelle ouvre les droits de diffusion
+et que vous êtes affecté à un poste de secours,
+votre espace passe automatiquement en <strong>SPHOT ON</strong>.
+
+</div>
+`}
+
       <div style="text-align:center;margin:35px 0;">
 
         <a
@@ -3715,6 +3741,18 @@ Identifiant : ${identifiant}
 Mot de passe temporaire : ${motDePasse}
 
 Lors de votre première connexion, vous devrez modifier votre mot de passe.
+
+SPHOT OFF / SPHOT ON
+
+Vous pouvez vous connecter à SPHOT SAUVETEUR dès maintenant.
+
+En SPHOT OFF, vous pouvez découvrir et tester l'application, mais vos actions
+ne modifient ni l'état opérationnel réel du poste ni les informations des
+sauveteurs actuellement en SPHOT ON.
+
+Lorsque votre administration de tutelle ouvre les droits de diffusion et que
+vous êtes affecté à un poste de secours, votre espace passe automatiquement
+en SPHOT ON.
 
 Se connecter à SPHOT :
 ${SPHOT_LOGIN_URL}
