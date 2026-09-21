@@ -62,9 +62,21 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
 
     switch (_sphotModeReason) {
       case 'no_active_assignment':
-        return 'SPHOT OFF : aucune affectation active ne permet actuellement '
-            'd’agir sur un SPHOT réel. Vous pouvez utiliser l’application '
-            'en mode préparation et test.';
+        return 'SPHOT OFF : aucun poste de secours ne vous est actuellement '
+            'affecté. Vous pouvez utiliser l’application en mode préparation '
+            'et test.';
+      case 'assignment_not_started':
+        return 'SPHOT OFF : votre période d’affectation n’a pas encore '
+            'commencé. Vous pouvez préparer et tester SPHOT SAUVETEUR sans '
+            'modifier l’état opérationnel réel.';
+      case 'assignment_ended':
+        return 'SPHOT OFF : votre période d’affectation est terminée. '
+            'Votre compte reste accessible, mais vos actions ne modifient '
+            'plus les données opérationnelles réelles.';
+      case 'assignment_period_unavailable':
+      case 'no_active_assignment_period':
+        return 'SPHOT OFF : aucune période d’affectation active ne peut être '
+            'confirmée. Contactez votre administrateur SPHOT si nécessaire.';
       case 'account_inactive':
         return 'SPHOT OFF : votre compte n’est pas actuellement autorisé à '
             'agir sur les données opérationnelles réelles.';
