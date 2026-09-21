@@ -320,6 +320,10 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                   builder: (_) => SauveteurActionsRapidesPage(
                                     profileColor: profileColor,
                                     sphotMode: _sphotMode,
+                                    territoireId: widget.territoireId,
+                                    sauveteurSessionToken:
+                                        widget.sauveteurSessionToken,
+                                    postesAffectes: _postesAffectes,
                                   ),
                                 ),
                               );
