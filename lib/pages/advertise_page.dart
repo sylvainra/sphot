@@ -265,11 +265,6 @@ Future<void> _pickBannerImage() async {
   if (!allowedExtensions.contains(extension)) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Format refusé. Utilisez PNG, JPG, JPEG ou WEBP.'),
-      ),
-    );
     return;
   }
 
@@ -423,11 +418,6 @@ Future<void> _searchReferencePlace() async {
   final query = _centerCityController.text.trim();
 
   if (query.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Merci de saisir une commune ou un lieu.'),
-      ),
-    );
     return;
   }
 
@@ -463,11 +453,6 @@ Future<void> _searchReferencePlace() async {
     if (results.isEmpty) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Lieu introuvable. Essayez avec une commune proche.'),
-        ),
-      );
       return;
     }
 
@@ -494,11 +479,6 @@ Future<void> _searchReferencePlace() async {
   debugPrint('ERREUR LOCALISATION : $e');
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Impossible de localiser ce lieu pour le moment.'),
-      ),
-    );
   } finally {
     if (mounted) {
       setState(() {
@@ -1929,11 +1909,6 @@ await Future.delayed(const Duration(seconds: 1));
 
     setState(() => _isSubmitting = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Erreur lors de l’envoi : $e'),
-      ),
-    );
   }
 }
 
