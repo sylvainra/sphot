@@ -4281,6 +4281,8 @@ async function activeLegalPackInfo() {
  * @param {Object} legalPack Pack juridique actif.
  * @return {boolean} Vrai lorsque la validation est complète.
  */
+const SAUVETEUR_LEGAL_ACCEPTANCE_REVISION = "2";
+
 function sauveteurLegalAcceptanceIsCurrent(accountData, legalPack) {
   const acceptance = accountData.legalAcceptance || {};
   const documents = acceptance.documents || {};
@@ -4288,12 +4290,15 @@ function sauveteurLegalAcceptanceIsCurrent(accountData, legalPack) {
 
   return acceptance.accepted === true &&
     acceptance.version === legalPack.version &&
+    acceptance.revision === SAUVETEUR_LEGAL_ACCEPTANCE_REVISION &&
     documents.cgu === true &&
     documents.privacy === true &&
     documents.rgpd === true &&
     operationalRules.publicOperationalDiffusionAcknowledged === true &&
     operationalRules.institutionalReadAcknowledged === true &&
-    operationalRules.personalAccountUseAccepted === true;
+    operationalRules.personalAccountUseAccepted === true &&
+    operationalRules.sphotTransmissionRoleAcknowledged === true &&
+    operationalRules.professionalDecisionResponsibilityAccepted === true;
 }
 
 exports.loginSauveteur = onRequest(
@@ -4537,6 +4542,8 @@ exports.acceptSauveteurLegalTerms = onRequest(
           request.body.publicOperationalDiffusionAcknowledged === true,
           request.body.institutionalReadAcknowledged === true,
           request.body.personalAccountUseAccepted === true,
+          request.body.sphotTransmissionRoleAcknowledged === true,
+          request.body.professionalDecisionResponsibilityAccepted === true,
         ];
 
         if (requiredFlags.some((value) => value !== true)) {
@@ -4557,6 +4564,7 @@ exports.acceptSauveteurLegalTerms = onRequest(
           accepted: true,
           version: legalPack.version,
           versionId: legalPack.versionId,
+          revision: SAUVETEUR_LEGAL_ACCEPTANCE_REVISION,
           legalPackPath: legalPack.packPath,
           acceptedAt,
           documents: {
@@ -4575,7 +4583,10 @@ exports.acceptSauveteurLegalTerms = onRequest(
 
         const historyReference = accountReference
             .collection("legalAcceptances")
-            .doc(legalPack.versionId);
+            .doc(
+                `${legalPack.versionId}_sauveteur_r` +
+                SAUVETEUR_LEGAL_ACCEPTANCE_REVISION,
+            );
 
         const historySnapshot = await historyReference.get();
         const batch = admin.firestore().batch();
