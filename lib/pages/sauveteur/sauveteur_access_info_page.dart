@@ -146,8 +146,8 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Avant de commencer, voici comment fonctionnent '
-                    'vos droits et ceux des autres intervenants.',
+                    'Avant de commencer, voici vos droits, devoirs et '
+                    'responsabilités professionnelles dans SPHOT SAUVETEUR.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Color(0xFF374151),
@@ -179,9 +179,11 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                             children: [
                               if (_isSphotOn)
                                 _line(
-                                  'Vous êtes actuellement autorisé à agir '
-                                  'sur les données opérationnelles réelles '
-                                  'des SPHOTS auxquels vous êtes affecté.',
+                                  'Vous êtes actuellement autorisé à agir, '
+                                  'dans le cadre de vos fonctions '
+                                  'professionnelles, sur les données '
+                                  'opérationnelles réelles des SPHOTS '
+                                  'auxquels vous êtes affecté.',
                                   strong: true,
                                 )
                               else
@@ -207,16 +209,17 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                             children: [
                               _line(
                                 'Tous les sauveteurs SPHOT ON affectés au même '
-                                'poste peuvent agir sur les paramètres '
-                                'opérationnels partagés : drapeau, statut '
-                                'de baignade, dangers, météo, éphéméride '
-                                'et autres renseignements sauveteur.',
+                                'poste peuvent agir professionnellement sur '
+                                'les paramètres opérationnels partagés : '
+                                'drapeau, statut de baignade, dangers, météo, '
+                                'éphéméride et autres renseignements métier.',
                               ),
                               _line(
                                 'Si plusieurs sauveteurs sont SPHOT ON sur '
                                 'le même poste, ils travaillent sur le même '
-                                'état réel. Une modification validée devient '
-                                'visible par les autres sauveteurs autorisés.',
+                                'état opérationnel réel. Chaque modification '
+                                'professionnelle validée devient visible par '
+                                'les autres sauveteurs autorisés.',
                               ),
                               _line(
                                 'Un sauveteur SPHOT OFF ne peut jamais '
@@ -232,8 +235,8 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                             children: [
                               _line(
                                 'Le chef de poste et son adjoint disposent '
-                                'des mêmes droits opérationnels que les autres '
-                                'sauveteurs SPHOT ON.',
+                                'des mêmes droits opérationnels professionnels '
+                                'que les autres sauveteurs SPHOT ON.',
                               ),
                               _line(
                                 'Ils disposent en plus des droits de gestion '
@@ -253,8 +256,9 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                             color: purple,
                             children: [
                               _line(
-                                'La MAIN COURANTE n’est jamais destinée '
-                                'à la diffusion publique SPHOT.',
+                                'La MAIN COURANTE est un outil professionnel '
+                                'interne et n’est jamais destinée à la '
+                                'diffusion publique SPHOT.',
                                 strong: true,
                               ),
                               _line(
