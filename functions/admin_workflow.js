@@ -886,14 +886,84 @@ async function sendTrialApproval(requestId) {
     });
 
     const html = `
-      <p>${escapeHtml(buildGreeting(data))}</p>
-      <p>Votre demande de <strong>période d’essai gratuite SPHOT ADMIN</strong>
-      a été validée.</p>
-      <p>Votre essai débute le <strong>${escapeHtml(formatFrenchDate(start))}</strong>
-      et prendra fin le <strong>${escapeHtml(formatFrenchDate(end))}</strong>.</p>
-      <p><strong>Vos droits de diffusion SPHOT ADMIN sont désormais activés.</strong></p>
-      <p><a href="${SPHOT_LOGIN_URL}">Accéder à SPHOT ADMIN</a></p>
-      <p>Cordialement,<br>L’équipe SPHOT</p>`;
+<p style="font-size:16px;line-height:1.6;">
+  ${escapeHtml(buildGreeting(data))}
+</p>
+
+<p style="font-size:16px;line-height:1.6;">
+  Votre demande de
+  <strong>période d’essai gratuite SPHOT ADMIN</strong>
+  a été validée.
+</p>
+
+<div style="
+  margin:22px 0;
+  padding:18px;
+  border-left:4px solid #16a34a;
+  border-radius:8px;
+  background:#f0fdf4;
+  font-size:15px;
+  line-height:1.6;
+">
+  Votre essai débute le
+  <strong>${escapeHtml(formatFrenchDate(start))}</strong>
+  et prendra fin le
+  <strong>${escapeHtml(formatFrenchDate(end))}</strong>.
+  <br><br>
+  <strong>Vos droits de diffusion SPHOT ADMIN sont désormais activés.</strong>
+</div>
+
+<div style="
+  margin:24px 0;
+  padding:18px;
+  border-left:4px solid #f59e0b;
+  border-radius:8px;
+  background:#fff7df;
+  font-size:15px;
+  line-height:1.65;
+">
+  <strong style="color:#dc2626;">
+    IMPORTANT — PRÉVENEZ RAPIDEMENT VOS SAUVETEURS
+  </strong>
+  <br><br>
+  Pour profiter pleinement de la période d’essai, prévenez dès maintenant
+  les sauveteurs affectés à vos SPHOTS.
+  <br><br>
+  Ils doivent se connecter à SPHOT avec leurs identifiants afin de
+  <strong>renseigner leur partie de l’application</strong> et compléter
+  les informations nécessaires au fonctionnement du service.
+  <br><br>
+  Si certains sauveteurs ne disposent pas encore de leurs accès,
+  créez ou vérifiez leur compte depuis SPHOT ADMIN puis transmettez-leur
+  rapidement leurs identifiants.
+</div>
+
+<div style="text-align:center;margin:30px 0;">
+  <a
+    href="${SPHOT_LOGIN_URL}"
+    style="
+      display:inline-block;
+      padding:15px 28px;
+      border-radius:14px;
+      background:#1e3a8a;
+      color:#ffffff;
+      text-decoration:none;
+      font-size:16px;
+      font-weight:900;
+    "
+  >
+    ACCÉDER À SPHOT ADMIN
+  </a>
+</div>
+
+<p style="
+  margin-top:28px;
+  font-size:15px;
+  line-height:1.6;
+">
+  À bientôt sur SPHOT,<br>
+  <strong>L'équipe SPHOT</strong>
+</p>`;
 
     const mailResult = await sendSphotMail(
         transporter(),
