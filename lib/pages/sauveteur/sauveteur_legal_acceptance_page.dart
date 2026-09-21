@@ -346,7 +346,7 @@ class _SauveteurLegalAcceptancePageState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'RÈGLES OPÉRATIONNELLES ET DROITS DE REGARD',
+            'RÈGLES PROFESSIONNELLES, OPÉRATIONNELLES ET DROITS DE REGARD',
             style: TextStyle(
               color: Color(0xFF8E24AA),
               fontSize: 13.5,
@@ -355,9 +355,12 @@ class _SauveteurLegalAcceptancePageState
           ),
           const SizedBox(height: 8),
           const Text(
-            'Ces validations concernent le fonctionnement de '
-            'SPHOT SAUVETEUR. Elles ne rendent pas votre identité '
-            'personnelle publique par défaut.',
+            'SPHOT SAUVETEUR est un outil métier opérationnel destiné '
+            'aux sauveteurs exerçant une mission professionnelle de '
+            'surveillance et de sécurité des zones de baignade surveillées. '
+            'Ces validations encadrent son utilisation professionnelle. '
+            'Elles ne rendent pas votre identité personnelle publique '
+            'par défaut.',
             style: TextStyle(
               color: Color(0xFF1F2937),
               fontSize: 11.5,
@@ -369,8 +372,8 @@ class _SauveteurLegalAcceptancePageState
             value: _publicOperationalDiffusionAcknowledged,
             text:
                 'J’ai compris que les informations opérationnelles '
-                'que je renseigne en SPHOT ON — drapeau, statut de '
-                'baignade, dangers, météo, éphéméride et données '
+                'professionnelles que je renseigne en SPHOT ON — drapeau, '
+                'statut de baignade, dangers, météo, éphéméride et données '
                 'similaires — peuvent être diffusées dans SPHOT public.',
             onChanged: (value) {
               setState(() {
@@ -381,9 +384,9 @@ class _SauveteurLegalAcceptancePageState
           _acceptanceLine(
             value: _institutionalReadAcknowledged,
             text:
-                'J’ai été informé que la MAIN COURANTE n’est pas '
-                'publique mais qu’elle peut être consultée par '
-                'l’administrateur SPHOT et par les membres '
+                'J’ai été informé que la MAIN COURANTE est un outil '
+                'professionnel interne, non public, pouvant être consulté '
+                'par l’administrateur SPHOT et par les membres '
                 'institutionnels habilités par son administration, '
                 'selon leurs droits de lecture.',
             onChanged: (value) {
@@ -395,9 +398,10 @@ class _SauveteurLegalAcceptancePageState
           _acceptanceLine(
             value: _personalAccountUseAccepted,
             text:
-                'Je m’engage à utiliser personnellement mes '
-                'identifiants SPHOT, à ne pas les partager et à '
-                'respecter les droits associés à mon rôle.',
+                'Je m’engage à utiliser personnellement mes identifiants '
+                'SPHOT dans le cadre de mes fonctions professionnelles, '
+                'à ne pas les partager et à respecter les droits, devoirs '
+                'et responsabilités associés à mon rôle.',
             onChanged: (value) {
               setState(() {
                 _personalAccountUseAccepted = value ?? false;
