@@ -4274,6 +4274,8 @@ async function activeLegalPackInfo() {
   };
 }
 
+const SAUVETEUR_LEGAL_ACCEPTANCE_REVISION = "2";
+
 /**
  * Vérifie que l'acceptation Sauveteur correspond au pack juridique actif.
  *
@@ -4281,8 +4283,6 @@ async function activeLegalPackInfo() {
  * @param {Object} legalPack Pack juridique actif.
  * @return {boolean} Vrai lorsque la validation est complète.
  */
-const SAUVETEUR_LEGAL_ACCEPTANCE_REVISION = "2";
-
 function sauveteurLegalAcceptanceIsCurrent(accountData, legalPack) {
   const acceptance = accountData.legalAcceptance || {};
   const documents = acceptance.documents || {};
