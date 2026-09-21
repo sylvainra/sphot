@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../pages/sauveteur/change_password_page.dart';
 import '../pages/sauveteur/sauveteur_menu_page.dart';
+import '../pages/sauveteur/sauveteur_legal_acceptance_page.dart';
 
 class ProfilLoginPage extends StatefulWidget {
   const ProfilLoginPage({super.key});
@@ -164,6 +165,8 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
           (result['sauveteurSessionToken'] ?? '').toString();
       final canManageRestrictedOperationalData =
           result['canManageRestrictedOperationalData'] == true;
+      final legalAcceptanceRequired =
+          result['legalAcceptanceRequired'] == true;
       final postesAffectes = (result['postesAffectes'] is List)
           ? (result['postesAffectes'] as List)
               .map((value) => value.toString())
@@ -197,6 +200,25 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
 
       if (userRole.toUpperCase() == 'SUPER_ADMIN') {
         await _openSuperAdminDashboard(webSessionToken);
+        return;
+      }
+
+      if (legalAcceptanceRequired) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => SauveteurLegalAcceptancePage(
+              login: id,
+              territoireId: territoireId,
+              userRole: userRole,
+              sphotMode: sphotMode,
+              sphotModeReason: sphotModeReason,
+              sauveteurSessionToken: sauveteurSessionToken,
+              postesAffectes: postesAffectes,
+              canManageRestrictedOperationalData:
+                  canManageRestrictedOperationalData,
+            ),
+          ),
+        );
         return;
       }
 
