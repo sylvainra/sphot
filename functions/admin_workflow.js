@@ -578,20 +578,32 @@ async function ensureRegistrationApprovalDocument(requestId, data) {
     documentType: "registration_approval",
     category: "administrative",
     subcategory: "inscription",
-    title: "Validation de l’inscription SPHOT ADMIN",
+    title: "Décision d’approbation de l’accès administrateur",
+    rubric: "Demande d’accès",
+    statusLabel: "APPROUVÉ",
+    introduction:
+      "Après instruction de votre demande, SPHOT confirme " +
+      "l’approbation de votre accès administrateur pour la structure " +
+      `${cleanValue(structure.nom, organisationDisplay(data))}.`,
     lines: [
       {heading: "Décision"},
-      {label: "Statut", value: "Inscription administrateur approuvée"},
-      {label: "Validée le", value: formatFrenchDate(approvedAt)},
+      {label: "Statut", value: "Accès administrateur approuvé"},
+      {label: "Décision prise le", value: formatFrenchDate(approvedAt)},
       {heading: "Demandeur"},
       {label: "Responsable", value:
         `${cleanValue(profile.prenomAffiche)} ${cleanValue(profile.nomAffiche)}`.trim()},
       {label: "Email", value: profile.email},
-      {heading: "Structure"},
+      {heading: "Structure concernée"},
       {label: "Organisation", value: structure.nom},
       {label: "SIRET", value: structure.siret},
-      {label: "Ville", value: territoire.ville},
+      {label: "Commune", value: territoire.ville},
+      {label: "Département", value: territoire.departement},
     ],
+    notice:
+      "Cette décision concerne uniquement l’accès administrateur au " +
+      "portail SPHOT. Elle n’ouvre pas automatiquement une période " +
+      "d’essai, un abonnement ou des droits de facturation. Ces étapes " +
+      "font l’objet de décisions et de documents distincts.",
   });
 
   await admin.firestore().collection("adminRequests").doc(requestId).set({
@@ -668,14 +680,26 @@ async function sendTrialReceipt(requestId) {
       documentType: "trial_acknowledgement",
       category: "administrative",
       subcategory: "essai",
-      title: "Accusé de réception de la demande d’essai SPHOT ADMIN",
+      title: "Accusé de réception de la demande de période d’essai",
+      rubric: "Période d’essai",
+      statusLabel: "EN ATTENTE",
+      introduction:
+        "Nous accusons réception de votre demande d’ouverture d’une " +
+        `période d’essai gratuite de ${duration} jours pour ` +
+        `${organisationDisplay(data)}.`,
       lines: [
-        {label: "Demande", value: "Période d’essai gratuite SPHOT ADMIN"},
-        {label: "Durée", value: `${duration} jours`},
+        {heading: "Demande"},
         {label: "Demande reçue le", value: formatFrenchDate(requestedAt)},
+        {label: "Durée sollicitée", value: `${duration} jours`},
         {label: "Statut", value: "En attente de validation"},
+        {heading: "Structure concernée"},
         {label: "Organisation", value: organisationDisplay(data)},
       ],
+      notice:
+        "La période d’essai n’est pas active à ce stade. Aucun droit de " +
+        "diffusion n’est ouvert par le présent document. Vous recevrez " +
+        "une décision distincte lors de l’activation éventuelle de " +
+        "votre période d’essai.",
     });
 
     const greeting = buildGreeting(data);
@@ -837,15 +861,28 @@ async function sendTrialApproval(requestId) {
       documentType: "trial_approval",
       category: "administrative",
       subcategory: "essai",
-      title: "Validation de la période d’essai SPHOT ADMIN",
+      title: "Décision d’ouverture de la période d’essai",
+      rubric: "Période d’essai",
+      statusLabel: "ACTIVÉE",
+      introduction:
+        "SPHOT confirme l’ouverture de votre période d’essai gratuite. " +
+        "Les droits associés à cette phase sont activés pour la durée " +
+        "indiquée ci-dessous.",
       lines: [
-        {label: "Statut", value: "Période d’essai validée"},
+        {heading: "Période d’essai"},
+        {label: "Statut", value: "Période d’essai activée"},
         {label: "Durée", value: `${duration} jours`},
         {label: "Début", value: formatFrenchDate(start)},
         {label: "Fin", value: formatFrenchDate(end)},
-        {label: "Droits de diffusion", value: "Autorisés"},
+        {label: "Droits de diffusion", value: "Autorisés pendant l’essai"},
+        {heading: "Structure concernée"},
         {label: "Organisation", value: organisationDisplay(data)},
       ],
+      notice:
+        "L’activation de la période d’essai ne constitue pas une " +
+        "souscription payante. Toute activation d’un abonnement annuel " +
+        "fera l’objet d’une démarche, d’une référence et d’un document " +
+        "distincts.",
     });
 
     const html = `
@@ -1338,23 +1375,37 @@ exports.processAdminOrderCreated = onDocumentCreated(
         documentType: "subscription_order",
         category: "financial",
         subcategory: "commandes",
-        title: "Commande d’abonnement annuel SPHOT ADMIN",
+        title: "Enregistrement de la commande d’abonnement annuel",
+        rubric: "Abonnement",
+        statusLabel: "ENREGISTRÉE",
+        introduction:
+          "Votre commande d’abonnement annuel SPHOT ADMIN a bien été " +
+          "enregistrée. Le présent document récapitule les éléments " +
+          "transmis pour son traitement.",
         relatedOrderId: orderId,
         lines: [
+          {heading: "Organisme payeur"},
           {label: "Organisation", value: order.billingOrganisation},
           {label: "SIRET", value: order.billingSiret},
+          {heading: "Commande"},
           {label: "Nombre de postes", value: order.numberOfRescueStations},
           {label: "Prix unitaire HT", value:
             currency(order.unitPriceExclTax || DEFAULT_PRICE_PER_STATION_EXCL_TAX)},
           {label: "Montant HT", value: currency(order.totalExclTax)},
           {label: "TVA", value: `${Number(order.vatRate || DEFAULT_VAT_RATE)} %`},
           {label: "Montant TTC", value: currency(order.totalInclTax)},
+          {heading: "Règlement"},
           {label: "Mode de règlement", value:
             order.paymentMethod === "card" ? "Carte bancaire" : "Facturation publique / Chorus Pro"},
           {label: "Bon de commande", value: order.purchaseOrderNumber},
           {label: "Engagement", value: order.engagementNumber},
           {label: "Code service Chorus", value: order.chorusServiceCode},
         ],
+        notice:
+          "Ce document atteste de l’enregistrement de la commande. Il ne " +
+          "constitue pas une facture. La facturation, le règlement et " +
+          "leurs références propres sont suivis dans des documents " +
+          "distincts.",
       });
 
       // Prépare la future facture électronique sans l’émettre juridiquement.
