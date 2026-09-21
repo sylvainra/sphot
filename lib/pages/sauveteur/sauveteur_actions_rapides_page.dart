@@ -1,15 +1,25 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class SauveteurActionsRapidesPage extends StatefulWidget {
   final Color profileColor;
   final String sphotMode;
+  final String territoireId;
+  final String sauveteurSessionToken;
+  final List<String> postesAffectes;
 
   const SauveteurActionsRapidesPage({
     super.key,
     required this.profileColor,
     required this.sphotMode,
+    required this.territoireId,
+    required this.sauveteurSessionToken,
+    required this.postesAffectes,
   });
 
   bool get isSphotOn => sphotMode.toUpperCase() == 'ON';
@@ -19,17 +29,25 @@ class SauveteurActionsRapidesPage extends StatefulWidget {
       _SauveteurActionsRapidesPageState();
 }
 
-class _SauveteurActionsRapidesPageState extends State<SauveteurActionsRapidesPage> {
+class _SauveteurActionsRapidesPageState
+    extends State<SauveteurActionsRapidesPage> {
   String flagColor = 'Vert';
   String flagPosition = 'Hissé';
   String status = 'Baignade surveillée';
 
-  String nomSecours = 'LONGE 09';
-  String nomSphot = 'Le Rocher';
+  String nomSecours = 'AUCUN POSTE';
+  String nomSphot = '';
   String typeSphot = 'Poste de secours';
+  String? selectedSpotId;
 
   bool isSphotMenuOpen = false;
   bool isDangerMenuOpen = false;
+  bool _loadingSpots = true;
+  bool _liveWriteBlocked = false;
+  String? _liveStatusMessage;
+
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      _liveSubscription;
 
   final Set<String> selectedDangers = {};
 
@@ -66,26 +84,271 @@ class _SauveteurActionsRapidesPageState extends State<SauveteurActionsRapidesPag
    
   ];
 
-  final List<Map<String, String>> postesSecoursCommune = [
-    {
-      'nomSecours': 'LONGE 09',
-      'nomSphot': 'Le Rocher',
-      'typeSphot': 'Poste de secours',
-    },
-    {
-      'nomSecours': 'LONGE 13',
-      'nomSphot': 'Les Conches',
-      'typeSphot': 'Poste de secours',
-    },
-  ];
+  final List<Map<String, String>> postesSecoursCommune = [];
 
-  void updateFlagPosition(String position) {
+  @override
+  void initState() {
+    super.initState();
+    _loadAssignedSpots();
+  }
+
+  @override
+  void dispose() {
+    _liveSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadAssignedSpots() async {
+    final ids = widget.postesAffectes
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList();
+
+    final loaded = <Map<String, String>>[];
+
+    for (final spotId in ids) {
+      try {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('territoires')
+            .doc(widget.territoireId)
+            .collection('spots')
+            .doc(spotId)
+            .get();
+
+        final data = snapshot.data() ?? <String, dynamic>{};
+        loaded.add({
+          'spotId': spotId,
+          'nomSecours': (data['nomSecours'] ?? spotId).toString(),
+          'nomSphot': (data['nomSphot'] ?? '').toString(),
+          'typeSphot': (data['typeSphot'] ?? 'Poste de secours').toString(),
+        });
+      } catch (_) {
+        loaded.add({
+          'spotId': spotId,
+          'nomSecours': spotId,
+          'nomSphot': '',
+          'typeSphot': 'Poste de secours',
+        });
+      }
+    }
+
+    loaded.sort((a, b) {
+      return (a['nomSecours'] ?? '').compareTo(b['nomSecours'] ?? '');
+    });
+
+    if (!mounted) return;
+
+    setState(() {
+      postesSecoursCommune
+        ..clear()
+        ..addAll(loaded);
+      _loadingSpots = false;
+    });
+
+    if (postesSecoursCommune.isNotEmpty) {
+      await _selectSpot(postesSecoursCommune.first);
+    }
+  }
+
+  Future<void> _selectSpot(Map<String, String> poste) async {
+    await _liveSubscription?.cancel();
+    _liveSubscription = null;
+
+    if (!mounted) return;
+
+    setState(() {
+      selectedSpotId = poste['spotId'];
+      nomSecours = poste['nomSecours'] ?? 'POSTE';
+      nomSphot = poste['nomSphot'] ?? '';
+      typeSphot = poste['typeSphot'] ?? 'Poste de secours';
+      isSphotMenuOpen = false;
+      _liveWriteBlocked = false;
+      _liveStatusMessage = null;
+
+      if (!widget.isSphotOn) {
+        flagColor = 'Vert';
+        flagPosition = 'Hissé';
+        status = 'Baignade surveillée';
+        selectedDangers.clear();
+      }
+    });
+
+    if (widget.isSphotOn && selectedSpotId != null) {
+      _listenToLiveSpot(selectedSpotId!);
+    }
+  }
+
+  void _listenToLiveSpot(String spotId) {
+    _liveSubscription = FirebaseFirestore.instance
+        .collection('spots')
+        .doc(spotId)
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted || !snapshot.exists) return;
+
+      final data = snapshot.data() ?? <String, dynamic>{};
+      final liveFlag = data['liveFlag'] is Map
+          ? Map<String, dynamic>.from(data['liveFlag'] as Map)
+          : <String, dynamic>{};
+
+      final rawColor = (liveFlag['flagColor'] ?? '').toString().toLowerCase();
+      final rawPosition =
+          (liveFlag['flagPosition'] ?? '').toString().toLowerCase();
+
+      String? nextColor;
+      if (rawColor == 'green' || rawColor == 'vert') {
+        nextColor = 'Vert';
+      } else if (rawColor == 'yellow' || rawColor == 'jaune') {
+        nextColor = 'Jaune';
+      } else if (rawColor == 'red' || rawColor == 'rouge') {
+        nextColor = 'Rouge';
+      }
+
+      String? nextPosition;
+      if (rawPosition == 'affale' || rawPosition == 'affalé') {
+        nextPosition = 'Affalé';
+      } else if (rawPosition == 'hisse' || rawPosition == 'hissé') {
+        nextPosition = 'Hissé';
+      }
+
+      final rawDangers = data['dangers'];
+
+      setState(() {
+        if (nextColor != null) flagColor = nextColor;
+        if (nextPosition != null) flagPosition = nextPosition;
+
+        status = flagPosition == 'Affalé'
+            ? 'Baignade non surveillée temporairement'
+            : _statusForFlagColor(flagColor);
+
+        if (rawDangers is Iterable) {
+          selectedDangers
+            ..clear()
+            ..addAll(rawDangers.map((value) => value.toString()));
+        }
+      });
+    });
+  }
+
+  String _statusForFlagColor(String color) {
+    switch (color) {
+      case 'Jaune':
+        return 'Baignade surveillée mais dangereuse';
+      case 'Rouge':
+        return 'Baignade interdite';
+      default:
+        return 'Baignade surveillée et autorisée';
+    }
+  }
+
+  String _flagColorValue(String color) {
+    switch (color) {
+      case 'Jaune':
+        return 'yellow';
+      case 'Rouge':
+        return 'red';
+      default:
+        return 'green';
+    }
+  }
+
+  String _flagPositionValue(String position) {
+    return position == 'Affalé' ? 'affale' : 'hisse';
+  }
+
+  Future<bool> _persistLiveChanges(Map<String, dynamic> changes) async {
+    if (!widget.isSphotOn || selectedSpotId == null) {
+      return false;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+          'updateSauveteurLiveState',
+        ),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'sauveteurSessionToken': widget.sauveteurSessionToken,
+          'spotId': selectedSpotId,
+          'changes': changes,
+        }),
+      );
+
+      if (!mounted) return false;
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        setState(() {
+          _liveWriteBlocked = false;
+          _liveStatusMessage = null;
+        });
+        return true;
+      }
+
+      String errorCode = '';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          errorCode = (decoded['error'] ?? '').toString();
+        }
+      } catch (_) {}
+
+      setState(() {
+        _liveWriteBlocked = errorCode == 'sphot_off' ||
+            errorCode == 'spot_not_assigned';
+        _liveStatusMessage = _liveWriteBlocked
+            ? 'SPHOT OFF — cette action reste locale et ne modifie pas '
+                'le poste réel.'
+            : 'La modification opérationnelle n’a pas pu être enregistrée.';
+      });
+
+      return false;
+    } catch (_) {
+      if (!mounted) return false;
+
+      setState(() {
+        _liveStatusMessage =
+            'Connexion au SPHOT réel impossible. La modification reste locale.';
+      });
+      return false;
+    }
+  }
+
+  Future<void> _persistFlagState() async {
+    final currentStatus = flagPosition == 'Affalé'
+        ? 'Baignade non surveillée temporairement'
+        : _statusForFlagColor(flagColor);
+
+    await _persistLiveChanges({
+      'liveFlag': {
+        'flagColor': _flagColorValue(flagColor),
+        'flagPosition': _flagPositionValue(flagPosition),
+      },
+      'statutBaignade': currentStatus,
+    });
+  }
+
+  Future<void> _changeFlagColor(String color) async {
+    setState(() {
+      flagColor = color;
+      if (flagPosition != 'Affalé') {
+        status = _statusForFlagColor(color);
+      }
+    });
+
+    await _persistFlagState();
+  }
+
+  Future<void> updateFlagPosition(String position) async {
     setState(() {
       flagPosition = position;
       status = position == 'Affalé'
           ? 'Baignade non surveillée temporairement'
-          : 'Baignade surveillée';
+          : _statusForFlagColor(flagColor);
     });
+
+    await _persistFlagState();
   }
 
   void _goHome() {
