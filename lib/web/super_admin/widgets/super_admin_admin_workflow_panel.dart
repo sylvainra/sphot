@@ -394,6 +394,160 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
     );
   }
 
+  String _documentRubricKey(Map<String, dynamic> data) {
+    final subcategory = _text(data['subcategory']).toLowerCase();
+    final type = _text(data['documentType']).toLowerCase();
+
+    if (subcategory == 'inscription' ||
+        type.contains('registration') ||
+        type.contains('access')) {
+      return 'access';
+    }
+
+    if (subcategory == 'essai' || type.contains('trial')) {
+      return 'trial';
+    }
+
+    if (subcategory == 'commandes' ||
+        subcategory == 'abonnement' ||
+        type.contains('subscription') ||
+        type.contains('order')) {
+      return 'subscription';
+    }
+
+    if (subcategory == 'factures' ||
+        subcategory == 'facturation' ||
+        type.contains('invoice') ||
+        type.contains('billing')) {
+      return 'billing';
+    }
+
+    if (subcategory == 'renouvellement' ||
+        type.contains('renewal') ||
+        type.contains('renew')) {
+      return 'renewal';
+    }
+
+    if (subcategory == 'administrateurs' ||
+        subcategory == 'administrateur' ||
+        type.contains('admin_change') ||
+        type.contains('administrator_change') ||
+        type.contains('replacement') ||
+        type.contains('revocation')) {
+      return 'admins';
+    }
+
+    return 'access';
+  }
+
+  int _compareDocumentsByReference(
+    QueryDocumentSnapshot<Map<String, dynamic>> a,
+    QueryDocumentSnapshot<Map<String, dynamic>> b,
+  ) {
+    final aData = a.data();
+    final bData = b.data();
+    final aNumber = _text(aData['documentNumber']);
+    final bNumber = _text(bData['documentNumber']);
+
+    if (aNumber.isNotEmpty && bNumber.isNotEmpty) {
+      final referenceCompare = aNumber.compareTo(bNumber);
+      if (referenceCompare != 0) return referenceCompare;
+    }
+
+    final aRawDate = aData['issuedAt'] ?? aData['createdAt'];
+    final bRawDate = bData['issuedAt'] ?? bData['createdAt'];
+    final aDate = aRawDate is Timestamp ? aRawDate.toDate() : DateTime(1970);
+    final bDate = bRawDate is Timestamp ? bRawDate.toDate() : DateTime(1970);
+    return aDate.compareTo(bDate);
+  }
+
+  Widget _documentRubric({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+    required int documentCount,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _blue.withOpacity(0.18)),
+      ),
+      child: Theme(
+        data: ThemeData(
+          dividerColor: Colors.transparent,
+          colorScheme: ColorScheme.fromSeed(seedColor: _blue),
+        ),
+        child: ExpansionTile(
+          initiallyExpanded: documentCount > 0,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+          leading: Icon(icon, color: _red, size: 21),
+          title: Text(
+            title,
+            style: const TextStyle(
+              color: _blue,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                constraints: const BoxConstraints(minWidth: 24),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 7,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: documentCount > 0
+                      ? _blue.withOpacity(0.08)
+                      : Colors.grey.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  '$documentCount',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: documentCount > 0 ? _blue : Colors.black45,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.expand_more_rounded,
+                color: _blue,
+                size: 19,
+              ),
+            ],
+          ),
+          children: children.isEmpty
+              ? const [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(8, 4, 8, 8),
+                      child: Text(
+                        'Aucun document émis à ce stade.',
+                        style: TextStyle(
+                          color: Colors.black45,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ]
+              : children,
+        ),
+      ),
+    );
+  }
+
   Widget _documents(
     BuildContext context,
     DocumentSnapshot<Map<String, dynamic>> requestSnapshot,
@@ -406,68 +560,158 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
       builder: (context, snapshot) {
         final docs = snapshot.data?.docs.toList() ??
             <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-        docs.sort((a, b) {
-          final ad = a.data()['createdAt'];
-          final bd = b.data()['createdAt'];
-          final aDate = ad is Timestamp ? ad.toDate() : DateTime(1970);
-          final bDate = bd is Timestamp ? bd.toDate() : DateTime(1970);
-          return bDate.compareTo(aDate);
-        });
 
         final requestData = requestSnapshot.data() ?? const <String, dynamic>{};
         final legacy = _map(requestData['acknowledgementDocument']);
         final hasLegacyInRegistry = docs.any(
-          (doc) => _text(doc.data()['documentType']) == 'registration_acknowledgement',
+          (doc) =>
+              _text(doc.data()['documentType']) ==
+              'registration_acknowledgement',
         );
 
-        final itemCount = docs.length +
-            ((!hasLegacyInRegistry && _text(legacy['downloadUrl']).isNotEmpty)
-                ? 1
-                : 0);
-
-        if (snapshot.connectionState == ConnectionState.waiting && itemCount == 0) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            docs.isEmpty &&
+            _text(legacy['downloadUrl']).isEmpty) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           );
         }
 
-        if (itemCount == 0) {
-          return const Text(
-            'Aucun document disponible pour ce dossier.',
-            style: TextStyle(
-              color: Colors.black54,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
+        final grouped =
+            <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{
+          'access': [],
+          'trial': [],
+          'subscription': [],
+          'billing': [],
+          'renewal': [],
+          'admins': [],
+        };
+
+        for (final doc in docs) {
+          final key = _documentRubricKey(doc.data());
+          grouped.putIfAbsent(key, () => []).add(doc);
+        }
+
+        for (final values in grouped.values) {
+          values.sort(_compareDocumentsByReference);
+        }
+
+        final accessChildren = <Widget>[
+          for (final doc in grouped['access']!)
+            _documentTile(
+              context,
+              title: _text(doc.data()['title']).isEmpty
+                  ? _text(doc.data()['documentType'])
+                  : _text(doc.data()['title']),
+              number: _text(doc.data()['documentNumber']),
+              date: _formatDateTime(
+                doc.data()['issuedAt'] ?? doc.data()['createdAt'],
+              ),
+              status: _text(doc.data()['status']),
+              url: _text(doc.data()['downloadUrl']),
+            ),
+        ];
+
+        if (!hasLegacyInRegistry &&
+            _text(legacy['downloadUrl']).isNotEmpty) {
+          accessChildren.insert(
+            0,
+            _documentTile(
+              context,
+              title:
+                  'Accusé de réception de la demande d’accès administrateur',
+              number:
+                  '${_text(requestData['requestNumber'])}-INS-AR-01',
+              date: _formatDateTime(
+                legacy['generatedAt'] ?? requestData['requestedAt'],
+              ),
+              status: 'issued',
+              url: _text(legacy['downloadUrl']),
             ),
           );
         }
 
-        final widgets = <Widget>[];
-        for (final doc in docs) {
-          final data = doc.data();
-          widgets.add(_documentTile(
-            context,
-            title: _text(data['title']).isEmpty
-                ? _text(data['documentType'])
-                : _text(data['title']),
-            number: _text(data['documentNumber']),
-            date: _formatDateTime(data['issuedAt'] ?? data['createdAt']),
-            url: _text(data['downloadUrl']),
-          ));
+        List<Widget> tilesFor(String key) {
+          return grouped[key]!
+              .map(
+                (doc) => _documentTile(
+                  context,
+                  title: _text(doc.data()['title']).isEmpty
+                      ? _text(doc.data()['documentType'])
+                      : _text(doc.data()['title']),
+                  number: _text(doc.data()['documentNumber']),
+                  date: _formatDateTime(
+                    doc.data()['issuedAt'] ?? doc.data()['createdAt'],
+                  ),
+                  status: _text(doc.data()['status']),
+                  url: _text(doc.data()['downloadUrl']),
+                ),
+              )
+              .toList();
         }
 
-        if (!hasLegacyInRegistry && _text(legacy['downloadUrl']).isNotEmpty) {
-          widgets.add(_documentTile(
-            context,
-            title: 'Accusé de réception de l’inscription administrateur',
-            number: '${_text(requestData['requestNumber'])}-INS-AR-01',
-            date: _formatDateTime(legacy['generatedAt'] ?? requestData['requestedAt']),
-            url: _text(legacy['downloadUrl']),
-          ));
-        }
-
-        return Column(children: widgets);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Historique documentaire du dossier',
+              style: TextStyle(
+                color: _blue,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Documents conservés par rubrique et classés '
+              'historiquement par référence.',
+              style: TextStyle(
+                color: Colors.black54,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 10),
+            _documentRubric(
+              title: '1 — DEMANDE D’ACCÈS',
+              icon: Icons.assignment_ind_outlined,
+              children: accessChildren,
+              documentCount: accessChildren.length,
+            ),
+            _documentRubric(
+              title: '2 — PÉRIODE D’ESSAI',
+              icon: Icons.hourglass_bottom_rounded,
+              children: tilesFor('trial'),
+              documentCount: grouped['trial']!.length,
+            ),
+            _documentRubric(
+              title: '3 — ABONNEMENT',
+              icon: Icons.fact_check_outlined,
+              children: tilesFor('subscription'),
+              documentCount: grouped['subscription']!.length,
+            ),
+            _documentRubric(
+              title: '4 — FACTURATION',
+              icon: Icons.receipt_long_outlined,
+              children: tilesFor('billing'),
+              documentCount: grouped['billing']!.length,
+            ),
+            _documentRubric(
+              title: '5 — RENOUVELLEMENT',
+              icon: Icons.autorenew_rounded,
+              children: tilesFor('renewal'),
+              documentCount: grouped['renewal']!.length,
+            ),
+            _documentRubric(
+              title: '6 — CHANGEMENTS D’ADMINISTRATEUR',
+              icon: Icons.manage_accounts_outlined,
+              children: tilesFor('admins'),
+              documentCount: grouped['admins']!.length,
+            ),
+          ],
+        );
       },
     );
   }
@@ -477,20 +721,48 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
     required String title,
     required String number,
     required String date,
+    required String status,
     required String url,
   }) {
+    final normalizedStatus = status.toLowerCase();
+
+    final statusLabel = switch (normalizedStatus) {
+      'issued' => 'ÉMIS',
+      'generated' => 'ÉMIS',
+      'approved' => 'VALIDÉ',
+      'validated' => 'VALIDÉ',
+      'pending' => 'EN ATTENTE',
+      'replaced' => 'REMPLACÉ',
+      'cancelled' => 'ANNULÉ',
+      _ => status.isEmpty ? '' : status.toUpperCase(),
+    };
+
+    final statusColor = switch (normalizedStatus) {
+      'approved' || 'validated' => _green,
+      'pending' => _orange,
+      'replaced' || 'cancelled' => Colors.black54,
+      _ => _blue,
+    };
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(top: 7),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _blue.withOpacity(0.025),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _blue.withOpacity(0.18)),
+        border: Border.all(color: _blue.withOpacity(0.14)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.description_outlined, color: _blue, size: 22),
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(
+              Icons.description_outlined,
+              color: _blue,
+              size: 21,
+            ),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -500,29 +772,54 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                   title,
                   style: const TextStyle(
                     color: _blue,
-                    fontSize: 12.5,
+                    fontSize: 12,
                     fontWeight: FontWeight.w900,
+                    height: 1.2,
                   ),
                 ),
                 if (number.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     number,
                     style: const TextStyle(
                       color: _red,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
                 if (date != '—') ...[
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     date,
                     style: const TextStyle(
                       color: Colors.black54,
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                if (statusLabel.isNotEmpty) ...[
+                  const SizedBox(height: 5),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(99),
+                      border: Border.all(
+                        color: statusColor.withOpacity(0.55),
+                      ),
+                    ),
+                    child: Text(
+                      statusLabel,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ],
@@ -534,7 +831,10 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
               onPressed: () async {
                 final uri = Uri.tryParse(url);
                 if (uri == null) return;
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                await launchUrl(
+                  uri,
+                  mode: LaunchMode.externalApplication,
+                );
               },
               child: const Text(
                 'VOIR',
