@@ -4231,10 +4231,16 @@ async function resolveSauveteurSession(token) {
       login,
   );
 
+  const legalPack = await activeLegalPackInfo();
+  const legalAcceptanceCurrent =
+    sauveteurLegalAcceptanceIsCurrent(accountData, legalPack);
+
   return {
     login,
     accountData,
     context,
+    legalPack,
+    legalAcceptanceCurrent,
   };
 }
 
@@ -4545,30 +4551,46 @@ exports.acceptSauveteurLegalTerms = onRequest(
             .collection("sauveteurAccounts")
             .doc(session.login);
 
-        await accountReference.set({
-          legalAcceptanceCompleted: true,
-          legalAcceptance: {
-            accepted: true,
-            version: legalPack.version,
-            versionId: legalPack.versionId,
-            legalPackPath: legalPack.packPath,
-            acceptedAt:
-              admin.firestore.FieldValue.serverTimestamp(),
-            documents: {
-              cgu: true,
-              privacy: true,
-              rgpd: true,
-            },
-            operationalRules: {
-              publicOperationalDiffusionAcknowledged: true,
-              institutionalReadAcknowledged: true,
-              personalAccountUseAccepted: true,
-              publicIdentityDisclosureByDefault: false,
-            },
-            source: "sphot_sauveteur_access_validation",
+        const acceptedAt =
+          admin.firestore.FieldValue.serverTimestamp();
+        const acceptanceData = {
+          accepted: true,
+          version: legalPack.version,
+          versionId: legalPack.versionId,
+          legalPackPath: legalPack.packPath,
+          acceptedAt,
+          documents: {
+            cgu: true,
+            privacy: true,
+            rgpd: true,
           },
+          operationalRules: {
+            publicOperationalDiffusionAcknowledged: true,
+            institutionalReadAcknowledged: true,
+            personalAccountUseAccepted: true,
+            publicIdentityDisclosureByDefault: false,
+          },
+          source: "sphot_sauveteur_access_validation",
+        };
+
+        const historyReference = accountReference
+            .collection("legalAcceptances")
+            .doc(legalPack.versionId);
+
+        const historySnapshot = await historyReference.get();
+        const batch = admin.firestore().batch();
+
+        batch.set(accountReference, {
+          legalAcceptanceCompleted: true,
+          legalAcceptance: acceptanceData,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, {merge: true});
+
+        if (!historySnapshot.exists) {
+          batch.set(historyReference, acceptanceData);
+        }
+
+        await batch.commit();
 
         response.status(200).json({
           success: true,
@@ -4613,6 +4635,14 @@ exports.saveSauveteurPlanning = onRequest(
           response.status(401).json({
             success: false,
             error: "invalid_session",
+          });
+          return;
+        }
+
+        if (!session.legalAcceptanceCurrent) {
+          response.status(403).json({
+            success: false,
+            error: "legal_acceptance_required",
           });
           return;
         }
@@ -4717,6 +4747,14 @@ exports.updateSauveteurLiveState = onRequest(
           return;
         }
 
+        if (!session.legalAcceptanceCurrent) {
+          response.status(403).json({
+            success: false,
+            error: "legal_acceptance_required",
+          });
+          return;
+        }
+
         const {context} = session;
         const spotId = (request.body.spotId || "").toString().trim();
         const changes = request.body.changes || {};
@@ -4816,6 +4854,14 @@ exports.getSauveteurMainCourante = onRequest(
           return;
         }
 
+        if (!session.legalAcceptanceCurrent) {
+          response.status(403).json({
+            success: false,
+            error: "legal_acceptance_required",
+          });
+          return;
+        }
+
         const {context} = session;
         const spotId = (request.body.spotId || "").toString().trim();
 
@@ -4910,6 +4956,14 @@ exports.addSauveteurMainCouranteEntry = onRequest(
           response.status(401).json({
             success: false,
             error: "invalid_session",
+          });
+          return;
+        }
+
+        if (!session.legalAcceptanceCurrent) {
+          response.status(403).json({
+            success: false,
+            error: "legal_acceptance_required",
           });
           return;
         }
