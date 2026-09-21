@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import 'sauveteur_menu_page.dart';
+import 'sauveteur_access_info_page.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   final String login;
@@ -104,11 +104,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => SauveteurMenuPage(
-          profileColor: const Color(0xFFFF0000),
-          userRole: widget.userRole,
-          territoireId: widget.territoireId,
+        builder: (_) => SauveteurAccessInfoPage(
           login: widget.login,
+          territoireId: widget.territoireId,
+          userRole: widget.userRole,
           sphotMode: widget.sphotMode,
           sphotModeReason: widget.sphotModeReason,
           sauveteurSessionToken: widget.sauveteurSessionToken,
