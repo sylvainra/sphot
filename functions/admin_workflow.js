@@ -543,7 +543,7 @@ async function registerLegacyAcknowledgement(requestId, data) {
     subcategory: "inscription",
     year: Number(data.requestYear || yearInParis()),
     version: 1,
-    title: "Accusé de réception de l’inscription administrateur",
+    title: "Accusé de réception de la demande d’accès administrateur",
     status: "issued",
     storagePath: legacy.storagePath || null,
     downloadUrl: legacy.downloadUrl,
