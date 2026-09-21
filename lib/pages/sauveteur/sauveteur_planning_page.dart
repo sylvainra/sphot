@@ -14,6 +14,7 @@ class SauveteurPlanningPage extends StatefulWidget {
   final String sphotMode;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final bool canManageRestrictedOperationalData;
 
   const SauveteurPlanningPage({
     super.key,
@@ -23,6 +24,7 @@ class SauveteurPlanningPage extends StatefulWidget {
     required this.sphotMode,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    required this.canManageRestrictedOperationalData,
   });
 
   @override
@@ -30,12 +32,7 @@ class SauveteurPlanningPage extends StatefulWidget {
 }
 
 class _SauveteurPlanningPageState extends State<SauveteurPlanningPage> {
-  bool get canEdit {
-    final role = widget.userRole.trim().toLowerCase();
-
-    return role == 'chef de poste' ||
-        role == 'adjoint chef de poste';
-  }
+  bool get canEdit => widget.canManageRestrictedOperationalData;
 
   bool get canPersist =>
       canEdit && widget.sphotMode.toUpperCase() == 'ON';
