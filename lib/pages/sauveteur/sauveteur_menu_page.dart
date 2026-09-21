@@ -22,6 +22,7 @@ class SauveteurMenuPage extends StatefulWidget {
   final String sphotModeReason;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final bool canManageRestrictedOperationalData;
 
   const SauveteurMenuPage({
     super.key,
@@ -33,6 +34,7 @@ class SauveteurMenuPage extends StatefulWidget {
     required this.sphotModeReason,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    required this.canManageRestrictedOperationalData,
   });
 
   @override
@@ -45,6 +47,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
   late String _sphotMode;
   late String _sphotModeReason;
   late List<String> _postesAffectes;
+  late bool _canManageRestrictedOperationalData;
 
   Timer? _modeRefreshTimer;
   bool _refreshingMode = false;
@@ -81,6 +84,8 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
     _sphotMode = widget.sphotMode.toUpperCase();
     _sphotModeReason = widget.sphotModeReason;
     _postesAffectes = List<String>.from(widget.postesAffectes);
+    _canManageRestrictedOperationalData =
+        widget.canManageRestrictedOperationalData;
 
     _refreshMode();
     _modeRefreshTimer = Timer.periodic(
@@ -147,6 +152,8 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
         _sphotModeReason =
             (decoded['sphotModeReason'] ?? _sphotModeReason).toString();
         _postesAffectes = currentSpots;
+        _canManageRestrictedOperationalData =
+            decoded['canManageRestrictedOperationalData'] == true;
       });
     } catch (_) {
       // Le dernier état connu reste affiché. Les écritures sensibles sont
@@ -392,6 +399,8 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                          canManageRestrictedOperationalData:
+                                              _canManageRestrictedOperationalData,
                                         ),
                                       ),
                                     );
@@ -434,6 +443,8 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                     sauveteurSessionToken:
                                         widget.sauveteurSessionToken,
                                     postesAffectes: _postesAffectes,
+                                    canManageRestrictedOperationalData:
+                                        _canManageRestrictedOperationalData,
                                   ),
                                 ),
                               );
