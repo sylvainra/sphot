@@ -211,6 +211,20 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
                   login: login,
                   territoireId: territoireId,
                   userRole: userRole,
+                  sphotMode:
+                      (decoded['sphotMode'] ?? 'OFF').toString().toUpperCase(),
+                  sphotModeReason:
+                      (decoded['sphotModeReason'] ??
+                              'administration_diffusion_off')
+                          .toString(),
+                  sauveteurSessionToken:
+                      (decoded['sauveteurSessionToken'] ?? '').toString(),
+                  postesAffectes: decoded['postesAffectes'] is List
+                      ? (decoded['postesAffectes'] as List)
+                          .map((value) => value.toString())
+                          .where((value) => value.trim().isNotEmpty)
+                          .toList()
+                      : <String>[],
                 ),
               ),
             );
