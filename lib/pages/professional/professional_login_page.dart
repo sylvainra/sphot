@@ -225,6 +225,8 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
                           .where((value) => value.trim().isNotEmpty)
                           .toList()
                       : <String>[],
+                  canManageRestrictedOperationalData:
+                      decoded['canManageRestrictedOperationalData'] == true,
                 ),
               ),
             );
