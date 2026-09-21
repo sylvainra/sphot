@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
 import 'map/map_page.dart';
+import 'map/profil_login_page.dart';
 import 'web/advertiser/web_advertiser_app.dart';
 import 'web/advertiser/pages/advertiser_first_access_page.dart';
 import 'web/admin/pages/admin_proconnect_access_page.dart';
@@ -105,6 +106,13 @@ class SphotApp extends StatelessWidget {
         builder: (_) => ProfessionalLoginPage(
           advertiserAccess: uri.queryParameters['audience'] == 'advertiser',
         ),
+      );
+    }
+
+    if (uri.path == '/sauveteur-login') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => const ProfilLoginPage(),
       );
     }
 
