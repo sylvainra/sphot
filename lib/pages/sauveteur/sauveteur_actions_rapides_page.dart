@@ -392,7 +392,7 @@ class _SauveteurActionsRapidesPageState
                   ),
                 ),
 
-                if (!widget.isSphotOn)
+                if (!widget.isSphotOn || _liveWriteBlocked)
                   Container(
                     width: double.infinity,
                     margin: const EdgeInsets.fromLTRB(16, 2, 16, 4),
@@ -408,11 +408,16 @@ class _SauveteurActionsRapidesPageState
                         width: 1.5,
                       ),
                     ),
-                    child: const Text(
-                      'SPHOT OFF — SIMULATION : les changements effectués '
-                      'sur cet écran ne modifient pas l’état opérationnel réel.',
+                    child: Text(
+                      _liveWriteBlocked
+                          ? 'SPHOT OFF — l’autorisation opérationnelle a changé. '
+                              'Les actions restent locales et ne modifient pas '
+                              'le poste réel.'
+                          : 'SPHOT OFF — SIMULATION : les changements effectués '
+                              'sur cet écran ne modifient pas l’état '
+                              'opérationnel réel.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Color(0xFFB91C1C),
                         fontSize: 10.5,
                         fontWeight: FontWeight.w900,
@@ -449,18 +454,14 @@ class _SauveteurActionsRapidesPageState
                                   setState(() => isSphotMenuOpen = false);
                                 },
                                 onSelected: (poste) {
-                                  setState(() {
-                                    nomSecours = poste['nomSecours']!;
-                                    nomSphot = poste['nomSphot']!;
-                                    typeSphot = poste['typeSphot']!;
-                                    isSphotMenuOpen = false;
-                                  });
+                                  _selectSpot(poste);
                                 },
                                 itemBuilder: (context) {
                                   return postesSecoursCommune.map((poste) {
                                     final secours = poste['nomSecours']!;
                                     final sphot = poste['nomSphot']!;
-                                    final bool selected = secours == nomSecours;
+                                    final bool selected =
+                                        poste['spotId'] == selectedSpotId;
 
                                     return PopupMenuItem<Map<String, String>>(
                                       value: poste,
@@ -485,6 +486,40 @@ class _SauveteurActionsRapidesPageState
                               ),
                             ],
                           ),
+
+                          if (_loadingSpots)
+                            const Padding(
+                              padding: EdgeInsets.only(bottom: 6),
+                              child: LinearProgressIndicator(),
+                            ),
+
+                          if (!_loadingSpots &&
+                              postesSecoursCommune.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.only(bottom: 6),
+                              child: Text(
+                                'Aucun poste de secours ne vous est affecté.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Color(0xFFDC2626),
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+
+                          if (_liveStatusMessage != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Text(
+                                _liveStatusMessage!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xFFB91C1C),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
 
                           if (!isTemporaryClosed)
                             Container(
@@ -546,7 +581,7 @@ _sectionCard(
                                     color: const Color(0xFF22C55E),
                                     selected: flagColor == 'Vert',
                                     onTap: () {
-                                      setState(() => flagColor = 'Vert');
+                                      _changeFlagColor('Vert');
                                     },
                                   ),
                                   const SizedBox(width: 10),
@@ -555,7 +590,7 @@ _sectionCard(
                                     color: const Color(0xFFFDE047),
                                     selected: flagColor == 'Jaune',
                                     onTap: () {
-                                      setState(() => flagColor = 'Jaune');
+                                      _changeFlagColor('Jaune');
                                     },
                                   ),
                                   const SizedBox(width: 10),
@@ -564,7 +599,7 @@ _sectionCard(
                                     color: const Color(0xFFEF4444),
                                     selected: flagColor == 'Rouge',
                                     onTap: () {
-                                      setState(() => flagColor = 'Rouge');
+                                      _changeFlagColor('Rouge');
                                     },
                                   ),
                                 ],
@@ -751,8 +786,11 @@ _ActionButton(
             width: double.infinity,
             height: 42,
             child: ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 setState(() => isDangerMenuOpen = false);
+                await _persistLiveChanges({
+                  'dangers': selectedDangers.toList(),
+                });
               },
               style: ElevatedButton.styleFrom(
   backgroundColor: Colors.red,
