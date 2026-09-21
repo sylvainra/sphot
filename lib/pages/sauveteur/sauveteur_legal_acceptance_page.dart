@@ -386,7 +386,7 @@ class _SauveteurLegalAcceptancePageState
             text:
                 'J’ai été informé que la MAIN COURANTE est un outil '
                 'professionnel interne, non public, pouvant être consulté '
-                'par l’administrateur SPHOT et par les membres '
+                'par l’administrateur SPHOT ADMIN et par les membres '
                 'institutionnels habilités par son administration, '
                 'selon leurs droits de lecture.',
             onChanged: (value) {
@@ -399,7 +399,7 @@ class _SauveteurLegalAcceptancePageState
             value: _personalAccountUseAccepted,
             text:
                 'Je m’engage à utiliser personnellement mes identifiants '
-                'SPHOT dans le cadre de mes fonctions professionnelles, '
+                'SPHOT SAUVETEUR dans le cadre de mes fonctions professionnelles, '
                 'à ne pas les partager et à respecter les droits, devoirs '
                 'et responsabilités associés à mon rôle.',
             onChanged: (value) {
