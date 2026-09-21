@@ -3773,6 +3773,135 @@ L'équipe SPHOT`,
     },
 );
 
+exports.notifySauveteurSphotOffAfterAssignment = onDocumentUpdated(
+    {
+      document: "sauveteurAccounts/{login}",
+      secrets: ["GMAIL_APP_PASSWORD"],
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const before = event.data?.before.data() || {};
+      const after = event.data?.after.data() || {};
+
+      const beforeSpots = Array.isArray(before.postesAffectes) ?
+        before.postesAffectes.filter((value) => value) :
+        [];
+      const afterSpots = Array.isArray(after.postesAffectes) ?
+        after.postesAffectes.filter((value) => value) :
+        [];
+
+      if (beforeSpots.length === 0 || afterSpots.length > 0) return;
+      if (after.accountStatus !== "ACTIVE") return;
+
+      const email = (after.email || "").toString().trim();
+      if (!email) return;
+
+      const prenom = (after.prenom || "").toString().trim();
+      const nom = (after.nom || "").toString().trim().toUpperCase();
+      const destinataire = [prenom, nom]
+          .filter((value) => value)
+          .join(" ") || "Sauveteur";
+
+      const mailTransporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: SMTP_USER,
+          pass: process.env.GMAIL_APP_PASSWORD,
+        },
+      });
+
+      await sendSphotMail(mailTransporter, {
+        from: MAIL_FROM,
+        to: email,
+        subject: "SPHOT SAUVETEUR — Passage en SPHOT OFF",
+        html: `
+<p>${escapeHtml(destinataire)} bonjour,</p>
+
+<p>
+  Votre période d'affectation opérationnelle à un poste de secours
+  SPHOT est terminée.
+</p>
+
+<div style="
+    background:#fff1f2;
+    border-left:5px solid #dc2626;
+    padding:16px;
+    border-radius:8px;
+    margin:24px 0;">
+
+<strong>SPHOT OFF</strong><br><br>
+
+Votre compte SPHOT reste accessible et vous pouvez continuer
+à consulter, découvrir ou tester l'application.
+<br><br>
+
+En SPHOT OFF, vos actions de test
+<strong>ne modifient pas l'état opérationnel réel</strong>
+des postes de secours et ne peuvent pas altérer les informations
+renseignées par les sauveteurs actuellement en SPHOT ON.
+
+</div>
+
+<p>
+  Lors d'une nouvelle affectation, SPHOT ON sera réactivé
+  automatiquement dès lors que les droits de diffusion de votre
+  administration de tutelle seront ouverts.
+</p>
+
+<div style="text-align:center;margin:35px 0;">
+  <a
+    href="${SPHOT_LOGIN_URL}"
+    style="
+      display:inline-block;
+      padding:15px 28px;
+      border-radius:14px;
+      background:#1e3a8a;
+      color:#ffffff;
+      text-decoration:none;
+      font-size:16px;
+      font-weight:900;">
+    SE CONNECTER À SPHOT
+  </a>
+</div>
+
+<p>
+  À bientôt sur SPHOT,<br>
+  <strong>L'équipe SPHOT</strong>
+</p>
+`,
+        text: `${destinataire} bonjour,
+
+Votre période d'affectation opérationnelle à un poste de secours SPHOT
+est terminée.
+
+SPHOT OFF
+
+Votre compte SPHOT reste accessible et vous pouvez continuer à consulter,
+découvrir ou tester l'application.
+
+En SPHOT OFF, vos actions de test ne modifient pas l'état opérationnel réel
+des postes de secours et ne peuvent pas altérer les informations renseignées
+par les sauveteurs actuellement en SPHOT ON.
+
+Lors d'une nouvelle affectation, SPHOT ON sera réactivé automatiquement dès
+lors que les droits de diffusion de votre administration de tutelle seront ouverts.
+
+${SPHOT_LOGIN_URL}
+
+À bientôt sur SPHOT,
+
+L'équipe SPHOT`,
+      });
+
+      await event.data.after.ref.set({
+        sphotOffNotificationAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        sphotOffNotificationReason: "assignment_ended",
+      }, {merge: true});
+    },
+);
+
 /**
  * Normalise les fonctions métier d'un sauveteur.
  *
