@@ -188,7 +188,7 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                                 )
                               else
                                 _line(
-                                  'Vous êtes actuellement en SPHOT OFF.\n\n'
+                                  'Vous êtes actuellement en SPHOT OFF.\n'
                                   'Vous pouvez découvrir et tester '
                                   'SPHOT SAUVETEUR. Vos actions de test '
                                   'ne modifient jamais l’état opérationnel '
@@ -210,6 +210,9 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                             color: red,
                             children: [
                               _line(
+                                'Vous basculerez en SPHOT ON dès lors que '
+                                'votre administration SPHOT ADMIN bénéficiera '
+                                'des droits de diffusion sur SPHOT.\n'
                                 'Tous les sauveteurs SPHOT ON affectés au même '
                                 'poste peuvent agir professionnellement sur '
                                 'les paramètres opérationnels partagés : '
