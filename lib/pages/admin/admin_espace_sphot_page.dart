@@ -586,12 +586,6 @@ setState(() {
 }
 
 void _showMessage(String message) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(message),
-      duration: const Duration(seconds: 1),
-    ),
-  );
 }
 
   void _nextStep() {
