@@ -170,8 +170,8 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                         children: [
                           _section(
                             title: _isSphotOn
-                                ? 'VOTRE ESPACE EST ACTUELLEMENT SPHOT ON'
-                                : 'VOTRE ESPACE EST ACTUELLEMENT SPHOT OFF',
+                                ? 'SPHOT ON'
+                                : 'SPHOT OFF',
                             icon: _isSphotOn
                                 ? Icons.toggle_on_rounded
                                 : Icons.toggle_off_rounded,
@@ -188,6 +188,7 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                                 )
                               else
                                 _line(
+                                  'Vous êtes actuellement en SPHOT OFF.\n\n'
                                   'Vous pouvez découvrir et tester '
                                   'SPHOT SAUVETEUR. Vos actions de test '
                                   'ne modifient jamais l’état opérationnel '
@@ -198,12 +199,13 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                               _line(
                                 'Le passage SPHOT OFF / SPHOT ON dépend '
                                 'de vos affectations et des droits de diffusion '
-                                'ouverts par votre administration de tutelle.',
+                                'ouverts par votre administration de tutelle '
+                                'SPHOT ADMIN.',
                               ),
                             ],
                           ),
                           _section(
-                            title: 'CE QUE PEUT FAIRE UN SAUVETEUR EN SPHOT ON',
+                            title: 'SPHOT ON',
                             icon: Icons.health_and_safety_rounded,
                             color: red,
                             children: [
@@ -262,8 +264,8 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                                 strong: true,
                               ),
                               _line(
-                                'Votre administrateur SPHOT dispose d’un '
-                                'droit de consultation de la main courante '
+                                'Votre administrateur SPHOT ADMIN dispose '
+                                'd’un droit de consultation de la main courante '
                                 'et de ses archives.',
                               ),
                               _line(
@@ -281,19 +283,20 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                             ],
                           ),
                           _section(
-                            title: 'À LA FIN DE VOTRE AFFECTATION',
+                            title: 'FIN D’AFFECTATION',
                             icon: Icons.event_busy_rounded,
                             color: const Color(0xFFD97706),
                             children: [
                               _line(
-                                'Votre compte reste accessible, mais votre '
-                                'espace repasse en SPHOT OFF dès que votre '
-                                'affectation ne permet plus une action réelle.',
+                                'Votre compte SPHOT SAUVETEUR reste '
+                                'accessible, mais votre espace repasse en '
+                                'SPHOT OFF dès que votre affectation ne permet '
+                                'plus une action réelle.',
                               ),
                               _line(
-                                'Vous pouvez alors continuer à découvrir '
-                                'ou tester l’application sans modifier '
-                                'le fonctionnement réel du poste.',
+                                'Vos actions ne modifieront plus l’état '
+                                'opérationnel réel ni les informations '
+                                'renseignées par les sauveteurs en SPHOT ON.',
                               ),
                             ],
                           ),
