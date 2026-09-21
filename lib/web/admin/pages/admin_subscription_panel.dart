@@ -418,22 +418,8 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       await batch.commit();
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Abonnement activé jusqu\'au 31/12/${now.year}.',
-          ),
-          backgroundColor: _green,
-        ),
-      );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Activation impossible : $error'),
-          backgroundColor: _red,
-        ),
-      );
     } finally {
       if (mounted) {
         setState(() {
@@ -473,21 +459,9 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(successMessage),
-          backgroundColor: _green,
-        ),
-      );
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Enregistrement impossible : $error'),
-          backgroundColor: _red,
-        ),
-      );
     } finally {
       if (mounted) {
         setState(() {
