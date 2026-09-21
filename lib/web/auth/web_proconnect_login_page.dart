@@ -57,13 +57,6 @@ void initState() {
 
   Future<void> _signInWithProConnect() async {
     if (!isAdmin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Connexion sauveteur non encore reliée à ProConnect.',
-          ),
-        ),
-      );
       return;
     }
 
@@ -78,11 +71,6 @@ void initState() {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur ProConnect : $e'),
-        ),
-      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -96,13 +84,6 @@ void initState() {
   }) async {
     switch (result.status) {
       case WebAdminAccessStatus.approved:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Connexion Admin ProConnect réussie.',
-            ),
-          ),
-        );
         break;
 
       case WebAdminAccessStatus.pending:
@@ -139,11 +120,6 @@ void initState() {
 
       case WebAdminAccessStatus.signedOut:
         if (showSignedOutMessage) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Connexion annulée.'),
-            ),
-          );
         }
         break;
     }
