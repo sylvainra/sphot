@@ -81,11 +81,6 @@ class _AdminPeriodesSurveillancePageState
 } catch (e) {
   if (!mounted) return;
 
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text('ERREUR FIRESTORE : $e'),
-    ),
-  );
 }
 }
 
