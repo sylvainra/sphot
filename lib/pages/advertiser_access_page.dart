@@ -99,11 +99,6 @@ class _AdvertiserAccessPageState extends State<AdvertiserAccessPage> {
         _checking = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Votre demande annonceur est en cours de validation.'),
-        ),
-      );
 
       return;
     }
@@ -123,15 +118,6 @@ class _AdvertiserAccessPageState extends State<AdvertiserAccessPage> {
       _checking = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          status == 'rejected'
-              ? 'Votre accès annonceur a été refusé.'
-              : 'Votre demande annonceur est en cours de validation.',
-        ),
-      ),
-    );
   }
 
   Future<void> _connectWithProConnect() async {
