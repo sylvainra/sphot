@@ -61,6 +61,10 @@ function buildPublicSpot(territoireId, spotId, spot) {
     "equipement",
     "labelSphot",
     "liveFlag",
+    "dangers",
+    "meteoTerrestre",
+    "meteoMarine",
+    "ephemeride",
   ];
 
   const result = {territoireId, spotId};
@@ -88,6 +92,10 @@ function buildPublicLiveState(spot) {
     "heureFin",
     "phone",
     "telephonePoste",
+    "dangers",
+    "meteoTerrestre",
+    "meteoMarine",
+    "ephemeride",
   ];
   const result = {};
   liveFields.forEach((field) => {
