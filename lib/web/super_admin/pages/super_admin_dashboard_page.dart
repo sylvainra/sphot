@@ -4435,13 +4435,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                           } catch (error) {
                             if (!mounted) return;
 
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Erreur lors de l’approbation : $error',
-                                ),
-                              ),
-                            );
                           }
                         },
                         icon: const Icon(Icons.check_circle_rounded),
@@ -4468,11 +4461,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                           } catch (error) {
                             if (!mounted) return;
 
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Erreur lors du refus : $error'),
-                              ),
-                            );
                           }
                         },
                         icon: const Icon(Icons.cancel_rounded),
@@ -5462,9 +5450,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   Future<void> _saveLegalChapter() async {
     if (_selectedLegalDocument == null || _selectedLegalChapter == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Aucun chapitre sélectionné.')),
-      );
       return;
     }
 
@@ -5502,9 +5487,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erreur Firebase : $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -5533,13 +5515,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   Future<void> _saveLegalVersion() async {
     if (!_canPublishVersion) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Sélectionnez au moins un document, un chapitre modifié et renseignez le résumé des modifications.',
-          ),
-        ),
-      );
       return;
     }
 
@@ -5667,15 +5642,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         _legalChangeLogController.clear();
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Version SPHOT $version publiée et archivée.')),
-      );
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur publication version SPHOT : $error')),
-      );
     }
   }
 
