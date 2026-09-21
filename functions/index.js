@@ -898,392 +898,437 @@ function createAdminRequestPdf({
       const doc = new PDFDocument({
         size: "A4",
         margins: {
-          top: 34,
-          bottom: 34,
-          left: 42,
-          right: 42,
+          top: 30,
+          bottom: 30,
+          left: 40,
+          right: 40,
         },
         info: {
-          Title: "Accusé de réception d'une demande d'accès SPHOT",
+          Title:
+            "Accusé de réception de la demande d'accès administrateur",
           Author: "SPHOT",
           Subject: requestNumber,
         },
       });
 
       const chunks = [];
-
       doc.on("data", (chunk) => chunks.push(chunk));
-
-      doc.on("end", () => {
-        resolve(Buffer.concat(chunks));
-      });
-
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
       doc.on("error", reject);
 
       const blue = "#1E3A8A";
       const red = "#DC2626";
       const dark = "#263238";
       const grey = "#607D8B";
-      const lightBlue = "#F3F6FB";
+      const pale = "#F3F6FB";
+      const paleWarm = "#FFF8E1";
+      const white = "#FFFFFF";
 
-      const contentWidth =
-          doc.page.width -
-          doc.page.margins.left -
-          doc.page.margins.right;
+      const left = doc.page.margins.left;
+      const right = doc.page.width - doc.page.margins.right;
+      const contentWidth = right - left;
 
-      /**
-       * Affiche un titre de section compact.
-       *
-       * @param {string} title Titre à afficher.
-       */
-      const sectionTitle = (title) => {
-        const left = doc.page.margins.left;
-        const iconSize = 18;
-        const titleY = doc.y + 8;
-        const titleX = left + iconSize + 10;
+      const safe = (value, fallback = "Non renseigné") =>
+        cleanValue(value, fallback);
 
-        doc
-            .circle(
-                left + (iconSize / 2),
-                titleY + (iconSize / 2),
-                iconSize / 2,
-            )
-            .lineWidth(1)
-            .strokeColor(red)
-            .stroke();
-
+      const drawSectionTitle = (title) => {
+        const y = doc.y + 3;
         doc
             .font("Helvetica-Bold")
             .fontSize(9)
             .fillColor(red)
-            .text(
-                "S",
-                left,
-                titleY + 1,
-                {
-                  width: iconSize,
-                  align: "center",
-                },
-            );
-
-        doc
-            .font("Helvetica-Bold")
-            .fontSize(10)
-            .fillColor(red)
-            .text(
-                title.toUpperCase(),
-                titleX,
-                titleY + 1,
-                {
-                  width: contentWidth - iconSize - 10,
-                  align: "left",
-                },
-            );
-
-        const lineY = titleY + iconSize + 4;
-
+            .text(title.toUpperCase(), left, y, {
+              width: contentWidth,
+            });
         doc
             .strokeColor(blue)
-            .lineWidth(0.8)
-            .moveTo(titleX, lineY)
-            .lineTo(
-                doc.page.width - doc.page.margins.right,
-                lineY,
-            )
+            .lineWidth(0.7)
+            .moveTo(left, y + 14)
+            .lineTo(right, y + 14)
             .stroke();
-
-        doc.x = left;
-        doc.y = lineY + 8;
+        doc.y = y + 21;
       };
 
-      /**
-       * Affiche une ligne d'information compacte.
-       *
-       * @param {string} label Libellé du champ.
-       * @param {*} value Valeur du champ.
-       */
-      const informationLine = (label, value) => {
-        const labelWidth = 105;
-        const startY = doc.y;
-        const startX = doc.page.margins.left + 12;
-
+      const drawInfoRow = (label, value, options = {}) => {
+        const y = doc.y;
+        const labelWidth = options.labelWidth || 104;
         doc
             .font("Helvetica-Bold")
-            .fontSize(8.2)
+            .fontSize(7.7)
             .fillColor(blue)
-            .text(
-                `${label}`,
-                startX,
-                startY,
-                {
-                  width: labelWidth,
-                  align: "left",
-                },
-            );
-
+            .text(label, left + 10, y, {
+              width: labelWidth,
+            });
         doc
             .font("Helvetica")
-            .fontSize(8.6)
+            .fontSize(8)
             .fillColor(dark)
-            .text(
-                cleanValue(value),
-                startX + labelWidth + 4,
-                startY,
-                {
-                  width: contentWidth - labelWidth - 8,
-                  align: "left",
-                },
-            );
+            .text(safe(value), left + 10 + labelWidth, y, {
+              width: contentWidth - labelWidth - 20,
+              ellipsis: true,
+            });
+        doc.y = y + 11.5;
+      };
 
-        doc.y = startY + 13;
+      const drawTwoColumnBox = ({
+        titleLeft,
+        rowsLeft,
+        titleRight,
+        rowsRight,
+      }) => {
+        const boxY = doc.y;
+        const gap = 10;
+        const boxWidth = (contentWidth - gap) / 2;
+        const boxHeight = 112;
+
+        for (const entry of [
+          {x: left, title: titleLeft, rows: rowsLeft},
+          {
+            x: left + boxWidth + gap,
+            title: titleRight,
+            rows: rowsRight,
+          },
+        ]) {
+          doc
+              .roundedRect(entry.x, boxY, boxWidth, boxHeight, 10)
+              .fillAndStroke(pale, "#D9E2EC");
+          doc
+              .font("Helvetica-Bold")
+              .fontSize(8.5)
+              .fillColor(red)
+              .text(entry.title.toUpperCase(), entry.x + 12, boxY + 12, {
+                width: boxWidth - 24,
+              });
+
+          let rowY = boxY + 31;
+          for (const row of entry.rows) {
+            const value = safe(row.value);
+            doc
+                .font("Helvetica-Bold")
+                .fontSize(7.1)
+                .fillColor(blue)
+                .text(row.label, entry.x + 12, rowY, {
+                  width: 78,
+                });
+            doc
+                .font("Helvetica")
+                .fontSize(7.3)
+                .fillColor(dark)
+                .text(value, entry.x + 92, rowY, {
+                  width: boxWidth - 104,
+                  ellipsis: true,
+                });
+            rowY += 13;
+          }
+        }
+
+        doc.y = boxY + boxHeight + 10;
       };
 
       doc
+          .roundedRect(left, 30, contentWidth, 72, 14)
+          .fillAndStroke(white, "#D9E2EC");
+
+      doc
           .font("Helvetica-Bold")
-          .fontSize(26)
+          .fontSize(25)
           .fillColor(red)
-          .text("SPHOT", {
-            align: "center",
+          .text("SPHOT", left + 18, 43, {
+            width: 120,
           });
 
       doc
-          .moveDown(0.08)
+          .font("Helvetica")
+          .fontSize(7.2)
+          .fillColor(grey)
+          .text(
+              "Des plages plus sûres, propres et connectées",
+              left + 18,
+              73,
+              {width: 200},
+          );
+
+      doc
           .font("Helvetica-Bold")
-          .fontSize(12)
+          .fontSize(8)
           .fillColor(blue)
           .text(
-              "ACCUSÉ DE RÉCEPTION D'UNE DEMANDE D'ACCÈS " +
+              "SURVEILLER  •  PRÉSERVER  •  INFORMER  •  ENSEMBLE",
+              left + 222,
+              56,
+              {
+                width: contentWidth - 240,
+                align: "right",
+              },
+          );
+
+      doc.y = 116;
+
+      doc
+          .font("Helvetica-Bold")
+          .fontSize(13)
+          .fillColor(blue)
+          .text(
+              "ACCUSÉ DE RÉCEPTION DE LA DEMANDE D'ACCÈS " +
               "ADMINISTRATEUR",
               {
                 align: "center",
-                lineGap: 0,
+                width: contentWidth,
+                lineGap: 1,
               },
           );
 
       doc.moveDown(0.35);
 
-      const summaryTop = doc.y;
-
+      const referenceY = doc.y;
       doc
-          .roundedRect(
-              doc.page.margins.left,
-              summaryTop,
-              contentWidth,
-              82,
-              10,
-          )
-          .fillAndStroke(lightBlue, blue);
+          .roundedRect(left, referenceY, contentWidth, 72, 12)
+          .fillAndStroke(pale, blue);
 
       doc
           .font("Helvetica-Bold")
-          .fontSize(7.8)
-          .fillColor(blue)
-          .text(
-              "NUMÉRO DE DEMANDE",
-              doc.page.margins.left + 13,
-              summaryTop + 18,
-          );
+          .fontSize(7.2)
+          .fillColor(grey)
+          .text("RÉFÉRENCE DU DOSSIER", left + 14, referenceY + 13);
 
       doc
           .font("Helvetica-Bold")
-          .fontSize(12)
+          .fontSize(11.4)
           .fillColor(red)
-          .text(
-              requestNumber,
-              doc.page.margins.left + 13,
-              summaryTop + 42,
-          );
+          .text(requestNumber, left + 14, referenceY + 29, {
+            width: 300,
+          });
 
       doc
           .font("Helvetica")
-          .fontSize(6.8)
+          .fontSize(7.2)
           .fillColor(grey)
           .text(
-              `Demande transmise le ${formatFrenchDate(createdAt)}`,
-              doc.page.margins.left + 13,
-              summaryTop + 69,
+              `Demande reçue le ${formatFrenchDate(createdAt)}`,
+              left + 14,
+              referenceY + 50,
           );
-
-      doc.y = summaryTop + 100;
-
-      doc
-          .font("Helvetica")
-          .fontSize(8.5)
-          .fillColor(blue)
-          .text(
-              "Votre demande d'accès au portail d'administration SPHOT " +
-        "a bien été enregistrée.",
-              {
-                align: "center",
-                lineGap: 0,
-              },
-          );
-
-      sectionTitle("Demandeur");
-
-      informationLine("Nom", profile.nomAffiche);
-      informationLine("Prénom", profile.prenomAffiche);
-      informationLine("Fonction", profile.fonction);
-      informationLine("Email", profile.email);
-      informationLine("Téléphone", profile.telephone);
-
-      sectionTitle("Identité transmise par ProConnect");
-
-      informationLine("Nom", proConnect.nom);
-      informationLine("Prénom", proConnect.prenom);
-      informationLine("Email", proConnect.email);
-      informationLine("Organisation", proConnect.organisation);
-      informationLine("SIRET", proConnect.siret);
-      informationLine("SIREN", proConnect.siren);
-
-      sectionTitle("Structure");
-
-      informationLine("Nom", structure.nom);
-      informationLine("Type", structure.type);
-      informationLine("SIRET", structure.siret);
-      informationLine("SIREN", structure.siren);
-
-      sectionTitle("Territoire");
-
-      informationLine("Pays", territoire.pays);
-      informationLine("Région", territoire.region);
-      informationLine("Département", territoire.departement);
-      informationLine("Ville", territoire.ville);
-
-      sectionTitle("Votre essai SPHOT");
 
       doc
           .font("Helvetica-Bold")
-          .fontSize(9.6)
-          .fillColor(red)
-          .text(
-              "Essai gratuit, sans engagement ni facturation.",
-              {
-                lineGap: 0,
-              },
-          );
-
-      doc
-          .moveDown(0.08)
-          .font("Helvetica")
-          .fontSize(8.1)
+          .fontSize(7.1)
           .fillColor(blue)
-          .text(
-              "Après validation de votre demande par l'équipe SPHOT, " +
-              "vous pourrez accéder au portail d'administration SPHOT " +
-              "afin de créer vos SPHOTS, vos sauveteurs et vos périodes " +
-              "de surveillance.",
-              {
-                lineGap: 1,
-              },
-          );
+          .text("RUBRIQUE", right - 138, referenceY + 13, {
+            width: 120,
+            align: "right",
+          });
 
       doc
-          .moveDown(0.12)
-          .text(
-              "Vous recevrez prochainement, par courrier électronique, " +
-              "une réponse vous informant de la décision prise concernant " +
-              "votre demande.",
-              {
-                lineGap: 1,
-              },
-          );
+          .font("Helvetica-Bold")
+          .fontSize(8.4)
+          .fillColor(dark)
+          .text("DEMANDE D'ACCÈS", right - 138, referenceY + 31, {
+            width: 120,
+            align: "right",
+          });
+
+      doc.y = referenceY + 84;
+
+      drawTwoColumnBox({
+        titleLeft: "Demandeur",
+        rowsLeft: [
+          {label: "Nom", value: profile.nomAffiche},
+          {label: "Prénom", value: profile.prenomAffiche},
+          {label: "Fonction", value: profile.fonction},
+          {label: "Email", value: profile.email},
+          {label: "Téléphone", value: profile.telephone},
+        ],
+        titleRight: "Structure et territoire",
+        rowsRight: [
+          {label: "Structure", value: structure.nom},
+          {label: "Type", value: structure.type},
+          {label: "SIRET", value: structure.siret},
+          {label: "Commune", value: territoire.ville},
+          {label: "Département", value: territoire.departement},
+        ],
+      });
+
+      const proConnectValues = [
+        proConnect.nom,
+        proConnect.prenom,
+        proConnect.email,
+        proConnect.organisation,
+        proConnect.siret,
+        proConnect.siren,
+      ].map((value) => cleanValue(value));
+
+      if (proConnectValues.some((value) => value)) {
+        drawSectionTitle("Identité certifiée transmise par ProConnect");
+        drawInfoRow(
+            "Identité",
+            [proConnect.prenom, proConnect.nom]
+                .map((value) => cleanValue(value))
+                .filter(Boolean)
+                .join(" "),
+        );
+        drawInfoRow("Email", proConnect.email);
+        drawInfoRow("Organisation", proConnect.organisation);
+        drawInfoRow(
+            "SIRET / SIREN",
+            [
+              cleanValue(proConnect.siret),
+              cleanValue(proConnect.siren),
+            ].filter(Boolean).join(" / "),
+        );
+        doc.moveDown(0.2);
+      }
+
+      drawSectionTitle("Objet du document");
 
       doc
-          .moveDown(0.12)
+          .font("Helvetica")
+          .fontSize(8.3)
+          .fillColor(dark)
           .text(
-              "La période d'essai gratuite de 8 jours débutera uniquement " +
-              "lorsque votre configuration sera complète et que l'essai " +
-              "aura été activé.",
+              "Votre demande d'accès au portail d'administration SPHOT " +
+              "a bien été enregistrée. Elle va maintenant faire l'objet " +
+              "d'une instruction par l'équipe SPHOT. Une décision " +
+              "distincte vous sera communiquée à l'issue de cette " +
+              "instruction.",
+              left + 10,
+              doc.y,
               {
-                lineGap: 1,
+                width: contentWidth - 20,
+                lineGap: 1.2,
               },
           );
 
-      sectionTitle("Conditions acceptées");
+      doc.moveDown(0.45);
+      drawSectionTitle("Consentements enregistrés");
 
-      const acceptedDocuments =
-          trialRequest.acceptedDocuments || {};
-
-      informationLine(
-          "Habilitation à représenter la structure",
-          trialRequest.certifyRepresentative === true ?
-            "Oui" :
-            "Non",
-      );
-
-      informationLine(
-          "Conditions Générales d'Utilisation",
-          acceptedDocuments.cgu === true ?
-            "Acceptées" :
-            "Non acceptées",
-      );
-
-      informationLine(
-          "Politique de confidentialité",
+      const acceptedDocuments = trialRequest.acceptedDocuments || {};
+      const consentY = doc.y;
+      const consentRows = [
+        [
+          "Habilitation",
+          trialRequest.certifyRepresentative === true ? "Oui" : "Non",
+        ],
+        [
+          "CGU",
+          acceptedDocuments.cgu === true ? "Acceptées" : "Non acceptées",
+        ],
+        [
+          "Confidentialité",
           acceptedDocuments.privacy === true ?
             "Acceptée" :
             "Non acceptée",
-      );
+        ],
+        [
+          "Données personnelles",
+          acceptedDocuments.rgpd === true ? "Accepté" : "Non accepté",
+        ],
+      ];
 
-      informationLine(
-          "Traitement des données personnelles",
-          acceptedDocuments.rgpd === true ?
-            "Accepté" :
-            "Non accepté",
-      );
+      const consentColumnWidth = contentWidth / 2;
+      for (let index = 0; index < consentRows.length; index++) {
+        const column = index % 2;
+        const row = Math.floor(index / 2);
+        const x = left + (column * consentColumnWidth) + 10;
+        const y = consentY + (row * 18);
 
-      informationLine(
-          "Version des documents",
-          acceptedDocuments.version,
-      );
+        doc
+            .font("Helvetica-Bold")
+            .fontSize(7.3)
+            .fillColor(blue)
+            .text(consentRows[index][0], x, y, {width: 92});
 
-      sectionTitle("Information importante");
+        doc
+            .font("Helvetica")
+            .fontSize(7.5)
+            .fillColor(dark)
+            .text(
+                consentRows[index][1],
+                x + 94,
+                y,
+                {width: consentColumnWidth - 112},
+            );
+      }
+
+      doc.y = consentY + 41;
+
+      const warningY = doc.y + 5;
+      doc
+          .roundedRect(left, warningY, contentWidth, 63, 10)
+          .fillAndStroke(paleWarm, "#F59E0B");
+
+      doc
+          .font("Helvetica-Bold")
+          .fontSize(8.2)
+          .fillColor(red)
+          .text("INFORMATION IMPORTANTE", left + 13, warningY + 11);
 
       doc
           .font("Helvetica")
-          .fontSize(8)
+          .fontSize(7.8)
+          .fillColor(dark)
+          .text(
+              "Le présent document atteste uniquement de la réception " +
+              "de votre demande. Il ne constitue ni une décision " +
+              "d'approbation, ni une autorisation d'accès au portail " +
+              "SPHOT. La période d'essai, l'abonnement et la facturation " +
+              "font l'objet d'étapes et de documents distincts.",
+              left + 13,
+              warningY + 27,
+              {
+                width: contentWidth - 26,
+                lineGap: 1,
+              },
+          );
+
+      const signatureY = warningY + 76;
+      doc
+          .font("Helvetica")
+          .fontSize(8.2)
+          .fillColor(dark)
+          .text("À bientôt sur SPHOT,", left, signatureY, {
+            width: contentWidth,
+            align: "right",
+          });
+
+      doc
+          .font("Helvetica-Bold")
+          .fontSize(8.5)
           .fillColor(blue)
-          .text(
-              "Ce document confirme uniquement la bonne réception et " +
-              "l'enregistrement de votre demande d'accès au portail " +
-              "d'administration SPHOT.",
-              {
-                lineGap: 1,
-              },
-          );
+          .text("L'équipe SPHOT", left, signatureY + 13, {
+            width: contentWidth,
+            align: "right",
+          });
+
+      const footerY = doc.page.height - 54;
+      doc
+          .strokeColor("#D9E2EC")
+          .lineWidth(0.7)
+          .moveTo(left, footerY)
+          .lineTo(right, footerY)
+          .stroke();
 
       doc
-          .moveDown(0.05)
-          .text(
-              "Il ne vaut ni acceptation, ni refus de votre demande et " +
-              "ne confère, à ce stade, aucun droit d'accès au portail.",
-              {
-                lineGap: 1,
-              },
-          );
-
-      doc
-          .moveDown(0.05)
-          .text(
-              "La période d'essai gratuite n'est pas encore ouverte et " +
-              "aucune facturation ne peut intervenir avant la validation " +
-              "de votre demande et l'activation effective de votre essai.",
-              {
-                lineGap: 1,
-              },
-          );
-
-      doc
-          .moveDown(0.70)
           .font("Helvetica")
-          .fontSize(6.8)
+          .fontSize(6.6)
           .fillColor(grey)
           .text(
-              `Document généré automatiquement par SPHOT — ${requestNumber}`,
+              "Document généré automatiquement par SPHOT",
+              left,
+              footerY + 10,
+              {width: 220},
+          );
+
+      doc
+          .font("Helvetica")
+          .fontSize(6.6)
+          .fillColor(grey)
+          .text(
+              `${requestNumber}-INS-AR-01  •  Version 01  •  Page 1 / 1`,
+              left + 210,
+              footerY + 10,
               {
-                align: "center",
-                lineGap: 0,
+                width: contentWidth - 210,
+                align: "right",
               },
           );
 
@@ -1575,6 +1620,46 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
         });
 
         const downloadUrl = await getDownloadURL(file);
+
+        const documentNumber = `${requestNumber}-INS-AR-01`;
+        const registryId = cleanValue(
+            `${requestId}_${documentNumber}`,
+        )
+            .replace(/[^A-Za-z0-9_-]/g, "_")
+            .replace(/_+/g, "_")
+            .slice(0, 700);
+
+        await admin.firestore().collection("documents").doc(registryId).set(
+            {
+              requestId: requestId,
+              adminUid: cleanValue(data.uid || requestId),
+              dossierNumber: requestNumber,
+              documentNumber: documentNumber,
+              documentType: "registration_acknowledgement",
+              category: "administrative",
+              subcategory: "inscription",
+              year: Number(
+                  data.requestYear ||
+                  new Intl.DateTimeFormat("fr-FR", {
+                    timeZone: "Europe/Paris",
+                    year: "numeric",
+                  }).format(createdAt),
+              ),
+              version: 1,
+              title:
+                  "Accusé de réception de la demande d'accès " +
+                  "administrateur",
+              status: "issued",
+              storagePath: storagePath,
+              downloadUrl: downloadUrl,
+              issuedAt:
+                  admin.firestore.FieldValue.serverTimestamp(),
+              createdAt:
+                  admin.firestore.FieldValue.serverTimestamp(),
+              createdByRole: "system",
+            },
+            {merge: true},
+        );
 
         const mailResult = await sendAdminAccessAcknowledgementEmail(
             data,
