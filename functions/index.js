@@ -3597,7 +3597,7 @@ de votre mot de passe.
 `:
 `
 <p>
-  Votre compte SPHOT a été créé par votre administrateur.
+  Votre compte SPHOT SAUVETEUR a été créé par votre administrateur SPHOT ADMIN.
 </p>
 
 <p>
@@ -3714,7 +3714,7 @@ ${SPHOT_SAUVETEUR_LOGIN_URL}
 L'équipe SPHOT` :
 `${destinataire} bonjour,
 
-Votre compte SPHOT a été créé par votre administrateur.
+Votre compte SPHOT SAUVETEUR a été créé par votre administrateur SPHOT ADMIN.
 
 Identifiant : ${identifiant}
 Mot de passe temporaire : ${motDePasse}
