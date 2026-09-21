@@ -132,7 +132,11 @@ function simplePdfBuffer({
   title,
   documentNumber,
   requestNumber,
+  rubric = "",
+  statusLabel = "ÉMIS",
+  introduction = "",
   lines,
+  notice = "",
 }) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
@@ -155,6 +159,7 @@ function simplePdfBuffer({
     const dark = "#263238";
     const grey = "#607D8B";
     const pale = "#F3F6FB";
+    const paleWarm = "#FFF8E1";
     const white = "#FFFFFF";
 
     const left = doc.page.margins.left;
@@ -163,9 +168,30 @@ function simplePdfBuffer({
 
     const headingCount = lines.filter((line) => line?.heading).length;
     const dataCount = lines.filter((line) => line && !line.heading).length;
-    const compact = dataCount > 11 || headingCount > 4;
-    const valueFontSize = compact ? 7.6 : 8.2;
-    const rowHeight = compact ? 13 : 15;
+    const compact = dataCount > 9 || headingCount > 3;
+    const valueFontSize = compact ? 7.2 : 7.8;
+    const rowHeight = compact ? 11.5 : 13;
+
+    const drawSectionTitle = (heading) => {
+      const titleY = doc.y + 3;
+
+      doc
+          .font("Helvetica-Bold")
+          .fontSize(8.4)
+          .fillColor(red)
+          .text(cleanValue(heading).toUpperCase(), left, titleY, {
+            width: contentWidth,
+          });
+
+      doc
+          .strokeColor(blue)
+          .lineWidth(0.65)
+          .moveTo(left, titleY + 14)
+          .lineTo(right, titleY + 14)
+          .stroke();
+
+      doc.y = titleY + 20;
+    };
 
     doc
         .roundedRect(left, 30, contentWidth, 72, 14)
@@ -206,7 +232,7 @@ function simplePdfBuffer({
 
     doc
         .font("Helvetica-Bold")
-        .fontSize(13)
+        .fontSize(12.6)
         .fillColor(blue)
         .text(title.toUpperCase(), {
           align: "center",
@@ -223,52 +249,85 @@ function simplePdfBuffer({
 
     doc
         .font("Helvetica-Bold")
-        .fontSize(7.2)
+        .fontSize(7.1)
         .fillColor(grey)
-        .text("RÉFÉRENCE DU DOCUMENT", left + 14, referenceY + 13);
+        .text("RÉFÉRENCE DU DOCUMENT", left + 14, referenceY + 11);
 
     doc
         .font("Helvetica-Bold")
-        .fontSize(10.5)
+        .fontSize(10.3)
         .fillColor(red)
-        .text(documentNumber, left + 14, referenceY + 29, {
-          width: contentWidth - 28,
+        .text(documentNumber, left + 14, referenceY + 27, {
+          width: 330,
         });
 
     doc
         .font("Helvetica")
-        .fontSize(7.2)
+        .fontSize(7)
         .fillColor(grey)
         .text(
             `Dossier : ${requestNumber}`,
             left + 14,
-            referenceY + 52,
+            referenceY + 50,
         );
 
-    doc.y = referenceY + 90;
+    if (rubric) {
+      doc
+          .font("Helvetica-Bold")
+          .fontSize(7.1)
+          .fillColor(blue)
+          .text("RUBRIQUE", right - 145, referenceY + 11, {
+            width: 130,
+            align: "right",
+          });
+
+      doc
+          .font("Helvetica-Bold")
+          .fontSize(8.1)
+          .fillColor(dark)
+          .text(rubric.toUpperCase(), right - 145, referenceY + 27, {
+            width: 130,
+            align: "right",
+          });
+    }
+
+    doc
+        .font("Helvetica-Bold")
+        .fontSize(7.1)
+        .fillColor(blue)
+        .text("STATUT", right - 145, referenceY + 50, {
+          width: 130,
+          align: "right",
+        });
+
+    doc
+        .font("Helvetica-Bold")
+        .fontSize(8.1)
+        .fillColor(dark)
+        .text(statusLabel.toUpperCase(), right - 145, referenceY + 63, {
+          width: 130,
+          align: "right",
+        });
+
+    doc.y = referenceY + 89;
+
+    if (introduction) {
+      doc
+          .font("Helvetica")
+          .fontSize(8)
+          .fillColor(dark)
+          .text(introduction, left + 8, doc.y, {
+            width: contentWidth - 16,
+            lineGap: 1.1,
+          });
+      doc.moveDown(0.45);
+    }
 
     for (const line of lines) {
       if (!line) continue;
 
       if (line.heading) {
-        const titleY = doc.y + 4;
-
-        doc
-            .font("Helvetica-Bold")
-            .fontSize(8.6)
-            .fillColor(red)
-            .text(cleanValue(line.heading).toUpperCase(), left, titleY, {
-              width: contentWidth,
-            });
-
-        doc
-            .strokeColor(blue)
-            .lineWidth(0.65)
-            .moveTo(left, titleY + 14)
-            .lineTo(right, titleY + 14)
-            .stroke();
-
-        doc.y = titleY + 21;
+        drawSectionTitle(line.heading);
         continue;
       }
 
@@ -296,16 +355,37 @@ function simplePdfBuffer({
       doc.y = rowY + rowHeight;
     }
 
-    const availableBottom = doc.page.height - 124;
-    if (doc.y < availableBottom - 78) {
-      doc.y = Math.max(doc.y + 12, availableBottom - 78);
+    if (notice) {
+      const noticeY = doc.y + 8;
+      const noticeHeight = compact ? 56 : 62;
+
+      doc
+          .roundedRect(left, noticeY, contentWidth, noticeHeight, 10)
+          .fillAndStroke(paleWarm, "#F59E0B");
+
+      doc
+          .font("Helvetica-Bold")
+          .fontSize(7.8)
+          .fillColor(red)
+          .text("INFORMATION IMPORTANTE", left + 12, noticeY + 10);
+
+      doc
+          .font("Helvetica")
+          .fontSize(compact ? 7.1 : 7.5)
+          .fillColor(dark)
+          .text(notice, left + 12, noticeY + 25, {
+            width: contentWidth - 24,
+            lineGap: 0.8,
+          });
+
+      doc.y = noticeY + noticeHeight + 10;
     } else {
-      doc.y += 8;
+      doc.y += 10;
     }
 
     doc
         .font("Helvetica")
-        .fontSize(8.2)
+        .fontSize(8.1)
         .fillColor(dark)
         .text("À bientôt sur SPHOT,", left, doc.y, {
           width: contentWidth,
@@ -314,7 +394,7 @@ function simplePdfBuffer({
 
     doc
         .font("Helvetica-Bold")
-        .fontSize(8.5)
+        .fontSize(8.4)
         .fillColor(blue)
         .text("L'équipe SPHOT", left, doc.y + 2, {
           width: contentWidth,
@@ -367,7 +447,11 @@ async function createRegistryPdf({
   category,
   subcategory,
   title,
+  rubric = "",
+  statusLabel = "ÉMIS",
+  introduction = "",
   lines,
+  notice = "",
   relatedOrderId = null,
   relatedInvoiceId = null,
 }) {
@@ -391,7 +475,11 @@ async function createRegistryPdf({
     title,
     documentNumber,
     requestNumber,
+    rubric,
+    statusLabel,
+    introduction,
     lines,
+    notice,
   });
   const file = bucket.file(storagePath);
   await file.save(buffer, {
