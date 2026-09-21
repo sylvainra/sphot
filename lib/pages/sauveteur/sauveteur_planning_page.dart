@@ -1,20 +1,28 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:csv/csv.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
 
 class SauveteurPlanningPage extends StatefulWidget {
   final Color profileColor;
   final String userRole;
   final String territoireId;
-
+  final String sphotMode;
+  final String sauveteurSessionToken;
+  final List<String> postesAffectes;
 
   const SauveteurPlanningPage({
     super.key,
     required this.profileColor,
     required this.userRole,
     required this.territoireId,
+    required this.sphotMode,
+    required this.sauveteurSessionToken,
+    required this.postesAffectes,
   });
 
   @override
@@ -28,6 +36,9 @@ class _SauveteurPlanningPageState extends State<SauveteurPlanningPage> {
     return role == 'chef de poste' ||
         role == 'adjoint chef de poste';
   }
+
+  bool get canPersist =>
+      canEdit && widget.sphotMode.toUpperCase() == 'ON';
 
   late stt.SpeechToText _speech;
 
@@ -182,7 +193,11 @@ String? selectedSpotId;
       .where('typeSphot', isEqualTo: '🚨 POSTE DE SECOURS 🚨')
       .get();
 
-  final spots = snapshot.docs.map((doc) {
+  final assignedIds = widget.postesAffectes.toSet();
+
+  final spots = snapshot.docs
+      .where((doc) => assignedIds.contains(doc.id))
+      .map((doc) {
     final data = doc.data();
     final nomSecours = (data['nomSecours'] ?? '').toString();
     final nomSphot = (data['nomSphot'] ?? '').toString();
@@ -285,7 +300,7 @@ Future<void> _loadPlanning() async {
 }
 
 Future<void> _savePlanning() async {
-  if (selectedSpotId == null) return;
+  if (selectedSpotId == null || !canPersist) return;
 
   final cells = <String, String>{};
   for (final entry in controllers.entries) {
@@ -297,35 +312,44 @@ Future<void> _savePlanning() async {
     names[entry.key] = entry.value.text;
   }
 
-  await FirebaseFirestore.instance
-      .collection('territoires')
-      .doc(widget.territoireId)
-      .collection('spots')
-      .doc(selectedSpotId)
-      .collection('planningSauveteurs')
-      .doc(_planningMonthId)
-      .set({
-    'spotId': selectedSpotId,
-    'spotLabel': selectedBeach,
-    'monthId': _planningMonthId,
-    'openingHours': hoursController.text,
-    'cells': cells,
-    'names': names,
-    'updatedAt': FieldValue.serverTimestamp(),
-  }, SetOptions(merge: true));
+  final uri = Uri.parse(
+    'https://us-central1-sphot-ab80b.cloudfunctions.net/saveSauveteurPlanning',
+  );
+
+  final response = await http.post(
+    uri,
+    headers: const {'Content-Type': 'application/json'},
+    body: jsonEncode({
+      'sauveteurSessionToken': widget.sauveteurSessionToken,
+      'spotId': selectedSpotId,
+      'spotLabel': selectedBeach,
+      'monthId': _planningMonthId,
+      'openingHours': hoursController.text,
+      'cells': cells,
+      'names': names,
+    }),
+  );
+
   if (!mounted) return;
 
-setState(() {
-  planningEnregistre = true;
-});
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    setState(() {
+      planningEnregistre = false;
+    });
+    return;
+  }
 
-await Future.delayed(const Duration(seconds: 1));
+  setState(() {
+    planningEnregistre = true;
+  });
 
-if (!mounted) return;
+  await Future.delayed(const Duration(seconds: 1));
 
-setState(() {
-  planningEnregistre = false;
-});
+  if (!mounted) return;
+
+  setState(() {
+    planningEnregistre = false;
+  });
 }
 
   Future<void> _listenToCell(
@@ -1091,16 +1115,26 @@ SizedBox(
   width: double.infinity,
   height: 46,
   child: ElevatedButton.icon(
-    onPressed: _savePlanning,
+    onPressed: canPersist ? _savePlanning : null,
     icon: Icon(
-      planningEnregistre ? Icons.check_rounded : Icons.save_rounded,
+      planningEnregistre
+          ? Icons.check_rounded
+          : canPersist
+              ? Icons.save_rounded
+              : Icons.visibility_rounded,
       color: planningEnregistre ? Colors.white : const Color(0xFFFF0000),
       size: 20,
     ),
     label: FittedBox(
       fit: BoxFit.scaleDown,
       child: Text(
-        planningEnregistre ? 'PLANNING ENREGISTRÉ' : 'ENREGISTRER LE PLANNING',
+        planningEnregistre
+            ? 'PLANNING ENREGISTRÉ'
+            : canPersist
+                ? 'ENREGISTRER LE PLANNING'
+                : canEdit
+                    ? 'SPHOT OFF — TEST NON ENREGISTRÉ'
+                    : 'PLANNING EN CONSULTATION',
         maxLines: 1,
         style: TextStyle(
           fontWeight: FontWeight.w900,
