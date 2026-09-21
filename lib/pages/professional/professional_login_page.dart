@@ -345,18 +345,6 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
       _errorMessage = null;
     });
 
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text(
-            'La réinitialisation du mot de passe sera raccordée à Firebase.',
-            textAlign: TextAlign.center,
-          ),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 3),
-        ),
-      );
   }
 
   InputDecoration _buildInputDecoration({
