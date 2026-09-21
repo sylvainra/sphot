@@ -104,23 +104,11 @@ class _WebAdminRegistrationPageState extends State<WebAdminRegistrationPage> {
 }) async {
   final available = await _speech.initialize(
     onError: (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur micro : ${error.errorMsg}'),
-          duration: const Duration(seconds: 3),
-        ),
-      );
     },
     onStatus: (status) {},
   );
 
   if (!available) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Reconnaissance vocale non disponible ou micro non autorisé.'),
-        duration: Duration(seconds: 3),
-      ),
-    );
     return;
   }
 
@@ -1219,13 +1207,6 @@ String _territoryId() {
     final territoryId = _territoryId();
 
     if (territoryId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Renseigne au minimum le pays, la région, le département et la ville.',
-          ),
-        ),
-      );
       return;
     }
 
@@ -1235,13 +1216,6 @@ String _territoryId() {
     FirebaseFirestore.instance.collection('adminRequests').doc().id;
 
 if (!_legalValidationComplete) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text(
-        'Tu dois accepter le pack juridique SPHOT avant d’envoyer la demande.',
-      ),
-    ),
-  );
   return;
 }
 
@@ -1355,11 +1329,6 @@ final legalVersionId = _versionId(legalVersion);
   } catch (error) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Erreur enregistrement : $error'),
-      ),
-    );
   }
 }
 
