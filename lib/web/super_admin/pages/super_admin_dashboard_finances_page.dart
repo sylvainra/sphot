@@ -436,12 +436,6 @@ class _SubscriptionPricingEditorState
     );
 
     if (price == null || price <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tarif annuel invalide.'),
-          backgroundColor: _red,
-        ),
-      );
       return;
     }
 
@@ -463,11 +457,6 @@ class _SubscriptionPricingEditorState
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tarif annuel enregistré.'),
-        ),
-      );
     } finally {
       if (mounted) {
         setState(() {
