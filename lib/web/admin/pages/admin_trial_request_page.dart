@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../../widgets/adaptive_asset_image.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -2158,8 +2159,8 @@ const SizedBox(height: 24),
                     width: 62,
                     height: 62,
                     alignment: Alignment.topCenter,
-                    child: Image.asset(
-                      'data/icons/fire_red_icon.png',
+                    child: AdaptiveAssetImage(
+                      'data/icons/fire_red_icon.svg',
                       filterQuality: FilterQuality.high,
                     ),
                   ),
@@ -2229,8 +2230,8 @@ if (!isVille || !_cityInfoComplete) {
       ),
       child: Row(
         children: [
-          Image.asset(
-            'data/icons/fire_red_icon.png',
+          AdaptiveAssetImage(
+            'data/icons/fire_red_icon.svg',
             width: 24,
             height: 24,
             filterQuality: FilterQuality.high,

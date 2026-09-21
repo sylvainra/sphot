@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../widgets/adaptive_asset_image.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
@@ -287,33 +288,33 @@ String _getMarkerIconPath(Map<String, dynamic> data) {
   final fullType = '$type $nature $label';
 
   if (fullType.contains('NATURISME')) {
-    return 'data/icons/fire_skin_icon.png';
+    return 'data/icons/fire_skin_icon.svg';
   }
 
   if (fullType.contains('POSTE DE SECOURS')) {
-    return 'data/icons/fire_red_icon.png';
+    return 'data/icons/fire_red_icon.svg';
   }
 
   if (fullType.contains('ACCES PLAGE')) {
-    return 'data/icons/fire_orange_icon.png';
+    return 'data/icons/fire_orange_icon.svg';
   }
 
   if (fullType.contains('LAC') ||
       fullType.contains("PLAN D'EAU") ||
       fullType.contains('PLAN D EAU') ||
       fullType.contains('BARRAGE')) {
-    return 'data/icons/fire_blue_icon.png';
+    return 'data/icons/fire_blue_icon.svg';
   }
 
   if (fullType.contains('FLEUVE') || fullType.contains('RIVIERE')) {
-    return 'data/icons/fire_green_icon.png';
+    return 'data/icons/fire_green_icon.svg';
   }
 
   if (fullType.contains('LAGON') || fullType.contains('PISCINE NATURELLE')) {
-    return 'data/icons/fire_cyan_icon.png';
+    return 'data/icons/fire_cyan_icon.svg';
   }
 
-  return 'data/icons/fire_orange1_icon.png';
+  return 'data/icons/fire_orange1_icon.svg';
 }
 
 Color _spotTypeColor(Map<String, dynamic> data) {
@@ -899,30 +900,30 @@ Color _clusterBorderColor(List<Marker> markers) {
 
 String _clusterIconPath(Color color) {
   if (color == const Color(0xFFFF0000)) {
-    return 'data/icons/fire_red_icon.png';
+    return 'data/icons/fire_red_icon.svg';
   }
 
   if (color == const Color(0xFFD87A5C)) {
-    return 'data/icons/fire_skin_icon.png';
+    return 'data/icons/fire_skin_icon.svg';
   }
 
   if (color == const Color(0xFFFFD000)) {
-    return 'data/icons/fire_orange_icon.png';
+    return 'data/icons/fire_orange_icon.svg';
   }
 
   if (color == const Color(0xFF1E3A8A)) {
-    return 'data/icons/fire_blue_icon.png';
+    return 'data/icons/fire_blue_icon.svg';
   }
 
   if (color == const Color(0xFF2E7D32)) {
-    return 'data/icons/fire_green_icon.png';
+    return 'data/icons/fire_green_icon.svg';
   }
 
   if (color == const Color(0xFF00ACC1)) {
-    return 'data/icons/fire_cyan_icon.png';
+    return 'data/icons/fire_cyan_icon.svg';
   }
 
-  return 'data/icons/fire_orange1_icon.png';
+  return 'data/icons/fire_orange1_icon.svg';
 }
 
   Marker _buildSpotMarker(Map<String, dynamic> data) {
@@ -1330,8 +1331,8 @@ GestureDetector(
     ),
     child: Row(
       children: [
-        Image.asset(
-          'data/icons/fire_blue_icon.png',
+        AdaptiveAssetImage(
+          'data/icons/fire_blue_icon.svg',
           width: 30,
           height: 30,
           filterQuality: FilterQuality.high,
@@ -1378,8 +1379,8 @@ GestureDetector(
       ),
       child: Row(
         children: [
-          Image.asset(
-  'data/icons/fire_blue_icon.png',
+          AdaptiveAssetImage(
+  'data/icons/fire_blue_icon.svg',
   width: 34,
   height: 34,
   filterQuality: FilterQuality.high,
@@ -4665,8 +4666,8 @@ Marker _buildAdminMarker(Map<String, dynamic> data) {
             child: Stack(
               alignment: Alignment.topCenter,
               children: [
-                Image.asset(
-                  'data/icons/fire_red_icon.png',
+                AdaptiveAssetImage(
+                  'data/icons/fire_red_icon.svg',
                   width: 85,
                   height: 85,
                   fit: BoxFit.contain,
@@ -5006,7 +5007,7 @@ final adminMarkers = <Marker>[
                                         child: Stack(
                                           alignment: Alignment.center,
                                           children: [
-                                            Image.asset(
+                                            AdaptiveAssetImage(
                                               iconPath,
                                               width: 54,
                                               height: 54,
@@ -5128,7 +5129,7 @@ class DashboardSpotMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
+    return AdaptiveAssetImage(
       iconPath,
       width: 46,
       height: 46,

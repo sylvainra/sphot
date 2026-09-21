@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../widgets/adaptive_asset_image.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter/foundation.dart';
@@ -895,8 +896,8 @@ focusedErrorBorder: OutlineInputBorder(
   title: 'SPHOT',
   subtitle: 'Visible directement sur la fiche détaillée d’un SPHOT.',
   iconAsset: _visibility == 'premium'
-      ? 'data/icons/fire_red_icon.png'
-      : 'data/icons/fire_blue_icon.png',
+      ? 'data/icons/fire_red_icon.svg'
+      : 'data/icons/fire_blue_icon.svg',
   selected: _visibility == 'premium',
   onTap: () => setState(() => _visibility = 'premium'),
 ),
@@ -937,7 +938,8 @@ String? iconAsset,
           _phoneMockup(),
           const SizedBox(height: 10),
           iconAsset != null
-    ? Image.asset(
+    ? AdaptiveAssetImage(
+
         iconAsset,
         width: 34,
         height: 34,
@@ -1419,8 +1421,9 @@ Text(
   alignment: Alignment.center,
   child: Transform.translate(
     offset: const Offset(0, -28),
-    child: Image.asset(
-      'data/icons/fire_red_icon.png',
+    child: AdaptiveAssetImage(
+
+      'data/icons/fire_red_icon.svg',
       fit: BoxFit.contain,
     ),
   ),

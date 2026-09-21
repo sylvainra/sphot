@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../widgets/adaptive_asset_image.dart';
 
 import 'admin_espace_sphot_page.dart';
 import 'admin_espace_sauveteur_page.dart';
@@ -176,7 +177,7 @@ class _AdminEspacePageState extends State<AdminEspacePage> {
                                 title: 'SPHOT(S)',
                                 subtitle:
                                     'Créer, voir, copier, modifier, supprimer\nle(s) SPHOT(S)',
-                                imageAsset: 'data/icons/fire_red_icon.png',
+                                imageAsset: 'data/icons/fire_red_icon.svg',
                                 topSpacing: 2,
                                 color: adminColor,
                                 onTap: () {
@@ -308,7 +309,8 @@ class _AdminButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (imageAsset != null)
-              Image.asset(
+              AdaptiveAssetImage(
+
                 imageAsset!,
                 height: 42,
                 fit: BoxFit.contain,
