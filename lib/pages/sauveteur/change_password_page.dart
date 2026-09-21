@@ -213,7 +213,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                         ),
                                         const SizedBox(height: 12),
                                         const Text(
-                                          'Pour sécuriser votre compte, vous devez choisir un nouveau mot de passe avant d’accéder à SPHOT.',
+                                          'Pour sécuriser votre compte, vous devez choisir un nouveau mot de passe avant d’accéder à SPHOT SAUVETEUR.',
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                             color: sauveteurColor,
