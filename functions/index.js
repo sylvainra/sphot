@@ -18,6 +18,8 @@ admin.initializeApp();
 const SMTP_USER = "admin@sphot.app";
 const MAIL_FROM = "\"SPHOT\" <no-reply@sphot.app>";
 const SPHOT_LOGIN_URL = "https://sphot.app";
+const SPHOT_SAUVETEUR_LOGIN_URL =
+  `${SPHOT_LOGIN_URL}/#/sauveteur-login`;
 
 
 setGlobalOptions({maxInstances: 10});
@@ -3695,7 +3697,7 @@ votre espace passe automatiquement en <strong>SPHOT ON</strong>.
       <div style="text-align:center;margin:35px 0;">
 
         <a
-          href="${SPHOT_LOGIN_URL}"
+          href="${SPHOT_SAUVETEUR_LOGIN_URL}"
           style="
 display:inline-block;
 padding:15px 28px;
@@ -3707,7 +3709,7 @@ font-size:16px;
 font-weight:900;
 ">
 
-          SE CONNECTER À SPHOT
+          SE CONNECTER À SPHOT SAUVETEUR
 
         </a>
 
@@ -3730,8 +3732,8 @@ Utilisez le mot de passe temporaire ci-dessus.
 
 À votre prochaine connexion, vous devrez le modifier.
 
-Se connecter à SPHOT :
-${SPHOT_LOGIN_URL}
+Se connecter à SPHOT SAUVETEUR :
+${SPHOT_SAUVETEUR_LOGIN_URL}
 
 À bientôt sur SPHOT,
 
@@ -3758,7 +3760,7 @@ vous êtes affecté à un poste de secours, votre espace passe automatiquement
 en SPHOT ON.
 
 Se connecter à SPHOT :
-${SPHOT_LOGIN_URL}
+${SPHOT_SAUVETEUR_LOGIN_URL}
 
 À bientôt sur SPHOT,
 
@@ -3854,7 +3856,7 @@ renseignées par les sauveteurs actuellement en SPHOT ON.
 
 <div style="text-align:center;margin:35px 0;">
   <a
-    href="${SPHOT_LOGIN_URL}"
+    href="${SPHOT_SAUVETEUR_LOGIN_URL}"
     style="
       display:inline-block;
       padding:15px 28px;
@@ -3864,7 +3866,7 @@ renseignées par les sauveteurs actuellement en SPHOT ON.
       text-decoration:none;
       font-size:16px;
       font-weight:900;">
-    SE CONNECTER À SPHOT
+    SE CONNECTER À SPHOT SAUVETEUR
   </a>
 </div>
 
@@ -6586,7 +6588,7 @@ font-size:16px;
 font-weight:900;
 "
       >
-        SE CONNECTER À SPHOT ADMIN
+        SE CONNECTER À SPHOT SAUVETEUR ADMIN
       </a>
     </div>
 
