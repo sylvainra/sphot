@@ -60,11 +60,6 @@ Future<void> _sendResetCredentialsEmail({
   if (email.isEmpty || identifiant.isEmpty || motDePasse.isEmpty) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Email impossible : donnée manquante.'),
-      ),
-    );
     return;
   }
 
@@ -100,11 +95,6 @@ setState(() {
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Erreur envoi email : $e'),
-      ),
-    );
   }
 }
 
