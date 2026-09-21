@@ -162,6 +162,8 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
               .toString();
       final sauveteurSessionToken =
           (result['sauveteurSessionToken'] ?? '').toString();
+      final canManageRestrictedOperationalData =
+          result['canManageRestrictedOperationalData'] == true;
       final postesAffectes = (result['postesAffectes'] is List)
           ? (result['postesAffectes'] as List)
               .map((value) => value.toString())
@@ -184,6 +186,8 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
               sphotModeReason: sphotModeReason,
               sauveteurSessionToken: sauveteurSessionToken,
               postesAffectes: postesAffectes,
+              canManageRestrictedOperationalData:
+                  canManageRestrictedOperationalData,
             ),
           ),
         );
@@ -207,6 +211,8 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
             sphotModeReason: sphotModeReason,
             sauveteurSessionToken: sauveteurSessionToken,
             postesAffectes: postesAffectes,
+            canManageRestrictedOperationalData:
+                canManageRestrictedOperationalData,
           ),
         ),
       );
