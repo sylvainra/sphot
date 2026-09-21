@@ -9,12 +9,20 @@ class ChangePasswordPage extends StatefulWidget {
   final String login;
   final String territoireId;
   final String userRole;
+  final String sphotMode;
+  final String sphotModeReason;
+  final String sauveteurSessionToken;
+  final List<String> postesAffectes;
 
   const ChangePasswordPage({
     super.key,
     required this.login,
     required this.territoireId,
     required this.userRole,
+    required this.sphotMode,
+    required this.sphotModeReason,
+    required this.sauveteurSessionToken,
+    required this.postesAffectes,
   });
 
   @override
@@ -98,6 +106,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           profileColor: const Color(0xFFFF0000),
           userRole: widget.userRole,
           territoireId: widget.territoireId,
+          login: widget.login,
+          sphotMode: widget.sphotMode,
+          sphotModeReason: widget.sphotModeReason,
+          sauveteurSessionToken: widget.sauveteurSessionToken,
+          postesAffectes: widget.postesAffectes,
         ),
       ),
     );
