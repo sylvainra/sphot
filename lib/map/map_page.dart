@@ -643,12 +643,6 @@ SpotFlagState? _findBestSpotMatch(
 }
 
   void _showMapMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   void _openPublicSpotDetail(SpotFlagState spot) {
