@@ -3885,7 +3885,8 @@ des postes de secours et ne peuvent pas altérer les informations renseignées
 par les sauveteurs actuellement en SPHOT ON.
 
 Lors d'une nouvelle affectation, SPHOT ON sera réactivé automatiquement dès
-lors que les droits de diffusion de votre administration de tutelle seront ouverts.
+lors que les droits de diffusion de votre administration de tutelle
+seront ouverts.
 
 ${SPHOT_LOGIN_URL}
 
