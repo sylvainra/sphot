@@ -102,6 +102,14 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       return;
     }
 
+    if (widget.userRole.toUpperCase() == 'SUPER_ADMIN') {
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/professional-login',
+        (route) => false,
+      );
+      return;
+    }
+
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => SauveteurLegalAcceptancePage(
