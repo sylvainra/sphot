@@ -171,17 +171,6 @@ class _AdminChangePasswordPageState extends State<AdminChangePasswordPage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Votre mot de passe a été modifié avec succès.',
-              textAlign: TextAlign.center,
-            ),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
 
       Navigator.of(context).pushReplacement(
   MaterialPageRoute(
