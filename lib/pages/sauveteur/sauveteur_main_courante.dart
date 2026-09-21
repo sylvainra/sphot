@@ -12,6 +12,7 @@ class SauveteurMainCourantePage extends StatefulWidget {
   final String sphotMode;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final bool canManageRestrictedOperationalData;
 
   const SauveteurMainCourantePage({
     super.key,
@@ -22,6 +23,7 @@ class SauveteurMainCourantePage extends StatefulWidget {
     required this.sphotMode,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    required this.canManageRestrictedOperationalData,
   });
 
   @override
@@ -59,10 +61,7 @@ class _SauveteurMainCourantePageState
 
   bool get _isSphotOn => widget.sphotMode.toUpperCase() == 'ON';
 
-  bool get _isSupervisor {
-    final role = widget.userRole.trim().toLowerCase();
-    return role == 'chef de poste' || role == 'adjoint chef de poste';
-  }
+  bool get _isSupervisor => widget.canManageRestrictedOperationalData;
 
   bool get _canWrite => _isSphotOn && _isSupervisor;
 
