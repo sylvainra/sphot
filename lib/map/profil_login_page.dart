@@ -156,6 +156,18 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
       final userRole = (result['userRole'] ?? 'Sauveteur').toString();
       final territoireId = (result['territoireId'] ?? '').toString();
       final mustChangePassword = result['mustChangePassword'] == true;
+      final sphotMode = (result['sphotMode'] ?? 'OFF').toString().toUpperCase();
+      final sphotModeReason =
+          (result['sphotModeReason'] ?? 'administration_diffusion_off')
+              .toString();
+      final sauveteurSessionToken =
+          (result['sauveteurSessionToken'] ?? '').toString();
+      final postesAffectes = (result['postesAffectes'] is List)
+          ? (result['postesAffectes'] as List)
+              .map((value) => value.toString())
+              .where((value) => value.trim().isNotEmpty)
+              .toList()
+          : <String>[];
       final webSessionToken =
           (result['webSessionToken'] ?? '').toString();
 
@@ -168,6 +180,10 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
               login: id,
               territoireId: territoireId,
               userRole: userRole,
+              sphotMode: sphotMode,
+              sphotModeReason: sphotModeReason,
+              sauveteurSessionToken: sauveteurSessionToken,
+              postesAffectes: postesAffectes,
             ),
           ),
         );
@@ -186,6 +202,11 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
             profileColor: const Color(0xFFFF0000),
             userRole: userRole,
             territoireId: territoireId,
+            login: id,
+            sphotMode: sphotMode,
+            sphotModeReason: sphotModeReason,
+            sauveteurSessionToken: sauveteurSessionToken,
+            postesAffectes: postesAffectes,
           ),
         ),
       );
