@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import 'sauveteur_access_info_page.dart';
+import 'sauveteur_legal_acceptance_page.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   final String login;
@@ -104,7 +104,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => SauveteurAccessInfoPage(
+        builder: (_) => SauveteurLegalAcceptancePage(
           login: widget.login,
           territoireId: widget.territoireId,
           userRole: widget.userRole,
