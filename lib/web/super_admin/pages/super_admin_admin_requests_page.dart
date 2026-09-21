@@ -224,14 +224,6 @@ class _SuperAdminAdminRequestsPageState
 
   if (!context.mounted) return;
 
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text(
-        'Demande approuvée. Le mail d’accès va être envoyé.',
-      ),
-      backgroundColor: Colors.green,
-    ),
-  );
 }
 
   Future<void> _rejectRequest(
@@ -281,12 +273,6 @@ class _SuperAdminAdminRequestsPageState
 
     if (!context.mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Demande refusée.'),
-        backgroundColor: redColor,
-      ),
-    );
   }
 
   Future<void> _setPending(
@@ -336,11 +322,6 @@ class _SuperAdminAdminRequestsPageState
 
     if (!context.mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Demande remise en attente.'),
-      ),
-    );
   }
 
   String _text(dynamic value) => (value ?? '').toString();
