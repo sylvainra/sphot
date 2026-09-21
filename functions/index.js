@@ -3929,6 +3929,139 @@ function isSauveteurSupervisor(functions) {
 }
 
 /**
+ * Retourne une clé YYYYMMDD dans le fuseau horaire de Paris.
+ *
+ * @param {Date} date Date à convertir.
+ * @return {number} Clé numérique de date.
+ */
+function parisDateKey(date) {
+  const parts = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const values = {};
+  parts.forEach((part) => {
+    if (part.type !== "literal") {
+      values[part.type] = part.value;
+    }
+  });
+
+  return Number(
+      `${values.year}${values.month}${values.day}`,
+  );
+}
+
+/**
+ * Calcule l'état des périodes de surveillance affectées au sauveteur.
+ *
+ * Les horaires journaliers restent gérés par le poste. Ici, SPHOT ON/OFF
+ * bascule sur les dates de début et de fin de l'affectation saisonnière.
+ *
+ * @param {FirebaseFirestore.Firestore} db Instance Firestore.
+ * @param {string} territoireId Identifiant du territoire.
+ * @param {Array<string>} periodIds Périodes affectées.
+ * @return {Promise<Object>} État des périodes.
+ */
+async function resolveSauveteurAssignmentPeriods(
+    db,
+    territoireId,
+    periodIds,
+) {
+  if (!territoireId || periodIds.length === 0) {
+    return {
+      active: true,
+      reason: "legacy_assignment",
+      activePeriodIds: [],
+    };
+  }
+
+  const references = periodIds.map((periodId) => {
+    return db.collection("territoires")
+        .doc(territoireId)
+        .collection("periodesSurveillance")
+        .doc(periodId);
+  });
+
+  const snapshots = await db.getAll(...references);
+  const todayKey = parisDateKey(new Date());
+
+  let hasFuture = false;
+  let hasPast = false;
+  let hasValidPeriod = false;
+  const activePeriodIds = [];
+
+  snapshots.forEach((snapshot) => {
+    if (!snapshot.exists) return;
+
+    const data = snapshot.data() || {};
+    const startDate = data.startDate &&
+      typeof data.startDate.toDate === "function" ?
+      data.startDate.toDate() :
+      null;
+    const endDate = data.endDate &&
+      typeof data.endDate.toDate === "function" ?
+      data.endDate.toDate() :
+      null;
+
+    if (!startDate || !endDate) return;
+
+    hasValidPeriod = true;
+
+    const startKey = parisDateKey(startDate);
+    const endKey = parisDateKey(endDate);
+
+    if (todayKey >= startKey && todayKey <= endKey) {
+      activePeriodIds.push(snapshot.id);
+    } else if (todayKey < startKey) {
+      hasFuture = true;
+    } else if (todayKey > endKey) {
+      hasPast = true;
+    }
+  });
+
+  if (activePeriodIds.length > 0) {
+    return {
+      active: true,
+      reason: "active",
+      activePeriodIds,
+    };
+  }
+
+  if (!hasValidPeriod) {
+    return {
+      active: false,
+      reason: "assignment_period_unavailable",
+      activePeriodIds: [],
+    };
+  }
+
+  if (hasFuture) {
+    return {
+      active: false,
+      reason: "assignment_not_started",
+      activePeriodIds: [],
+    };
+  }
+
+  if (hasPast) {
+    return {
+      active: false,
+      reason: "assignment_ended",
+      activePeriodIds: [],
+    };
+  }
+
+  return {
+    active: false,
+    reason: "no_active_assignment_period",
+    activePeriodIds: [],
+  };
+}
+
+/**
  * Reconstitue le contexte opérationnel SPHOT ON / SPHOT OFF.
  *
  * SPHOT ON exige :
@@ -3988,6 +4121,24 @@ async function resolveSauveteurOperationalContext(accountData, login) {
           .filter((value) => value),
   )];
 
+  const rawPeriods = Array.isArray(profileData.periodesSurveillance) ?
+    profileData.periodesSurveillance :
+    Array.isArray(accountData.periodesSurveillance) ?
+      accountData.periodesSurveillance :
+      [];
+
+  const assignedPeriodIds = [...new Set(
+      rawPeriods
+          .map((value) => (value || "").toString().trim())
+          .filter((value) => value),
+  )];
+
+  const assignmentPeriods = await resolveSauveteurAssignmentPeriods(
+      db,
+      territoireId,
+      assignedPeriodIds,
+  );
+
   let diffusionAccessGranted = false;
   if (territoireId) {
     const adminsSnapshot = await db.collection("admins")
@@ -4002,7 +4153,8 @@ async function resolveSauveteurOperationalContext(accountData, login) {
   const accountActive = accountData.accountStatus === "ACTIVE";
   const sphotOn = accountActive &&
     diffusionAccessGranted &&
-    assignedSpotIds.length > 0;
+    assignedSpotIds.length > 0 &&
+    assignmentPeriods.active;
 
   let modeReason = "active";
   if (!accountActive) {
@@ -4011,6 +4163,8 @@ async function resolveSauveteurOperationalContext(accountData, login) {
     modeReason = "no_active_assignment";
   } else if (!diffusionAccessGranted) {
     modeReason = "administration_diffusion_off";
+  } else if (!assignmentPeriods.active) {
+    modeReason = assignmentPeriods.reason;
   }
 
   const userRole = functions[0] ||
@@ -4022,6 +4176,8 @@ async function resolveSauveteurOperationalContext(accountData, login) {
     functions,
     userRole,
     assignedSpotIds,
+    assignedPeriodIds,
+    activePeriodIds: assignmentPeriods.activePeriodIds,
     diffusionAccessGranted,
     sphotMode: sphotOn ? "ON" : "OFF",
     sphotModeReason: modeReason,
@@ -4171,6 +4327,7 @@ exports.loginSauveteur = onRequest(
               sauveteurId: context.sauveteurId,
               fonctions: context.functions,
               postesAffectes: context.assignedSpotIds,
+              periodesSurveillance: context.assignedPeriodIds,
               lastLoginAt:
                   admin.firestore.FieldValue.serverTimestamp(),
               updatedAt:
@@ -4213,6 +4370,8 @@ exports.loginSauveteur = onRequest(
           userRole: context.userRole,
           fonctions: context.functions,
           postesAffectes: context.assignedSpotIds,
+          periodesSurveillance: context.assignedPeriodIds,
+          activePeriodIds: context.activePeriodIds,
           diffusionAccessGranted: context.diffusionAccessGranted,
           sphotMode: context.sphotMode,
           sphotModeReason: context.sphotModeReason,
