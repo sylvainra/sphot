@@ -3759,7 +3759,7 @@ Lorsque votre administration de tutelle ouvre les droits de diffusion et que
 vous êtes affecté à un poste de secours, votre espace passe automatiquement
 en SPHOT ON.
 
-Se connecter à SPHOT :
+Se connecter à SPHOT SAUVETEUR :
 ${SPHOT_SAUVETEUR_LOGIN_URL}
 
 À bientôt sur SPHOT,
@@ -3893,7 +3893,8 @@ Lors d'une nouvelle affectation, SPHOT ON sera réactivé automatiquement dès
 lors que les droits de diffusion de votre administration de tutelle
 seront ouverts.
 
-${SPHOT_LOGIN_URL}
+Se connecter à SPHOT SAUVETEUR :
+${SPHOT_SAUVETEUR_LOGIN_URL}
 
 À bientôt sur SPHOT,
 
@@ -6303,7 +6304,7 @@ exports.changeSauveteurPassword = onRequest(
       <div style="text-align:center;margin:35px 0;">
 
         <a
-          href="${SPHOT_LOGIN_URL}"
+          href="${SPHOT_SAUVETEUR_LOGIN_URL}"
           style="
 display:inline-block;
 padding:15px 28px;
@@ -6315,7 +6316,7 @@ font-size:16px;
 font-weight:900;
 ">
 
-          SE CONNECTER À SPHOT
+          SE CONNECTER À SPHOT SAUVETEUR
 
         </a>
 
@@ -6334,6 +6335,9 @@ a été modifié avec succès.
 Si vous n'êtes pas à l'origine de cette modification,
 contactez immédiatement l'équipe SPHOT :
 contact@sphot.app
+
+Se connecter à SPHOT SAUVETEUR :
+${SPHOT_SAUVETEUR_LOGIN_URL}
 
 À bientôt sur SPHOT,
 
@@ -6588,7 +6592,7 @@ font-size:16px;
 font-weight:900;
 "
       >
-        SE CONNECTER À SPHOT SAUVETEUR ADMIN
+        SE CONNECTER À SPHOT ADMIN
       </a>
     </div>
 
