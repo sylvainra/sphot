@@ -50,12 +50,6 @@ class AdminSubscriptionOrderService {
   }) async {
     final uid = adminUid.trim();
     if (uid.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Identifiant administrateur introuvable.'),
-          backgroundColor: _red,
-        ),
-      );
       return;
     }
 
@@ -71,14 +65,6 @@ class AdminSubscriptionOrderService {
     final totalInclTax = totalExclTax + vatAmount;
 
     if (stations <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Sélectionnez au moins un poste de secours avant de valider la commande.',
-          ),
-          backgroundColor: _orange,
-        ),
-      );
       return;
     }
 
@@ -104,14 +90,6 @@ class AdminSubscriptionOrderService {
         billingPostalCode.isEmpty ||
         billingCity.isEmpty ||
         billingContactEmail.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Complétez les informations administratives et de facturation avant de valider la commande.',
-          ),
-          backgroundColor: _orange,
-        ),
-      );
       return;
     }
 
@@ -286,12 +264,6 @@ class AdminSubscriptionOrderService {
     final requestSnapshot = await _requestForUid(uid);
     if (requestSnapshot == null || !requestSnapshot.exists) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Dossier administratif introuvable.'),
-          backgroundColor: _red,
-        ),
-      );
       return;
     }
 
@@ -392,14 +364,6 @@ class AdminSubscriptionOrderService {
     await batch.commit();
 
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Commande d’abonnement enregistrée. Un email de confirmation va vous être envoyé.',
-        ),
-        backgroundColor: _green,
-      ),
-    );
   }
 
   static Widget _summaryLine(String label, String value) {
