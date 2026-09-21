@@ -13,6 +13,7 @@ class ChangePasswordPage extends StatefulWidget {
   final String sphotModeReason;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final bool canManageRestrictedOperationalData;
 
   const ChangePasswordPage({
     super.key,
@@ -23,6 +24,7 @@ class ChangePasswordPage extends StatefulWidget {
     required this.sphotModeReason,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    required this.canManageRestrictedOperationalData,
   });
 
   @override
@@ -111,6 +113,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           sphotModeReason: widget.sphotModeReason,
           sauveteurSessionToken: widget.sauveteurSessionToken,
           postesAffectes: widget.postesAffectes,
+          canManageRestrictedOperationalData:
+              widget.canManageRestrictedOperationalData,
         ),
       ),
     );
