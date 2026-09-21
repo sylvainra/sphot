@@ -324,15 +324,6 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
     await batch.commit();
 
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Période d’essai validée jusqu’au ${_formatDateTime(Timestamp.fromDate(end))}. '
-          'Le mail d’activation va être envoyé.',
-        ),
-        backgroundColor: _green,
-      ),
-    );
   }
 
   Future<void> _approveOrder(
@@ -342,14 +333,6 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
     final data = order.data();
     final paymentMethod = _text(data['paymentMethod']);
     if (paymentMethod == 'card' && _text(data['paymentStatus']) != 'paid') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Cette commande par carte doit être confirmée par le futur prestataire de paiement.',
-          ),
-          backgroundColor: _orange,
-        ),
-      );
       return;
     }
 
