@@ -4,11 +4,15 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class SauveteurActionsRapidesPage extends StatefulWidget {
   final Color profileColor;
+  final String sphotMode;
 
   const SauveteurActionsRapidesPage({
     super.key,
     required this.profileColor,
+    required this.sphotMode,
   });
+
+  bool get isSphotOn => sphotMode.toUpperCase() == 'ON';
 
   @override
   State<SauveteurActionsRapidesPage> createState() =>
@@ -124,6 +128,34 @@ class _SauveteurActionsRapidesPageState extends State<SauveteurActionsRapidesPag
                     letterSpacing: 0.6,
                   ),
                 ),
+
+                if (!widget.isSphotOn)
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.fromLTRB(16, 2, 16, 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF1F2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFDC2626),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: const Text(
+                      'SPHOT OFF — SIMULATION : les changements effectués '
+                      'sur cet écran ne modifient pas l’état opérationnel réel.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFFB91C1C),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
 
                 const SizedBox(height: 0),
 
