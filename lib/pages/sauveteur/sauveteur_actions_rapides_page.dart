@@ -413,9 +413,8 @@ class _SauveteurActionsRapidesPageState
                           ? 'SPHOT OFF — l’autorisation opérationnelle a changé. '
                               'Les actions restent locales et ne modifient pas '
                               'le poste réel.'
-                          : 'SPHOT OFF — SIMULATION : les changements effectués '
-                              'sur cet écran ne modifient pas l’état '
-                              'opérationnel réel.',
+                          : 'SPHOT OFF - Les changements effectués sur cet '
+                              'écran ne modifient pas l’état opérationnel réel.',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: Color(0xFFB91C1C),
