@@ -886,6 +886,7 @@ const COMMERCIAL_DOCUMENTS = {
  */
 function createAdminRequestPdf({
   requestNumber,
+  documentNumber,
   createdAt,
   profile,
   proConnect,
@@ -1089,31 +1090,41 @@ function createAdminRequestPdf({
           .font("Helvetica-Bold")
           .fontSize(7.2)
           .fillColor(grey)
-          .text("RÉFÉRENCE DU DOSSIER", left + 14, referenceY + 13);
+          .text("RÉFÉRENCE DU DOCUMENT", left + 14, referenceY + 11);
 
       doc
           .font("Helvetica-Bold")
-          .fontSize(11.4)
+          .fontSize(10.6)
           .fillColor(red)
-          .text(requestNumber, left + 14, referenceY + 29, {
-            width: 300,
+          .text(documentNumber, left + 14, referenceY + 26, {
+            width: 325,
           });
 
       doc
           .font("Helvetica")
-          .fontSize(7.2)
+          .fontSize(7)
           .fillColor(grey)
           .text(
-              `Demande reçue le ${formatFrenchDate(createdAt)}`,
+              `Dossier : ${requestNumber}`,
               left + 14,
-              referenceY + 50,
+              referenceY + 47,
+          );
+
+      doc
+          .font("Helvetica")
+          .fontSize(7)
+          .fillColor(grey)
+          .text(
+              `Émis le ${formatFrenchDate(createdAt)}`,
+              left + 14,
+              referenceY + 60,
           );
 
       doc
           .font("Helvetica-Bold")
           .fontSize(7.1)
           .fillColor(blue)
-          .text("RUBRIQUE", right - 138, referenceY + 13, {
+          .text("RUBRIQUE", right - 138, referenceY + 11, {
             width: 120,
             align: "right",
           });
@@ -1122,7 +1133,25 @@ function createAdminRequestPdf({
           .font("Helvetica-Bold")
           .fontSize(8.4)
           .fillColor(dark)
-          .text("DEMANDE D'ACCÈS", right - 138, referenceY + 31, {
+          .text("DEMANDE D'ACCÈS", right - 138, referenceY + 27, {
+            width: 120,
+            align: "right",
+          });
+
+      doc
+          .font("Helvetica-Bold")
+          .fontSize(7.1)
+          .fillColor(blue)
+          .text("STATUT", right - 138, referenceY + 49, {
+            width: 120,
+            align: "right",
+          });
+
+      doc
+          .font("Helvetica-Bold")
+          .fontSize(8.2)
+          .fillColor(dark)
+          .text("ÉMIS", right - 138, referenceY + 62, {
             width: 120,
             align: "right",
           });
@@ -1323,7 +1352,7 @@ function createAdminRequestPdf({
           .fontSize(6.6)
           .fillColor(grey)
           .text(
-              `${requestNumber}-INS-AR-01  •  Version 01  •  Page 1 / 1`,
+              `${documentNumber}  •  Version 01  •  Page 1 / 1`,
               left + 210,
               footerY + 10,
               {
@@ -1560,11 +1589,19 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
         createdAt,
     );
 
-      const fileName =
-          `SPHOT_Accuse_Reception_${requestNumber}.pdf`;
+      const documentNumber = `${requestNumber}-INS-AR-01`;
+      const documentYear = Number(
+          data.requestYear ||
+          new Intl.DateTimeFormat("fr-FR", {
+            timeZone: "Europe/Paris",
+            year: "numeric",
+          }).format(createdAt),
+      );
+      const fileName = `${documentNumber}.pdf`;
 
       const storagePath =
-          `adminRequests/${requestId}/documents/${fileName}`;
+          `adminRequests/${requestId}/documents/administratif/` +
+          `${documentYear}/inscription/${fileName}`;
 
       await requestReference.set(
           {
@@ -1593,6 +1630,7 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
       try {
         const pdfBuffer = await createAdminRequestPdf({
           requestNumber: requestNumber,
+          documentNumber: documentNumber,
           createdAt: createdAt,
           profile: profile,
           proConnect: proConnect,
@@ -1621,7 +1659,6 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
 
         const downloadUrl = await getDownloadURL(file);
 
-        const documentNumber = `${requestNumber}-INS-AR-01`;
         const registryId = cleanValue(
             `${requestId}_${documentNumber}`,
         )
@@ -1638,13 +1675,7 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
               documentType: "registration_acknowledgement",
               category: "administrative",
               subcategory: "inscription",
-              year: Number(
-                  data.requestYear ||
-                  new Intl.DateTimeFormat("fr-FR", {
-                    timeZone: "Europe/Paris",
-                    year: "numeric",
-                  }).format(createdAt),
-              ),
+              year: documentYear,
               version: 1,
               title:
                   "Accusé de réception de la demande d'accès " +
@@ -1678,6 +1709,9 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
                 storagePath: storagePath,
                 downloadUrl: downloadUrl,
                 version: "1.0",
+                documentNumber: documentNumber,
+                category: "administrative",
+                subcategory: "inscription",
                 generatedAt:
                     admin.firestore.FieldValue.serverTimestamp(),
                 generatedBy: "system",
