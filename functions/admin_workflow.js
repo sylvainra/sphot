@@ -128,17 +128,23 @@ function safeDocumentId(value) {
       .slice(0, 700);
 }
 
-function simplePdfBuffer({title, documentNumber, requestNumber, lines}) {
+function simplePdfBuffer({
+  title,
+  documentNumber,
+  requestNumber,
+  lines,
+}) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
       size: "A4",
-      margins: {top: 44, bottom: 44, left: 48, right: 48},
+      margins: {top: 30, bottom: 30, left: 40, right: 40},
       info: {
         Title: title,
         Author: "SPHOT",
         Subject: documentNumber,
       },
     });
+
     const chunks = [];
     doc.on("data", (chunk) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
@@ -146,51 +152,208 @@ function simplePdfBuffer({title, documentNumber, requestNumber, lines}) {
 
     const blue = "#1E3A8A";
     const red = "#DC2626";
-    const grey = "#4B5563";
+    const dark = "#263238";
+    const grey = "#607D8B";
+    const pale = "#F3F6FB";
+    const white = "#FFFFFF";
 
-    doc.font("Helvetica-Bold").fontSize(28).fillColor(red)
-        .text("SPHOT", {align: "center"});
-    doc.moveDown(0.15);
-    doc.font("Helvetica-Bold").fontSize(13).fillColor(blue)
-        .text(title.toUpperCase(), {align: "center"});
-    doc.moveDown(0.8);
+    const left = doc.page.margins.left;
+    const right = doc.page.width - doc.page.margins.right;
+    const contentWidth = right - left;
 
-    doc.roundedRect(48, doc.y, 499, 74, 10)
-        .fillAndStroke("#F8FAFC", blue);
-    const boxY = doc.y;
-    doc.fillColor(blue).font("Helvetica-Bold").fontSize(8)
-        .text("RÉFÉRENCE DU DOCUMENT", 64, boxY + 15);
-    doc.fillColor(red).fontSize(11)
-        .text(documentNumber, 64, boxY + 31);
-    doc.fillColor(grey).font("Helvetica").fontSize(8)
-        .text(`Dossier : ${requestNumber}`, 64, boxY + 50);
-    doc.y = boxY + 92;
+    const headingCount = lines.filter((line) => line?.heading).length;
+    const dataCount = lines.filter((line) => line && !line.heading).length;
+    const compact = dataCount > 11 || headingCount > 4;
+    const valueFontSize = compact ? 7.6 : 8.2;
+    const rowHeight = compact ? 13 : 15;
+
+    doc
+        .roundedRect(left, 30, contentWidth, 72, 14)
+        .fillAndStroke(white, "#D9E2EC");
+
+    doc
+        .font("Helvetica-Bold")
+        .fontSize(25)
+        .fillColor(red)
+        .text("SPHOT", left + 18, 43, {width: 120});
+
+    doc
+        .font("Helvetica")
+        .fontSize(7.2)
+        .fillColor(grey)
+        .text(
+            "Des plages plus sûres, propres et connectées",
+            left + 18,
+            73,
+            {width: 200},
+        );
+
+    doc
+        .font("Helvetica-Bold")
+        .fontSize(8)
+        .fillColor(blue)
+        .text(
+            "SURVEILLER  •  PRÉSERVER  •  INFORMER  •  ENSEMBLE",
+            left + 222,
+            56,
+            {
+              width: contentWidth - 240,
+              align: "right",
+            },
+        );
+
+    doc.y = 116;
+
+    doc
+        .font("Helvetica-Bold")
+        .fontSize(13)
+        .fillColor(blue)
+        .text(title.toUpperCase(), {
+          align: "center",
+          width: contentWidth,
+          lineGap: 1,
+        });
+
+    doc.moveDown(0.35);
+
+    const referenceY = doc.y;
+    doc
+        .roundedRect(left, referenceY, contentWidth, 76, 12)
+        .fillAndStroke(pale, blue);
+
+    doc
+        .font("Helvetica-Bold")
+        .fontSize(7.2)
+        .fillColor(grey)
+        .text("RÉFÉRENCE DU DOCUMENT", left + 14, referenceY + 13);
+
+    doc
+        .font("Helvetica-Bold")
+        .fontSize(10.5)
+        .fillColor(red)
+        .text(documentNumber, left + 14, referenceY + 29, {
+          width: contentWidth - 28,
+        });
+
+    doc
+        .font("Helvetica")
+        .fontSize(7.2)
+        .fillColor(grey)
+        .text(
+            `Dossier : ${requestNumber}`,
+            left + 14,
+            referenceY + 52,
+        );
+
+    doc.y = referenceY + 90;
 
     for (const line of lines) {
       if (!line) continue;
+
       if (line.heading) {
-        doc.moveDown(0.3);
-        doc.fillColor(red).font("Helvetica-Bold").fontSize(10)
-            .text(cleanValue(line.heading).toUpperCase());
-        doc.moveDown(0.25);
+        const titleY = doc.y + 4;
+
+        doc
+            .font("Helvetica-Bold")
+            .fontSize(8.6)
+            .fillColor(red)
+            .text(cleanValue(line.heading).toUpperCase(), left, titleY, {
+              width: contentWidth,
+            });
+
+        doc
+            .strokeColor(blue)
+            .lineWidth(0.65)
+            .moveTo(left, titleY + 14)
+            .lineTo(right, titleY + 14)
+            .stroke();
+
+        doc.y = titleY + 21;
         continue;
       }
+
+      const rowY = doc.y;
       const label = cleanValue(line.label);
       const value = cleanValue(line.value, "Non renseigné");
-      doc.fillColor(blue).font("Helvetica-Bold").fontSize(9)
-          .text(label, {continued: true});
-      doc.fillColor("#111827").font("Helvetica").fontSize(9)
-          .text(`  ${value}`);
-      doc.moveDown(0.2);
+
+      doc
+          .font("Helvetica-Bold")
+          .fontSize(valueFontSize)
+          .fillColor(blue)
+          .text(label, left + 10, rowY, {
+            width: 118,
+          });
+
+      doc
+          .font("Helvetica")
+          .fontSize(valueFontSize)
+          .fillColor(dark)
+          .text(value, left + 132, rowY, {
+            width: contentWidth - 142,
+            ellipsis: true,
+          });
+
+      doc.y = rowY + rowHeight;
     }
 
-    doc.moveDown(1.2);
-    doc.fillColor(grey).font("Helvetica").fontSize(7.5)
+    const availableBottom = doc.page.height - 124;
+    if (doc.y < availableBottom - 78) {
+      doc.y = Math.max(doc.y + 12, availableBottom - 78);
+    } else {
+      doc.y += 8;
+    }
+
+    doc
+        .font("Helvetica")
+        .fontSize(8.2)
+        .fillColor(dark)
+        .text("À bientôt sur SPHOT,", left, doc.y, {
+          width: contentWidth,
+          align: "right",
+        });
+
+    doc
+        .font("Helvetica-Bold")
+        .fontSize(8.5)
+        .fillColor(blue)
+        .text("L'équipe SPHOT", left, doc.y + 2, {
+          width: contentWidth,
+          align: "right",
+        });
+
+    const footerY = doc.page.height - 54;
+    doc
+        .strokeColor("#D9E2EC")
+        .lineWidth(0.7)
+        .moveTo(left, footerY)
+        .lineTo(right, footerY)
+        .stroke();
+
+    doc
+        .font("Helvetica")
+        .fontSize(6.6)
+        .fillColor(grey)
         .text(
-            "Document généré automatiquement par SPHOT. " +
-            `Généré le ${formatFrenchDate(new Date())}.`,
-            {align: "center"},
+            "Document généré automatiquement par SPHOT",
+            left,
+            footerY + 10,
+            {width: 220},
         );
+
+    doc
+        .font("Helvetica")
+        .fontSize(6.6)
+        .fillColor(grey)
+        .text(
+            `${documentNumber}  •  Version 01  •  Page 1 / 1`,
+            left + 210,
+            footerY + 10,
+            {
+              width: contentWidth - 210,
+              align: "right",
+            },
+        );
+
     doc.end();
   });
 }
