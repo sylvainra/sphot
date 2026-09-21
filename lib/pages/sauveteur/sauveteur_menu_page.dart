@@ -277,7 +277,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                             child: Text(
                               _isSphotOn
                                   ? 'SPHOT ON — DIFFUSION ACTIVE'
-                                  : 'SPHOT OFF — MODE PRÉPARATION',
+                                  : 'SPHOT OFF',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
