@@ -4238,6 +4238,58 @@ async function resolveSauveteurSession(token) {
   };
 }
 
+/**
+ * Lit la version juridique active utilisée par les parcours SPHOT.
+ *
+ * @return {Promise<Object>} Version et chemin du pack juridique.
+ */
+async function activeLegalPackInfo() {
+  const snapshot = await admin.firestore()
+      .collection("legalDocuments")
+      .doc("metadata")
+      .get();
+
+  const data = snapshot.data() || {};
+  const version = (
+    data.legalVersion ||
+    data.version ||
+    data.activeVersion ||
+    "1.0"
+  ).toString();
+
+  const versionId = version.trim().replaceAll(".", "_");
+  const packPath = (data.packPath || "").toString().trim() ||
+    `legalPacks/versions/items/${versionId}`;
+
+  return {
+    version,
+    versionId,
+    packPath,
+  };
+}
+
+/**
+ * Vérifie que l'acceptation Sauveteur correspond au pack juridique actif.
+ *
+ * @param {Object} accountData Données du compte sauveteur.
+ * @param {Object} legalPack Pack juridique actif.
+ * @return {boolean} Vrai lorsque la validation est complète.
+ */
+function sauveteurLegalAcceptanceIsCurrent(accountData, legalPack) {
+  const acceptance = accountData.legalAcceptance || {};
+  const documents = acceptance.documents || {};
+  const operationalRules = acceptance.operationalRules || {};
+
+  return acceptance.accepted === true &&
+    acceptance.version === legalPack.version &&
+    documents.cgu === true &&
+    documents.privacy === true &&
+    documents.rgpd === true &&
+    operationalRules.publicOperationalDiffusionAcknowledged === true &&
+    operationalRules.institutionalReadAcknowledged === true &&
+    operationalRules.personalAccountUseAccepted === true;
+}
+
 exports.loginSauveteur = onRequest(
     {
       cpu: 1,
@@ -4295,6 +4347,10 @@ exports.loginSauveteur = onRequest(
             login,
         );
 
+        const activeLegalPack = await activeLegalPackInfo();
+        const legalAcceptanceRequired =
+          !sauveteurLegalAcceptanceIsCurrent(data, activeLegalPack);
+
         await accountDoc.ref.set(
             {
               sauveteurId: context.sauveteurId,
@@ -4350,6 +4406,8 @@ exports.loginSauveteur = onRequest(
           sphotModeReason: context.sphotModeReason,
           canManageRestrictedOperationalData:
             context.canManageRestrictedOperationalData,
+          legalAcceptanceRequired,
+          activeLegalVersion: activeLegalPack.version,
           mustChangePassword: data.mustChangePassword === true,
           sauveteurSessionToken,
           webSessionToken,
@@ -4389,7 +4447,13 @@ exports.getSauveteurSessionState = onRequest(
           return;
         }
 
-        const {context} = session;
+        const {context, accountData} = session;
+        const activeLegalPack = await activeLegalPackInfo();
+        const legalAcceptanceRequired =
+          !sauveteurLegalAcceptanceIsCurrent(
+              accountData,
+              activeLegalPack,
+          );
 
         response.status(200).json({
           success: true,
@@ -4403,9 +4467,118 @@ exports.getSauveteurSessionState = onRequest(
           sphotModeReason: context.sphotModeReason,
           canManageRestrictedOperationalData:
             context.canManageRestrictedOperationalData,
+          legalAcceptanceRequired,
+          activeLegalVersion: activeLegalPack.version,
         });
       } catch (error) {
         console.error("Erreur lecture état session sauveteur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.acceptSauveteurLegalTerms = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      if (request.method !== "POST") {
+        response.status(405).json({success: false});
+        return;
+      }
+
+      try {
+        const session = await resolveSauveteurSession(
+            request.body.sauveteurSessionToken,
+        );
+
+        if (!session) {
+          response.status(401).json({
+            success: false,
+            error: "invalid_session",
+          });
+          return;
+        }
+
+        const legalPack = await activeLegalPackInfo();
+        const submittedVersion = (
+          request.body.legalVersion || ""
+        ).toString();
+
+        if (submittedVersion !== legalPack.version) {
+          response.status(409).json({
+            success: false,
+            error: "legal_version_changed",
+            activeLegalVersion: legalPack.version,
+          });
+          return;
+        }
+
+        const requiredFlags = [
+          request.body.cguAccepted === true,
+          request.body.privacyAcknowledged === true,
+          request.body.rgpdAcknowledged === true,
+          request.body.publicOperationalDiffusionAcknowledged === true,
+          request.body.institutionalReadAcknowledged === true,
+          request.body.personalAccountUseAccepted === true,
+        ];
+
+        if (requiredFlags.some((value) => value !== true)) {
+          response.status(400).json({
+            success: false,
+            error: "legal_acceptance_incomplete",
+          });
+          return;
+        }
+
+        const accountReference = admin.firestore()
+            .collection("sauveteurAccounts")
+            .doc(session.login);
+
+        await accountReference.set({
+          legalAcceptanceCompleted: true,
+          legalAcceptance: {
+            accepted: true,
+            version: legalPack.version,
+            versionId: legalPack.versionId,
+            legalPackPath: legalPack.packPath,
+            acceptedAt:
+              admin.firestore.FieldValue.serverTimestamp(),
+            documents: {
+              cgu: true,
+              privacy: true,
+              rgpd: true,
+            },
+            operationalRules: {
+              publicOperationalDiffusionAcknowledged: true,
+              institutionalReadAcknowledged: true,
+              personalAccountUseAccepted: true,
+              publicIdentityDisclosureByDefault: false,
+            },
+            source: "sphot_sauveteur_access_validation",
+          },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {merge: true});
+
+        response.status(200).json({
+          success: true,
+          legalVersion: legalPack.version,
+        });
+      } catch (error) {
+        console.error(
+            "Erreur validation juridique sauveteur:",
+            error,
+        );
         response.status(500).json({success: false});
       }
     },
