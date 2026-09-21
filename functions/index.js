@@ -332,8 +332,8 @@ async function reconcilePublicTerritory(territoireId, publish) {
 }
 
 /**
- * Vérifie qu'au moins un administrateur du territoire a été approuvé
- * par le Super Admin.
+ * Vérifie que le territoire dispose d'un administrateur approuvé
+ * dont les droits de diffusion SPHOT sont actuellement ouverts.
  *
  * @param {string} territoireId Identifiant du territoire.
  * @return {Promise<boolean>}
