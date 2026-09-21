@@ -5935,6 +5935,45 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  Future<void> _syncSauveteurAccountContext({
+    required String login,
+    required String sauveteurId,
+  }) async {
+    if (login.trim().isEmpty) {
+      return;
+    }
+
+    final uri = Uri.parse(
+      'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+      'upsertSauveteurAccount',
+    );
+
+    final response = await http.post(
+      uri,
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'login': login.trim().toLowerCase(),
+        'sauveteurId': sauveteurId,
+        'territoireId': _resolvedTerritoireId,
+        'civilite': _sauveteurCivilite,
+        'nom': _sauveteurNomController.text.trim().toUpperCase(),
+        'prenom': _sauveteurPrenomController.text.trim(),
+        'email': _sauveteurEmailController.text.trim(),
+        'role': 'SAUVETEUR',
+        'fonctions': _sauveteurFonctions.toList(),
+        'postesAffectes': _sauveteurPostes.toList(),
+        'periodesSurveillance': _sauveteurPeriodesSurveillance.toList(),
+      }),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        'Synchronisation du compte impossible '
+        '(${response.statusCode}).',
+      );
+    }
+  }
+
   Future<void> _generateSauveteurAccess() async {
     if (!_validateSauveteurContact()) {
       return;
@@ -6255,6 +6294,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           .doc(sauveteurId);
 
       await sauveteurRef.set(data, SetOptions(merge: true));
+
+      await _syncSauveteurAccountContext(
+        login: _sauveteurGeneratedLogin,
+        sauveteurId: sauveteurId,
+      );
 
       final removedPostes = _originalSauveteurPostes.difference(
         _sauveteurPostes,
