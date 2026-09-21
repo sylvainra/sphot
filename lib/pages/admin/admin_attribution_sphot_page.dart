@@ -214,12 +214,6 @@ Future<void> _saveDraft() async {
 }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   Widget _sphotSelector() {
