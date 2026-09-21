@@ -227,14 +227,16 @@ createdSauveteurDocId ??= docRef.id;
   }, SetOptions(merge: true));
 
   await _upsertSauveteurAccount(
-  login: login,
-  temporaryPassword: password,
-  accountStatus: 'ACTIVE',
-  sauveteurId: docRef.id,
-  nom: nom.toUpperCase(),
-  prenom: prenom,
-  email: emailController.text.trim(),
-);
+    login: login,
+    temporaryPassword: password,
+    accountStatus: 'ACTIVE',
+    sauveteurId: docRef.id,
+    nom: nom.toUpperCase(),
+    prenom: prenom,
+    email: emailController.text.trim(),
+    fonctions: fonctionsSelectionnees,
+    postesAffectes: postesSelectionnes,
+  );
 
   setState(() {
   generatedLogin = login;
@@ -253,6 +255,8 @@ Future<void> _upsertSauveteurAccount({
   required String nom,
   required String prenom,
   required String email,
+  required List<String> fonctions,
+  required List<String> postesAffectes,
 }) async {
   final uri = Uri.parse(
     'https://us-central1-sphot-ab80b.cloudfunctions.net/upsertSauveteurAccount',
@@ -272,6 +276,8 @@ Future<void> _upsertSauveteurAccount({
       'prenom': prenom,
       'email': email,
       'role': 'SAUVETEUR',
+      'fonctions': fonctions,
+      'postesAffectes': postesAffectes,
     }),
   );
 }
@@ -441,6 +447,8 @@ final sauveteurData = {
     nom: nom.toUpperCase(),
     prenom: prenom,
     email: emailController.text.trim(),
+    fonctions: fonctionsSelectionnees,
+    postesAffectes: postesSelectionnes,
   );
 }
 
