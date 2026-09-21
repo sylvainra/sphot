@@ -4066,6 +4066,56 @@ exports.loginSauveteur = onRequest(
     },
 );
 
+exports.getSauveteurSessionState = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const session = await resolveSauveteurSession(
+            request.body.sauveteurSessionToken,
+        );
+
+        if (!session) {
+          response.status(401).json({
+            success: false,
+            error: "invalid_session",
+          });
+          return;
+        }
+
+        const {context} = session;
+
+        response.status(200).json({
+          success: true,
+          sauveteurId: context.sauveteurId,
+          territoireId: context.territoireId,
+          userRole: context.userRole,
+          fonctions: context.functions,
+          postesAffectes: context.assignedSpotIds,
+          diffusionAccessGranted: context.diffusionAccessGranted,
+          sphotMode: context.sphotMode,
+          sphotModeReason: context.sphotModeReason,
+          canManageRestrictedOperationalData:
+            context.canManageRestrictedOperationalData,
+        });
+      } catch (error) {
+        console.error("Erreur lecture état session sauveteur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
 exports.saveSauveteurPlanning = onRequest(
     {
       cpu: 1,
