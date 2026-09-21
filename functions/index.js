@@ -6477,7 +6477,7 @@ exports.changeSauveteurPassword = onRequest(
 
       <p>
         Nous vous confirmons que le mot de passe de votre compte
-        SPHOT a été modifié avec succès.
+        SPHOT SAUVETEUR a été modifié avec succès.
       </p>
 
 <p>
@@ -6518,8 +6518,8 @@ font-weight:900;
 `,
               text: `${destinataire} bonjour,
 
-Nous vous confirmons que votre mot de passe SPHOT
-a été modifié avec succès.
+Nous vous confirmons que le mot de passe de votre compte
+SPHOT SAUVETEUR a été modifié avec succès.
 
 Si vous n'êtes pas à l'origine de cette modification,
 contactez immédiatement l'équipe SPHOT :
