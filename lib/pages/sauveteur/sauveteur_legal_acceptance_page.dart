@@ -55,6 +55,8 @@ class _SauveteurLegalAcceptancePageState
   bool _publicOperationalDiffusionAcknowledged = false;
   bool _institutionalReadAcknowledged = false;
   bool _personalAccountUseAccepted = false;
+  bool _sphotTransmissionRoleAcknowledged = false;
+  bool _professionalDecisionResponsibilityAccepted = false;
 
   bool get _canSubmit =>
       _cguAccepted &&
@@ -63,6 +65,8 @@ class _SauveteurLegalAcceptancePageState
       _publicOperationalDiffusionAcknowledged &&
       _institutionalReadAcknowledged &&
       _personalAccountUseAccepted &&
+      _sphotTransmissionRoleAcknowledged &&
+      _professionalDecisionResponsibilityAccepted &&
       !_loading &&
       !_submitting;
 
@@ -152,6 +156,8 @@ class _SauveteurLegalAcceptancePageState
           'publicOperationalDiffusionAcknowledged': true,
           'institutionalReadAcknowledged': true,
           'personalAccountUseAccepted': true,
+          'sphotTransmissionRoleAcknowledged': true,
+          'professionalDecisionResponsibilityAccepted': true,
         }),
       );
 
@@ -399,12 +405,90 @@ class _SauveteurLegalAcceptancePageState
             value: _personalAccountUseAccepted,
             text:
                 'Je m’engage à utiliser personnellement mes identifiants '
-                'SPHOT SAUVETEUR dans le cadre de mes fonctions professionnelles, '
-                'à ne pas les partager et à respecter les droits, devoirs '
-                'et responsabilités associés à mon rôle.',
+                'SPHOT SAUVETEUR dans le cadre de mes fonctions '
+                'professionnelles, à ne pas les partager et à respecter '
+                'les droits, devoirs et responsabilités associés à mon rôle.',
             onChanged: (value) {
               setState(() {
                 _personalAccountUseAccepted = value ?? false;
+              });
+            },
+          ),
+          const Divider(height: 22),
+          const Text(
+            'RÔLE DE SPHOT ET RESPONSABILITÉ PROFESSIONNELLE',
+            style: TextStyle(
+              color: Color(0xFF8E24AA),
+              fontSize: 13.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'SPHOT est un outil numérique professionnel de collecte, '
+            'de transmission et de diffusion d’informations issues du '
+            'terrain. SPHOT ne constitue pas un dispositif de surveillance '
+            'de baignade, un service de secours ni un système autonome de '
+            'prise de décision opérationnelle.\n\n'
+            'Les décisions relatives à la surveillance de la baignade, '
+            'à la couleur ou à la position du drapeau, à l’évaluation des '
+            'dangers, aux conditions de baignade, aux interventions de '
+            'secours et, plus généralement, à la conduite opérationnelle '
+            'du poste relèvent des professionnels compétents et des '
+            'autorités responsables.\n\n'
+            'SPHOT permet aux sauveteurs habilités de transformer leurs '
+            'observations et décisions professionnelles de terrain en '
+            'informations numériques destinées, selon leur nature, au '
+            'fonctionnement interne du service ou à leur diffusion dans '
+            'SPHOT.\n\n'
+            'SPHOT ne valide pas la pertinence d’une décision '
+            'professionnelle prise par un sauveteur et ne se substitue ni '
+            'à son appréciation du terrain, ni aux consignes de sa '
+            'hiérarchie, ni aux décisions de son administration de tutelle '
+            'SPHOT ADMIN.\n\n'
+            'Le sauveteur reste responsable de la nature, de l’exactitude '
+            'et de l’actualité des informations professionnelles qu’il '
+            'renseigne dans SPHOT SAUVETEUR dans le cadre de ses fonctions.\n\n'
+            'Les fonctions automatisées de SPHOT constituent des mécanismes '
+            'techniques d’exécution et de transmission. Elles ne constituent '
+            'pas une décision autonome de SPHOT relative à la sécurité de '
+            'la baignade.\n\n'
+            'En cas de divergence entre SPHOT et la situation constatée '
+            'sur le terrain, la situation réelle, les décisions des '
+            'professionnels présents et les consignes des autorités '
+            'compétentes prévalent toujours.',
+            style: TextStyle(
+              color: Color(0xFF1F2937),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+            ),
+          ),
+          _acceptanceLine(
+            value: _sphotTransmissionRoleAcknowledged,
+            text:
+                'J’ai compris que SPHOT est un outil professionnel de '
+                'collecte, de transmission et de diffusion des informations '
+                'de terrain et qu’il ne se substitue pas à mon appréciation '
+                'professionnelle, aux décisions de ma hiérarchie ou à celles '
+                'de mon administration de tutelle SPHOT ADMIN.',
+            onChanged: (value) {
+              setState(() {
+                _sphotTransmissionRoleAcknowledged = value ?? false;
+              });
+            },
+          ),
+          _acceptanceLine(
+            value: _professionalDecisionResponsibilityAccepted,
+            text:
+                'Je reconnais rester responsable, dans le cadre de mes '
+                'fonctions professionnelles, des informations '
+                'opérationnelles et des décisions de terrain que je '
+                'renseigne ou retranscris dans SPHOT SAUVETEUR.',
+            onChanged: (value) {
+              setState(() {
+                _professionalDecisionResponsibilityAccepted =
+                    value ?? false;
               });
             },
           ),
