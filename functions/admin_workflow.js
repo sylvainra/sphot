@@ -929,13 +929,16 @@ async function sendTrialApproval(requestId) {
   Pour profiter pleinement de la période d’essai, prévenez dès maintenant
   les sauveteurs affectés à vos SPHOTS.
   <br><br>
-  Ils doivent se connecter à SPHOT avec leurs identifiants afin de
-  <strong>renseigner leur partie de l’application</strong> et compléter
-  les informations nécessaires au fonctionnement du service.
+  Ils doivent se connecter chaque jour à SPHOT avec leurs identifiants
+  afin de <strong>renseigner quotidiennement leur espace SPHOT SAUVETEUR</strong>
+  et compléter les informations nécessaires au bon fonctionnement
+  de l’application SPHOT.
   <br><br>
   Si certains sauveteurs ne disposent pas encore de leurs accès,
-  créez ou vérifiez leur compte depuis SPHOT ADMIN puis transmettez-leur
-  rapidement leurs identifiants.
+  créez ou vérifiez leur compte depuis
+  <strong>SPHOT ADMIN — étape 4 « ESPACE SPHOT ADMIN »</strong>,
+  en cliquant sur le crayon situé en face de leur identité, puis
+  transmettez-leur rapidement leurs identifiants.
 </div>
 
 <div style="text-align:center;margin:30px 0;">
