@@ -340,21 +340,16 @@ async function reconcilePublicTerritory(territoireId, publish) {
  */
 async function isTerritoryPublic(territoireId) {
   const db = admin.firestore();
-  const [adminsSnapshot, requestsSnapshot] = await Promise.all([
-    db.collection("admins")
-        .where("territoireId", "==", territoireId)
-        .get(),
-    db.collection("adminRequests")
-        .where("territoire.territoireId", "==", territoireId)
-        .get(),
-  ]);
-  const approvedAdmin = adminsSnapshot.docs.some((document) => {
-    return document.data().accessStatus === "approved";
+  const adminsSnapshot = await db.collection("admins")
+      .where("territoireId", "==", territoireId)
+      .get();
+
+  return adminsSnapshot.docs.some((document) => {
+    const data = document.data() || {};
+
+    return data.accessStatus === "approved" &&
+      data.diffusionAccessGranted === true;
   });
-  const approvedRequest = requestsSnapshot.docs.some((document) => {
-    return isApprovedAdminRequest(document.data());
-  });
-  return approvedAdmin || approvedRequest;
 }
 
 /**
