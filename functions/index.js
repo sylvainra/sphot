@@ -3735,6 +3735,217 @@ L'équipe SPHOT`,
     },
 );
 
+/**
+ * Normalise les fonctions métier d'un sauveteur.
+ *
+ * @param {Object} data Données du compte ou du profil sauveteur.
+ * @return {Array<string>} Fonctions normalisées.
+ */
+function sauveteurFunctions(data) {
+  if (Array.isArray(data.fonctions)) {
+    return data.fonctions
+        .map((value) => (value || "").toString().trim())
+        .filter((value) => value);
+  }
+
+  const role = (data.role || "").toString().trim();
+  return role ? [role] : ["Sauveteur"];
+}
+
+/**
+ * Indique si le profil peut administrer le planning et la main courante.
+ *
+ * @param {Array<string>} functions Fonctions du sauveteur.
+ * @return {boolean} Vrai pour chef de poste ou adjoint.
+ */
+function isSauveteurSupervisor(functions) {
+  return functions.some((value) => {
+    const role = value.toString().trim().toLowerCase();
+    return role === "chef de poste" || role === "adjoint chef de poste";
+  });
+}
+
+/**
+ * Reconstitue le contexte opérationnel SPHOT ON / SPHOT OFF.
+ *
+ * SPHOT ON exige :
+ * - un compte actif ;
+ * - au moins une affectation à un SPHOT ;
+ * - des droits de diffusion ouverts par l'administration de tutelle.
+ *
+ * @param {Object} accountData Données sauveteurAccounts.
+ * @param {string} login Identifiant du compte.
+ * @return {Promise<Object>} Contexte opérationnel.
+ */
+async function resolveSauveteurOperationalContext(accountData, login) {
+  const db = admin.firestore();
+  const territoireId = (accountData.territoireId || "").toString().trim();
+  let sauveteurId = (accountData.sauveteurId || "").toString().trim();
+  let profileData = {};
+
+  if (territoireId && sauveteurId) {
+    const profileSnapshot = await db.collection("territoires")
+        .doc(territoireId)
+        .collection("sauveteurs")
+        .doc(sauveteurId)
+        .get();
+
+    if (profileSnapshot.exists) {
+      profileData = profileSnapshot.data() || {};
+    }
+  } else if (territoireId && login) {
+    const profileSnapshot = await db.collection("territoires")
+        .doc(territoireId)
+        .collection("sauveteurs")
+        .where("login", "==", login)
+        .limit(1)
+        .get();
+
+    if (!profileSnapshot.empty) {
+      sauveteurId = profileSnapshot.docs[0].id;
+      profileData = profileSnapshot.docs[0].data() || {};
+    }
+  }
+
+  const functions = sauveteurFunctions({
+    ...accountData,
+    ...(Array.isArray(profileData.fonctions) ?
+      {fonctions: profileData.fonctions} : {}),
+  });
+
+  const rawSpots = Array.isArray(profileData.postesAffectes) ?
+    profileData.postesAffectes :
+    Array.isArray(accountData.postesAffectes) ?
+      accountData.postesAffectes :
+      [];
+
+  const assignedSpotIds = [...new Set(
+      rawSpots
+          .map((value) => (value || "").toString().trim())
+          .filter((value) => value),
+  )];
+
+  let diffusionAccessGranted = false;
+  if (territoireId) {
+    const adminsSnapshot = await db.collection("admins")
+        .where("territoireId", "==", territoireId)
+        .get();
+
+    diffusionAccessGranted = adminsSnapshot.docs.some((document) => {
+      return document.data().diffusionAccessGranted === true;
+    });
+  }
+
+  const accountActive = accountData.accountStatus === "ACTIVE";
+  const sphotOn = accountActive &&
+    diffusionAccessGranted &&
+    assignedSpotIds.length > 0;
+
+  let modeReason = "active";
+  if (!accountActive) {
+    modeReason = "account_inactive";
+  } else if (assignedSpotIds.length === 0) {
+    modeReason = "no_active_assignment";
+  } else if (!diffusionAccessGranted) {
+    modeReason = "administration_diffusion_off";
+  }
+
+  const userRole = functions[0] ||
+    (accountData.role || "Sauveteur").toString();
+
+  return {
+    sauveteurId: sauveteurId || login,
+    territoireId,
+    functions,
+    userRole,
+    assignedSpotIds,
+    diffusionAccessGranted,
+    sphotMode: sphotOn ? "ON" : "OFF",
+    sphotModeReason: modeReason,
+    canManageRestrictedOperationalData:
+      isSauveteurSupervisor(functions),
+  };
+}
+
+/**
+ * Crée une session sauveteur non persistante côté client.
+ *
+ * @param {string} login Identifiant du compte.
+ * @param {Object} context Contexte opérationnel.
+ * @return {Promise<string>} Jeton de session.
+ */
+async function createSauveteurSession(login, context) {
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+  await admin.firestore()
+      .collection("sauveteurSessions")
+      .doc(tokenHash)
+      .set({
+        login,
+        sauveteurId: context.sauveteurId,
+        territoireId: context.territoireId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt: admin.firestore.Timestamp.fromMillis(
+            Date.now() + 12 * 60 * 60 * 1000,
+        ),
+      });
+
+  return token;
+}
+
+/**
+ * Valide une session sauveteur et recalcule ses droits en temps réel.
+ *
+ * @param {string} token Jeton reçu lors de la connexion.
+ * @return {Promise<Object|null>} Session et contexte courant.
+ */
+async function resolveSauveteurSession(token) {
+  const normalizedToken = (token || "").toString().trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(normalizedToken)) return null;
+
+  const db = admin.firestore();
+  const tokenHash = crypto
+      .createHash("sha256")
+      .update(normalizedToken)
+      .digest("hex");
+  const sessionReference = db.collection("sauveteurSessions").doc(tokenHash);
+  const sessionSnapshot = await sessionReference.get();
+
+  if (!sessionSnapshot.exists) return null;
+
+  const session = sessionSnapshot.data() || {};
+  const expiresAt = session.expiresAt;
+
+  if (!expiresAt ||
+      typeof expiresAt.toMillis !== "function" ||
+      expiresAt.toMillis() < Date.now()) {
+    await sessionReference.delete();
+    return null;
+  }
+
+  const login = (session.login || "").toString().trim().toLowerCase();
+  const accountSnapshot = await db.collection("sauveteurAccounts")
+      .doc(login)
+      .get();
+
+  if (!accountSnapshot.exists) return null;
+
+  const accountData = accountSnapshot.data() || {};
+  if (accountData.accountStatus !== "ACTIVE") return null;
+
+  const context = await resolveSauveteurOperationalContext(
+      accountData,
+      login,
+  );
+
+  return {
+    login,
+    accountData,
+    context,
+  };
+}
+
 exports.loginSauveteur = onRequest(
     {
       cpu: 1,
@@ -3775,7 +3986,7 @@ exports.loginSauveteur = onRequest(
           return;
         }
 
-        const data = accountDoc.data();
+        const data = accountDoc.data() || {};
 
         if (data.accountStatus !== "ACTIVE") {
           response.status(401).json({success: false});
@@ -3787,27 +3998,32 @@ exports.loginSauveteur = onRequest(
           return;
         }
 
-        const doc = accountDoc;
+        const context = await resolveSauveteurOperationalContext(
+            data,
+            login,
+        );
 
-        let userRole = "Sauveteur";
-
-        if (Array.isArray(data.fonctions) && data.fonctions.length > 0) {
-          userRole = data.fonctions[0].toString();
-        } else if ((data.role || "").toString().trim() !== "") {
-          userRole = data.role.toString();
-        }
-
-        await doc.ref.set(
+        await accountDoc.ref.set(
             {
+              sauveteurId: context.sauveteurId,
+              fonctions: context.functions,
+              postesAffectes: context.assignedSpotIds,
               lastLoginAt:
+                  admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt:
                   admin.firestore.FieldValue.serverTimestamp(),
             },
             {merge: true},
         );
 
+        const sauveteurSessionToken = await createSauveteurSession(
+            login,
+            context,
+        );
+
         let webSessionToken = "";
 
-        if (userRole.toUpperCase() === "SUPER_ADMIN") {
+        if (context.userRole.toUpperCase() === "SUPER_ADMIN") {
           webSessionToken = crypto.randomBytes(32).toString("hex");
           const tokenHash = crypto
               .createHash("sha256")
@@ -3818,7 +4034,7 @@ exports.loginSauveteur = onRequest(
               .collection("superAdminWebSessions")
               .doc(tokenHash)
               .set({
-                login: doc.id,
+                login: accountDoc.id,
                 createdAt:
                     admin.firestore.FieldValue.serverTimestamp(),
                 expiresAt: admin.firestore.Timestamp.fromMillis(
@@ -3829,14 +4045,422 @@ exports.loginSauveteur = onRequest(
 
         response.status(200).json({
           success: true,
-          sauveteurId: doc.id,
-          territoireId: (data.territoireId || "").toString(),
-          userRole: userRole,
+          sauveteurId: context.sauveteurId,
+          territoireId: context.territoireId,
+          userRole: context.userRole,
+          fonctions: context.functions,
+          postesAffectes: context.assignedSpotIds,
+          diffusionAccessGranted: context.diffusionAccessGranted,
+          sphotMode: context.sphotMode,
+          sphotModeReason: context.sphotModeReason,
+          canManageRestrictedOperationalData:
+            context.canManageRestrictedOperationalData,
           mustChangePassword: data.mustChangePassword === true,
-          webSessionToken: webSessionToken,
+          sauveteurSessionToken,
+          webSessionToken,
         });
       } catch (error) {
         console.error("Erreur login sauveteur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.saveSauveteurPlanning = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      if (request.method !== "POST") {
+        response.status(405).json({success: false});
+        return;
+      }
+
+      try {
+        const session = await resolveSauveteurSession(
+            request.body.sauveteurSessionToken,
+        );
+
+        if (!session) {
+          response.status(401).json({
+            success: false,
+            error: "invalid_session",
+          });
+          return;
+        }
+
+        const {context} = session;
+        const spotId = (request.body.spotId || "").toString().trim();
+        const monthId = (request.body.monthId || "").toString().trim();
+
+        if (!context.sphotMode || context.sphotMode !== "ON") {
+          response.status(403).json({
+            success: false,
+            error: "sphot_off",
+          });
+          return;
+        }
+
+        if (!context.assignedSpotIds.includes(spotId)) {
+          response.status(403).json({
+            success: false,
+            error: "spot_not_assigned",
+          });
+          return;
+        }
+
+        if (!context.canManageRestrictedOperationalData) {
+          response.status(403).json({
+            success: false,
+            error: "insufficient_role",
+          });
+          return;
+        }
+
+        if (!spotId || !monthId) {
+          response.status(400).json({
+            success: false,
+            error: "missing_fields",
+          });
+          return;
+        }
+
+        await admin.firestore()
+            .collection("territoires")
+            .doc(context.territoireId)
+            .collection("spots")
+            .doc(spotId)
+            .collection("planningSauveteurs")
+            .doc(monthId)
+            .set({
+              spotId,
+              spotLabel: (request.body.spotLabel || "").toString(),
+              monthId,
+              openingHours:
+                (request.body.openingHours || "").toString(),
+              cells: request.body.cells || {},
+              names: request.body.names || {},
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedBy: {
+                sauveteurId: context.sauveteurId,
+                login: session.login,
+                role: context.userRole,
+              },
+            }, {merge: true});
+
+        response.status(200).json({success: true});
+      } catch (error) {
+        console.error("Erreur sauvegarde planning sauveteur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.updateSauveteurLiveState = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      if (request.method !== "POST") {
+        response.status(405).json({success: false});
+        return;
+      }
+
+      try {
+        const session = await resolveSauveteurSession(
+            request.body.sauveteurSessionToken,
+        );
+
+        if (!session) {
+          response.status(401).json({
+            success: false,
+            error: "invalid_session",
+          });
+          return;
+        }
+
+        const {context} = session;
+        const spotId = (request.body.spotId || "").toString().trim();
+        const changes = request.body.changes || {};
+
+        if (context.sphotMode !== "ON") {
+          response.status(403).json({
+            success: false,
+            error: "sphot_off",
+          });
+          return;
+        }
+
+        if (!context.assignedSpotIds.includes(spotId)) {
+          response.status(403).json({
+            success: false,
+            error: "spot_not_assigned",
+          });
+          return;
+        }
+
+        const allowedFields = new Set([
+          "liveFlag",
+          "statutBaignade",
+          "dangers",
+          "meteoTerrestre",
+          "meteoMarine",
+          "ephemeride",
+        ]);
+        const sanitizedChanges = {};
+
+        Object.entries(changes).forEach(([key, value]) => {
+          if (allowedFields.has(key)) sanitizedChanges[key] = value;
+        });
+
+        if (Object.keys(sanitizedChanges).length === 0) {
+          response.status(400).json({
+            success: false,
+            error: "no_allowed_changes",
+          });
+          return;
+        }
+
+        const db = admin.firestore();
+        const spotReference = db.collection("spots").doc(spotId);
+        const auditReference = db.collection("sauveteurOperationalAudit").doc();
+
+        const batch = db.batch();
+        batch.set(spotReference, {
+          ...sanitizedChanges,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedBySauveteurId: context.sauveteurId,
+        }, {merge: true});
+        batch.set(auditReference, {
+          territoireId: context.territoireId,
+          spotId,
+          sauveteurId: context.sauveteurId,
+          login: session.login,
+          role: context.userRole,
+          changes: sanitizedChanges,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        await batch.commit();
+
+        response.status(200).json({success: true});
+      } catch (error) {
+        console.error("Erreur mise à jour live sauveteur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.getSauveteurMainCourante = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const session = await resolveSauveteurSession(
+            request.body.sauveteurSessionToken,
+        );
+
+        if (!session) {
+          response.status(401).json({
+            success: false,
+            error: "invalid_session",
+          });
+          return;
+        }
+
+        const {context} = session;
+        const spotId = (request.body.spotId || "").toString().trim();
+
+        if (context.sphotMode !== "ON" ||
+            !context.assignedSpotIds.includes(spotId)) {
+          response.status(403).json({
+            success: false,
+            error: "main_courante_not_available",
+          });
+          return;
+        }
+
+        const snapshot = await admin.firestore()
+            .collection("territoires")
+            .doc(context.territoireId)
+            .collection("spots")
+            .doc(spotId)
+            .collection("mainCourante")
+            .orderBy("occurredAt", "desc")
+            .limit(100)
+            .get();
+
+        const canSeeRestricted =
+          context.canManageRestrictedOperationalData;
+
+        const entries = snapshot.docs
+            .map((document) => {
+              const data = document.data() || {};
+              return {id: document.id, ...data};
+            })
+            .filter((entry) => {
+              return entry.visibility !== "restricted" || canSeeRestricted;
+            })
+            .map((entry) => ({
+              id: entry.id,
+              type: entry.type || "Observation",
+              description: entry.description || "",
+              actionTaken: entry.actionTaken || "",
+              visibility: entry.visibility || "operational",
+              occurredAt: entry.occurredAt &&
+                  typeof entry.occurredAt.toMillis === "function" ?
+                entry.occurredAt.toMillis() : null,
+              createdBy: entry.createdBy || {},
+            }));
+
+        await admin.firestore()
+            .collection("mainCouranteAccessLogs")
+            .add({
+              territoireId: context.territoireId,
+              spotId,
+              viewerId: context.sauveteurId,
+              viewerLogin: session.login,
+              viewerRole: context.userRole,
+              viewerType: "sauveteur",
+              action: "view",
+              viewedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+        response.status(200).json({
+          success: true,
+          entries,
+          canWrite: context.canManageRestrictedOperationalData,
+        });
+      } catch (error) {
+        console.error("Erreur lecture main courante:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.addSauveteurMainCouranteEntry = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const session = await resolveSauveteurSession(
+            request.body.sauveteurSessionToken,
+        );
+
+        if (!session) {
+          response.status(401).json({
+            success: false,
+            error: "invalid_session",
+          });
+          return;
+        }
+
+        const {context} = session;
+        const spotId = (request.body.spotId || "").toString().trim();
+
+        if (context.sphotMode !== "ON" ||
+            !context.assignedSpotIds.includes(spotId)) {
+          response.status(403).json({
+            success: false,
+            error: "sphot_off",
+          });
+          return;
+        }
+
+        if (!context.canManageRestrictedOperationalData) {
+          response.status(403).json({
+            success: false,
+            error: "insufficient_role",
+          });
+          return;
+        }
+
+        const description = (request.body.description || "")
+            .toString()
+            .trim();
+
+        if (!description) {
+          response.status(400).json({
+            success: false,
+            error: "description_required",
+          });
+          return;
+        }
+
+        const visibility = request.body.visibility === "restricted" ?
+          "restricted" :
+          "operational";
+
+        const entryReference = admin.firestore()
+            .collection("territoires")
+            .doc(context.territoireId)
+            .collection("spots")
+            .doc(spotId)
+            .collection("mainCourante")
+            .doc();
+
+        await entryReference.set({
+          type: (request.body.type || "Observation").toString(),
+          description,
+          actionTaken: (request.body.actionTaken || "").toString().trim(),
+          visibility,
+          occurredAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdBy: {
+            sauveteurId: context.sauveteurId,
+            login: session.login,
+            role: context.userRole,
+          },
+          immutableOriginal: true,
+        });
+
+        response.status(200).json({
+          success: true,
+          entryId: entryReference.id,
+        });
+      } catch (error) {
+        console.error("Erreur écriture main courante:", error);
         response.status(500).json({success: false});
       }
     },
