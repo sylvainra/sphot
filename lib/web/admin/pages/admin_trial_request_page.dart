@@ -406,11 +406,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         _isLoadingCorrection = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors du chargement de la demande : $error'),
-        ),
-      );
     }
   }
 
@@ -1004,25 +999,11 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     final available = await _speech.initialize(
       onError: (error) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur micro : ${error.errorMsg}'),
-            duration: const Duration(seconds: 3),
-          ),
-        );
       },
     );
 
     if (!available) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Reconnaissance vocale non disponible ou micro non autorisé.',
-          ),
-          duration: Duration(seconds: 3),
-        ),
-      );
       return;
     }
 
@@ -1113,9 +1094,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
       setState(() => _legalLoading = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur chargement documents légaux : $error')),
-      );
     }
   }
 
@@ -1361,12 +1339,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         _isSaving = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur enregistrement : $error'),
-          duration: const Duration(seconds: 6),
-        ),
-      );
     }
   }
 
