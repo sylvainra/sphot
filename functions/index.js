@@ -1402,13 +1402,15 @@ async function sendAdminAccessAcknowledgementEmail(
         "SPHOT - Confirmation de votre demande d'accès administrateur",
 
     html: `
-<p>
+<p style="font-size:16px;line-height:1.6;">
   ${escapeHtml(greeting)}
 </p>
 
-<p>
-  Votre demande d'accès à votre SPHOT ADMIN
-  pour <strong>${organisation}</strong> a bien été enregistrée.
+<p style="font-size:16px;line-height:1.6;">
+  Votre demande d'accès administrateur à la plateforme
+  <strong>SPHOT</strong> pour
+  <strong>${escapeHtml(organisation)}</strong>
+  a bien été enregistrée.
 </p>
 
 <div style="
@@ -1424,7 +1426,7 @@ async function sendAdminAccessAcknowledgementEmail(
     font-weight:bold;
     text-transform:uppercase;
   ">
-    Numéro de demande
+    Référence du dossier
   </div>
 
   <div style="
@@ -1433,47 +1435,32 @@ async function sendAdminAccessAcknowledgementEmail(
     font-size:21px;
     font-weight:bold;
   ">
-    ${requestNumber}
+    ${escapeHtml(requestNumber)}
   </div>
 </div>
 
-<p style="
-  color:#dc2626;
-  font-size:18px;
-  font-weight:bold;
-">
-  Essai gratuit, sans engagement ni facturation.
+<p style="font-size:16px;line-height:1.6;">
+  Votre demande va maintenant faire l'objet d'une instruction
+  par l'équipe SPHOT. Une décision distincte vous sera communiquée
+  à l'issue de cette instruction.
 </p>
 
-<p>
-  Après validation de votre demande par l'équipe SPHOT,
-  vous pourrez accéder à votre SPHOT ADMIN
-  afin de créer vos SPHOTS, vos sauveteurs et vos périodes
-  de surveillance.
-
-  Vous recevrez prochainement, par courrier électronique,
-  une réponse vous informant de la décision prise concernant
-  votre demande.
-</p>
-
-<p>
-  La période d'essai gratuite de 8 jours débutera uniquement
-  lorsque votre configuration sera complète et que l'essai
-  aura été activé.
-</p>
-
-<p style="
+<div style="
   margin-top:28px;
   padding:16px;
   background:#fff8e1;
   border-left:5px solid #ff9800;
   border-radius:8px;
+  font-size:14px;
+  line-height:1.6;
 ">
-  Ce message confirme l'enregistrement de votre demande.
-  Aucun essai ni aucune facturation ne sont en cours à ce stade.
-</p>
+  Ce message confirme uniquement la bonne réception de votre demande.
+  Il ne constitue ni une décision d'approbation, ni une autorisation
+  d'accès au portail SPHOT. La période d'essai, l'abonnement et la
+  facturation font l'objet d'étapes distinctes.
+</div>
 
-<p style="margin-top:34px;">
+<p style="margin-top:34px;font-size:15px;line-height:1.6;">
   À bientôt sur SPHOT,<br>
   <strong>L'équipe SPHOT</strong>
 </p>
@@ -1482,25 +1469,23 @@ async function sendAdminAccessAcknowledgementEmail(
     text:
 `${greeting}
 
-Votre demande d'accès à votre SPHOT ADMIN
+Votre demande d'accès administrateur à la plateforme SPHOT
 pour ${organisation} a bien été enregistrée.
 
-Numéro de demande : ${requestNumber}
+Référence du dossier : ${requestNumber}
 
-Essai gratuit, sans engagement ni facturation.
+Votre demande va maintenant faire l'objet d'une instruction par l'équipe SPHOT.
+Une décision distincte vous sera communiquée à l'issue de cette instruction.
 
-Après validation de votre demande, vous pourrez accéder à votre SPHOT ADMIN
-afin de créer vos SPHOTS, vos sauveteurs et vos périodes de surveillance.
-
-La période d'essai de 8 jours ne commencera qu'une fois
-ces informations renseignées et l'essai activé.
-
-Ce message confirme l'enregistrement de votre demande.
-Aucun essai ni aucune facturation ne sont en cours à ce stade.
+Ce message confirme uniquement la bonne réception de votre demande.
+Il ne constitue ni une décision d'approbation, ni une autorisation d'accès
+au portail SPHOT. La période d'essai, l'abonnement et la facturation font
+l'objet d'étapes distinctes.
 
 À bientôt sur SPHOT,
 
 L'équipe SPHOT`,
+
   });
 }
 
