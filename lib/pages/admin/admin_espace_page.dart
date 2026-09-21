@@ -96,12 +96,6 @@ class _AdminEspacePageState extends State<AdminEspacePage> {
         territoireId = '';
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur chargement admin : $error'),
-          duration: const Duration(seconds: 6),
-        ),
-      );
     }
   }
 
