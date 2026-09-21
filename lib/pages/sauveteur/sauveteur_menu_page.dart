@@ -197,9 +197,6 @@ class SauveteurMenuPage extends StatelessWidget {
                                   builder: (_) => SauveteurActionsRapidesPage(
                                     profileColor: profileColor,
                                     sphotMode: sphotMode,
-                                    sauveteurSessionToken:
-                                        sauveteurSessionToken,
-                                    postesAffectes: postesAffectes,
                                   ),
                                 ),
                               );
