@@ -9682,8 +9682,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       child: Material(
         color: Colors.transparent,
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -9953,13 +9954,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
                 const SizedBox(height: 14),
 
-                _sphotSectionTitle(6, 'WEBCAM'),
+                _sphotSectionTitle(6, 'WEBCAM OU CLICHÉ'),
 
                 const SizedBox(height: 5),
 
                 _sphotEditorField(
                   controller: _sphotWebcamUrlController,
-                  label: 'https://webcam',
+                  label: 'https://webcam ou URL du cliché',
                   keyboardType: TextInputType.url,
                 ),
 
@@ -9970,7 +9971,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   height: 46,
                   child: OutlinedButton.icon(
                     onPressed: _isSavingSphot ? null : _saveSphotFromDashboard,
-
                     icon: _isSavingSphot
                         ? const SizedBox(
                             width: 18,
@@ -9981,7 +9981,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             ),
                           )
                         : const Icon(Icons.save_rounded),
-
                     label: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
@@ -9993,7 +9992,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ),
-
                     style: OutlinedButton.styleFrom(
                       foregroundColor: redColor,
                       backgroundColor: Colors.transparent,

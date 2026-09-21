@@ -1,5 +1,7 @@
 "use strict";
 
+const {sendSphotMail} = require("./sphot_email_design");
+
 const {onDocumentCreated, onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
@@ -428,26 +430,99 @@ async function sendTrialReceipt(requestId) {
     const greeting = buildGreeting(data);
     const organisation = organisationDisplay(data);
     const html = `
-      <p>${escapeHtml(greeting)}</p>
-      <p>Nous accusons réception de votre demande de
-      <strong>période d’essai gratuite SPHOT ADMIN de ${duration} jours</strong>
-      pour ${escapeHtml(organisation)}.</p>
-      <p>Votre demande est actuellement en attente de validation par l’équipe SPHOT.</p>
-      <p><strong>La période d’essai ne débutera qu’après cette validation.</strong>
-      Vous recevrez un nouvel email dès son activation.</p>
-      <p>Référence du dossier : <strong>${escapeHtml(requestNumber)}</strong></p>
-      <p>Cordialement,<br>L’équipe SPHOT</p>`;
+<p style="font-size:16px;line-height:1.6;">
+  ${escapeHtml(greeting)}
+</p>
 
-    const mailResult = await transporter().sendMail({
-      from: MAIL_FROM,
-      to: email,
-      subject: "SPHOT ADMIN — Demande d’essai bien reçue",
-      html,
-      attachments: [{
-        filename: `${docNumber}.pdf`,
-        href: pdf.downloadUrl,
-      }],
-    });
+<p style="font-size:16px;line-height:1.6;">
+  Nous accusons réception de votre demande de
+  <strong>
+    période d’essai gratuite SPHOT ADMIN de ${duration} jours
+  </strong>
+  pour <strong>${escapeHtml(organisation)}</strong>.
+</p>
+
+<p style="
+  color:#dc2626;
+  font-size:16px;
+  line-height:1.6;
+  font-weight:900;
+">
+  Demande de période d’essai bien enregistrée.
+</p>
+
+<div style="
+  margin-top:20px;
+  padding:16px;
+  border-left:4px solid #f59e0b;
+  border-radius:8px;
+  background:#fff7df;
+  font-size:14px;
+  line-height:1.6;
+">
+  Votre demande est actuellement
+  <strong>en attente de validation par l’équipe SPHOT</strong>.
+  <br><br>
+  La période d’essai gratuite ne débutera
+  <strong>qu’après cette validation</strong>.
+  Vous recevrez un nouvel email dès son activation.
+</div>
+
+<div style="
+  margin:20px 0;
+  padding:16px;
+  border-left:4px solid #1e3a8a;
+  border-radius:8px;
+  background:#f3f6fb;
+  font-size:14px;
+  line-height:1.6;
+">
+  Référence du dossier :
+  <strong style="color:#dc2626;">
+    ${escapeHtml(requestNumber)}
+  </strong>
+</div>
+
+<div style="text-align:center;margin:30px 0;">
+  <a
+    href="${SPHOT_LOGIN_URL}"
+    style="
+      display:inline-block;
+      padding:15px 28px;
+      border-radius:14px;
+      background:#1e3a8a;
+      color:#ffffff;
+      text-decoration:none;
+      font-size:16px;
+      font-weight:900;
+    "
+  >
+    SE CONNECTER À SPHOT ADMIN
+  </a>
+</div>
+
+<p style="
+  margin-top:28px;
+  font-size:15px;
+  line-height:1.6;
+">
+  À bientôt sur SPHOT,<br>
+  <strong>L'équipe SPHOT</strong>
+</p>`;
+
+    const mailResult = await sendSphotMail(
+        transporter(),
+        {
+          from: MAIL_FROM,
+          to: email,
+          subject: "SPHOT ADMIN — Demande d’essai bien reçue",
+          html,
+          attachments: [{
+            filename: `${docNumber}.pdf`,
+            href: pdf.downloadUrl,
+          }],
+        },
+    );
 
     await requestRef.set({
       "trialTracking.status": "pending",
@@ -532,13 +607,22 @@ async function sendTrialApproval(requestId) {
       <p><a href="${SPHOT_LOGIN_URL}">Accéder à SPHOT ADMIN</a></p>
       <p>Cordialement,<br>L’équipe SPHOT</p>`;
 
-    const mailResult = await transporter().sendMail({
-      from: MAIL_FROM,
-      to: email,
-      subject: "SPHOT ADMIN — Votre période d’essai est activée",
-      html,
-      attachments: [{filename: `${docNumber}.pdf`, href: pdf.downloadUrl}],
-    });
+    const mailResult = await sendSphotMail(
+        transporter(),
+        {
+          from: MAIL_FROM,
+          to: email,
+          subject:
+          "SPHOT ADMIN — Votre période d’essai est activée",
+          html,
+          attachments: [
+            {
+              filename: `${docNumber}.pdf`,
+              href: pdf.downloadUrl,
+            },
+          ],
+        },
+    );
 
     await requestRef.set({
       trialApprovalDocument: {
@@ -654,7 +738,15 @@ async function sendLifecycleMail({requestSnap, fieldName, subject, html}) {
   }, {merge: true});
 
   try {
-    const result = await transporter().sendMail({from: MAIL_FROM, to: email, subject, html});
+    const result = await sendSphotMail(
+        transporter(),
+        {
+          from: MAIL_FROM,
+          to: email,
+          subject,
+          html,
+        },
+    );
     await requestRef.set({
       [fieldName]: {
         status: "sent",
@@ -1064,20 +1156,87 @@ exports.processAdminOrderCreated = onDocumentCreated(
       }, {merge: true});
 
       const email = recipientEmail(requestData);
+
       if (email) {
-        await transporter().sendMail({
-          from: MAIL_FROM,
-          to: email,
-          subject: "SPHOT ADMIN — Commande d’abonnement bien reçue",
-          html: `
-            <p>${escapeHtml(buildGreeting(requestData))}</p>
-            <p>Votre commande d’abonnement annuel SPHOT ADMIN a bien été enregistrée.</p>
-            <p>Référence : <strong>${escapeHtml(orderNumber)}</strong></p>
-            <p>Montant : <strong>${escapeHtml(currency(order.totalExclTax))} HT</strong>.</p>
-            <p>Le traitement de la facture électronique et du règlement sera suivi dans votre espace.</p>
-            <p>Cordialement,<br>L’équipe SPHOT</p>`,
-          attachments: [{filename: `${orderNumber}.pdf`, href: pdf.downloadUrl}],
-        });
+        await sendSphotMail(
+            transporter(),
+            {
+              from: MAIL_FROM,
+              to: email,
+              subject:
+                  "SPHOT ADMIN — Commande d’abonnement bien reçue",
+
+              html: `
+<p style="font-size:16px;line-height:1.6;">
+  ${escapeHtml(buildGreeting(requestData))}
+</p>
+
+<p style="font-size:16px;line-height:1.6;">
+  Votre commande d’abonnement annuel
+  <strong>SPHOT ADMIN</strong>
+  a bien été enregistrée.
+</p>
+
+<div style="
+  margin:20px 0;
+  padding:16px;
+  border-left:4px solid #1e3a8a;
+  border-radius:8px;
+  background:#f3f6fb;
+  font-size:14px;
+  line-height:1.6;
+">
+  Référence :
+  <strong style="color:#dc2626;">
+    ${escapeHtml(orderNumber)}
+  </strong>
+  <br><br>
+  Montant :
+  <strong>
+    ${escapeHtml(currency(order.totalExclTax))} HT
+  </strong>
+</div>
+
+<p style="font-size:16px;line-height:1.6;">
+  Le traitement de la facture électronique et du règlement
+  sera suivi dans votre espace SPHOT ADMIN.
+</p>
+
+<div style="text-align:center;margin:30px 0;">
+  <a
+    href="${SPHOT_LOGIN_URL}"
+    style="
+      display:inline-block;
+      padding:15px 28px;
+      border-radius:14px;
+      background:#1e3a8a;
+      color:#ffffff;
+      text-decoration:none;
+      font-size:16px;
+      font-weight:900;
+    "
+  >
+    SE CONNECTER À SPHOT ADMIN
+  </a>
+</div>
+
+<p style="
+  margin-top:28px;
+  font-size:15px;
+  line-height:1.6;
+">
+  À bientôt sur SPHOT,<br>
+  <strong>L'équipe SPHOT</strong>
+</p>`,
+
+              attachments: [
+                {
+                  filename: `${orderNumber}.pdf`,
+                  href: pdf.downloadUrl,
+                },
+              ],
+            },
+        );
       }
     },
 );

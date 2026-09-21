@@ -72,25 +72,19 @@ class SuperAdminDashboardPage extends StatefulWidget {
       _SuperAdminDashboardPageState();
 }
 
-class _SuperAdminDashboardPageState
-    extends State<SuperAdminDashboardPage> {
+class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
+  static const Color adminColor = Color(0xFF1E3A8A);
 
-  static const Color adminColor =
-      Color(0xFF1E3A8A);
-
-  static const Color redColor =
-      Color(0xFFDC2626);
+  static const Color redColor = Color(0xFFDC2626);
 
   static const String _rescueStationTypeAsset =
       'data/icons/flag_red_yellow_5x3.svg';
 
-  final MapController _mapController =
-      MapController();
+  final MapController _mapController = MapController();
   final ScrollController _leftPanelScrollController = ScrollController();
   Timer? _mapMovementTimer;
   DateTime? _lastSpotMarkerInteraction;
-  final Map<String, Future<Map<String, dynamic>>>
-    _spotSupervisionFutures = {};
+  final Map<String, Future<Map<String, dynamic>>> _spotSupervisionFutures = {};
 
   int _selectedTileStyle = 0;
 
@@ -102,7 +96,8 @@ class _SuperAdminDashboardPageState
     ),
     _SuperAdminTileStyle(
       name: 'Satellite',
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      url:
+          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       maxZoom: 19,
     ),
     _SuperAdminTileStyle(
@@ -1086,55 +1081,55 @@ class _SuperAdminDashboardPageState
   }
 
   Marker _buildSpotMarker(Map<String, dynamic> data) {
-  final lat = _toDouble(data['sphotLat']);
-  final lng = _toDouble(data['sphotLng']);
-  final name = _spotName(data);
-  final iconPath = _getMarkerIconPath(data);
-  final typeColor = _spotTypeColor(data);
+    final lat = _toDouble(data['sphotLat']);
+    final lng = _toDouble(data['sphotLng']);
 
-  return Marker(
-    point: LatLng(lat, lng),
-    width: 180,
-    height: 86,
-    alignment: Alignment.center,
-    child: DashboardSpotMarker(
-      data: data,
-      name: name,
-      iconPath: iconPath,
-      typeColor: typeColor,
-      onTap: () {
-        // Permet de distinguer le clic sur un SPHOT
-        // du clic général sur la carte.
-        _lastSpotMarkerInteraction = DateTime.now();
+    final spotName = _spotName(data);
 
-        final supervisionKey =
-    _spotSupervisionKey(data);
+    final idSphot = _cleanText(data['idSphot'] ?? data['_docId']);
 
-_spotSupervisionFutures.remove(
-  supervisionKey,
-);
+    final name = idSphot.isEmpty ? spotName : '$idSphot - $spotName';
 
-        setState(() {
-          _selectedSpot = Map<String, dynamic>.from(data);
+    final iconPath = _getMarkerIconPath(data);
+    final typeColor = _spotTypeColor(data);
 
-          _selectedAdmin = null;
-          _selectedAdvertiser = null;
+    return Marker(
+      point: LatLng(lat, lng),
+      width: 180,
+      height: 86,
+      alignment: Alignment.center,
+      child: DashboardSpotMarker(
+        data: data,
+        name: name,
+        iconPath: iconPath,
+        typeColor: typeColor,
+        onTap: () {
+          // Permet de distinguer le clic sur un SPHOT
+          // du clic général sur la carte.
+          _lastSpotMarkerInteraction = DateTime.now();
 
-          _showLegalDocumentsPanel = false;
-          _showPricingPanel = false;
+          final supervisionKey = _spotSupervisionKey(data);
 
-          _selectedLegalDocument = null;
-          _selectedLegalChapter = null;
-        });
+          _spotSupervisionFutures.remove(supervisionKey);
 
-        _mapController.move(
-          LatLng(lat, lng),
-          18,
-        );
-      },
-    ),
-  );
-}
+          setState(() {
+            _selectedSpot = Map<String, dynamic>.from(data);
+
+            _selectedAdmin = null;
+            _selectedAdvertiser = null;
+
+            _showLegalDocumentsPanel = false;
+            _showPricingPanel = false;
+
+            _selectedLegalDocument = null;
+            _selectedLegalChapter = null;
+          });
+
+          _mapController.move(LatLng(lat, lng), 18);
+        },
+      ),
+    );
+  }
 
   Widget _selectedSpotCard() {
     final spot = _selectedSpot;
@@ -1339,10 +1334,12 @@ _spotSupervisionFutures.remove(
     final trialRequestStatus = _cleanText(
       data['trialRequestStatus'] ?? trialRequest['status'],
     ).toLowerCase();
-    final commercialStatus = _cleanText(commercialTracking['status'])
-        .toLowerCase();
-    final subscriptionStatus = _cleanText(subscription?['status'])
-        .toLowerCase();
+    final commercialStatus = _cleanText(
+      commercialTracking['status'],
+    ).toLowerCase();
+    final subscriptionStatus = _cleanText(
+      subscription?['status'],
+    ).toLowerCase();
 
     switch (_selectedAdminFilter) {
       case DashboardAdminFilter.none:
@@ -1463,8 +1460,9 @@ _spotSupervisionFutures.remove(
         final subscriptionStart = subscription['subscriptionStartDate'];
         final subscriptionEnd = subscription['subscriptionEndDate'];
 
-        final numberOfSpots = _toDouble(subscription['numberOfRescueStations'])
-            .toInt();
+        final numberOfSpots = _toDouble(
+          subscription['numberOfRescueStations'],
+        ).toInt();
 
         final pricePerSpot = _toDouble(subscription['pricePerStationExclTax']);
 
@@ -2008,1191 +2006,957 @@ _spotSupervisionFutures.remove(
     );
   }
 
-static const Map<String, String> _superAdminLabelIconPaths = {
-  '🟦 PAVILLON BLEU': 'data/icons/pavillon_bleu.png',
-  '♿ HANDIPLAGE NIVEAU I': 'data/icons/handiplage1.png',
-  '♿ HANDIPLAGE NIVEAU II': 'data/icons/handiplage2.png',
-  '♿ HANDIPLAGE NIVEAU III': 'data/icons/handiplage3.png',
-  '♿ HANDIPLAGE NIVEAU IV': 'data/icons/handiplage4.png',
-  '🚭 PLAGE SANS TABAC': 'data/icons/plage_sans_tabac.png',
+  static const Map<String, String> _superAdminLabelIconPaths = {
+    '🟦 PAVILLON BLEU': 'data/icons/pavillon_bleu.png',
+    '♿ HANDIPLAGE NIVEAU I': 'data/icons/handiplage1.png',
+    '♿ HANDIPLAGE NIVEAU II': 'data/icons/handiplage2.png',
+    '♿ HANDIPLAGE NIVEAU III': 'data/icons/handiplage3.png',
+    '♿ HANDIPLAGE NIVEAU IV': 'data/icons/handiplage4.png',
+    '🚭 PLAGE SANS TABAC': 'data/icons/plage_sans_tabac.png',
 
-  'QUALITÉ DES EAUX : EXCELLENTE':
-      'data/icons/qualite_eau_excellente.png',
+    'QUALITÉ DES EAUX : EXCELLENTE': 'data/icons/qualite_eau_excellente.png',
 
-  'QUALITÉ DES EAUX : BONNE':
-      'data/icons/qualite_eau_bonne.png',
+    'QUALITÉ DES EAUX : BONNE': 'data/icons/qualite_eau_bonne.png',
 
-  'QUALITÉ DES EAUX : SUFFISANTE':
-      'data/icons/qualite_eau_suffisante.png',
+    'QUALITÉ DES EAUX : SUFFISANTE': 'data/icons/qualite_eau_suffisante.png',
 
-  'QUALITÉ DES EAUX : INSUFFISANTE':
-      'data/icons/qualite_eau_insuffisante.png',
-};
+    'QUALITÉ DES EAUX : INSUFFISANTE':
+        'data/icons/qualite_eau_insuffisante.png',
+  };
 
-static const Map<String, String> _superAdminLabelDisplayNames = {
-  '🟦 PAVILLON BLEU': 'PAVILLON BLEU',
-  '♿ HANDIPLAGE NIVEAU I': 'HANDIPLAGE NIVEAU I',
-  '♿ HANDIPLAGE NIVEAU II': 'HANDIPLAGE NIVEAU II',
-  '♿ HANDIPLAGE NIVEAU III': 'HANDIPLAGE NIVEAU III',
-  '♿ HANDIPLAGE NIVEAU IV': 'HANDIPLAGE NIVEAU IV',
-  '🚭 PLAGE SANS TABAC': 'PLAGE SANS TABAC',
-};
+  static const Map<String, String> _superAdminLabelDisplayNames = {
+    '🟦 PAVILLON BLEU': 'PAVILLON BLEU',
+    '♿ HANDIPLAGE NIVEAU I': 'HANDIPLAGE NIVEAU I',
+    '♿ HANDIPLAGE NIVEAU II': 'HANDIPLAGE NIVEAU II',
+    '♿ HANDIPLAGE NIVEAU III': 'HANDIPLAGE NIVEAU III',
+    '♿ HANDIPLAGE NIVEAU IV': 'HANDIPLAGE NIVEAU IV',
+    '🚭 PLAGE SANS TABAC': 'PLAGE SANS TABAC',
+  };
 
-List<String> _splitSphotValues(dynamic value) {
-  if (value is Iterable) {
-    return value
-        .map((item) => _cleanText(item))
-        .where(
-          (item) =>
-              item.isNotEmpty &&
-              _normalizeType(item) != 'AUCUN',
-        )
+  List<String> _splitSphotValues(dynamic value) {
+    if (value is Iterable) {
+      return value
+          .map((item) => _cleanText(item))
+          .where((item) => item.isNotEmpty && _normalizeType(item) != 'AUCUN')
+          .toList();
+    }
+
+    final raw = _cleanText(value);
+
+    if (raw.isEmpty) {
+      return <String>[];
+    }
+
+    final parts = raw.contains('|') ? raw.split('|') : raw.split(',');
+
+    return parts
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty && _normalizeType(item) != 'AUCUN')
         .toList();
   }
 
-  final raw = _cleanText(value);
+  String _spotTypeDisplayName(Map<String, dynamic> spot) {
+    final raw = _cleanText(spot['typeSphot']);
 
-  if (raw.isEmpty) {
-    return <String>[];
+    final normalized = _normalizeType(raw);
+
+    if (normalized.contains('POSTE DE SECOURS')) {
+      return 'POSTE DE SECOURS';
+    }
+
+    if (normalized.contains('ACCES PLAGE')) {
+      return 'ACCÈS PLAGE';
+    }
+
+    if (normalized.contains('NATURISME')) {
+      return 'NATURISME';
+    }
+
+    if (normalized.contains('PISCINE NATURELLE')) {
+      return 'PISCINE NATURELLE';
+    }
+
+    if (normalized.contains('BASE DE LOISIRS')) {
+      return 'BASE DE LOISIRS';
+    }
+
+    if (normalized.contains('PLAN D')) {
+      return 'PLAN D’EAU';
+    }
+
+    if (normalized.contains('LAGON')) {
+      return 'LAGON';
+    }
+
+    if (normalized.contains('BARRAGE')) {
+      return 'BARRAGE';
+    }
+
+    if (normalized.contains('RIVIERE')) {
+      return 'RIVIÈRE';
+    }
+
+    if (normalized.contains('FLEUVE')) {
+      return 'FLEUVE';
+    }
+
+    if (normalized.contains('CASCADE')) {
+      return 'CASCADE';
+    }
+
+    if (normalized.contains('ETANG')) {
+      return 'ÉTANG';
+    }
+
+    if (normalized.contains('LAC')) {
+      return 'LAC';
+    }
+
+    if (normalized.contains('PLAGE')) {
+      return 'PLAGE';
+    }
+
+    if (normalized.contains('PARC')) {
+      return 'PARC';
+    }
+
+    return raw.isEmpty ? 'Non renseigné' : raw;
   }
 
-  final parts = raw.contains('|')
-      ? raw.split('|')
-      : raw.split(',');
+  Map<String, dynamic>? _adminForSpot(Map<String, dynamic> spot) {
+    final spotTerritoryId = _cleanText(spot['territoireId']);
 
-  return parts
-      .map((item) => item.trim())
-      .where(
-        (item) =>
-            item.isNotEmpty &&
-            _normalizeType(item) != 'AUCUN',
-      )
-      .toList();
-}
+    if (spotTerritoryId.isEmpty) {
+      return null;
+    }
 
-String _spotTypeDisplayName(Map<String, dynamic> spot) {
-  final raw = _cleanText(spot['typeSphot']);
+    for (final doc in _latestAdminDocs) {
+      final data = Map<String, dynamic>.from(doc.data());
 
-  final normalized = _normalizeType(raw);
+      final territoireValue = data['territoire'];
 
-  if (normalized.contains('POSTE DE SECOURS')) {
-    return 'POSTE DE SECOURS';
-  }
+      final territoire = territoireValue is Map
+          ? Map<String, dynamic>.from(territoireValue)
+          : <String, dynamic>{};
 
-  if (normalized.contains('ACCES PLAGE')) {
-    return 'ACCÈS PLAGE';
-  }
+      final adminTerritoryId = _cleanText(
+        territoire['territoireId'] ??
+            data['territoireId'] ??
+            data['organisationId'],
+      );
 
-  if (normalized.contains('NATURISME')) {
-    return 'NATURISME';
-  }
+      if (adminTerritoryId == spotTerritoryId) {
+        return {...data, '_docId': doc.id};
+      }
+    }
 
-  if (normalized.contains('PISCINE NATURELLE')) {
-    return 'PISCINE NATURELLE';
-  }
-
-  if (normalized.contains('BASE DE LOISIRS')) {
-    return 'BASE DE LOISIRS';
-  }
-
-  if (normalized.contains('PLAN D')) {
-    return 'PLAN D’EAU';
-  }
-
-  if (normalized.contains('LAGON')) {
-    return 'LAGON';
-  }
-
-  if (normalized.contains('BARRAGE')) {
-    return 'BARRAGE';
-  }
-
-  if (normalized.contains('RIVIERE')) {
-    return 'RIVIÈRE';
-  }
-
-  if (normalized.contains('FLEUVE')) {
-    return 'FLEUVE';
-  }
-
-  if (normalized.contains('CASCADE')) {
-    return 'CASCADE';
-  }
-
-  if (normalized.contains('ETANG')) {
-    return 'ÉTANG';
-  }
-
-  if (normalized.contains('LAC')) {
-    return 'LAC';
-  }
-
-  if (normalized.contains('PLAGE')) {
-    return 'PLAGE';
-  }
-
-  if (normalized.contains('PARC')) {
-    return 'PARC';
-  }
-
-  return raw.isEmpty ? 'Non renseigné' : raw;
-}
-
-Map<String, dynamic>? _adminForSpot(
-  Map<String, dynamic> spot,
-) {
-  final spotTerritoryId = _cleanText(
-    spot['territoireId'],
-  );
-
-  if (spotTerritoryId.isEmpty) {
     return null;
   }
 
-  for (final doc in _latestAdminDocs) {
-    final data = Map<String, dynamic>.from(
-      doc.data(),
+  Widget _spotPanelSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 7),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: redColor,
+          fontSize: 13,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.35,
+        ),
+      ),
+    );
+  }
+
+  Widget _spotPanelBox({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFBFF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: adminColor, width: 1.2),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _spotVerticalField(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$label :',
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value.isEmpty ? 'Non renseigné' : value,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              height: 1.25,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _spotAssetValueLine({
+    required String assetPath,
+    required String text,
+    double iconSize = 22,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 30,
+            child: Center(
+              child: AdaptiveAssetImage(
+                assetPath,
+                width: iconSize,
+                height: iconSize,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.black87,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                height: 1.25,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _spotCsvValueLine(String rawValue) {
+    final value = rawValue.trim();
+
+    if (value.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final parts = value.split(RegExp(r'\s+'));
+
+    final firstPart = parts.isEmpty ? '' : parts.first;
+
+    final hasPictogram = firstPart.runes.any((rune) => rune >= 0x2300);
+
+    final displayText = hasPictogram && parts.length > 1
+        ? parts.skip(1).join(' ')
+        : value;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 30,
+            child: Text(
+              hasPictogram ? firstPart : '•',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 18, height: 1.1),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              displayText,
+              style: const TextStyle(
+                color: Colors.black87,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                height: 1.25,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _spotLabelValueLine(String label) {
+    final iconPath = _superAdminLabelIconPaths[label];
+
+    final displayName = _superAdminLabelDisplayNames[label] ?? label;
+
+    if (iconPath == null) {
+      return _spotCsvValueLine(displayName);
+    }
+
+    return _spotAssetValueLine(
+      assetPath: iconPath,
+      text: displayName,
+      iconSize: 22,
+    );
+  }
+
+  String _periodHour(dynamic value) {
+    final raw = _cleanText(value);
+
+    if (raw.isEmpty) {
+      return '';
+    }
+
+    return raw.replaceFirst(':', 'h');
+  }
+
+  String _periodDescription(Map<String, dynamic> period) {
+    final name = _cleanText(
+      period['name'] ?? period['nom'] ?? period['_docId'],
     );
 
-    final territoireValue = data['territoire'];
+    final start = period['startDate'];
+    final end = period['endDate'];
 
-    final territoire = territoireValue is Map
-        ? Map<String, dynamic>.from(territoireValue)
-        : <String, dynamic>{};
+    final startHour = _periodHour(period['startHour']);
 
-    final adminTerritoryId = _cleanText(
-      territoire['territoireId'] ??
-          data['territoireId'] ??
-          data['organisationId'],
+    final endHour = _periodHour(period['endHour']);
+
+    final lines = <String>[];
+
+    if (name.isNotEmpty) {
+      lines.add(name.toUpperCase());
+    }
+
+    if (start != null || end != null) {
+      lines.add('DU ${_formatDate(start)} AU ${_formatDate(end)}');
+    }
+
+    if (startHour.isNotEmpty && endHour.isNotEmpty) {
+      lines.add('DE $startHour À $endHour');
+    }
+
+    return lines.join('\n');
+  }
+
+  String _spotSupervisionKey(Map<String, dynamic> spot) {
+    final territoireId = _cleanText(spot['territoireId']);
+
+    final spotId = _cleanText(spot['_docId'] ?? spot['idSphot']);
+
+    return '$territoireId::$spotId';
+  }
+
+  Future<Map<String, dynamic>> _spotSupervisionFuture(
+    Map<String, dynamic> spot,
+  ) {
+    final key = _spotSupervisionKey(spot);
+
+    return _spotSupervisionFutures.putIfAbsent(
+      key,
+      () => _loadSpotSupervision(spot),
     );
+  }
 
-    if (adminTerritoryId == spotTerritoryId) {
+  Future<Map<String, dynamic>> _loadSpotSupervision(
+    Map<String, dynamic> spot,
+  ) async {
+    final territoireId = _cleanText(spot['territoireId']);
+
+    final spotDocId = _cleanText(spot['_docId'] ?? spot['idSphot']);
+
+    if (territoireId.isEmpty || spotDocId.isEmpty) {
       return {
-        ...data,
-        '_docId': doc.id,
+        'sauveteurs': <Map<String, dynamic>>[],
+        'periodsById': <String, Map<String, dynamic>>{},
       };
     }
-  }
 
-  return null;
-}
+    final firestore = FirebaseFirestore.instance;
 
-Widget _spotPanelSectionTitle(String title) {
-  return Padding(
-    padding: const EdgeInsets.only(
-      top: 16,
-      bottom: 9,
-    ),
-    child: Text(
-      title,
-      style: const TextStyle(
-        color: adminColor,
-        fontSize: 13,
-        fontWeight: FontWeight.w900,
-        letterSpacing: 0.35,
-      ),
-    ),
-  );
-}
+    final territoryReference = firestore
+        .collection('territoires')
+        .doc(territoireId);
 
-Widget _spotVerticalField(
-  String label,
-  String value,
-) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '$label :',
-          style: const TextStyle(
-            color: Colors.black87,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value.isEmpty ? 'Non renseigné' : value,
-          style: const TextStyle(
-            color: Colors.black87,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            height: 1.25,
-          ),
-        ),
-      ],
-    ),
-  );
-}
+    final spotReference = territoryReference.collection('spots').doc(spotDocId);
 
-Widget _spotAssetValueLine({
-  required String assetPath,
-  required String text,
-  double iconSize = 22,
-}) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        SizedBox(
-          width: 30,
-          child: Center(
-            child: AdaptiveAssetImage(
-              assetPath,
-              width: iconSize,
-              height: iconSize,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              color: Colors.black87,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              height: 1.25,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
+    final results = await Future.wait([
+      spotReference.collection('sauveteursAffectes').get(),
+      territoryReference.collection('sauveteurs').get(),
+      territoryReference.collection('periodesSurveillance').get(),
+    ]).timeout(const Duration(seconds: 8));
 
-Widget _spotCsvValueLine(String rawValue) {
-  final value = rawValue.trim();
+    final assignedSnapshot = results[0] as QuerySnapshot<Map<String, dynamic>>;
 
-  if (value.isEmpty) {
-    return const SizedBox.shrink();
-  }
+    final sauveteursSnapshot =
+        results[1] as QuerySnapshot<Map<String, dynamic>>;
 
-  final parts = value.split(
-    RegExp(r'\s+'),
-  );
+    final periodsSnapshot = results[2] as QuerySnapshot<Map<String, dynamic>>;
 
-  final firstPart =
-      parts.isEmpty ? '' : parts.first;
-
-  final hasPictogram = firstPart.runes.any(
-    (rune) => rune >= 0x2300,
-  );
-
-  final displayText =
-      hasPictogram && parts.length > 1
-          ? parts.skip(1).join(' ')
-          : value;
-
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 30,
-          child: Text(
-            hasPictogram ? firstPart : '•',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 18,
-              height: 1.1,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            displayText,
-            style: const TextStyle(
-              color: Colors.black87,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              height: 1.25,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _spotLabelValueLine(String label) {
-  final iconPath =
-      _superAdminLabelIconPaths[label];
-
-  final displayName =
-      _superAdminLabelDisplayNames[label] ??
-      label;
-
-  if (iconPath == null) {
-    return _spotCsvValueLine(displayName);
-  }
-
-  return _spotAssetValueLine(
-    assetPath: iconPath,
-    text: displayName,
-    iconSize: 22,
-  );
-}
-
-String _periodHour(dynamic value) {
-  final raw = _cleanText(value);
-
-  if (raw.isEmpty) {
-    return '';
-  }
-
-  return raw.replaceFirst(':', 'h');
-}
-
-String _periodDescription(
-  Map<String, dynamic> period,
-) {
-  final name = _cleanText(
-    period['name'] ??
-        period['nom'] ??
-        period['_docId'],
-  );
-
-  final start = period['startDate'];
-  final end = period['endDate'];
-
-  final startHour =
-      _periodHour(period['startHour']);
-
-  final endHour =
-      _periodHour(period['endHour']);
-
-  final lines = <String>[];
-
-  if (name.isNotEmpty) {
-    lines.add(name.toUpperCase());
-  }
-
-  if (start != null || end != null) {
-    lines.add(
-      'DU ${_formatDate(start)} AU ${_formatDate(end)}',
-    );
-  }
-
-  if (startHour.isNotEmpty &&
-      endHour.isNotEmpty) {
-    lines.add(
-      'DE $startHour À $endHour',
-    );
-  }
-
-  return lines.join('\n');
-}
-
-String _spotSupervisionKey(
-  Map<String, dynamic> spot,
-) {
-  final territoireId = _cleanText(
-    spot['territoireId'],
-  );
-
-  final spotId = _cleanText(
-    spot['_docId'] ??
-        spot['idSphot'],
-  );
-
-  return '$territoireId::$spotId';
-}
-
-Future<Map<String, dynamic>>
-    _spotSupervisionFuture(
-  Map<String, dynamic> spot,
-) {
-  final key = _spotSupervisionKey(
-    spot,
-  );
-
-  return _spotSupervisionFutures.putIfAbsent(
-    key,
-    () => _loadSpotSupervision(
-      spot,
-    ),
-  );
-}
-
-Future<Map<String, dynamic>> _loadSpotSupervision(
-  Map<String, dynamic> spot,
-) async {
-  final territoireId = _cleanText(
-    spot['territoireId'],
-  );
-
-  final spotDocId = _cleanText(
-    spot['_docId'] ??
-        spot['idSphot'],
-  );
-
-  // SOURCE UNIQUE DES PÉRIODES :
-  // celles réellement attribuées au SPHOT.
-  final periodLabels = _splitSphotValues(
-    spot['periodesSurveillance'],
-  );
-
-  if (territoireId.isEmpty ||
-      spotDocId.isEmpty) {
-    return {
-      'periodLabels': periodLabels,
-      'sauveteurs':
-          <Map<String, dynamic>>[],
+    final sauveteursById = <String, Map<String, dynamic>>{
+      for (final document in sauveteursSnapshot.docs)
+        document.id: <String, dynamic>{
+          ...document.data(),
+          '_docId': document.id,
+        },
     };
-  }
 
-  final sauveteursSnapshot =
-      await FirebaseFirestore.instance
-          .collection('territoires')
-          .doc(territoireId)
-          .collection('spots')
-          .doc(spotDocId)
-          .collection('sauveteursAffectes')
-          .get()
-          .timeout(
-            const Duration(seconds: 8),
-          );
-
-  final sauveteurs =
-      sauveteursSnapshot.docs.map((doc) {
-    return <String, dynamic>{
-      ...doc.data(),
-      '_docId': doc.id,
+    final periodsById = <String, Map<String, dynamic>>{
+      for (final document in periodsSnapshot.docs)
+        document.id: <String, dynamic>{
+          ...document.data(),
+          '_docId': document.id,
+        },
     };
-  }).toList();
 
-  return {
-    'periodLabels': periodLabels,
-    'sauveteurs': sauveteurs,
-  };
-}
+    final sauveteurs = assignedSnapshot.docs.map((document) {
+      final assignedData = document.data();
 
-int _sauveteurRolePriority(
-  Map<String, dynamic> sauveteur,
-) {
-  final fonctions = _splitSphotValues(
-    sauveteur['fonctions'],
-  ).map(_normalizeType).toList();
+      final sauveteurId = _cleanText(
+        assignedData['sauveteurId'] ?? document.id,
+      );
 
-  if (fonctions.any(
-    (fonction) =>
-        fonction == 'CHEF DE POSTE',
-  )) {
-    return 0;
+      final fullData = sauveteursById[sauveteurId] ?? <String, dynamic>{};
+
+      return <String, dynamic>{
+        ...fullData,
+        ...assignedData,
+        '_docId': sauveteurId,
+      };
+    }).toList();
+
+    return {'sauveteurs': sauveteurs, 'periodsById': periodsById};
   }
 
-  if (fonctions.any(
-    (fonction) =>
-        fonction.contains(
-          'ADJOINT CHEF DE POSTE',
-        ),
-  )) {
-    return 1;
+  int _sauveteurRolePriority(Map<String, dynamic> sauveteur) {
+    final fonctions = _splitSphotValues(
+      sauveteur['fonctions'],
+    ).map(_normalizeType).toList();
+
+    if (fonctions.any((fonction) => fonction == 'CHEF DE POSTE')) {
+      return 0;
+    }
+
+    if (fonctions.any(
+      (fonction) => fonction.contains('ADJOINT CHEF DE POSTE'),
+    )) {
+      return 1;
+    }
+
+    if (fonctions.any((fonction) => fonction.contains('SAUVETEUR'))) {
+      return 2;
+    }
+
+    return 3;
   }
 
-  if (fonctions.any(
-    (fonction) =>
-        fonction.contains('SAUVETEUR'),
-  )) {
-    return 2;
+  String _sauveteurRoleLabel(Map<String, dynamic> sauveteur) {
+    final fonctions = _splitSphotValues(sauveteur['fonctions']);
+
+    final normalized = fonctions.map(_normalizeType).toList();
+
+    if (normalized.any((fonction) => fonction == 'CHEF DE POSTE')) {
+      return 'CHEF DE POSTE';
+    }
+
+    if (normalized.any(
+      (fonction) => fonction.contains('ADJOINT CHEF DE POSTE'),
+    )) {
+      return 'ADJOINT CHEF DE POSTE';
+    }
+
+    if (normalized.any((fonction) => fonction.contains('SAUVETEUR'))) {
+      return 'SAUVETEUR';
+    }
+
+    return fonctions.isEmpty ? 'SAUVETEUR' : fonctions.first;
   }
 
-  return 3;
-}
+  String _formatAssignedPeriodLabel(String value) {
+    final raw = value.trim();
 
-String _sauveteurRoleLabel(
-  Map<String, dynamic> sauveteur,
-) {
-  final fonctions = _splitSphotValues(
-    sauveteur['fonctions'],
-  );
+    if (raw.isEmpty) {
+      return '';
+    }
 
-  final normalized =
-      fonctions.map(_normalizeType).toList();
-
-  if (normalized.any(
-    (fonction) =>
-        fonction == 'CHEF DE POSTE',
-  )) {
-    return 'CHEF DE POSTE';
-  }
-
-  if (normalized.any(
-    (fonction) =>
-        fonction.contains(
-          'ADJOINT CHEF DE POSTE',
-        ),
-  )) {
-    return 'ADJOINT CHEF DE POSTE';
-  }
-
-  if (normalized.any(
-    (fonction) =>
-        fonction.contains('SAUVETEUR'),
-  )) {
-    return 'SAUVETEUR';
-  }
-
-  return fonctions.isEmpty
-      ? 'SAUVETEUR'
-      : fonctions.first;
-}
-
-String _formatAssignedPeriodLabel(
-  String value,
-) {
-  final raw = value.trim();
-
-  if (raw.isEmpty) {
-    return '';
-  }
-
-  final parts = raw
-      .split(' — ')
-      .map((part) => part.trim())
-      .where((part) => part.isNotEmpty)
-      .toList();
-
-  if (parts.isEmpty) {
-    return raw;
-  }
-
-  return parts.join('\n');
-}
-
-Widget _buildSpotSupervisionSection(
-  Map<String, dynamic> spot,
-) {
-  return FutureBuilder<Map<String, dynamic>>(
-    future: _spotSupervisionFuture(spot),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState ==
-          ConnectionState.waiting) {
-        return const Padding(
-          padding: EdgeInsets.symmetric(
-            vertical: 20,
-          ),
-          child: Center(
-            child: SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-              ),
-            ),
-          ),
-        );
-      }
-
-if (snapshot.hasError) {
-  debugPrint(
-    'ERREUR CHARGEMENT SURVEILLANCE : '
-    '${snapshot.error}',
-  );
-
-  return Padding(
-    padding: const EdgeInsets.symmetric(
-      vertical: 12,
-    ),
-    child: Text(
-      'Impossible de charger '
-      'l’équipe de surveillance.',
-      style: TextStyle(
-        color: Colors.red.shade700,
-        fontSize: 12.5,
-        fontWeight: FontWeight.w700,
-      ),
-    ),
-  );
-}
-
-      final data =
-          snapshot.data ??
-          <String, dynamic>{};
-
-      final periodLabels =
-    List<String>.from(
-  data['periodLabels'] ?? const [],
-);
-
-final sauveteurs =
-    List<Map<String, dynamic>>.from(
-  data['sauveteurs'] ?? const [],
-);
-
-      // ==================================================
-      // CLASSEMENT HIÉRARCHIQUE
-      // 1 - CHEF DE POSTE
-      // 2 - ADJOINT CHEF DE POSTE
-      // 3 - SAUVETEUR
-      // ==================================================
-      sauveteurs.sort((a, b) {
-        final rankA =
-            _sauveteurRolePriority(a);
-
-        final rankB =
-            _sauveteurRolePriority(b);
-
-        if (rankA != rankB) {
-          return rankA.compareTo(rankB);
-        }
-
-        final nomA =
-            '${_cleanText(a['nom'])} '
-            '${_cleanText(a['prenom'])}'
-                .toUpperCase();
-
-        final nomB =
-            '${_cleanText(b['nom'])} '
-            '${_cleanText(b['prenom'])}'
-                .toUpperCase();
-
-        return nomA.compareTo(nomB);
-      });
-
-      // Les périodes sont actuellement enregistrées
-      // sur le SPHOT et non individuellement
-      // sur chaque sauveteur.
-      final spotPeriodDescriptions =
-    periodLabels
-        .map(_formatAssignedPeriodLabel)
-        .where(
-          (value) =>
-              value.trim().isNotEmpty,
-        )
+    final parts = raw
+        .split(' — ')
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
         .toList();
 
-      return Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-        children: [
-          _spotPanelSectionTitle(
-            'ÉQUIPE DE SURVEILLANCE',
-          ),
+    if (parts.isEmpty) {
+      return raw;
+    }
 
-          if (sauveteurs.isEmpty)
-            const Text(
-              'Aucun sauveteur affecté à ce poste.',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
+    return parts.join('\n');
+  }
+
+  Widget _buildSpotSupervisionSection(Map<String, dynamic> spot) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _spotSupervisionFuture(spot),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
-            )
-          else
-            ...sauveteurs.map((sauveteur) {
-              final nom = _cleanText(
-                sauveteur['nom'],
-              ).toUpperCase();
+            ),
+          );
+        }
 
-              final prenom = _cleanText(
-                sauveteur['prenom'],
-              );
+        if (snapshot.hasError) {
+          debugPrint(
+            'ERREUR CHARGEMENT SURVEILLANCE : '
+            '${snapshot.error}',
+          );
 
-              final identity = [
-                prenom,
-                nom,
-              ].where(
-                (value) => value.isNotEmpty,
-              ).join(' ');
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              'Impossible de charger '
+              'l’équipe de surveillance.',
+              style: TextStyle(
+                color: Colors.red.shade700,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          );
+        }
 
-              final fonctions =
-                  _splitSphotValues(
-                sauveteur['fonctions'],
-              );
+        final data = snapshot.data ?? <String, dynamic>{};
 
-              final role =
-                  _sauveteurRoleLabel(
-                sauveteur,
-              );
+        final sauveteurs = List<Map<String, dynamic>>.from(
+          data['sauveteurs'] ?? const [],
+        );
 
-              final priority =
-                  _sauveteurRolePriority(
-                sauveteur,
-              );
+        final rawPeriodsById = data['periodsById'];
 
-              final Color roleColor;
+        final periodsById = <String, Map<String, dynamic>>{};
 
-              switch (priority) {
-                case 0:
-                  roleColor =
-                      const Color(0xFFDC2626);
-                  break;
+        if (rawPeriodsById is Map) {
+          rawPeriodsById.forEach((key, value) {
+            if (value is Map) {
+              periodsById[key.toString()] = Map<String, dynamic>.from(value);
+            }
+          });
+        }
 
-                case 1:
-                  roleColor =
-                      const Color(0xFFF59E0B);
-                  break;
+        sauveteurs.sort((a, b) {
+          final rankA = _sauveteurRolePriority(a);
 
-                default:
-                  roleColor = adminColor;
-              }
+          final rankB = _sauveteurRolePriority(b);
 
-              // Les périodes affichées sont celles
-// attribuées au poste de secours.
-final displayedPeriods =
-    List<String>.from(
-  spotPeriodDescriptions,
-);
+          if (rankA != rankB) {
+            return rankA.compareTo(rankB);
+          }
 
-return Container(
-                width: double.infinity,
-                margin:
-                    const EdgeInsets.only(
-                  bottom: 12,
-                ),
-                padding:
-                    const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color:
-                      roleColor.withOpacity(
-                    0.05,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(12),
-                  border: Border.all(
-                    color:
-                        roleColor.withOpacity(
-                      0.35,
-                    ),
-                    width: 1.2,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.center,
-                      children: [
-                        Icon(
-                          priority == 0
-                              ? Icons
-                                  .supervisor_account_rounded
-                              : priority == 1
-                                  ? Icons
-                                      .person_pin_rounded
-                                  : Icons
-                                      .person_rounded,
-                          color: roleColor,
-                          size: 22,
-                        ),
+          final nameA =
+              '${_cleanText(a['prenom'])} '
+                      '${_cleanText(a['nom'])}'
+                  .toUpperCase();
 
-                        const SizedBox(
-                          width: 8,
-                        ),
+          final nameB =
+              '${_cleanText(b['prenom'])} '
+                      '${_cleanText(b['nom'])}'
+                  .toUpperCase();
 
-                        Expanded(
-                          child: Text(
-                            identity.isEmpty
-                                ? 'Sauveteur'
-                                : identity,
-                            style: TextStyle(
-                              color: roleColor,
-                              fontSize: 14,
-                              fontWeight:
-                                  FontWeight
-                                      .w900,
-                            ),
+          return nameA.compareTo(nameB);
+        });
+
+        final idSphot = _cleanText(spot['idSphot'] ?? spot['_docId']);
+
+        final spotName = _spotName(spot);
+
+        final spotDisplayName = idSphot.isEmpty
+            ? spotName
+            : '$idSphot - $spotName';
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _spotPanelSectionTitle('ÉQUIPE DE SURVEILLANCE'),
+
+            _spotPanelBox(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const AdaptiveAssetImage(
+                        'data/icons/fire_red_icon.svg',
+                        width: 34,
+                        height: 34,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                      ),
+
+                      const SizedBox(width: 9),
+
+                      Expanded(
+                        child: Text(
+                          spotDisplayName,
+                          style: const TextStyle(
+                            color: adminColor,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
                           ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 7),
-
-                    Container(
-                      padding:
-                          const EdgeInsets
-                              .symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration:
-                          BoxDecoration(
-                        color: roleColor
-                            .withOpacity(
-                          0.10,
-                        ),
-                        borderRadius:
-                            BorderRadius
-                                .circular(6),
-                      ),
-                      child: Text(
-                        role,
-                        style: TextStyle(
-                          color: roleColor,
-                          fontSize: 11.5,
-                          fontWeight:
-                              FontWeight.w900,
-                        ),
-                      ),
-                    ),
-
-                    if (fonctions.length >
-                        1) ...[
-                      const SizedBox(
-                        height: 7,
-                      ),
-                      Text(
-                        'Fonctions : '
-                        '${fonctions.join(' • ')}',
-                        style:
-                            const TextStyle(
-                          color:
-                              Colors.black87,
-                          fontSize: 12.5,
-                          fontWeight:
-                              FontWeight.w700,
                         ),
                       ),
                     ],
+                  ),
 
-                    const SizedBox(height: 9),
+                  const SizedBox(height: 12),
 
-                    const Text(
-                      'PÉRIODE(S)',
-                      style: TextStyle(
-                        color: adminColor,
-                        fontSize: 11.5,
-                        fontWeight:
-                            FontWeight.w900,
-                      ),
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    if (displayedPeriods
-                        .isEmpty)
-                      const Text(
-                        'Aucune période renseignée.',
-                        style: TextStyle(
-                          color:
-                              Colors.black54,
-                          fontSize: 12,
-                          fontWeight:
-                              FontWeight.w600,
-                        ),
-                      )
-                    else
-                      ...displayedPeriods.map(
-                        (period) => Padding(
-                          padding:
-                              const EdgeInsets
-                                  .only(
-                            bottom: 5,
-                          ),
-                          child: Text(
-                            '• $period',
-                            style:
-                                const TextStyle(
-                              color:
-                                  Colors.black87,
-                              fontSize: 12,
-                              fontWeight:
-                                  FontWeight
-                                      .w600,
-                              height: 1.3,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            }),
-        ],
-      );
-    },
-  );
-}
-
-  Widget _buildSpotDetailPanel() {
-  final spot = _selectedSpot;
-
-  if (spot == null) {
-    return const SizedBox.shrink();
-  }
-
-  final color = _spotTypeColor(spot);
-
-  final name = _spotName(spot);
-
-  final idSphot = _cleanText(
-    spot['idSphot'] ??
-        spot['_docId'] ??
-        'Non renseigné',
-  );
-
-  final type =
-      _spotTypeDisplayName(spot);
-
-  final equipments =
-      _splitSphotValues(
-    spot['equipement'],
-  );
-
-  final labels =
-      _splitSphotValues(
-    spot['labelSphot'],
-  );
-
-  final ville = _cleanText(
-    spot['ville'],
-  );
-
-  final departement = _cleanText(
-    spot['departement'],
-  );
-
-  final region = _cleanText(
-    spot['region'],
-  );
-
-  final pays = _cleanText(
-    spot['pays'],
-  );
-
-  final isValidated =
-      spot['sphotValide'] == true;
-
-  final isRescueStation =
-      _normalizeType(
-        _cleanText(spot['typeSphot']),
-      ).contains(
-        'POSTE DE SECOURS',
-      );
-
-  final admin =
-      _adminForSpot(spot);
-
-  final profileValue =
-      admin?['profile'];
-
-  final profile =
-      profileValue is Map
-          ? Map<String, dynamic>.from(
-              profileValue,
-            )
-          : <String, dynamic>{};
-
-  final adminNom = _cleanText(
-    profile['nom'] ??
-        profile['nomAffiche'] ??
-        admin?['nomResponsable'] ??
-        admin?['nom'],
-  );
-
-  final adminPrenom = _cleanText(
-    profile['prenom'] ??
-        profile['prenomAffiche'] ??
-        admin?['prenomResponsable'] ??
-        admin?['prenom'],
-  );
-
-  final adminIdentity = [
-    adminPrenom,
-    adminNom.toUpperCase(),
-  ].where(
-    (value) => value.isNotEmpty,
-  ).join(' ');
-
-  final adminEmail = _cleanText(
-    profile['email'] ??
-        admin?['email'],
-  );
-
-  final adminTelephone = _cleanText(
-    profile['telephone'] ??
-        admin?['telephone'],
-  );
-
-  return Container(
-    width: 445,
-    decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.98),
-      border: Border(
-        left: BorderSide(
-          color: color.withOpacity(0.45),
-          width: 1.5,
-        ),
-      ),
-    ),
-    child: SafeArea(
-      child: SingleChildScrollView(
-        padding:
-            const EdgeInsets.fromLTRB(
-          22,
-          18,
-          22,
-          24,
-        ),
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.center,
-              children: [
-                AdaptiveAssetImage(
-                  _getMarkerIconPath(spot),
-                  width: 38,
-                  height: 38,
-                  fit: BoxFit.contain,
-                  filterQuality:
-                      FilterQuality.high,
-                  errorBuilder:
-                      (_, __, ___) {
-                    return Icon(
-                      Icons.place,
-                      color: color,
-                      size: 36,
-                    );
-                  },
-                ),
-
-                const SizedBox(width: 10),
-
-                Expanded(
-                  child: Text(
-                    name,
+                  const Text(
+                    'SAUVETEURS AFFECTÉS',
                     style: TextStyle(
-                      color: color,
-                      fontSize: 20,
-                      fontWeight:
-                          FontWeight.w900,
-                      height: 1.1,
+                      color: Color(0xFFDC2626),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                ),
 
-                IconButton(
-                  tooltip: 'Fermer',
-                  onPressed: () {
-                    setState(() {
-                      _selectedSpot = null;
-                    });
-                  },
-                  icon: const Icon(
-                    Icons.close_rounded,
+                  const SizedBox(height: 7),
+
+                  if (sauveteurs.isEmpty)
+                    const Text(
+                      'Aucun sauveteur actuellement affecté.',
+                      style: TextStyle(
+                        color: adminColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    )
+                  else
+                    ...sauveteurs.map((sauveteur) {
+                      final prenom = _cleanText(sauveteur['prenom']);
+
+                      final nom = _cleanText(sauveteur['nom']).toUpperCase();
+
+                      final identity = [
+                        prenom,
+                        nom,
+                      ].where((value) => value.isNotEmpty).join(' ');
+
+                      final role = _sauveteurRoleLabel(sauveteur);
+
+                      final rawPeriodIds = sauveteur['periodesSurveillance'];
+
+                      final periodIds = rawPeriodIds is Iterable
+                          ? rawPeriodIds
+                                .map((value) => _cleanText(value))
+                                .where((value) => value.isNotEmpty)
+                                .toList()
+                          : <String>[];
+
+                      final assignedPeriods = periodIds
+                          .map((periodId) => periodsById[periodId])
+                          .whereType<Map<String, dynamic>>()
+                          .toList();
+
+                      assignedPeriods.sort((first, second) {
+                        final firstDate = first['startDate'];
+
+                        final secondDate = second['startDate'];
+
+                        if (firstDate is Timestamp && secondDate is Timestamp) {
+                          return firstDate.compareTo(secondDate);
+                        }
+
+                        return 0;
+                      });
+
+                      final periodTitles = assignedPeriods
+                          .map(
+                            (period) => _cleanText(
+                              period['name'] ?? 'PÉRIODE',
+                            ).toUpperCase(),
+                          )
+                          .where((value) => value.isNotEmpty)
+                          .toList();
+
+                      return Padding(
+                        padding: const EdgeInsets.only(left: 12, bottom: 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '• ${identity.isEmpty ? 'Sauveteur' : identity}',
+                              style: const TextStyle(
+                                color: adminColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+
+                            const SizedBox(height: 2),
+
+                            Padding(
+                              padding: const EdgeInsets.only(left: 12),
+                              child: Text(
+                                role,
+                                style: const TextStyle(
+                                  color: adminColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+
+                            if (periodTitles.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+
+                              ...periodTitles.map(
+                                (title) => Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: 12,
+                                    top: 1,
+                                  ),
+                                  child: Text(
+                                    title,
+                                    style: const TextStyle(
+                                      color: adminColor,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      height: 1.25,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    }),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSpotDetailPanel() {
+    final spot = _selectedSpot;
+
+    if (spot == null) {
+      return const SizedBox.shrink();
+    }
+
+    final color = _spotTypeColor(spot);
+
+    final name = _spotName(spot);
+
+    final idSphot = _cleanText(
+      spot['idSphot'] ?? spot['_docId'] ?? 'Non renseigné',
+    );
+
+    final spotDisplayName = idSphot.isEmpty ? name : '$idSphot - $name';
+
+    final type = _spotTypeDisplayName(spot);
+
+    final equipments = _splitSphotValues(spot['equipement']);
+
+    final labels = _splitSphotValues(spot['labelSphot']);
+
+    final ville = _cleanText(spot['ville']);
+
+    final departement = _cleanText(spot['departement']);
+
+    final region = _cleanText(spot['region']);
+
+    final pays = _cleanText(spot['pays']);
+
+    final isValidated = spot['sphotValide'] == true;
+
+    final isRescueStation = _normalizeType(
+      _cleanText(spot['typeSphot']),
+    ).contains('POSTE DE SECOURS');
+
+    final admin = _adminForSpot(spot);
+
+    final profileValue = admin?['profile'];
+
+    final profile = profileValue is Map
+        ? Map<String, dynamic>.from(profileValue)
+        : <String, dynamic>{};
+
+    final adminNom = _cleanText(
+      profile['nom'] ??
+          profile['nomAffiche'] ??
+          admin?['nomResponsable'] ??
+          admin?['nom'],
+    );
+
+    final adminPrenom = _cleanText(
+      profile['prenom'] ??
+          profile['prenomAffiche'] ??
+          admin?['prenomResponsable'] ??
+          admin?['prenom'],
+    );
+
+    final adminIdentity = [
+      adminPrenom,
+      adminNom.toUpperCase(),
+    ].where((value) => value.isNotEmpty).join(' ');
+
+    final adminEmail = _cleanText(profile['email'] ?? admin?['email']);
+
+    final adminTelephone = _cleanText(
+      profile['telephone'] ?? admin?['telephone'],
+    );
+
+    return Container(
+      width: 445,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.98),
+        border: Border(
+          left: BorderSide(color: color.withOpacity(0.45), width: 1.5),
+        ),
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  AdaptiveAssetImage(
+                    _getMarkerIconPath(spot),
+                    width: 38,
+                    height: 38,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (_, __, ___) {
+                      return Icon(Icons.place, color: color, size: 36);
+                    },
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  Expanded(
+                    child: Text(
+                      spotDisplayName,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+
+                  IconButton(
+                    tooltip: 'Fermer',
+                    onPressed: () {
+                      setState(() {
+                        _selectedSpot = null;
+                      });
+                    },
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              _spotPanelSectionTitle('TYPE'),
+
+              _spotPanelBox(
+                child: _spotAssetValueLine(
+                  assetPath: isRescueStation
+                      ? _rescueStationTypeAsset
+                      : _getMarkerIconPath(spot),
+                  text: type,
+                  iconSize: isRescueStation ? 30 : 24,
+                ),
+              ),
+
+              if (equipments.isNotEmpty) ...[
+                _spotPanelSectionTitle('ÉQUIPEMENTS'),
+
+                _spotPanelBox(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: equipments.map(_spotCsvValueLine).toList(),
                   ),
                 ),
               ],
-            ),
 
-            const SizedBox(height: 18),
+              if (labels.isNotEmpty) ...[
+                _spotPanelSectionTitle('LABELS'),
 
-            _spotVerticalField(
-              'ID SPHOT',
-              idSphot,
-            ),
+                _spotPanelBox(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: labels.map(_spotLabelValueLine).toList(),
+                  ),
+                ),
+              ],
 
-            _spotPanelSectionTitle(
-              'TYPE',
-            ),
+              _spotPanelSectionTitle('LOCALISATION'),
 
-            _spotAssetValueLine(
-  assetPath: isRescueStation
-      ? _rescueStationTypeAsset
-      : _getMarkerIconPath(spot),
-  text: type,
-  iconSize: isRescueStation ? 30 : 24,
-),
-
-            if (equipments.isNotEmpty) ...[
-              _spotPanelSectionTitle(
-                'ÉQUIPEMENTS',
+              _spotPanelBox(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _spotVerticalField('Ville', ville),
+                    _spotVerticalField('Département', departement),
+                    _spotVerticalField('Région', region),
+                    _spotVerticalField('Pays', pays),
+                  ],
+                ),
               ),
 
-              ...equipments.map(
-                _spotCsvValueLine,
+              if (isRescueStation) _buildSpotSupervisionSection(spot),
+
+              _spotPanelSectionTitle('ADMINISTRATION'),
+
+              _spotPanelBox(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _spotVerticalField(
+                      'Validation',
+                      isValidated ? 'Validé' : 'Non validé',
+                    ),
+                    _spotVerticalField(
+                      'Admin',
+                      adminIdentity.isEmpty ? 'Non renseigné' : adminIdentity,
+                    ),
+                    _spotVerticalField('Email', adminEmail),
+                    _spotVerticalField('Téléphone', adminTelephone),
+                  ],
+                ),
               ),
             ],
-
-            if (labels.isNotEmpty) ...[
-              _spotPanelSectionTitle(
-                'LABELS',
-              ),
-
-              ...labels.map(
-                _spotLabelValueLine,
-              ),
-            ],
-
-            _spotPanelSectionTitle(
-              'LOCALISATION',
-            ),
-
-            _spotVerticalField(
-              'Ville',
-              ville,
-            ),
-
-            _spotVerticalField(
-              'Département',
-              departement,
-            ),
-
-            _spotVerticalField(
-              'Région',
-              region,
-            ),
-
-            _spotVerticalField(
-              'Pays',
-              pays,
-            ),
-
-            if (isRescueStation)
-  _buildSpotSupervisionSection(
-    spot,
-  ),
-
-            _spotPanelSectionTitle(
-              'ADMINISTRATION',
-            ),
-
-            _spotVerticalField(
-              'Validation',
-              isValidated
-                  ? 'Validé'
-                  : 'Non validé',
-            ),
-
-            _spotVerticalField(
-              'Admin',
-              adminIdentity.isEmpty
-                  ? 'Non renseigné'
-                  : adminIdentity,
-            ),
-
-            _spotVerticalField(
-              'Email',
-              adminEmail,
-            ),
-
-            _spotVerticalField(
-              'Téléphone',
-              adminTelephone,
-            ),
-
-            
-          ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildAdvertiserDetailPanel() {
     final advertiser = _selectedAdvertiser;
@@ -4145,10 +3909,10 @@ return Container(
   }
 
   Future<void> _rejectAdminRequest(
-  Map<String, dynamic> adminData,
-  String rejectionReason,
-  List<String> fieldsToCorrect,
-) async {
+    Map<String, dynamic> adminData,
+    String rejectionReason,
+    List<String> fieldsToCorrect,
+  ) async {
     final requestId = _cleanText(adminData['requestId'] ?? adminData['uid']);
 
     if (requestId.isEmpty) {
@@ -4241,283 +4005,196 @@ return Container(
     });
   }
 
-  Future<void> _openAdminRejectionDialog(
-  Map<String, dynamic> adminData,
-) async {
-  const fieldGroups = <String, List<Map<String, String>>>{
-    'STRUCTURE': [
-      {
-        'value': 'structure.type',
-        'label': 'Type de structure',
-      },
-      {
-        'value': 'structure.nom',
-        'label': 'Nom de la structure',
-      },
-      {
-        'value': 'structure.siret',
-        'label': 'SIRET',
-      },
-      {
-        'value': 'structure.siren',
-        'label': 'SIREN',
-      },
-    ],
-    'RESPONSABLE': [
-      {
-        'value': 'profile.civilite',
-        'label': 'Civilité',
-      },
-      {
-        'value': 'profile.nomAffiche',
-        'label': 'Nom',
-      },
-      {
-        'value': 'profile.prenomAffiche',
-        'label': 'Prénom',
-      },
-      {
-        'value': 'profile.fonction',
-        'label': 'Fonction',
-      },
-      {
-        'value': 'profile.telephone',
-        'label': 'Téléphone',
-      },
-      {
-        'value': 'profile.email',
-        'label': 'Email',
-      },
-    ],
-    'TERRITOIRE': [
-      {
-        'value': 'territoire.pays',
-        'label': 'Pays',
-      },
-      {
-        'value': 'territoire.region',
-        'label': 'Région',
-      },
-      {
-        'value': 'territoire.departement',
-        'label': 'Département',
-      },
-      {
-        'value': 'territoire.ville',
-        'label': 'Commune',
-      },
-      {
-        'value': 'territoire.adresse',
-        'label': 'Adresse',
-      },
-      {
-        'value': 'territoire.codePostal',
-        'label': 'Code postal',
-      },
-    ],
-    'LIEU': [
-      {
-        'value': 'territoire.logoVille',
-        'label': 'Logo',
-      },
-      {
-        'value': 'territoire.siteInternetVille',
-        'label': 'Site internet',
-      },
-      {
-        'value': 'territoire.arretesMunicipaux',
-        'label': 'Réglementation / arrêtés',
-      },
-      {
-        'value': 'territoire.villeLat',
-        'label': 'Position sur la carte',
-      },
-      {
-        'value': 'territoire.villeLng',
-        'label': 'Position sur la carte',
-      },
-    ],
-  };
+  Future<void> _openAdminRejectionDialog(Map<String, dynamic> adminData) async {
+    const fieldGroups = <String, List<Map<String, String>>>{
+      'STRUCTURE': [
+        {'value': 'structure.type', 'label': 'Type de structure'},
+        {'value': 'structure.nom', 'label': 'Nom de la structure'},
+        {'value': 'structure.siret', 'label': 'SIRET'},
+        {'value': 'structure.siren', 'label': 'SIREN'},
+      ],
+      'RESPONSABLE': [
+        {'value': 'profile.civilite', 'label': 'Civilité'},
+        {'value': 'profile.nomAffiche', 'label': 'Nom'},
+        {'value': 'profile.prenomAffiche', 'label': 'Prénom'},
+        {'value': 'profile.fonction', 'label': 'Fonction'},
+        {'value': 'profile.telephone', 'label': 'Téléphone'},
+        {'value': 'profile.email', 'label': 'Email'},
+      ],
+      'TERRITOIRE': [
+        {'value': 'territoire.pays', 'label': 'Pays'},
+        {'value': 'territoire.region', 'label': 'Région'},
+        {'value': 'territoire.departement', 'label': 'Département'},
+        {'value': 'territoire.ville', 'label': 'Commune'},
+        {'value': 'territoire.adresse', 'label': 'Adresse'},
+        {'value': 'territoire.codePostal', 'label': 'Code postal'},
+      ],
+      'LIEU': [
+        {'value': 'territoire.logoVille', 'label': 'Logo'},
+        {'value': 'territoire.siteInternetVille', 'label': 'Site internet'},
+        {
+          'value': 'territoire.arretesMunicipaux',
+          'label': 'Réglementation / arrêtés',
+        },
+        {'value': 'territoire.villeLat', 'label': 'Position sur la carte'},
+        {'value': 'territoire.villeLng', 'label': 'Position sur la carte'},
+      ],
+    };
 
-  final result = await showDialog<Map<String, dynamic>>(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      String rejectionReason = '';
-      final selectedFields = <String>{};
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        String rejectionReason = '';
+        final selectedFields = <String>{};
 
-      return StatefulBuilder(
-        builder: (context, setDialogState) {
-          final canSubmit =
-              rejectionReason.trim().isNotEmpty &&
-              selectedFields.isNotEmpty;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final canSubmit =
+                rejectionReason.trim().isNotEmpty && selectedFields.isNotEmpty;
 
-          return AlertDialog(
-            title: const Text(
-              'DEMANDER UNE CORRECTION',
-              style: TextStyle(
-                color: redColor,
-                fontWeight: FontWeight.w900,
+            return AlertDialog(
+              title: const Text(
+                'DEMANDER UNE CORRECTION',
+                style: TextStyle(color: redColor, fontWeight: FontWeight.w900),
               ),
-            ),
-            content: SizedBox(
-              width: 560,
-              height: 620,
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Sélectionnez les informations '
-                      'que l’administrateur doit corriger.',
-                      style: TextStyle(
-                        color: adminColor,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    for (final group in fieldGroups.entries) ...[
-                      Text(
-                        group.key,
-                        style: const TextStyle(
-                          color: redColor,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
+              content: SizedBox(
+                width: 560,
+                height: 620,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Sélectionnez les informations '
+                        'que l’administrateur doit corriger.',
+                        style: TextStyle(
+                          color: adminColor,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 14),
 
-                      for (final field in group.value)
-                        CheckboxListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          value: selectedFields.contains(
-                            field['value'],
+                      for (final group in fieldGroups.entries) ...[
+                        Text(
+                          group.key,
+                          style: const TextStyle(
+                            color: redColor,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
                           ),
-                          activeColor: adminColor,
-                          title: Text(
-                            field['label']!,
-                            style: const TextStyle(
+                        ),
+                        const SizedBox(height: 4),
+
+                        for (final field in group.value)
+                          CheckboxListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            value: selectedFields.contains(field['value']),
+                            activeColor: adminColor,
+                            title: Text(
+                              field['label']!,
+                              style: const TextStyle(
+                                color: adminColor,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            onChanged: (checked) {
+                              setDialogState(() {
+                                if (checked == true) {
+                                  selectedFields.add(field['value']!);
+                                } else {
+                                  selectedFields.remove(field['value']!);
+                                }
+                              });
+                            },
+                          ),
+
+                        const SizedBox(height: 10),
+                      ],
+
+                      TextField(
+                        minLines: 4,
+                        maxLines: 8,
+                        onChanged: (value) {
+                          rejectionReason = value.trim();
+                          setDialogState(() {});
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Message adressé au demandeur',
+                          hintText:
+                              'Expliquez précisément la correction attendue.',
+                          alignLabelWithHint: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
                               color: adminColor,
-                              fontWeight: FontWeight.w700,
+                              width: 1.5,
                             ),
                           ),
-                          onChanged: (checked) {
-                            setDialogState(() {
-                              if (checked == true) {
-                                selectedFields.add(
-                                  field['value']!,
-                                );
-                              } else {
-                                selectedFields.remove(
-                                  field['value']!,
-                                );
-                              }
-                            });
-                          },
-                        ),
-
-                      const SizedBox(height: 10),
-                    ],
-
-                    TextField(
-                      minLines: 4,
-                      maxLines: 8,
-                      onChanged: (value) {
-                        rejectionReason = value.trim();
-                        setDialogState(() {});
-                      },
-                      decoration: InputDecoration(
-                        labelText:
-                            'Message adressé au demandeur',
-                        hintText:
-                            'Expliquez précisément la correction attendue.',
-                        alignLabelWithHint: true,
-                        border: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(14),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: adminColor,
-                            width: 1.5,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: redColor,
-                            width: 2,
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: redColor,
+                              width: 2,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                },
-                child: const Text('ANNULER'),
-              ),
-              ElevatedButton(
-                onPressed: canSubmit
-                    ? () {
-                        Navigator.of(dialogContext).pop({
-                          'reason': rejectionReason.trim(),
-                          'fieldsToCorrect':
-                              selectedFields.toList(),
-                        });
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: redColor,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor:
-                      Colors.grey.shade400,
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('ANNULER'),
                 ),
-                child: const Text(
-                  'ENVOYER LA DEMANDE DE CORRECTION',
+                ElevatedButton(
+                  onPressed: canSubmit
+                      ? () {
+                          Navigator.of(dialogContext).pop({
+                            'reason': rejectionReason.trim(),
+                            'fieldsToCorrect': selectedFields.toList(),
+                          });
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: redColor,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade400,
+                  ),
+                  child: const Text('ENVOYER LA DEMANDE DE CORRECTION'),
                 ),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
+              ],
+            );
+          },
+        );
+      },
+    );
 
-  if (!mounted || result == null) {
-    return;
+    if (!mounted || result == null) {
+      return;
+    }
+
+    final reason = (result['reason'] ?? '').toString().trim();
+
+    final fieldsToCorrect = ((result['fieldsToCorrect'] as List?) ?? const [])
+        .map((value) => value.toString())
+        .where((value) => value.isNotEmpty)
+        .toList();
+
+    if (reason.isEmpty || fieldsToCorrect.isEmpty) {
+      return;
+    }
+
+    await _rejectAdminRequest(adminData, reason, fieldsToCorrect);
   }
-
-  final reason =
-      (result['reason'] ?? '').toString().trim();
-
-  final fieldsToCorrect =
-      ((result['fieldsToCorrect'] as List?) ?? const [])
-          .map((value) => value.toString())
-          .where((value) => value.isNotEmpty)
-          .toList();
-
-  if (reason.isEmpty || fieldsToCorrect.isEmpty) {
-    return;
-  }
-
-  await _rejectAdminRequest(
-    adminData,
-    reason,
-    fieldsToCorrect,
-  );
-}
 
   Widget _buildAdminDetailPanel() {
     final admin = _selectedAdmin;
@@ -4744,9 +4421,7 @@ return Container(
                 ],
               ),
               const SizedBox(height: 10),
-              SuperAdminAdminWorkflowPanel(
-  adminData: admin,
-),
+              SuperAdminAdminWorkflowPanel(adminData: admin),
               const SizedBox(height: 18),
 
               if (rawStatus.toLowerCase() == 'pending')
@@ -5220,8 +4895,9 @@ return Container(
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Theme(
-                data: Theme.of(context)
-                    .copyWith(dividerColor: Colors.transparent),
+                data: Theme.of(
+                  context,
+                ).copyWith(dividerColor: Colors.transparent),
                 child: ExpansionTile(
                   shape: const Border(),
                   collapsedShape: const Border(),
@@ -5826,8 +5502,9 @@ return Container(
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erreur Firebase : $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erreur Firebase : $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -6580,189 +6257,152 @@ return Container(
   }
 
   void _centerOnFirstCurrentResult() {
-  final results = <Map<String, dynamic>>[];
+    final results = <Map<String, dynamic>>[];
 
-  // =========================
-  // SPHOTS
-  // =========================
-  for (final doc in _latestSpotDocs) {
-    final data = <String, dynamic>{
-      ...doc.data(),
-      '_docId': doc.id,
-    };
+    // =========================
+    // SPHOTS
+    // =========================
+    for (final doc in _latestSpotDocs) {
+      final data = <String, dynamic>{...doc.data(), '_docId': doc.id};
 
-    final lat = _toDouble(data['sphotLat']);
-    final lng = _toDouble(data['sphotLng']);
+      final lat = _toDouble(data['sphotLat']);
+      final lng = _toDouble(data['sphotLng']);
 
-    final score = _searchScore([
-      data['nomSphot'],
-      data['nomSecours'],
-      data['typeSphot'],
-      data['natureSphot'],
-      data['labelSphot'],
-      data['ville'],
-      data['departement'],
-    ]);
+      final score = _searchScore([
+        data['nomSphot'],
+        data['nomSecours'],
+        data['typeSphot'],
+        data['natureSphot'],
+        data['labelSphot'],
+        data['ville'],
+        data['departement'],
+      ]);
 
-    if (lat != 0 && lng != 0 && score > 0) {
-      results.add({
-        'type': 'spot',
-        'score': score,
-        'data': data,
-        'lat': lat,
-        'lng': lng,
-        'zoom': 16.0,
-      });
-    }
-  }
-
-  // =========================
-  // ADMINS
-  // =========================
-  for (final doc in _latestAdminDocs) {
-    final data = doc.data();
-
-    final territoire = Map<String, dynamic>.from(
-      data['territoire'] ?? {},
-    );
-
-    final structure = Map<String, dynamic>.from(
-      data['structure'] ?? {},
-    );
-
-    final profile = Map<String, dynamic>.from(
-      data['profile'] ?? {},
-    );
-
-    final lat = _toDouble(
-      territoire['villeLat'],
-    );
-
-    final lng = _toDouble(
-      territoire['villeLng'],
-    );
-
-    final score = _searchScore([
-      data['nomStructure'],
-      data['organisation'],
-      data['email'],
-      data['siret'],
-      data['nomResponsable'],
-      structure['nom'],
-      structure['siret'],
-      profile['email'],
-      profile['nomAffiche'],
-      territoire['ville'],
-      territoire['departement'],
-      territoire['region'],
-    ]);
-
-    if (lat != 0 && lng != 0 && score > 0) {
-      results.add({
-        'type': 'admin',
-        'score': score,
-        'data': data,
-        'lat': lat,
-        'lng': lng,
-        'zoom': 18.0,
-      });
-    }
-  }
-
-  // =========================
-  // ANNONCEURS
-  // =========================
-  for (final doc in _latestAdDocs) {
-    final data = <String, dynamic>{
-      ...doc.data(),
-      'id': doc.id,
-    };
-
-    final location = _advertiserLocation(
-      data,
-    );
-
-    if (location == null) {
-      continue;
+      if (lat != 0 && lng != 0 && score > 0) {
+        results.add({
+          'type': 'spot',
+          'score': score,
+          'data': data,
+          'lat': lat,
+          'lng': lng,
+          'zoom': 16.0,
+        });
+      }
     }
 
-    final score = _searchScore([
-      data['advertiserName'],
-      data['contactName'],
-      data['email'],
-      data['phone'],
-      data['siret'],
-      data['city'],
-      data['department'],
-      data['region'],
-      data['status'],
-      data['broadcastType'],
-      data['visibilityLabel'],
-      data['campaignTitle'],
-      data['companyName'],
-      data['businessName'],
-      data['organisation'],
-    ]);
+    // =========================
+    // ADMINS
+    // =========================
+    for (final doc in _latestAdminDocs) {
+      final data = doc.data();
 
-    if (score > 0) {
-      results.add({
-        'type': 'advertiser',
-        'score': score,
-        'data': data,
-        'lat': location.latitude,
-        'lng': location.longitude,
-        'zoom': 16.0,
-      });
+      final territoire = Map<String, dynamic>.from(data['territoire'] ?? {});
+
+      final structure = Map<String, dynamic>.from(data['structure'] ?? {});
+
+      final profile = Map<String, dynamic>.from(data['profile'] ?? {});
+
+      final lat = _toDouble(territoire['villeLat']);
+
+      final lng = _toDouble(territoire['villeLng']);
+
+      final score = _searchScore([
+        data['nomStructure'],
+        data['organisation'],
+        data['email'],
+        data['siret'],
+        data['nomResponsable'],
+        structure['nom'],
+        structure['siret'],
+        profile['email'],
+        profile['nomAffiche'],
+        territoire['ville'],
+        territoire['departement'],
+        territoire['region'],
+      ]);
+
+      if (lat != 0 && lng != 0 && score > 0) {
+        results.add({
+          'type': 'admin',
+          'score': score,
+          'data': data,
+          'lat': lat,
+          'lng': lng,
+          'zoom': 18.0,
+        });
+      }
     }
+
+    // =========================
+    // ANNONCEURS
+    // =========================
+    for (final doc in _latestAdDocs) {
+      final data = <String, dynamic>{...doc.data(), 'id': doc.id};
+
+      final location = _advertiserLocation(data);
+
+      if (location == null) {
+        continue;
+      }
+
+      final score = _searchScore([
+        data['advertiserName'],
+        data['contactName'],
+        data['email'],
+        data['phone'],
+        data['siret'],
+        data['city'],
+        data['department'],
+        data['region'],
+        data['status'],
+        data['broadcastType'],
+        data['visibilityLabel'],
+        data['campaignTitle'],
+        data['companyName'],
+        data['businessName'],
+        data['organisation'],
+      ]);
+
+      if (score > 0) {
+        results.add({
+          'type': 'advertiser',
+          'score': score,
+          'data': data,
+          'lat': location.latitude,
+          'lng': location.longitude,
+          'zoom': 16.0,
+        });
+      }
+    }
+
+    if (results.isEmpty) {
+      return;
+    }
+
+    results.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+
+    final best = results.first;
+
+    final type = best['type'];
+
+    final selectedData = Map<String, dynamic>.from(best['data']);
+
+    setState(() {
+      _selectedSpot = type == 'spot' ? selectedData : null;
+
+      _selectedAdmin = type == 'admin' ? selectedData : null;
+
+      _selectedAdvertiser = type == 'advertiser' ? selectedData : null;
+
+      _showPricingPanel = false;
+      _showLegalDocumentsPanel = false;
+    });
+
+    _mapController.move(
+      LatLng(best['lat'] as double, best['lng'] as double),
+      best['zoom'] as double,
+    );
   }
-
-  if (results.isEmpty) {
-    return;
-  }
-
-  results.sort(
-    (a, b) => (b['score'] as int).compareTo(
-      a['score'] as int,
-    ),
-  );
-
-  final best = results.first;
-
-  final type = best['type'];
-
-  final selectedData =
-      Map<String, dynamic>.from(
-    best['data'],
-  );
-
-  setState(() {
-    _selectedSpot =
-        type == 'spot'
-            ? selectedData
-            : null;
-
-    _selectedAdmin =
-        type == 'admin'
-            ? selectedData
-            : null;
-
-    _selectedAdvertiser =
-        type == 'advertiser'
-            ? selectedData
-            : null;
-
-    _showPricingPanel = false;
-    _showLegalDocumentsPanel = false;
-  });
-
-  _mapController.move(
-    LatLng(
-      best['lat'] as double,
-      best['lng'] as double,
-    ),
-    best['zoom'] as double,
-  );
-}
 
   Marker _buildAdminMarker(Map<String, dynamic> data) {
     final territoire = Map<String, dynamic>.from(data['territoire'] ?? {});
@@ -7067,13 +6707,11 @@ return Container(
                     });
 
                     final clusteredMarkers = <Marker>[
-  ...validSpots.map(
-    (doc) => _buildSpotMarker({
-      ...doc.data(),
-      '_docId': doc.id,
-    }),
-  ),
-];
+                      ...validSpots.map(
+                        (doc) =>
+                            _buildSpotMarker({...doc.data(), '_docId': doc.id}),
+                      ),
+                    ];
 
                     final advertiserMarkers = <Marker>[
                       ...validAdvertisers.map((doc) {
@@ -7105,32 +6743,34 @@ return Container(
                                   minZoom: 2,
                                   maxZoom: 18,
                                   onTap: (_, __) {
-  final lastSpotInteraction = _lastSpotMarkerInteraction;
+                                    final lastSpotInteraction =
+                                        _lastSpotMarkerInteraction;
 
-  // Si ce clic vient juste d'un marqueur SPHOT,
-  // on ne laisse pas la carte effacer la sélection.
-  if (lastSpotInteraction != null) {
-    final elapsed = DateTime.now().difference(
-      lastSpotInteraction,
-    );
+                                    // Si ce clic vient juste d'un marqueur SPHOT,
+                                    // on ne laisse pas la carte effacer la sélection.
+                                    if (lastSpotInteraction != null) {
+                                      final elapsed = DateTime.now().difference(
+                                        lastSpotInteraction,
+                                      );
 
-    if (elapsed < const Duration(milliseconds: 600)) {
-      return;
-    }
-  }
+                                      if (elapsed <
+                                          const Duration(milliseconds: 600)) {
+                                        return;
+                                      }
+                                    }
 
-  setState(() {
-    _selectedSpot = null;
-    _selectedAdmin = null;
-    _selectedAdvertiser = null;
+                                    setState(() {
+                                      _selectedSpot = null;
+                                      _selectedAdmin = null;
+                                      _selectedAdvertiser = null;
 
-    _showLegalDocumentsPanel = false;
-    _showPricingPanel = false;
+                                      _showLegalDocumentsPanel = false;
+                                      _showPricingPanel = false;
 
-    _selectedLegalDocument = null;
-    _selectedLegalChapter = null;
-  });
-},
+                                      _selectedLegalDocument = null;
+                                      _selectedLegalChapter = null;
+                                    });
+                                  },
                                   onPositionChanged: (_, __) {
                                     _mapMovementTimer?.cancel();
 
@@ -7306,11 +6946,8 @@ return Container(
   }
 }
 
-class _DashboardAdvertiserMarker
-    extends StatelessWidget {
-  const _DashboardAdvertiserMarker({
-    required this.name,
-  });
+class _DashboardAdvertiserMarker extends StatelessWidget {
+  const _DashboardAdvertiserMarker({required this.name});
 
   final String name;
 
@@ -7332,8 +6969,7 @@ class _DashboardAdvertiserMarker
                 width: 48,
                 height: 48,
                 fit: BoxFit.contain,
-                filterQuality:
-                    FilterQuality.high,
+                filterQuality: FilterQuality.high,
               ),
             ),
 
@@ -7345,19 +6981,14 @@ class _DashboardAdvertiserMarker
                 name,
                 textAlign: TextAlign.center,
                 maxLines: 2,
-                overflow:
-                    TextOverflow.ellipsis,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: Color(0xFF2E7D32),
                   fontSize: 12,
-                  fontWeight:
-                      FontWeight.w900,
+                  fontWeight: FontWeight.w900,
                   height: 1.05,
                   shadows: [
-                    Shadow(
-                      color: Colors.white,
-                      blurRadius: 4,
-                    ),
+                    Shadow(color: Colors.white, blurRadius: 4),
                     Shadow(
                       color: Colors.white,
                       blurRadius: 4,
@@ -7366,8 +6997,7 @@ class _DashboardAdvertiserMarker
                     Shadow(
                       color: Colors.white,
                       blurRadius: 4,
-                      offset:
-                          Offset(-1, -1),
+                      offset: Offset(-1, -1),
                     ),
                   ],
                 ),
@@ -7425,11 +7055,7 @@ class DashboardSpotMarker extends StatelessWidget {
                   fit: BoxFit.contain,
                   filterQuality: FilterQuality.high,
                   errorBuilder: (_, __, ___) {
-                    return Icon(
-                      Icons.place,
-                      color: typeColor,
-                      size: 38,
-                    );
+                    return Icon(Icons.place, color: typeColor, size: 38);
                   },
                 ),
               ),
@@ -7449,10 +7075,7 @@ class DashboardSpotMarker extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                     height: 1.05,
                     shadows: const [
-                      Shadow(
-                        color: Colors.white,
-                        blurRadius: 4,
-                      ),
+                      Shadow(color: Colors.white, blurRadius: 4),
                       Shadow(
                         color: Colors.white,
                         blurRadius: 4,
