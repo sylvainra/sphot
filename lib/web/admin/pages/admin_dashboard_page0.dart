@@ -1834,17 +1834,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         }
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Modification enregistrée.')),
-      );
     } catch (error) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Impossible d’enregistrer : $error')),
-      );
     }
   }
 
@@ -2072,17 +2066,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         }
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Référent administratif modifié.')),
-      );
     } catch (error) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Impossible d’enregistrer : $error')),
-      );
     }
   }
 
@@ -3509,12 +3497,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final uid = widget.adminUid.trim();
 
     if (uid.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Administrateur non identifié.'),
-          backgroundColor: redColor,
-        ),
-      );
       return;
     }
 
@@ -3577,12 +3559,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       onCompleted();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Votre demande d’essai gratuit a été envoyée.'),
-          backgroundColor: adminColor,
-        ),
-      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -3594,24 +3570,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       if (requestAlreadyExists) {
         onCompleted();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Une demande d’essai gratuit a déjà été enregistrée.',
-            ),
-            backgroundColor: pendingColor,
-          ),
-        );
 
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Envoi de la demande impossible : $error'),
-          backgroundColor: redColor,
-        ),
-      );
     }
   }
 
@@ -3956,15 +3918,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   Future<void> _openTrialSummaryDialog() async {
     if (_resolvedTerritoireId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Le territoire doit être chargé avant '
-            'd’ouvrir le récapitulatif.',
-          ),
-          backgroundColor: redColor,
-        ),
-      );
       return;
     }
 
@@ -4002,15 +3955,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   void _openTrialSummaryPanel() {
     if (_resolvedTerritoireId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Le territoire doit être chargé avant '
-            'd’ouvrir le récapitulatif.',
-          ),
-          backgroundColor: redColor,
-        ),
-      );
       return;
     }
 
@@ -4044,14 +3988,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   Future<void> _openSphotAdminSummaryPage() async {
     if (_resolvedTerritoireId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Le territoire doit être chargé avant d’ouvrir la fiche récapitulative.',
-          ),
-          backgroundColor: redColor,
-        ),
-      );
       return;
     }
 
@@ -4066,12 +4002,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ouverture de la fiche récapitulative impossible : $error'),
-          backgroundColor: redColor,
-        ),
-      );
     }
   }
 
@@ -5286,14 +5216,6 @@ _buildCommercialSection(
 
   void _openSurveillancePeriodsPanel() {
     if (_resolvedTerritoireId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Le territoire doit être chargé avant de gérer les périodes.',
-          ),
-          backgroundColor: redColor,
-        ),
-      );
       return;
     }
 
@@ -5375,27 +5297,11 @@ _buildCommercialSection(
         });
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            period == null
-                ? 'Période enregistrée avec succès.'
-                : 'Période modifiée avec succès.',
-          ),
-          backgroundColor: adminColor,
-        ),
-      );
     } catch (error) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Enregistrement impossible : $error'),
-          backgroundColor: redColor,
-        ),
-      );
     }
   }
 
@@ -5450,23 +5356,11 @@ _buildCommercialSection(
         });
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Période supprimée.'),
-          backgroundColor: adminColor,
-        ),
-      );
     } catch (error) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Suppression impossible : $error'),
-          backgroundColor: redColor,
-        ),
-      );
     }
   }
 
@@ -6078,14 +5972,6 @@ _sphotWebcamUrlController.clear();
         : widget.territoireId.trim();
 
     if (territoireId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Le territoire doit être chargé avant de créer un sauveteur.',
-          ),
-          backgroundColor: redColor,
-        ),
-      );
       return;
     }
 
@@ -6111,14 +5997,6 @@ _sphotWebcamUrlController.clear();
 
   void _openSauveteursManagementPanel() {
     if (_resolvedTerritoireId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Le territoire doit être chargé avant de gérer les sauveteurs.',
-          ),
-          backgroundColor: redColor,
-        ),
-      );
       return;
     }
 
@@ -6466,9 +6344,6 @@ _sphotWebcamUrlController.clear();
     }
 
     if (errorMessage != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(errorMessage)));
       return;
     }
 
@@ -6565,12 +6440,6 @@ _sphotWebcamUrlController.clear();
         _isSavingSphot = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Enregistrement impossible : $error'),
-          backgroundColor: redColor,
-        ),
-      );
     }
   }
 
@@ -6580,12 +6449,6 @@ _sphotWebcamUrlController.clear();
     final territoireId = _resolvedTerritoireId.trim();
 
     if (documentId.isEmpty || territoireId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Impossible d’identifier le SPHOT à supprimer.'),
-          backgroundColor: redColor,
-        ),
-      );
       return;
     }
 
@@ -6651,23 +6514,11 @@ _sphotWebcamUrlController.clear();
         _trialSummaryPanelFuture = _loadTrialSummaryData();
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('SPHOT supprimé avec succès.'),
-          backgroundColor: adminColor,
-        ),
-      );
     } catch (error) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Suppression impossible : $error'),
-          backgroundColor: redColor,
-        ),
-      );
     }
   }
 
@@ -6679,12 +6530,6 @@ _sphotWebcamUrlController.clear();
         : widget.territoireId.trim();
 
     if (documentId.isEmpty || territoireId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Impossible d’identifier le SPHOT à supprimer.'),
-          backgroundColor: redColor,
-        ),
-      );
       return;
     }
 
@@ -6752,12 +6597,6 @@ _sphotWebcamUrlController.clear();
         _clearSphotEditor();
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('SPHOT supprimé avec succès.'),
-          backgroundColor: adminColor,
-        ),
-      );
     } catch (error) {
       if (!mounted) return;
 
@@ -6765,12 +6604,6 @@ _sphotWebcamUrlController.clear();
         _isSavingSphot = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Suppression impossible : $error'),
-          backgroundColor: redColor,
-        ),
-      );
     }
   }
 
@@ -10221,9 +10054,6 @@ _sphotWebcamUrlController.clear();
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
 
     if (!opened && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d’ouvrir ce lien.')),
-      );
     }
   }
 
@@ -11336,9 +11166,6 @@ _sphotWebcamUrlController.clear();
 
   Future<void> _saveLegalChapter() async {
     if (_selectedLegalDocument == null || _selectedLegalChapter == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Aucun chapitre sélectionné.')),
-      );
       return;
     }
 
@@ -11376,9 +11203,6 @@ _sphotWebcamUrlController.clear();
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erreur Firebase : $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -11407,13 +11231,6 @@ _sphotWebcamUrlController.clear();
 
   Future<void> _saveLegalVersion() async {
     if (!_canPublishVersion) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Sélectionnez au moins un document, un chapitre modifié et renseignez le résumé des modifications.',
-          ),
-        ),
-      );
       return;
     }
 
@@ -11541,15 +11358,9 @@ _sphotWebcamUrlController.clear();
         _legalChangeLogController.clear();
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Version SPHOT $version publiée et archivée.')),
-      );
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur publication version SPHOT : $error')),
-      );
     }
   }
 
