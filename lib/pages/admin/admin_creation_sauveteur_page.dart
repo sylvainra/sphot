@@ -499,13 +499,6 @@ Navigator.of(context).pop();
 }
 
 void _showError(String message) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(message),
-      duration: const Duration(seconds: 3),
-      backgroundColor: const Color(0xFFDC2626),
-    ),
-  );
 }
 
 bool _validateContactBeforeAccess() {
