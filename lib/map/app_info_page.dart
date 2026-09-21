@@ -44,8 +44,10 @@ class AppInfoPage extends StatelessWidget {
             content:
                 "L’utilisation de SPHOT implique l’acceptation des présentes conditions.\n\n"
                 "L’utilisateur s’engage à utiliser l’application de manière responsable et à ne pas détourner son usage.\n\n"
+                "SPHOT est un outil numérique de collecte, de transmission et de diffusion d’informations. Il ne constitue pas un dispositif de surveillance de baignade, un service de secours ni un système autonome de prise de décision opérationnelle.\n\n"
+                "Les décisions de surveillance, les consignes opérationnelles et l’appréciation de la situation sur le terrain relèvent des professionnels compétents et des autorités responsables. En cas de divergence avec SPHOT, la situation réelle et les consignes locales prévalent.\n\n"
                 "SPHOT ne garantit pas l’exactitude permanente, l’exhaustivité ou l’actualisation en temps réel de toutes les informations affichées.\n\n"
-                "La responsabilité de l’éditeur ne saurait être engagée en cas d’accident, de mauvaise interprétation des informations, d’absence de données, de données erronées ou de non-respect des consignes locales.",
+                "La responsabilité de l’éditeur s’apprécie dans les limites prévues par la loi et ne se substitue pas à celle des professionnels ou autorités pour leurs décisions de terrain, leurs consignes ou les informations qu’ils renseignent.",
           ),
           _InfoSection(
             icon: Icons.privacy_tip_outlined,
