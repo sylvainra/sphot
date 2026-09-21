@@ -31,9 +31,6 @@ class PublicSpotDetailPage extends StatelessWidget {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
 
     if (!opened && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d’ouvrir ce lien.')),
-      );
     }
   }
 
@@ -43,9 +40,6 @@ class PublicSpotDetailPage extends StatelessWidget {
 
     final opened = await launchUrl(Uri(scheme: 'tel', path: phone));
     if (!opened && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Appel indisponible sur cet appareil.')),
-      );
     }
   }
 
