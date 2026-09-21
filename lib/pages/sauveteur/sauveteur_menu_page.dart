@@ -8,20 +8,82 @@ import 'sauveteur_meteo_marine_page.dart';
 import 'sauveteur_recherche_personne_page.dart';
 import 'sauveteur_ephemeride_dicton_page.dart';
 import 'sauveteur_planning_page.dart';
+import 'sauveteur_main_courante.dart';
 
 class SauveteurMenuPage extends StatelessWidget {
   final Color profileColor;
   final String userRole;
   final String territoireId;
-
+  final String login;
+  final String sphotMode;
+  final String sphotModeReason;
+  final String sauveteurSessionToken;
+  final List<String> postesAffectes;
 
   const SauveteurMenuPage({
-  super.key,
-  required this.profileColor,
-  required this.userRole,
-  required this.territoireId,
+    super.key,
+    required this.profileColor,
+    required this.userRole,
+    required this.territoireId,
+    required this.login,
+    required this.sphotMode,
+    required this.sphotModeReason,
+    required this.sauveteurSessionToken,
+    required this.postesAffectes,
+  });
 
-});
+  bool get isSphotOn => sphotMode.toUpperCase() == 'ON';
+
+  String get _modeExplanation {
+    if (isSphotOn) {
+      return 'SPHOT ON : vous êtes autorisé à agir sur les données '
+          'opérationnelles réelles des SPHOTS auxquels vous êtes affecté.';
+    }
+
+    switch (sphotModeReason) {
+      case 'no_active_assignment':
+        return 'SPHOT OFF : aucune affectation active ne permet actuellement '
+            'd’agir sur un SPHOT réel. Vous pouvez utiliser l’application '
+            'en mode préparation et test.';
+      case 'account_inactive':
+        return 'SPHOT OFF : votre compte n’est pas actuellement autorisé à '
+            'agir sur les données opérationnelles réelles.';
+      default:
+        return 'SPHOT OFF : votre administration de tutelle n’a pas '
+            'actuellement ouvert les droits de diffusion. Vous pouvez tester '
+            'SPHOT SAUVETEUR, mais vos actions ne modifient pas le SPHOT réel.';
+    }
+  }
+
+  Future<void> _showModeInfo(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          isSphotOn ? 'SPHOT ON' : 'SPHOT OFF',
+          style: TextStyle(
+            color: isSphotOn
+                ? const Color(0xFF15803D)
+                : const Color(0xFFDC2626),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: Text(
+          _modeExplanation,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('FERMER'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,10 +119,60 @@ class SauveteurMenuPage extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
+
+                  GestureDetector(
+                    onTap: () => _showModeInfo(context),
+                    child: Container(
+                      width: double.infinity,
+                      height: 38,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: isSphotOn
+                            ? const Color(0xFFEAF7EE)
+                            : const Color(0xFFFFF1F2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSphotOn
+                              ? const Color(0xFF15803D)
+                              : const Color(0xFFDC2626),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isSphotOn
+                                ? Icons.toggle_on_rounded
+                                : Icons.toggle_off_rounded,
+                            color: isSphotOn
+                                ? const Color(0xFF15803D)
+                                : const Color(0xFFDC2626),
+                            size: 26,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            isSphotOn
+                                ? 'SPHOT ON — DIFFUSION ACTIVE'
+                                : 'SPHOT OFF — MODE PRÉPARATION',
+                            style: TextStyle(
+                              color: isSphotOn
+                                  ? const Color(0xFF15803D)
+                                  : const Color(0xFFDC2626),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 6),
 
                   SizedBox(
-                    height: 474,
+                    height: 430,
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -84,6 +196,10 @@ class SauveteurMenuPage extends StatelessWidget {
                                 MaterialPageRoute(
                                   builder: (_) => SauveteurActionsRapidesPage(
                                     profileColor: profileColor,
+                                    sphotMode: sphotMode,
+                                    sauveteurSessionToken:
+                                        sauveteurSessionToken,
+                                    postesAffectes: postesAffectes,
                                   ),
                                 ),
                               );
@@ -169,10 +285,13 @@ _MenuSquare(
   Navigator.of(context).push(
     MaterialPageRoute(
       builder: (_) => SauveteurPlanningPage(
-  profileColor: const Color(0xFF43A047),
-  userRole: userRole,
-  territoireId: territoireId,
-),
+        profileColor: const Color(0xFF43A047),
+        userRole: userRole,
+        territoireId: territoireId,
+        sphotMode: sphotMode,
+        sauveteurSessionToken: sauveteurSessionToken,
+        postesAffectes: postesAffectes,
+      ),
     ),
   );
 },
@@ -207,10 +326,16 @@ _MenuSquare(
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => SauveteurEspaceReservePage(
-  title: 'MAIN COURANTE',
-  profileColor: profileColor,
-),
+                                  builder: (_) => SauveteurMainCourantePage(
+                                    profileColor: profileColor,
+                                    userRole: userRole,
+                                    territoireId: territoireId,
+                                    login: login,
+                                    sphotMode: sphotMode,
+                                    sauveteurSessionToken:
+                                        sauveteurSessionToken,
+                                    postesAffectes: postesAffectes,
+                                  ),
                                 ),
                               );
                             },
