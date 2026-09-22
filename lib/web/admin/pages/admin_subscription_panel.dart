@@ -54,6 +54,45 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
 
   String _text(dynamic value) => value?.toString().trim() ?? '';
 
+  int? _administrativeReferenceYear(Map<String, dynamic> data) {
+    for (final field in const [
+      'currentPeriodStartDate',
+      'renewalStartDate',
+      'subscriptionStartDate',
+      'trialStartDate',
+    ]) {
+      final value = data[field];
+      if (value is Timestamp) return value.toDate().year;
+      if (value is DateTime) return value.year;
+      if (value is String) {
+        final parsed = DateTime.tryParse(value);
+        if (parsed != null) return parsed.year;
+      }
+    }
+
+    final explicitYear = data['billingYear'] ?? data['subscriptionYear'];
+    return explicitYear is num ? explicitYear.toInt() : null;
+  }
+
+  String _periodAdministrativeReference(Map<String, dynamic> data) {
+    final reference = _text(
+      data['administrativeReference'] ?? data['requestNumber'],
+    );
+    final year = _administrativeReferenceYear(data);
+    if (reference.isEmpty || year == null) return reference;
+
+    final pattern = RegExp(
+      r'^(SPHOT-ADM-[A-Z]{3}-)\d{4}(-\d+)$',
+      caseSensitive: false,
+    );
+    if (!pattern.hasMatch(reference)) return reference;
+
+    return reference.replaceFirstMapped(
+      pattern,
+      (match) => '${match.group(1)}$year${match.group(2)}',
+    );
+  }
+
   Future<String> _resolveTerritoireId() async {
     if (_uid.isEmpty) return '';
 
@@ -161,6 +200,9 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
 
     return <String, dynamic>{
       ...subscription,
+      'administrativeReference': value('administrativeReference', [
+        request['requestNumber'],
+      ]),
       'billingOrganisation': value('billingOrganisation', [
         facturation['billingOrganisation'],
         structure['nom'],
@@ -411,9 +453,16 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     });
 
     try {
+      final requestSnapshot = await _adminRequestReference.get();
+      final administrativeReference = _text(
+        requestSnapshot.data()?['requestNumber'],
+      );
+
       await _subscriptionReference.set(
         <String, dynamic>{
           'adminUid': _uid,
+          if (administrativeReference.isNotEmpty)
+            'administrativeReference': administrativeReference,
           ...fields,
           'updatedAt': FieldValue.serverTimestamp(),
         },
@@ -579,7 +628,8 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         ),
         Row(
           children: [
-            Expanded(
+            SizedBox(
+              width: 85,
               child: _field(
                 data: data,
                 field: 'billingPostalCode',
@@ -944,15 +994,66 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
 
   Widget _orderForm(Map<String, dynamic> data) {
     final noOrderRequired = _noOrderRequired(data);
+    final administrativeReference =
+        _periodAdministrativeReference(data);
 
     return Column(
       children: [
+        if (administrativeReference.isNotEmpty) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+            decoration: BoxDecoration(
+              color: _blue.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _blue.withOpacity(0.30),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'RÉFÉRENCE ADMIN SPHOT',
+                  style: TextStyle(
+                    color: _grey,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  administrativeReference,
+                  style: const TextStyle(
+                    color: _red,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'À rappeler sur les devis, commandes et documents '
+                  'rattachés à cet espace Admin.',
+                  style: TextStyle(
+                    color: _blue,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         CheckboxListTile(
           contentPadding: EdgeInsets.zero,
           value: noOrderRequired,
           activeColor: _blue,
           title: const Text(
-            'Aucun bon de commande nécessaire',
+            'Aucun bon de commande exigé par l’organisme',
             style: TextStyle(
               color: _blue,
               fontSize: 12,
@@ -969,12 +1070,12 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         _field(
           data: data,
           field: 'purchaseOrderNumber',
-          label: 'Numéro de bon de commande',
+          label: 'Numéro de bon de commande de l’organisme',
         ),
         _field(
           data: data,
           field: 'engagementNumber',
-          label: 'Numéro d’engagement',
+          label: 'Numéro d’engagement juridique',
         ),
         _field(
           data: data,
@@ -1425,7 +1526,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                                       Icons.assignment_turned_in_outlined,
                                   title: 'COMMANDE',
                                   description:
-                                      'Bon de commande, numéro d’engagement et code service si nécessaire.',
+                                      'Références communiquées par votre organisme pour la commande et Chorus Pro.',
                                   status: _status(
                                     complete: orderComplete,
                                     started: orderStarted,
