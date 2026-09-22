@@ -3844,6 +3844,7 @@ Future<void> _applyLegalTerminologyToFirestore() async {
     };
 
     final batch = firestore.batch();
+    var changedCount = 0;
 
     for (final entry in legalDocuments.entries) {
       final snapshot = await firestore
@@ -3879,10 +3880,13 @@ Future<void> _applyLegalTerminologyToFirestore() async {
         changedChapters[entry.key]!.add(
           normalizedTitle.trim().isEmpty ? chapter.id : normalizedTitle.trim(),
         );
+        changedCount++;
       }
     }
 
-    await batch.commit();
+    if (changedCount > 0) {
+      await batch.commit();
+    }
 
     Future<Map<String, dynamic>> loadDocumentSnapshot({
       required String label,
@@ -3939,8 +3943,9 @@ Future<void> _applyLegalTerminologyToFirestore() async {
 
     final versionRef = firestore.collection('legalVersions').doc('1_0');
     final versionDoc = await versionRef.get();
+    final versionData = versionDoc.data() ?? <String, dynamic>{};
     final previousSummary =
-        (versionDoc.data()?['summary'] ?? '').toString().trim();
+        (versionData['summary'] ?? '').toString().trim();
 
     final summary = previousSummary.contains(migrationSummary)
         ? previousSummary
@@ -3948,16 +3953,28 @@ Future<void> _applyLegalTerminologyToFirestore() async {
             ? migrationSummary
             : '$previousSummary • $migrationSummary';
 
-    final documentsModified = changedChapters.entries
-        .where((entry) => entry.value.isNotEmpty)
-        .map((entry) => entry.key)
-        .toList();
+    final hasChanges = changedCount > 0;
+
+    final documentsModified = hasChanges
+        ? changedChapters.entries
+            .where((entry) => entry.value.isNotEmpty)
+            .map((entry) => entry.key)
+            .toList()
+        : List<String>.from(
+            versionData['documentsModified'] ?? const <String>[],
+          );
+
+    final chaptersModified = hasChanges
+        ? changedChapters
+        : Map<String, dynamic>.from(
+            versionData['chaptersModified'] ?? const <String, dynamic>{},
+          );
 
     await firestore.collection('legalDocuments').doc('metadata').set({
       'version': '1.0',
       'summary': summary,
       'documentsModified': documentsModified,
-      'chaptersModified': changedChapters,
+      'chaptersModified': chaptersModified,
       'updatedAt': FieldValue.serverTimestamp(),
       'updatedAtText': formattedDate,
     }, SetOptions(merge: true));
@@ -3967,7 +3984,7 @@ Future<void> _applyLegalTerminologyToFirestore() async {
       'versionId': '1_0',
       'summary': summary,
       'documentsModified': documentsModified,
-      'chaptersModified': changedChapters,
+      'chaptersModified': chaptersModified,
       'documents': {
         'cgu': cguSnapshot,
         'privacyPolicy': privacySnapshot,
