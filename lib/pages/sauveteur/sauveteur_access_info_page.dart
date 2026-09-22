@@ -188,7 +188,6 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                                 )
                               else
                                 _line(
-                                  'Vous êtes actuellement en SPHOT OFF.\n'
                                   'Vous pouvez découvrir et tester '
                                   'SPHOT SAUVETEUR. Vos actions de test '
                                   'ne modifient jamais l’état opérationnel '
