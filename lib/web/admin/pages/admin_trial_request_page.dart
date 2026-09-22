@@ -2741,7 +2741,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                               .toString();
 
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.only(top: 12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -2753,7 +2753,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),
-                            const SizedBox(height: 4),
                             Text(
                               content,
                               style: const TextStyle(
