@@ -135,6 +135,12 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     'RGPD': [],
   };
 
+  final Map<String, Map<String, String>> _legalChapterIdsByDocument = {
+    'cgu': {},
+    'privacyPolicy': {},
+    'rgpdNotice': {},
+  };
+
   final Map<String, Set<String>> _modifiedChapters = {
     'CGU': {},
     'Politique de confidentialité': {},
@@ -4576,10 +4582,18 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         .orderBy(FieldPath.documentId)
         .get();
 
-    return snapshot.docs.map((doc) {
+    final chapterIds = <String, String>{};
+
+    final titles = snapshot.docs.map((doc) {
       final data = doc.data();
-      return (data['title'] ?? data['titre'] ?? doc.id).toString();
+      final title = (data['title'] ?? data['titre'] ?? doc.id).toString();
+      chapterIds[title] = doc.id;
+      return title;
     }).toList();
+
+    _legalChapterIdsByDocument[documentId] = chapterIds;
+
+    return titles;
   }
 
   Future<void> _loadAllLegalChaptersFromFirebase() async {
@@ -5447,10 +5461,31 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     }
   }
 
-  String _legalChapterId(String chapter) {
+  String _legalChapterId(String documentTitle, String chapter) {
+    final documentId = _legalDocumentIdFromTitle(documentTitle);
+
+    final storedId = _legalChapterIdsByDocument[documentId]?[chapter];
+    if (storedId != null && storedId.isNotEmpty) {
+      return storedId;
+    }
+
     final match = RegExp(r'^(\d+)').firstMatch(chapter);
-    final number = match?.group(1) ?? '1';
-    return number.padLeft(2, '0');
+    if (match != null) {
+      return match.group(1)!.padLeft(2, '0');
+    }
+
+    final chapterListKey = documentTitle == 'POLITIQUE DE CONFIDENTIALITÉ'
+        ? 'Politique de confidentialité'
+        : documentTitle;
+
+    final chapterIndex =
+        _documentChapters[chapterListKey]?.indexOf(chapter) ?? -1;
+
+    if (chapterIndex >= 0) {
+      return (chapterIndex + 1).toString().padLeft(2, '0');
+    }
+
+    return '01';
   }
 
   String _legalChapterTitle(String chapter) {
@@ -5460,7 +5495,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   Future<void> _loadLegalChapter(String documentTitle, String chapter) async {
     print('LOAD : $documentTitle / $chapter');
     final documentId = _legalDocumentId(documentTitle);
-    final chapterId = _legalChapterId(chapter);
+    final chapterId = _legalChapterId(documentTitle, chapter);
 
     _selectedLegalDocument = documentTitle;
     _selectedLegalChapter = chapter;
@@ -5495,7 +5530,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     }
 
     final documentId = _legalDocumentId(_selectedLegalDocument!);
-    final chapterId = _legalChapterId(_selectedLegalChapter!);
+    final chapterId = _legalChapterId(
+      _selectedLegalDocument!,
+      _selectedLegalChapter!,
+    );
     final order = int.tryParse(chapterId) ?? 1;
 
     final title = _legalTitleController.text.trim().isEmpty
