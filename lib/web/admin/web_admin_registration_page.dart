@@ -645,7 +645,7 @@ void _showLegalDocument(String key, String title) {
                       (chapter['content'] ?? chapter['texte'] ?? '').toString();
 
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.only(top: 14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -657,7 +657,6 @@ void _showLegalDocument(String key, String title) {
                               fontWeight: FontWeight.w900,
                             ),
                           ),
-                        const SizedBox(height: 4),
                         Text(
                           content,
                           style: const TextStyle(
