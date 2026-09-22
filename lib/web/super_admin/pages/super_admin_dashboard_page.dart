@@ -131,6 +131,7 @@ final Map<String, Set<String>> _modifiedChapters = {
 
   bool _isSavingLegalChapter = false;
   bool _isLoadingLegalChapter = false;
+  bool _isApplyingLegalTerminology = false;
   
 int _visibleAdvertiserCount = 0;
 
@@ -3193,12 +3194,17 @@ Widget _buildLegalVersionTile() {
         children: [
           TextField(
             controller: _legalVersionController,
+            readOnly: true,
             style: const TextStyle(
               color: redColor,
               fontWeight: FontWeight.w800,
             ),
             decoration: InputDecoration(
-              labelText: 'Version',
+              labelText: 'Version (phase de test)',
+              suffixIcon: const Icon(
+                Icons.lock_outline_rounded,
+                color: adminColor,
+              ),
               labelStyle: const TextStyle(
                 color: adminColor,
                 fontWeight: FontWeight.w700,
@@ -3217,6 +3223,41 @@ Widget _buildLegalVersionTile() {
               ),
             ),
           ),
+          const SizedBox(height: 12),
+
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton.icon(
+              onPressed: _isApplyingLegalTerminology
+                  ? null
+                  : _applyLegalTerminologyToFirestore,
+              icon: _isApplyingLegalTerminology
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.auto_fix_high_rounded),
+              label: Text(
+                _isApplyingLegalTerminology
+                    ? 'MISE À JOUR EN COURS'
+                    : 'APPLIQUER SPHOT ADMIN / SPHOT PUBLICITAIRE',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: adminColor,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+
           const SizedBox(height: 12),
           TextField(
             controller: _legalPublicationDateController,
@@ -3739,6 +3780,235 @@ void _markLegalVersionModified() {
   });
 }
 
+String _normalizeLegalTerminology(String input) {
+  if (input.trim().isEmpty) return input;
+
+  var value = input;
+
+  const adminDefinitionToken = '§§SPHOT_ADMIN_DEFINITION§§';
+
+  value = value.replaceAll(
+    RegExp(
+      r"Administrateur\s*:\s*la\s+personne\s+habilitée\s+à\s+gérer\s+un\s+ou\s+plusieurs\s+SPHOTS\s+pour\s+le\s+compte\s+d[’']une\s+structure\.",
+      caseSensitive: false,
+    ),
+    adminDefinitionToken,
+  );
+
+  value = value.replaceAll(
+    RegExp(r"\bl[’']annonceurs?\b", caseSensitive: false),
+    'SPHOT PUBLICITAIRE',
+  );
+
+  value = value.replaceAllMapped(
+    RegExp(
+      r'\badministrateurs?\b(?!\s+SPHOT ADMIN)',
+      caseSensitive: false,
+    ),
+    (match) => '${match.group(0)} SPHOT ADMIN',
+  );
+
+  value = value.replaceAll(
+    RegExp(r'\bannonceurs?\b', caseSensitive: false),
+    'SPHOT PUBLICITAIRE',
+  );
+
+  value = value.replaceAll(
+    adminDefinitionToken,
+    'SPHOT ADMIN : l’administrateur habilité à gérer un ou plusieurs SPHOTS pour le compte d’une structure.',
+  );
+
+  return value
+      .replaceAll('SPHOT ADMIN SPHOT ADMIN', 'SPHOT ADMIN')
+      .replaceAll('SPHOT PUBLICITAIRE SPHOT PUBLICITAIRE', 'SPHOT PUBLICITAIRE');
+}
+
+Future<void> _applyLegalTerminologyToFirestore() async {
+  if (_isApplyingLegalTerminology) return;
+
+  setState(() {
+    _isApplyingLegalTerminology = true;
+  });
+
+  try {
+    final firestore = FirebaseFirestore.instance;
+
+    const legalDocuments = <String, String>{
+      'CGU': 'cgu',
+      'Politique de confidentialité': 'privacyPolicy',
+      'RGPD': 'rgpdNotice',
+    };
+
+    final changedChapters = <String, List<String>>{
+      for (final label in legalDocuments.keys) label: <String>[],
+    };
+
+    final batch = firestore.batch();
+
+    for (final entry in legalDocuments.entries) {
+      final snapshot = await firestore
+          .collection('legalDocuments')
+          .doc(entry.value)
+          .collection('chapters')
+          .orderBy(FieldPath.documentId)
+          .get();
+
+      for (final chapter in snapshot.docs) {
+        final data = chapter.data();
+        final currentTitle = (data['title'] ?? data['titre'] ?? '').toString();
+        final currentContent = (data['content'] ?? data['texte'] ?? '').toString();
+
+        final normalizedTitle = _normalizeLegalTerminology(currentTitle);
+        final normalizedContent = _normalizeLegalTerminology(currentContent);
+
+        if (normalizedTitle == currentTitle &&
+            normalizedContent == currentContent) {
+          continue;
+        }
+
+        batch.set(
+          chapter.reference,
+          {
+            'title': normalizedTitle,
+            'content': normalizedContent,
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        );
+
+        changedChapters[entry.key]!.add(
+          normalizedTitle.trim().isEmpty ? chapter.id : normalizedTitle.trim(),
+        );
+      }
+    }
+
+    await batch.commit();
+
+    Future<Map<String, dynamic>> loadDocumentSnapshot({
+      required String label,
+      required String documentId,
+    }) async {
+      final doc =
+          await firestore.collection('legalDocuments').doc(documentId).get();
+
+      final chaptersSnapshot = await firestore
+          .collection('legalDocuments')
+          .doc(documentId)
+          .collection('chapters')
+          .orderBy(FieldPath.documentId)
+          .get();
+
+      return {
+        'label': label,
+        'documentId': documentId,
+        'modified': changedChapters[label]!.isNotEmpty,
+        'modifiedChapters': changedChapters[label]!,
+        'document': doc.data() ?? {},
+        'chapters': chaptersSnapshot.docs.map((chapter) {
+          return {
+            'id': chapter.id,
+            ...chapter.data(),
+          };
+        }).toList(),
+      };
+    }
+
+    final cguSnapshot = await loadDocumentSnapshot(
+      label: 'CGU',
+      documentId: 'cgu',
+    );
+
+    final privacySnapshot = await loadDocumentSnapshot(
+      label: 'Politique de confidentialité',
+      documentId: 'privacyPolicy',
+    );
+
+    final rgpdSnapshot = await loadDocumentSnapshot(
+      label: 'RGPD',
+      documentId: 'rgpdNotice',
+    );
+
+    final now = DateTime.now();
+    final formattedDate =
+        '${now.day.toString().padLeft(2, '0')}/'
+        '${now.month.toString().padLeft(2, '0')}/'
+        '${now.year}';
+
+    const migrationSummary =
+        'Harmonisation terminologique SPHOT ADMIN / SPHOT PUBLICITAIRE.';
+
+    final versionRef = firestore.collection('legalVersions').doc('1_0');
+    final versionDoc = await versionRef.get();
+    final previousSummary =
+        (versionDoc.data()?['summary'] ?? '').toString().trim();
+
+    final summary = previousSummary.contains(migrationSummary)
+        ? previousSummary
+        : previousSummary.isEmpty
+            ? migrationSummary
+            : '$previousSummary • $migrationSummary';
+
+    final documentsModified = changedChapters.entries
+        .where((entry) => entry.value.isNotEmpty)
+        .map((entry) => entry.key)
+        .toList();
+
+    await firestore.collection('legalDocuments').doc('metadata').set({
+      'version': '1.0',
+      'summary': summary,
+      'documentsModified': documentsModified,
+      'chaptersModified': changedChapters,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedAtText': formattedDate,
+    }, SetOptions(merge: true));
+
+    await versionRef.set({
+      'version': '1.0',
+      'versionId': '1_0',
+      'summary': summary,
+      'documentsModified': documentsModified,
+      'chaptersModified': changedChapters,
+      'documents': {
+        'cgu': cguSnapshot,
+        'privacyPolicy': privacySnapshot,
+        'rgpdNotice': rgpdSnapshot,
+      },
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedAtText': formattedDate,
+    }, SetOptions(merge: true));
+
+    if (!mounted) return;
+
+    _legalVersionController.text = '1.0';
+
+    await _loadAllLegalChaptersFromFirebase();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Terminologie SPHOT ADMIN / SPHOT PUBLICITAIRE appliquée. Version maintenue à 1.0.',
+        ),
+      ),
+    );
+  } catch (error) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Erreur mise à jour juridique : $error'),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isApplyingLegalTerminology = false;
+      });
+    }
+  }
+}
+
 Future<void> _saveLegalVersionAndTurnButtonRed() async {
   setState(() {
     _legalVersionButtonRed = true;
@@ -3761,11 +4031,12 @@ Future<void> _saveLegalVersion() async {
 
   final now = DateTime.now();
 
-  final version = _legalVersionController.text.trim().isEmpty
-      ? '1.0'
-      : _legalVersionController.text.trim();
+  const version = '1.0';
+  const versionId = '1_0';
 
-  final versionId = version.replaceAll('.', '_');
+  if (_legalVersionController.text != version) {
+    _legalVersionController.text = version;
+  }
 
   final formattedDate =
       '${now.day.toString().padLeft(2, '0')}/'
@@ -4004,6 +4275,7 @@ void _openLegalStatusMenu() {
 void initState() {
   super.initState();
   _speech = stt.SpeechToText();
+  _legalVersionController.text = '1.0';
   _legalVersionController.addListener(_markLegalVersionModified);
   _legalPublicationDateController.addListener(_markLegalVersionModified);
   _legalChangeLogController.addListener(_markLegalVersionModified);
