@@ -349,6 +349,11 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                         builder: (_) =>
                                             SauveteurMeteoTerrestrePage(
                                           profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sphotMode: _sphotMode,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
                                         ),
                                       ),
                                     );
@@ -364,6 +369,11 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                         builder: (_) =>
                                             SauveteurMeteoMarinePage(
                                           profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sphotMode: _sphotMode,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
                                         ),
                                       ),
                                     );
@@ -379,6 +389,11 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                         builder: (_) =>
                                             SauveteurEphemerideDictonPage(
                                           profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sphotMode: _sphotMode,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
                                         ),
                                       ),
                                     );
