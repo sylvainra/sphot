@@ -127,6 +127,30 @@ void initState() {
     return 0.0;
   }
 
+  Future<void> _openLoginPage() async {
+    if (kIsWeb) {
+      final uri = Uri.base.replace(fragment: '/login');
+      final opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+        webOnlyWindowName: '_blank',
+      );
+
+      if (!opened) {
+        _showMapMessage('Impossible d’ouvrir la page de connexion.');
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const ProfilLoginPage(),
+      ),
+    );
+  }
+
   Future<void> _openAdvertiserWebsite() async {
     final uri = kIsWeb
         ? Uri.base.replace(fragment: '/advertiser')
@@ -1825,11 +1849,7 @@ Widget _buildBottomBar() {
                   ),
                 );
               } else if (index == 4) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const ProfilLoginPage(),
-                  ),
-                );
+                unawaited(_openLoginPage());
               }
             },
             child: SizedBox(
