@@ -528,7 +528,31 @@ async function reconcilePublicSubscription(subscriptionId, subscription) {
 
   const adminSnapshot = await db.collection("admins").doc(adminUid).get();
   const adminData = adminSnapshot.data() || {};
-  const territoireId = (adminData.territoireId || "").toString().trim();
+  let territoireId = (adminData.territoireId || "").toString().trim();
+
+  if (!territoireId) {
+    const requestSnapshot = await db.collection("adminRequests")
+        .where("uid", "==", adminUid)
+        .limit(1)
+        .get();
+
+    if (!requestSnapshot.empty) {
+      territoireId = adminRequestTerritoryId(
+          requestSnapshot.docs[0].data() || {},
+      );
+    }
+  }
+
+  if (!territoireId) {
+    const requestById = await db.collection("adminRequests")
+        .doc(adminUid)
+        .get();
+
+    if (requestById.exists) {
+      territoireId = adminRequestTerritoryId(requestById.data() || {});
+    }
+  }
+
   if (!territoireId) return;
 
   const publish = await isTerritoryPublic(territoireId);
@@ -3173,6 +3197,21 @@ exports.syncPublicSpotsForAdmin = onDocumentWritten(
             .trim();
         if (territoireId) territoireIds.add(territoireId);
       });
+
+      if (territoireIds.size === 0) {
+        const requestSnapshot = await admin.firestore()
+            .collection("adminRequests")
+            .where("uid", "==", event.params.adminUid)
+            .limit(1)
+            .get();
+
+        if (!requestSnapshot.empty) {
+          const territoireId = adminRequestTerritoryId(
+              requestSnapshot.docs[0].data() || {},
+          );
+          if (territoireId) territoireIds.add(territoireId);
+        }
+      }
 
       for (const territoireId of territoireIds) {
         const publish = await isTerritoryPublic(territoireId);
