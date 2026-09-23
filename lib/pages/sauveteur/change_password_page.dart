@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'sauveteur_legal_acceptance_page.dart';
+import 'sauveteur_menu_page.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   final String login;
@@ -74,6 +75,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
     if (!_validatePassword()) return;
 
+    final newPassword = _newPasswordController.text.trim();
+
     final uri = Uri.parse(
       'https://us-central1-sphot-ab80b.cloudfunctions.net/changeSauveteurPassword',
     );
@@ -85,7 +88,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
         'login': widget.login,
-        'newPassword': _newPasswordController.text.trim(),
+        'newPassword': newPassword,
       }),
     );
 
@@ -110,18 +113,105 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       return;
     }
 
+    /*
+     * Le mot de passe vient de changer : on recrée immédiatement une session
+     * sauveteur afin de ne jamais transporter l'ancien état SPHOT ON/OFF,
+     * l'ancien jeton ou un ancien statut d'acceptation juridique.
+     */
+    final loginResponse = await http.post(
+      Uri.parse(
+        'https://us-central1-sphot-ab80b.cloudfunctions.net/loginSauveteur',
+      ),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'login': widget.login,
+        'password': newPassword,
+      }),
+    );
+
+    if (!mounted) return;
+
+    if (loginResponse.statusCode < 200 || loginResponse.statusCode >= 300) {
+      setState(() {
+        _message =
+            'Mot de passe modifié, mais la nouvelle session SPHOT '
+            'n’a pas pu être créée. Reconnectez-vous.';
+      });
+      return;
+    }
+
+    final decoded = jsonDecode(loginResponse.body);
+    if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
+      setState(() {
+        _message =
+            'Mot de passe modifié, mais la nouvelle session SPHOT '
+            'est invalide. Reconnectez-vous.';
+      });
+      return;
+    }
+
+    final userRole = (decoded['userRole'] ?? widget.userRole).toString();
+    final territoireId =
+        (decoded['territoireId'] ?? widget.territoireId).toString();
+    final sphotMode =
+        (decoded['sphotMode'] ?? 'OFF').toString().toUpperCase();
+    final sphotModeReason =
+        (decoded['sphotModeReason'] ?? 'administration_diffusion_off')
+            .toString();
+    final sauveteurSessionToken =
+        (decoded['sauveteurSessionToken'] ?? '').toString();
+    final legalAcceptanceRequired =
+        decoded['legalAcceptanceRequired'] == true;
+    final canManageRestrictedOperationalData =
+        decoded['canManageRestrictedOperationalData'] == true;
+    final postesAffectes = decoded['postesAffectes'] is List
+        ? (decoded['postesAffectes'] as List)
+            .map((value) => value.toString())
+            .where((value) => value.trim().isNotEmpty)
+            .toList()
+        : <String>[];
+
+    if (sauveteurSessionToken.trim().isEmpty) {
+      setState(() {
+        _message =
+            'Le service SPHOT SAUVETEUR n’a pas renvoyé de session valide. '
+            'Reconnectez-vous après mise à jour du service.';
+      });
+      return;
+    }
+
+    if (legalAcceptanceRequired) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => SauveteurLegalAcceptancePage(
+            login: widget.login,
+            territoireId: territoireId,
+            userRole: userRole,
+            sphotMode: sphotMode,
+            sphotModeReason: sphotModeReason,
+            sauveteurSessionToken: sauveteurSessionToken,
+            postesAffectes: postesAffectes,
+            canManageRestrictedOperationalData:
+                canManageRestrictedOperationalData,
+          ),
+        ),
+      );
+      return;
+    }
+
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => SauveteurLegalAcceptancePage(
+        builder: (_) => SauveteurMenuPage(
+          profileColor: const Color(0xFFFF0000),
+          userRole: userRole,
+          territoireId: territoireId,
           login: widget.login,
-          territoireId: widget.territoireId,
-          userRole: widget.userRole,
-          sphotMode: widget.sphotMode,
-          sphotModeReason: widget.sphotModeReason,
-          sauveteurSessionToken: widget.sauveteurSessionToken,
-          postesAffectes: widget.postesAffectes,
+          sphotMode: sphotMode,
+          sphotModeReason: sphotModeReason,
+          sauveteurSessionToken: sauveteurSessionToken,
+          postesAffectes: postesAffectes,
           canManageRestrictedOperationalData:
-              widget.canManageRestrictedOperationalData,
+              canManageRestrictedOperationalData,
         ),
       ),
     );
