@@ -178,6 +178,29 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
 
       if (!mounted) return;
 
+      /*
+       * Ne jamais masquer un backend Sauveteur ancien derrière des valeurs
+       * par défaut. Sans jeton de session et état opérationnel serveur,
+       * l'application afficherait artificiellement SPHOT OFF et ne pourrait
+       * pas conserver correctement les validations juridiques.
+       */
+      final modernSauveteurBackend =
+          result.containsKey('sphotMode') &&
+          result.containsKey('sphotModeReason') &&
+          result.containsKey('legalAcceptanceRequired') &&
+          sauveteurSessionToken.trim().isNotEmpty;
+
+      if (userRole.toUpperCase() != 'SUPER_ADMIN' &&
+          !modernSauveteurBackend) {
+        setState(() {
+          _loginErrorMessage =
+              'Le service SPHOT SAUVETEUR n’est pas à jour. '
+              'Les Cloud Functions doivent être redéployées avant '
+              'de poursuivre.';
+        });
+        return;
+      }
+
       if (mustChangePassword) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
