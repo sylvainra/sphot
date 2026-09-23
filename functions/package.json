@@ -11,7 +11,7 @@
     "rebuild-public-spots": "node scripts/rebuild_public_spots.js"
   },
   "engines": {
-    "node": "24"
+    "node": "22"
   },
   "main": "index.js",
   "dependencies": {
