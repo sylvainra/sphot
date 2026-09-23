@@ -183,18 +183,84 @@ class _SauveteurLegalAcceptancePageState
         return;
       }
 
+      /*
+       * Relit immédiatement l'état serveur après l'enregistrement juridique.
+       * Cela garantit que l'écran suivant reçoit le vrai SPHOT ON/OFF et
+       * vérifie que l'acceptation n'est plus demandée.
+       */
+      final stateResponse = await http.post(
+        Uri.parse(
+          'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+          'getSauveteurSessionState',
+        ),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'sauveteurSessionToken': widget.sauveteurSessionToken,
+        }),
+      );
+
+      if (!mounted) return;
+
+      if (stateResponse.statusCode < 200 || stateResponse.statusCode >= 300) {
+        setState(() {
+          _message =
+              'La validation a été enregistrée, mais l’état du compte '
+              'n’a pas pu être actualisé. Reconnectez-vous.';
+          _submitting = false;
+        });
+        return;
+      }
+
+      final decoded = jsonDecode(stateResponse.body);
+      if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
+        setState(() {
+          _message =
+              'La validation a été enregistrée, mais la session SPHOT '
+              'n’a pas pu être actualisée. Reconnectez-vous.';
+          _submitting = false;
+        });
+        return;
+      }
+
+      if (decoded['legalAcceptanceRequired'] == true) {
+        setState(() {
+          _message =
+              'La validation juridique a bien été envoyée, mais le serveur '
+              'ne la reconnaît pas encore. Le service SPHOT SAUVETEUR '
+              'doit être mis à jour.';
+          _submitting = false;
+        });
+        return;
+      }
+
+      final userRole = (decoded['userRole'] ?? widget.userRole).toString();
+      final territoireId =
+          (decoded['territoireId'] ?? widget.territoireId).toString();
+      final sphotMode =
+          (decoded['sphotMode'] ?? widget.sphotMode).toString().toUpperCase();
+      final sphotModeReason =
+          (decoded['sphotModeReason'] ?? widget.sphotModeReason).toString();
+      final postesAffectes = decoded['postesAffectes'] is List
+          ? (decoded['postesAffectes'] as List)
+              .map((value) => value.toString())
+              .where((value) => value.trim().isNotEmpty)
+              .toList()
+          : List<String>.from(widget.postesAffectes);
+      final canManageRestrictedOperationalData =
+          decoded['canManageRestrictedOperationalData'] == true;
+
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => SauveteurAccessInfoPage(
             login: widget.login,
-            territoireId: widget.territoireId,
-            userRole: widget.userRole,
-            sphotMode: widget.sphotMode,
-            sphotModeReason: widget.sphotModeReason,
+            territoireId: territoireId,
+            userRole: userRole,
+            sphotMode: sphotMode,
+            sphotModeReason: sphotModeReason,
             sauveteurSessionToken: widget.sauveteurSessionToken,
-            postesAffectes: widget.postesAffectes,
+            postesAffectes: postesAffectes,
             canManageRestrictedOperationalData:
-                widget.canManageRestrictedOperationalData,
+                canManageRestrictedOperationalData,
           ),
         ),
       );
@@ -202,7 +268,8 @@ class _SauveteurLegalAcceptancePageState
       if (!mounted) return;
       setState(() {
         _message =
-            'La validation n’a pas pu être enregistrée. Réessayez.';
+            'La validation n’a pas pu être enregistrée ou actualisée. '
+            'Réessayez.';
         _submitting = false;
       });
     }
