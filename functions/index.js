@@ -342,6 +342,158 @@ async function reconcilePublicTerritory(territoireId, publish) {
 }
 
 /**
+ * Convertit une valeur Firestore/date en Date JavaScript.
+ *
+ * @param {*} value Valeur à convertir.
+ * @return {Date|null} Date valide ou null.
+ */
+function firestoreDate(value) {
+  if (!value) return null;
+
+  if (typeof value.toDate === "function") {
+    const date = value.toDate();
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  return null;
+}
+
+/**
+ * Détermine si un abonnement ouvre actuellement les droits de diffusion.
+ *
+ * Une période d'essai active ouvre les mêmes droits opérationnels qu'un
+ * abonnement actif pendant sa période de validité.
+ *
+ * @param {Object} subscription Données de l'abonnement.
+ * @return {boolean} Vrai lorsque la diffusion est autorisée.
+ */
+function subscriptionGrantsDiffusion(subscription) {
+  const data = subscription || {};
+  const status = (data.status || "").toString().trim().toLowerCase();
+  const now = new Date();
+
+  const trialStatuses = new Set([
+    "trial",
+    "trial_active",
+    "trialing",
+    "in_trial",
+  ]);
+
+  if (trialStatuses.has(status)) {
+    const start = firestoreDate(data.trialStartDate);
+    const end = firestoreDate(data.trialEndDate);
+
+    return Boolean(
+        start &&
+        end &&
+        now.getTime() >= start.getTime() &&
+        now.getTime() <= end.getTime(),
+    );
+  }
+
+  if (status === "active") {
+    const start = firestoreDate(data.subscriptionStartDate);
+    const end = firestoreDate(data.subscriptionEndDate);
+
+    if (!start && !end) return true;
+    if (start && now.getTime() < start.getTime()) return false;
+    if (end && now.getTime() > end.getTime()) return false;
+
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Retourne les administrateurs rattachés à un territoire.
+ *
+ * Le second chemin assure la compatibilité avec les dossiers dont le
+ * territoireId n'a pas encore été recopié à la racine de admins/{uid}.
+ *
+ * @param {FirebaseFirestore.Firestore} db Instance Firestore.
+ * @param {string} territoireId Identifiant du territoire.
+ * @return {Promise<Array<FirebaseFirestore.QueryDocumentSnapshot>>}
+ */
+async function territoryAdminDocuments(db, territoireId) {
+  const directSnapshot = await db.collection("admins")
+      .where("territoireId", "==", territoireId)
+      .get();
+
+  if (!directSnapshot.empty) {
+    return directSnapshot.docs;
+  }
+
+  const requestsSnapshot = await db.collection("adminRequests")
+      .where("territoire.territoireId", "==", territoireId)
+      .get();
+
+  if (requestsSnapshot.empty) {
+    return [];
+  }
+
+  const adminReferences = requestsSnapshot.docs
+      .map((document) => {
+        const data = document.data() || {};
+        const uid = (data.uid || document.id).toString().trim();
+        return uid ? db.collection("admins").doc(uid) : null;
+      })
+      .filter((reference) => reference);
+
+  if (adminReferences.length === 0) {
+    return [];
+  }
+
+  const snapshots = await db.getAll(...adminReferences);
+  return snapshots.filter((document) => document.exists);
+}
+
+/**
+ * Vérifie qu'un territoire possède actuellement des droits de diffusion.
+ *
+ * Le booléen admins.diffusionAccessGranted reste prioritaire. En sécurité,
+ * une période d'essai active ou un abonnement actif ouvre aussi les droits.
+ *
+ * @param {FirebaseFirestore.Firestore} db Instance Firestore.
+ * @param {string} territoireId Identifiant du territoire.
+ * @return {Promise<boolean>}
+ */
+async function territoryDiffusionAccessGranted(db, territoireId) {
+  if (!territoireId) return false;
+
+  const adminDocuments = await territoryAdminDocuments(db, territoireId);
+
+  for (const document of adminDocuments) {
+    const data = document.data() || {};
+    if (data.accessStatus !== "approved") continue;
+
+    if (data.diffusionAccessGranted === true) {
+      return true;
+    }
+
+    const subscriptionSnapshot = await db.collection("subscriptions")
+        .doc(document.id)
+        .get();
+
+    if (subscriptionSnapshot.exists &&
+        subscriptionGrantsDiffusion(subscriptionSnapshot.data() || {})) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Vérifie que le territoire dispose d'un administrateur approuvé
  * dont les droits de diffusion SPHOT sont actuellement ouverts.
  *
@@ -350,16 +502,7 @@ async function reconcilePublicTerritory(territoireId, publish) {
  */
 async function isTerritoryPublic(territoireId) {
   const db = admin.firestore();
-  const adminsSnapshot = await db.collection("admins")
-      .where("territoireId", "==", territoireId)
-      .get();
-
-  return adminsSnapshot.docs.some((document) => {
-    const data = document.data() || {};
-
-    return data.accessStatus === "approved" &&
-      data.diffusionAccessGranted === true;
-  });
+  return territoryDiffusionAccessGranted(db, territoireId);
 }
 
 /**
@@ -4112,16 +4255,8 @@ async function resolveSauveteurOperationalContext(accountData, login) {
       assignedPeriodIds,
   );
 
-  let diffusionAccessGranted = false;
-  if (territoireId) {
-    const adminsSnapshot = await db.collection("admins")
-        .where("territoireId", "==", territoireId)
-        .get();
-
-    diffusionAccessGranted = adminsSnapshot.docs.some((document) => {
-      return document.data().diffusionAccessGranted === true;
-    });
-  }
+  const diffusionAccessGranted =
+    await territoryDiffusionAccessGranted(db, territoireId);
 
   const accountActive = accountData.accountStatus === "ACTIVE";
   const sphotOn = accountActive &&
@@ -4288,17 +4423,40 @@ function sauveteurLegalAcceptanceIsCurrent(accountData, legalPack) {
   const documents = acceptance.documents || {};
   const operationalRules = acceptance.operationalRules || {};
 
+  const isCurrentRevision =
+    acceptance.revision === SAUVETEUR_LEGAL_ACCEPTANCE_REVISION;
+
+  /*
+   * Compatibilité avec les validations r2 déjà enregistrées avant le correctif :
+   * l'API exigeait bien ces deux confirmations dans la requête, mais omettait
+   * de les recopier dans operationalRules. Elles peuvent donc être considérées
+   * comme acquises pour une validation r2 issue de ce parcours précis.
+   */
+  const legacyR2Acceptance =
+    isCurrentRevision &&
+    acceptance.source === "sphot_sauveteur_access_validation";
+
+  const transmissionRoleAcknowledged =
+    operationalRules.sphotTransmissionRoleAcknowledged === true ||
+    (legacyR2Acceptance &&
+      operationalRules.sphotTransmissionRoleAcknowledged == null);
+
+  const professionalDecisionResponsibilityAccepted =
+    operationalRules.professionalDecisionResponsibilityAccepted === true ||
+    (legacyR2Acceptance &&
+      operationalRules.professionalDecisionResponsibilityAccepted == null);
+
   return acceptance.accepted === true &&
     acceptance.version === legalPack.version &&
-    acceptance.revision === SAUVETEUR_LEGAL_ACCEPTANCE_REVISION &&
+    isCurrentRevision &&
     documents.cgu === true &&
     documents.privacy === true &&
     documents.rgpd === true &&
     operationalRules.publicOperationalDiffusionAcknowledged === true &&
     operationalRules.institutionalReadAcknowledged === true &&
     operationalRules.personalAccountUseAccepted === true &&
-    operationalRules.sphotTransmissionRoleAcknowledged === true &&
-    operationalRules.professionalDecisionResponsibilityAccepted === true;
+    transmissionRoleAcknowledged &&
+    professionalDecisionResponsibilityAccepted;
 }
 
 exports.loginSauveteur = onRequest(
@@ -4576,6 +4734,8 @@ exports.acceptSauveteurLegalTerms = onRequest(
             publicOperationalDiffusionAcknowledged: true,
             institutionalReadAcknowledged: true,
             personalAccountUseAccepted: true,
+            sphotTransmissionRoleAcknowledged: true,
+            professionalDecisionResponsibilityAccepted: true,
             publicIdentityDisclosureByDefault: false,
           },
           source: "sphot_sauveteur_access_validation",
