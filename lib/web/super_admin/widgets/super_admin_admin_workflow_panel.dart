@@ -244,6 +244,10 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
     final profile = _map(data['profile']);
     final proConnect = _map(data['proConnect']);
     final uid = _text(data['uid'] ?? requestSnapshot.id);
+    final territoire = _map(data['territoire']);
+    final territoireId = _text(
+      data['territoireId'] ?? territoire['territoireId'],
+    );
     final email = _text(profile['email'] ?? proConnect['email'] ?? data['email']);
     final duration = (trialRequest['trialDurationDays'] is num)
         ? (trialRequest['trialDurationDays'] as num).toInt()
@@ -314,6 +318,9 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
     batch.set(
       db.collection('admins').doc(uid),
       <String, dynamic>{
+        'uid': uid,
+        if (territoireId.isNotEmpty) 'territoireId': territoireId,
+        'accessStatus': 'approved',
         'diffusionAccessGranted': true,
         'diffusionAccessOpenedAt': serverNow,
         'updatedAt': serverNow,
