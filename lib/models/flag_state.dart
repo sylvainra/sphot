@@ -30,6 +30,11 @@ class SpotFlagState {
   final String adresseWebcam;
   final String arretesMunicipaux;
   final Map<String, dynamic>? liveFlag;
+  final dynamic dangers;
+  final dynamic meteoTerrestre;
+  final dynamic meteoMarine;
+  final dynamic ephemeride;
+  final dynamic updatedAt;
 
   SpotFlagState({
     required this.id,
@@ -59,6 +64,11 @@ class SpotFlagState {
     required this.adresseWebcam,
     required this.arretesMunicipaux,
     this.liveFlag,
+    this.dangers,
+    this.meteoTerrestre,
+    this.meteoMarine,
+    this.ephemeride,
+    this.updatedAt,
   });
 
   factory SpotFlagState.fromFirestore(String id, Map<String, dynamic> data) {
@@ -96,6 +106,11 @@ class SpotFlagState {
     liveFlag: data['liveFlag'] is Map<String, dynamic>
         ? data['liveFlag'] as Map<String, dynamic>
         : null,
+    dangers: data['dangers'],
+    meteoTerrestre: data['meteoTerrestre'],
+    meteoMarine: data['meteoMarine'],
+    ephemeride: data['ephemeride'],
+    updatedAt: data['updatedAt'],
   );
 }
 
