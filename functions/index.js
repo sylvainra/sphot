@@ -5025,7 +5025,62 @@ exports.updateSauveteurLiveState = onRequest(
 
         const db = admin.firestore();
         const spotReference = db.collection("spots").doc(spotId);
+        const spotSnapshot = await spotReference.get();
+        const previousSpot = spotSnapshot.data() || {};
+        const previousLiveFlag = previousSpot.liveFlag || {};
         const auditReference = db.collection("sauveteurOperationalAudit").doc();
+
+        const flagJournalLines = [];
+        const nextLiveFlag = sanitizedChanges.liveFlag;
+
+        if (nextLiveFlag &&
+            typeof nextLiveFlag === "object" &&
+            !Array.isArray(nextLiveFlag)) {
+          const colorLabel = (value) => {
+            const normalized = (value || "").toString().toLowerCase();
+            if (normalized === "green" || normalized === "vert") {
+              return "Vert";
+            }
+            if (normalized === "yellow" || normalized === "jaune") {
+              return "Jaune";
+            }
+            if (normalized === "red" || normalized === "rouge") {
+              return "Rouge";
+            }
+            if (normalized === "violet") {
+              return "Violet";
+            }
+            return "Non renseigné";
+          };
+
+          const positionLabel = (value) => {
+            const normalized = (value || "").toString().toLowerCase();
+            if (normalized === "hisse" || normalized === "hissé") {
+              return "Hissé";
+            }
+            if (normalized === "affale" || normalized === "affalé") {
+              return "Affalé";
+            }
+            return "Non renseignée";
+          };
+
+          const oldColor = colorLabel(previousLiveFlag.flagColor);
+          const newColor = colorLabel(nextLiveFlag.flagColor);
+          const oldPosition = positionLabel(previousLiveFlag.flagPosition);
+          const newPosition = positionLabel(nextLiveFlag.flagPosition);
+
+          if (oldColor !== newColor) {
+            flagJournalLines.push(
+                `Couleur du drapeau : ${oldColor} → ${newColor}`,
+            );
+          }
+
+          if (oldPosition !== newPosition) {
+            flagJournalLines.push(
+                `Position du drapeau : ${oldPosition} → ${newPosition}`,
+            );
+          }
+        }
 
         const batch = db.batch();
         batch.set(spotReference, {
@@ -5042,6 +5097,33 @@ exports.updateSauveteurLiveState = onRequest(
           changes: sanitizedChanges,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+
+        if (flagJournalLines.length > 0) {
+          const mainCouranteReference = db
+              .collection("territoires")
+              .doc(context.territoireId)
+              .collection("spots")
+              .doc(spotId)
+              .collection("mainCourante")
+              .doc();
+
+          batch.set(mainCouranteReference, {
+            type: "Drapeau",
+            description: flagJournalLines.join(" • "),
+            actionTaken: "Enregistrement automatique SPHOT SAUVETEUR",
+            visibility: "operational",
+            occurredAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdBy: {
+              sauveteurId: context.sauveteurId,
+              login: session.login,
+              role: context.userRole,
+            },
+            source: "automatic_flag_event",
+            immutableOriginal: true,
+          });
+        }
+
         await batch.commit();
 
         response.status(200).json({success: true});
