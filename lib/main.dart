@@ -109,7 +109,7 @@ class SphotApp extends StatelessWidget {
       );
     }
 
-    if (uri.path == '/sauveteur-login') {
+    if (uri.path == '/login' || uri.path == '/sauveteur-login') {
       return MaterialPageRoute(
         settings: settings,
         builder: (_) => const ProfilLoginPage(),
