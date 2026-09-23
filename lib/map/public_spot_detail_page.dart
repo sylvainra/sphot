@@ -414,6 +414,7 @@ class _PublicLiveDataSection extends StatelessWidget {
 
     if (value is Map) {
       return value.entries
+          .where((entry) => !_isTechnicalKey(entry.key.toString()))
           .map((entry) {
             final raw = entry.value;
             if (raw == null) return '';
@@ -446,6 +447,16 @@ class _PublicLiveDataSection extends StatelessWidget {
 
     final text = value.toString().trim();
     return text.isEmpty ? const [] : <String>[text];
+  }
+
+  static bool _isTechnicalKey(String key) {
+    final normalized = key.toLowerCase();
+
+    return normalized.endsWith(' index') ||
+        normalized.endsWith(' heure') ||
+        normalized.endsWith(' minute') ||
+        normalized.endsWith(' mètres') ||
+        normalized.endsWith(' décimales');
   }
 
   static String _humanizeKey(String key) {
