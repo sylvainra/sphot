@@ -429,32 +429,34 @@ async function territoryAdminDocuments(db, territoireId) {
       .where("territoireId", "==", territoireId)
       .get();
 
-  if (!directSnapshot.empty) {
-    return directSnapshot.docs;
-  }
+  const documentsById = new Map();
+  directSnapshot.docs.forEach((document) => {
+    documentsById.set(document.id, document);
+  });
 
   const requestsSnapshot = await db.collection("adminRequests")
       .where("territoire.territoireId", "==", territoireId)
       .get();
 
-  if (requestsSnapshot.empty) {
-    return [];
-  }
-
   const adminReferences = requestsSnapshot.docs
       .map((document) => {
         const data = document.data() || {};
         const uid = (data.uid || document.id).toString().trim();
-        return uid ? db.collection("admins").doc(uid) : null;
+        if (!uid || documentsById.has(uid)) return null;
+        return db.collection("admins").doc(uid);
       })
       .filter((reference) => reference);
 
-  if (adminReferences.length === 0) {
-    return [];
+  if (adminReferences.length > 0) {
+    const snapshots = await db.getAll(...adminReferences);
+    snapshots.forEach((document) => {
+      if (document.exists) {
+        documentsById.set(document.id, document);
+      }
+    });
   }
 
-  const snapshots = await db.getAll(...adminReferences);
-  return snapshots.filter((document) => document.exists);
+  return [...documentsById.values()];
 }
 
 /**
@@ -474,11 +476,17 @@ async function territoryDiffusionAccessGranted(db, territoireId) {
 
   for (const document of adminDocuments) {
     const data = document.data() || {};
-    if (data.accessStatus !== "approved") continue;
 
+    /*
+     * Le Super Admin ouvre explicitement la diffusion au moment de la
+     * validation de l'essai. Ce booléen est donc l'autorité prioritaire,
+     * même pour les anciens documents admins dépourvus de accessStatus.
+     */
     if (data.diffusionAccessGranted === true) {
       return true;
     }
+
+    if (data.accessStatus !== "approved") continue;
 
     const subscriptionSnapshot = await db.collection("subscriptions")
         .doc(document.id)
@@ -4410,7 +4418,7 @@ async function activeLegalPackInfo() {
 }
 
 const SAUVETEUR_LEGAL_ACCEPTANCE_REVISION = "2";
-const SAUVETEUR_BACKEND_REVISION = "2026-09-23-r3";
+const SAUVETEUR_BACKEND_REVISION = "2026-09-23-r4";
 
 /**
  * Vérifie que l'acceptation Sauveteur correspond au pack juridique actif.
@@ -4634,6 +4642,8 @@ exports.getSauveteurSessionState = onRequest(
           userRole: context.userRole,
           fonctions: context.functions,
           postesAffectes: context.assignedSpotIds,
+          periodesSurveillance: context.assignedPeriodIds,
+          activePeriodIds: context.activePeriodIds,
           diffusionAccessGranted: context.diffusionAccessGranted,
           sphotMode: context.sphotMode,
           sphotModeReason: context.sphotModeReason,
