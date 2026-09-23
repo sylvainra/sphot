@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+import '../../services/sauveteur_live_publication_service.dart';
+
 class SauveteurEphemerideDictonPage extends StatefulWidget {
   final Color profileColor;
+  final String territoireId;
+  final String sphotMode;
+  final String sauveteurSessionToken;
+  final List<String> postesAffectes;
 
   const SauveteurEphemerideDictonPage({
     super.key,
     required this.profileColor,
+    required this.territoireId,
+    required this.sphotMode,
+    required this.sauveteurSessionToken,
+    required this.postesAffectes,
   });
 
   @override
@@ -27,10 +37,207 @@ class _SauveteurEphemerideDictonPageState
   final TextEditingController dictonController =
       TextEditingController();
 
+  final List<SauveteurAssignedSpot> _assignedSpots = [];
+  String? _selectedSpotId;
+  bool _loadingLive = true;
+  bool _savingLive = false;
+  String? _liveMessage;
+
+  bool get _isSphotOn => widget.sphotMode.toUpperCase() == 'ON';
+
   @override
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
+    _loadLiveContext();
+  }
+
+  Future<void> _loadLiveContext() async {
+    try {
+      final spots = await SauveteurLivePublicationService.loadAssignedSpots(
+        territoireId: widget.territoireId,
+        postesAffectes: widget.postesAffectes,
+      );
+
+      if (!mounted) return;
+
+      _assignedSpots
+        ..clear()
+        ..addAll(spots);
+      _selectedSpotId = _assignedSpots.isEmpty ? null : _assignedSpots.first.id;
+
+      if (_selectedSpotId != null) {
+        await _loadSelectedSpotState();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _liveMessage = 'Impossible de charger le poste affecté.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _loadingLive = false);
+    }
+  }
+
+  Future<void> _loadSelectedSpotState() async {
+    final spotId = _selectedSpotId;
+    if (spotId == null) return;
+
+    final data = await SauveteurLivePublicationService.loadLiveSpotState(
+      spotId: spotId,
+    );
+    final ephemeride = data['ephemeride'];
+
+    if (!mounted || ephemeride is! Map) return;
+
+    setState(() {
+      ephemerideController.text =
+          (ephemeride['Éphéméride'] ?? '').toString();
+      dictonController.text = (ephemeride['Dicton'] ?? '').toString();
+    });
+  }
+
+  Future<void> _selectSpot(String? spotId) async {
+    if (spotId == null || spotId == _selectedSpotId) return;
+
+    setState(() {
+      _selectedSpotId = spotId;
+      _liveMessage = null;
+      _loadingLive = true;
+    });
+
+    try {
+      await _loadSelectedSpotState();
+    } finally {
+      if (mounted) setState(() => _loadingLive = false);
+    }
+  }
+
+  Future<void> _publishEphemeride() async {
+    if (!_isSphotOn || _selectedSpotId == null || _savingLive) return;
+
+    setState(() {
+      _savingLive = true;
+      _liveMessage = null;
+    });
+
+    try {
+      await SauveteurLivePublicationService.publish(
+        sauveteurSessionToken: widget.sauveteurSessionToken,
+        spotId: _selectedSpotId!,
+        changes: {
+          'ephemeride': {
+            'Éphéméride': ephemerideController.text.trim(),
+            'Dicton': dictonController.text.trim(),
+          },
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _liveMessage = 'Éphéméride publiée sur le SPHOT.';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _liveMessage =
+              'Publication refusée. Vérifiez que SPHOT est ON et le poste affecté.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _savingLive = false);
+    }
+  }
+
+  Widget _livePublicationBar() {
+    final enabled = _isSphotOn && _selectedSpotId != null && !_loadingLive;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 2, 0, 6),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedSpotId,
+                  isDense: true,
+                  decoration: InputDecoration(
+                    labelText: 'Poste',
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: _assignedSpots
+                      .map(
+                        (spot) => DropdownMenuItem<String>(
+                          value: spot.id,
+                          child: Text(
+                            spot.label,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _loadingLive ? null : _selectSpot,
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 42,
+                child: ElevatedButton.icon(
+                  onPressed: enabled && !_savingLive
+                      ? _publishEphemeride
+                      : null,
+                  icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                  label: Text(
+                    _savingLive ? '...' : 'PUBLIER',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF9A825),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (!_isSphotOn)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                'SPHOT OFF — publication réelle désactivée.',
+                style: TextStyle(
+                  color: Color(0xFFB91C1C),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            )
+          else if (_liveMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                _liveMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF1E3A8A),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -197,6 +404,8 @@ class _SauveteurEphemerideDictonPageState
                   ),
 
                   const SizedBox(height: 2),
+
+                  _livePublicationBar(),
 
                   Expanded(
                     child: Container(
