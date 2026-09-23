@@ -223,11 +223,14 @@ class _SauveteurLegalAcceptancePageState
       }
 
       if (decoded['legalAcceptanceRequired'] == true) {
+        final backendRevision =
+            (decoded['backendRevision'] ?? 'ancienne/inconnue').toString();
+
         setState(() {
           _message =
               'La validation juridique a bien été envoyée, mais le serveur '
-              'ne la reconnaît pas encore. Le service SPHOT SAUVETEUR '
-              'doit être mis à jour.';
+              'ne la reconnaît pas encore. Révision backend : '
+              '$backendRevision.';
           _submitting = false;
         });
         return;
