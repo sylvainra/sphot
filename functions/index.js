@@ -4410,6 +4410,7 @@ async function activeLegalPackInfo() {
 }
 
 const SAUVETEUR_LEGAL_ACCEPTANCE_REVISION = "2";
+const SAUVETEUR_BACKEND_REVISION = "2026-09-23-r3";
 
 /**
  * Vérifie que l'acceptation Sauveteur correspond au pack juridique actif.
@@ -4577,6 +4578,7 @@ exports.loginSauveteur = onRequest(
             context.canManageRestrictedOperationalData,
           legalAcceptanceRequired,
           activeLegalVersion: activeLegalPack.version,
+          backendRevision: SAUVETEUR_BACKEND_REVISION,
           mustChangePassword: data.mustChangePassword === true,
           sauveteurSessionToken,
           webSessionToken,
@@ -4638,6 +4640,7 @@ exports.getSauveteurSessionState = onRequest(
             context.canManageRestrictedOperationalData,
           legalAcceptanceRequired,
           activeLegalVersion: activeLegalPack.version,
+          backendRevision: SAUVETEUR_BACKEND_REVISION,
         });
       } catch (error) {
         console.error("Erreur lecture état session sauveteur:", error);
@@ -4766,6 +4769,8 @@ exports.acceptSauveteurLegalTerms = onRequest(
         response.status(200).json({
           success: true,
           legalVersion: legalPack.version,
+          legalAcceptanceRequired: false,
+          backendRevision: SAUVETEUR_BACKEND_REVISION,
         });
       } catch (error) {
         console.error(
