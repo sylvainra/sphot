@@ -3,13 +3,23 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:numberpicker/numberpicker.dart';
 
+import '../../services/sauveteur_live_publication_service.dart';
+
 
 class SauveteurMeteoMarinePage extends StatefulWidget {
   final Color profileColor;
+  final String territoireId;
+  final String sphotMode;
+  final String sauveteurSessionToken;
+  final List<String> postesAffectes;
 
   const SauveteurMeteoMarinePage({
     super.key,
     required this.profileColor,
+    required this.territoireId,
+    required this.sphotMode,
+    required this.sauveteurSessionToken,
+    required this.postesAffectes,
   });
 
   @override
@@ -45,6 +55,277 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
 
   int periodMin = 8;
   int periodMax = 12;
+
+  final List<SauveteurAssignedSpot> _assignedSpots = [];
+  String? _selectedSpotId;
+  bool _loadingLive = true;
+  bool _savingLive = false;
+  String? _liveMessage;
+
+  bool get _isSphotOn => widget.sphotMode.toUpperCase() == 'ON';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLiveContext();
+  }
+
+  Future<void> _loadLiveContext() async {
+    try {
+      final spots = await SauveteurLivePublicationService.loadAssignedSpots(
+        territoireId: widget.territoireId,
+        postesAffectes: widget.postesAffectes,
+      );
+
+      if (!mounted) return;
+
+      _assignedSpots
+        ..clear()
+        ..addAll(spots);
+      _selectedSpotId = _assignedSpots.isEmpty ? null : _assignedSpots.first.id;
+
+      if (_selectedSpotId != null) {
+        await _loadSelectedSpotState();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _liveMessage = 'Impossible de charger le poste affecté.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _loadingLive = false);
+    }
+  }
+
+  Future<void> _loadSelectedSpotState() async {
+    final spotId = _selectedSpotId;
+    if (spotId == null) return;
+
+    final data = await SauveteurLivePublicationService.loadLiveSpotState(
+      spotId: spotId,
+    );
+    final weather = data['meteoMarine'];
+
+    if (!mounted || weather is! Map) return;
+
+    int readInt(String key, int fallback) {
+      final value = weather[key];
+      if (value is num) return value.toInt();
+      return int.tryParse(value?.toString() ?? '') ?? fallback;
+    }
+
+    setState(() {
+      waterMin = readInt('Température eau min', waterMin);
+      waterMax = readInt('Température eau max', waterMax);
+      seaStateIndex = readInt('État de la mer index', seaStateIndex);
+
+      highTideHour1 = readInt('Pleine mer 1 heure', highTideHour1);
+      highTideMinute1 = readInt('Pleine mer 1 minute', highTideMinute1);
+      highTideHour2 = readInt('Pleine mer 2 heure', highTideHour2);
+      highTideMinute2 = readInt('Pleine mer 2 minute', highTideMinute2);
+      highTideCoef = readInt('Coefficient pleine mer', highTideCoef);
+
+      lowTideHour1 = readInt('Basse mer 1 heure', lowTideHour1);
+      lowTideMinute1 = readInt('Basse mer 1 minute', lowTideMinute1);
+      lowTideHour2 = readInt('Basse mer 2 heure', lowTideHour2);
+      lowTideMinute2 = readInt('Basse mer 2 minute', lowTideMinute2);
+      lowTideCoef = readInt('Coefficient basse mer', lowTideCoef);
+
+      swellMorningHeight =
+          readInt('Houle matin mètres', swellMorningHeight);
+      swellMorningDecimal =
+          readInt('Houle matin décimales', swellMorningDecimal);
+      swellAfternoonHeight =
+          readInt('Houle après-midi mètres', swellAfternoonHeight);
+      swellAfternoonDecimal =
+          readInt('Houle après-midi décimales', swellAfternoonDecimal);
+      periodMin = readInt('Période houle min secondes', periodMin);
+      periodMax = readInt('Période houle max secondes', periodMax);
+
+      swellDirectionMorning =
+          (weather['Direction houle matin'] ?? swellDirectionMorning)
+              .toString();
+      swellDirectionAfternoon =
+          (weather['Direction houle après-midi'] ?? swellDirectionAfternoon)
+              .toString();
+    });
+  }
+
+  Future<void> _selectSpot(String? spotId) async {
+    if (spotId == null || spotId == _selectedSpotId) return;
+
+    setState(() {
+      _selectedSpotId = spotId;
+      _liveMessage = null;
+      _loadingLive = true;
+    });
+
+    try {
+      await _loadSelectedSpotState();
+    } finally {
+      if (mounted) setState(() => _loadingLive = false);
+    }
+  }
+
+  Future<void> _publishWeather() async {
+    if (!_isSphotOn || _selectedSpotId == null || _savingLive) return;
+
+    setState(() {
+      _savingLive = true;
+      _liveMessage = null;
+    });
+
+    try {
+      await SauveteurLivePublicationService.publish(
+        sauveteurSessionToken: widget.sauveteurSessionToken,
+        spotId: _selectedSpotId!,
+        changes: {
+          'meteoMarine': {
+            'Température eau min': waterMin,
+            'Température eau max': waterMax,
+            'État de la mer index': seaStateIndex,
+            'Pleine mer 1':
+                '${highTideHour1.toString().padLeft(2, '0')}:'
+                '${highTideMinute1.toString().padLeft(2, '0')}',
+            'Pleine mer 2':
+                '${highTideHour2.toString().padLeft(2, '0')}:'
+                '${highTideMinute2.toString().padLeft(2, '0')}',
+            'Pleine mer 1 heure': highTideHour1,
+            'Pleine mer 1 minute': highTideMinute1,
+            'Pleine mer 2 heure': highTideHour2,
+            'Pleine mer 2 minute': highTideMinute2,
+            'Coefficient pleine mer': highTideCoef,
+            'Basse mer 1':
+                '${lowTideHour1.toString().padLeft(2, '0')}:'
+                '${lowTideMinute1.toString().padLeft(2, '0')}',
+            'Basse mer 2':
+                '${lowTideHour2.toString().padLeft(2, '0')}:'
+                '${lowTideMinute2.toString().padLeft(2, '0')}',
+            'Basse mer 1 heure': lowTideHour1,
+            'Basse mer 1 minute': lowTideMinute1,
+            'Basse mer 2 heure': lowTideHour2,
+            'Basse mer 2 minute': lowTideMinute2,
+            'Coefficient basse mer': lowTideCoef,
+            'Direction houle matin': swellDirectionMorning,
+            'Direction houle après-midi': swellDirectionAfternoon,
+            'Houle matin':
+                '$swellMorningHeight.$swellMorningDecimal m',
+            'Houle après-midi':
+                '$swellAfternoonHeight.$swellAfternoonDecimal m',
+            'Houle matin mètres': swellMorningHeight,
+            'Houle matin décimales': swellMorningDecimal,
+            'Houle après-midi mètres': swellAfternoonHeight,
+            'Houle après-midi décimales': swellAfternoonDecimal,
+            'Période houle min secondes': periodMin,
+            'Période houle max secondes': periodMax,
+          },
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _liveMessage = 'Météo marine publiée sur le SPHOT.';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _liveMessage =
+              'Publication refusée. Vérifiez que SPHOT est ON et le poste affecté.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _savingLive = false);
+    }
+  }
+
+  Widget _livePublicationBar() {
+    final enabled = _isSphotOn && _selectedSpotId != null && !_loadingLive;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 2, 0, 5),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedSpotId,
+                  isDense: true,
+                  decoration: InputDecoration(
+                    labelText: 'Poste',
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: _assignedSpots
+                      .map(
+                        (spot) => DropdownMenuItem<String>(
+                          value: spot.id,
+                          child: Text(
+                            spot.label,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _loadingLive ? null : _selectSpot,
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 42,
+                child: ElevatedButton.icon(
+                  onPressed: enabled && !_savingLive ? _publishWeather : null,
+                  icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                  label: Text(
+                    _savingLive ? '...' : 'PUBLIER',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0277BD),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (!_isSphotOn)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                'SPHOT OFF — publication réelle désactivée.',
+                style: TextStyle(
+                  color: Color(0xFFB91C1C),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            )
+          else if (_liveMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                _liveMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF1E3A8A),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,8 +373,10 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
 
                   const SizedBox(height: 2),
 
+                  _livePublicationBar(),
+
                   SizedBox(
-                    height: 500,
+                    height: 450,
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
