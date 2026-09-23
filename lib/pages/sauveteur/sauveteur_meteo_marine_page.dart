@@ -184,6 +184,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
           'meteoMarine': {
             'Température eau min': waterMin,
             'Température eau max': waterMax,
+            'État de la mer': seaStateLabels[seaStateIndex],
             'État de la mer index': seaStateIndex,
             'Pleine mer 1':
                 '${highTideHour1.toString().padLeft(2, '0')}:'
