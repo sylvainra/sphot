@@ -4428,7 +4428,8 @@ function sauveteurLegalAcceptanceIsCurrent(accountData, legalPack) {
     acceptance.revision === SAUVETEUR_LEGAL_ACCEPTANCE_REVISION;
 
   /*
-   * Compatibilité avec les validations r2 déjà enregistrées avant le correctif :
+   * Compatibilité avec les validations r2 déjà enregistrées
+   * avant le correctif :
    * l'API exigeait bien ces deux confirmations dans la requête, mais omettait
    * de les recopier dans operationalRules. Elles peuvent donc être considérées
    * comme acquises pour une validation r2 issue de ce parcours précis.
