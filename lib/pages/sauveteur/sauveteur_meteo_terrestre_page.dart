@@ -3,12 +3,22 @@ import 'package:numberpicker/numberpicker.dart';
 
 import 'dart:math';
 
+import '../../services/sauveteur_live_publication_service.dart';
+
 class SauveteurMeteoTerrestrePage extends StatefulWidget {
   final Color profileColor;
+  final String territoireId;
+  final String sphotMode;
+  final String sauveteurSessionToken;
+  final List<String> postesAffectes;
 
   const SauveteurMeteoTerrestrePage({
     super.key,
     required this.profileColor,
+    required this.territoireId,
+    required this.sphotMode,
+    required this.sauveteurSessionToken,
+    required this.postesAffectes,
   });
 
   @override
@@ -31,6 +41,253 @@ class _SauveteurMeteoTerrestrePageState extends State<SauveteurMeteoTerrestrePag
   int windEveningSpeed = 20;
 
   int gusts = 35;
+
+  int skyMorningIndex = 2;
+  int skyAfternoonIndex = 4;
+
+  final List<SauveteurAssignedSpot> _assignedSpots = [];
+  String? _selectedSpotId;
+  bool _loadingLive = true;
+  bool _savingLive = false;
+  String? _liveMessage;
+
+  bool get _isSphotOn => widget.sphotMode.toUpperCase() == 'ON';
+
+  static const List<String> _skyEmojis = [
+    '❄️',
+    '🌫️',
+    '☀️',
+    '🌤️',
+    '⛅',
+    '🌦️',
+    '🌧️',
+    '⛈️',
+    '🥵',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLiveContext();
+  }
+
+  Future<void> _loadLiveContext() async {
+    try {
+      final spots = await SauveteurLivePublicationService.loadAssignedSpots(
+        territoireId: widget.territoireId,
+        postesAffectes: widget.postesAffectes,
+      );
+
+      if (!mounted) return;
+
+      _assignedSpots
+        ..clear()
+        ..addAll(spots);
+      _selectedSpotId = _assignedSpots.isEmpty ? null : _assignedSpots.first.id;
+
+      if (_selectedSpotId != null) {
+        await _loadSelectedSpotState();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _liveMessage = 'Impossible de charger le poste affecté.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _loadingLive = false);
+    }
+  }
+
+  Future<void> _loadSelectedSpotState() async {
+    final spotId = _selectedSpotId;
+    if (spotId == null) return;
+
+    final data = await SauveteurLivePublicationService.loadLiveSpotState(
+      spotId: spotId,
+    );
+    final weather = data['meteoTerrestre'];
+
+    if (!mounted || weather is! Map) return;
+
+    int readInt(String key, int fallback) {
+      final value = weather[key];
+      if (value is num) return value.toInt();
+      return int.tryParse(value?.toString() ?? '') ?? fallback;
+    }
+
+    setState(() {
+      airMin = readInt('Température air min', airMin);
+      airMax = readInt('Température air max', airMax);
+      uvIndex = readInt('Indice UV', uvIndex);
+      heatwaveLevel = readInt('Niveau canicule', heatwaveLevel);
+      windMorningSpeed = readInt('Vent matin km/h', windMorningSpeed);
+      windEveningSpeed = readInt('Vent après-midi km/h', windEveningSpeed);
+      gusts = readInt('Rafales km/h', gusts);
+      skyMorningIndex = readInt('Ciel matin index', skyMorningIndex)
+          .clamp(0, _skyEmojis.length - 1);
+      skyAfternoonIndex = readInt(
+        'Ciel après-midi index',
+        skyAfternoonIndex,
+      ).clamp(0, _skyEmojis.length - 1);
+      windDirectionMorning =
+          (weather['Direction vent matin'] ?? windDirectionMorning).toString();
+      windDirectionEvening =
+          (weather['Direction vent après-midi'] ?? windDirectionEvening)
+              .toString();
+    });
+  }
+
+  Future<void> _selectSpot(String? spotId) async {
+    if (spotId == null || spotId == _selectedSpotId) return;
+
+    setState(() {
+      _selectedSpotId = spotId;
+      _liveMessage = null;
+      _loadingLive = true;
+    });
+
+    try {
+      await _loadSelectedSpotState();
+    } finally {
+      if (mounted) setState(() => _loadingLive = false);
+    }
+  }
+
+  Future<void> _publishWeather() async {
+    if (!_isSphotOn || _selectedSpotId == null || _savingLive) return;
+
+    setState(() {
+      _savingLive = true;
+      _liveMessage = null;
+    });
+
+    try {
+      await SauveteurLivePublicationService.publish(
+        sauveteurSessionToken: widget.sauveteurSessionToken,
+        spotId: _selectedSpotId!,
+        changes: {
+          'meteoTerrestre': {
+            'Température air min': airMin,
+            'Température air max': airMax,
+            'Ciel matin': _skyEmojis[skyMorningIndex],
+            'Ciel après-midi': _skyEmojis[skyAfternoonIndex],
+            'Ciel matin index': skyMorningIndex,
+            'Ciel après-midi index': skyAfternoonIndex,
+            'Direction vent matin': windDirectionMorning,
+            'Direction vent après-midi': windDirectionEvening,
+            'Vent matin km/h': windMorningSpeed,
+            'Vent après-midi km/h': windEveningSpeed,
+            'Rafales km/h': gusts,
+            'Indice UV': uvIndex,
+            'Niveau canicule': heatwaveLevel,
+          },
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _liveMessage = 'Météo terrestre publiée sur le SPHOT.';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _liveMessage =
+              'Publication refusée. Vérifiez que SPHOT est ON et le poste affecté.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _savingLive = false);
+    }
+  }
+
+  Widget _livePublicationBar() {
+    final enabled = _isSphotOn && _selectedSpotId != null && !_loadingLive;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 2, 0, 5),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedSpotId,
+                  isDense: true,
+                  decoration: InputDecoration(
+                    labelText: 'Poste',
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: _assignedSpots
+                      .map(
+                        (spot) => DropdownMenuItem<String>(
+                          value: spot.id,
+                          child: Text(
+                            spot.label,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _loadingLive ? null : _selectSpot,
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 42,
+                child: ElevatedButton.icon(
+                  onPressed: enabled && !_savingLive ? _publishWeather : null,
+                  icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                  label: Text(
+                    _savingLive ? '...' : 'PUBLIER',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF5D4037),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (!_isSphotOn)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                'SPHOT OFF — publication réelle désactivée.',
+                style: TextStyle(
+                  color: Color(0xFFB91C1C),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            )
+          else if (_liveMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                _liveMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF1E3A8A),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   @override
 Widget build(BuildContext context) {
@@ -68,8 +325,10 @@ Widget build(BuildContext context) {
 
                 const SizedBox(height: 2),
 
+                _livePublicationBar(),
+
                 SizedBox(
-  height: 497,
+  height: 450,
   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -127,7 +386,20 @@ Widget build(BuildContext context) {
                               const SizedBox(width: 12),
 
                               Expanded(
-                                child: _WeatherSkyCard(),
+                                child: _WeatherSkyCard(
+                                  morningIndex: skyMorningIndex,
+                                  afternoonIndex: skyAfternoonIndex,
+                                  onMorningChanged: (value) {
+                                    setState(() {
+                                      skyMorningIndex = value;
+                                    });
+                                  },
+                                  onAfternoonChanged: (value) {
+                                    setState(() {
+                                      skyAfternoonIndex = value;
+                                    });
+                                  },
+                                ),
                               ),
                             ],
                           ),
@@ -521,12 +793,24 @@ const SizedBox(width: 8),
 }
 
 class _WeatherSkyCard extends StatefulWidget {
+  final int morningIndex;
+  final int afternoonIndex;
+  final ValueChanged<int> onMorningChanged;
+  final ValueChanged<int> onAfternoonChanged;
+
+  const _WeatherSkyCard({
+    required this.morningIndex,
+    required this.afternoonIndex,
+    required this.onMorningChanged,
+    required this.onAfternoonChanged,
+  });
+
   @override
   State<_WeatherSkyCard> createState() => _WeatherSkyCardState();
 }
 
 class _WeatherSkyCardState extends State<_WeatherSkyCard> {
-  final List<String> emojis = [
+  static const List<String> emojis = [
     '❄️',
     '🌫️',
     '☀️',
@@ -538,8 +822,41 @@ class _WeatherSkyCardState extends State<_WeatherSkyCard> {
     '🥵',
   ];
 
-  int morningIndex = 2;
-  int afternoonIndex = 4;
+  late final FixedExtentScrollController _morningController;
+  late final FixedExtentScrollController _afternoonController;
+
+  @override
+  void initState() {
+    super.initState();
+    _morningController = FixedExtentScrollController(
+      initialItem: widget.morningIndex,
+    );
+    _afternoonController = FixedExtentScrollController(
+      initialItem: widget.afternoonIndex,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _WeatherSkyCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.morningIndex != widget.morningIndex &&
+        _morningController.hasClients) {
+      _morningController.jumpToItem(widget.morningIndex);
+    }
+
+    if (oldWidget.afternoonIndex != widget.afternoonIndex &&
+        _afternoonController.hasClients) {
+      _afternoonController.jumpToItem(widget.afternoonIndex);
+    }
+  }
+
+  @override
+  void dispose() {
+    _morningController.dispose();
+    _afternoonController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -564,9 +881,7 @@ class _WeatherSkyCardState extends State<_WeatherSkyCard> {
               color: Color(0xFF1E88E5),
             ),
           ),
-
           const SizedBox(height: 2),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -581,22 +896,17 @@ class _WeatherSkyCardState extends State<_WeatherSkyCard> {
                   ),
                 ),
               ),
-
               const SizedBox(width: 6),
-
               SizedBox(
                 width: 36,
                 height: 30,
                 child: ListWheelScrollView.useDelegate(
+                  controller: _morningController,
                   itemExtent: 26,
                   perspective: 0.003,
                   diameterRatio: 1.2,
                   physics: const FixedExtentScrollPhysics(),
-                  onSelectedItemChanged: (index) {
-                    setState(() {
-                      morningIndex = index;
-                    });
-                  },
+                  onSelectedItemChanged: widget.onMorningChanged,
                   childDelegate: ListWheelChildBuilderDelegate(
                     childCount: emojis.length,
                     builder: (context, index) {
@@ -612,9 +922,7 @@ class _WeatherSkyCardState extends State<_WeatherSkyCard> {
               ),
             ],
           ),
-
           const SizedBox(height: 2),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -629,22 +937,17 @@ class _WeatherSkyCardState extends State<_WeatherSkyCard> {
                   ),
                 ),
               ),
-
               const SizedBox(width: 6),
-
               SizedBox(
                 width: 36,
                 height: 30,
                 child: ListWheelScrollView.useDelegate(
+                  controller: _afternoonController,
                   itemExtent: 26,
                   perspective: 0.003,
                   diameterRatio: 1.2,
                   physics: const FixedExtentScrollPhysics(),
-                  onSelectedItemChanged: (index) {
-                    setState(() {
-                      afternoonIndex = index;
-                    });
-                  },
+                  onSelectedItemChanged: widget.onAfternoonChanged,
                   childDelegate: ListWheelChildBuilderDelegate(
                     childCount: emojis.length,
                     builder: (context, index) {
