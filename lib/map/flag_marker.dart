@@ -93,7 +93,8 @@ class _FlagMarkerState extends State<FlagMarker>
               ),
             ),
           ),
-          if (widget.spot.hasValidFlag)
+          if (widget.spot.flagColor != FlagColor.none &&
+              widget.spot.flagPosition != FlagPosition.none)
             Positioned(
               left: flagLeft,
               top: flagTop,
