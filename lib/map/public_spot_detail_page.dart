@@ -1,8 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/flag_state.dart';
+import 'flag_marker.dart';
 import 'public_webcam_view.dart';
 
 const TextStyle _publicSectionTitleStyle = TextStyle(
@@ -45,20 +47,8 @@ class PublicSpotDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = Color(spot.statutColor);
     final headerColor = Color(spot.markerColor);
     final commune = spot.ville.trim();
-    final flagIsLowered =
-        spot.isPosteSecours && spot.flagPosition == FlagPosition.affale;
-    final showUnsupervisedWarning =
-        spot.isMissingFlagColorDuringSurveillance || flagIsLowered;
-    final rawPublicDetailStatus = flagIsLowered
-        ? '⚠️ BAIGNADE NON SURVEILLÉE TEMPORAIREMENT'
-        : spot.displayStatut;
-    final publicDetailStatus = rawPublicDetailStatus.replaceFirst(
-      ' ⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
-      '\n⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
-    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FA),
@@ -117,14 +107,9 @@ class PublicSpotDetailPage extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _StatusCard(
-                            color: statusColor,
-                            text: publicDetailStatus,
+                          _LiveOperationalSnapshot(
+                            initialSpot: spot,
                           ),
-                          if (showUnsupervisedWarning) ...[
-                            const SizedBox(height: 10),
-                            const _UnsupervisedWarning(),
-                          ],
                           const SizedBox(height: 18),
                           _PublicInfoLine(
                             iconAssetPath: spot.markerIconPath,
@@ -253,6 +238,312 @@ class PublicSpotDetailPage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+class _LiveOperationalSnapshot extends StatelessWidget {
+  final SpotFlagState initialSpot;
+
+  const _LiveOperationalSnapshot({
+    required this.initialSpot,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('publicSpots')
+          .doc(initialSpot.id)
+          .snapshots(),
+      builder: (context, snapshot) {
+        var currentSpot = initialSpot;
+
+        if (snapshot.hasData && snapshot.data!.exists) {
+          final data = snapshot.data!.data();
+          if (data != null) {
+            currentSpot = SpotFlagState.fromFirestore(
+              snapshot.data!.id,
+              data,
+            );
+          }
+        }
+
+        final flagIsLowered =
+            currentSpot.isPosteSecours &&
+            currentSpot.flagPosition == FlagPosition.affale;
+        final showUnsupervisedWarning =
+            currentSpot.isMissingFlagColorDuringSurveillance ||
+            flagIsLowered;
+        final rawStatus = flagIsLowered
+            ? '⚠️ BAIGNADE NON SURVEILLÉE TEMPORAIREMENT'
+            : currentSpot.displayStatut;
+        final publicStatus = rawStatus.replaceFirst(
+          ' ⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
+          '\n⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
+        );
+        final statusColor = Color(currentSpot.statutColor);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (currentSpot.isPosteSecours) ...[
+                  SizedBox(
+                    width: 88,
+                    height: 104,
+                    child: Center(
+                      child: FlagMarker(spot: currentSpot),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: _StatusCard(
+                    color: statusColor,
+                    text: publicStatus,
+                  ),
+                ),
+              ],
+            ),
+            if (showUnsupervisedWarning) ...[
+              const SizedBox(height: 10),
+              const _UnsupervisedWarning(),
+            ],
+            const SizedBox(height: 14),
+            _PublicLiveDataSection(spot: currentSpot),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PublicLiveDataSection extends StatelessWidget {
+  final SpotFlagState spot;
+
+  const _PublicLiveDataSection({
+    required this.spot,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dangerValues = _flattenValues(spot.dangers);
+    final terrestrialValues = _flattenValues(spot.meteoTerrestre);
+    final marineValues = _flattenValues(spot.meteoMarine);
+    final ephemerideValues = _flattenValues(spot.ephemeride);
+    final updatedAt = _formatTimestamp(spot.updatedAt);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFDCE3EA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.sensors_rounded,
+                size: 18,
+                color: Color(0xFF1E3A8A),
+              ),
+              const SizedBox(width: 7),
+              const Expanded(
+                child: Text(
+                  'INFORMATIONS OPÉRATIONNELLES EN DIRECT',
+                  style: _publicSectionTitleStyle,
+                ),
+              ),
+              if (updatedAt.isNotEmpty)
+                Text(
+                  updatedAt,
+                  style: const TextStyle(
+                    color: Colors.black45,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _LiveDataBlock(
+            icon: Icons.warning_amber_rounded,
+            title: 'Dangers du jour',
+            values: dangerValues,
+          ),
+          const SizedBox(height: 8),
+          _LiveDataBlock(
+            icon: Icons.wb_sunny_outlined,
+            title: 'Météo terrestre',
+            values: terrestrialValues,
+          ),
+          const SizedBox(height: 8),
+          _LiveDataBlock(
+            icon: Icons.water_rounded,
+            title: 'Météo marine',
+            values: marineValues,
+          ),
+          const SizedBox(height: 8),
+          _LiveDataBlock(
+            icon: Icons.calendar_today_outlined,
+            title: 'Éphéméride',
+            values: ephemerideValues,
+          ),
+        ],
+      ),
+    );
+  }
+
+  static List<String> _flattenValues(dynamic value) {
+    if (value == null) return const [];
+
+    if (value is Iterable) {
+      return value
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false);
+    }
+
+    if (value is Map) {
+      return value.entries
+          .map((entry) {
+            final raw = entry.value;
+            if (raw == null) return '';
+
+            final label = _humanizeKey(entry.key.toString());
+            if (raw is Iterable) {
+              final values = raw
+                  .map((item) => item.toString().trim())
+                  .where((item) => item.isNotEmpty)
+                  .join(' • ');
+              return values.isEmpty ? '' : '$label : $values';
+            }
+
+            if (raw is Map) {
+              final nested = raw.entries
+                  .map((nestedEntry) {
+                    return '${_humanizeKey(nestedEntry.key.toString())} '
+                        '${nestedEntry.value}';
+                  })
+                  .join(' • ');
+              return nested.isEmpty ? '' : '$label : $nested';
+            }
+
+            final text = raw.toString().trim();
+            return text.isEmpty ? '' : '$label : $text';
+          })
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false);
+    }
+
+    final text = value.toString().trim();
+    return text.isEmpty ? const [] : <String>[text];
+  }
+
+  static String _humanizeKey(String key) {
+    final spaced = key
+        .replaceAllMapped(
+          RegExp(r'([a-z0-9])([A-Z])'),
+          (match) => '${match.group(1)} ${match.group(2)}',
+        )
+        .replaceAll('_', ' ')
+        .trim();
+
+    if (spaced.isEmpty) return '';
+    return '${spaced[0].toUpperCase()}${spaced.substring(1)}';
+  }
+
+  static String _formatTimestamp(dynamic value) {
+    DateTime? date;
+
+    if (value is Timestamp) {
+      date = value.toDate().toLocal();
+    } else if (value is DateTime) {
+      date = value.toLocal();
+    }
+
+    if (date == null) return '';
+
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+
+    return '$day/$month • $hour:$minute';
+  }
+}
+
+class _LiveDataBlock extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final List<String> values;
+
+  const _LiveDataBlock({
+    required this.icon,
+    required this.title,
+    required this.values,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size: 17,
+          color: const Color(0xFF1E3A8A),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title.toUpperCase(),
+                style: const TextStyle(
+                  color: Color(0xFF1E3A8A),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 3),
+              if (values.isEmpty)
+                const Text(
+                  'Non renseigné',
+                  style: TextStyle(
+                    color: Colors.black38,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              else
+                ...values.map(
+                  (value) => Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Text(
+                      value,
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
