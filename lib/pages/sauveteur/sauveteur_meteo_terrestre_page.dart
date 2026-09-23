@@ -125,11 +125,12 @@ class _SauveteurMeteoTerrestrePageState extends State<SauveteurMeteoTerrestrePag
       windEveningSpeed = readInt('Vent après-midi km/h', windEveningSpeed);
       gusts = readInt('Rafales km/h', gusts);
       skyMorningIndex = readInt('Ciel matin index', skyMorningIndex)
-          .clamp(0, _skyEmojis.length - 1);
+          .clamp(0, _skyEmojis.length - 1)
+          .toInt();
       skyAfternoonIndex = readInt(
         'Ciel après-midi index',
         skyAfternoonIndex,
-      ).clamp(0, _skyEmojis.length - 1);
+      ).clamp(0, _skyEmojis.length - 1).toInt();
       windDirectionMorning =
           (weather['Direction vent matin'] ?? windDirectionMorning).toString();
       windDirectionEvening =
