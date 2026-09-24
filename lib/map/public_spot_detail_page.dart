@@ -335,6 +335,14 @@ class _PublicLiveDataSection extends StatelessWidget {
     final terrestrialValues = _flattenValues(spot.meteoTerrestre);
     final marineValues = _flattenValues(spot.meteoMarine);
     final ephemerideValues = _flattenValues(spot.ephemeride);
+    final notification = spot.notificationPublique is Map
+        ? Map<String, dynamic>.from(spot.notificationPublique as Map)
+        : <String, dynamic>{};
+    final notificationMessage =
+        (notification['message'] ?? '').toString().trim();
+    final notificationActive = notification['active'] != false;
+    final notificationPublishedAt =
+        _formatTimestamp(notification['publishedAt']);
     final updatedAt = _formatTimestamp(spot.updatedAt);
 
     return Container(
@@ -374,11 +382,14 @@ class _PublicLiveDataSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          _LiveDataBlock(
-            icon: Icons.warning_amber_rounded,
-            title: 'Dangers du jour',
-            values: dangerValues,
-          ),
+          if (notificationActive && notificationMessage.isNotEmpty) ...[
+            _PublicNotificationCard(
+              message: notificationMessage,
+              publishedAt: notificationPublishedAt,
+            ),
+            const SizedBox(height: 10),
+          ],
+          _PublicDangerList(values: dangerValues),
           const SizedBox(height: 8),
           _LiveDataBlock(
             icon: Icons.wb_sunny_outlined,
@@ -490,6 +501,274 @@ class _PublicLiveDataSection extends StatelessWidget {
 
     return '$day/$month • $hour:$minute';
   }
+}
+
+class _PublicNotificationCard extends StatelessWidget {
+  final String message;
+  final String publishedAt;
+
+  const _PublicNotificationCard({
+    required this.message,
+    required this.publishedAt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFEF4444)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.campaign_rounded,
+            size: 21,
+            color: Color(0xFFDC2626),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'INFORMATION DU POSTE',
+                  style: TextStyle(
+                    color: Color(0xFFB91C1C),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: Colors.black87,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+                if (publishedAt.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    publishedAt,
+                    style: const TextStyle(
+                      color: Colors.black45,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PublicDangerList extends StatelessWidget {
+  final List<String> values;
+
+  const _PublicDangerList({
+    required this.values,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(
+          Icons.warning_amber_rounded,
+          size: 17,
+          color: Color(0xFF1E3A8A),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'DANGERS DU JOUR',
+                style: TextStyle(
+                  color: Color(0xFF1E3A8A),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              if (values.isEmpty)
+                const Text(
+                  'Aucun danger signalé',
+                  style: TextStyle(
+                    color: Colors.black38,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              else
+                ...values.map((value) => _PublicDangerRow(value: value)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PublicDangerRow extends StatelessWidget {
+  final String value;
+
+  const _PublicDangerRow({
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final visual = _dangerVisual(value);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 28,
+            height: 24,
+            child: Center(
+              child: Icon(
+                visual.icon,
+                size: visual.size,
+                color: visual.color,
+              ),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Colors.black87,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                height: 1.2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static _DangerVisual _dangerVisual(String danger) {
+    final normalized = danger.toUpperCase();
+
+    if (normalized.contains('BAÏNE') || normalized.contains('BAINE')) {
+      final match = RegExp(r'NIVEAU\s*([1-5])').firstMatch(normalized);
+      final level = int.tryParse(match?.group(1) ?? '') ?? 1;
+      final colors = <Color>[
+        const Color(0xFF22C55E),
+        const Color(0xFF84CC16),
+        const Color(0xFFF59E0B),
+        const Color(0xFFF97316),
+        const Color(0xFFDC2626),
+      ];
+      return _DangerVisual(
+        icon: Icons.waves_rounded,
+        color: colors[level - 1],
+        size: 15 + (level * 2.5),
+      );
+    }
+
+    if (normalized.contains('COURANT')) {
+      return const _DangerVisual(
+        icon: Icons.sync_alt_rounded,
+        color: Color(0xFF0284C7),
+      );
+    }
+    if (normalized.contains('SHORE BREAK') ||
+        normalized.contains('VAGUES') ||
+        normalized.contains('HOULE') ||
+        normalized.contains('REMOUS') ||
+        normalized.contains('TOURBILLON')) {
+      return const _DangerVisual(
+        icon: Icons.waves_rounded,
+        color: Color(0xFF2563EB),
+      );
+    }
+    if (normalized.contains('VENT')) {
+      return const _DangerVisual(
+        icon: Icons.air_rounded,
+        color: Color(0xFF64748B),
+      );
+    }
+    if (normalized.contains('CHALEUR') ||
+        normalized.contains('CHÂLEUR') ||
+        normalized.contains('CANICULE')) {
+      return const _DangerVisual(
+        icon: Icons.wb_sunny_rounded,
+        color: Color(0xFFF97316),
+      );
+    }
+    if (normalized.contains('EAUX') ||
+        normalized.contains('EAU FROIDE') ||
+        normalized.contains('DÉVERSEMENT')) {
+      return const _DangerVisual(
+        icon: Icons.water_drop_rounded,
+        color: Color(0xFF0891B2),
+      );
+    }
+    if (normalized.contains('ROCHER') ||
+        normalized.contains('RÉCIF')) {
+      return const _DangerVisual(
+        icon: Icons.landscape_rounded,
+        color: Color(0xFF78716C),
+      );
+    }
+    if (normalized.contains('REQUIN') ||
+        normalized.contains('ESPÈCES DANGEREUSES')) {
+      return const _DangerVisual(
+        icon: Icons.warning_rounded,
+        color: Color(0xFFDC2626),
+      );
+    }
+    if (normalized.contains('PROFONDEUR')) {
+      return const _DangerVisual(
+        icon: Icons.height_rounded,
+        color: Color(0xFF7C3AED),
+      );
+    }
+    if (normalized.contains('TRAF')) {
+      return const _DangerVisual(
+        icon: Icons.directions_boat_rounded,
+        color: Color(0xFF0F766E),
+      );
+    }
+
+    return const _DangerVisual(
+      icon: Icons.warning_amber_rounded,
+      color: Color(0xFFF59E0B),
+    );
+  }
+}
+
+class _DangerVisual {
+  final IconData icon;
+  final Color color;
+  final double size;
+
+  const _DangerVisual({
+    required this.icon,
+    required this.color,
+    this.size = 19,
+  });
 }
 
 class _LiveDataBlock extends StatelessWidget {
