@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+import '../../map/flag_marker.dart';
+import '../../models/flag_state.dart';
+
 class SauveteurActionsRapidesPage extends StatefulWidget {
   final Color profileColor;
   final String sphotMode;
@@ -50,6 +53,7 @@ class _SauveteurActionsRapidesPageState
       _liveSubscription;
 
   final Set<String> selectedDangers = {};
+  int baineLevel = 0;
 
   final List<String> dangerChoices = [
     'COURANTS',
@@ -171,6 +175,7 @@ class _SauveteurActionsRapidesPageState
         flagPosition = 'Hissé';
         status = 'Baignade surveillée';
         selectedDangers.clear();
+        baineLevel = 0;
       }
     });
 
@@ -223,9 +228,28 @@ class _SauveteurActionsRapidesPageState
             : _statusForFlagColor(flagColor);
 
         if (rawDangers is Iterable) {
+          final values = rawDangers.map((value) => value.toString()).toList();
+          final baine = values.cast<String?>().firstWhere(
+                (value) {
+                  final upper = (value ?? '').toUpperCase();
+                  return upper.contains('BAÏNE') || upper.contains('BAINE');
+                },
+                orElse: () => null,
+              );
+
+          var nextBaineLevel = 0;
+          if (baine != null) {
+            final match = RegExp(
+              r'NIVEAU\s*([1-5])',
+              caseSensitive: false,
+            ).firstMatch(baine);
+            nextBaineLevel = int.tryParse(match?.group(1) ?? '') ?? 1;
+          }
+
           selectedDangers
             ..clear()
-            ..addAll(rawDangers.map((value) => value.toString()));
+            ..addAll(values);
+          baineLevel = nextBaineLevel;
         }
       });
     });
@@ -349,6 +373,76 @@ class _SauveteurActionsRapidesPageState
     });
 
     await _persistFlagState();
+  }
+
+  void _previewFlagPosition(String position) {
+    if (flagPosition == position) return;
+
+    setState(() {
+      flagPosition = position;
+      status = position == 'Affalé'
+          ? 'Baignade non surveillée temporairement'
+          : _statusForFlagColor(flagColor);
+    });
+  }
+
+  SpotFlagState _previewSpotState() {
+    return SpotFlagState(
+      id: selectedSpotId ?? 'preview',
+      idSphot: nomSecours,
+      territoireId: widget.territoireId,
+      name: nomSecours,
+      nomSphot: nomSphot,
+      ville: '',
+      departement: '',
+      logoVille: '',
+      siteInternetVille: '',
+      villeLat: 0,
+      villeLng: 0,
+      departementLat: 0,
+      departementLng: 0,
+      lat: 0,
+      lng: 0,
+      typeSphot: typeSphot,
+      statutBaignade: status,
+      periode: '',
+      heureDebut: '',
+      heureFin: '',
+      phone: '',
+      activite: '',
+      equipement: '',
+      labelSphot: '',
+      adresseWebcam: '',
+      arretesMunicipaux: '',
+      liveFlag: {
+        'flagColor': _flagColorValue(flagColor),
+        'flagPosition': _flagPositionValue(flagPosition),
+      },
+    );
+  }
+
+  void _setBaineLevel(int level) {
+    setState(() {
+      selectedDangers.removeWhere((danger) {
+        final upper = danger.toUpperCase();
+        return upper.contains('BAÏNE') || upper.contains('BAINE');
+      });
+
+      baineLevel = level;
+
+      if (level > 0) {
+        selectedDangers.add('BAÏNES - NIVEAU $level');
+      }
+    });
+  }
+
+  Future<bool> _publishNotification(String message) {
+    return _persistLiveChanges({
+      'notificationPublique': {
+        'message': message.trim(),
+        'active': true,
+      },
+    });
   }
 
   void _goHome() {
