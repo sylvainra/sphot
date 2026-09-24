@@ -436,6 +436,38 @@ class _SauveteurActionsRapidesPageState
     });
   }
 
+  List<String> _dangerValuesForPublication() {
+    final values = <String>[];
+
+    for (final choice in dangerChoices) {
+      final upper = choice.toUpperCase();
+      final isBaine =
+          upper.contains('BAÏNE') || upper.contains('BAINE');
+
+      if (isBaine) {
+        if (baineLevel > 0) {
+          values.add('BAÏNES - NIVEAU $baineLevel');
+        }
+        continue;
+      }
+
+      if (selectedDangers.contains(choice)) {
+        values.add(choice);
+      }
+    }
+
+    final known = values.toSet();
+    final extras = selectedDangers.where((danger) {
+      final upper = danger.toUpperCase();
+      final isBaine =
+          upper.contains('BAÏNE') || upper.contains('BAINE');
+      return !isBaine && !known.contains(danger);
+    });
+
+    values.addAll(extras);
+    return values;
+  }
+
   Future<bool> _publishNotification(String message) {
     return _persistLiveChanges({
       'notificationPublique': {
@@ -961,6 +993,17 @@ class _SauveteurActionsRapidesPageState
               itemCount: dangerChoices.length,
               itemBuilder: (context, index) {
                 final danger = dangerChoices[index];
+                final upper = danger.toUpperCase();
+                final isBaine =
+                    upper.contains('BAÏNE') || upper.contains('BAINE');
+
+                if (isBaine) {
+                  return _BaineDangerSelector(
+                    level: baineLevel,
+                    onChanged: _setBaineLevel,
+                  );
+                }
+
                 final bool selected = selectedDangers.contains(danger);
 
                 return CheckboxListTile(
@@ -969,6 +1012,7 @@ class _SauveteurActionsRapidesPageState
                   value: selected,
                   activeColor: const Color(0xFFFDE047),
                   checkColor: Colors.black,
+                  secondary: _DangerChoiceIcon(danger: danger),
                   title: Text(
                     danger,
                     softWrap: true,
@@ -1001,7 +1045,7 @@ class _SauveteurActionsRapidesPageState
               onPressed: () async {
                 setState(() => isDangerMenuOpen = false);
                 await _persistLiveChanges({
-                  'dangers': selectedDangers.toList(),
+                  'dangers': _dangerValuesForPublication(),
                 });
               },
               style: ElevatedButton.styleFrom(
