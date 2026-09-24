@@ -1691,10 +1691,14 @@ class _ActionButton extends StatelessWidget {
 
 class SauveteurNotificationPage extends StatefulWidget {
   final Color profileColor;
+  final String spotLabel;
+  final Future<bool> Function(String message) onPublish;
 
   const SauveteurNotificationPage({
     super.key,
     required this.profileColor,
+    required this.spotLabel,
+    required this.onPublish,
   });
 
   @override
@@ -1707,9 +1711,10 @@ class _SauveteurNotificationPageState
   late stt.SpeechToText _speech;
 
   bool _isListening = false;
+  bool _saving = false;
+  String? _message;
 
-  final TextEditingController controller =
-      TextEditingController();
+  final TextEditingController controller = TextEditingController();
 
   @override
   void initState() {
@@ -1724,61 +1729,87 @@ class _SauveteurNotificationPageState
     super.dispose();
   }
 
-  void _listen() async {
+  Future<void> _listen() async {
     if (!_isListening) {
-      final bool available =
-          await _speech.initialize();
+      final available = await _speech.initialize();
 
-      if (available) {
-        setState(() => _isListening = true);
+      if (!available || !mounted) return;
 
-        _speech.listen(
-          localeId: 'fr_FR',
-          onResult: (result) {
-            setState(() {
-              controller.text =
-                  result.recognizedWords;
+      setState(() => _isListening = true);
 
-              controller.selection =
-                  TextSelection.fromPosition(
-                TextPosition(
-                  offset: controller.text.length,
-                ),
-              );
-            });
-          },
-        );
-      }
-    } else {
-      setState(() => _isListening = false);
-      _speech.stop();
+      _speech.listen(
+        localeId: 'fr_FR',
+        onResult: (result) {
+          if (!mounted) return;
+
+          setState(() {
+            controller.text = result.recognizedWords;
+            controller.selection = TextSelection.fromPosition(
+              TextPosition(offset: controller.text.length),
+            );
+          });
+        },
+      );
+      return;
     }
+
+    setState(() => _isListening = false);
+    await _speech.stop();
+  }
+
+  Future<void> _submit() async {
+    final message = controller.text.trim();
+
+    if (message.isEmpty || _saving) {
+      if (message.isEmpty) {
+        setState(() {
+          _message = 'Saisissez une notification avant de la publier.';
+        });
+      }
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    await _speech.stop();
+
+    if (!mounted) return;
+
+    setState(() {
+      _saving = true;
+      _isListening = false;
+      _message = null;
+    });
+
+    final published = await widget.onPublish(message);
+
+    if (!mounted) return;
+
+    if (published) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+
+    setState(() {
+      _saving = false;
+      _message =
+          'La notification n’a pas pu être publiée sur le SPHOT.';
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-
       body: Stack(
         fit: StackFit.expand,
-
         children: [
           Image.asset(
             'data/images/map_background.jpg',
             fit: BoxFit.cover,
           ),
-
           SafeArea(
             child: Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(
-                16,
-                8,
-                16,
-                16,
-              ),
-
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 children: [
                   Image.asset(
@@ -1786,284 +1817,202 @@ class _SauveteurNotificationPageState
                     height: 56,
                     fit: BoxFit.contain,
                   ),
-
                   Text(
                     'ÉCRIRE UNE NOTIFICATION',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
-                      fontWeight:
-                          FontWeight.w900,
-                      color:
-                          widget.profileColor,
+                      fontWeight: FontWeight.w900,
+                      color: widget.profileColor,
                       letterSpacing: 0.6,
                     ),
                   ),
-
-                  const SizedBox(height: 16),
-
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.82),
+                      borderRadius: BorderRadius.circular(13),
+                      border: Border.all(
+                        color: Colors.black.withOpacity(0.35),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.place_rounded,
+                          color: widget.profileColor,
+                          size: 19,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            widget.spotLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   Expanded(
                     child: Container(
                       width: double.infinity,
-
-                      padding:
-                          const EdgeInsets.all(
-                        16,
-                      ),
-
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.transparent,
-
-                        borderRadius:
-                            BorderRadius.circular(
-                          22,
-                        ),
-
+                        borderRadius: BorderRadius.circular(22),
                         border: Border.all(
                           color: Colors.black,
                           width: 2,
                         ),
-
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black
-                                .withOpacity(
-                              0.12,
-                            ),
+                            color: Colors.black.withOpacity(0.12),
                             blurRadius: 12,
-                            offset:
-                                const Offset(
-                              0,
-                              5,
-                            ),
+                            offset: const Offset(0, 5),
                           ),
                         ],
                       ),
-
                       child: Column(
                         children: [
                           Row(
                             children: [
                               Icon(
-                                Icons
-                                    .mode_edit_outline_rounded,
-                                color: widget
-                                    .profileColor,
-                                size: 20,
+                                Icons.campaign_rounded,
+                                color: widget.profileColor,
+                                size: 21,
                               ),
-
-                              const SizedBox(
-                                width: 8,
-                              ),
-
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  'Message',
-                                  style:
-                                      TextStyle(
-                                    color: widget
-                                        .profileColor,
-                                    fontSize:
-                                        19,
-                                    fontWeight:
-                                        FontWeight
-                                            .bold,
+                                  'Message public',
+                                  style: TextStyle(
+                                    color: widget.profileColor,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ),
-
                               IconButton(
-                                onPressed:
-                                    _listen,
-
-                                padding:
-                                    EdgeInsets
-                                        .zero,
-
-                                constraints:
-                                    const BoxConstraints(
-                                  minWidth:
-                                      34,
-                                  minHeight:
-                                      34,
+                                onPressed: _saving ? null : _listen,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 34,
+                                  minHeight: 34,
                                 ),
-
                                 icon: Icon(
                                   _isListening
-                                      ? Icons
-                                          .mic_rounded
-                                      : Icons
-                                          .mic_none_rounded,
-
+                                      ? Icons.mic_rounded
+                                      : Icons.mic_none_rounded,
                                   color: _isListening
-                                      ? Colors
-                                          .red
-                                      : widget
-                                          .profileColor,
-
+                                      ? Colors.red
+                                      : widget.profileColor,
                                   size: 24,
                                 ),
                               ),
                             ],
                           ),
-
                           if (_isListening)
                             const Padding(
-                              padding:
-                                  EdgeInsets.only(
-                                top: 4,
-                              ),
-
+                              padding: EdgeInsets.only(top: 4),
                               child: Text(
                                 'Écoute en cours...',
-                                style:
-                                    TextStyle(
-                                  color:
-                                      Colors
-                                          .red,
-                                  fontWeight:
-                                      FontWeight
-                                          .w800,
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
                             ),
-
-                          const SizedBox(
-                            height: 16,
-                          ),
-
+                          const SizedBox(height: 12),
                           Expanded(
                             child: TextField(
-                              controller:
-                                  controller,
-
+                              controller: controller,
+                              enabled: !_saving,
                               maxLines: null,
-
                               expands: true,
-
-                              textAlignVertical:
-                                  TextAlignVertical
-                                      .top,
-
-                              decoration:
-                                  InputDecoration(
+                              textAlignVertical: TextAlignVertical.top,
+                              decoration: InputDecoration(
                                 hintText:
-                                    'Écrivez ou dictez ici...',
-
+                                    'Information utile au public sur ce SPHOT...',
                                 filled: true,
-
-                                fillColor:
-                                    const Color(
-                                  0xFFF3F7FA,
-                                ),
-
-                                enabledBorder:
-                                    OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(
-                                    16,
-                                  ),
-
-                                  borderSide:
-                                      const BorderSide(
-                                    color: Colors
-                                        .black,
+                                fillColor: const Color(0xFFF3F7FA),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(
+                                    color: Colors.black,
                                     width: 2,
                                   ),
                                 ),
-
-                                border:
-                                    OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(
-                                    16,
-                                  ),
-
-                                  borderSide:
-                                      const BorderSide(
-                                    color: Colors
-                                        .black,
-                                    width: 2,
+                                disabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(
+                                    color: Colors.black26,
                                   ),
                                 ),
-
-                                focusedBorder:
-                                    OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(
-                                    16,
-                                  ),
-
-                                  borderSide:
-                                      BorderSide(
-                                    color: widget
-                                        .profileColor,
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(
+                                    color: widget.profileColor,
                                     width: 3,
                                   ),
                                 ),
                               ),
                             ),
                           ),
-
-                          const SizedBox(
-                            height: 14,
-                          ),
-
-                          SizedBox(
-                            width:
-                                double.infinity,
-
-                            height: 52,
-
-                            child:
-                                ElevatedButton
-                                    .icon(
-                              onPressed: () {
-                                Navigator.of(
-                                        context)
-                                    .pop();
-                              },
-
-                              icon: const Icon(
-                                Icons
-                                    .check_rounded,
+                          if (_message != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              _message!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xFFB91C1C),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
                               ),
-
-                              label:
-                                  const Text(
-                                'VALIDER LA NOTIFICATION',
-                                style:
-                                    TextStyle(
-                                  fontWeight:
-                                      FontWeight
-                                          .w900,
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: ElevatedButton.icon(
+                              onPressed: _saving ? null : _submit,
+                              icon: _saving
+                                  ? const SizedBox.square(
+                                      dimension: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.4,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(Icons.campaign_rounded),
+                              label: Text(
+                                _saving
+                                    ? 'PUBLICATION...'
+                                    : 'PUBLIER LA NOTIFICATION',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
-
-                              style:
-                                  ElevatedButton
-                                      .styleFrom(
-                                backgroundColor:
-                                    widget
-                                        .profileColor,
-
-                                foregroundColor:
-                                    Colors
-                                        .white,
-
-                                side:
-                                    const BorderSide(
-                                  color: Colors
-                                      .black,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: widget.profileColor,
+                                foregroundColor: Colors.white,
+                                side: const BorderSide(
+                                  color: Colors.black,
                                   width: 2,
                                 ),
-
-                                shape:
-                                    RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(
-                                    16,
-                                  ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
                             ),
@@ -2072,35 +2021,30 @@ class _SauveteurNotificationPageState
                       ),
                     ),
                   ),
-
-                  const SizedBox(
-                    height: 10,
-                  ),
-
+                  const SizedBox(height: 10),
                   Container(
-  width: 48,
-  height: 48,
-  decoration: BoxDecoration(
-    color: Colors.transparent,
-    shape: BoxShape.circle,
-    border: Border.all(
-      color: Colors.black,
-      width: 2,
-    ),
-  ),
-  child: IconButton(
-    onPressed: () =>
-        Navigator.of(context).pop(),
-
-    padding: EdgeInsets.zero,
-
-    icon: const Icon(
-      Icons.arrow_back_ios_new_rounded,
-      color: Colors.black,
-      size: 20,
-    ),
-  ),
-),
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.black,
+                        width: 2,
+                      ),
+                    ),
+                    child: IconButton(
+                      onPressed: _saving
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.black,
+                        size: 20,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
