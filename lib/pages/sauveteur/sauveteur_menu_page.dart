@@ -232,7 +232,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                     fit: BoxFit.contain,
                   ),
                   Text(
-                    'RENSEIGNEMENTS SAUVETEURS',
+                    'SPHOT SAUVETEUR',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
