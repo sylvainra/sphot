@@ -34,6 +34,7 @@ class SpotFlagState {
   final dynamic meteoTerrestre;
   final dynamic meteoMarine;
   final dynamic ephemeride;
+  final dynamic notificationPublique;
   final dynamic updatedAt;
 
   SpotFlagState({
@@ -68,6 +69,7 @@ class SpotFlagState {
     this.meteoTerrestre,
     this.meteoMarine,
     this.ephemeride,
+    this.notificationPublique,
     this.updatedAt,
   });
 
@@ -110,6 +112,7 @@ class SpotFlagState {
     meteoTerrestre: data['meteoTerrestre'],
     meteoMarine: data['meteoMarine'],
     ephemeride: data['ephemeride'],
+    notificationPublique: data['notificationPublique'],
     updatedAt: data['updatedAt'],
   );
 }
