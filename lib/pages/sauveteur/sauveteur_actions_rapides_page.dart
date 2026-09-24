@@ -445,6 +445,96 @@ class _SauveteurActionsRapidesPageState
     });
   }
 
+  Widget _buildFlagMastControl() {
+    const height = 174.0;
+
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.45),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Colors.black.withOpacity(0.25),
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapUp: (details) {
+              final next = details.localPosition.dy <
+                      constraints.maxHeight / 2
+                  ? 'Hissé'
+                  : 'Affalé';
+              unawaited(updateFlagPosition(next));
+            },
+            onVerticalDragUpdate: (details) {
+              final next = details.localPosition.dy <
+                      constraints.maxHeight / 2
+                  ? 'Hissé'
+                  : 'Affalé';
+              _previewFlagPosition(next);
+            },
+            onVerticalDragEnd: (_) {
+              unawaited(_persistFlagState());
+            },
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const Positioned(
+                  top: 7,
+                  left: 0,
+                  right: 0,
+                  child: Text(
+                    'HISSÉ',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF15803D),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 18, bottom: 18),
+                  child: Transform.scale(
+                    scale: 1.08,
+                    child: FlagMarker(
+                      spot: _previewSpotState(),
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  bottom: 7,
+                  left: 0,
+                  right: 0,
+                  child: Text(
+                    'AFFALÉ',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFFDC2626),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 6,
+                  top: 66,
+                  child: Icon(
+                    Icons.unfold_more_rounded,
+                    size: 22,
+                    color: Colors.black.withOpacity(0.45),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _goHome() {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
@@ -526,56 +616,80 @@ class _SauveteurActionsRapidesPageState
     child: Column(
       children: [
                           _sectionCard(
-                            title: 'Choix du sphot',
+                            title: 'Choix du SPHOT de surveillance',
                             icon: Icons.place_rounded,
                             children: [
-                              PopupMenuButton<Map<String, String>>(
-                                offset: Offset.zero,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(22),
+                              const SizedBox(height: 5),
+                              DropdownButtonFormField<String>(
+                                value: selectedSpotId,
+                                isExpanded: true,
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: Colors.white.withOpacity(0.92),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 11,
+                                  ),
+                                  prefixIcon: Icon(
+                                    Icons.place_rounded,
+                                    color: widget.profileColor,
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                    borderSide: const BorderSide(
+                                      color: Colors.black,
+                                      width: 1.4,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                    borderSide: BorderSide(
+                                      color: widget.profileColor,
+                                      width: 2.2,
+                                    ),
+                                  ),
                                 ),
-                                color: Colors.white.withOpacity(0.98),
-                                elevation: 12,
-                                constraints: BoxConstraints(
-  minWidth: MediaQuery.of(context).size.width - 64,
-  maxWidth: MediaQuery.of(context).size.width - 64,
-),
-                                onOpened: () {
-                                  setState(() => isSphotMenuOpen = true);
-                                },
-                                onCanceled: () {
-                                  setState(() => isSphotMenuOpen = false);
-                                },
-                                onSelected: (poste) {
-                                  _selectSpot(poste);
-                                },
-                                itemBuilder: (context) {
-                                  return postesSecoursCommune.map((poste) {
-                                    final secours = poste['nomSecours']!;
-                                    final sphot = poste['nomSphot']!;
-                                    final bool selected =
-                                        poste['spotId'] == selectedSpotId;
-
-                                    return PopupMenuItem<Map<String, String>>(
-                                      value: poste,
-                                      padding: EdgeInsets.zero,
-                                      child: _SphotMenuItem(
-                                        title: '$secours - $sphot',
-                                        color: widget.profileColor,
-                                        selected: selected,
-                                        showArrow: false,
-                                        isOpen: false,
-                                      ),
-                                    );
-                                  }).toList();
-                                },
-                                child: _SphotMenuItem(
-                                  title: '$nomSecours - $nomSphot',
+                                icon: Icon(
+                                  Icons.keyboard_arrow_down_rounded,
                                   color: widget.profileColor,
-                                  selected: true,
-                                  showArrow: true,
-                                  isOpen: isSphotMenuOpen,
                                 ),
+                                dropdownColor: Colors.white,
+                                items: postesSecoursCommune.map((poste) {
+                                  final secours =
+                                      (poste['nomSecours'] ?? '').trim();
+                                  final sphot =
+                                      (poste['nomSphot'] ?? '').trim();
+                                  final label = [
+                                    secours,
+                                    sphot,
+                                  ].where((value) => value.isNotEmpty).join(
+                                        ' - ',
+                                      );
+
+                                  return DropdownMenuItem<String>(
+                                    value: poste['spotId'],
+                                    child: Text(
+                                      label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: _loadingSpots
+                                    ? null
+                                    : (spotId) {
+                                        if (spotId == null) return;
+                                        final poste =
+                                            postesSecoursCommune.firstWhere(
+                                          (item) =>
+                                              item['spotId'] == spotId,
+                                        );
+                                        unawaited(_selectSpot(poste));
+                                      },
                               ),
                             ],
                           ),
@@ -618,7 +732,10 @@ class _SauveteurActionsRapidesPageState
                             Container(
                               width: double.infinity,
                               height: 58,
-                              margin: const EdgeInsets.only(top: 3, bottom: 6),
+                              margin: const EdgeInsets.only(
+                                top: 3,
+                                bottom: 6,
+                              ),
                               padding: const EdgeInsets.symmetric(
                                 vertical: 16,
                                 horizontal: 14,
@@ -656,98 +773,100 @@ class _SauveteurActionsRapidesPageState
 
                           if (isTemporaryClosed) _dangerBanner(),
 
-_sectionCard(
-  title: 'Actions rapides',
+                          _sectionCard(
+                            title: 'Actions rapides',
                             icon: Icons.flash_on,
                             children: [
-                              const Text(
-                                'Couleur du drapeau',
-                                style: TextStyle(fontWeight: FontWeight.w600),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                height: 174,
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    SizedBox(
+                                      width: 132,
+                                      child: _buildFlagMastControl(),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        children: [
+                                          Expanded(
+                                            child: _FlagColorButton(
+                                              label: 'Vert',
+                                              color: const Color(0xFF22C55E),
+                                              selected: flagColor == 'Vert',
+                                              onTap: () {
+                                                _changeFlagColor('Vert');
+                                              },
+                                            ),
+                                          ),
+                                          const SizedBox(height: 7),
+                                          Expanded(
+                                            child: _FlagColorButton(
+                                              label: 'Jaune',
+                                              color: const Color(0xFFFDE047),
+                                              selected: flagColor == 'Jaune',
+                                              onTap: () {
+                                                _changeFlagColor('Jaune');
+                                              },
+                                            ),
+                                          ),
+                                          const SizedBox(height: 7),
+                                          Expanded(
+                                            child: _FlagColorButton(
+                                              label: 'Rouge',
+                                              color: const Color(0xFFEF4444),
+                                              selected: flagColor == 'Rouge',
+                                              onTap: () {
+                                                _changeFlagColor('Rouge');
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-
                               const SizedBox(height: 10),
-
-                              Row(
-                                children: [
-                                  _FlagColorButton(
-                                    label: 'Vert',
-                                    color: const Color(0xFF22C55E),
-                                    selected: flagColor == 'Vert',
-                                    onTap: () {
-                                      _changeFlagColor('Vert');
-                                    },
-                                  ),
-                                  const SizedBox(width: 10),
-                                  _FlagColorButton(
-                                    label: 'Jaune',
-                                    color: const Color(0xFFFDE047),
-                                    selected: flagColor == 'Jaune',
-                                    onTap: () {
-                                      _changeFlagColor('Jaune');
-                                    },
-                                  ),
-                                  const SizedBox(width: 10),
-                                  _FlagColorButton(
-                                    label: 'Rouge',
-                                    color: const Color(0xFFEF4444),
-                                    selected: flagColor == 'Rouge',
-                                    onTap: () {
-                                      _changeFlagColor('Rouge');
-                                    },
-                                  ),
-                                ],
+                              _ActionButton(
+                                icon: Icons.warning_amber_rounded,
+                                label: selectedDangers.isEmpty
+                                    ? 'Déclarer un danger'
+                                    : '${selectedDangers.length} '
+                                        'danger(s) sélectionné(s)',
+                                color: const Color(0xFFFDE047),
+                                onTap: () {
+                                  setState(() {
+                                    isDangerMenuOpen = !isDangerMenuOpen;
+                                  });
+                                },
                               ),
-
                               const SizedBox(height: 10),
-
-                              const Text(
-                                'Position du drapeau',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-
-                              const SizedBox(height: 10),
-
-                              _FlagPositionSwitch(
-                                isAffale: flagPosition == 'Affalé',
-                                color: widget.profileColor,
-                                onChanged: (isAffale) {
-                                  updateFlagPosition(
-                                    isAffale ? 'Affalé' : 'Hissé',
+                              _ActionButton(
+                                icon: Icons.campaign_rounded,
+                                label: 'Ajouter une notification',
+                                color: Colors.red,
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          SauveteurNotificationPage(
+                                        profileColor: widget.profileColor,
+                                        spotLabel: [
+                                          nomSecours,
+                                          nomSphot,
+                                        ].where(
+                                          (value) => value.trim().isNotEmpty,
+                                        ).join(' - '),
+                                        onPublish: _publishNotification,
+                                      ),
+                                    ),
                                   );
                                 },
                               ),
-
-                              const SizedBox(height: 10),
-
-_ActionButton(
-  icon: Icons.warning_amber_rounded,
-  label: selectedDangers.isEmpty
-      ? 'Déclarer un danger'
-      : '${selectedDangers.length} danger(s) sélectionné(s)',
-  color: const Color(0xFFFDE047),
-  onTap: () {
-    setState(() {
-      isDangerMenuOpen = !isDangerMenuOpen;
-    });
-  },
-),
-
-const SizedBox(height: 10),
-
-_ActionButton(
-  icon: Icons.mode_edit_outline_rounded,
-  label: 'Ajouter une notification',
-  color: Colors.red,
-  onTap: () {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => SauveteurNotificationPage(
-  profileColor: widget.profileColor,
-),
-      ),
-    );
-  },
-),
                             ],
                           ),
                         ],
