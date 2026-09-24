@@ -67,6 +67,7 @@ function buildPublicSpot(territoireId, spotId, spot) {
     "meteoTerrestre",
     "meteoMarine",
     "ephemeride",
+    "notificationPublique",
   ];
 
   const result = {territoireId, spotId};
@@ -98,6 +99,7 @@ function buildPublicLiveState(spot) {
     "meteoTerrestre",
     "meteoMarine",
     "ephemeride",
+    "notificationPublique",
   ];
   const result = {};
   liveFields.forEach((field) => {
@@ -5008,12 +5010,44 @@ exports.updateSauveteurLiveState = onRequest(
           "meteoTerrestre",
           "meteoMarine",
           "ephemeride",
+          "notificationPublique",
         ]);
         const sanitizedChanges = {};
 
         Object.entries(changes).forEach(([key, value]) => {
           if (allowedFields.has(key)) sanitizedChanges[key] = value;
         });
+
+        if (Object.keys(sanitizedChanges).length === 0) {
+          response.status(400).json({
+            success: false,
+            error: "no_allowed_changes",
+          });
+          return;
+        }
+
+        if (sanitizedChanges.notificationPublique !== undefined) {
+          const notification = sanitizedChanges.notificationPublique || {};
+          const message = (notification.message || "")
+              .toString()
+              .trim();
+
+          if (!message) {
+            delete sanitizedChanges.notificationPublique;
+          } else {
+            sanitizedChanges.notificationPublique = {
+              message,
+              active: notification.active !== false,
+              publishedAt:
+                admin.firestore.FieldValue.serverTimestamp(),
+              publishedBy: {
+                sauveteurId: context.sauveteurId,
+                login: session.login,
+                role: context.userRole,
+              },
+            };
+          }
+        }
 
         if (Object.keys(sanitizedChanges).length === 0) {
           response.status(400).json({
