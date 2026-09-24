@@ -1329,37 +1329,35 @@ class _FlagColorButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          height: 52,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? Colors.black : Colors.transparent,
-              width: selected ? 3 : 0,
-            ),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : [],
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? Colors.black : Colors.transparent,
+            width: selected ? 3 : 0,
           ),
-          child: Center(
-            child: Text(
-              label.toUpperCase(),
-              style: TextStyle(
-                color: label == 'Jaune' ? Colors.black : Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 13,
-              ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [],
+        ),
+        child: Center(
+          child: Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: label == 'Jaune' ? Colors.black : Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 13,
             ),
           ),
         ),
@@ -1448,6 +1446,188 @@ class _FlagPositionSwitch extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _BaineDangerSelector extends StatelessWidget {
+  final int level;
+  final ValueChanged<int> onChanged;
+
+  const _BaineDangerSelector({
+    required this.level,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const colors = <Color>[
+      Color(0xFF22C55E),
+      Color(0xFF84CC16),
+      Color(0xFFF59E0B),
+      Color(0xFFF97316),
+      Color(0xFFDC2626),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.fromLTRB(2, 7, 2, 8),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.black.withOpacity(0.08),
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.waves_rounded,
+                color: level > 0 ? colors[level - 1] : Colors.black45,
+                size: 23,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'BAÏNES',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              if (level > 0)
+                TextButton(
+                  onPressed: () => onChanged(0),
+                  child: const Text(
+                    'RETIRER',
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Row(
+            children: List.generate(5, (index) {
+              final currentLevel = index + 1;
+              final selected = level == currentLevel;
+              final color = colors[index];
+
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    right: index == 4 ? 0 : 5,
+                  ),
+                  child: GestureDetector(
+                    onTap: () => onChanged(currentLevel),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? color.withOpacity(0.16)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(11),
+                        border: Border.all(
+                          color: selected ? color : Colors.black26,
+                          width: selected ? 2 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.waves_rounded,
+                            color: color,
+                            size: 14 + currentLevel * 2.2,
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            '$currentLevel',
+                            style: TextStyle(
+                              color: color,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DangerChoiceIcon extends StatelessWidget {
+  final String danger;
+
+  const _DangerChoiceIcon({
+    required this.danger,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final visual = _visualFor(danger);
+
+    return SizedBox(
+      width: 30,
+      child: Icon(
+        visual.$1,
+        color: visual.$2,
+        size: 21,
+      ),
+    );
+  }
+
+  static (IconData, Color) _visualFor(String danger) {
+    final value = danger.toUpperCase();
+
+    if (value.contains('COURANT')) {
+      return (Icons.sync_alt_rounded, const Color(0xFF0284C7));
+    }
+    if (value.contains('SHORE BREAK') ||
+        value.contains('VAGUES') ||
+        value.contains('HOULE') ||
+        value.contains('REMOUS') ||
+        value.contains('TOURBILLON')) {
+      return (Icons.waves_rounded, const Color(0xFF2563EB));
+    }
+    if (value.contains('VENT')) {
+      return (Icons.air_rounded, const Color(0xFF64748B));
+    }
+    if (value.contains('CHALEUR') ||
+        value.contains('CHÂLEUR') ||
+        value.contains('CANICULE')) {
+      return (Icons.wb_sunny_rounded, const Color(0xFFF97316));
+    }
+    if (value.contains('EAUX') ||
+        value.contains('EAU FROIDE') ||
+        value.contains('DÉVERSEMENT')) {
+      return (Icons.water_drop_rounded, const Color(0xFF0891B2));
+    }
+    if (value.contains('ROCHER') || value.contains('RÉCIF')) {
+      return (Icons.landscape_rounded, const Color(0xFF78716C));
+    }
+    if (value.contains('REQUIN') ||
+        value.contains('ESPÈCES DANGEREUSES')) {
+      return (Icons.warning_rounded, const Color(0xFFDC2626));
+    }
+    if (value.contains('TRAF')) {
+      return (Icons.directions_boat_rounded, const Color(0xFF0F766E));
+    }
+
+    return (Icons.warning_amber_rounded, const Color(0xFFF59E0B));
   }
 }
 
