@@ -229,7 +229,54 @@ class _SauveteurMeteoTerrestrePageState extends State<SauveteurMeteoTerrestrePag
                   onChanged: (spotId) {
                     _selectSpot(spotId);
                   },
-                )
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 42,
+                child: ElevatedButton.icon(
+                  onPressed: enabled && !_savingLive ? _publishWeather : null,
+                  icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                  label: Text(
+                    _savingLive ? '...' : 'PUBLIER',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF5D4037),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (!_isSphotOn)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                'SPHOT OFF — publication réelle désactivée.',
+                style: TextStyle(
+                  color: Color(0xFFB91C1C),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            )
+          else if (_liveMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                _liveMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF1E3A8A),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   @override
