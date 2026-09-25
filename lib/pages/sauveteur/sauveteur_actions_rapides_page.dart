@@ -8,6 +8,9 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../../map/flag_marker.dart';
 import '../../models/flag_state.dart';
+import '../../widgets/adaptive_asset_image.dart';
+import '../../widgets/danger_pictogram.dart';
+import 'widgets/sauveteur_styled_dropdown.dart';
 
 class SauveteurActionsRapidesPage extends StatefulWidget {
   final Color profileColor;
@@ -43,7 +46,6 @@ class _SauveteurActionsRapidesPageState
   String typeSphot = 'Poste de secours';
   String? selectedSpotId;
 
-  bool isSphotMenuOpen = false;
   bool isDangerMenuOpen = false;
   bool _loadingSpots = true;
   bool _liveWriteBlocked = false;
@@ -54,6 +56,7 @@ class _SauveteurActionsRapidesPageState
 
   final Set<String> selectedDangers = {};
   int baineLevel = 0;
+  int caniculeLevel = 0;
 
   final List<String> dangerChoices = [
     'COURANTS',
@@ -63,10 +66,7 @@ class _SauveteurActionsRapidesPageState
     'HOULE',
     'CONDITIONS DÉFAVORABLES DE VENT POUR CERTAINS ÉQUIPEMENTS NAUTIQUES',
     'CHÂLEURS',
-    'CANICULE NIVEAU 1',
-    'CANICULE NIVEAU 2',
-    'CANICULE NIVEAU 3',
-    'CANICULE NIVEAU 4',
+    'CANICULE',
     'ALTÉRATION DE LA QUALITÉ DES EAUX DE BAIGNADE',
     'PRÉSENCE D’ESPÈCES DANGEREUSES (MÉDUSES...)',
     'EXISTANCE D’UNE ZONE MARINE OU SOUS-MARINE PROTÉGÉE',
@@ -166,7 +166,6 @@ class _SauveteurActionsRapidesPageState
       nomSecours = poste['nomSecours'] ?? 'POSTE';
       nomSphot = poste['nomSphot'] ?? '';
       typeSphot = poste['typeSphot'] ?? 'Poste de secours';
-      isSphotMenuOpen = false;
       _liveWriteBlocked = false;
       _liveStatusMessage = null;
 
@@ -176,6 +175,7 @@ class _SauveteurActionsRapidesPageState
         status = 'Baignade surveillée';
         selectedDangers.clear();
         baineLevel = 0;
+        caniculeLevel = 0;
       }
     });
 
@@ -229,27 +229,35 @@ class _SauveteurActionsRapidesPageState
 
         if (rawDangers is Iterable) {
           final values = rawDangers.map((value) => value.toString()).toList();
-          final baine = values.cast<String?>().firstWhere(
-                (value) {
-                  final upper = (value ?? '').toUpperCase();
-                  return upper.contains('BAÏNE') || upper.contains('BAINE');
-                },
-                orElse: () => null,
-              );
 
           var nextBaineLevel = 0;
-          if (baine != null) {
-            final match = RegExp(
-              r'NIVEAU\s*([1-5])',
-              caseSensitive: false,
-            ).firstMatch(baine);
-            nextBaineLevel = int.tryParse(match?.group(1) ?? '') ?? 1;
+          var nextCaniculeLevel = 0;
+
+          for (final value in values) {
+            final upper = value.toUpperCase();
+
+            if (upper.contains('BAÏNE') || upper.contains('BAINE')) {
+              final match = RegExp(
+                r'NIVEAU\s*([1-5])',
+                caseSensitive: false,
+              ).firstMatch(value);
+              nextBaineLevel = int.tryParse(match?.group(1) ?? '') ?? 1;
+            }
+
+            if (upper.contains('CANICULE')) {
+              final match = RegExp(
+                r'NIVEAU\s*([1-4])',
+                caseSensitive: false,
+              ).firstMatch(value);
+              nextCaniculeLevel = int.tryParse(match?.group(1) ?? '') ?? 1;
+            }
           }
 
           selectedDangers
             ..clear()
             ..addAll(values);
           baineLevel = nextBaineLevel;
+          caniculeLevel = nextCaniculeLevel;
         }
       });
     });
