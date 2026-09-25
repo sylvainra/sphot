@@ -700,44 +700,18 @@ class _SauveteurActionsRapidesPageState
       children: [
                           _sectionCard(
                             title: 'Choix du SPHOT de surveillance',
-                            icon: Icons.place_rounded,
+                            leading: const AdaptiveAssetImage(
+                              'data/icons/fire_red_icon.svg',
+                              width: 24,
+                              height: 24,
+                            ),
                             children: [
                               const SizedBox(height: 5),
-                              DropdownButtonFormField<String>(
+                              SauveteurStyledDropdown(
+                                labelText: 'SPHOT surveillé',
                                 value: selectedSpotId,
-                                isExpanded: true,
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: Colors.white.withOpacity(0.92),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 11,
-                                  ),
-                                  prefixIcon: Icon(
-                                    Icons.place_rounded,
-                                    color: widget.profileColor,
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(18),
-                                    borderSide: const BorderSide(
-                                      color: Colors.black,
-                                      width: 1.4,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(18),
-                                    borderSide: BorderSide(
-                                      color: widget.profileColor,
-                                      width: 2.2,
-                                    ),
-                                  ),
-                                ),
-                                icon: Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                  color: widget.profileColor,
-                                ),
-                                dropdownColor: Colors.white,
-                                items: postesSecoursCommune.map((poste) {
+                                enabled: !_loadingSpots,
+                                options: postesSecoursCommune.map((poste) {
                                   final secours =
                                       (poste['nomSecours'] ?? '').trim();
                                   final sphot =
@@ -749,30 +723,20 @@ class _SauveteurActionsRapidesPageState
                                         ' - ',
                                       );
 
-                                  return DropdownMenuItem<String>(
-                                    value: poste['spotId'],
-                                    child: Text(
-                                      label,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
+                                  return SauveteurDropdownOption(
+                                    value: poste['spotId'] ?? '',
+                                    label: label,
                                   );
+                                }).where((option) {
+                                  return option.value.isNotEmpty;
                                 }).toList(),
-                                onChanged: _loadingSpots
-                                    ? null
-                                    : (spotId) {
-                                        if (spotId == null) return;
-                                        final poste =
-                                            postesSecoursCommune.firstWhere(
-                                          (item) =>
-                                              item['spotId'] == spotId,
-                                        );
-                                        unawaited(_selectSpot(poste));
-                                      },
+                                onChanged: (spotId) {
+                                  final poste =
+                                      postesSecoursCommune.firstWhere(
+                                    (item) => item['spotId'] == spotId,
+                                  );
+                                  unawaited(_selectSpot(poste));
+                                },
                               ),
                             ],
                           ),
@@ -1218,9 +1182,11 @@ class _SauveteurActionsRapidesPageState
 
   Widget _sectionCard({
     required String title,
-    required IconData icon,
+    IconData? icon,
+    Widget? leading,
     required List<Widget> children,
   }) {
+    assert(icon != null || leading != null);
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 3),
@@ -1245,7 +1211,11 @@ class _SauveteurActionsRapidesPageState
   children: [
           Row(
             children: [
-              Icon(icon, color: widget.profileColor),
+              leading ??
+                  Icon(
+                    icon,
+                    color: widget.profileColor,
+                  ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
