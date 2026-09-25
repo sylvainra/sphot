@@ -446,13 +446,13 @@ class _PublicLiveDataSection extends StatelessWidget {
 
     switch (level) {
       case 1:
-        return 'Niveau 1 : Veille saisonnière';
+        return 'Niveau 1 – Veille saisonnière';
       case 2:
-        return 'Niveau 2 : Avertissement chaleur';
+        return 'Niveau 2 – Avertissement chaleur';
       case 3:
-        return 'Niveau 3 : Alerte canicule';
+        return 'Niveau 3 – Alerte canicule';
       case 4:
-        return 'Niveau 4 : Mobilisation maximale';
+        return 'Niveau 4 – Mobilisation maximale';
       default:
         return rawLevel.trim();
     }
@@ -831,6 +831,27 @@ class _PublicDangerRow extends StatelessWidget {
     required this.value,
   });
 
+  String get _displayValue {
+    final normalized = value.toUpperCase();
+
+    if ((normalized.contains('BAÏNE') || normalized.contains('BAINE')) &&
+        !normalized.contains('RISQUE')) {
+      final match = RegExp(r'NIVEAU\s*([1-5])').firstMatch(normalized);
+      final level = int.tryParse(match?.group(1) ?? '') ?? 1;
+
+      final risk = switch (level) {
+        1 || 2 => 'Risque faible à modéré',
+        3 => 'Risque marqué',
+        4 => 'Risque très élevé',
+        _ => 'Risque maximal (Alerte maximale)',
+      };
+
+      return '$value : $risk';
+    }
+
+    return value;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -851,7 +872,7 @@ class _PublicDangerRow extends StatelessWidget {
           const SizedBox(width: 5),
           Expanded(
             child: Text(
-              value,
+              _displayValue,
               style: const TextStyle(
                 color: Colors.black87,
                 fontSize: 10.5,
