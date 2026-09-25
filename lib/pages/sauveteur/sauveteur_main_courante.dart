@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+
+import 'widgets/sauveteur_styled_dropdown.dart';
 import 'package:http/http.dart' as http;
 
 class SauveteurMainCourantePage extends StatefulWidget {
@@ -300,26 +302,17 @@ class _SauveteurMainCourantePageState
       );
     }
 
-    return DropdownButtonFormField<String>(
+    return SauveteurStyledDropdown(
+      labelText: 'Poste de secours',
       value: _selectedSpotId,
-      isExpanded: true,
-      decoration: InputDecoration(
-        labelText: 'Poste de secours',
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-      ),
-      items: _spots
+      options: _spots
           .map(
-            (spot) => DropdownMenuItem<String>(
-              value: spot['id'],
-              child: Text(
-                spot['label']!,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
+            (spot) => SauveteurDropdownOption(
+              value: spot['id'] ?? '',
+              label: spot['label'] ?? spot['id'] ?? '',
             ),
           )
+          .where((option) => option.value.isNotEmpty)
           .toList(),
       onChanged: (value) async {
         setState(() => _selectedSpotId = value);
@@ -457,26 +450,19 @@ class _SauveteurMainCourantePageState
       ),
       child: Column(
         children: [
-          DropdownButtonFormField<String>(
+          SauveteurStyledDropdown(
+            labelText: 'Type de fait',
             value: _selectedType,
-            decoration: InputDecoration(
-              labelText: 'Type de fait',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            items: _types
+            options: _types
                 .map(
-                  (type) => DropdownMenuItem<String>(
+                  (type) => SauveteurDropdownOption(
                     value: type,
-                    child: Text(type),
+                    label: type,
                   ),
                 )
                 .toList(),
             onChanged: (value) {
-              if (value != null) {
-                setState(() => _selectedType = value);
-              }
+              setState(() => _selectedType = value);
             },
           ),
           const SizedBox(height: 10),
