@@ -460,6 +460,42 @@ class _PublicLiveDataSection extends StatelessWidget {
     target.add('$label : $text$suffix');
   }
 
+  static String _expandDirection(String rawDirection) {
+    final raw = rawDirection.trim();
+    if (raw.isEmpty) return '';
+
+    final normalized = raw
+        .toUpperCase()
+        .replaceAll(' ', '')
+        .replaceAll('-', '');
+
+    const directions = <String, String>{
+      'N': 'Nord',
+      'NNE': 'Nord-Nord-Est',
+      'NE': 'Nord-Est',
+      'ENE': 'Est-Nord-Est',
+      'E': 'Est',
+      'ESE': 'Est-Sud-Est',
+      'SE': 'Sud-Est',
+      'SSE': 'Sud-Sud-Est',
+      'S': 'Sud',
+      'SSO': 'Sud-Sud-Ouest',
+      'SO': 'Sud-Ouest',
+      'OSO': 'Ouest-Sud-Ouest',
+      'O': 'Ouest',
+      'ONO': 'Ouest-Nord-Ouest',
+      'NO': 'Nord-Ouest',
+      'NNO': 'Nord-Nord-Ouest',
+      'W': 'Ouest',
+      'WSW': 'Ouest-Sud-Ouest',
+      'SW': 'Sud-Ouest',
+      'WNW': 'Ouest-Nord-Ouest',
+      'NW': 'Nord-Ouest',
+    };
+
+    return directions[normalized] ?? raw;
+  }
+
   static String _caniculeLevelText(String rawLevel) {
     final level = int.tryParse(rawLevel.trim());
 
@@ -504,7 +540,7 @@ class _PublicLiveDataSection extends StatelessWidget {
     _addValue(
       result,
       'Direction vent matin',
-      _textValue(values, 'Direction vent matin'),
+      _expandDirection(_textValue(values, 'Direction vent matin')),
     );
     _addValue(
       result,
@@ -515,7 +551,7 @@ class _PublicLiveDataSection extends StatelessWidget {
     _addValue(
       result,
       'Direction vent après-midi',
-      _textValue(values, 'Direction vent après-midi'),
+      _expandDirection(_textValue(values, 'Direction vent après-midi')),
     );
     _addValue(
       result,
@@ -569,12 +605,12 @@ class _PublicLiveDataSection extends StatelessWidget {
     _addValue(
       result,
       'Direction de la houle matin',
-      _textValue(values, 'Direction houle matin'),
+      _expandDirection(_textValue(values, 'Direction houle matin')),
     );
     _addValue(
       result,
       'Direction de la houle après-midi',
-      _textValue(values, 'Direction houle après-midi'),
+      _expandDirection(_textValue(values, 'Direction houle après-midi')),
     );
     _addValue(
       result,
@@ -916,6 +952,20 @@ class _PublicDangerRow extends StatelessWidget {
   }
 }
 
+class _UvContext {
+  final int index;
+  final String label;
+  final String advice;
+  final Color color;
+
+  const _UvContext({
+    required this.index,
+    required this.label,
+    required this.advice,
+    required this.color,
+  });
+}
+
 class _LiveDataBlock extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -926,6 +976,103 @@ class _LiveDataBlock extends StatelessWidget {
     required this.title,
     required this.values,
   });
+
+  static _UvContext? _uvContextFromValue(String value) {
+    if (!value.startsWith('Indice UV :')) return null;
+
+    final raw = value.substring('Indice UV :'.length).trim();
+    final match = RegExp(r'^(\d+)').firstMatch(raw);
+    final index = int.tryParse(match?.group(1) ?? '');
+    if (index == null) return null;
+
+    if (index <= 2) {
+      return _UvContext(
+        index: index,
+        label: 'Faible',
+        advice: 'Protection non nécessaire',
+        color: const Color(0xFF2FAF34),
+      );
+    }
+
+    if (index <= 5) {
+      return _UvContext(
+        index: index,
+        label: 'Moyen',
+        advice:
+            'Protection nécessaire : chapeau, t-shirt, lunettes de soleil '
+            'et crème solaire',
+        color: const Color(0xFFD4B000),
+      );
+    }
+
+    if (index <= 7) {
+      return _UvContext(
+        index: index,
+        label: 'Élevé',
+        advice:
+            'Protection nécessaire : chapeau, t-shirt, lunettes de soleil '
+            'et crème solaire',
+        color: const Color(0xFFF28C00),
+      );
+    }
+
+    if (index <= 10) {
+      return _UvContext(
+        index: index,
+        label: 'Très élevé',
+        advice:
+            'Protection supplémentaire nécessaire : éviter, si possible, '
+            'tout séjour en plein air',
+        color: const Color(0xFFE73312),
+      );
+    }
+
+    return _UvContext(
+      index: index,
+      label: 'Extrême',
+      advice:
+          'Protection supplémentaire nécessaire : éviter, si possible, '
+          'tout séjour en plein air',
+      color: const Color(0xFFB05AA8),
+    );
+  }
+
+  static Widget _buildValue(String value) {
+    final uv = _uvContextFromValue(value);
+
+    if (uv == null) {
+      return Text(
+        value,
+        style: const TextStyle(
+          color: Colors.black87,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          height: 1.25,
+        ),
+      );
+    }
+
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(
+          color: Colors.black87,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          height: 1.25,
+        ),
+        children: [
+          const TextSpan(text: 'Indice UV : '),
+          TextSpan(
+            text: '${uv.index} – ${uv.label} – ${uv.advice}',
+            style: TextStyle(
+              color: uv.color,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -964,15 +1111,7 @@ class _LiveDataBlock extends StatelessWidget {
                 ...values.map(
                   (value) => Padding(
                     padding: const EdgeInsets.only(bottom: 2),
-                    child: Text(
-                      value,
-                      style: const TextStyle(
-                        color: Colors.black87,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        height: 1.25,
-                      ),
-                    ),
+                    child: _buildValue(value),
                   ),
                 ),
             ],
