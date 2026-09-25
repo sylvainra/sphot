@@ -1492,17 +1492,14 @@ class _BaineDangerSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const colors = <Color>[
-      Color(0xFF22C55E),
-      Color(0xFF84CC16),
-      Color(0xFFF59E0B),
-      Color(0xFFF97316),
-      Color(0xFFDC2626),
-    ];
+    final enabled = level > 0;
+    final displayLevel = enabled ? level : 1;
+    final displayColor =
+        enabled ? baineLevelColor(displayLevel) : Colors.black38;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.fromLTRB(2, 7, 2, 8),
+      padding: const EdgeInsets.fromLTRB(2, 6, 2, 8),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
@@ -1511,14 +1508,19 @@ class _BaineDangerSelector extends StatelessWidget {
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                Icons.waves_rounded,
-                color: level > 0 ? colors[level - 1] : Colors.black45,
-                size: 23,
+              SizedBox(
+                width: 34,
+                child: Center(
+                  child: BaineWaveGlyph(
+                    level: displayLevel,
+                    color: displayColor,
+                    width: 30,
+                    height: 24,
+                  ),
+                ),
               ),
               const SizedBox(width: 8),
               const Expanded(
@@ -1530,136 +1532,219 @@ class _BaineDangerSelector extends StatelessWidget {
                   ),
                 ),
               ),
-              if (level > 0)
-                TextButton(
-                  onPressed: () => onChanged(0),
-                  child: const Text(
-                    'RETIRER',
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
+              Checkbox(
+                value: enabled,
+                activeColor: const Color(0xFFFDE047),
+                checkColor: Colors.black,
+                onChanged: (value) {
+                  onChanged(value == true ? displayLevel : 0);
+                },
+              ),
             ],
           ),
-          const SizedBox(height: 5),
-          Row(
-            children: List.generate(5, (index) {
-              final currentLevel = index + 1;
-              final selected = level == currentLevel;
-              final color = colors[index];
+          if (enabled) ...[
+            const SizedBox(height: 3),
+            Row(
+              children: List.generate(5, (index) {
+                final currentLevel = index + 1;
+                final selected = level == currentLevel;
+                final color = baineLevelColor(currentLevel);
 
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    right: index == 4 ? 0 : 5,
-                  ),
-                  child: GestureDetector(
-                    onTap: () => onChanged(currentLevel),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? color.withOpacity(0.16)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(11),
-                        border: Border.all(
-                          color: selected ? color : Colors.black26,
-                          width: selected ? 2 : 1,
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: index == 4 ? 0 : 5,
+                    ),
+                    child: GestureDetector(
+                      onTap: () => onChanged(currentLevel),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? color.withOpacity(0.14)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(11),
+                          border: Border.all(
+                            color: selected ? color : Colors.black26,
+                            width: selected ? 2 : 1,
+                          ),
                         ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.waves_rounded,
-                            color: color,
-                            size: 14 + currentLevel * 2.2,
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            '$currentLevel',
-                            style: TextStyle(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            BaineWaveGlyph(
+                              level: currentLevel,
                               color: color,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
+                              width: 30,
+                              height: 25,
                             ),
-                          ),
-                        ],
+                            Text(
+                              '$currentLevel',
+                              style: TextStyle(
+                                color: color,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-            }),
-          ),
+                );
+              }),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _DangerChoiceIcon extends StatelessWidget {
-  final String danger;
+class _CaniculeDangerSelector extends StatelessWidget {
+  final int level;
+  final ValueChanged<int> onChanged;
 
-  const _DangerChoiceIcon({
-    required this.danger,
+  const _CaniculeDangerSelector({
+    required this.level,
+    required this.onChanged,
   });
+
+  String _titleForLevel(int value) {
+    switch (value) {
+      case 1:
+        return 'Veille saisonnière';
+      case 2:
+        return 'Avertissement chaleur';
+      case 3:
+        return 'Alerte canicule';
+      case 4:
+        return 'Mobilisation maximale';
+      default:
+        return '';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final visual = _visualFor(danger);
+    final enabled = level > 0;
+    final displayLevel = enabled ? level : 1;
+    final displayColor =
+        enabled ? caniculeLevelColor(displayLevel) : Colors.black38;
 
-    return SizedBox(
-      width: 30,
-      child: Icon(
-        visual.$1,
-        color: visual.$2,
-        size: 21,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.fromLTRB(2, 6, 2, 8),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.black.withOpacity(0.08),
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 34,
+                child: Center(
+                  child: CaniculeLevelGlyph(
+                    level: displayLevel,
+                    width: 32,
+                    height: 24,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'CANICULE',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Checkbox(
+                value: enabled,
+                activeColor: const Color(0xFFFDE047),
+                checkColor: Colors.black,
+                onChanged: (value) {
+                  onChanged(value == true ? displayLevel : 0);
+                },
+              ),
+            ],
+          ),
+          if (enabled) ...[
+            const SizedBox(height: 3),
+            Row(
+              children: List.generate(4, (index) {
+                final currentLevel = index + 1;
+                final selected = level == currentLevel;
+                final color = caniculeLevelColor(currentLevel);
+
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: index == 3 ? 0 : 5,
+                    ),
+                    child: GestureDetector(
+                      onTap: () => onChanged(currentLevel),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? color.withOpacity(0.14)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(11),
+                          border: Border.all(
+                            color: selected ? color : Colors.black26,
+                            width: selected ? 2 : 1,
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CaniculeLevelGlyph(
+                              level: currentLevel,
+                              width: 48,
+                              height: 25,
+                            ),
+                            Text(
+                              'N$currentLevel',
+                              style: TextStyle(
+                                color: color,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 5),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Niveau $level : ${_titleForLevel(level)}',
+                style: TextStyle(
+                  color: displayColor,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
-  }
-
-  static (IconData, Color) _visualFor(String danger) {
-    final value = danger.toUpperCase();
-
-    if (value.contains('COURANT')) {
-      return (Icons.sync_alt_rounded, const Color(0xFF0284C7));
-    }
-    if (value.contains('SHORE BREAK') ||
-        value.contains('VAGUES') ||
-        value.contains('HOULE') ||
-        value.contains('REMOUS') ||
-        value.contains('TOURBILLON')) {
-      return (Icons.waves_rounded, const Color(0xFF2563EB));
-    }
-    if (value.contains('VENT')) {
-      return (Icons.air_rounded, const Color(0xFF64748B));
-    }
-    if (value.contains('CHALEUR') ||
-        value.contains('CHÂLEUR') ||
-        value.contains('CANICULE')) {
-      return (Icons.wb_sunny_rounded, const Color(0xFFF97316));
-    }
-    if (value.contains('EAUX') ||
-        value.contains('EAU FROIDE') ||
-        value.contains('DÉVERSEMENT')) {
-      return (Icons.water_drop_rounded, const Color(0xFF0891B2));
-    }
-    if (value.contains('ROCHER') || value.contains('RÉCIF')) {
-      return (Icons.landscape_rounded, const Color(0xFF78716C));
-    }
-    if (value.contains('REQUIN') ||
-        value.contains('ESPÈCES DANGEREUSES')) {
-      return (Icons.warning_rounded, const Color(0xFFDC2626));
-    }
-    if (value.contains('TRAF')) {
-      return (Icons.directions_boat_rounded, const Color(0xFF0F766E));
-    }
-
-    return (Icons.warning_amber_rounded, const Color(0xFFF59E0B));
   }
 }
 
