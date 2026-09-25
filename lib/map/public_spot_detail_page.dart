@@ -839,12 +839,16 @@ class _PublicDangerRow extends StatelessWidget {
       final match = RegExp(r'NIVEAU\s*([1-5])').firstMatch(normalized);
       final level = int.tryParse(match?.group(1) ?? '') ?? 1;
 
-      final risk = switch (level) {
-        1 || 2 => 'Risque faible à modéré',
-        3 => 'Risque marqué',
-        4 => 'Risque très élevé',
-        _ => 'Risque maximal (Alerte maximale)',
-      };
+      final String risk;
+      if (level <= 2) {
+        risk = 'Risque faible à modéré';
+      } else if (level == 3) {
+        risk = 'Risque marqué';
+      } else if (level == 4) {
+        risk = 'Risque très élevé';
+      } else {
+        risk = 'Risque maximal (Alerte maximale)';
+      }
 
       return '$value : $risk';
     }
