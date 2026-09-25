@@ -444,6 +444,37 @@ class _SauveteurActionsRapidesPageState
     });
   }
 
+  String _caniculeLevelTitle(int level) {
+    switch (level) {
+      case 1:
+        return 'Veille saisonnière';
+      case 2:
+        return 'Avertissement chaleur';
+      case 3:
+        return 'Alerte canicule';
+      case 4:
+        return 'Mobilisation maximale';
+      default:
+        return '';
+    }
+  }
+
+  void _setCaniculeLevel(int level) {
+    setState(() {
+      selectedDangers.removeWhere(
+        (danger) => danger.toUpperCase().contains('CANICULE'),
+      );
+
+      caniculeLevel = level;
+
+      if (level > 0) {
+        selectedDangers.add(
+          'CANICULE - NIVEAU $level : ${_caniculeLevelTitle(level)}',
+        );
+      }
+    });
+  }
+
   List<String> _dangerValuesForPublication() {
     final values = <String>[];
 
@@ -451,10 +482,21 @@ class _SauveteurActionsRapidesPageState
       final upper = choice.toUpperCase();
       final isBaine =
           upper.contains('BAÏNE') || upper.contains('BAINE');
+      final isCanicule = upper.contains('CANICULE');
 
       if (isBaine) {
         if (baineLevel > 0) {
           values.add('BAÏNES - NIVEAU $baineLevel');
+        }
+        continue;
+      }
+
+      if (isCanicule) {
+        if (caniculeLevel > 0) {
+          values.add(
+            'CANICULE - NIVEAU $caniculeLevel : '
+            '${_caniculeLevelTitle(caniculeLevel)}',
+          );
         }
         continue;
       }
@@ -469,7 +511,8 @@ class _SauveteurActionsRapidesPageState
       final upper = danger.toUpperCase();
       final isBaine =
           upper.contains('BAÏNE') || upper.contains('BAINE');
-      return !isBaine && !known.contains(danger);
+      final isCanicule = upper.contains('CANICULE');
+      return !isBaine && !isCanicule && !known.contains(danger);
     });
 
     values.addAll(extras);
