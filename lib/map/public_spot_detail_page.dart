@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/flag_state.dart';
+import '../widgets/danger_pictogram.dart';
 import 'flag_marker.dart';
 import 'public_webcam_view.dart';
 
@@ -632,21 +633,18 @@ class _PublicDangerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visual = _dangerVisual(value);
-
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: 5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            width: 28,
-            height: 24,
+            width: 38,
+            height: 28,
             child: Center(
-              child: Icon(
-                visual.icon,
-                size: visual.size,
-                color: visual.color,
+              child: DangerPictogram(
+                danger: value,
+                size: 27,
               ),
             ),
           ),
@@ -666,109 +664,6 @@ class _PublicDangerRow extends StatelessWidget {
       ),
     );
   }
-
-  static _DangerVisual _dangerVisual(String danger) {
-    final normalized = danger.toUpperCase();
-
-    if (normalized.contains('BAÏNE') || normalized.contains('BAINE')) {
-      final match = RegExp(r'NIVEAU\s*([1-5])').firstMatch(normalized);
-      final level = int.tryParse(match?.group(1) ?? '') ?? 1;
-      final colors = <Color>[
-        const Color(0xFF22C55E),
-        const Color(0xFF84CC16),
-        const Color(0xFFF59E0B),
-        const Color(0xFFF97316),
-        const Color(0xFFDC2626),
-      ];
-      return _DangerVisual(
-        icon: Icons.waves_rounded,
-        color: colors[level - 1],
-        size: 15 + (level * 2.5),
-      );
-    }
-
-    if (normalized.contains('COURANT')) {
-      return const _DangerVisual(
-        icon: Icons.sync_alt_rounded,
-        color: Color(0xFF0284C7),
-      );
-    }
-    if (normalized.contains('SHORE BREAK') ||
-        normalized.contains('VAGUES') ||
-        normalized.contains('HOULE') ||
-        normalized.contains('REMOUS') ||
-        normalized.contains('TOURBILLON')) {
-      return const _DangerVisual(
-        icon: Icons.waves_rounded,
-        color: Color(0xFF2563EB),
-      );
-    }
-    if (normalized.contains('VENT')) {
-      return const _DangerVisual(
-        icon: Icons.air_rounded,
-        color: Color(0xFF64748B),
-      );
-    }
-    if (normalized.contains('CHALEUR') ||
-        normalized.contains('CHÂLEUR') ||
-        normalized.contains('CANICULE')) {
-      return const _DangerVisual(
-        icon: Icons.wb_sunny_rounded,
-        color: Color(0xFFF97316),
-      );
-    }
-    if (normalized.contains('EAUX') ||
-        normalized.contains('EAU FROIDE') ||
-        normalized.contains('DÉVERSEMENT')) {
-      return const _DangerVisual(
-        icon: Icons.water_drop_rounded,
-        color: Color(0xFF0891B2),
-      );
-    }
-    if (normalized.contains('ROCHER') ||
-        normalized.contains('RÉCIF')) {
-      return const _DangerVisual(
-        icon: Icons.landscape_rounded,
-        color: Color(0xFF78716C),
-      );
-    }
-    if (normalized.contains('REQUIN') ||
-        normalized.contains('ESPÈCES DANGEREUSES')) {
-      return const _DangerVisual(
-        icon: Icons.warning_rounded,
-        color: Color(0xFFDC2626),
-      );
-    }
-    if (normalized.contains('PROFONDEUR')) {
-      return const _DangerVisual(
-        icon: Icons.height_rounded,
-        color: Color(0xFF7C3AED),
-      );
-    }
-    if (normalized.contains('TRAF')) {
-      return const _DangerVisual(
-        icon: Icons.directions_boat_rounded,
-        color: Color(0xFF0F766E),
-      );
-    }
-
-    return const _DangerVisual(
-      icon: Icons.warning_amber_rounded,
-      color: Color(0xFFF59E0B),
-    );
-  }
-}
-
-class _DangerVisual {
-  final IconData icon;
-  final Color color;
-  final double size;
-
-  const _DangerVisual({
-    required this.icon,
-    required this.color,
-    this.size = 19,
-  });
 }
 
 class _LiveDataBlock extends StatelessWidget {
