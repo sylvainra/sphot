@@ -104,7 +104,7 @@ class PublicSpotDetailPage extends StatelessWidget {
                   iconAssetPath: spot.isPosteSecours
                       ? 'data/icons/fire_red_icon.svg'
                       : spot.markerIconPath,
-                  iconVerticalOffset: -5,
+                  iconVerticalOffset: -9,
                   label: 'Type de SPHOT',
                   value: spot.typeSphot,
                   valueColor: const Color(0xFF1E3A8A),
@@ -483,12 +483,6 @@ class _PublicLiveDataSection extends StatelessWidget {
 
     final result = <String>[];
 
-    _addValue(result, 'Ciel matin', _textValue(values, 'Ciel matin'));
-    _addValue(
-      result,
-      'Ciel après-midi',
-      _textValue(values, 'Ciel après-midi'),
-    );
     _addValue(
       result,
       'Température de l’air mini',
@@ -500,6 +494,12 @@ class _PublicLiveDataSection extends StatelessWidget {
       'Température de l’air maxi',
       _textValue(values, 'Température air max'),
       suffix: ' °C',
+    );
+    _addValue(result, 'Ciel matin', _textValue(values, 'Ciel matin'));
+    _addValue(
+      result,
+      'Ciel après-midi',
+      _textValue(values, 'Ciel après-midi'),
     );
     _addValue(
       result,
