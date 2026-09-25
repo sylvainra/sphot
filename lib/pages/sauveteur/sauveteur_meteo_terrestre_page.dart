@@ -4,6 +4,7 @@ import 'package:numberpicker/numberpicker.dart';
 import 'dart:math';
 
 import '../../services/sauveteur_live_publication_service.dart';
+import 'widgets/sauveteur_styled_dropdown.dart';
 
 class SauveteurMeteoTerrestrePage extends StatefulWidget {
   final Color profileColor;
@@ -213,81 +214,22 @@ class _SauveteurMeteoTerrestrePageState extends State<SauveteurMeteoTerrestrePag
           Row(
             children: [
               Expanded(
-                child: DropdownButtonFormField<String>(
+                child: SauveteurStyledDropdown(
+                  labelText: 'SPHOT surveillé',
                   value: _selectedSpotId,
-                  isDense: true,
-                  decoration: InputDecoration(
-                    labelText: 'Poste',
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  items: _assignedSpots
+                  enabled: !_loadingLive,
+                  options: _assignedSpots
                       .map(
-                        (spot) => DropdownMenuItem<String>(
+                        (spot) => SauveteurDropdownOption(
                           value: spot.id,
-                          child: Text(
-                            spot.label,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
+                          label: spot.label,
                         ),
                       )
                       .toList(),
-                  onChanged: _loadingLive ? null : _selectSpot,
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                height: 42,
-                child: ElevatedButton.icon(
-                  onPressed: enabled && !_savingLive ? _publishWeather : null,
-                  icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-                  label: Text(
-                    _savingLive ? '...' : 'PUBLIER',
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF5D4037),
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (!_isSphotOn)
-            const Padding(
-              padding: EdgeInsets.only(top: 4),
-              child: Text(
-                'SPHOT OFF — publication réelle désactivée.',
-                style: TextStyle(
-                  color: Color(0xFFB91C1C),
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            )
-          else if (_liveMessage != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                _liveMessage!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF1E3A8A),
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
+                  onChanged: (spotId) {
+                    _selectSpot(spotId);
+                  },
+                )
   }
 
   @override
