@@ -1011,11 +1011,19 @@ class _SauveteurActionsRapidesPageState
                 final upper = danger.toUpperCase();
                 final isBaine =
                     upper.contains('BAÏNE') || upper.contains('BAINE');
+                final isCanicule = upper == 'CANICULE';
 
                 if (isBaine) {
                   return _BaineDangerSelector(
                     level: baineLevel,
                     onChanged: _setBaineLevel,
+                  );
+                }
+
+                if (isCanicule) {
+                  return _CaniculeDangerSelector(
+                    level: caniculeLevel,
+                    onChanged: _setCaniculeLevel,
                   );
                 }
 
@@ -1027,7 +1035,10 @@ class _SauveteurActionsRapidesPageState
                   value: selected,
                   activeColor: const Color(0xFFFDE047),
                   checkColor: Colors.black,
-                  secondary: _DangerChoiceIcon(danger: danger),
+                  secondary: DangerPictogram(
+                    danger: danger,
+                    size: 28,
+                  ),
                   title: Text(
                     danger,
                     softWrap: true,
