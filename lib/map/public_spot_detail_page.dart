@@ -496,6 +496,36 @@ class _PublicLiveDataSection extends StatelessWidget {
     return directions[normalized] ?? raw;
   }
 
+  static String _uvIndexText(String rawIndex) {
+    final index = int.tryParse(rawIndex.trim());
+
+    if (index == null) {
+      return rawIndex.trim();
+    }
+
+    if (index <= 2) {
+      return '$index – Faible – Protection non nécessaire';
+    }
+
+    if (index <= 5) {
+      return '$index – Modéré – Protection nécessaire : '
+          'chapeau, t-shirt, lunettes de soleil et crème solaire';
+    }
+
+    if (index <= 7) {
+      return '$index – Élevé – Protection nécessaire : '
+          'chapeau, t-shirt, lunettes de soleil et crème solaire';
+    }
+
+    if (index <= 10) {
+      return '$index – Très élevé – Protection supplémentaire nécessaire : '
+          'éviter, si possible, tout séjour en plein air';
+    }
+
+    return '$index – Extrême – Protection supplémentaire nécessaire : '
+        'éviter, si possible, tout séjour en plein air';
+  }
+
   static String _caniculeLevelText(String rawLevel) {
     final level = int.tryParse(rawLevel.trim());
 
@@ -565,11 +595,10 @@ class _PublicLiveDataSection extends StatelessWidget {
       _textValue(values, 'Rafales km/h'),
       suffix: ' km/h',
     );
-    _addValue(
-      result,
-      'Indice UV',
-      _textValue(values, 'Indice UV'),
-    );
+    final uvIndex = _textValue(values, 'Indice UV');
+    if (uvIndex.isNotEmpty) {
+      result.add('Indice UV : ${_uvIndexText(uvIndex)}');
+    }
 
     final canicule = _textValue(values, 'Niveau canicule');
     if (canicule.isNotEmpty) {
