@@ -429,6 +429,22 @@ class _SauveteurActionsRapidesPageState
     );
   }
 
+  String _baineLevelTitle(int level) {
+    switch (level) {
+      case 1:
+      case 2:
+        return 'Risque faible à modéré';
+      case 3:
+        return 'Risque marqué';
+      case 4:
+        return 'Risque très élevé';
+      case 5:
+        return 'Risque maximal (Alerte maximale)';
+      default:
+        return '';
+    }
+  }
+
   void _setBaineLevel(int level) {
     setState(() {
       selectedDangers.removeWhere((danger) {
@@ -439,7 +455,9 @@ class _SauveteurActionsRapidesPageState
       baineLevel = level;
 
       if (level > 0) {
-        selectedDangers.add('BAÏNES - NIVEAU $level');
+        selectedDangers.add(
+          'BAÏNES - NIVEAU $level : ${_baineLevelTitle(level)}',
+        );
       }
     });
   }
@@ -486,7 +504,10 @@ class _SauveteurActionsRapidesPageState
 
       if (isBaine) {
         if (baineLevel > 0) {
-          values.add('BAÏNES - NIVEAU $baineLevel');
+          values.add(
+            'BAÏNES - NIVEAU $baineLevel : '
+            '${_baineLevelTitle(baineLevel)}',
+          );
         }
         continue;
       }
@@ -1490,6 +1511,22 @@ class _BaineDangerSelector extends StatelessWidget {
     required this.onChanged,
   });
 
+  String _titleForLevel(int value) {
+    switch (value) {
+      case 1:
+      case 2:
+        return 'Risque faible à modéré';
+      case 3:
+        return 'Risque marqué';
+      case 4:
+        return 'Risque très élevé';
+      case 5:
+        return 'Risque maximal (Alerte maximale)';
+      default:
+        return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final enabled = level > 0;
@@ -1594,6 +1631,20 @@ class _BaineDangerSelector extends StatelessWidget {
                   ),
                 );
               }),
+            ),
+            const SizedBox(height: 5),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                level <= 2
+                    ? 'Niveaux 1 & 2 : ${_titleForLevel(level)}'
+                    : 'Niveau $level : ${_titleForLevel(level)}',
+                style: TextStyle(
+                  color: baineLevelColor(level),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
           ],
         ],
