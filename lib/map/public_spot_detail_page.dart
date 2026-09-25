@@ -86,12 +86,12 @@ class PublicSpotDetailPage extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
-                  vertical: 4,
+                  vertical: 2,
                 ),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -101,7 +101,10 @@ class PublicSpotDetailPage extends StatelessWidget {
                   ),
                 ),
                 child: _PublicInfoLine(
-                  iconAssetPath: spot.markerIconPath,
+                  iconAssetPath: spot.isPosteSecours
+                      ? 'data/icons/fire_red_icon.svg'
+                      : spot.markerIconPath,
+                  iconVerticalOffset: -5,
                   label: 'Type de SPHOT',
                   value: spot.typeSphot,
                   valueColor: const Color(0xFF1E3A8A),
@@ -113,7 +116,7 @@ class PublicSpotDetailPage extends StatelessWidget {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 760),
@@ -1110,6 +1113,7 @@ class _UnsupervisedWarning extends StatelessWidget {
 class _PublicInfoLine extends StatelessWidget {
   final IconData? icon;
   final String? iconAssetPath;
+  final double iconVerticalOffset;
   final String label;
   final String value;
   final Color? valueColor;
@@ -1119,6 +1123,7 @@ class _PublicInfoLine extends StatelessWidget {
   const _PublicInfoLine({
     this.icon,
     this.iconAssetPath,
+    this.iconVerticalOffset = 0,
     required this.label,
     required this.value,
     this.valueColor,
@@ -1139,13 +1144,16 @@ class _PublicInfoLine extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (iconAssetPath != null)
-              SvgPicture.asset(
-                iconAssetPath!,
-                width: 34,
-                height: 34,
-                fit: BoxFit.contain,
-                placeholderBuilder: (_) =>
-                    const SizedBox.square(dimension: 34),
+              Transform.translate(
+                offset: Offset(0, iconVerticalOffset),
+                child: SvgPicture.asset(
+                  iconAssetPath!,
+                  width: 34,
+                  height: 34,
+                  fit: BoxFit.contain,
+                  placeholderBuilder: (_) =>
+                      const SizedBox.square(dimension: 34),
+                ),
               )
             else
               Icon(icon, size: 22, color: const Color(0xFF1E3A8A)),
