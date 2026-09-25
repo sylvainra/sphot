@@ -208,7 +208,7 @@ class DangerPictogram extends StatelessWidget {
   }) {
     final match = RegExp(r'NIVEAU\s*([1-9])').firstMatch(value);
     final parsed = int.tryParse(match?.group(1) ?? '') ?? fallback;
-    return parsed.clamp(1, max);
+    return parsed.clamp(1, max).toInt();
   }
 
   static Widget _icon(IconData icon, Color color, double size) {
@@ -278,7 +278,7 @@ class BaineWaveGlyph extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final safeLevel = level.clamp(1, 5);
+    final safeLevel = level.clamp(1, 5).toInt();
 
     return CustomPaint(
       size: Size(width, height),
@@ -304,9 +304,9 @@ class CaniculeLevelGlyph extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final safeLevel = level.clamp(1, 4);
+    final safeLevel = level.clamp(1, 4).toInt();
     final color = caniculeLevelColor(safeLevel);
-    final iconSize = math.max(10.0, height * 0.58);
+    final iconSize = math.max(10.0, height * 0.58).toDouble();
 
     return SizedBox(
       width: width,
