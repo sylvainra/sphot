@@ -333,9 +333,10 @@ class _PublicLiveDataSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dangerValues = _flattenValues(spot.dangers);
-    final terrestrialValues = _flattenValues(spot.meteoTerrestre);
-    final marineValues = _flattenValues(spot.meteoMarine);
-    final ephemerideValues = _flattenValues(spot.ephemeride);
+    final terrestrialValues =
+        _formatTerrestrialValues(spot.meteoTerrestre);
+    final marineValues = _formatMarineValues(spot.meteoMarine);
+    final ephemerideValues = _formatEphemerideValues(spot.ephemeride);
     final notification = spot.notificationPublique is Map
         ? Map<String, dynamic>.from(spot.notificationPublique as Map)
         : <String, dynamic>{};
@@ -406,12 +407,211 @@ class _PublicLiveDataSection extends StatelessWidget {
           const SizedBox(height: 8),
           _LiveDataBlock(
             icon: Icons.calendar_today_outlined,
-            title: 'Éphéméride',
+            title: 'Dicton & Éphéméride',
             values: ephemerideValues,
           ),
         ],
       ),
     );
+  }
+
+  static Map<String, dynamic> _asStringMap(dynamic value) {
+    if (value is! Map) return const <String, dynamic>{};
+
+    return value.map(
+      (key, mapValue) => MapEntry(key.toString(), mapValue),
+    );
+  }
+
+  static String _textValue(Map<String, dynamic> values, String key) {
+    final value = values[key];
+    if (value == null) return '';
+    return value.toString().trim();
+  }
+
+  static void _addValue(
+    List<String> target,
+    String label,
+    String value, {
+    String suffix = '',
+  }) {
+    final text = value.trim();
+    if (text.isEmpty) return;
+
+    target.add('$label : $text$suffix');
+  }
+
+  static String _caniculeLevelText(String rawLevel) {
+    final level = int.tryParse(rawLevel.trim());
+
+    switch (level) {
+      case 1:
+        return 'Niveau 1 : Veille saisonnière';
+      case 2:
+        return 'Niveau 2 : Avertissement chaleur';
+      case 3:
+        return 'Niveau 3 : Alerte canicule';
+      case 4:
+        return 'Niveau 4 : Mobilisation maximale';
+      default:
+        return rawLevel.trim();
+    }
+  }
+
+  static List<String> _formatTerrestrialValues(dynamic value) {
+    final values = _asStringMap(value);
+    if (values.isEmpty) return _flattenValues(value);
+
+    final result = <String>[];
+
+    _addValue(result, 'Ciel matin', _textValue(values, 'Ciel matin'));
+    _addValue(
+      result,
+      'Ciel après-midi',
+      _textValue(values, 'Ciel après-midi'),
+    );
+    _addValue(
+      result,
+      'Température de l’air mini',
+      _textValue(values, 'Température air min'),
+      suffix: ' °C',
+    );
+    _addValue(
+      result,
+      'Température de l’air maxi',
+      _textValue(values, 'Température air max'),
+      suffix: ' °C',
+    );
+    _addValue(
+      result,
+      'Direction vent matin',
+      _textValue(values, 'Direction vent matin'),
+    );
+    _addValue(
+      result,
+      'Vent matin',
+      _textValue(values, 'Vent matin km/h'),
+      suffix: ' km/h',
+    );
+    _addValue(
+      result,
+      'Direction vent après-midi',
+      _textValue(values, 'Direction vent après-midi'),
+    );
+    _addValue(
+      result,
+      'Vent après-midi',
+      _textValue(values, 'Vent après-midi km/h'),
+      suffix: ' km/h',
+    );
+    _addValue(
+      result,
+      'Indice UV',
+      _textValue(values, 'Indice UV'),
+    );
+
+    final canicule = _textValue(values, 'Niveau canicule');
+    if (canicule.isNotEmpty) {
+      result.add('Niveau canicule : ${_caniculeLevelText(canicule)}');
+    }
+
+    return result;
+  }
+
+  static List<String> _formatMarineValues(dynamic value) {
+    final values = _asStringMap(value);
+    if (values.isEmpty) return _flattenValues(value);
+
+    final result = <String>[];
+
+    _addValue(
+      result,
+      'Température de l’eau mini',
+      _textValue(values, 'Température eau min'),
+      suffix: ' °C',
+    );
+    _addValue(
+      result,
+      'Température de l’eau maxi',
+      _textValue(values, 'Température eau max'),
+      suffix: ' °C',
+    );
+    _addValue(
+      result,
+      'État de la mer',
+      _textValue(values, 'État de la mer'),
+    );
+    _addValue(
+      result,
+      'Direction de la houle matin',
+      _textValue(values, 'Direction houle matin'),
+    );
+    _addValue(
+      result,
+      'Direction de la houle après-midi',
+      _textValue(values, 'Direction houle après-midi'),
+    );
+    _addValue(
+      result,
+      'Houle matin',
+      _textValue(values, 'Houle matin'),
+    );
+    _addValue(
+      result,
+      'Houle après-midi',
+      _textValue(values, 'Houle après-midi'),
+    );
+    _addValue(
+      result,
+      'Période houle mini',
+      _textValue(values, 'Période houle min secondes'),
+      suffix: ' s',
+    );
+    _addValue(
+      result,
+      'Période houle maxi',
+      _textValue(values, 'Période houle max secondes'),
+      suffix: ' s',
+    );
+
+    final lowTides = [
+      _textValue(values, 'Basse mer 1'),
+      _textValue(values, 'Basse mer 2'),
+    ].where((item) => item.isNotEmpty).join(' • ');
+    _addValue(result, 'Basses mer', lowTides);
+
+    final highTides = [
+      _textValue(values, 'Pleine mer 1'),
+      _textValue(values, 'Pleine mer 2'),
+    ].where((item) => item.isNotEmpty).join(' • ');
+    _addValue(result, 'Pleines mer', highTides);
+
+    _addValue(
+      result,
+      'Coefficient basse mer',
+      _textValue(values, 'Coefficient basse mer'),
+    );
+    _addValue(
+      result,
+      'Coefficient haute mer',
+      _textValue(values, 'Coefficient pleine mer'),
+    );
+
+    return result;
+  }
+
+  static List<String> _formatEphemerideValues(dynamic value) {
+    final values = _asStringMap(value);
+    if (values.isEmpty) return _flattenValues(value);
+
+    final result = <String>[];
+    _addValue(result, 'Dicton', _textValue(values, 'Dicton'));
+    _addValue(
+      result,
+      'Éphéméride',
+      _textValue(values, 'Éphéméride'),
+    );
+    return result;
   }
 
   static List<String> _flattenValues(dynamic value) {
