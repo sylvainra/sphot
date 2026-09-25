@@ -85,6 +85,32 @@ class PublicSpotDetailPage extends StatelessWidget {
                 ],
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFFDCE3EA),
+                  ),
+                ),
+                child: _PublicInfoLine(
+                  iconAssetPath: spot.markerIconPath,
+                  label: 'Type de SPHOT',
+                  value: spot.typeSphot,
+                  valueColor: const Color(0xFF1E3A8A),
+                  valueWidget: spot.isPosteSecours
+                      ? const _PublicRescueStationValue()
+                      : null,
+                ),
+              ),
+            ),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
@@ -110,16 +136,6 @@ class PublicSpotDetailPage extends StatelessWidget {
                         children: [
                           _LiveOperationalSnapshot(
                             initialSpot: spot,
-                          ),
-                          const SizedBox(height: 18),
-                          _PublicInfoLine(
-                            iconAssetPath: spot.markerIconPath,
-                            label: 'Type de SPHOT',
-                            value: spot.typeSphot,
-                            valueColor: const Color(0xFF1E3A8A),
-                            valueWidget: spot.isPosteSecours
-                                ? const _PublicRescueStationValue()
-                                : null,
                           ),
                           if (spot.adresseWebcam.isNotEmpty) ...[
                             const SizedBox(height: 14),
@@ -502,6 +518,12 @@ class _PublicLiveDataSection extends StatelessWidget {
       result,
       'Vent après-midi',
       _textValue(values, 'Vent après-midi km/h'),
+      suffix: ' km/h',
+    );
+    _addValue(
+      result,
+      'Rafales',
+      _textValue(values, 'Rafales km/h'),
       suffix: ' km/h',
     );
     _addValue(
