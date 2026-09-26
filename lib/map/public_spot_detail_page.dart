@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/flag_state.dart';
@@ -279,7 +281,10 @@ class PublicSpotMobileSheet extends StatefulWidget {
 }
 
 class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
+  static const String _favoritesKey = 'sphot_public_favorite_ids';
+
   int _selectedPage = 0;
+  bool _isSaved = false;
 
   static const List<(String, IconData)> _pages = [
     ('Live', Icons.sensors_rounded),
@@ -288,6 +293,102 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     ('Dicton & Éphéméride', Icons.calendar_today_outlined),
     ('Infos', Icons.info_outline_rounded),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedState();
+  }
+
+  Future<void> _loadSavedState() async {
+    final preferences = await SharedPreferences.getInstance();
+    final favorites = preferences.getStringList(_favoritesKey) ?? const [];
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSaved = favorites.contains(widget.spot.id);
+    });
+  }
+
+  Future<void> _openDirections(SpotFlagState spot) async {
+    final destination = '${spot.lat},${spot.lng}';
+    final uri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$destination',
+    );
+
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _startNavigation(SpotFlagState spot) async {
+    final destination = '${spot.lat},${spot.lng}';
+    final uri = Uri.parse(
+      'https://www.google.com/maps/dir/'
+      '?api=1&destination=$destination&dir_action=navigate',
+    );
+
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _shareSpot(
+    BuildContext context,
+    SpotFlagState spot,
+  ) async {
+    final mapsUrl =
+        'https://www.google.com/maps/search/?api=1&query='
+        '${spot.lat},${spot.lng}';
+    final placeName = spot.mapDisplayName.trim().isEmpty
+        ? 'SPHOT'
+        : spot.mapDisplayName.trim();
+
+    final box = context.findRenderObject();
+    Rect? shareOrigin;
+    if (box is RenderBox) {
+      shareOrigin = box.localToGlobal(Offset.zero) & box.size;
+    }
+
+    await SharePlus.instance.share(
+      ShareParams(
+        subject: placeName,
+        text: '$placeName\n$mapsUrl',
+        sharePositionOrigin: shareOrigin,
+      ),
+    );
+  }
+
+  Future<void> _toggleSaved(SpotFlagState spot) async {
+    final preferences = await SharedPreferences.getInstance();
+    final favorites = List<String>.from(
+      preferences.getStringList(_favoritesKey) ?? const <String>[],
+    );
+
+    final nextSaved = !favorites.contains(spot.id);
+
+    if (nextSaved) {
+      favorites.add(spot.id);
+    } else {
+      favorites.remove(spot.id);
+    }
+
+    await preferences.setStringList(_favoritesKey, favorites);
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSaved = nextSaved;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(milliseconds: 1400),
+        content: Text(
+          nextSaved
+              ? 'SPHOT enregistré dans vos favoris.'
+              : 'SPHOT retiré de vos favoris.',
+        ),
+      ),
+    );
+  }
 
   Future<void> _openUrl(String rawUrl) async {
     var url = rawUrl.trim();
@@ -473,6 +574,13 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                 ),
                 Expanded(
                   child: _buildSelectedPage(context, currentSpot),
+                ),
+                _MobileSpotActionBar(
+                  isSaved: _isSaved,
+                  onDirections: () => _openDirections(currentSpot),
+                  onStart: () => _startNavigation(currentSpot),
+                  onShare: () => _shareSpot(context, currentSpot),
+                  onSave: () => _toggleSaved(currentSpot),
                 ),
               ],
             ),
@@ -694,6 +802,121 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _MobileSpotActionBar extends StatelessWidget {
+  final bool isSaved;
+  final VoidCallback onDirections;
+  final VoidCallback onStart;
+  final VoidCallback onShare;
+  final VoidCallback onSave;
+
+  const _MobileSpotActionBar({
+    required this.isSaved,
+    required this.onDirections,
+    required this.onStart,
+    required this.onShare,
+    required this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        height: 66,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: Color(0xFFDCE3EA)),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x12000000),
+              blurRadius: 10,
+              offset: Offset(0, -3),
+            ),
+          ],
+        ),
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          children: [
+            _MobileSpotActionButton(
+              icon: Icons.directions_rounded,
+              label: 'ITINÉRAIRE',
+              onTap: onDirections,
+            ),
+            const SizedBox(width: 8),
+            _MobileSpotActionButton(
+              icon: Icons.navigation_rounded,
+              label: 'DÉMARRER',
+              onTap: onStart,
+            ),
+            const SizedBox(width: 8),
+            _MobileSpotActionButton(
+              icon: Icons.share_rounded,
+              label: 'PARTAGER',
+              onTap: onShare,
+            ),
+            const SizedBox(width: 8),
+            _MobileSpotActionButton(
+              icon: isSaved
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+              label: isSaved ? 'ENREGISTRÉ' : 'ENREGISTRER',
+              selected: isSaved,
+              onTap: onSave,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileSpotActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _MobileSpotActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.selected = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(
+        label,
+        maxLines: 1,
+        style: const TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor:
+            selected ? Colors.white : const Color(0xFF1E3A8A),
+        backgroundColor:
+            selected ? const Color(0xFF1E3A8A) : Colors.white,
+        side: const BorderSide(color: Color(0xFF1E3A8A)),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 10,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(99),
+        ),
+      ),
     );
   }
 }
