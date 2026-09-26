@@ -9811,7 +9811,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   maxMenuHeight: 145,
                 ),
 
-                if (_selectedSphotType == _rescueStationType) ...[
+                if (_selectedSphotType.isEmpty ||
+                    _selectedSphotType == _rescueStationType) ...[
                   const SizedBox(height: 14),
                   _sphotSectionTitle(6, 'TÉLÉPHONE DU POSTE'),
                   const SizedBox(height: 5),
@@ -9826,7 +9827,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 const SizedBox(height: 14),
 
                 _sphotSectionTitle(
-                  _selectedSphotType == _rescueStationType ? 7 : 6,
+                  (_selectedSphotType.isEmpty ||
+                          _selectedSphotType == _rescueStationType)
+                      ? 7
+                      : 6,
                   'WEBCAM OU CLICHÉ',
                 ),
 
