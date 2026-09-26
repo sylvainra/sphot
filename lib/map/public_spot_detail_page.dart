@@ -12,7 +12,7 @@ import 'public_webcam_view.dart';
 
 const TextStyle _publicSectionTitleStyle = TextStyle(
   color: Color(0xFF1E3A8A),
-  fontSize: 11,
+  fontSize: 10,
   fontWeight: FontWeight.w900,
   letterSpacing: 0.5,
 );
@@ -2459,7 +2459,13 @@ class _PublicLinkButton extends StatelessWidget {
     return OutlinedButton.icon(
       onPressed: onTap,
       icon: Icon(icon, size: 18),
-      label: Text(label),
+      label: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
       style: OutlinedButton.styleFrom(
         foregroundColor: const Color(0xFF1E3A8A),
         side: const BorderSide(color: Color(0xFF1E3A8A)),
