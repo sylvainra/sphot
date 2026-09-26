@@ -149,6 +149,9 @@ Future<void> _toggleFavoritesFilter() async {
   setState(() {
     _favoriteSpotIds = ids;
     _showFavoritesOnly = !_showFavoritesOnly;
+    if (_showFavoritesOnly) {
+      _selectedFilter = SpotFilter.all;
+    }
     _isFilterOpen = false;
     _isMapStyleOpen = false;
   });
@@ -1644,7 +1647,10 @@ List<Marker> _buildSecoursMarkers(
                         selected: selected,
                         selectedTileColor: color.withOpacity(0.10),
                         onTap: () {
-                          setState(() => _selectedFilter = filter);
+                          setState(() {
+                            _selectedFilter = filter;
+                            _showFavoritesOnly = false;
+                          });
                           Navigator.of(context).pop();
                         },
                       ),
