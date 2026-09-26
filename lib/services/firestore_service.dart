@@ -12,15 +12,7 @@ class FirestoreService {
       }).toList();
     });
   }
-
-  Stream<List<Map<String, dynamic>>> getTerritoriesStream() {
-    return _firestore.collection('territoires').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        return <String, dynamic>{
-          ...doc.data(),
-          '_docId': doc.id,
-        };
-      }).toList();
-    });
-  }
 }
+
+
+
