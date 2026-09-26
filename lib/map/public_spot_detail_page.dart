@@ -2,10 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/flag_state.dart';
+import '../services/public_favorites_service.dart';
 import '../widgets/danger_pictogram.dart';
 import 'flag_marker.dart';
 import 'public_webcam_view.dart';
@@ -281,8 +281,6 @@ class PublicSpotMobileSheet extends StatefulWidget {
 }
 
 class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
-  static const String _favoritesKey = 'sphot_public_favorite_ids';
-
   int _selectedPage = 0;
   bool _isSaved = false;
 
@@ -301,13 +299,12 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   }
 
   Future<void> _loadSavedState() async {
-    final preferences = await SharedPreferences.getInstance();
-    final favorites = preferences.getStringList(_favoritesKey) ?? const [];
+    final saved = await PublicFavoritesService.contains(widget.spot.id);
 
     if (!mounted) return;
 
     setState(() {
-      _isSaved = favorites.contains(widget.spot.id);
+      _isSaved = saved;
     });
   }
 
@@ -357,20 +354,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   }
 
   Future<void> _toggleSaved(SpotFlagState spot) async {
-    final preferences = await SharedPreferences.getInstance();
-    final favorites = List<String>.from(
-      preferences.getStringList(_favoritesKey) ?? const <String>[],
-    );
-
-    final nextSaved = !favorites.contains(spot.id);
-
-    if (nextSaved) {
-      favorites.add(spot.id);
-    } else {
-      favorites.remove(spot.id);
-    }
-
-    await preferences.setStringList(_favoritesKey, favorites);
+    final nextSaved = await PublicFavoritesService.toggle(spot.id);
 
     if (!mounted) return;
 
@@ -429,43 +413,222 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     );
   }
 
+  List<String> _valuesForPrefixes(
+    List<String> values,
+    List<String> prefixes,
+  ) {
+    return values.where((value) {
+      return prefixes.any(
+        (prefix) => value == prefix || value.startsWith('$prefix :'),
+      );
+    }).toList(growable: false);
+  }
+
+  Widget _buildGroupedPage({
+    required BuildContext context,
+    required SpotFlagState spot,
+    required ScrollController controller,
+    required List<(IconData, String, List<String>)> groups,
+  }) {
+    return ListView(
+      controller: controller,
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
+      children: [
+        for (var index = 0; index < groups.length; index++) ...[
+          if (index > 0) const SizedBox(height: 10),
+          _MobilePublicCard(
+            child: _LiveDataBlock(
+              icon: groups[index].$1,
+              title: groups[index].$2,
+              values: groups[index].$3,
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        _buildSpotActions(context, spot),
+      ],
+    );
+  }
+
+  Widget _buildTerrestrialPage(
+    BuildContext context,
+    SpotFlagState spot,
+    ScrollController controller,
+  ) {
+    final values = _PublicLiveDataSection._formatTerrestrialValues(
+      spot.meteoTerrestre,
+    );
+
+    return _buildGroupedPage(
+      context: context,
+      spot: spot,
+      controller: controller,
+      groups: [
+        (
+          Icons.thermostat_outlined,
+          'Températures',
+          _valuesForPrefixes(
+            values,
+            const [
+              'Température de l’air mini',
+              'Température de l’air maxi',
+            ],
+          ),
+        ),
+        (
+          Icons.wb_cloudy_outlined,
+          'Ciel',
+          _valuesForPrefixes(
+            values,
+            const ['Ciel matin', 'Ciel après-midi'],
+          ),
+        ),
+        (
+          Icons.air_rounded,
+          'Vent',
+          _valuesForPrefixes(
+            values,
+            const [
+              'Direction vent matin',
+              'Vent matin',
+              'Direction vent après-midi',
+              'Vent après-midi',
+              'Rafales',
+            ],
+          ),
+        ),
+        (
+          Icons.wb_sunny_outlined,
+          'Indice UV',
+          _valuesForPrefixes(values, const ['Indice UV']),
+        ),
+        (
+          Icons.local_fire_department_outlined,
+          'Canicule',
+          _valuesForPrefixes(values, const ['Niveau canicule']),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMarinePage(
+    BuildContext context,
+    SpotFlagState spot,
+    ScrollController controller,
+  ) {
+    final values = _PublicLiveDataSection._formatMarineValues(
+      spot.meteoMarine,
+    );
+
+    return _buildGroupedPage(
+      context: context,
+      spot: spot,
+      controller: controller,
+      groups: [
+        (
+          Icons.thermostat_outlined,
+          'Températures de l’eau',
+          _valuesForPrefixes(
+            values,
+            const [
+              'Température de l’eau mini',
+              'Température de l’eau maxi',
+            ],
+          ),
+        ),
+        (
+          Icons.water_outlined,
+          'État de la mer',
+          _valuesForPrefixes(values, const ['État de la mer']),
+        ),
+        (
+          Icons.waves_rounded,
+          'Houle',
+          _valuesForPrefixes(
+            values,
+            const [
+              'Direction de la houle matin',
+              'Direction de la houle après-midi',
+              'Houle matin',
+              'Houle après-midi',
+            ],
+          ),
+        ),
+        (
+          Icons.timelapse_rounded,
+          'Périodes de houle',
+          _valuesForPrefixes(
+            values,
+            const ['Période houle mini', 'Période houle maxi'],
+          ),
+        ),
+        (
+          Icons.tsunami_rounded,
+          'Marées et coefficients',
+          _valuesForPrefixes(
+            values,
+            const [
+              'Basses mer',
+              'Pleines mer',
+              'Coefficient basse mer',
+              'Coefficient haute mer',
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEphemeridePage(
+    BuildContext context,
+    SpotFlagState spot,
+    ScrollController controller,
+  ) {
+    final values = _PublicLiveDataSection._formatEphemerideValues(
+      spot.ephemeride,
+    );
+
+    return _buildGroupedPage(
+      context: context,
+      spot: spot,
+      controller: controller,
+      groups: [
+        (
+          Icons.format_quote_rounded,
+          'Dicton',
+          _valuesForPrefixes(values, const ['Dicton']),
+        ),
+        (
+          Icons.calendar_today_outlined,
+          'Éphéméride',
+          _valuesForPrefixes(values, const ['Éphéméride']),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSelectedPage(
     BuildContext context,
     SpotFlagState spot,
   ) {
     switch (_selectedPage) {
       case 1:
-        return _buildDataPage(
-          context: context,
-          spot: spot,
-          title: 'Météo terrestre',
-          icon: Icons.wb_sunny_outlined,
-          values: _PublicLiveDataSection._formatTerrestrialValues(
-            spot.meteoTerrestre,
-          ),
-          controller: widget.sheetScrollController,
+        return _buildTerrestrialPage(
+          context,
+          spot,
+          widget.sheetScrollController,
         );
       case 2:
-        return _buildDataPage(
-          context: context,
-          spot: spot,
-          title: 'Météo marine',
-          icon: Icons.water_rounded,
-          values: _PublicLiveDataSection._formatMarineValues(
-            spot.meteoMarine,
-          ),
-          controller: widget.sheetScrollController,
+        return _buildMarinePage(
+          context,
+          spot,
+          widget.sheetScrollController,
         );
       case 3:
-        return _buildDataPage(
-          context: context,
-          spot: spot,
-          title: 'Dicton & Éphéméride',
-          icon: Icons.calendar_today_outlined,
-          values: _PublicLiveDataSection._formatEphemerideValues(
-            spot.ephemeride,
-          ),
-          controller: widget.sheetScrollController,
+        return _buildEphemeridePage(
+          context,
+          spot,
+          widget.sheetScrollController,
         );
       case 4:
         return _buildInfoPage(
@@ -700,31 +863,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     );
   }
 
-  Widget _buildDataPage({
-    required BuildContext context,
-    required SpotFlagState spot,
-    required String title,
-    required IconData icon,
-    required List<String> values,
-    required ScrollController controller,
-  }) {
-    return ListView(
-      controller: controller,
-      padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
-      children: [
-        _MobilePublicCard(
-          child: _LiveDataBlock(
-            icon: icon,
-            title: title,
-            values: values,
-          ),
-        ),
-        const SizedBox(height: 12),
-        _buildSpotActions(context, spot),
-      ],
-    );
-  }
-
   Widget _buildInfoPage(
     BuildContext context,
     SpotFlagState spot,
@@ -734,6 +872,33 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
       controller: controller,
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
+        _MobilePublicCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                spot.displayName,
+                style: const TextStyle(
+                  color: Color(0xFF172033),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              if (spot.ville.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  spot.ville.toUpperCase(),
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
         _MobilePublicCard(
           child: Column(
             children: [
@@ -1876,8 +2041,8 @@ class _LiveDataBlock extends StatelessWidget {
           const TextSpan(text: 'Indice UV : '),
           TextSpan(
             text: '${uv.index} – ${uv.label} – ${uv.advice}',
-            style: TextStyle(
-              color: uv.color,
+            style: const TextStyle(
+              color: Colors.black87,
               fontWeight: FontWeight.w900,
             ),
           ),
