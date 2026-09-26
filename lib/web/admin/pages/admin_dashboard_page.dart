@@ -541,6 +541,60 @@ String _cleanText(dynamic value) {
   return (value ?? '').toString().trim();
 }
 
+String _formatFrenchPhoneNumber(String value) {
+  final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+
+  if (digits.isEmpty) {
+    return '';
+  }
+
+  final limitedDigits =
+      digits.length > 10 ? digits.substring(0, 10) : digits;
+
+  final groups = <String>[];
+
+  for (var index = 0; index < limitedDigits.length; index += 2) {
+    final end = math.min(index + 2, limitedDigits.length);
+    groups.add(limitedDigits.substring(index, end));
+  }
+
+  return groups.join(' ');
+}
+
+TextEditingValue _formatFrenchPhoneInput(
+  TextEditingValue oldValue,
+  TextEditingValue newValue,
+) {
+  final formatted = _formatFrenchPhoneNumber(newValue.text);
+
+  final rawCursor = newValue.selection.end < 0
+      ? newValue.text.length
+      : newValue.selection.end;
+
+  final digitsBeforeCursor = newValue.text
+      .substring(0, math.min(rawCursor, newValue.text.length))
+      .replaceAll(RegExp(r'[^0-9]'), '');
+
+  final keptDigitsBeforeCursor =
+      math.min(digitsBeforeCursor.length, 10);
+
+  final spacesBeforeCursor = keptDigitsBeforeCursor <= 0
+      ? 0
+      : ((keptDigitsBeforeCursor - 1) ~/ 2);
+
+  final cursorOffset = math.min(
+    keptDigitsBeforeCursor + spacesBeforeCursor,
+    formatted.length,
+  );
+
+  return TextEditingValue(
+    text: formatted,
+    selection: TextSelection.collapsed(
+      offset: cursorOffset,
+    ),
+  );
+}
+
 String _spotName(Map<String, dynamic> data) {
   return _cleanText(
     data['nomSphot'] ??
@@ -6648,8 +6702,10 @@ void _loadSphotInEditor(Map<String, dynamic> data) {
     _sphotNameController.text = _spotName(data) == 'SPHOT sans nom'
         ? ''
         : _spotName(data);
-    _sphotPhoneController.text = _cleanText(
-      data['telephonePoste'] ?? data['phone'],
+    _sphotPhoneController.text = _formatFrenchPhoneNumber(
+      _cleanText(
+        data['telephonePoste'] ?? data['phone'],
+      ),
     );
     _sphotLatController.text = lat == 0 ? '' : lat.toStringAsFixed(6);
     _sphotLngController.text = lng == 0 ? '' : lng.toStringAsFixed(6);
@@ -6782,7 +6838,9 @@ Future<void> _saveSphotFromDashboard() async {
           _selectedSphotType == '🚨 POSTE DE SECOURS 🚨',
       'sphotLat': lat,
       'sphotLng': lng,
-      'telephonePoste': _sphotPhoneController.text.trim(),
+      'telephonePoste': _formatFrenchPhoneNumber(
+        _sphotPhoneController.text,
+      ),
       'equipement': _selectedSphotEquipments.join(' | '),
       'labelSphot': _selectedSphotLabels.join(' | '),
       'pays': territoryData['pays'] ?? '',
@@ -9730,8 +9788,8 @@ _sphotEditorField(
   label: 'Téléphone du poste de secours',
   keyboardType: TextInputType.phone,
   inputFormatters: [
-    FilteringTextInputFormatter.allow(
-      RegExp(r'[0-9+ .()\-]'),
+    TextInputFormatter.withFunction(
+      _formatFrenchPhoneInput,
     ),
   ],
 ),
