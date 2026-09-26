@@ -282,7 +282,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   int _selectedPage = 0;
 
   static const List<(String, IconData)> _pages = [
-    ('Infos en direct', Icons.sensors_rounded),
+    ('Live', Icons.sensors_rounded),
     ('Météo terrestre', Icons.wb_sunny_outlined),
     ('Météo marine', Icons.water_rounded),
     ('Dicton & Éphéméride', Icons.calendar_today_outlined),
