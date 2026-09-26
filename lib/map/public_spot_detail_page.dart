@@ -568,15 +568,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             ],
           ),
         ),
-        const SizedBox(height: 10),
-        if (spot.adresseWebcam.isNotEmpty)
-          _MobilePublicCard(
-            child: _PublicWebcamSection(url: spot.adresseWebcam),
-          )
-        else
-          const _MobilePublicCard(
-            child: _MobileMediaPlaceholder(),
-          ),
         if (notificationActive && notificationMessage.isNotEmpty) ...[
           const SizedBox(height: 10),
           _PublicNotificationCard(
@@ -588,33 +579,23 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         _MobilePublicCard(
           child: _PublicDangerList(values: dangerValues),
         ),
-        if (spot.phone.isNotEmpty ||
-            spot.siteInternetVille.isNotEmpty) ...[
+        if (spot.phone.isNotEmpty) ...[
           const SizedBox(height: 10),
-          Row(
-            children: [
-              if (spot.phone.isNotEmpty)
-                Expanded(
-                  child: _MobileQuickAction(
-                    icon: Icons.call_outlined,
-                    label: 'Appeler',
-                    onTap: () => _call(spot),
-                  ),
-                ),
-              if (spot.phone.isNotEmpty &&
-                  spot.siteInternetVille.isNotEmpty)
-                const SizedBox(width: 8),
-              if (spot.siteInternetVille.isNotEmpty)
-                Expanded(
-                  child: _MobileQuickAction(
-                    icon: Icons.language_rounded,
-                    label: 'Site',
-                    onTap: () => _openUrl(spot.siteInternetVille),
-                  ),
-                ),
-            ],
+          _MobileQuickAction(
+            icon: Icons.call_outlined,
+            label: 'Appeler',
+            onTap: () => _call(spot),
           ),
         ],
+        const SizedBox(height: 10),
+        if (spot.adresseWebcam.isNotEmpty)
+          _MobilePublicCard(
+            child: _PublicWebcamSection(url: spot.adresseWebcam),
+          )
+        else
+          const _MobilePublicCard(
+            child: _MobileMediaPlaceholder(),
+          ),
       ],
     );
   }
@@ -703,8 +684,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             ),
           ),
         ],
-        if (spot.siteInternetVille.isNotEmpty ||
-            spot.arretesMunicipaux.isNotEmpty) ...[
+        if (spot.arretesMunicipaux.isNotEmpty) ...[
           const SizedBox(height: 10),
           _MobilePublicCard(
             child: Column(
@@ -715,21 +695,11 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                   style: _publicSectionTitleStyle,
                 ),
                 const SizedBox(height: 10),
-                if (spot.siteInternetVille.isNotEmpty)
-                  _PublicLinkButton(
-                    icon: Icons.language,
-                    label: 'Site internet du lieu',
-                    onTap: () => _openUrl(spot.siteInternetVille),
-                  ),
-                if (spot.siteInternetVille.isNotEmpty &&
-                    spot.arretesMunicipaux.isNotEmpty)
-                  const SizedBox(height: 8),
-                if (spot.arretesMunicipaux.isNotEmpty)
-                  _PublicLinkButton(
-                    icon: Icons.gavel_outlined,
-                    label: 'Réglementation de baignade',
-                    onTap: () => _openUrl(spot.arretesMunicipaux),
-                  ),
+                _PublicLinkButton(
+                  icon: Icons.gavel_outlined,
+                  label: 'Réglementation de baignade',
+                  onTap: () => _openUrl(spot.arretesMunicipaux),
+                ),
               ],
             ),
           ),
