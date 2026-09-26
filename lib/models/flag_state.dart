@@ -102,7 +102,12 @@ class SpotFlagState {
     activite: _readString(data['activite']),
     equipement: _readString(data['equipement']),
     labelSphot: _readString(data['labelSphot']),
-    adresseWebcam: _readString(data['adresseWebcam']),
+    adresseWebcam: _readString(
+      data['adresseWebcam'] ??
+          data['webcamUrl'] ??
+          data['urlWebcam'] ??
+          data['webcam'],
+    ),
     arretesMunicipaux: _readString(data['arretesMunicipaux']),
 
     liveFlag: data['liveFlag'] is Map<String, dynamic>
