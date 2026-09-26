@@ -334,7 +334,17 @@ List<Marker> _buildAdminMarkers(
         ? spot.territoireId.trim()
         : ville.toUpperCase();
 
-    admins.putIfAbsent(adminKey, () => spot);
+    final currentSpot = admins[adminKey];
+
+    if (currentSpot == null) {
+      admins[adminKey] = spot;
+      continue;
+    }
+
+    if (currentSpot.logoVille.trim().isEmpty &&
+        spot.logoVille.trim().isNotEmpty) {
+      admins[adminKey] = spot;
+    }
   }
 
   for (final spot in admins.values) {
