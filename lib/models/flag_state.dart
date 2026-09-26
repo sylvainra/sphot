@@ -98,7 +98,10 @@ class SpotFlagState {
     periode: _readString(data['periode']),
     heureDebut: _readString(data['heureDebut']),
     heureFin: _readString(data['heureFin']),
-    phone: _readString(data['phone'] ?? data['telephonePoste']),
+    phone: _readFirstNonEmpty([
+      data['telephonePoste'],
+      data['phone'],
+    ]),
     activite: _readString(data['activite']),
     equipement: _readString(data['equipement']),
     labelSphot: _readString(data['labelSphot']),
@@ -417,6 +420,14 @@ class SpotFlagState {
   static String _readString(dynamic value) {
     if (value == null) return '';
     return value.toString().trim();
+  }
+
+  static String _readFirstNonEmpty(List<dynamic> values) {
+    for (final value in values) {
+      final text = _readString(value);
+      if (text.isNotEmpty) return text;
+    }
+    return '';
   }
 
   static double _readDouble(dynamic value) {
