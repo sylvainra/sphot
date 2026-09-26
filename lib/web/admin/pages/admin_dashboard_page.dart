@@ -6852,6 +6852,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             : '',
 
         'webcamUrl': _sphotWebcamUrlController.text.trim(),
+        'adresseWebcam': _sphotWebcamUrlController.text.trim(),
         'pays': territoryData['pays'] ?? '',
         'region': territoryData['region'] ?? '',
         'departement': territoryData['departement'] ?? '',
