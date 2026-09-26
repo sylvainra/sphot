@@ -6704,7 +6704,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       );
 
       _sphotWebcamUrlController.text = _cleanText(
-        data['webcamUrl'] ?? data['urlWebcam'] ?? data['webcam'],
+        data['adresseWebcam'] ??
+            data['webcamUrl'] ??
+            data['urlWebcam'] ??
+            data['webcam'],
       );
 
       _showSauveteurEditorPanel = false;
