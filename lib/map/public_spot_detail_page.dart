@@ -263,6 +263,613 @@ class PublicSpotDetailPage extends StatelessWidget {
 }
 
 
+class PublicSpotMobileSheet extends StatefulWidget {
+  final SpotFlagState spot;
+  final ScrollController sheetScrollController;
+
+  const PublicSpotMobileSheet({
+    super.key,
+    required this.spot,
+    required this.sheetScrollController,
+  });
+
+  @override
+  State<PublicSpotMobileSheet> createState() =>
+      _PublicSpotMobileSheetState();
+}
+
+class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
+  final PageController _pageController = PageController();
+  int _selectedPage = 0;
+
+  static const List<(String, IconData)> _pages = [
+    ('Actions rapides', Icons.flash_on_rounded),
+    ('Météo terrestre', Icons.wb_sunny_outlined),
+    ('Météo marine', Icons.water_rounded),
+    ('Dicton & Éphéméride', Icons.calendar_today_outlined),
+    ('Infos', Icons.info_outline_rounded),
+  ];
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openUrl(String rawUrl) async {
+    var url = rawUrl.trim();
+    if (url.isEmpty) return;
+
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://$url';
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _call(SpotFlagState spot) async {
+    final phone = spot.phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (phone.isEmpty) return;
+
+    await launchUrl(Uri(scheme: 'tel', path: phone));
+  }
+
+  void _selectPage(int index) {
+    if (_selectedPage == index) return;
+
+    setState(() => _selectedPage = index);
+
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.sizeOf(context).height;
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('publicSpots')
+          .doc(widget.spot.id)
+          .snapshots(),
+      builder: (context, snapshot) {
+        var currentSpot = widget.spot;
+
+        if (snapshot.hasData && snapshot.data!.exists) {
+          final data = snapshot.data!.data();
+          if (data != null) {
+            currentSpot = SpotFlagState.fromFirestore(
+              snapshot.data!.id,
+              data,
+            );
+          }
+        }
+
+        return Material(
+          color: Colors.transparent,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFFF4F7FA),
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x26000000),
+                  blurRadius: 22,
+                  offset: Offset(0, -5),
+                ),
+              ],
+            ),
+            child: ListView(
+              controller: widget.sheetScrollController,
+              padding: EdgeInsets.zero,
+              children: [
+                const SizedBox(height: 8),
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFB9C2CC),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 10, 8, 7),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              currentSpot.mapDisplayName.toUpperCase(),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFF172033),
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                height: 1.05,
+                              ),
+                            ),
+                            if (currentSpot.ville.trim().isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                currentSpot.ville.toUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Fermer',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  height: 48,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(14, 2, 14, 8),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _pages.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final page = _pages[index];
+                      final selected = _selectedPage == index;
+
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(99),
+                        onTap: () => _selectPage(index),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? const Color(0xFF1E3A8A)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(99),
+                            border: Border.all(
+                              color: selected
+                                  ? const Color(0xFF1E3A8A)
+                                  : const Color(0xFFD5DEE7),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                page.$2,
+                                size: 17,
+                                color: selected
+                                    ? Colors.white
+                                    : const Color(0xFF1E3A8A),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                page.$1.toUpperCase(),
+                                style: TextStyle(
+                                  color: selected
+                                      ? Colors.white
+                                      : const Color(0xFF1E3A8A),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                SizedBox(
+                  height: screenHeight * 0.68,
+                  child: PageView(
+                    controller: _pageController,
+                    onPageChanged: (index) {
+                      setState(() => _selectedPage = index);
+                    },
+                    children: [
+                      _buildActionsPage(context, currentSpot),
+                      _buildDataPage(
+                        title: 'Météo terrestre',
+                        icon: Icons.wb_sunny_outlined,
+                        values: _PublicLiveDataSection
+                            ._formatTerrestrialValues(
+                          currentSpot.meteoTerrestre,
+                        ),
+                      ),
+                      _buildDataPage(
+                        title: 'Météo marine',
+                        icon: Icons.water_rounded,
+                        values: _PublicLiveDataSection._formatMarineValues(
+                          currentSpot.meteoMarine,
+                        ),
+                      ),
+                      _buildDataPage(
+                        title: 'Dicton & Éphéméride',
+                        icon: Icons.calendar_today_outlined,
+                        values:
+                            _PublicLiveDataSection._formatEphemerideValues(
+                          currentSpot.ephemeride,
+                        ),
+                      ),
+                      _buildInfoPage(context, currentSpot),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildActionsPage(
+    BuildContext context,
+    SpotFlagState spot,
+  ) {
+    final flagIsLowered =
+        spot.isPosteSecours &&
+        spot.flagPosition == FlagPosition.affale;
+    final showUnsupervisedWarning =
+        spot.isMissingFlagColorDuringSurveillance || flagIsLowered;
+    final rawStatus = flagIsLowered
+        ? '⚠️ BAIGNADE NON SURVEILLÉE TEMPORAIREMENT'
+        : spot.displayStatut;
+    final publicStatus = rawStatus.replaceFirst(
+      ' ⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
+      '\n⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
+    );
+    final statusColor = Color(spot.statutColor);
+    final dangerValues =
+        _PublicLiveDataSection._flattenValues(spot.dangers);
+
+    final notification = spot.notificationPublique is Map
+        ? Map<String, dynamic>.from(spot.notificationPublique as Map)
+        : <String, dynamic>{};
+    final notificationMessage =
+        (notification['message'] ?? '').toString().trim();
+    final notificationActive = notification['active'] != false;
+    final notificationPublishedAt =
+        _PublicLiveDataSection._formatTimestamp(
+      notification['publishedAt'],
+    );
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
+      children: [
+        _MobilePublicCard(
+          child: _PublicInfoLine(
+            iconAssetPath: spot.isPosteSecours
+                ? 'data/icons/fire_red_icon.svg'
+                : spot.markerIconPath,
+            iconVerticalOffset: -7,
+            label: 'Type de SPHOT',
+            value: spot.typeSphot,
+            valueColor: const Color(0xFF1E3A8A),
+            valueWidget: spot.isPosteSecours
+                ? const _PublicRescueStationValue()
+                : null,
+          ),
+        ),
+        const SizedBox(height: 10),
+        _MobilePublicCard(
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  if (spot.isPosteSecours) ...[
+                    SizedBox(
+                      width: 78,
+                      height: 98,
+                      child: Center(
+                        child: FlagMarker(spot: spot),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: _StatusCard(
+                      color: statusColor,
+                      text: publicStatus,
+                    ),
+                  ),
+                ],
+              ),
+              if (showUnsupervisedWarning) ...[
+                const SizedBox(height: 10),
+                const _UnsupervisedWarning(),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (spot.adresseWebcam.isNotEmpty)
+          _MobilePublicCard(
+            child: _PublicWebcamSection(url: spot.adresseWebcam),
+          )
+        else
+          const _MobilePublicCard(
+            child: _MobileMediaPlaceholder(),
+          ),
+        if (notificationActive && notificationMessage.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _PublicNotificationCard(
+            message: notificationMessage,
+            publishedAt: notificationPublishedAt,
+          ),
+        ],
+        const SizedBox(height: 10),
+        _MobilePublicCard(
+          child: _PublicDangerList(values: dangerValues),
+        ),
+        if (spot.phone.isNotEmpty ||
+            spot.siteInternetVille.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              if (spot.phone.isNotEmpty)
+                Expanded(
+                  child: _MobileQuickAction(
+                    icon: Icons.call_outlined,
+                    label: 'Appeler',
+                    onTap: () => _call(spot),
+                  ),
+                ),
+              if (spot.phone.isNotEmpty &&
+                  spot.siteInternetVille.isNotEmpty)
+                const SizedBox(width: 8),
+              if (spot.siteInternetVille.isNotEmpty)
+                Expanded(
+                  child: _MobileQuickAction(
+                    icon: Icons.language_rounded,
+                    label: 'Site',
+                    onTap: () => _openUrl(spot.siteInternetVille),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDataPage({
+    required String title,
+    required IconData icon,
+    required List<String> values,
+  }) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
+      children: [
+        _MobilePublicCard(
+          child: _LiveDataBlock(
+            icon: icon,
+            title: title,
+            values: values,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoPage(
+    BuildContext context,
+    SpotFlagState spot,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
+      children: [
+        _MobilePublicCard(
+          child: Column(
+            children: [
+              if (spot.periode.isNotEmpty)
+                _PublicInfoLine(
+                  icon: Icons.date_range_outlined,
+                  label: 'Période de surveillance',
+                  value: spot.periode,
+                ),
+              if (spot.heureDebut.isNotEmpty ||
+                  spot.heureFin.isNotEmpty)
+                _PublicInfoLine(
+                  icon: Icons.schedule_outlined,
+                  label: 'Horaires',
+                  value: [
+                    spot.heureDebut,
+                    spot.heureFin,
+                  ].where((value) => value.isNotEmpty).join(' – '),
+                ),
+              if (spot.phone.isNotEmpty)
+                _PublicInfoLine(
+                  icon: Icons.phone_outlined,
+                  label: 'Téléphone public',
+                  value: spot.phone,
+                  onTap: () => _call(spot),
+                ),
+              if (spot.activite.isNotEmpty)
+                _PublicInfoLine(
+                  icon: Icons.waves_outlined,
+                  label: 'Activités',
+                  value: spot.activite,
+                ),
+            ],
+          ),
+        ),
+        if (spot.publicEquipment.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _MobilePublicCard(
+            child: _PublicChips(
+              title: 'Équipements',
+              values: spot.publicEquipment,
+            ),
+          ),
+        ],
+        if (spot.publicLabels.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _MobilePublicCard(
+            child: _PublicChips(
+              title: 'Labels',
+              values: spot.publicLabels,
+              showLabelIcons: true,
+            ),
+          ),
+        ],
+        if (spot.siteInternetVille.isNotEmpty ||
+            spot.arretesMunicipaux.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _MobilePublicCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'LIENS PUBLICS',
+                  style: _publicSectionTitleStyle,
+                ),
+                const SizedBox(height: 10),
+                if (spot.siteInternetVille.isNotEmpty)
+                  _PublicLinkButton(
+                    icon: Icons.language,
+                    label: 'Site internet du lieu',
+                    onTap: () => _openUrl(spot.siteInternetVille),
+                  ),
+                if (spot.siteInternetVille.isNotEmpty &&
+                    spot.arretesMunicipaux.isNotEmpty)
+                  const SizedBox(height: 8),
+                if (spot.arretesMunicipaux.isNotEmpty)
+                  _PublicLinkButton(
+                    icon: Icons.gavel_outlined,
+                    label: 'Réglementation de baignade',
+                    onTap: () => _openUrl(spot.arretesMunicipaux),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _MobilePublicCard extends StatelessWidget {
+  final Widget child;
+
+  const _MobilePublicCard({
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFDCE3EA)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x10000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _MobileMediaPlaceholder extends StatelessWidget {
+  const _MobileMediaPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const AspectRatio(
+      aspectRatio: 16 / 7,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.photo_camera_back_outlined,
+              size: 34,
+              color: Color(0xFF94A3B8),
+            ),
+            SizedBox(height: 7),
+            Text(
+              'PHOTO / WEBCAM NON RENSEIGNÉE',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileQuickAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _MobileQuickAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: const Color(0xFF1E3A8A),
+        side: const BorderSide(color: Color(0xFF1E3A8A)),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+    );
+  }
+}
+
 class _LiveOperationalSnapshot extends StatelessWidget {
   final SpotFlagState initialSpot;
 
