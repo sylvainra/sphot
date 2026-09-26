@@ -270,6 +270,7 @@ class SpotFlagState {
 
   bool get hasValidFlag {
     return isPosteSecours &&
+        _isCurrentlyInSurveillanceWindow() &&
         flagColor != FlagColor.none &&
         flagPosition == FlagPosition.hisse;
   }
@@ -291,7 +292,7 @@ class SpotFlagState {
   }
 
   String get displayStatut {
-    if (!isPosteSecours) {
+    if (!isPosteSecours || !_isCurrentlyInSurveillanceWindow()) {
       return '⚠️ BAIGNADE NON SURVEILLÉE ⚠️ BAIGNADE À VOS RISQUES ET PÉRILS';
     }
 
@@ -299,9 +300,11 @@ class SpotFlagState {
       return '⚠️ BAIGNADE NON SURVEILLÉE TEMPORAIREMENT ⚠️ BAIGNADE À VOS RISQUES ET PÉRILS';
     }
 
-    if (flagPosition == FlagPosition.hisse &&
-        flagColor != FlagColor.none) {
-      switch (flagColor) {
+    if (flagColor == FlagColor.none) {
+      return '⚠️ COULEUR DE LA FLAMME NON RENSEIGNÉE';
+    }
+
+    switch (flagColor) {
       case FlagColor.green:
         return 'BAIGNADE SURVEILLÉE ET AUTORISÉE';
       case FlagColor.yellow:
@@ -312,23 +315,16 @@ class SpotFlagState {
         return '⚠️ BAIGNADE INTERDITE - POLLUTION OU PRÉSENCE D’ESPÈCES DANGEREUSES';
       case FlagColor.none:
         return '⚠️ COULEUR DE LA FLAMME NON RENSEIGNÉE';
-      }
     }
-
-    if (!_isCurrentlyInSurveillanceWindow()) {
-      return '⚠️ BAIGNADE NON SURVEILLÉE ⚠️ BAIGNADE À VOS RISQUES ET PÉRILS';
-    }
-
-    return '⚠️ COULEUR DE LA FLAMME NON RENSEIGNÉE';
   }
 
   int get statutColor {
     if (!isPosteSecours) return 0xFFFF0000;
+    if (!_isCurrentlyInSurveillanceWindow()) return 0xFFFF0000;
     if (flagPosition == FlagPosition.affale) return 0xFFFF0000;
+    if (flagColor == FlagColor.none) return 0xFFFF0000;
 
-    if (flagPosition == FlagPosition.hisse &&
-        flagColor != FlagColor.none) {
-      switch (flagColor) {
+    switch (flagColor) {
       case FlagColor.green:
         return 0xFF22C55E;
       case FlagColor.yellow:
@@ -339,10 +335,7 @@ class SpotFlagState {
         return 0xFFD946EF;
       case FlagColor.none:
         return 0xFFFF0000;
-      }
     }
-
-    return 0xFFFF0000;
   }
 
   bool _isCurrentlyInSurveillanceWindow() {
