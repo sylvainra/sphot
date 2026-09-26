@@ -361,17 +361,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     setState(() {
       _isSaved = nextSaved;
     });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(milliseconds: 1400),
-        content: Text(
-          nextSaved
-              ? 'SPHOT enregistré dans vos favoris.'
-              : 'SPHOT retiré de vos favoris.',
-        ),
-      ),
-    );
   }
 
   Future<void> _openUrl(String rawUrl) async {
@@ -868,6 +857,13 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     SpotFlagState spot,
     ScrollController controller,
   ) {
+    final hasCoreInfo =
+        spot.periode.trim().isNotEmpty ||
+        spot.heureDebut.trim().isNotEmpty ||
+        spot.heureFin.trim().isNotEmpty ||
+        spot.phone.trim().isNotEmpty ||
+        spot.activite.trim().isNotEmpty;
+
     return ListView(
       controller: controller,
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
@@ -877,11 +873,12 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                spot.displayName,
+                spot.mapDisplayName,
                 style: const TextStyle(
                   color: Color(0xFF172033),
-                  fontSize: 15,
+                  fontSize: 13,
                   fontWeight: FontWeight.w900,
+                  height: 1.2,
                 ),
               ),
               if (spot.ville.trim().isNotEmpty) ...[
@@ -889,51 +886,53 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                 Text(
                   spot.ville.toUpperCase(),
                   style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1E3A8A),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ],
             ],
           ),
         ),
-        const SizedBox(height: 10),
-        _MobilePublicCard(
-          child: Column(
-            children: [
-              if (spot.periode.isNotEmpty)
-                _PublicInfoLine(
-                  icon: Icons.date_range_outlined,
-                  label: 'Période de surveillance',
-                  value: spot.periode,
-                ),
-              if (spot.heureDebut.isNotEmpty ||
-                  spot.heureFin.isNotEmpty)
-                _PublicInfoLine(
-                  icon: Icons.schedule_outlined,
-                  label: 'Horaires',
-                  value: [
-                    spot.heureDebut,
-                    spot.heureFin,
-                  ].where((value) => value.isNotEmpty).join(' – '),
-                ),
-              if (spot.phone.isNotEmpty)
-                _PublicInfoLine(
-                  icon: Icons.phone_outlined,
-                  label: 'Téléphone public',
-                  value: spot.phone,
-                  onTap: () => _call(spot),
-                ),
-              if (spot.activite.isNotEmpty)
-                _PublicInfoLine(
-                  icon: Icons.waves_outlined,
-                  label: 'Activités',
-                  value: spot.activite,
-                ),
-            ],
+        if (hasCoreInfo) ...[
+          const SizedBox(height: 10),
+          _MobilePublicCard(
+            child: Column(
+              children: [
+                if (spot.periode.isNotEmpty)
+                  _PublicInfoLine(
+                    icon: Icons.date_range_outlined,
+                    label: 'Période de surveillance',
+                    value: spot.periode,
+                  ),
+                if (spot.heureDebut.isNotEmpty ||
+                    spot.heureFin.isNotEmpty)
+                  _PublicInfoLine(
+                    icon: Icons.schedule_outlined,
+                    label: 'Horaires',
+                    value: [
+                      spot.heureDebut,
+                      spot.heureFin,
+                    ].where((value) => value.isNotEmpty).join(' – '),
+                  ),
+                if (spot.phone.isNotEmpty)
+                  _PublicInfoLine(
+                    icon: Icons.phone_outlined,
+                    label: 'Téléphone public',
+                    value: spot.phone,
+                    onTap: () => _call(spot),
+                  ),
+                if (spot.activite.isNotEmpty)
+                  _PublicInfoLine(
+                    icon: Icons.waves_outlined,
+                    label: 'Activités',
+                    value: spot.activite,
+                  ),
+              ],
+            ),
           ),
-        ),
+        ],
         if (spot.publicEquipment.isNotEmpty) ...[
           const SizedBox(height: 10),
           _MobilePublicCard(
@@ -2272,8 +2271,8 @@ class _PublicInfoLine extends StatelessWidget {
                 ),
               )
             else
-              Icon(icon, size: 22, color: const Color(0xFF1E3A8A)),
-            const SizedBox(width: 12),
+              Icon(icon, size: 17, color: const Color(0xFF1E3A8A)),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2291,8 +2290,9 @@ class _PublicInfoLine extends StatelessWidget {
                               (onTap == null
                                   ? Colors.black87
                                   : const Color(0xFF1E3A8A)),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
                           decoration: onTap == null
                               ? null
                               : TextDecoration.underline,
@@ -2424,7 +2424,16 @@ class _PublicChips extends StatelessWidget {
             ),
             const SizedBox(width: 7),
           ],
-          Flexible(child: Text(displayName)),
+          Flexible(
+            child: Text(
+              displayName,
+              style: const TextStyle(
+                color: Colors.black87,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         ],
       ),
       visualDensity: VisualDensity.compact,
