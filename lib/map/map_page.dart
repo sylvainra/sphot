@@ -756,11 +756,11 @@ SpotFlagState? _findBestSpotMatch(
       builder: (sheetContext) {
         return DraggableScrollableSheet(
           expand: false,
-          initialChildSize: 0.36,
+          initialChildSize: 0.46,
           minChildSize: 0.18,
           maxChildSize: 0.94,
           snap: true,
-          snapSizes: const [0.36, 0.94],
+          snapSizes: const [0.46, 0.94],
           builder: (_, scrollController) {
             return PublicSpotMobileSheet(
               spot: spot,
@@ -2888,15 +2888,8 @@ const SizedBox(width: 2),
 
                           SizedBox(height: _lineSpacing() - 1.8),
 
-                          _warningLineUniform(
-                            'BAIGNADE NON SURVEILLÉE',
-                            _labelSize(22),
-                          ),
-
-                          SizedBox(height: _lineSpacing() - 1.8),
-
-                          _warningLineUniform(
-                            'BAIGNADE À VOS RISQUES ET PÉRILS',
+                          _rescueStatusUnderMarker(
+                            spot,
                             _labelSize(22),
                           ),
                         ],
@@ -2910,6 +2903,56 @@ const SizedBox(width: 2),
       ),
     );
   }
+}
+
+Widget _rescueStatusUnderMarker(
+  SpotFlagState spot,
+  double size,
+) {
+  if (spot.hasValidFlag) {
+    final statusColor = Color(spot.statutColor);
+    final statusText = spot.displayStatut.replaceAll('⚠️ ', '');
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (spot.flagColor != FlagColor.green) ...[
+          Icon(
+            Icons.warning_amber_rounded,
+            size: size,
+            color: statusColor,
+          ),
+          const SizedBox(width: 2),
+        ],
+        Flexible(
+          child: Text(
+            statusText,
+            textAlign: TextAlign.center,
+            style: _mapLabelStyle(
+              fontSize: size * 0.55,
+              fontWeight: FontWeight.w900,
+              color: statusColor,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      _warningLineUniform(
+        'BAIGNADE NON SURVEILLÉE',
+        size,
+      ),
+      const SizedBox(height: 1),
+      _warningLineUniform(
+        'BAIGNADE À VOS RISQUES ET PÉRILS',
+        size,
+      ),
+    ],
+  );
 }
 
 Widget _warningLineUniform(String text, double size) {
