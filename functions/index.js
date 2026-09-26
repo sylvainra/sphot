@@ -253,9 +253,56 @@ async function reconcilePublicTerritory(territoireId, publish) {
       .collection("adminRequests")
       .where("territoire.territoireId", "==", territoireId)
       .get() : null;
-  const approvedRequest = requestSnapshot ? requestSnapshot.docs.find(
+  let approvedRequest = requestSnapshot ? requestSnapshot.docs.find(
       (document) => isApprovedAdminRequest(document.data()),
   ) : null;
+
+  if (publish && !approvedRequest) {
+    const legacyRequestSnapshot = await db
+        .collection("adminRequests")
+        .where("territoireId", "==", territoireId)
+        .get();
+
+    approvedRequest = legacyRequestSnapshot.docs.find(
+        (document) => isApprovedAdminRequest(document.data()),
+    ) || null;
+  }
+
+  if (publish && !approvedRequest) {
+    const adminSnapshot = await db
+        .collection("admins")
+        .where("territoireId", "==", territoireId)
+        .get();
+
+    for (const adminDocument of adminSnapshot.docs) {
+      const requestByUidSnapshot = await db
+          .collection("adminRequests")
+          .where("uid", "==", adminDocument.id)
+          .limit(1)
+          .get();
+
+      const requestByUid = requestByUidSnapshot.docs.find(
+          (document) => isApprovedAdminRequest(document.data()),
+      );
+
+      if (requestByUid) {
+        approvedRequest = requestByUid;
+        break;
+      }
+
+      const requestById = await db
+          .collection("adminRequests")
+          .doc(adminDocument.id)
+          .get();
+
+      if (requestById.exists &&
+          isApprovedAdminRequest(requestById.data() || {})) {
+        approvedRequest = requestById;
+        break;
+      }
+    }
+  }
+
   const approvedRequestData = approvedRequest ? approvedRequest.data() : {};
   const territorySources = [
     approvedRequestData.territoire || {},
