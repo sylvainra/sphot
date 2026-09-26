@@ -14,6 +14,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../models/flag_state.dart';
 import '../services/firestore_service.dart';
+import '../services/public_favorites_service.dart';
 import 'flag_marker.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
@@ -68,6 +69,8 @@ class _MapPageState extends State<MapPage> {
   int _selectedTileStyle = 0;
   int _selectedBottomIndex = 1;
   String? _selectedPublicSpotId;
+  Set<String> _favoriteSpotIds = <String>{};
+  bool _showFavoritesOnly = false;
   bool _isMovingMap = false;
   Timer? _mapMoveTimer;
 Timer? _searchTimer;
@@ -107,6 +110,48 @@ void initState() {
   _speech = stt.SpeechToText();
   _publicAdvertisingSpotsFuture =
       _firestoreService.getPublicAdvertisingSpots();
+  unawaited(_loadFavoriteSpotIds());
+}
+
+Future<void> _loadFavoriteSpotIds() async {
+  final ids = await PublicFavoritesService.loadFavoriteIds();
+
+  if (!mounted) return;
+
+  setState(() {
+    _favoriteSpotIds = ids;
+    if (_showFavoritesOnly && ids.isEmpty) {
+      _showFavoritesOnly = false;
+    }
+  });
+}
+
+Future<void> _toggleFavoritesFilter() async {
+  final ids = await PublicFavoritesService.loadFavoriteIds();
+
+  if (!mounted) return;
+
+  if (ids.isEmpty) {
+    setState(() {
+      _favoriteSpotIds = ids;
+      _showFavoritesOnly = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        duration: Duration(milliseconds: 1400),
+        content: Text('Aucun SPHOT enregistré dans les favoris.'),
+      ),
+    );
+    return;
+  }
+
+  setState(() {
+    _favoriteSpotIds = ids;
+    _showFavoritesOnly = !_showFavoritesOnly;
+    _isFilterOpen = false;
+    _isMapStyleOpen = false;
+  });
 }
 
   bool _showTextForZoom(double zoom) {
@@ -770,6 +815,8 @@ SpotFlagState? _findBestSpotMatch(
         );
       },
     );
+
+    await _loadFavoriteSpotIds();
 
     if (mounted) {
       setState(() {
@@ -1835,7 +1882,12 @@ Widget _buildBottomBar() {
   final items = [
     {'icon': Icons.tune, 'label': 'FILTRES'},
     {'icon': Icons.layers_outlined, 'label': 'CARTES'},
-    {'icon': Icons.star_border, 'label': 'FAVORIS'},
+    {
+      'icon': _favoriteSpotIds.isNotEmpty
+          ? Icons.star
+          : Icons.star_border,
+      'label': 'FAVORIS',
+    },
     {'icon': Icons.info_outline, 'label': 'INFOS'},
     {'icon': Icons.add, 'label': 'LOGIN'},
   ];
@@ -1869,7 +1921,7 @@ Widget _buildBottomBar() {
               } else if (index == 1) {
                 _toggleMapStyleBar();
               } else if (index == 2) {
-                _showMapMessage('Favoris bientôt disponibles');
+                unawaited(_toggleFavoritesFilter());
               } else if (index == 3) {
                 Navigator.of(context).push(
                   MaterialPageRoute(
@@ -1880,9 +1932,15 @@ Widget _buildBottomBar() {
                 unawaited(_openLoginPage());
               }
             },
-            child: SizedBox(
+            child: Container(
               width: 58,
               height: 50,
+              decoration: BoxDecoration(
+                color: index == 2 && _showFavoritesOnly
+                    ? const Color(0x22FFD000)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -2048,7 +2106,13 @@ void dispose() {
           }
 
           final allSpots = snapshot.data!;
-final spots = allSpots.where(_matchesFilter).toList();
+final spots = allSpots
+    .where(_matchesFilter)
+    .where(
+      (spot) =>
+          !_showFavoritesOnly || _favoriteSpotIds.contains(spot.id),
+    )
+    .toList();
 
 debugPrint('SPHOTS CHARGÉS : ${allSpots.length}');
 debugPrint('SPHOTS AFFICHÉS : ${spots.length}');
