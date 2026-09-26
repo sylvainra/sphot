@@ -754,6 +754,22 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     );
   }
 
+  String _formatFrenchPhoneForDisplay(String rawPhone) {
+    final digits = rawPhone.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (digits.length == 10 && digits.startsWith('0')) {
+      final groups = <String>[];
+
+      for (var index = 0; index < digits.length; index += 2) {
+        groups.add(digits.substring(index, index + 2));
+      }
+
+      return groups.join(' ');
+    }
+
+    return rawPhone.trim();
+  }
+
   Widget _buildActionsPage(
     BuildContext context,
     SpotFlagState spot,
@@ -813,6 +829,71 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                   ),
                 ],
               ),
+              if (spot.phone.trim().isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Material(
+                  color: const Color(0xFFF4F7FB),
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => _call(spot),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF1E3A8A),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.info_outline_rounded,
+                            size: 18,
+                            color: Color(0xFF1E3A8A),
+                          ),
+                          const SizedBox(width: 7),
+                          const Text(
+                            'INFOS',
+                            style: TextStyle(
+                              color: Color(0xFF1E3A8A),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                          const Spacer(),
+                          const Icon(
+                            Icons.phone_in_talk_outlined,
+                            size: 18,
+                            color: Color(0xFF1E3A8A),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              _formatFrenchPhoneForDisplay(spot.phone),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                color: Color(0xFF1E3A8A),
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w900,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               if (showUnsupervisedWarning) ...[
                 const SizedBox(height: 10),
                 const _UnsupervisedWarning(),
