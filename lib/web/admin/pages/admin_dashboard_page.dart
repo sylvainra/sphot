@@ -6868,17 +6868,6 @@ Future<void> _saveSphotFromDashboard() async {
   SetOptions(merge: true),
 );
 
-    await FirebaseFirestore.instance
-        .collection('spots')
-        .doc(documentId)
-        .set(
-          {
-            ...data,
-            'publicSyncAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        );
-
 // Laisse le panneau visible pendant la mise à jour de la carte.
 if (!wasEditing) {
   await Future<void>.delayed(
@@ -6984,31 +6973,12 @@ Future<void> _deleteSphotFromSummary(
   }
 
   try {
-    final firestore = FirebaseFirestore.instance;
-
-    await firestore
+    await FirebaseFirestore.instance
         .collection('territoires')
         .doc(territoireId)
         .collection('spots')
         .doc(documentId)
         .delete();
-
-    final publicSpotReference =
-        firestore.collection('spots').doc(documentId);
-
-    final publicSpotSnapshot =
-        await publicSpotReference.get();
-
-    if (!publicSpotSnapshot.exists ||
-        _cleanText(
-          publicSpotSnapshot.data()?['territoireId'],
-        ).isEmpty ||
-        _cleanText(
-              publicSpotSnapshot.data()?['territoireId'],
-            ) ==
-            territoireId) {
-      await publicSpotReference.delete();
-    }
 
     if (!mounted) {
       return;
@@ -7118,31 +7088,12 @@ Future<void> _deleteSphotFromDashboard() async {
   });
 
   try {
-    final firestore = FirebaseFirestore.instance;
-
-    await firestore
+    await FirebaseFirestore.instance
         .collection('territoires')
         .doc(territoireId)
         .collection('spots')
         .doc(documentId)
         .delete();
-
-    final publicSpotReference =
-        firestore.collection('spots').doc(documentId);
-
-    final publicSpotSnapshot =
-        await publicSpotReference.get();
-
-    if (!publicSpotSnapshot.exists ||
-        _cleanText(
-          publicSpotSnapshot.data()?['territoireId'],
-        ).isEmpty ||
-        _cleanText(
-              publicSpotSnapshot.data()?['territoireId'],
-            ) ==
-            territoireId) {
-      await publicSpotReference.delete();
-    }
 
     if (!mounted) return;
 
@@ -12204,115 +12155,6 @@ void _openLegalStatusMenu() {
   Overlay.of(context).insert(_dropdownOverlay!);
 }
 
-Future<void> _syncTerritorySpotsToPublicRoot({
-  required String territoireId,
-  required Map<String, dynamic> territoryData,
-}) async {
-  final cleanTerritoireId = territoireId.trim();
-
-  if (cleanTerritoireId.isEmpty) {
-    return;
-  }
-
-  final firestore = FirebaseFirestore.instance;
-
-  final snapshot = await firestore
-      .collection('territoires')
-      .doc(cleanTerritoireId)
-      .collection('spots')
-      .get();
-
-  if (snapshot.docs.isEmpty) {
-    return;
-  }
-
-  String firstNonEmpty(List<dynamic> values) {
-    for (final value in values) {
-      final text = _cleanText(value);
-      if (text.isNotEmpty) {
-        return text;
-      }
-    }
-    return '';
-  }
-
-  WriteBatch batch = firestore.batch();
-  var operationCount = 0;
-
-  Future<void> commitBatchIfNeeded({bool force = false}) async {
-    if (operationCount == 0) {
-      return;
-    }
-
-    if (!force && operationCount < 400) {
-      return;
-    }
-
-    await batch.commit();
-    batch = firestore.batch();
-    operationCount = 0;
-  }
-
-  for (final doc in snapshot.docs) {
-    final spot = doc.data();
-
-    final publicData = <String, dynamic>{
-      ...spot,
-      'idSphot': firstNonEmpty([
-        spot['idSphot'],
-        doc.id,
-      ]),
-      'territoireId': cleanTerritoireId,
-      'pays': firstNonEmpty([
-        spot['pays'],
-        territoryData['pays'],
-      ]),
-      'region': firstNonEmpty([
-        spot['region'],
-        territoryData['region'],
-      ]),
-      'departement': firstNonEmpty([
-        spot['departement'],
-        territoryData['departement'],
-      ]),
-      'ville': firstNonEmpty([
-        spot['ville'],
-        territoryData['ville'],
-      ]),
-      'villeLat': _toDouble(spot['villeLat']) != 0
-          ? spot['villeLat']
-          : territoryData['villeLat'] ?? 0.0,
-      'villeLng': _toDouble(spot['villeLng']) != 0
-          ? spot['villeLng']
-          : territoryData['villeLng'] ?? 0.0,
-      'logoVille': firstNonEmpty([
-        spot['logoVille'],
-        territoryData['logoVille'],
-        territoryData['logoUrl'],
-      ]),
-      'siteInternetVille': firstNonEmpty([
-        spot['siteInternetVille'],
-        territoryData['siteInternetVille'],
-        territoryData['siteInternet'],
-      ]),
-      'source': 'admin',
-      'sphotValide': spot['sphotValide'] != false,
-      'publicSyncAt': FieldValue.serverTimestamp(),
-    };
-
-    batch.set(
-      firestore.collection('spots').doc(doc.id),
-      publicData,
-      SetOptions(merge: true),
-    );
-
-    operationCount++;
-    await commitBatchIfNeeded();
-  }
-
-  await commitBatchIfNeeded(force: true);
-}
-
 Future<void> _loadAdministratorTerritoryCenter() async {
   try {
     final uid = widget.adminUid.trim();
@@ -12343,31 +12185,18 @@ Future<void> _loadAdministratorTerritoryCenter() async {
       return 0;
     }
 
-    final directRequestSnapshot = await firestore
+    final requestSnapshot = await firestore
         .collection('adminRequests')
         .doc(uid)
         .get();
-
-    Map<String, dynamic> requestData =
-        directRequestSnapshot.data() ?? <String, dynamic>{};
-
-    if (requestData.isEmpty) {
-      final requestQuery = await firestore
-          .collection('adminRequests')
-          .where('uid', isEqualTo: uid)
-          .limit(1)
-          .get();
-
-      if (requestQuery.docs.isNotEmpty) {
-        requestData = requestQuery.docs.first.data();
-      }
-    }
 
     final approvedAdminSnapshot = await firestore
         .collection('admins')
         .doc(uid)
         .get();
 
+    final requestData =
+        requestSnapshot.data() ?? <String, dynamic>{};
     final approvedAdminData =
         approvedAdminSnapshot.data() ?? <String, dynamic>{};
 
@@ -12467,62 +12296,6 @@ Future<void> _loadAdministratorTerritoryCenter() async {
       requestData['logoVille'],
       requestData['logoUrl'],
     ]);
-
-    final siteInternetVille = firstNonEmptyText([
-      rootTerritory['siteInternetVille'],
-      rootTerritory['siteInternet'],
-      approvedTerritory['siteInternetVille'],
-      approvedTerritory['siteInternet'],
-      requestTerritory['siteInternetVille'],
-      requestTerritory['siteInternet'],
-      approvedAdminData['siteInternetVille'],
-      requestData['siteInternetVille'],
-    ]);
-
-    final publicTerritoryData = <String, dynamic>{
-      ...rootTerritory,
-      'territoireId': territoireId,
-      'pays': firstNonEmptyText([
-        rootTerritory['pays'],
-        approvedTerritory['pays'],
-        requestTerritory['pays'],
-      ]),
-      'region': firstNonEmptyText([
-        rootTerritory['region'],
-        approvedTerritory['region'],
-        requestTerritory['region'],
-      ]),
-      'departement': firstNonEmptyText([
-        rootTerritory['departement'],
-        approvedTerritory['departement'],
-        requestTerritory['departement'],
-      ]),
-      'ville': firstNonEmptyText([
-        rootTerritory['ville'],
-        approvedTerritory['ville'],
-        requestTerritory['ville'],
-      ]),
-      'villeLat': latitude,
-      'villeLng': longitude,
-      'logoVille': logoVille,
-      'siteInternetVille': siteInternetVille,
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-
-    if (territoireId.isNotEmpty) {
-      await firestore
-          .collection('territoires')
-          .doc(territoireId)
-          .set(
-            publicTerritoryData,
-            SetOptions(merge: true),
-          );
-
-      await _syncTerritorySpotsToPublicRoot(
-        territoireId: territoireId,
-        territoryData: publicTerritoryData,
-      );
-    }
 
     final center = LatLng(
       latitude,
