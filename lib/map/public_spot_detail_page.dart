@@ -416,6 +416,19 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     setState(() => _selectedPage = index);
   }
 
+  Widget _buildSpotActions(
+    BuildContext context,
+    SpotFlagState spot,
+  ) {
+    return _MobileSpotActionBar(
+      isSaved: _isSaved,
+      onDirections: () => _openDirections(spot),
+      onStart: () => _startNavigation(spot),
+      onShare: () => _shareSpot(context, spot),
+      onSave: () => _toggleSaved(spot),
+    );
+  }
+
   Widget _buildSelectedPage(
     BuildContext context,
     SpotFlagState spot,
@@ -423,6 +436,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     switch (_selectedPage) {
       case 1:
         return _buildDataPage(
+          context: context,
+          spot: spot,
           title: 'Météo terrestre',
           icon: Icons.wb_sunny_outlined,
           values: _PublicLiveDataSection._formatTerrestrialValues(
@@ -432,6 +447,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         );
       case 2:
         return _buildDataPage(
+          context: context,
+          spot: spot,
           title: 'Météo marine',
           icon: Icons.water_rounded,
           values: _PublicLiveDataSection._formatMarineValues(
@@ -441,6 +458,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         );
       case 3:
         return _buildDataPage(
+          context: context,
+          spot: spot,
           title: 'Dicton & Éphéméride',
           icon: Icons.calendar_today_outlined,
           values: _PublicLiveDataSection._formatEphemerideValues(
@@ -575,13 +594,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                 Expanded(
                   child: _buildSelectedPage(context, currentSpot),
                 ),
-                _MobileSpotActionBar(
-                  isSaved: _isSaved,
-                  onDirections: () => _openDirections(currentSpot),
-                  onStart: () => _startNavigation(currentSpot),
-                  onShare: () => _shareSpot(context, currentSpot),
-                  onSave: () => _toggleSaved(currentSpot),
-                ),
               ],
             ),
           ),
@@ -682,11 +694,15 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           const _MobilePublicCard(
             child: _MobileMediaPlaceholder(),
           ),
+        const SizedBox(height: 12),
+        _buildSpotActions(context, spot),
       ],
     );
   }
 
   Widget _buildDataPage({
+    required BuildContext context,
+    required SpotFlagState spot,
     required String title,
     required IconData icon,
     required List<String> values,
@@ -703,6 +719,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             values: values,
           ),
         ),
+        const SizedBox(height: 12),
+        _buildSpotActions(context, spot),
       ],
     );
   }
@@ -801,6 +819,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             ),
           ),
         ],
+        const SizedBox(height: 12),
+        _buildSpotActions(context, spot),
       ],
     );
   }
@@ -823,55 +843,39 @@ class _MobileSpotActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Container(
-        height: 66,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(
-            top: BorderSide(color: Color(0xFFDCE3EA)),
+    return SizedBox(
+      height: 48,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
+        children: [
+          _MobileSpotActionButton(
+            icon: Icons.directions_rounded,
+            label: 'ITINÉRAIRE',
+            onTap: onDirections,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x12000000),
-              blurRadius: 10,
-              offset: Offset(0, -3),
-            ),
-          ],
-        ),
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-          children: [
-            _MobileSpotActionButton(
-              icon: Icons.directions_rounded,
-              label: 'ITINÉRAIRE',
-              onTap: onDirections,
-            ),
-            const SizedBox(width: 8),
-            _MobileSpotActionButton(
-              icon: Icons.navigation_rounded,
-              label: 'DÉMARRER',
-              onTap: onStart,
-            ),
-            const SizedBox(width: 8),
-            _MobileSpotActionButton(
-              icon: Icons.share_rounded,
-              label: 'PARTAGER',
-              onTap: onShare,
-            ),
-            const SizedBox(width: 8),
-            _MobileSpotActionButton(
-              icon: isSaved
-                  ? Icons.bookmark_rounded
-                  : Icons.bookmark_border_rounded,
-              label: isSaved ? 'ENREGISTRÉ' : 'ENREGISTRER',
-              selected: isSaved,
-              onTap: onSave,
-            ),
-          ],
-        ),
+          const SizedBox(width: 8),
+          _MobileSpotActionButton(
+            icon: Icons.navigation_rounded,
+            label: 'DÉMARRER',
+            onTap: onStart,
+          ),
+          const SizedBox(width: 8),
+          _MobileSpotActionButton(
+            icon: Icons.share_rounded,
+            label: 'PARTAGER',
+            onTap: onShare,
+          ),
+          const SizedBox(width: 8),
+          _MobileSpotActionButton(
+            icon: isSaved
+                ? Icons.bookmark_rounded
+                : Icons.bookmark_border_rounded,
+            label: isSaved ? 'ENREGISTRÉ' : 'ENREGISTRER',
+            selected: isSaved,
+            onTap: onSave,
+          ),
+        ],
       ),
     );
   }
@@ -892,29 +896,45 @@ class _MobileSpotActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 18),
-      label: Text(
-        label,
-        maxLines: 1,
-        style: const TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-      style: OutlinedButton.styleFrom(
-        foregroundColor:
-            selected ? Colors.white : const Color(0xFF1E3A8A),
-        backgroundColor:
-            selected ? const Color(0xFF1E3A8A) : Colors.white,
-        side: const BorderSide(color: Color(0xFF1E3A8A)),
+    return InkWell(
+      borderRadius: BorderRadius.circular(99),
+      onTap: onTap,
+      child: Container(
         padding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 10,
+          horizontal: 13,
+          vertical: 8,
         ),
-        shape: RoundedRectangleBorder(
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFF1E3A8A)
+              : Colors.white,
           borderRadius: BorderRadius.circular(99),
+          border: Border.all(
+            color: const Color(0xFF1E3A8A),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 17,
+              color: selected
+                  ? Colors.white
+                  : const Color(0xFF1E3A8A),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              maxLines: 1,
+              style: TextStyle(
+                color: selected
+                    ? Colors.white
+                    : const Color(0xFF1E3A8A),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
         ),
       ),
     );
