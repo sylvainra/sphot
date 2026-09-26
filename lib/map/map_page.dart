@@ -756,11 +756,11 @@ SpotFlagState? _findBestSpotMatch(
       builder: (sheetContext) {
         return DraggableScrollableSheet(
           expand: false,
-          initialChildSize: 0.46,
+          initialChildSize: 0.60,
           minChildSize: 0.18,
           maxChildSize: 0.94,
           snap: true,
-          snapSizes: const [0.46, 0.94],
+          snapSizes: const [0.60, 0.94],
           builder: (_, scrollController) {
             return PublicSpotMobileSheet(
               spot: spot,
