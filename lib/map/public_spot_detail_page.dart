@@ -282,7 +282,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   int _selectedPage = 0;
 
   static const List<(String, IconData)> _pages = [
-    ('Actions rapides', Icons.flash_on_rounded),
+    ('Infos en direct', Icons.sensors_rounded),
     ('Météo terrestre', Icons.wb_sunny_outlined),
     ('Météo marine', Icons.water_rounded),
     ('Dicton & Éphéméride', Icons.calendar_today_outlined),
@@ -401,42 +401,22 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             child: Column(
               children: [
                 SizedBox(
-                  height: 32,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFB9C2CC),
-                          borderRadius: BorderRadius.circular(99),
-                        ),
+                  height: 26,
+                  child: Center(
+                    child: Container(
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB9C2CC),
+                        borderRadius: BorderRadius.circular(99),
                       ),
-                      Positioned(
-                        right: 6,
-                        top: 0,
-                        child: IconButton(
-                          tooltip: 'Fermer',
-                          onPressed: () => Navigator.of(context).pop(),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 32,
-                            minHeight: 32,
-                          ),
-                          icon: const Icon(
-                            Icons.close_rounded,
-                            size: 22,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 SizedBox(
                   height: 48,
                   child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(12, 2, 52, 8),
+                    padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
                     scrollDirection: Axis.horizontal,
                     itemCount: _pages.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 8),
@@ -568,6 +548,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             ],
           ),
         ),
+        const SizedBox(height: 10),
+        _PublicDangerList(values: dangerValues),
         if (notificationActive && notificationMessage.isNotEmpty) ...[
           const SizedBox(height: 10),
           _PublicNotificationCard(
@@ -575,10 +557,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             publishedAt: notificationPublishedAt,
           ),
         ],
-        const SizedBox(height: 10),
-        _MobilePublicCard(
-          child: _PublicDangerList(values: dangerValues),
-        ),
         if (spot.phone.isNotEmpty) ...[
           const SizedBox(height: 10),
           _MobileQuickAction(
@@ -684,7 +662,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             ),
           ),
         ],
-        if (spot.arretesMunicipaux.isNotEmpty) ...[
+        if (spot.siteInternetVille.isNotEmpty ||
+            spot.arretesMunicipaux.isNotEmpty) ...[
           const SizedBox(height: 10),
           _MobilePublicCard(
             child: Column(
@@ -695,11 +674,21 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                   style: _publicSectionTitleStyle,
                 ),
                 const SizedBox(height: 10),
-                _PublicLinkButton(
-                  icon: Icons.gavel_outlined,
-                  label: 'Réglementation de baignade',
-                  onTap: () => _openUrl(spot.arretesMunicipaux),
-                ),
+                if (spot.siteInternetVille.isNotEmpty)
+                  _PublicLinkButton(
+                    icon: Icons.language_rounded,
+                    label: 'Site internet du lieu',
+                    onTap: () => _openUrl(spot.siteInternetVille),
+                  ),
+                if (spot.siteInternetVille.isNotEmpty &&
+                    spot.arretesMunicipaux.isNotEmpty)
+                  const SizedBox(height: 8),
+                if (spot.arretesMunicipaux.isNotEmpty)
+                  _PublicLinkButton(
+                    icon: Icons.gavel_outlined,
+                    label: 'Réglementation de baignade',
+                    onTap: () => _openUrl(spot.arretesMunicipaux),
+                  ),
               ],
             ),
           ),
@@ -1415,43 +1404,52 @@ class _PublicDangerList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Icon(
-          Icons.warning_amber_rounded,
-          size: 17,
-          color: Color(0xFF1E3A8A),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'DANGERS DU JOUR',
-                style: TextStyle(
-                  color: Color(0xFF1E3A8A),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 4),
-              if (values.isEmpty)
-                const Text(
-                  'Aucun danger signalé',
-                  style: TextStyle(
-                    color: Colors.black38,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                )
-              else
-                ...values.map((value) => _PublicDangerRow(value: value)),
-            ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFEF4444)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            size: 21,
+            color: Color(0xFFDC2626),
           ),
-        ),
-      ],
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'DANGERS DU JOUR',
+                  style: TextStyle(
+                    color: Color(0xFFB91C1C),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (values.isEmpty)
+                  const Text(
+                    'Aucun danger signalé',
+                    style: TextStyle(
+                      color: Colors.black54,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  )
+                else
+                  ...values.map((value) => _PublicDangerRow(value: value)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
