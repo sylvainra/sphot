@@ -3,9 +3,12 @@ import 'dart:ui' as ui;
 import 'dart:async';
 import 'profil_login_page.dart';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../widgets/adaptive_asset_image.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -19,7 +22,6 @@ import 'public_spot_detail_page.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
-import '../pages/advertiser_access_page.dart';
 
 enum SpotFilter {
   all,
@@ -57,6 +59,8 @@ class _MapPageState extends State<MapPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final FirestoreService _firestoreService = FirestoreService();
   final MapController _mapController = MapController();
+  late final Future<List<Map<String, dynamic>>>
+      _publicAdvertisingSpotsFuture;
 
   SpotFilter _selectedFilter = SpotFilter.all;
 
@@ -100,9 +104,9 @@ static const List<_MapTileStyle> _tileStyles = [
 void initState() {
   super.initState();
   _speech = stt.SpeechToText();
+  _publicAdvertisingSpotsFuture =
+      _firestoreService.getPublicAdvertisingSpots();
 }
-
-  bool _showFlagForZoom(double zoom) => zoom >= 12.5;
 
   bool _showTextForZoom(double zoom) {
     final isTouchDevice =
@@ -123,7 +127,84 @@ void initState() {
     return 0.0;
   }
 
-  Future<void> _openCityWebsite(String rawUrl) async {
+  Future<void> _openAdvertiserWebsite() async {
+    final uri = kIsWeb
+        ? Uri.base.replace(fragment: '/advertiser')
+        : Uri.parse('https://sphot.app/#/advertiser');
+
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: kIsWeb ? '_blank' : null,
+    );
+
+    if (!opened) {
+      _showMapMessage('Impossible d’ouvrir l’espace annonceur.');
+    }
+  }
+
+  double _publicAdvertisingDouble(Object? value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  Future<void> _openPublicAdvertisingSpot(
+    Map<String, dynamic> advertiser,
+  ) async {
+    var url = advertiser['destinationUrl']?.toString().trim() ?? '';
+    if (url.isEmpty) {
+      _showMapMessage('Site internet de l’annonceur non renseigné.');
+      return;
+    }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://$url';
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      _showMapMessage('Adresse du site annonceur invalide.');
+      return;
+    }
+
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened) {
+      _showMapMessage('Impossible d’ouvrir le site de l’annonceur.');
+    }
+  }
+
+  List<Marker> _buildPublicAdvertisingMarkers(
+    List<Map<String, dynamic>> advertisers,
+    double zoom,
+    double rotation,
+  ) {
+    final showText = _showTextForZoom(zoom);
+    return advertisers.map((advertiser) {
+      final latitude = _publicAdvertisingDouble(advertiser['latitude']);
+      final longitude = _publicAdvertisingDouble(advertiser['longitude']);
+      final name = advertiser['name']?.toString().trim() ?? '';
+
+      return Marker(
+        point: LatLng(latitude, longitude),
+        width: 56,
+        height: 56,
+        alignment: Alignment.center,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _openPublicAdvertisingSpot(advertiser),
+          child: _PublicAdvertisingMarker(
+            name: name.isEmpty ? 'SPHOT PUBLICITAIRE' : name,
+            showTextAllowed: showText,
+            rotation: rotation,
+            labelOpacity: _labelOpacity(zoom),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  Future<void> _openCityWebsite(
+    String rawUrl,
+    SpotFlagState spot,
+  ) async {
   var url = rawUrl.trim();
 
   if (url.isEmpty) {
@@ -142,6 +223,18 @@ void initState() {
     return;
   }
 
+  final territoireId = spot.territoireId.trim();
+  final ville = spot.ville.trim();
+  unawaited(
+    _firestoreService.recordPublicClick(
+      territoireId: territoireId,
+      targetId: territoireId.isNotEmpty ? territoireId : ville.toUpperCase(),
+      targetType: 'admin',
+      targetName: 'SPHOT ADMIN - ${ville.toUpperCase()}',
+      source: kIsWeb ? 'web' : 'app',
+    ),
+  );
+
   final opened = await launchUrl(
     uri,
     mode: LaunchMode.externalApplication,
@@ -152,7 +245,7 @@ void initState() {
   }
 }
 
-List<Marker> _buildTerritoryLogoMarkers(
+List<Marker> _buildAdminMarkers(
   List<SpotFlagState> spots,
   double zoom,
   double rotation,
@@ -161,18 +254,24 @@ List<Marker> _buildTerritoryLogoMarkers(
 
   if (zoom < 12) return markers;
 
-  final cities = <String, SpotFlagState>{};
+  final admins = <String, SpotFlagState>{};
 
   for (final spot in spots) {
     final ville = spot.ville.trim();
+    final siteInternetVille = spot.siteInternetVille.trim();
 
     if (ville.isEmpty) continue;
     if (spot.villeLat == 0 || spot.villeLng == 0) continue;
+    if (siteInternetVille.isEmpty) continue;
 
-    final currentSpot = cities[ville];
+    final adminKey = spot.territoireId.trim().isNotEmpty
+        ? spot.territoireId.trim()
+        : ville.toUpperCase();
+
+    final currentSpot = admins[adminKey];
 
     if (currentSpot == null) {
-      cities[ville] = spot;
+      admins[adminKey] = spot;
       continue;
     }
 
@@ -180,29 +279,97 @@ List<Marker> _buildTerritoryLogoMarkers(
     final candidateLogo = spot.logoVille.trim();
 
     if (currentLogo.isEmpty && candidateLogo.isNotEmpty) {
-      cities[ville] = spot;
+      admins[adminKey] = spot;
     }
   }
 
-  for (final spot in cities.values) {
+  for (final spot in admins.values) {
     final logoVille = spot.logoVille.trim();
     final siteInternetVille = spot.siteInternetVille.trim();
-
-    if (logoVille.isEmpty) continue;
 
     markers.add(
       Marker(
         point: LatLng(spot.villeLat, spot.villeLng),
-        width: 70,
-        height: 70,
-        child: GestureDetector(
-          onTap: () => _openCityWebsite(siteInternetVille),
-          child: Transform.rotate(
-            angle: -rotation * pi / 180,
-            child: Image.network(
-              logoVille,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        width: 85,
+        height: 85,
+        alignment: Alignment.topCenter,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _openCityWebsite(siteInternetVille, spot),
+            child: Tooltip(
+              message: spot.ville.toUpperCase(),
+              preferBelow: true,
+              verticalOffset: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF0000),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              textStyle: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+              child: Transform.rotate(
+                angle: -rotation * pi / 180,
+                child: SizedBox(
+                  width: 85,
+                  height: 85,
+                  child: Stack(
+                    alignment: Alignment.topCenter,
+                    children: [
+                      Image.asset(
+                        'data/icons/fire_red_icon.png',
+                        width: 85,
+                        height: 85,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                      ),
+                      Positioned(
+                        top: 23,
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: ClipOval(
+                            child: logoVille.isEmpty
+                                ? const Icon(
+                                    Icons.account_balance_rounded,
+                                    color: Color(0xFF1E3A8A),
+                                    size: 23,
+                                  )
+                                : IgnorePointer(
+                                    child: Image.network(
+                                      logoVille,
+                                      key: ValueKey<String>(
+                                        'public-admin-logo-$logoVille',
+                                      ),
+                                      width: 34,
+                                      height: 34,
+                                      fit: BoxFit.contain,
+                                      gaplessPlayback: true,
+                                      webHtmlElementStrategy:
+                                          WebHtmlElementStrategy.prefer,
+                                      errorBuilder: (_, __, ___) => const Icon(
+                                        Icons.account_balance_rounded,
+                                        color: Color(0xFF1E3A8A),
+                                        size: 23,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -216,24 +383,24 @@ List<Marker> _buildTerritoryLogoMarkers(
   String _getMarkerIconPath(SpotFlagState spot) {
     final type = spot.normalizedType;
 
-    if (spot.isNaturisme) return 'data/icons/fire_skin_icon.png';
-    if (type.contains('ACCES PLAGE')) return 'data/icons/fire_orange_icon.png';
+    if (spot.isNaturisme) return 'data/icons/fire_skin_icon.svg';
+    if (type.contains('ACCES PLAGE')) return 'data/icons/fire_orange_icon.svg';
 
     if (type.contains('LAC') ||
         type.contains("PLAN D'EAU") ||
         type.contains('BARRAGE')) {
-      return 'data/icons/fire_blue_icon.png';
+      return 'data/icons/fire_blue_icon.svg';
     }
 
     if (type.contains('FLEUVE') || type.contains('RIVIERE')) {
-      return 'data/icons/fire_green_icon.png';
+      return 'data/icons/fire_green_icon.svg';
     }
 
     if (type.contains('LAGON') || type.contains('PISCINE NATURELLE')) {
-      return 'data/icons/fire_cyan_icon.png';
+      return 'data/icons/fire_cyan_icon.svg';
     }
 
-    return 'data/icons/fire_orange_icon.png';
+    return 'data/icons/fire_orange_icon.svg';
   }
 
   Color _typeColor(SpotFlagState spot) {
@@ -332,7 +499,12 @@ List<Marker> _buildTerritoryLogoMarkers(
 }
 
   Widget _drawerAssetIcon(String path) {
-    return Image.asset(path, width: 40, height: 40, fit: BoxFit.contain);
+    return AdaptiveAssetImage(
+      path,
+      width: 40,
+      height: 40,
+      fit: BoxFit.contain,
+    );
   }
 
   Widget _filterIcon(SpotFilter filter) {
@@ -342,17 +514,17 @@ List<Marker> _buildTerritoryLogoMarkers(
       case SpotFilter.secours:
         return const _DrawerFlagIcon();
       case SpotFilter.plage:
-        return _drawerAssetIcon('data/icons/fire_orange_icon.png');
+        return _drawerAssetIcon('data/icons/fire_orange_icon.svg');
       case SpotFilter.eauBleue:
-        return _drawerAssetIcon('data/icons/fire_blue_icon.png');
+        return _drawerAssetIcon('data/icons/fire_blue_icon.svg');
       case SpotFilter.eauVerte:
-        return _drawerAssetIcon('data/icons/fire_green_icon.png');
+        return _drawerAssetIcon('data/icons/fire_green_icon.svg');
       case SpotFilter.lagon:
-        return _drawerAssetIcon('data/icons/fire_cyan_icon.png');
+        return _drawerAssetIcon('data/icons/fire_cyan_icon.svg');
       case SpotFilter.naturisme:
-        return _drawerAssetIcon('data/icons/fire_skin_icon.png');
+        return _drawerAssetIcon('data/icons/fire_skin_icon.svg');
       case SpotFilter.autre:
-        return _drawerAssetIcon('data/icons/fire_orange1_icon.png');
+        return _drawerAssetIcon('data/icons/fire_orange1_icon.svg');
     }
   }
 
@@ -494,6 +666,16 @@ SpotFlagState? _findBestSpotMatch(
   void _openPublicSpotDetail(SpotFlagState spot) {
     _searchFocusNode.unfocus();
 
+    unawaited(
+      _firestoreService.recordPublicClick(
+        territoireId: spot.territoireId,
+        targetId: spot.id,
+        targetType: 'spot',
+        targetName: spot.mapDisplayName,
+        source: kIsWeb ? 'web' : 'app',
+      ),
+    );
+
     setState(() {
       _isFilterOpen = false;
       _isMapStyleOpen = false;
@@ -505,32 +687,28 @@ SpotFlagState? _findBestSpotMatch(
       showGeneralDialog<void>(
         context: context,
         barrierDismissible: true,
-        barrierLabel: 'Fermer la fiche du SPHOT',
+        barrierLabel: 'Fermer la fiche publique',
         barrierColor: Colors.black.withOpacity(0.12),
-        transitionDuration:
-            const Duration(milliseconds: 320),
+        transitionDuration: const Duration(milliseconds: 320),
         pageBuilder: (_, __, ___) {
           return SafeArea(
             child: Align(
               alignment: Alignment.centerRight,
               child: SizedBox(
-                width: min(460.0, screenWidth * 0.38),
+                width: min(460, screenWidth * 0.38),
                 height: double.infinity,
                 child: ClipRRect(
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(22),
                     bottomLeft: Radius.circular(22),
                   ),
-                  child: PublicSpotDetailPage(
-                    spot: spot,
-                  ),
+                  child: PublicSpotDetailPage(spot: spot),
                 ),
               ),
             ),
           );
         },
-        transitionBuilder:
-            (_, animation, __, child) {
+        transitionBuilder: (_, animation, __, child) {
           final slideAnimation = Tween<Offset>(
             begin: const Offset(1, 0),
             end: Offset.zero,
@@ -555,16 +733,10 @@ SpotFlagState? _findBestSpotMatch(
       PageRouteBuilder<void>(
         opaque: true,
         maintainState: true,
-        transitionDuration:
-            const Duration(milliseconds: 320),
-        reverseTransitionDuration:
-            const Duration(milliseconds: 260),
-        pageBuilder: (_, __, ___) =>
-            PublicSpotDetailPage(
-          spot: spot,
-        ),
-        transitionsBuilder:
-            (_, animation, __, child) {
+        transitionDuration: const Duration(milliseconds: 320),
+        reverseTransitionDuration: const Duration(milliseconds: 260),
+        pageBuilder: (_, __, ___) => PublicSpotDetailPage(spot: spot),
+        transitionsBuilder: (_, animation, __, child) {
           final slideAnimation = Tween<Offset>(
             begin: const Offset(1, 0),
             end: Offset.zero,
@@ -914,6 +1086,33 @@ Widget _verticalFilterChoiceButton(SpotFilter filter, int index) {
   );
 }
 
+double _bottomMenuLeft({
+  required double menuWidth,
+  required int itemIndex,
+}) {
+  const sideInset = 8.0;
+  const itemWidth = 58.0;
+  const itemCount = 5;
+
+  final screenWidth = MediaQuery.of(context).size.width;
+  final barWidth = screenWidth - (sideInset * 2);
+  final spacing =
+      ((barWidth - (itemWidth * itemCount)) / (itemCount + 1))
+          .clamp(0.0, double.infinity)
+          .toDouble();
+  final itemCenter = sideInset +
+      (spacing * (itemIndex + 1)) +
+      (itemWidth * itemIndex) +
+      (itemWidth / 2);
+  final maxLeft = (screenWidth - menuWidth - sideInset)
+      .clamp(sideInset, double.infinity)
+      .toDouble();
+
+  return (itemCenter - (menuWidth / 2))
+      .clamp(sideInset, maxLeft)
+      .toDouble();
+}
+
 Widget _buildVerticalFilterMenu() {
   final orderedFilters = [
     SpotFilter.all,
@@ -927,8 +1126,11 @@ Widget _buildVerticalFilterMenu() {
   ];
 
   return Positioned(
-    left: 8,
-    bottom: 120,
+    left: _bottomMenuLeft(
+      menuWidth: 190,
+      itemIndex: 0,
+    ),
+    bottom: 154,
     child: IgnorePointer(
       ignoring: !_isFilterOpen,
       child: SizedBox(
@@ -1241,25 +1443,10 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
 
   Marker _buildSecoursMarker(
     SpotFlagState spot,
-    bool showFlag,
     bool showText,
     double zoom,
     double rotation,
   ) {
-    if (!showFlag) {
-      return Marker(
-        point: LatLng(spot.lat, spot.lng),
-        width: 18,
-        height: 18,
-        alignment: Alignment.center,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => _openPublicSpotDetail(spot),
-          child: _SimplePostePoint(spot: spot),
-        ),
-      );
-    }
-
     return Marker(
       point: LatLng(spot.lat, spot.lng),
       width: 70,
@@ -1284,7 +1471,6 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   double zoom,
   double rotation,
 ) {
-  final showFlag = _showFlagForZoom(zoom);
   final showText = _showTextForZoom(zoom);
 
   debugPrint('MARKERS À AFFICHER : ${spots.length}');
@@ -1293,10 +1479,28 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
       .where((spot) => spot.lat.isFinite && spot.lng.isFinite)
       .map((spot) {
     if (spot.isPosteSecours) {
-      return _buildSecoursMarker(spot, showFlag, showText, zoom, rotation);
+      return _buildSecoursMarker(spot, showText, zoom, rotation);
     }
     return _buildOtherSpotMarker(spot, showText, zoom, rotation);
   }).toList();
+}
+
+List<Marker> _buildSecoursMarkers(
+  List<SpotFlagState> spots,
+  double zoom,
+  double rotation,
+) {
+  final showText = _showTextForZoom(zoom);
+
+  return spots
+      .where(
+        (spot) =>
+            spot.isPosteSecours && spot.lat.isFinite && spot.lng.isFinite,
+      )
+      .map(
+        (spot) => _buildSecoursMarker(spot, showText, zoom, rotation),
+      )
+      .toList();
 }
 
   Widget _buildDrawer() {
@@ -1403,16 +1607,13 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   final colors = <Color>{};
 
   for (final marker in markers) {
-    final child = marker.child;
+    final markerChild = marker.child;
+    final child = markerChild is GestureDetector
+        ? markerChild.child
+        : markerChild;
     if (child is _OtherSpotMarker) {
       colors.add(child.typeTextColor);
-    } else if (child is _SimplePostePoint || child is _HoverMarker) {
-      colors.add(const Color(0xFFFF0000));
     }
-  }
-
-  if (colors.contains(const Color(0xFFFF0000))) {
-    return const Color(0xFFFF0000); // Poste de secours
   }
 
   if (colors.contains(const Color(0xFFD87A5C))) {
@@ -1439,31 +1640,27 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
 }
 
 String _clusterIconPath(Color color) {
-  if (color == const Color(0xFFFF0000)) {
-    return 'data/icons/fire_red_icon.png';
-  }
-
   if (color == const Color(0xFFD87A5C)) {
-    return 'data/icons/fire_skin_icon.png';
+    return 'data/icons/fire_skin_icon.svg';
   }
 
   if (color == const Color(0xFFFFD000)) {
-    return 'data/icons/fire_orange_icon.png';
+    return 'data/icons/fire_orange_icon.svg';
   }
 
   if (color == const Color(0xFF1E3A8A)) {
-    return 'data/icons/fire_blue_icon.png';
+    return 'data/icons/fire_blue_icon.svg';
   }
 
   if (color == const Color(0xFF2E7D32)) {
-    return 'data/icons/fire_green_icon.png';
+    return 'data/icons/fire_green_icon.svg';
   }
 
   if (color == const Color(0xFF00ACC1)) {
-    return 'data/icons/fire_cyan_icon.png';
+    return 'data/icons/fire_cyan_icon.svg';
   }
 
-  return 'data/icons/fire_orange1_icon.png';
+  return 'data/icons/fire_orange1_icon.svg';
 }
 
   Widget _buildCluster(BuildContext context, List<Marker> markers) {
@@ -1480,7 +1677,8 @@ String _clusterIconPath(Color color) {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Image.asset(
+          AdaptiveAssetImage(
+
             iconPath,
             width: 54,
             height: 54,
@@ -1516,11 +1714,7 @@ Widget _buildAdBanner() {
     bottom: 58,
     child: GestureDetector(
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const AdvertiserAccessPage(),
-          ),
-        );
+        unawaited(_openAdvertiserWebsite());
       },
       child: Container(
         height: 90,
@@ -1549,8 +1743,9 @@ Widget _buildAdBanner() {
     width: 52,
     height: 52,
     color: Colors.transparent,
-    child: Image.asset(
-      'data/icons/fire_black_icon.png',
+    child: AdaptiveAssetImage(
+
+      'data/icons/fire_red_icon.svg',
       fit: BoxFit.contain,
     ),
   ),
@@ -1828,8 +2023,13 @@ final spots = allSpots.where(_matchesFilter).toList();
 debugPrint('SPHOTS CHARGÉS : ${allSpots.length}');
 debugPrint('SPHOTS AFFICHÉS : ${spots.length}');
 
-          return Stack(
-            children: [
+          return FutureBuilder<List<Map<String, dynamic>>>(
+            future: _publicAdvertisingSpotsFuture,
+            builder: (context, advertisingSnapshot) {
+              final publicAdvertisers =
+                  advertisingSnapshot.data ?? const <Map<String, dynamic>>[];
+              return Stack(
+                children: [
               FlutterMap(
                 mapController: _mapController,
                 options: MapOptions(
@@ -1899,7 +2099,7 @@ onPositionChanged: (position, hasGesture) {
                       final rotation = MapCamera.of(context).rotation;
 
                       return MarkerLayer(
-                        markers: _buildTerritoryLogoMarkers(allSpots, zoom, rotation),
+                        markers: _buildAdminMarkers(allSpots, zoom, rotation),
                       );
                     },
                   ),
@@ -1907,7 +2107,24 @@ onPositionChanged: (position, hasGesture) {
                     builder: (context) {
                       final zoom = MapCamera.of(context).zoom;
                       final rotation = MapCamera.of(context).rotation;
-                      final markers = _buildMarkers(spots, zoom, rotation);
+                      return MarkerLayer(
+                        markers: _buildPublicAdvertisingMarkers(
+                          publicAdvertisers,
+                          zoom,
+                          rotation,
+                        ),
+                      );
+                    },
+                  ),
+                  Builder(
+                    builder: (context) {
+                      final zoom = MapCamera.of(context).zoom;
+                      final rotation = MapCamera.of(context).rotation;
+                      final otherSpots = spots
+                          .where((spot) => !spot.isPosteSecours)
+                          .toList();
+                      final markers =
+                          _buildMarkers(otherSpots, zoom, rotation);
 
                       return MarkerClusterLayerWidget(
                         options: MarkerClusterLayerOptions(
@@ -1920,21 +2137,40 @@ onPositionChanged: (position, hasGesture) {
                       );
                     },
                   ),
+                  Builder(
+                    builder: (context) {
+                      final zoom = MapCamera.of(context).zoom;
+                      final rotation = MapCamera.of(context).rotation;
+
+                      return MarkerLayer(
+                        markers: _buildSecoursMarkers(
+                          spots,
+                          zoom,
+                          rotation,
+                        ),
+                      );
+                    },
+                  ),
                 ],
               ),
               _buildLeftMapControls(allSpots),
 
 
 Positioned(
-  left: 8,
-  bottom: 120,
+  left: _bottomMenuLeft(
+    menuWidth: 150,
+    itemIndex: 1,
+  ),
+  bottom: 154,
   child: _buildMapStyleVerticalMenu(),
 ),
 
 _buildVerticalFilterMenu(),
 _buildAdBanner(),
 _buildBottomBar(),
-            ],
+                ],
+              );
+            },
           );
         },
       ),
@@ -2066,82 +2302,89 @@ class _SphotSpinnerIcon extends StatefulWidget {
   State<_SphotSpinnerIcon> createState() => _SphotSpinnerIconState();
 }
 
-class _SphotSpinnerIconState extends State<_SphotSpinnerIcon> {
-  late final Timer _timer;
-  int _step = 0;
-
-  static const List<String> _icons = [
-    'data/icons/fire_orange_icon.png',
-    'data/icons/fire_blue_icon.png',
-    'data/icons/fire_green_icon.png',
-    'data/icons/fire_cyan_icon.png',
-    'data/icons/fire_skin_icon.png',
-    'data/icons/fire_orange1_icon.png',
-  ];
+class _SphotSpinnerIconState extends State<_SphotSpinnerIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
 
-    _timer = Timer.periodic(const Duration(milliseconds: 800), (_) {
-      if (!mounted) return;
-      setState(() => _step = _step + 1);
-    });
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    )..repeat();
   }
 
   @override
   void dispose() {
-    _timer.cancel();
+    _controller.dispose();
     super.dispose();
+  }
+
+  Color _markerColor(double progress) {
+    if (progress < 0.12) {
+      return Color.lerp(
+        Colors.black,
+        const Color(0xFFFF0000),
+        progress / 0.12,
+      )!;
+    }
+
+    if (progress < 0.78) {
+      final hue = ((progress - 0.12) / 0.66) * 360;
+
+      return HSVColor.fromAHSV(1, hue, 1, 1).toColor();
+    }
+
+    if (progress < 0.90) {
+      return Color.lerp(
+        const Color(0xFFFF0000),
+        Colors.white,
+        (progress - 0.78) / 0.12,
+      )!;
+    }
+
+    return Color.lerp(
+      Colors.white,
+      Colors.black,
+      (progress - 0.90) / 0.10,
+    )!;
+  }
+
+  Widget _colorLayer(Color color) {
+    return SvgPicture.asset(
+      'data/icons/fire_all_sphots_color_layer.svg',
+      width: 40,
+      height: 40,
+      fit: BoxFit.contain,
+      colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    const size = 42.0;
-    const iconSize = 22.0;
-    const radius = 10.0;
-    const count = 6;
-
-    final angles = List.generate(
-      count,
-      (i) => -pi / 2 + (2 * pi * i / count),
-    );
-
     return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: List.generate(count, (index) {
-          final angle = angles[index];
-          final path = _icons[index % _icons.length];
+      width: 40,
+      height: 40,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          final color = _markerColor(_controller.value);
 
-          final activeIndex = _step % count;
-          final isActive = index == activeIndex;
-
-          return Positioned(
-            left: size / 2 + cos(angle) * radius - iconSize / 2,
-            top: size / 2 + sin(angle) * radius - iconSize / 2,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 500),
-              opacity: isActive ? 1.0 : 0.18,
-              child: AnimatedScale(
-                duration: const Duration(milliseconds: 300),
-                scale: isActive ? 1.18 : 0.78,
-                child: Transform.rotate(
-                  angle: angle + pi / 2,
-                  child: Image.asset(
-                    path,
-                    width: iconSize,
-                    height: iconSize,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                  ),
-                ),
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              SvgPicture.asset(
+                'data/icons/fire_green_icon.svg',
+                width: 40,
+                height: 40,
+                fit: BoxFit.contain,
               ),
-            ),
+              _colorLayer(color),
+            ],
           );
-        }),
+        },
       ),
     );
   }
@@ -2290,6 +2533,84 @@ class MiniWavingFlagPainter extends CustomPainter {
   }
 }
 
+
+class _PublicAdvertisingMarker extends StatefulWidget {
+  const _PublicAdvertisingMarker({
+    required this.name,
+    required this.showTextAllowed,
+    required this.rotation,
+    required this.labelOpacity,
+  });
+
+  final String name;
+  final bool showTextAllowed;
+  final double rotation;
+  final double labelOpacity;
+
+  @override
+  State<_PublicAdvertisingMarker> createState() =>
+      _PublicAdvertisingMarkerState();
+}
+
+class _PublicAdvertisingMarkerState extends State<_PublicAdvertisingMarker> {
+  bool _isHovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isTouchDevice =
+        Theme.of(context).platform == TargetPlatform.android ||
+            Theme.of(context).platform == TargetPlatform.iOS;
+    final showText =
+        widget.showTextAllowed && (isTouchDevice || _isHovering);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovering = true),
+      onExit: (_) => setState(() => _isHovering = false),
+      child: SizedBox(
+        width: 56,
+        height: 56,
+        child: Transform.rotate(
+          angle: -widget.rotation * pi / 180,
+          alignment: Alignment.center,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              const AdaptiveAssetImage(
+                'data/icons/fire_green_icon.svg',
+                width: 48,
+                height: 48,
+                fit: BoxFit.contain,
+              ),
+              if (showText)
+                Positioned(
+                  top: 50,
+                  left: -160,
+                  child: Opacity(
+                    opacity: widget.labelOpacity,
+                    child: SizedBox(
+                      width: 380,
+                      child: Text(
+                        widget.name,
+                        textAlign: TextAlign.center,
+                        style: _mapLabelStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF2E7D32),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _OtherSpotMarker extends StatefulWidget {
   final SpotFlagState spot;
   final String iconPath;
@@ -2354,7 +2675,8 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              Image.asset(
+              AdaptiveAssetImage(
+
                 widget.iconPath,
                 width: spot.isNaturisme ? 52 : 48,
                 height: spot.isNaturisme ? 52 : 48,
@@ -2372,7 +2694,7 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '${spot.name} - ${spot.nomSphot}',
+                            spot.mapDisplayName,
                             textAlign: TextAlign.center,
                             style: _mapLabelStyle(
                               fontSize: _labelSize(11),
@@ -2408,45 +2730,6 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                 ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SimplePostePoint extends StatelessWidget {
-  final SpotFlagState spot;
-
-  const _SimplePostePoint({required this.spot});
-
-  Color _getColor() {
-    switch (spot.flagColor) {
-      case FlagColor.green:
-        return const Color(0xFF22C55E);
-      case FlagColor.yellow:
-        return const Color(0xFFFDE047);
-      case FlagColor.red:
-        return const Color(0xFFEF4444);
-      case FlagColor.violet:
-        return const Color(0xFFD946EF);
-      case FlagColor.none:
-        return Colors.transparent;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final hasFlag = spot.hasValidFlag;
-
-    return Container(
-      width: 12,
-      height: 12,
-      decoration: BoxDecoration(
-        color: hasFlag ? _getColor() : Colors.transparent,
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: hasFlag ? Colors.white : Colors.black,
-          width: 2,
         ),
       ),
     );
@@ -2528,7 +2811,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '${spot.name} - ${spot.nomSphot}',
+                            spot.mapDisplayName,
                             textAlign: TextAlign.center,
                             style: _mapLabelStyle(
                               fontSize: _labelSize(11),
@@ -2539,14 +2822,32 @@ class _HoverMarkerState extends State<_HoverMarker> {
 
                           SizedBox(height: _lineSpacing() + 5),
 
-                          Text(
-                            '🚨 POSTE DE SECOURS 🚨',
-                            textAlign: TextAlign.center,
-                            style: _mapLabelStyle(
-                              fontSize: _labelSize(12),
-                              fontWeight: FontWeight.w900,
-                              color: const Color(0xFFFF0000),
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Transform.scale(
+  scaleX: 0.8,
+  scaleY: 1.4,
+  alignment: Alignment.centerLeft,
+  child: SizedBox(
+    width: 18,
+    height: 28,
+    child: SvgPicture.asset(
+      'data/icons/flag_red_yellow_5x3.svg',
+      fit: BoxFit.contain,
+    ),
+  ),
+),
+const SizedBox(width: 2),
+                              Text(
+                                'POSTE DE SECOURS',
+                                style: _mapLabelStyle(
+                                  fontSize: _labelSize(12),
+                                  fontWeight: FontWeight.w900,
+                                  color: const Color(0xFFFF0000),
+                                ),
+                              ),
+                            ],
                           ),
 
                           SizedBox(height: _lineSpacing() - 1.8),
@@ -2600,7 +2901,7 @@ Widget _warningLineUniform(String text, double size) {
           Icon(
             Icons.warning_amber_rounded,
             size: size,
-            color: const Color(0xFFFF0000),
+            color: const Color(0xFFFFC107),
           ),
         ],
       ),
@@ -2679,8 +2980,5 @@ TextStyle _mapLabelStyle({
     ],
   );
 }
-
-
-
 
 
