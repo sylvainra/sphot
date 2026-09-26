@@ -1,13 +1,14 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import '../web/admin/pages/admin_trial_request_page.dart';
 import '../pages/sauveteur/change_password_page.dart';
 import '../pages/sauveteur/sauveteur_menu_page.dart';
-import '../web/super_admin/web_super_admin_app.dart';
-import '../pages/professional/professional_login_page.dart';
 
 class ProfilLoginPage extends StatefulWidget {
   const ProfilLoginPage({super.key});
@@ -155,6 +156,8 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
       final userRole = (result['userRole'] ?? 'Sauveteur').toString();
       final territoireId = (result['territoireId'] ?? '').toString();
       final mustChangePassword = result['mustChangePassword'] == true;
+      final webSessionToken =
+          (result['webSessionToken'] ?? '').toString();
 
       if (!mounted) return;
 
@@ -173,12 +176,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
       }
 
       if (userRole.toUpperCase() == 'SUPER_ADMIN') {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const WebSuperAdminApp(),
-          ),
-        );
-
+        await _openSuperAdminDashboard(webSessionToken);
         return;
       }
 
@@ -210,35 +208,114 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
     }
   }
 
-  void _createProSpace() {
-    /*
-     * SHUNT TEMPORAIRE PROCONNECT
-     *
-     * ProConnect n'est volontairement pas appelé ici.
-     * flutter_appauth n'est actuellement pas compatible avec
-     * le portail Flutter Web SPHOT dans la configuration actuelle.
-     *
-     * Le bouton ouvre donc directement la demande d'accès.
-     * Cette méthode sera remplacée ultérieurement par le flux
-     * Firebase Authentication OIDC + ProConnect.
-     */
+  Future<void> _createProSpace() async {
+    FocusScope.of(context).unfocus();
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const AdminTrialRequestPage(),
-      ),
+    final uri = kIsWeb
+        ? Uri.base.replace(fragment: '/admin-request')
+        : Uri.parse('https://sphot.app/#/admin-request');
+
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: kIsWeb ? '_blank' : null,
     );
+
+    if (!opened && mounted) {
+      setState(() {
+        _loginErrorMessage =
+            'Impossible d’ouvrir la demande d’accès Admin SPHOT.';
+      });
+    }
   }
 
-  void _openProLogin() {
-  FocusScope.of(context).unfocus();
+  Future<void> _openSuperAdminDashboard(String token) async {
+    FocusScope.of(context).unfocus();
 
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => const ProfessionalLoginPage(),
-    ),
-  );
-}
+    if (token.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          _loginErrorMessage =
+              'La session Web Super Admin n’a pas pu être créée.';
+        });
+      }
+      return;
+    }
+
+    final route = Uri(
+      path: '/super-admin',
+      queryParameters: {'token': token},
+    ).toString();
+    final uri = kIsWeb
+        ? Uri.base.replace(fragment: route)
+        : Uri.parse('https://sphot.app/#$route');
+
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: kIsWeb ? '_blank' : null,
+    );
+
+    if (!opened && mounted) {
+      setState(() {
+        _loginErrorMessage =
+            'Impossible d’ouvrir le dashboard Super Admin SPHOT.';
+      });
+    }
+  }
+
+  Future<void> _openProLogin() async {
+    FocusScope.of(context).unfocus();
+
+    final uri = kIsWeb
+        ? Uri.base.replace(fragment: '/professional-login')
+        : Uri.parse('https://sphot.app/#/professional-login');
+
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: kIsWeb ? '_blank' : null,
+    );
+
+    if (!opened && mounted) {
+      setState(() {
+        _loginErrorMessage =
+            'Impossible d’ouvrir le portail professionnel SPHOT.';
+      });
+    }
+  }
+
+  Future<void> _openAdvertiserSpace({required bool create}) async {
+    FocusScope.of(context).unfocus();
+
+    final route = create
+        ? '/advertiser'
+        : '/professional-login?audience=advertiser';
+    final uri = kIsWeb
+        ? Uri.base.replace(fragment: route)
+        : Uri.parse('https://sphot.app/#$route');
+
+    try {
+      final opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+        webOnlyWindowName: kIsWeb ? '_blank' : null,
+      );
+
+      if (!opened && mounted) {
+        setState(() {
+          _loginErrorMessage =
+              'Impossible d’ouvrir le portail SPHOT PUBLICITAIRE.';
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loginErrorMessage =
+            'Impossible d’ouvrir le portail SPHOT PUBLICITAIRE.';
+      });
+    }
+  }
 
   void _activateEditingMode() {
     if (_isEditing) return;
@@ -331,7 +408,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
       child: Column(
         children: [
           Text(
-            'ESPACE SAUVETEUR',
+            'SPHOT SAUVETEUR',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 18,
@@ -488,7 +565,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
       child: Column(
         children: [
           Text(
-            'ESPACE PRO',
+            'SPHOT ADMIN',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 18,
@@ -511,7 +588,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
               label: const FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  'CRÉER MON ESPACE SPHOT',
+                  'CRÉER MON SPHOT ADMIN',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -537,7 +614,88 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
               label: const FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  'ME CONNECTER À SPHOT',
+                  'ACCÉDER À MON SPHOT ADMIN',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdvertiserSpace({
+    required Color proColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: proColor,
+          width: 2.5,
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            'SPHOT PUBLICITAIRE',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: proColor,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () => _openAdvertiserSpace(create: true),
+              style: _buildOutlinedButtonStyle(proColor),
+              icon: Icon(
+                Icons.add_business_rounded,
+                color: proColor,
+                size: 23,
+              ),
+              label: const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'CRÉER MON SPHOT PUBLICITAIRE',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () => _openAdvertiserSpace(create: false),
+              style: _buildOutlinedButtonStyle(proColor),
+              icon: Icon(
+                Icons.login_rounded,
+                color: proColor,
+                size: 23,
+              ),
+              label: const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'ACCÉDER À MON SPHOT PUBLICITAIRE',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -566,9 +724,49 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
         child: Stack(
           fit: StackFit.expand,
           children: [
+            // Low-resolution offline fallback. The live map below covers it
+            // whenever map tiles are available.
             Image.asset(
               'data/images/map_background.jpg',
               fit: BoxFit.cover,
+            ),
+            IgnorePointer(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final aspectRatio =
+                      constraints.maxWidth / constraints.maxHeight;
+                  final initialZoom = aspectRatio >= 1.2 ? 17.35 : 16.2;
+
+                  return FlutterMap(
+                    options: MapOptions(
+                      initialCenter: const LatLng(
+                        46.3893825,
+                        -1.4942598,
+                      ),
+                      initialZoom: initialZoom,
+                      interactionOptions: const InteractionOptions(
+                        flags: InteractiveFlag.none,
+                      ),
+                      backgroundColor: Colors.transparent,
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        maxZoom: 19,
+                        maxNativeZoom: 19,
+                        userAgentPackageName: 'com.sylvainra.sphot',
+                        keepBuffer: 5,
+                        errorTileCallback: (tile, error, stackTrace) {
+                          debugPrint(
+                            'ERREUR FOND CARTE CONNEXION : $error',
+                          );
+                        },
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
             SafeArea(
               child: LayoutBuilder(
@@ -593,28 +791,16 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
                                 fit: BoxFit.contain,
                                 filterQuality: FilterQuality.high,
                               ),
-                              const SizedBox(height: 4),
-                              Visibility(
-                                visible: !_isEditing,
-                                maintainSize: true,
-                                maintainAnimation: true,
-                                maintainState: true,
-                                child: const Text(
-                                  'CONNEXION',
-                                  style: TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFFEF4444),
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
                               const SizedBox(height: 8),
                               _buildSauveteurSpace(
                                 sauveteurColor: sauveteurColor,
                               ),
                               const SizedBox(height: 12),
                               _buildProSpace(
+                                proColor: proColor,
+                              ),
+                              const SizedBox(height: 12),
+                              _buildAdvertiserSpace(
                                 proColor: proColor,
                               ),
                             ],
@@ -638,18 +824,17 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
                       color: Colors.transparent,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.white,
-                        width: 2,
-                      ),
+  color: const Color(0xFFEF4444),
+  width: 2,
+),
                     ),
                     child: IconButton(
-                      tooltip: 'Retour',
                       onPressed: () => Navigator.of(context).pop(),
                       icon: const Icon(
-                        Icons.arrow_back,
-                        color: Colors.white,
-                        size: 28,
-                      ),
+  Icons.arrow_back,
+  color: Color(0xFF1E3A8A),
+  size: 28,
+),
                     ),
                   ),
                 ),
