@@ -52,6 +52,9 @@ function buildPublicSpot(territoireId, spotId, spot) {
     "logoVille",
     "siteInternetVille",
     "adresseWebcam",
+    "webcamUrl",
+    "urlWebcam",
+    "webcam",
     "arretesMunicipaux",
     "statutBaignade",
     "periode",
@@ -76,6 +79,19 @@ function buildPublicSpot(territoireId, spotId, spot) {
       result[field] = spot[field];
     }
   });
+
+  const webcamUrl = (
+    spot.adresseWebcam ||
+    spot.webcamUrl ||
+    spot.urlWebcam ||
+    spot.webcam ||
+    ""
+  ).toString().trim();
+
+  if (webcamUrl) {
+    result.adresseWebcam = webcamUrl;
+  }
+
   result.updatedAt = admin.firestore.FieldValue.serverTimestamp();
   return result;
 }
