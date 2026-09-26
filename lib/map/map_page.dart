@@ -15,6 +15,7 @@ import 'flag_marker.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import 'app_info_page.dart';
+import 'public_spot_detail_page.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
@@ -474,6 +475,100 @@ SpotFlagState? _findBestSpotMatch(
       SnackBar(
         content: Text(message),
         duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _openPublicSpotDetail(SpotFlagState spot) {
+    _searchFocusNode.unfocus();
+
+    setState(() {
+      _isFilterOpen = false;
+      _isMapStyleOpen = false;
+    });
+
+    final screenWidth = MediaQuery.sizeOf(context).width;
+
+    if (screenWidth >= 900) {
+      showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: 'Fermer la fiche du SPHOT',
+        barrierColor: Colors.black.withOpacity(0.12),
+        transitionDuration:
+            const Duration(milliseconds: 320),
+        pageBuilder: (_, __, ___) {
+          return SafeArea(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(
+                width: min(460, screenWidth * 0.38),
+                height: double.infinity,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(22),
+                    bottomLeft: Radius.circular(22),
+                  ),
+                  child: PublicSpotDetailPage(
+                    spot: spot,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        transitionBuilder:
+            (_, animation, __, child) {
+          final slideAnimation = Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            ),
+          );
+
+          return SlideTransition(
+            position: slideAnimation,
+            child: child,
+          );
+        },
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: true,
+        maintainState: true,
+        transitionDuration:
+            const Duration(milliseconds: 320),
+        reverseTransitionDuration:
+            const Duration(milliseconds: 260),
+        pageBuilder: (_, __, ___) =>
+            PublicSpotDetailPage(
+          spot: spot,
+        ),
+        transitionsBuilder:
+            (_, animation, __, child) {
+          final slideAnimation = Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            ),
+          );
+
+          return SlideTransition(
+            position: slideAnimation,
+            child: child,
+          );
+        },
       ),
     );
   }
@@ -1116,14 +1211,18 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
       width: 56,
       height: 56,
       alignment: Alignment.center,
-      child: _OtherSpotMarker(
-        spot: spot,
-        iconPath: _getMarkerIconPath(spot),
-        showTextAllowed: showText,
-        zoom: zoom,
-        rotation: rotation,
-        labelOpacity: _labelOpacity(zoom),
-        typeTextColor: _typeColor(spot),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _openPublicSpotDetail(spot),
+        child: _OtherSpotMarker(
+          spot: spot,
+          iconPath: _getMarkerIconPath(spot),
+          showTextAllowed: showText,
+          zoom: zoom,
+          rotation: rotation,
+          labelOpacity: _labelOpacity(zoom),
+          typeTextColor: _typeColor(spot),
+        ),
       ),
     );
   }
@@ -1141,7 +1240,11 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
         width: 18,
         height: 18,
         alignment: Alignment.center,
-        child: _SimplePostePoint(spot: spot),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _openPublicSpotDetail(spot),
+          child: _SimplePostePoint(spot: spot),
+        ),
       );
     }
 
@@ -1150,12 +1253,16 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
       width: 70,
       height: 95,
       alignment: Alignment.center,
-      child: _HoverMarker(
-        spot: spot,
-        showTextAllowed: showText,
-        zoom: zoom,
-        rotation: rotation,
-        labelOpacity: _labelOpacity(zoom),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _openPublicSpotDetail(spot),
+        child: _HoverMarker(
+          spot: spot,
+          showTextAllowed: showText,
+          zoom: zoom,
+          rotation: rotation,
+          labelOpacity: _labelOpacity(zoom),
+        ),
       ),
     );
   }
