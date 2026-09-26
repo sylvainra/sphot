@@ -12107,6 +12107,26 @@ Future<void> _loadAdministratorTerritoryCenter() async {
 
     final firestore = FirebaseFirestore.instance;
 
+    String firstNonEmptyText(List<dynamic> values) {
+      for (final value in values) {
+        final text = _cleanText(value);
+        if (text.isNotEmpty) {
+          return text;
+        }
+      }
+      return '';
+    }
+
+    double firstNonZeroDouble(List<dynamic> values) {
+      for (final value in values) {
+        final number = _toDouble(value);
+        if (number != 0) {
+          return number;
+        }
+      }
+      return 0;
+    }
+
     final requestSnapshot = await firestore
         .collection('adminRequests')
         .doc(uid)
@@ -12141,15 +12161,15 @@ Future<void> _loadAdministratorTerritoryCenter() async {
       approvedAdminData['territoire'] ?? <String, dynamic>{},
     );
 
-    final territoireId = _cleanText(
-      approvedAdminData['territoireId'] ??
-          requestData['territoireId'] ??
-          approvedTerritory['territoireId'] ??
-          requestTerritory['territoireId'] ??
-          approvedAdminData['organisationId'] ??
-          requestData['organisationId'] ??
-          widget.territoireId,
-    );
+    final territoireId = firstNonEmptyText([
+      approvedAdminData['territoireId'],
+      requestData['territoireId'],
+      approvedTerritory['territoireId'],
+      requestTerritory['territoireId'],
+      approvedAdminData['organisationId'],
+      requestData['organisationId'],
+      widget.territoireId,
+    ]);
 
     Map<String, dynamic> rootTerritory = <String, dynamic>{};
 
@@ -12171,17 +12191,17 @@ Future<void> _loadAdministratorTerritoryCenter() async {
       ...rootTerritory,
     };
 
-    final latitude = _toDouble(
-      territoire['villeLat'] ??
-          approvedTerritory['villeLat'] ??
-          requestTerritory['villeLat'],
-    );
+    final latitude = firstNonZeroDouble([
+      rootTerritory['villeLat'],
+      approvedTerritory['villeLat'],
+      requestTerritory['villeLat'],
+    ]);
 
-    final longitude = _toDouble(
-      territoire['villeLng'] ??
-          approvedTerritory['villeLng'] ??
-          requestTerritory['villeLng'],
-    );
+    final longitude = firstNonZeroDouble([
+      rootTerritory['villeLng'],
+      approvedTerritory['villeLng'],
+      requestTerritory['villeLng'],
+    ]);
 
     if (latitude == 0 || longitude == 0) {
       return;
@@ -12196,26 +12216,28 @@ Future<void> _loadAdministratorTerritoryCenter() async {
       ),
     };
 
-    final organisationName = _cleanText(
-      structure['nom'] ??
-          approvedAdminData['nomStructure'] ??
-          requestData['nomStructure'] ??
-          approvedAdminData['organisation'] ??
-          requestData['organisation'] ??
-          territoire['ville'] ??
-          'ADMIN',
-    );
+    final organisationName = firstNonEmptyText([
+      structure['nom'],
+      approvedAdminData['nomStructure'],
+      requestData['nomStructure'],
+      approvedAdminData['organisation'],
+      requestData['organisation'],
+      territoire['ville'],
+      'ADMIN',
+    ]);
 
-    final logoVille = _cleanText(
-      rootTerritory['logoVille'] ??
-          rootTerritory['logoUrl'] ??
-          approvedTerritory['logoVille'] ??
-          approvedTerritory['logoUrl'] ??
-          requestTerritory['logoVille'] ??
-          requestTerritory['logoUrl'] ??
-          approvedAdminData['logoVille'] ??
-          requestData['logoVille'],
-    );
+    final logoVille = firstNonEmptyText([
+      rootTerritory['logoVille'],
+      rootTerritory['logoUrl'],
+      approvedTerritory['logoVille'],
+      approvedTerritory['logoUrl'],
+      requestTerritory['logoVille'],
+      requestTerritory['logoUrl'],
+      approvedAdminData['logoVille'],
+      approvedAdminData['logoUrl'],
+      requestData['logoVille'],
+      requestData['logoUrl'],
+    ]);
 
     final center = LatLng(
       latitude,
