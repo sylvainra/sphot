@@ -67,6 +67,7 @@ class _MapPageState extends State<MapPage> {
   double _currentRotation = 0;
   int _selectedTileStyle = 0;
   int _selectedBottomIndex = 1;
+  String? _selectedPublicSpotId;
   bool _isMovingMap = false;
   Timer? _mapMoveTimer;
 Timer? _searchTimer;
@@ -669,7 +670,7 @@ SpotFlagState? _findBestSpotMatch(
   void _showMapMessage(String message) {
   }
 
-  void _openPublicSpotDetail(SpotFlagState spot) {
+  Future<void> _openPublicSpotDetail(SpotFlagState spot) async {
     _searchFocusNode.unfocus();
 
     unawaited(
@@ -735,7 +736,16 @@ SpotFlagState? _findBestSpotMatch(
       return;
     }
 
-    showModalBottomSheet<void>(
+    setState(() {
+      _selectedPublicSpotId = spot.id;
+    });
+
+    _mapController.move(
+      LatLng(spot.lat - 0.0012, spot.lng),
+      17.2,
+    );
+
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: false,
@@ -746,11 +756,11 @@ SpotFlagState? _findBestSpotMatch(
       builder: (sheetContext) {
         return DraggableScrollableSheet(
           expand: false,
-          initialChildSize: 0.50,
-          minChildSize: 0.22,
+          initialChildSize: 0.36,
+          minChildSize: 0.18,
           maxChildSize: 0.94,
           snap: true,
-          snapSizes: const [0.50, 0.94],
+          snapSizes: const [0.36, 0.94],
           builder: (_, scrollController) {
             return PublicSpotMobileSheet(
               spot: spot,
@@ -760,6 +770,14 @@ SpotFlagState? _findBestSpotMatch(
         );
       },
     );
+
+    if (mounted) {
+      setState(() {
+        if (_selectedPublicSpotId == spot.id) {
+          _selectedPublicSpotId = null;
+        }
+      });
+    }
   }
 
   void _resetNorth() {
@@ -1432,11 +1450,12 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
       alignment: Alignment.center,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => _openPublicSpotDetail(spot),
+        onTap: () => unawaited(_openPublicSpotDetail(spot)),
         child: _OtherSpotMarker(
           spot: spot,
           iconPath: _getMarkerIconPath(spot),
           showTextAllowed: showText,
+          forceShowText: _selectedPublicSpotId == spot.id,
           zoom: zoom,
           rotation: rotation,
           labelOpacity: _labelOpacity(zoom),
@@ -1454,18 +1473,28 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   ) {
     return Marker(
       point: LatLng(spot.lat, spot.lng),
-      width: 70,
-      height: 95,
+      width: 120,
+      height: 170,
       alignment: Alignment.center,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => _openPublicSpotDetail(spot),
-        child: _HoverMarker(
-          spot: spot,
-          showTextAllowed: showText,
-          zoom: zoom,
-          rotation: rotation,
-          labelOpacity: _labelOpacity(zoom),
+        onTap: () => unawaited(_openPublicSpotDetail(spot)),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              top: 37.5,
+              left: 25,
+              child: _HoverMarker(
+                spot: spot,
+                showTextAllowed: showText,
+                forceShowText: _selectedPublicSpotId == spot.id,
+                zoom: zoom,
+                rotation: rotation,
+                labelOpacity: _labelOpacity(zoom),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2616,6 +2645,7 @@ class _OtherSpotMarker extends StatefulWidget {
   final SpotFlagState spot;
   final String iconPath;
   final bool showTextAllowed;
+  final bool forceShowText;
   final double zoom;
   final double rotation;
   final double labelOpacity;
@@ -2625,6 +2655,7 @@ class _OtherSpotMarker extends StatefulWidget {
     required this.spot,
     required this.iconPath,
     required this.showTextAllowed,
+    required this.forceShowText,
     required this.zoom,
     required this.rotation,
     required this.labelOpacity,
@@ -2661,7 +2692,8 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
         Theme.of(context).platform == TargetPlatform.android ||
             Theme.of(context).platform == TargetPlatform.iOS;
 
-    final showText = widget.showTextAllowed && (isTouchDevice || isHovering);
+    final showText = widget.forceShowText ||
+        (widget.showTextAllowed && (isTouchDevice || isHovering));
 
     return MouseRegion(
       onEnter: (_) => setState(() => isHovering = true),
@@ -2740,6 +2772,7 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
 class _HoverMarker extends StatefulWidget {
   final SpotFlagState spot;
   final bool showTextAllowed;
+  final bool forceShowText;
   final double zoom;
   final double rotation;
   final double labelOpacity;
@@ -2747,6 +2780,7 @@ class _HoverMarker extends StatefulWidget {
   const _HoverMarker({
     required this.spot,
     required this.showTextAllowed,
+    required this.forceShowText,
     required this.zoom,
     required this.rotation,
     required this.labelOpacity,
@@ -2782,7 +2816,8 @@ class _HoverMarkerState extends State<_HoverMarker> {
         Theme.of(context).platform == TargetPlatform.android ||
         Theme.of(context).platform == TargetPlatform.iOS;
 
-    final showText = widget.showTextAllowed && (isTouchDevice || isHovering);
+    final showText = widget.forceShowText ||
+        (widget.showTextAllowed && (isTouchDevice || isHovering));
 
     return MouseRegion(
       onEnter: (_) => setState(() => isHovering = true),
