@@ -7118,12 +7118,31 @@ Future<void> _deleteSphotFromDashboard() async {
   });
 
   try {
-    await FirebaseFirestore.instance
+    final firestore = FirebaseFirestore.instance;
+
+    await firestore
         .collection('territoires')
         .doc(territoireId)
         .collection('spots')
         .doc(documentId)
         .delete();
+
+    final publicSpotReference =
+        firestore.collection('spots').doc(documentId);
+
+    final publicSpotSnapshot =
+        await publicSpotReference.get();
+
+    if (!publicSpotSnapshot.exists ||
+        _cleanText(
+          publicSpotSnapshot.data()?['territoireId'],
+        ).isEmpty ||
+        _cleanText(
+              publicSpotSnapshot.data()?['territoireId'],
+            ) ==
+            territoireId) {
+      await publicSpotReference.delete();
+    }
 
     if (!mounted) return;
 
