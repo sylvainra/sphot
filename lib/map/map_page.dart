@@ -136,13 +136,6 @@ Future<void> _toggleFavoritesFilter() async {
       _favoriteSpotIds = ids;
       _showFavoritesOnly = false;
     });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        duration: Duration(milliseconds: 1400),
-        content: Text('Aucun SPHOT enregistré dans les favoris.'),
-      ),
-    );
     return;
   }
 
