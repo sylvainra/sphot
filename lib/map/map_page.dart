@@ -735,31 +735,30 @@ SpotFlagState? _findBestSpotMatch(
       return;
     }
 
-    Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        opaque: true,
-        maintainState: true,
-        transitionDuration: const Duration(milliseconds: 320),
-        reverseTransitionDuration: const Duration(milliseconds: 260),
-        pageBuilder: (_, __, ___) => PublicSpotDetailPage(spot: spot),
-        transitionsBuilder: (_, animation, __, child) {
-          final slideAnimation = Tween<Offset>(
-            begin: const Offset(1, 0),
-            end: Offset.zero,
-          ).animate(
-            CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInCubic,
-            ),
-          );
-
-          return SlideTransition(
-            position: slideAnimation,
-            child: child,
-          );
-        },
-      ),
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.transparent,
+      isDismissible: true,
+      enableDrag: false,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.50,
+          minChildSize: 0.22,
+          maxChildSize: 0.94,
+          snap: true,
+          snapSizes: const [0.50, 0.94],
+          builder: (_, scrollController) {
+            return PublicSpotMobileSheet(
+              spot: spot,
+              sheetScrollController: scrollController,
+            );
+          },
+        );
+      },
     );
   }
 
