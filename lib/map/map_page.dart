@@ -689,7 +689,7 @@ SpotFlagState? _findBestSpotMatch(
 
     final screenWidth = MediaQuery.sizeOf(context).width;
 
-    if (screenWidth >= 900) {
+    if (kIsWeb && screenWidth >= 900) {
       showGeneralDialog<void>(
         context: context,
         barrierDismissible: true,
