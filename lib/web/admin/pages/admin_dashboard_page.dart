@@ -129,6 +129,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final TextEditingController _sphotOtherLabelController =
       TextEditingController();
 
+  final TextEditingController _sphotPhoneController =
+      TextEditingController();
+
   final TextEditingController _sphotWebcamUrlController =
       TextEditingController();
 
@@ -535,6 +538,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   String _cleanText(dynamic value) {
     return (value ?? '').toString().trim();
+  }
+
+  String _firstCleanText(Iterable<dynamic> values) {
+    for (final value in values) {
+      final cleaned = _cleanText(value);
+      if (cleaned.isNotEmpty) return cleaned;
+    }
+    return '';
+  }
+
+  String _normalizeRemoteImageUrl(String value) {
+    final cleaned = value.trim();
+    if (cleaned.isEmpty) return '';
+    if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
+      return cleaned;
+    }
+    return 'https://$cleaned';
   }
 
   String _spotName(Map<String, dynamic> data) {
@@ -1430,7 +1450,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final departement = _cleanText(
       spot['departement'] ?? 'Département non renseigné',
     );
-    final telephone = _cleanText(spot['telephonePoste'] ?? 'Non renseigné');
+    final telephone = _cleanText(
+      spot['phone'] ?? spot['telephonePoste'] ?? 'Non renseigné',
+    );
 
     return Container(
       width: double.infinity,
@@ -6398,6 +6420,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _sphotOtherTypeController.clear();
     _sphotOtherEquipmentController.clear();
     _sphotOtherLabelController.clear();
+    _sphotPhoneController.clear();
     _sphotWebcamUrlController.clear();
   }
 
@@ -6703,6 +6726,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         data['autreLabel'] ?? data['labelSphotAutre'],
       );
 
+      _sphotPhoneController.text = _cleanText(
+        data['phone'] ?? data['telephonePoste'],
+      );
+
       _sphotWebcamUrlController.text = _cleanText(
         data['adresseWebcam'] ??
             data['webcamUrl'] ??
@@ -6854,6 +6881,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ? _sphotOtherLabelController.text.trim()
             : '',
 
+        'phone': _selectedSphotType == _rescueStationType
+            ? _sphotPhoneController.text.trim()
+            : '',
+        'telephonePoste': _selectedSphotType == _rescueStationType
+            ? _sphotPhoneController.text.trim()
+            : '',
         'webcamUrl': _sphotWebcamUrlController.text.trim(),
         'adresseWebcam': _sphotWebcamUrlController.text.trim(),
         'pays': territoryData['pays'] ?? '',
@@ -9778,9 +9811,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   maxMenuHeight: 145,
                 ),
 
+                if (_selectedSphotType == _rescueStationType) ...[
+                  const SizedBox(height: 14),
+                  _sphotSectionTitle(6, 'TÉLÉPHONE DU POSTE'),
+                  const SizedBox(height: 5),
+                  _sphotEditorField(
+                    controller: _sphotPhoneController,
+                    label: 'Téléphone du poste de secours',
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [FrenchPhoneNumberFormatter()],
+                  ),
+                ],
+
                 const SizedBox(height: 14),
 
-                _sphotSectionTitle(6, 'WEBCAM OU CLICHÉ'),
+                _sphotSectionTitle(
+                  _selectedSphotType == _rescueStationType ? 7 : 6,
+                  'WEBCAM OU CLICHÉ',
+                ),
 
                 const SizedBox(height: 5),
 
@@ -11939,16 +11987,31 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         administratorData['structure'] ?? <String, dynamic>{},
       );
 
-      final organisationName = _cleanText(
-        structure['nom'] ??
-            administratorData['nomStructure'] ??
-            administratorData['organisation'] ??
-            territoire['ville'] ??
-            'ADMIN',
-      );
+      final territorySnapshot = territoireId.isEmpty
+          ? null
+          : await firestore.collection('territoires').doc(territoireId).get();
+      final storedTerritory = territorySnapshot?.data() ?? <String, dynamic>{};
 
-      final logoVille = _cleanText(
-        territoire['logoVille'] ?? administratorData['logoVille'],
+      final organisationName = _firstCleanText([
+        structure['nom'],
+        administratorData['nomStructure'],
+        administratorData['organisation'],
+        territoire['ville'],
+        storedTerritory['ville'],
+        'ADMIN',
+      ]);
+
+      final logoVille = _normalizeRemoteImageUrl(
+        _firstCleanText([
+          territoire['logoVille'],
+          territoire['logoUrl'],
+          structure['logoVille'],
+          structure['logoUrl'],
+          administratorData['logoVille'],
+          administratorData['logoUrl'],
+          storedTerritory['logoVille'],
+          storedTerritory['logoUrl'],
+        ]),
       );
 
       final center = LatLng(latitude, longitude);
@@ -11958,6 +12021,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         'uid': uid,
         'territoireId': territoireId,
         'territoire': <String, dynamic>{
+          ...storedTerritory,
           ...territoire,
           'territoireId': territoireId,
           'villeLat': latitude,
@@ -12032,6 +12096,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _sphotOtherTypeController.dispose();
     _sphotOtherEquipmentController.dispose();
     _sphotOtherLabelController.dispose();
+    _sphotPhoneController.dispose();
     _sphotWebcamUrlController.dispose();
     _sauveteurNomController.dispose();
     _sauveteurPrenomController.dispose();
@@ -12645,13 +12710,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           'ADMIN',
     );
 
-    final logoUrl = _cleanText(
-      territoire['logoVille'] ??
-          territoire['logoUrl'] ??
-          structure['logoVille'] ??
-          structure['logoUrl'] ??
-          data['logoVille'] ??
-          data['logoUrl'],
+    final logoUrl = _normalizeRemoteImageUrl(
+      _firstCleanText([
+        territoire['logoVille'],
+        territoire['logoUrl'],
+        structure['logoVille'],
+        structure['logoUrl'],
+        data['logoVille'],
+        data['logoUrl'],
+      ]),
     );
 
     return Marker(
