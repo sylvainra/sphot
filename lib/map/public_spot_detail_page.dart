@@ -279,7 +279,6 @@ class PublicSpotMobileSheet extends StatefulWidget {
 }
 
 class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
-  final PageController _pageController = PageController();
   int _selectedPage = 0;
 
   static const List<(String, IconData)> _pages = [
@@ -289,12 +288,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     ('Dicton & Éphéméride', Icons.calendar_today_outlined),
     ('Infos', Icons.info_outline_rounded),
   ];
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
 
   Future<void> _openUrl(String rawUrl) async {
     var url = rawUrl.trim();
@@ -319,20 +312,58 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
 
   void _selectPage(int index) {
     if (_selectedPage == index) return;
-
     setState(() => _selectedPage = index);
+  }
 
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutCubic,
-    );
+  Widget _buildSelectedPage(
+    BuildContext context,
+    SpotFlagState spot,
+  ) {
+    switch (_selectedPage) {
+      case 1:
+        return _buildDataPage(
+          title: 'Météo terrestre',
+          icon: Icons.wb_sunny_outlined,
+          values: _PublicLiveDataSection._formatTerrestrialValues(
+            spot.meteoTerrestre,
+          ),
+          controller: widget.sheetScrollController,
+        );
+      case 2:
+        return _buildDataPage(
+          title: 'Météo marine',
+          icon: Icons.water_rounded,
+          values: _PublicLiveDataSection._formatMarineValues(
+            spot.meteoMarine,
+          ),
+          controller: widget.sheetScrollController,
+        );
+      case 3:
+        return _buildDataPage(
+          title: 'Dicton & Éphéméride',
+          icon: Icons.calendar_today_outlined,
+          values: _PublicLiveDataSection._formatEphemerideValues(
+            spot.ephemeride,
+          ),
+          controller: widget.sheetScrollController,
+        );
+      case 4:
+        return _buildInfoPage(
+          context,
+          spot,
+          widget.sheetScrollController,
+        );
+      default:
+        return _buildActionsPage(
+          context,
+          spot,
+          widget.sheetScrollController,
+        );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.sizeOf(context).height;
-
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('publicSpots')
@@ -367,61 +398,37 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                 ),
               ],
             ),
-            child: ListView(
-              controller: widget.sheetScrollController,
-              padding: EdgeInsets.zero,
+            child: Column(
               children: [
-                const SizedBox(height: 8),
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFB9C2CC),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 10, 8, 7),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                SizedBox(
+                  height: 32,
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              currentSpot.mapDisplayName.toUpperCase(),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Color(0xFF172033),
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                height: 1.05,
-                              ),
-                            ),
-                            if (currentSpot.ville.trim().isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                currentSpot.ville.toUpperCase(),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Color(0xFF64748B),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ],
+                      Container(
+                        width: 44,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFB9C2CC),
+                          borderRadius: BorderRadius.circular(99),
                         ),
                       ),
-                      IconButton(
-                        tooltip: 'Fermer',
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close_rounded),
+                      Positioned(
+                        right: 6,
+                        top: 0,
+                        child: IconButton(
+                          tooltip: 'Fermer',
+                          onPressed: () => Navigator.of(context).pop(),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 32,
+                            minHeight: 32,
+                          ),
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            size: 22,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -429,7 +436,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                 SizedBox(
                   height: 48,
                   child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(14, 2, 14, 8),
+                    padding: const EdgeInsets.fromLTRB(12, 2, 52, 8),
                     scrollDirection: Axis.horizontal,
                     itemCount: _pages.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 8),
@@ -484,41 +491,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                     },
                   ),
                 ),
-                SizedBox(
-                  height: screenHeight * 0.68,
-                  child: PageView(
-                    controller: _pageController,
-                    onPageChanged: (index) {
-                      setState(() => _selectedPage = index);
-                    },
-                    children: [
-                      _buildActionsPage(context, currentSpot),
-                      _buildDataPage(
-                        title: 'Météo terrestre',
-                        icon: Icons.wb_sunny_outlined,
-                        values: _PublicLiveDataSection
-                            ._formatTerrestrialValues(
-                          currentSpot.meteoTerrestre,
-                        ),
-                      ),
-                      _buildDataPage(
-                        title: 'Météo marine',
-                        icon: Icons.water_rounded,
-                        values: _PublicLiveDataSection._formatMarineValues(
-                          currentSpot.meteoMarine,
-                        ),
-                      ),
-                      _buildDataPage(
-                        title: 'Dicton & Éphéméride',
-                        icon: Icons.calendar_today_outlined,
-                        values:
-                            _PublicLiveDataSection._formatEphemerideValues(
-                          currentSpot.ephemeride,
-                        ),
-                      ),
-                      _buildInfoPage(context, currentSpot),
-                    ],
-                  ),
+                Expanded(
+                  child: _buildSelectedPage(context, currentSpot),
                 ),
               ],
             ),
@@ -531,6 +505,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   Widget _buildActionsPage(
     BuildContext context,
     SpotFlagState spot,
+    ScrollController controller,
   ) {
     final flagIsLowered =
         spot.isPosteSecours &&
@@ -560,23 +535,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     );
 
     return ListView(
+      controller: controller,
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
-        _MobilePublicCard(
-          child: _PublicInfoLine(
-            iconAssetPath: spot.isPosteSecours
-                ? 'data/icons/fire_red_icon.svg'
-                : spot.markerIconPath,
-            iconVerticalOffset: -7,
-            label: 'Type de SPHOT',
-            value: spot.typeSphot,
-            valueColor: const Color(0xFF1E3A8A),
-            valueWidget: spot.isPosteSecours
-                ? const _PublicRescueStationValue()
-                : null,
-          ),
-        ),
-        const SizedBox(height: 10),
         _MobilePublicCard(
           child: Column(
             children: [
@@ -662,8 +623,10 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     required String title,
     required IconData icon,
     required List<String> values,
+    required ScrollController controller,
   }) {
     return ListView(
+      controller: controller,
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
         _MobilePublicCard(
@@ -680,8 +643,10 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   Widget _buildInfoPage(
     BuildContext context,
     SpotFlagState spot,
+    ScrollController controller,
   ) {
     return ListView(
+      controller: controller,
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
         _MobilePublicCard(
