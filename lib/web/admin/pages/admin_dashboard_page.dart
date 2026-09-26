@@ -108,6 +108,7 @@ Color _sphotHoverColor = adminColor;
   final Set<String> _selectedSphotLabels = <String>{};
   final TextEditingController _sphotIdController = TextEditingController();
   final TextEditingController _sphotNameController = TextEditingController();
+  final TextEditingController _sphotPhoneController = TextEditingController();
   final TextEditingController _sphotLatController = TextEditingController();
   final TextEditingController _sphotLngController = TextEditingController();
 
@@ -1501,10 +1502,53 @@ _spotInfoLine('Ville', ville),
 _spotInfoLine('Département', departement),
 
 if (_normalizeType(type).contains('POSTE DE SECOURS'))
-  _spotInfoLine('Téléphone', telephone),
+  _spotInfoLine(
+    'Téléphone',
+    telephone,
+    onTap: telephone.isNotEmpty && telephone != 'Non renseigné'
+        ? () => _callPhoneNumber(telephone)
+        : null,
+  ),
       ],
     ),
   );
+}
+
+Future<void> _callPhoneNumber(String rawPhone) async {
+  final phone = rawPhone.trim();
+
+  if (phone.isEmpty || phone == 'Non renseigné') {
+    return;
+  }
+
+  final normalizedPhone = phone.replaceAll(
+    RegExp(r'[^0-9+]'),
+    '',
+  );
+
+  if (normalizedPhone.isEmpty) {
+    return;
+  }
+
+  final uri = Uri(
+    scheme: 'tel',
+    path: normalizedPhone,
+  );
+
+  final opened = await launchUrl(
+    uri,
+    mode: LaunchMode.externalApplication,
+  );
+
+  if (!opened && mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Impossible d’ouvrir l’application téléphone.',
+        ),
+      ),
+    );
+  }
 }
 
 Widget _spotInfoLine(
@@ -1512,7 +1556,20 @@ Widget _spotInfoLine(
   String value, {
   double labelWidth = 95,
   double bottomPadding = 4,
+  VoidCallback? onTap,
 }) {
+  final valueText = Text(
+    value,
+    style: TextStyle(
+      fontWeight: FontWeight.w600,
+      color: onTap == null ? Colors.black87 : adminColor,
+      fontSize: 13,
+      decoration:
+          onTap == null ? TextDecoration.none : TextDecoration.underline,
+      decorationColor: onTap == null ? null : adminColor,
+    ),
+  );
+
   return Padding(
     padding: EdgeInsets.only(bottom: bottomPadding),
     child: Row(
@@ -1533,14 +1590,15 @@ Widget _spotInfoLine(
           ),
         ),
         Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-              fontSize: 13,
-            ),
-          ),
+          child: onTap == null
+              ? valueText
+              : MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: InkWell(
+                    onTap: onTap,
+                    child: valueText,
+                  ),
+                ),
         ),
       ],
     ),
@@ -6284,6 +6342,7 @@ void _clearSphotEditor() {
   _selectedSphotLabels.clear();
   _sphotIdController.clear();
   _sphotNameController.clear();
+  _sphotPhoneController.clear();
   _sphotLatController.clear();
   _sphotLngController.clear();
 }
@@ -6589,6 +6648,9 @@ void _loadSphotInEditor(Map<String, dynamic> data) {
     _sphotNameController.text = _spotName(data) == 'SPHOT sans nom'
         ? ''
         : _spotName(data);
+    _sphotPhoneController.text = _cleanText(
+      data['telephonePoste'] ?? data['phone'],
+    );
     _sphotLatController.text = lat == 0 ? '' : lat.toStringAsFixed(6);
     _sphotLngController.text = lng == 0 ? '' : lng.toStringAsFixed(6);
     _selectedSphotType = _cleanText(data['typeSphot']);
@@ -6720,6 +6782,7 @@ Future<void> _saveSphotFromDashboard() async {
           _selectedSphotType == '🚨 POSTE DE SECOURS 🚨',
       'sphotLat': lat,
       'sphotLng': lng,
+      'telephonePoste': _sphotPhoneController.text.trim(),
       'equipement': _selectedSphotEquipments.join(' | '),
       'labelSphot': _selectedSphotLabels.join(' | '),
       'pays': territoryData['pays'] ?? '',
@@ -9657,6 +9720,26 @@ Expanded(
 
 _sphotSectionTitle(
   3,
+  'INFORMATIONS',
+),
+
+const SizedBox(height: 9),
+
+_sphotEditorField(
+  controller: _sphotPhoneController,
+  label: 'Téléphone du poste de secours',
+  keyboardType: TextInputType.phone,
+  inputFormatters: [
+    FilteringTextInputFormatter.allow(
+      RegExp(r'[0-9+ .()\-]'),
+    ),
+  ],
+),
+
+const SizedBox(height: 20),
+
+_sphotSectionTitle(
+  4,
   'TYPE',
 ),
 
@@ -9747,7 +9830,7 @@ const SizedBox(height: 9),
             ),
             const SizedBox(height: 20),
             _sphotSectionTitle(
-  4,
+  5,
   'ÉQUIPEMENTS',
 ),
             const SizedBox(height: 9),
@@ -9762,7 +9845,7 @@ const SizedBox(height: 9),
 const SizedBox(height: 14),
 
 _sphotSectionTitle(
-  5,
+  6,
   'LABELS',
 ),
 
@@ -9897,7 +9980,13 @@ Widget _buildSpotDetailPanel() {
             _spotInfoLine('Ville', ville),
             _spotInfoLine('Département', departement),
             _spotInfoLine('Région', region),
-            _spotInfoLine('Téléphone', telephone),
+            _spotInfoLine(
+              'Téléphone',
+              telephone,
+              onTap: telephone.isNotEmpty && telephone != 'Non renseigné'
+                  ? () => _callPhoneNumber(telephone)
+                  : null,
+            ),
             _spotInfoLine('Latitude', lat.toStringAsFixed(6)),
             _spotInfoLine('Longitude', lng.toStringAsFixed(6)),
             const SizedBox(height: 18),
@@ -12018,85 +12107,114 @@ Future<void> _loadAdministratorTerritoryCenter() async {
 
     final firestore = FirebaseFirestore.instance;
 
-    Map<String, dynamic>? administratorData;
-
-    /*
-     * Priorité à adminRequests/{uid}.
-     * C'est là que sont enregistrés villeLat, villeLng
-     * et logoVille pour cet Admin.
-     */
     final requestSnapshot = await firestore
         .collection('adminRequests')
         .doc(uid)
         .get();
 
-    if (requestSnapshot.exists) {
-      administratorData = requestSnapshot.data();
-    }
+    final approvedAdminSnapshot = await firestore
+        .collection('admins')
+        .doc(uid)
+        .get();
 
-    /*
-     * Sécurité pour les Admins dont la demande
-     * n'est plus disponible.
-     */
-    if (administratorData == null) {
-      final approvedAdminSnapshot = await firestore
-          .collection('admins')
-          .doc(uid)
-          .get();
+    final requestData =
+        requestSnapshot.data() ?? <String, dynamic>{};
+    final approvedAdminData =
+        approvedAdminSnapshot.data() ?? <String, dynamic>{};
 
-      if (approvedAdminSnapshot.exists) {
-        administratorData = approvedAdminSnapshot.data();
-      }
-    }
-
-    if (administratorData == null) {
+    if (requestData.isEmpty && approvedAdminData.isEmpty) {
       return;
     }
 
-    final territoire = Map<String, dynamic>.from(
-      administratorData['territoire'] ??
-          <String, dynamic>{},
+    // L'admin approuvé complète la demande historique, sans perdre
+    // les champs encore présents uniquement dans adminRequests.
+    final administratorData = <String, dynamic>{
+      ...requestData,
+      ...approvedAdminData,
+    };
+
+    final requestTerritory = Map<String, dynamic>.from(
+      requestData['territoire'] ?? <String, dynamic>{},
     );
 
-    /*
-     * Le centre est exclusivement celui enregistré
-     * dans le document de cet Admin.
-     */
+    final approvedTerritory = Map<String, dynamic>.from(
+      approvedAdminData['territoire'] ?? <String, dynamic>{},
+    );
+
+    final territoireId = _cleanText(
+      approvedAdminData['territoireId'] ??
+          requestData['territoireId'] ??
+          approvedTerritory['territoireId'] ??
+          requestTerritory['territoireId'] ??
+          approvedAdminData['organisationId'] ??
+          requestData['organisationId'] ??
+          widget.territoireId,
+    );
+
+    Map<String, dynamic> rootTerritory = <String, dynamic>{};
+
+    if (territoireId.isNotEmpty) {
+      final territorySnapshot = await firestore
+          .collection('territoires')
+          .doc(territoireId)
+          .get();
+
+      rootTerritory =
+          territorySnapshot.data() ?? <String, dynamic>{};
+    }
+
+    // Le document territoires/{territoireId} est la source de référence.
+    // Les copies présentes dans admins/adminRequests ne servent que de secours.
+    final territoire = <String, dynamic>{
+      ...requestTerritory,
+      ...approvedTerritory,
+      ...rootTerritory,
+    };
+
     final latitude = _toDouble(
-      territoire['villeLat'],
+      territoire['villeLat'] ??
+          approvedTerritory['villeLat'] ??
+          requestTerritory['villeLat'],
     );
 
     final longitude = _toDouble(
-      territoire['villeLng'],
+      territoire['villeLng'] ??
+          approvedTerritory['villeLng'] ??
+          requestTerritory['villeLng'],
     );
 
     if (latitude == 0 || longitude == 0) {
       return;
     }
 
-    final territoireId = _cleanText(
-      territoire['territoireId'] ??
-          administratorData['territoireId'] ??
-          administratorData['organisationId'] ??
-          widget.territoireId,
-    );
-
-    final structure = Map<String, dynamic>.from(
-      administratorData['structure'] ??
-          <String, dynamic>{},
-    );
+    final structure = <String, dynamic>{
+      ...Map<String, dynamic>.from(
+        requestData['structure'] ?? <String, dynamic>{},
+      ),
+      ...Map<String, dynamic>.from(
+        approvedAdminData['structure'] ?? <String, dynamic>{},
+      ),
+    };
 
     final organisationName = _cleanText(
       structure['nom'] ??
-          administratorData['nomStructure'] ??
-          administratorData['organisation'] ??
+          approvedAdminData['nomStructure'] ??
+          requestData['nomStructure'] ??
+          approvedAdminData['organisation'] ??
+          requestData['organisation'] ??
           territoire['ville'] ??
           'ADMIN',
     );
 
     final logoVille = _cleanText(
-      territoire['logoVille'] ??
-          administratorData['logoVille'],
+      rootTerritory['logoVille'] ??
+          rootTerritory['logoUrl'] ??
+          approvedTerritory['logoVille'] ??
+          approvedTerritory['logoUrl'] ??
+          requestTerritory['logoVille'] ??
+          requestTerritory['logoUrl'] ??
+          approvedAdminData['logoVille'] ??
+          requestData['logoVille'],
     );
 
     final center = LatLng(
@@ -12197,6 +12315,7 @@ void dispose() {
   _legalChangeLogController.dispose();
   _sphotIdController.dispose();
   _sphotNameController.dispose();
+  _sphotPhoneController.dispose();
   _sphotLatController.dispose();
   _sphotLngController.dispose();
   _sauveteurNomController.dispose();
