@@ -72,7 +72,9 @@ class SpotFlagState {
     periode: _readString(data['periode']),
     heureDebut: _readString(data['heureDebut']),
     heureFin: _readString(data['heureFin']),
-    phone: _readString(data['phone']),
+    phone: _readString(
+      data['telephonePoste'] ?? data['phone'],
+    ),
     activite: _readString(data['activite']),
 
     liveFlag: data['liveFlag'] is Map<String, dynamic>
