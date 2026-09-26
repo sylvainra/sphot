@@ -6726,9 +6726,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         data['autreLabel'] ?? data['labelSphotAutre'],
       );
 
-      _sphotPhoneController.text = _cleanText(
-        data['phone'] ?? data['telephonePoste'],
-      );
+      final loadedTelephonePoste = _cleanText(data['telephonePoste']);
+      final loadedLegacyPhone = _cleanText(data['phone']);
+      final loadedPhone = loadedTelephonePoste.isNotEmpty
+          ? loadedTelephonePoste
+          : loadedLegacyPhone;
+
+      _sphotPhoneController.text = FrenchPhoneNumberFormatter()
+          .formatEditUpdate(
+            const TextEditingValue(),
+            TextEditingValue(text: loadedPhone),
+          )
+          .text;
 
       _sphotWebcamUrlController.text = _cleanText(
         data['adresseWebcam'] ??
