@@ -152,8 +152,8 @@ void initState() {
   }
 }
 
-List<Marker> _buildTerritoryAdminMarkers(
-  List<Map<String, dynamic>> territories,
+List<Marker> _buildTerritoryLogoMarkers(
+  List<SpotFlagState> spots,
   double zoom,
   double rotation,
 ) {
@@ -161,171 +161,48 @@ List<Marker> _buildTerritoryAdminMarkers(
 
   if (zoom < 12) return markers;
 
-  String firstNonEmpty(List<dynamic> values) {
-    for (final value in values) {
-      final text = (value ?? '').toString().trim();
-      if (text.isNotEmpty) return text;
-    }
-    return '';
-  }
+  final cities = <String, SpotFlagState>{};
 
-  double firstValidCoordinate(List<dynamic> values) {
-    for (final value in values) {
-      if (value is num) {
-        final number = value.toDouble();
-        if (number.isFinite && number != 0) return number;
-        continue;
-      }
+  for (final spot in spots) {
+    final ville = spot.ville.trim();
 
-      final number = double.tryParse(
-        (value ?? '').toString().replaceAll(',', '.'),
-      );
+    if (ville.isEmpty) continue;
+    if (spot.villeLat == 0 || spot.villeLng == 0) continue;
 
-      if (number != null && number.isFinite && number != 0) {
-        return number;
-      }
+    final currentSpot = cities[ville];
+
+    if (currentSpot == null) {
+      cities[ville] = spot;
+      continue;
     }
 
-    return 0;
+    final currentLogo = currentSpot.logoVille.trim();
+    final candidateLogo = spot.logoVille.trim();
+
+    if (currentLogo.isEmpty && candidateLogo.isNotEmpty) {
+      cities[ville] = spot;
+    }
   }
 
-  for (final data in territories) {
-    final territory = data['territoire'] is Map
-        ? Map<String, dynamic>.from(data['territoire'] as Map)
-        : <String, dynamic>{};
+  for (final spot in cities.values) {
+    final logoVille = spot.logoVille.trim();
+    final siteInternetVille = spot.siteInternetVille.trim();
 
-    final structure = data['structure'] is Map
-        ? Map<String, dynamic>.from(data['structure'] as Map)
-        : <String, dynamic>{};
-
-    final ville = firstNonEmpty([
-      data['ville'],
-      territory['ville'],
-      structure['ville'],
-      structure['nom'],
-      data['organisation'],
-    ]);
-
-    final latitude = firstValidCoordinate([
-      data['villeLat'],
-      territory['villeLat'],
-      data['latitude'],
-      territory['latitude'],
-    ]);
-
-    final longitude = firstValidCoordinate([
-      data['villeLng'],
-      territory['villeLng'],
-      data['longitude'],
-      territory['longitude'],
-    ]);
-
-    if (latitude == 0 || longitude == 0) continue;
-
-    final logoVille = firstNonEmpty([
-      data['logoVille'],
-      data['logoUrl'],
-      territory['logoVille'],
-      territory['logoUrl'],
-      structure['logoVille'],
-      structure['logoUrl'],
-    ]);
-
-    final siteInternetVille = firstNonEmpty([
-      data['siteInternetVille'],
-      data['siteInternet'],
-      territory['siteInternetVille'],
-      territory['siteInternet'],
-      structure['siteInternetVille'],
-      structure['siteInternet'],
-    ]);
+    if (logoVille.isEmpty) continue;
 
     markers.add(
       Marker(
-        point: LatLng(latitude, longitude),
-        width: 85,
-        height: 85,
-        alignment: Alignment.topCenter,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => _openCityWebsite(siteInternetVille),
-            child: Tooltip(
-              message: ville.isEmpty ? 'ADMIN SPHOT' : ville.toUpperCase(),
-              preferBelow: true,
-              verticalOffset: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF0000),
-                borderRadius: BorderRadius.circular(5),
-              ),
-              textStyle: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-              ),
-              child: Transform.rotate(
-                angle: -rotation * pi / 180,
-                child: SizedBox(
-                  width: 85,
-                  height: 85,
-                  child: Stack(
-                    alignment: Alignment.topCenter,
-                    children: [
-                      Image.asset(
-                        'data/icons/fire_red_icon.png',
-                        width: 85,
-                        height: 85,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                      ),
-                      Positioned(
-                        top: 23,
-                        child: Container(
-                          width: 38,
-                          height: 38,
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white,
-                              width: 2,
-                            ),
-                          ),
-                          child: ClipOval(
-                            child: logoVille.isEmpty
-                                ? const Icon(
-                                    Icons.account_balance_rounded,
-                                    color: Color(0xFF1E3A8A),
-                                    size: 23,
-                                  )
-                                : IgnorePointer(
-                                    child: Image.network(
-                                      logoVille,
-                                      key: ValueKey<String>(
-                                        'public-admin-logo-$logoVille',
-                                      ),
-                                      width: 34,
-                                      height: 34,
-                                      fit: BoxFit.contain,
-                                      gaplessPlayback: true,
-                                      webHtmlElementStrategy:
-                                          WebHtmlElementStrategy.prefer,
-                                      errorBuilder: (_, __, ___) => const Icon(
-                                        Icons.account_balance_rounded,
-                                        color: Color(0xFF1E3A8A),
-                                        size: 23,
-                                      ),
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+        point: LatLng(spot.villeLat, spot.villeLng),
+        width: 70,
+        height: 70,
+        child: GestureDetector(
+          onTap: () => _openCityWebsite(siteInternetVille),
+          child: Transform.rotate(
+            angle: -rotation * pi / 180,
+            child: Image.network(
+              logoVille,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             ),
           ),
         ),
@@ -2021,20 +1898,8 @@ onPositionChanged: (position, hasGesture) {
                       final zoom = MapCamera.of(context).zoom;
                       final rotation = MapCamera.of(context).rotation;
 
-                      return StreamBuilder<List<Map<String, dynamic>>>(
-                        stream: _firestoreService.getTerritoriesStream(),
-                        builder: (context, territorySnapshot) {
-                          final territories = territorySnapshot.data ??
-                              const <Map<String, dynamic>>[];
-
-                          return MarkerLayer(
-                            markers: _buildTerritoryAdminMarkers(
-                              territories,
-                              zoom,
-                              rotation,
-                            ),
-                          );
-                        },
+                      return MarkerLayer(
+                        markers: _buildTerritoryLogoMarkers(allSpots, zoom, rotation),
                       );
                     },
                   ),
