@@ -12343,18 +12343,31 @@ Future<void> _loadAdministratorTerritoryCenter() async {
       return 0;
     }
 
-    final requestSnapshot = await firestore
+    final directRequestSnapshot = await firestore
         .collection('adminRequests')
         .doc(uid)
         .get();
+
+    Map<String, dynamic> requestData =
+        directRequestSnapshot.data() ?? <String, dynamic>{};
+
+    if (requestData.isEmpty) {
+      final requestQuery = await firestore
+          .collection('adminRequests')
+          .where('uid', isEqualTo: uid)
+          .limit(1)
+          .get();
+
+      if (requestQuery.docs.isNotEmpty) {
+        requestData = requestQuery.docs.first.data();
+      }
+    }
 
     final approvedAdminSnapshot = await firestore
         .collection('admins')
         .doc(uid)
         .get();
 
-    final requestData =
-        requestSnapshot.data() ?? <String, dynamic>{};
     final approvedAdminData =
         approvedAdminSnapshot.data() ?? <String, dynamic>{};
 
