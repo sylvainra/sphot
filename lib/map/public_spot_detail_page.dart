@@ -861,7 +861,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         spot.periode.trim().isNotEmpty ||
         spot.heureDebut.trim().isNotEmpty ||
         spot.heureFin.trim().isNotEmpty ||
-        spot.phone.trim().isNotEmpty ||
         spot.activite.trim().isNotEmpty;
 
     return ListView(
@@ -895,6 +894,17 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             ],
           ),
         ),
+        if (spot.phone.trim().isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _MobilePublicCard(
+            child: _PublicInfoLine(
+              icon: Icons.phone_outlined,
+              label: 'Téléphone du poste de secours',
+              value: spot.phone,
+              onTap: () => _call(spot),
+            ),
+          ),
+        ],
         if (hasCoreInfo) ...[
           const SizedBox(height: 10),
           _MobilePublicCard(
@@ -915,13 +925,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                       spot.heureDebut,
                       spot.heureFin,
                     ].where((value) => value.isNotEmpty).join(' – '),
-                  ),
-                if (spot.phone.isNotEmpty)
-                  _PublicInfoLine(
-                    icon: Icons.phone_outlined,
-                    label: 'Téléphone public',
-                    value: spot.phone,
-                    onTap: () => _call(spot),
                   ),
                 if (spot.activite.isNotEmpty)
                   _PublicInfoLine(
