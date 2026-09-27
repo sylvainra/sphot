@@ -14,13 +14,15 @@ class PublicWebcamView extends StatefulWidget {
 class _PublicWebcamViewState extends State<PublicWebcamView> {
   late final WebViewController _controller;
   bool _hasError = false;
+  late final bool _isDirectImage;
 
   @override
   void initState() {
     super.initState();
     _controller = WebViewController();
+    _isDirectImage = _looksLikeImage(widget.url);
 
-    if (!kIsWeb) {
+    if (!_isDirectImage && !kIsWeb) {
       _controller
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setBackgroundColor(Colors.black)
@@ -33,12 +35,22 @@ class _PublicWebcamViewState extends State<PublicWebcamView> {
         );
     }
 
-    final uri = _webcamUri(widget.url);
-    if (uri == null) {
-      _hasError = true;
-    } else {
-      _controller.loadRequest(uri);
+    if (!_isDirectImage) {
+      final uri = _webcamUri(widget.url);
+      if (uri == null) {
+        _hasError = true;
+      } else {
+        _controller.loadRequest(uri);
+      }
     }
+  }
+
+  bool _looksLikeImage(String rawUrl) {
+    final normalized = Uri.decodeFull(rawUrl).toLowerCase();
+
+    return RegExp(
+      r'\.(jpg|jpeg|png|webp|gif)(?:$|[?&#])',
+    ).hasMatch(normalized);
   }
 
   Uri? _webcamUri(String rawUrl) {
@@ -53,6 +65,30 @@ class _PublicWebcamViewState extends State<PublicWebcamView> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isDirectImage) {
+      return ColoredBox(
+        color: Colors.black,
+        child: Image.network(
+          widget.url,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(18),
+              child: Text(
+                'PHOTO TEMPORAIREMENT INDISPONIBLE',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_hasError) {
       return const ColoredBox(
         color: Colors.black,
