@@ -5602,6 +5602,7 @@ exports.updateInstitutionalMainCourantePreferences = onRequest(
 
 exports.updateSauveteurLiveState = onRequest(
     {
+      secrets: ["GMAIL_APP_PASSWORD"],
       cpu: 1,
       memory: "256MiB",
     },
@@ -5723,6 +5724,7 @@ exports.updateSauveteurLiveState = onRequest(
         const auditReference = db.collection("sauveteurOperationalAudit").doc();
 
         const flagJournalLines = [];
+        let flagWasLowered = false;
         const nextLiveFlag = sanitizedChanges.liveFlag;
 
         if (nextLiveFlag &&
@@ -5772,6 +5774,9 @@ exports.updateSauveteurLiveState = onRequest(
                 `Position du drapeau : ${oldPosition} → ${newPosition}`,
             );
           }
+
+          flagWasLowered =
+            oldPosition !== "Affalé" && newPosition === "Affalé";
         }
 
         const batch = db.batch();
@@ -5817,6 +5822,16 @@ exports.updateSauveteurLiveState = onRequest(
         }
 
         await batch.commit();
+
+        if (flagWasLowered) {
+          await sendInstitutionalOperationalNotification({
+            territoireId: context.territoireId,
+            spotId,
+            eventType: "flagLowered",
+            title: "Affalage du drapeau",
+            description: flagJournalLines.join(" • "),
+          });
+        }
 
         response.status(200).json({success: true});
       } catch (error) {
@@ -5921,6 +5936,8 @@ exports.getSauveteurMainCourante = onRequest(
               description: entry.description || "",
               actionTaken: entry.actionTaken || "",
               visibility: entry.visibility || "operational",
+              source: entry.source || "",
+              wasEdited: entry.wasEdited === true,
               occurredAt: entry.occurredAt &&
                   typeof entry.occurredAt.toMillis === "function" ?
                 entry.occurredAt.toMillis() : null,
@@ -5954,6 +5971,7 @@ exports.getSauveteurMainCourante = onRequest(
 
 exports.addSauveteurMainCouranteEntry = onRequest(
     {
+      secrets: ["GMAIL_APP_PASSWORD"],
       cpu: 1,
       memory: "256MiB",
     },
@@ -6032,8 +6050,12 @@ exports.addSauveteurMainCouranteEntry = onRequest(
             .collection("mainCourante")
             .doc();
 
+        const entryType =
+          (request.body.type || "Observation").toString().trim() ||
+          "Observation";
+
         await entryReference.set({
-          type: (request.body.type || "Observation").toString(),
+          type: entryType,
           description,
           actionTaken: (request.body.actionTaken || "").toString().trim(),
           visibility,
@@ -6044,8 +6066,28 @@ exports.addSauveteurMainCouranteEntry = onRequest(
             login: session.login,
             role: context.userRole,
           },
+          source: "manual_sauveteur_entry",
           immutableOriginal: true,
         });
+
+        const normalizedType = entryType.toLowerCase();
+        if (normalizedType === "incident") {
+          await sendInstitutionalOperationalNotification({
+            territoireId: context.territoireId,
+            spotId,
+            eventType: "incident",
+            title: "Incident",
+            description,
+          });
+        } else if (normalizedType === "intervention") {
+          await sendInstitutionalOperationalNotification({
+            territoireId: context.territoireId,
+            spotId,
+            eventType: "intervention",
+            title: "Intervention",
+            description,
+          });
+        }
 
         response.status(200).json({
           success: true,
