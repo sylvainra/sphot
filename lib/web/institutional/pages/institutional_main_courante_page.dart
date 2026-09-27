@@ -276,6 +276,7 @@ class _InstitutionalMainCourantePageState
         border: Border.all(color: _blue, width: 1.3),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             '${_months[today.month - 1]} ${today.year}',
@@ -511,9 +512,12 @@ class _InstitutionalMainCourantePageState
       backgroundColor: const Color(0xFFF3F6FB),
       bottomNavigationBar: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-          child: _dayTabs(),
+        child: SizedBox(
+          height: 94,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+            child: _dayTabs(),
+          ),
         ),
       ),
       body: SafeArea(
