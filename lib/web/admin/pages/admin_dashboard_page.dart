@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../models/advertising_pricing_config.dart';
+import '../../../services/admin_logo_storage_service.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
@@ -108,6 +110,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Future<Map<String, dynamic>>? _trialSummaryPanelFuture;
   bool _placingSphotOnMap = false;
   bool _isSavingSphot = false;
+  bool _isUpdatingAdminLogo = false;
 
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>? _cachedSpotsStream;
 
@@ -1719,6 +1722,255 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+  Widget _buildRemoteAdminLogo({
+    required String logoUrl,
+    String logoMimeType = '',
+    double size = 52,
+    double fallbackSize = 30,
+  }) {
+    final cleanUrl = logoUrl.trim();
+
+    if (cleanUrl.isEmpty) {
+      return Icon(
+        Icons.account_balance_rounded,
+        color: adminColor,
+        size: fallbackSize,
+      );
+    }
+
+    final isSvg =
+        logoMimeType.trim().toLowerCase() == 'image/svg+xml' ||
+        AdminLogoStorageService.isSvgUrl(cleanUrl);
+
+    if (isSvg) {
+      return SvgPicture.network(
+        cleanUrl,
+        key: ValueKey<String>('admin-svg-logo-$cleanUrl'),
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        placeholderBuilder: (_) => const Center(
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    return Image.network(
+      cleanUrl,
+      key: ValueKey<String>('admin-logo-$cleanUrl'),
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      gaplessPlayback: true,
+      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+      errorBuilder: (_, __, ___) => Icon(
+        Icons.account_balance_rounded,
+        color: adminColor,
+        size: fallbackSize,
+      ),
+    );
+  }
+
+  Future<List<DocumentReference<Map<String, dynamic>>>>
+      _adminRequestReferencesForUid(String uid) async {
+    final firestore = FirebaseFirestore.instance;
+    final references = <DocumentReference<Map<String, dynamic>>>[];
+    final seenPaths = <String>{};
+
+    final directReference = firestore.collection('adminRequests').doc(uid);
+    final directSnapshot = await directReference.get();
+
+    if (directSnapshot.exists) {
+      references.add(directReference);
+      seenPaths.add(directReference.path);
+    }
+
+    final querySnapshot = await firestore
+        .collection('adminRequests')
+        .where('uid', isEqualTo: uid)
+        .get();
+
+    for (final document in querySnapshot.docs) {
+      if (seenPaths.add(document.reference.path)) {
+        references.add(document.reference);
+      }
+    }
+
+    return references;
+  }
+
+  Future<void> _replaceAdminLogo() async {
+    if (_isUpdatingAdminLogo) {
+      return;
+    }
+
+    final territoireId = _resolvedTerritoireId.trim();
+    final uid = widget.adminUid.trim();
+
+    if (territoireId.isEmpty) {
+      return;
+    }
+
+    AdminLogoSelection? selection;
+
+    try {
+      selection = await AdminLogoStorageService.pickLogo();
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.toString().replaceFirst('Bad state: ', ''),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (selection == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isUpdatingAdminLogo = true;
+    });
+
+    try {
+      final uploadResult = await AdminLogoStorageService.uploadLogo(
+        territoireId: territoireId,
+        selection: selection,
+        requestId: uid,
+      );
+
+      final firestore = FirebaseFirestore.instance;
+      final now = FieldValue.serverTimestamp();
+
+      final logoData = <String, dynamic>{
+        'logoVille': uploadResult.url,
+        'logoStoragePath': uploadResult.storagePath,
+        'logoFileName': uploadResult.fileName,
+        'logoMimeType': uploadResult.mimeType,
+        'logoFileSizeBytes': uploadResult.sizeBytes,
+        'logoUploadedAt': now,
+        'updatedAt': now,
+      };
+
+      final territoryReference =
+          firestore.collection('territoires').doc(territoireId);
+
+      await territoryReference.set(
+        logoData,
+        SetOptions(merge: true),
+      );
+
+      final spotSnapshot = await territoryReference.collection('spots').get();
+
+      for (var index = 0; index < spotSnapshot.docs.length; index += 400) {
+        final batch = firestore.batch();
+        final page = spotSnapshot.docs.skip(index).take(400);
+
+        for (final spot in page) {
+          batch.set(
+            spot.reference,
+            {
+              ...logoData,
+              'territoireId': territoireId,
+            },
+            SetOptions(merge: true),
+          );
+        }
+
+        await batch.commit();
+      }
+
+      if (uid.isNotEmpty) {
+        final requestReferences = await _adminRequestReferencesForUid(uid);
+
+        for (final reference in requestReferences) {
+          await reference.set(
+            {
+              'territoire': logoData,
+              'updatedAt': now,
+            },
+            SetOptions(merge: true),
+          );
+        }
+
+        final adminReference = firestore.collection('admins').doc(uid);
+        final adminSnapshot = await adminReference.get();
+
+        if (adminSnapshot.exists) {
+          await adminReference.set(
+            {
+              'territoire': logoData,
+              'logoVille': uploadResult.url,
+              'updatedAt': now,
+            },
+            SetOptions(merge: true),
+          );
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      void updateLocalAdmin(Map<String, dynamic> source) {
+        final updatedTerritory = Map<String, dynamic>.from(
+          source['territoire'] ?? <String, dynamic>{},
+        );
+
+        updatedTerritory.addAll({
+          'logoVille': uploadResult.url,
+          'logoStoragePath': uploadResult.storagePath,
+          'logoFileName': uploadResult.fileName,
+          'logoMimeType': uploadResult.mimeType,
+          'logoFileSizeBytes': uploadResult.sizeBytes,
+        });
+
+        source['territoire'] = updatedTerritory;
+        source['logoVille'] = uploadResult.url;
+      }
+
+      setState(() {
+        _isUpdatingAdminLogo = false;
+
+        if (_selectedAdmin != null) {
+          final updatedAdmin = Map<String, dynamic>.from(_selectedAdmin!);
+          updateLocalAdmin(updatedAdmin);
+          _selectedAdmin = updatedAdmin;
+        }
+
+        if (_administratorTerritoryMarkerData != null) {
+          final updatedMarker = Map<String, dynamic>.from(
+            _administratorTerritoryMarkerData!,
+          );
+          updateLocalAdmin(updatedMarker);
+          _administratorTerritoryMarkerData = updatedMarker;
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Logo mis à jour.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _isUpdatingAdminLogo = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Mise à jour du logo impossible : $error'),
+        ),
+      );
+    }
+  }
+
   Future<void> _editAdminTerritoryLink({
     required String fieldName,
     required String dialogTitle,
@@ -2609,6 +2861,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
 
     final logoUrl = _cleanText(territoire['logoVille'] ?? admin['logoVille']);
+    final logoMimeType = _cleanText(
+      territoire['logoMimeType'] ?? admin['logoMimeType'],
+    );
 
     final siteInternetVille = _cleanText(
       territoire['siteInternetVille'] ??
@@ -2741,36 +2996,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         ],
                       ),
                       child: ClipOval(
-                        child: logoUrl.isEmpty
-                            ? const Icon(
-                                Icons.account_balance_rounded,
-                                color: adminColor,
-                                size: 34,
-                              )
-                            : Image.network(
-                                logoUrl,
-                                key: ValueKey<String>(
-                                  'admin-detail-logo-$logoUrl',
-                                ),
-                                width: 52,
-                                height: 52,
-                                fit: BoxFit.contain,
-                                gaplessPlayback: true,
-                                webHtmlElementStrategy:
-                                    WebHtmlElementStrategy.prefer,
-                                errorBuilder:
-                                    (
-                                      BuildContext context,
-                                      Object error,
-                                      StackTrace? stackTrace,
-                                    ) {
-                                      return const Icon(
-                                        Icons.account_balance_rounded,
-                                        color: adminColor,
-                                        size: 34,
-                                      );
-                                    },
-                              ),
+                        child: _buildRemoteAdminLogo(
+                          logoUrl: logoUrl,
+                          logoMimeType: logoMimeType,
+                          size: 52,
+                          fallbackSize: 34,
+                        ),
                       ),
                     ),
 
@@ -2951,6 +3182,119 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                     ),
                                   ],
                                 ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      // ====================================================
+                      // IDENTITÉ VISUELLE
+                      // ====================================================
+                      _adminPanelSectionTitle(
+                        icon: Icons.image_outlined,
+                        title: 'IDENTITÉ VISUELLE',
+                      ),
+
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: adminColor.withOpacity(0.055),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: adminColor.withOpacity(0.20),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 58,
+                              height: 58,
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: adminColor.withOpacity(0.35),
+                                ),
+                              ),
+                              child: ClipOval(
+                                child: _buildRemoteAdminLogo(
+                                  logoUrl: logoUrl,
+                                  logoMimeType: logoMimeType,
+                                  size: 48,
+                                  fallbackSize: 28,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'LOGO DE LA STRUCTURE',
+                                    style: TextStyle(
+                                      color: adminColor,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _cleanText(
+                                      territoire['logoFileName'],
+                                    ).isNotEmpty
+                                        ? _cleanText(
+                                            territoire['logoFileName'],
+                                          )
+                                        : (logoUrl.isEmpty
+                                            ? 'Aucun logo enregistré'
+                                            : 'Logo actuellement utilisé'),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: adminColor.withOpacity(0.75),
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              onPressed: _isUpdatingAdminLogo
+                                  ? null
+                                  : _replaceAdminLogo,
+                              icon: _isUpdatingAdminLogo
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.upload_file_rounded,
+                                      size: 18,
+                                    ),
+                              label: const Text(
+                                'REMPLACER',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: redColor,
+                                side: const BorderSide(
+                                  color: redColor,
+                                  width: 1.4,
+                                ),
                               ),
                             ),
                           ],
