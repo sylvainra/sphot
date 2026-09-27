@@ -139,10 +139,37 @@ function buildPublicLiveState(spot) {
  * @return {Object} Données consolidées.
  */
 function mergePublicSpotData(spot, historical) {
-  const result = {...spot, ...(historical || {})};
-  if (historical && historical.liveFlag === undefined) {
+  const result = {...spot};
+
+  if (!historical) {
+    return result;
+  }
+
+  const historicalLiveFields = [
+    "liveFlag",
+    "statutBaignade",
+    "periode",
+    "heureDebut",
+    "heureFin",
+    "phone",
+    "telephonePoste",
+    "dangers",
+    "meteoTerrestre",
+    "meteoMarine",
+    "ephemeride",
+    "notificationPublique",
+  ];
+
+  historicalLiveFields.forEach((field) => {
+    if (historical[field] !== undefined && historical[field] !== null) {
+      result[field] = historical[field];
+    }
+  });
+
+  if (historical.liveFlag === undefined) {
     delete result.liveFlag;
   }
+
   return result;
 }
 
