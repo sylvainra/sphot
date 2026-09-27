@@ -5038,6 +5038,568 @@ exports.saveSauveteurPlanning = onRequest(
     },
 );
 
+
+const INSTITUTIONAL_MAIN_COURANTE_URL =
+  SPHOT_LOGIN_URL + "/#/institutionnel-main-courante";
+
+function hashInstitutionalAccessToken(token) {
+  return crypto
+      .createHash("sha256")
+      .update((token || "").toString())
+      .digest("hex");
+}
+
+function institutionalNotificationPreferences(contact) {
+  const raw = contact &&
+      typeof contact.notificationPreferences === "object" &&
+      !Array.isArray(contact.notificationPreferences) ?
+    contact.notificationPreferences :
+    {};
+
+  return {
+    flagLowered: raw.flagLowered !== false,
+    incident: raw.incident !== false,
+    intervention: raw.intervention !== false,
+  };
+}
+
+async function sendInstitutionalOperationalNotification(options) {
+  const territoireId = (options.territoireId || "").toString();
+  const spotId = (options.spotId || "").toString();
+  const eventType = (options.eventType || "").toString();
+  const title = (options.title || "Information SPHOT").toString();
+  const description = (options.description || "").toString();
+
+  try {
+    const territorySnapshot = await admin.firestore()
+        .collection("territoires")
+        .doc(territoireId)
+        .get();
+
+    if (!territorySnapshot.exists) return;
+
+    const territoryData = territorySnapshot.data() || {};
+    const contacts = Array.isArray(territoryData.institutionnels) ?
+      territoryData.institutionnels :
+      [];
+
+    const enabledContacts = contacts.filter((rawContact) => {
+      const contact = rawContact || {};
+      const email = (contact.email || "").toString().trim().toLowerCase();
+      if (!email || contact.mainCouranteReadOnly === false) return false;
+
+      const preferences = institutionalNotificationPreferences(contact);
+      return preferences[eventType] === true;
+    });
+
+    if (enabledContacts.length === 0) return;
+
+    let spotLabel = spotId;
+    try {
+      const spotSnapshot = await admin.firestore()
+          .collection("territoires")
+          .doc(territoireId)
+          .collection("spots")
+          .doc(spotId)
+          .get();
+      const spotData = spotSnapshot.data() || {};
+      spotLabel = (
+        spotData.nomSecours ||
+        spotData.nomSphot ||
+        spotData.nom ||
+        spotId
+      ).toString();
+    } catch (_) {
+      // Le libellé technique suffit si la fiche SPHOT n'est pas disponible.
+    }
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: SMTP_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+    });
+
+    for (const rawContact of enabledContacts) {
+      const contact = rawContact || {};
+      const email = (contact.email || "").toString().trim().toLowerCase();
+      const firstName = (contact.prenom || "").toString().trim();
+      const greeting = firstName ? "Bonjour " + firstName + "," : "Bonjour,";
+
+      try {
+        await sendSphotMail(transporter, {
+          from: MAIL_FROM,
+          to: email,
+          subject: "SPHOT - " + title + " - " + spotLabel,
+          html:
+            "<p>" + escapeHtml(greeting) + "</p>" +
+            "<p>Une information opérationnelle vient d'être enregistrée " +
+            "pour <strong>" + escapeHtml(spotLabel) + "</strong>.</p>" +
+            "<div style=\"margin:22px 0;padding:16px;border:1px solid " +
+            "#1e3a8a;border-radius:12px;background:#f7f9fc;\">" +
+            "<strong>" + escapeHtml(title) + "</strong><br>" +
+            escapeHtml(description) + "</div>" +
+            "<p>Vous disposez d'un accès personnel SPHOT à la MAIN COURANTE " +
+            "en lecture seule. Vous pouvez également y modifier vos " +
+            "préférences de notification.</p>" +
+            "<p>Conservez le lien d'accès sécurisé qui vous a été adressé " +
+            "lors de votre habilitation.</p>" +
+            "<p>L'équipe SPHOT</p>",
+          text:
+            greeting + "\n\n" +
+            "Une information opérationnelle vient d'être enregistrée pour " +
+            spotLabel + ".\n\n" +
+            title + "\n" + description + "\n\n" +
+            "Vous disposez d'un accès personnel SPHOT à la MAIN COURANTE " +
+            "en lecture seule et pouvez y modifier vos préférences.\n\n" +
+            "L'équipe SPHOT",
+        });
+      } catch (mailError) {
+        console.error(
+            "Erreur notification institutionnelle:",
+            territoireId,
+            spotId,
+            email,
+            mailError,
+        );
+      }
+    }
+  } catch (error) {
+    console.error(
+        "Erreur préparation notifications institutionnelles:",
+        territoireId,
+        spotId,
+        eventType,
+        error,
+    );
+  }
+}
+
+exports.provisionInstitutionalMainCouranteAccess = onDocumentUpdated(
+    {
+      document: "territoires/{territoireId}",
+      region: "europe-west1",
+      secrets: ["GMAIL_APP_PASSWORD"],
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const territoireId = event.params.territoireId;
+      const beforeData = event.data.before.data() || {};
+      const afterData = event.data.after.data() || {};
+      const beforeContacts = Array.isArray(beforeData.institutionnels) ?
+        beforeData.institutionnels :
+        [];
+      const rawContacts = Array.isArray(afterData.institutionnels) ?
+        afterData.institutionnels :
+        [];
+
+      const normalizedContacts = [];
+      const onboarding = [];
+      let territoryNeedsUpdate = false;
+
+      for (let index = 0; index < rawContacts.length; index += 1) {
+        const original = rawContacts[index] || {};
+        const contact = {...original};
+        const email = (contact.email || "").toString().trim().toLowerCase();
+
+        let contactId = (contact.id || "").toString().trim();
+        if (!contactId) {
+          contactId = crypto.randomUUID();
+          contact.id = contactId;
+          territoryNeedsUpdate = true;
+        }
+
+        const preferences = institutionalNotificationPreferences(contact);
+        if (JSON.stringify(contact.notificationPreferences || {}) !==
+            JSON.stringify(preferences)) {
+          contact.notificationPreferences = preferences;
+          territoryNeedsUpdate = true;
+        }
+
+        if (contact.mainCouranteReadOnly !== true) {
+          contact.mainCouranteReadOnly = true;
+          territoryNeedsUpdate = true;
+        }
+
+        if (!email) {
+          normalizedContacts.push(contact);
+          continue;
+        }
+
+        let tokenHash = (contact.accessTokenHash || "").toString().trim();
+        let rawToken = "";
+
+        if (!tokenHash) {
+          rawToken = crypto.randomBytes(32).toString("hex");
+          tokenHash = hashInstitutionalAccessToken(rawToken);
+          contact.accessTokenHash = tokenHash;
+          territoryNeedsUpdate = true;
+          onboarding.push({contact: {...contact}, rawToken});
+        }
+
+        await admin.firestore()
+            .collection("institutionalMainCouranteAccess")
+            .doc(tokenHash)
+            .set({
+              territoireId,
+              contactId,
+              email,
+              civilite: (contact.civilite || "").toString(),
+              nom: (contact.nom || "").toString(),
+              prenom: (contact.prenom || "").toString(),
+              fonction: (contact.fonction || "").toString(),
+              enabled: true,
+              mainCouranteReadOnly: true,
+              notificationPreferences: preferences,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, {merge: true});
+
+        normalizedContacts.push(contact);
+      }
+
+      const activeHashes = new Set(
+          normalizedContacts
+              .map((contact) => (contact.accessTokenHash || "")
+                  .toString()
+                  .trim())
+              .filter(Boolean),
+      );
+
+      for (const oldContact of beforeContacts) {
+        const oldHash = (oldContact.accessTokenHash || "").toString().trim();
+        if (oldHash && !activeHashes.has(oldHash)) {
+          await admin.firestore()
+              .collection("institutionalMainCouranteAccess")
+              .doc(oldHash)
+              .set({
+                enabled: false,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              }, {merge: true});
+        }
+      }
+
+      if (territoryNeedsUpdate) {
+        await event.data.after.ref.set({
+          institutionnels: normalizedContacts,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {merge: true});
+      }
+
+      if (onboarding.length === 0) return;
+
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: SMTP_USER,
+          pass: process.env.GMAIL_APP_PASSWORD,
+        },
+      });
+
+      for (const item of onboarding) {
+        const contact = item.contact || {};
+        const email = (contact.email || "").toString().trim().toLowerCase();
+        if (!email) continue;
+
+        const accessUrl =
+          INSTITUTIONAL_MAIN_COURANTE_URL + "?token=" +
+          encodeURIComponent(item.rawToken);
+        const firstName = (contact.prenom || "").toString().trim();
+        const greeting = firstName ? "Bonjour " + firstName + "," : "Bonjour,";
+
+        try {
+          await sendSphotMail(transporter, {
+            from: MAIL_FROM,
+            to: email,
+            subject: "SPHOT - Votre accès institutionnel à la MAIN COURANTE",
+            html:
+              "<p>" + escapeHtml(greeting) + "</p>" +
+              "<p>Votre structure vous a habilité comme contact " +
+              "institutionnel SPHOT.</p>" +
+              "<p>Cet accès vous permet de consulter la " +
+              "<strong>MAIN COURANTE</strong> en lecture seule et de choisir " +
+              "les notifications que vous souhaitez recevoir : affalage du " +
+              "drapeau, incident et intervention.</p>" +
+              "<div style=\"text-align:center;margin:28px 0;\">" +
+              "<a href=\"" + accessUrl + "\" style=\"display:inline-block;" +
+              "padding:14px 24px;border-radius:12px;background:#1e3a8a;" +
+              "color:#ffffff;text-decoration:none;font-weight:900;\">" +
+              "OUVRIR MA MAIN COURANTE SPHOT</a></div>" +
+              "<p>Ce lien est personnel. Ne le transférez pas.</p>" +
+              "<p>L'équipe SPHOT</p>",
+            text:
+              greeting + "\n\n" +
+              "Votre structure vous a habilité comme contact institutionnel " +
+              "SPHOT.\n\nAccès lecture seule à la MAIN COURANTE :\n" +
+              accessUrl + "\n\nVous pourrez y régler vos notifications " +
+              "d'affalage du drapeau, d'incident et d'intervention.\n\n" +
+              "L'équipe SPHOT",
+          });
+        } catch (mailError) {
+          console.error(
+              "Erreur email habilitation institutionnelle:",
+              territoireId,
+              email,
+              mailError,
+          );
+        }
+      }
+    },
+);
+
+exports.getInstitutionalMainCourante = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const token = (request.body.token || "").toString().trim();
+        if (!token) {
+          response.status(401).json({success: false, error: "missing_token"});
+          return;
+        }
+
+        const tokenHash = hashInstitutionalAccessToken(token);
+        const accessReference = admin.firestore()
+            .collection("institutionalMainCouranteAccess")
+            .doc(tokenHash);
+        const accessSnapshot = await accessReference.get();
+        const access = accessSnapshot.data() || {};
+
+        if (!accessSnapshot.exists ||
+            access.enabled !== true ||
+            access.mainCouranteReadOnly !== true) {
+          response.status(403).json({success: false, error: "access_denied"});
+          return;
+        }
+
+        const territoireId = (access.territoireId || "").toString().trim();
+        if (!territoireId) {
+          response.status(403).json({success: false, error: "access_denied"});
+          return;
+        }
+
+        const territoryReference = admin.firestore()
+            .collection("territoires")
+            .doc(territoireId);
+        const territorySnapshot = await territoryReference.get();
+        const territory = territorySnapshot.data() || {};
+
+        const spotsSnapshot = await territoryReference
+            .collection("spots")
+            .where("typeSphot", "==", "🚨 POSTE DE SECOURS 🚨")
+            .get();
+
+        const spots = spotsSnapshot.docs
+            .map((document) => {
+              const data = document.data() || {};
+              const label = [
+                (data.nomSecours || "").toString().trim(),
+                (data.nomSphot || "").toString().trim(),
+              ].filter(Boolean).join(" - ");
+              return {
+                id: document.id,
+                label: label || document.id,
+              };
+            })
+            .sort((a, b) => a.label.localeCompare(b.label, "fr"));
+
+        let spotId = (request.body.spotId || "").toString().trim();
+        if (!spotId && spots.length > 0) spotId = spots[0].id;
+
+        if (spotId && !spots.some((spot) => spot.id === spotId)) {
+          response.status(403).json({success: false, error: "spot_denied"});
+          return;
+        }
+
+        let entries = [];
+        if (spotId) {
+          let entriesQuery = territoryReference
+              .collection("spots")
+              .doc(spotId)
+              .collection("mainCourante");
+
+          const dayStartMillis = Number(request.body.dayStartMillis);
+          const dayEndMillis = Number(request.body.dayEndMillis);
+          if (Number.isFinite(dayStartMillis) &&
+              Number.isFinite(dayEndMillis) &&
+              dayEndMillis > dayStartMillis) {
+            entriesQuery = entriesQuery
+                .where(
+                    "occurredAt",
+                    ">=",
+                    admin.firestore.Timestamp.fromMillis(dayStartMillis),
+                )
+                .where(
+                    "occurredAt",
+                    "<",
+                    admin.firestore.Timestamp.fromMillis(dayEndMillis),
+                );
+          }
+
+          const entriesSnapshot = await entriesQuery
+              .orderBy("occurredAt", "desc")
+              .limit(500)
+              .get();
+
+          entries = entriesSnapshot.docs
+              .map((document) => {
+                const data = document.data() || {};
+                return {
+                  id: document.id,
+                  type: data.type || "Observation",
+                  description: data.description || "",
+                  actionTaken: data.actionTaken || "",
+                  visibility: data.visibility || "operational",
+                  source: data.source || "",
+                  wasEdited: data.wasEdited === true,
+                  occurredAt: data.occurredAt &&
+                      typeof data.occurredAt.toMillis === "function" ?
+                    data.occurredAt.toMillis() : null,
+                };
+              })
+              .filter((entry) => entry.visibility !== "restricted");
+        }
+
+        await admin.firestore()
+            .collection("mainCouranteAccessLogs")
+            .add({
+              territoireId,
+              spotId,
+              viewerId: access.contactId || tokenHash,
+              viewerLogin: access.email || "",
+              viewerRole: "institutionnel",
+              viewerType: "institutionnel",
+              action: "view",
+              viewedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+        response.status(200).json({
+          success: true,
+          contact: {
+            civilite: access.civilite || "",
+            nom: access.nom || "",
+            prenom: access.prenom || "",
+            fonction: access.fonction || "",
+            email: access.email || "",
+          },
+          territory: {
+            id: territoireId,
+            organisation:
+              territory.organisation ||
+              territory.nomStructure ||
+              territory.ville ||
+              "",
+          },
+          spots,
+          selectedSpotId: spotId,
+          entries,
+          notificationPreferences:
+            institutionalNotificationPreferences(access),
+        });
+      } catch (error) {
+        console.error("Erreur lecture institutionnelle main courante:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.updateInstitutionalMainCourantePreferences = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const token = (request.body.token || "").toString().trim();
+        if (!token) {
+          response.status(401).json({success: false, error: "missing_token"});
+          return;
+        }
+
+        const tokenHash = hashInstitutionalAccessToken(token);
+        const accessReference = admin.firestore()
+            .collection("institutionalMainCouranteAccess")
+            .doc(tokenHash);
+        const accessSnapshot = await accessReference.get();
+        const access = accessSnapshot.data() || {};
+
+        if (!accessSnapshot.exists || access.enabled !== true) {
+          response.status(403).json({success: false, error: "access_denied"});
+          return;
+        }
+
+        const preferences = {
+          flagLowered: request.body.flagLowered === true,
+          incident: request.body.incident === true,
+          intervention: request.body.intervention === true,
+        };
+
+        const territoireId = (access.territoireId || "").toString().trim();
+        const contactId = (access.contactId || "").toString().trim();
+
+        await accessReference.set({
+          notificationPreferences: preferences,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {merge: true});
+
+        if (territoireId && contactId) {
+          const territoryReference = admin.firestore()
+              .collection("territoires")
+              .doc(territoireId);
+
+          await admin.firestore().runTransaction(async (transaction) => {
+            const territorySnapshot =
+                await transaction.get(territoryReference);
+            const territoryData = territorySnapshot.data() || {};
+            const contacts = Array.isArray(territoryData.institutionnels) ?
+              territoryData.institutionnels.map((rawContact) => {
+                const contact = {...(rawContact || {})};
+                if ((contact.id || "").toString() === contactId) {
+                  contact.notificationPreferences = preferences;
+                }
+                return contact;
+              }) :
+              [];
+
+            transaction.set(territoryReference, {
+              institutionnels: contacts,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, {merge: true});
+          });
+        }
+
+        response.status(200).json({success: true, preferences});
+      } catch (error) {
+        console.error(
+            "Erreur mise à jour préférences institutionnelles:",
+            error,
+        );
+        response.status(500).json({success: false});
+      }
+    },
+);
+
 exports.updateSauveteurLiveState = onRequest(
     {
       cpu: 1,
