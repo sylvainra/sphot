@@ -28,6 +28,9 @@ class SpotFlagState {
   final String equipement;
   final String labelSphot;
   final String adresseWebcam;
+  final String mediaType;
+  final String photoSphotUrl;
+  final String photoSphotMimeType;
   final String arretesMunicipaux;
   final Map<String, dynamic>? liveFlag;
   final dynamic dangers;
@@ -63,6 +66,9 @@ class SpotFlagState {
     required this.equipement,
     required this.labelSphot,
     required this.adresseWebcam,
+    required this.mediaType,
+    required this.photoSphotUrl,
+    required this.photoSphotMimeType,
     required this.arretesMunicipaux,
     this.liveFlag,
     this.dangers,
@@ -111,6 +117,9 @@ class SpotFlagState {
           data['urlWebcam'] ??
           data['webcam'],
     ),
+    mediaType: _readString(data['mediaType']).toLowerCase(),
+    photoSphotUrl: _readString(data['photoSphotUrl']),
+    photoSphotMimeType: _readString(data['photoSphotMimeType']),
     arretesMunicipaux: _readString(data['arretesMunicipaux']),
 
     liveFlag: data['liveFlag'] is Map<String, dynamic>
@@ -148,6 +157,52 @@ class SpotFlagState {
   List<String> get publicEquipment => _splitPublicValues(equipement);
 
   List<String> get publicLabels => _splitPublicValues(labelSphot);
+
+  bool get _legacyMediaLooksLikePhoto {
+    final normalized = Uri.decodeFull(adresseWebcam.trim()).toLowerCase();
+
+    return RegExp(
+      r'\.(jpg|jpeg|png|webp)(?:$|[?&#])',
+    ).hasMatch(normalized);
+  }
+
+  String get publicMediaType {
+    if (mediaType == 'webcam' || mediaType == 'photo') {
+      return mediaType;
+    }
+
+    if (photoSphotUrl.trim().isNotEmpty) {
+      return 'photo';
+    }
+
+    if (_legacyMediaLooksLikePhoto) {
+      return 'photo';
+    }
+
+    if (adresseWebcam.trim().isNotEmpty) {
+      return 'webcam';
+    }
+
+    return '';
+  }
+
+  String get publicMediaUrl {
+    if (publicMediaType == 'photo') {
+      if (photoSphotUrl.trim().isNotEmpty) {
+        return photoSphotUrl.trim();
+      }
+
+      return _legacyMediaLooksLikePhoto ? adresseWebcam.trim() : '';
+    }
+
+    if (publicMediaType == 'webcam') {
+      return adresseWebcam.trim();
+    }
+
+    return '';
+  }
+
+  bool get publicMediaIsPhoto => publicMediaType == 'photo';
 
   String get normalizedType {
     return typeSphot
