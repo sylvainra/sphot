@@ -5,6 +5,7 @@ import '../../../models/advertising_pricing_config.dart';
 import '../../../services/admin_logo_storage_service.dart';
 import '../../../services/sphot_media_storage_service.dart';
 import '../../../widgets/adaptive_asset_image.dart';
+import '../../../pages/sauveteur/widgets/sauveteur_styled_dropdown.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
@@ -1949,6 +1950,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final emailController = TextEditingController(
       text: _cleanText(existing['email']),
     );
+    final rawPreferences = existing['notificationPreferences'] is Map
+        ? Map<String, dynamic>.from(
+            existing['notificationPreferences'] as Map,
+          )
+        : <String, dynamic>{};
+    bool notifyFlagLowered = rawPreferences['flagLowered'] != false;
+    bool notifyIncidents = rawPreferences['incident'] != false;
+    bool notifyInterventions = rawPreferences['intervention'] != false;
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -1971,23 +1980,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      DropdownButtonFormField<String>(
+                      SauveteurStyledDropdown(
+                        labelText: 'Civilité',
                         value: civilite,
-                        decoration: const InputDecoration(
-                          labelText: 'Civilité',
-                        ),
-                        items: const [
-                          DropdownMenuItem(
+                        options: const [
+                          SauveteurDropdownOption(
                             value: 'Monsieur',
-                            child: Text('Monsieur'),
+                            label: 'Monsieur',
                           ),
-                          DropdownMenuItem(
+                          SauveteurDropdownOption(
                             value: 'Madame',
-                            child: Text('Madame'),
+                            label: 'Madame',
                           ),
                         ],
                         onChanged: (value) {
-                          if (value == null) return;
                           setDialogState(() => civilite = value);
                         },
                       ),
@@ -2027,6 +2033,68 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         keyboardType: TextInputType.emailAddress,
                         decoration: const InputDecoration(
                           labelText: 'Email de contact',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: adminColor.withOpacity(0.045),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: adminColor.withOpacity(0.22),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'ACCÈS & NOTIFICATIONS MAIN COURANTE',
+                              style: TextStyle(
+                                color: adminColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Le contact disposera d’un accès personnel en lecture seule. '
+                              'Il pourra ensuite modifier lui-même ces préférences.',
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 11,
+                                height: 1.25,
+                              ),
+                            ),
+                            SwitchListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Alerte lors de l’affalage du drapeau'),
+                              value: notifyFlagLowered,
+                              onChanged: (value) {
+                                setDialogState(() => notifyFlagLowered = value);
+                              },
+                            ),
+                            SwitchListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Alerte lors d’un incident'),
+                              value: notifyIncidents,
+                              onChanged: (value) {
+                                setDialogState(() => notifyIncidents = value);
+                              },
+                            ),
+                            SwitchListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Alerte lors d’une intervention'),
+                              value: notifyInterventions,
+                              onChanged: (value) {
+                                setDialogState(() => notifyInterventions = value);
+                              },
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -2069,6 +2137,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       'fonction': _capitalizeWords(fonction),
                       'telephone': telephone,
                       'email': email,
+                      'mainCouranteReadOnly': true,
+                      'notificationPreferences': {
+                        'flagLowered': notifyFlagLowered,
+                        'incident': notifyIncidents,
+                        'intervention': notifyInterventions,
+                      },
+                      if (_cleanText(existing['accessTokenHash']).isNotEmpty)
+                        'accessTokenHash': _cleanText(
+                          existing['accessTokenHash'],
+                        ),
                     });
                   },
                   icon: const Icon(Icons.save_outlined),
@@ -3127,25 +3205,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ),
                       const SizedBox(height: 18),
 
-                      DropdownButtonFormField<String>(
-                        initialValue: civilite,
-                        decoration: const InputDecoration(
-                          labelText: 'Civilité',
-                          prefixIcon: Icon(Icons.person_outline_rounded),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
+                      SauveteurStyledDropdown(
+                        labelText: 'Civilité',
+                        value: civilite,
+                        options: const [
+                          SauveteurDropdownOption(
                             value: 'Monsieur',
-                            child: Text('Monsieur'),
+                            label: 'Monsieur',
                           ),
-                          DropdownMenuItem(
+                          SauveteurDropdownOption(
                             value: 'Madame',
-                            child: Text('Madame'),
+                            label: 'Madame',
                           ),
                         ],
                         onChanged: (value) {
-                          if (value == null) return;
-
                           setDialogState(() {
                             civilite = value;
                           });
