@@ -37,7 +37,14 @@ class AdminTrialRequestPage extends StatefulWidget {
   State<AdminTrialRequestPage> createState() => _AdminTrialRequestPageState();
 }
 
-enum _TrialRequestSection { structure, responsable, territoire, ville, essai }
+enum _TrialRequestSection {
+  structure,
+  responsable,
+  institutionnels,
+  territoire,
+  ville,
+  essai,
+}
 
 class _TrialMapStyle {
   final String name;
@@ -126,6 +133,9 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   Map<String, dynamic> _originalRequestData = {};
   final Map<String, String> _correctionBaseline = {};
   final Set<String> _fieldsToCorrect = <String>{};
+
+  final List<Map<String, String>> _institutionalContacts = [];
+  int? _editingInstitutionalIndex;
 
   Map<String, dynamic>? _cguDoc;
   Map<String, dynamic>? _privacyDoc;
@@ -267,6 +277,26 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
       final territoire = Map<String, dynamic>.from(data['territoire'] ?? {});
 
+      final rawInstitutionalContacts =
+          data['institutionnels'] ?? territoire['institutionnels'];
+      final loadedInstitutionalContacts = rawInstitutionalContacts is List
+          ? rawInstitutionalContacts
+                .whereType<Map>()
+                .map((raw) {
+                  final contact = Map<String, dynamic>.from(raw);
+                  return <String, String>{
+                    'id': (contact['id'] ?? '').toString(),
+                    'civilite': (contact['civilite'] ?? '').toString(),
+                    'nom': (contact['nom'] ?? '').toString(),
+                    'prenom': (contact['prenom'] ?? '').toString(),
+                    'fonction': (contact['fonction'] ?? '').toString(),
+                    'telephone': (contact['telephone'] ?? '').toString(),
+                    'email': (contact['email'] ?? '').toString(),
+                  };
+                })
+                .toList()
+          : <Map<String, String>>[];
+
       final trialRequest = Map<String, dynamic>.from(
         data['trialRequest'] ?? {},
       );
@@ -366,6 +396,10 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           acceptedDocuments['rgpd'] == true;
       _acceptTerms = true;
 
+      _institutionalContacts
+        ..clear()
+        ..addAll(loadedInstitutionalContacts);
+
       if (!mounted) return;
 
       setState(() {
@@ -462,6 +496,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         _value('emailResponsable').isNotEmpty;
   }
 
+  bool get _institutionnelsComplete => _institutionalContacts.isNotEmpty;
+
   bool get _territoireComplete {
     return _value('pays').isNotEmpty &&
         _value('region').isNotEmpty &&
@@ -488,6 +524,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   bool get _canOpenTrialRequest {
     return _structureComplete &&
         _responsableComplete &&
+        _institutionnelsComplete &&
         _territoireComplete &&
         _villeComplete;
   }
@@ -735,6 +772,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           'telephoneResponsable',
           'emailResponsable',
         };
+      case _TrialRequestSection.institutionnels:
+        return const {};
       case _TrialRequestSection.territoire:
         return const {
           'pays',
@@ -1006,7 +1045,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       setState(() {
         _trialRequestMessage = _isCorrectionMode
             ? 'Corrigez d’abord la rubrique refusée avant de pouvoir renvoyer votre demande d’accès.'
-            : 'Complétez Structure, Responsable, Territoire et Lieu avant la demande d’accès.';
+            : 'Complétez Structure, Responsable, Contacts institutionnels, Territoire et Lieu avant la demande d’accès.';
       });
       return;
     }
@@ -1204,6 +1243,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             .toString();
 
         await requestReference.set({
+          'institutionnels': _institutionalContacts,
+
           'profile': {
             'civilite': _value('civiliteResponsable'),
             'nomAffiche': _value('nomResponsable'),
@@ -1223,6 +1264,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
           'territoire': {
             'territoireId': territoryId,
+            'institutionnels': _institutionalContacts,
             'pays': _value('pays'),
             'region': _value('region'),
             'departement': _value('departement'),
@@ -1307,6 +1349,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             'siren': widget.proConnectSiren,
           },
 
+          'institutionnels': _institutionalContacts,
+
           'profile': {
             'civilite': _value('civiliteResponsable'),
             'nomAffiche': _value('nomResponsable'),
@@ -1326,6 +1370,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
           'territoire': {
             'territoireId': territoryId,
+            'institutionnels': _institutionalContacts,
             'pays': _value('pays'),
             'region': _value('region'),
             'departement': _value('departement'),
@@ -1886,6 +1931,17 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                 ),
               ),
               _menuButton(
+                section: _TrialRequestSection.institutionnels,
+                icon: Icons.groups_2_outlined,
+                label: 'CONTACTS INSTITUTIONNELS',
+                completed: _isCorrectionMode
+                    ? false
+                    : _institutionnelsComplete,
+                enabled: _correctionSectionEnabled(
+                  _TrialRequestSection.institutionnels,
+                ),
+              ),
+              _menuButton(
                 section: _TrialRequestSection.territoire,
                 icon: Icons.public_rounded,
                 label: 'TERRITOIRE',
@@ -2403,6 +2459,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         return _structurePanel();
       case _TrialRequestSection.responsable:
         return _responsablePanel();
+      case _TrialRequestSection.institutionnels:
+        return _institutionnelsPanel();
       case _TrialRequestSection.territoire:
         return _territoirePanel();
       case _TrialRequestSection.ville:
@@ -2533,8 +2591,1219 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             const SizedBox(width: 20),
 
             _nextButton(
+              _TrialRequestSection.institutionnels,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  bool get _institutionalEditorComplete {
+    return _value('institutionCivilite').isNotEmpty &&
+        _value('institutionNom').isNotEmpty &&
+        _value('institutionPrenom').isNotEmpty &&
+        _value('institutionFonction').isNotEmpty &&
+        _value('institutionTelephone').replaceAll(RegExp(r'\D'), '').length >=
+            10 &&
+        RegExp(
+          r'^[^@\s]+@[^@\s]+\.[^@\s]+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _pageHeader(
+          'TERRITOIRE',
+          'Un accès SPHOT ADMIN est rattaché à une ville.',
+        ),
+        _textField(
+          'pays',
+          'Pays',
+          uppercase: true,
+          readOnly: !_isFieldEditable('pays'),
+        ),
+        const SizedBox(height: 11),
+        _textField(
+          'region',
+          'Région',
+          uppercase: true,
+          readOnly: !_isFieldEditable('region'),
+        ),
+        const SizedBox(height: 11),
+        _textField(
+          'departement',
+          'Département',
+          uppercase: true,
+          readOnly: !_isFieldEditable('departement'),
+        ),
+        const SizedBox(height: 11),
+        _textField(
+          'adresse',
+          'Adresse',
+          readOnly: !_isFieldEditable('adresse'),
+        ),
+        const SizedBox(height: 11),
+        _textField(
+          'codePostal',
+          'Code postal',
+          keyboardType: TextInputType.text,
+          readOnly: !_isFieldEditable('codePostal'),
+        ),
+        const SizedBox(height: 11),
+        _textField(
+          'ville',
+          'Ville',
+          uppercase: true,
+          readOnly: !_isFieldEditable('ville'),
+        ),
+        const SizedBox(height: 22),
+        const SizedBox(height: 22),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _previousButton(
+              _TrialRequestSection.institutionnels,
+            ),
+
+            const SizedBox(width: 20),
+
+            _nextButton(_TrialRequestSection.ville), // adapter selon la page
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickAdminLogo() async {
+    if (!_isFieldEditable('logoVille')) {
+      return;
+    }
+
+    try {
+      final selection = await AdminLogoStorageService.pickLogo();
+
+      if (selection == null || !mounted) {
+        return;
+      }
+
+      setState(() {
+        _selectedLogo = selection;
+        _logoFileName = selection.fileName;
+        _logoMimeType = selection.mimeType;
+        _logoFileSizeBytes = selection.sizeBytes;
+        _logoErrorMessage = null;
+        _saved = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _logoErrorMessage = error.toString().replaceFirst('Bad state: ', '');
+      });
+    }
+  }
+
+  String _formatLogoFileSize(int? bytes) {
+    if (bytes == null || bytes <= 0) return '';
+
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} Mo';
+    }
+
+    return '${(bytes / 1024).toStringAsFixed(1)} Ko';
+  }
+
+  Widget _buildAdminLogoPreview() {
+    final selectedLogo = _selectedLogo;
+    final logoUrl = _value('logoVille');
+    final currentMimeType = _logoMimeType.toLowerCase();
+
+    Widget image;
+
+    if (selectedLogo != null) {
+      image = selectedLogo.isSvg
+          ? SvgPicture.memory(
+              selectedLogo.bytes,
+              fit: BoxFit.contain,
+            )
+          : Image.memory(
+              selectedLogo.bytes,
+              fit: BoxFit.contain,
+            );
+    } else if (logoUrl.isNotEmpty) {
+      final isSvg =
+          currentMimeType == 'image/svg+xml' ||
+          AdminLogoStorageService.isSvgUrl(logoUrl);
+
+      image = isSvg
+          ? SvgPicture.network(
+              logoUrl,
+              fit: BoxFit.contain,
+              placeholderBuilder: (_) => const Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          : Image.network(
+              logoUrl,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.broken_image_outlined,
+                color: Colors.grey,
+                size: 34,
+              ),
+            );
+    } else {
+      image = const Icon(
+        Icons.image_outlined,
+        color: adminColor,
+        size: 38,
+      );
+    }
+
+    return SizedBox(
+      width: 92,
+      height: 72,
+      child: Center(child: image),
+    );
+  }
+
+  Widget _buildAdminLogoPicker() {
+    final editable = _isFieldEditable('logoVille');
+    final hasLogo = _hasLogo;
+    final displayedFileName = _selectedLogo?.fileName ?? _logoFileName;
+    final displayedSize =
+        _selectedLogo?.sizeBytes ?? _logoFileSizeBytes;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: _logoErrorMessage == null ? adminColor : redColor,
+          width: 1.4,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 104,
+                height: 84,
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: adminColor.withOpacity(0.20),
+                  ),
+                ),
+                child: _buildAdminLogoPreview(),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'LOGO OFFICIEL DE LA STRUCTURE',
+                      style: TextStyle(
+                        color: adminColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      displayedFileName.isNotEmpty
+                          ? displayedFileName
+                          : (hasLogo
+                              ? 'Logo déjà enregistré'
+                              : 'Aucun logo sélectionné'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: adminColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (displayedSize != null && displayedSize > 0) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        _formatLogoFileSize(displayedSize),
+                        style: TextStyle(
+                          color: adminColor.withOpacity(0.70),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: editable ? _pickAdminLogo : null,
+            icon: const Icon(Icons.upload_file_rounded),
+            label: Text(
+              hasLogo ? 'REMPLACER LE LOGO' : 'CHOISIR LE LOGO',
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: adminColor,
+              side: const BorderSide(color: adminColor, width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 13),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Formats acceptés : PNG, JPG, JPEG, WebP et SVG · 5 Mo maximum.',
+            style: TextStyle(
+              color: Colors.black54,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (_logoErrorMessage != null) ...[
+            const SizedBox(height: 7),
+            Text(
+              _logoErrorMessage!,
+              style: const TextStyle(
+                color: redColor,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _villePanel() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _pageHeader(
+          'LIEU',
+          'Positionnez le lieu du SPHOT ADMIN sur la carte centrale.',
+        ),
+        _textField(
+          'siteInternetVille',
+          'https://www.votre-site.fr',
+          readOnly: !_isFieldEditable('siteInternetVille'),
+        ),
+
+        const SizedBox(height: 11),
+
+        _buildAdminLogoPicker(),
+        const SizedBox(height: 11),
+        _textField(
+          'arretesMunicipaux',
+          'https://réglements-de-baignade',
+          readOnly: !_isFieldEditable('arretesMunicipaux'),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: adminColor, width: 1.4),
+          ),
+          child: const Text(
+            'Cliquez sur la carte pour positionner le lieu du SPHOT ADMIN.\n\nAstuce : les coordonnées GPS seront enregistrées automatiquement.',
+            style: TextStyle(
+              color: adminColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 48,
+          child: OutlinedButton.icon(
+            onPressed: _hasCityPosition ? _centerOnCity : null,
+            icon: const Icon(Icons.center_focus_strong_rounded),
+            label: const Text(
+              'CENTRER SUR LE LIEU',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: adminColor,
+              disabledForegroundColor: Colors.grey,
+              side: BorderSide(
+                color: _hasCityPosition ? adminColor : Colors.grey,
+                width: 1.6,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: _textField(
+                'villeLat',
+                'Latitude',
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
+                ),
+                readOnly: !_isFieldEditable('villeLat'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _textField(
+                'villeLng',
+                'Longitude',
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
+                ),
+                readOnly: !_isFieldEditable('villeLng'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 22),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _previousButton(_TrialRequestSection.territoire),
+
+            const SizedBox(width: 20),
+
+            _nextButton(_TrialRequestSection.essai, enabled: _villeComplete),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _legalDropdown({
+    required String title,
+    required Map<String, dynamic>? document,
+    required bool checked,
+    required String checkText,
+    required ValueChanged<bool?> onChanged,
+    required ExpansionTileController controller,
+  }) {
+    final chapters = List<Map<String, dynamic>>.from(
+      document?['chapters'] ?? [],
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: adminColor, width: 1.4),
+      ),
+      child: ExpansionTile(
+        controller: controller,
+        shape: const Border(),
+        collapsedShape: const Border(),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: adminColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        iconColor: redColor,
+        collapsedIconColor: redColor,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: chapters.isEmpty
+                  ? const [
+                      Text(
+                        'Aucun chapitre renseigné.',
+                        style: TextStyle(
+                          color: adminColor,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ]
+                  : chapters.map((chapter) {
+                      final chapterTitle =
+                          (chapter['title'] ?? chapter['titre'] ?? '')
+                              .toString();
+                      final content =
+                          (chapter['content'] ?? chapter['texte'] ?? '')
+                              .toString();
+
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (chapterTitle.isNotEmpty)
+                              Text(
+                                chapterTitle,
+                                style: const TextStyle(
+                                  color: redColor,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            Text(
+                              content,
+                              style: const TextStyle(
+                                color: adminColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+            child: SizedBox(
+              width: double.infinity,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Version SPHOT',
+                    style: TextStyle(
+                      color: redColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _sphotVersion,
+                    style: const TextStyle(
+                      color: adminColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          _checkLine(value: checked, text: checkText, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+
+  Widget _trialRequestPanel() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _pageHeader('DEMANDE D’ACCÈS', 'Demandez l’accès à votre SPHOT ADMIN.'),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: adminColor.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: adminColor.withOpacity(0.35), width: 1.3),
+          ),
+          child: const Text(
+            'Votre demande sera transmise à l’équipe SPHOT pour vérification '
+            'et validation.\n\n'
+            'Cette démarche ne déclenche ni période d’essai ni facturation.\n\n'
+            'Après validation, vous pourrez accéder à votre SPHOT ADMIN, '
+            'finaliser sa configuration puis demander votre période d’essai '
+            'gratuite de 8 jours.',
+            style: TextStyle(
+              color: adminColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              height: 1.4,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _trialFeature(
+          'Centralisez la gestion de vos SPHOTS et de vos sauveteurs',
+        ),
+
+        _trialFeature('Valorisez vos SPHOTS auprès du public'),
+
+        _trialFeature('Analysez la fréquentation de vos SPHOTS'),
+
+        _trialFeature('Informez en temps réel sur les conditions de baignade'),
+
+        _trialFeature('Partagez les conditions météo et maritimes'),
+
+        _trialFeature('Diffusez la couleur du drapeau et les dangers du jour'),
+
+        _checkLine(
+          value: _certifyRepresentative,
+          text: 'Je certifie être habilité à représenter cette structure.',
+          onChanged: (value) {
+            setState(() {
+              _certifyRepresentative = value ?? false;
+              _saved = false;
+            });
+          },
+        ),
+
+        if (_legalLoading)
+          const Center(child: CircularProgressIndicator())
+        else ...[
+          _legalDropdown(
+            title: 'Conditions Générales d’Utilisation',
+            document: _cguDoc,
+            checked: _legalReadConfirmed,
+            checkText: 'J’ai lu et j’accepte les CGU de SPHOT.',
+            controller: _cguExpansionController,
+            onChanged: (value) {
+              setState(() {
+                _legalReadConfirmed = value ?? false;
+                _saved = false;
+              });
+            },
+          ),
+
+          _legalDropdown(
+            title: 'Politique de confidentialité',
+            document: _privacyDoc,
+            checked: _privacyReadConfirmed,
+            checkText:
+                'J’ai lu et j’accepte la Politique de confidentialité de SPHOT.',
+            controller: _privacyExpansionController,
+            onChanged: (value) {
+              setState(() {
+                _privacyReadConfirmed = value ?? false;
+                _saved = false;
+              });
+            },
+          ),
+
+          _legalDropdown(
+            title: 'RGPD',
+            document: _rgpdDoc,
+            checked: _rgpdAccepted,
+            checkText:
+                'J’accepte le traitement des données conformément au RGPD.',
+            controller: _rgpdExpansionController,
+            onChanged: (value) {
+              setState(() {
+                _rgpdAccepted = value ?? false;
+                _saved = false;
+              });
+            },
+          ),
+        ],
+        const SizedBox(height: 18),
+
+        SizedBox(
+          height: 56,
+          child: ElevatedButton.icon(
+            onPressed: _canSubmitTrialRequest && !_isSaving && !_saved
+                ? _saveRegistration
+                : null,
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.rocket_launch_rounded),
+            label: Text(
+              _isSaving
+                  ? 'ENVOI EN COURS'
+                  : (_saved
+                        ? (_isCorrectionMode
+                              ? 'DEMANDE D’ACCÈS RENVOYÉE'
+                              : 'DEMANDE D’ACCÈS ENVOYÉE')
+                        : (_isCorrectionMode
+                              ? 'RENVOYER MA DEMANDE D’ACCÈS'
+                              : 'ENVOYER MA DEMANDE D’ACCÈS')),
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.2,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: adminColor,
+              disabledBackgroundColor: Colors.grey.shade400,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+          ),
+        ),
+        if (_trialRequestMessage != null) ...[
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: adminColor.withOpacity(0.07),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: adminColor, width: 1.4),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle_rounded, color: redColor, size: 24),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Votre demande a bien été enregistrée.',
+                        style: TextStyle(
+                          color: adminColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.mark_email_read_rounded,
+                      color: redColor,
+                      size: 24,
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Un email de confirmation vous a été envoyé.',
+                        style: TextStyle(
+                          color: adminColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _trialFeature(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.check_circle_rounded, color: adminColor, size: 20),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: adminColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                height: 1.25,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _checkLine({
+    required bool value,
+    required String text,
+    required ValueChanged<bool?> onChanged,
+  }) {
+    return CheckboxListTile(
+      value: value,
+      onChanged: onChanged,
+      activeColor: adminColor,
+      checkColor: Colors.white,
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: EdgeInsets.zero,
+      horizontalTitleGap: 0,
+      minLeadingWidth: 32,
+      visualDensity: const VisualDensity(horizontal: -4, vertical: -2),
+      title: Text(
+        text,
+        style: const TextStyle(
+          color: adminColor,
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+          height: 1.25,
+        ),
+      ),
+    );
+  }
+
+  Widget _nextButton(_TrialRequestSection nextSection, {bool enabled = true}) {
+    return SizedBox(
+      width: 180,
+      height: 48,
+      child: OutlinedButton(
+        onPressed: enabled ? () => _selectSection(nextSection) : null,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: adminColor,
+          disabledForegroundColor: Colors.grey,
+          side: BorderSide(
+            color: enabled ? adminColor : Colors.grey,
+            width: 1.6,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('SUIVANT', style: TextStyle(fontWeight: FontWeight.w900)),
+            SizedBox(width: 8),
+            Icon(Icons.arrow_forward_rounded),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _desktopLayout() {
+    return Row(children: [_leftMenu(), _mapCenter(), _rightPanel()]);
+  }
+
+  Widget _mobileLayout() {
+    return Column(
+      children: [
+        SizedBox(height: 360, child: _mapCenter()),
+        Expanded(child: Row(children: [_leftMenu(), _rightPanel()])),
+      ],
+    );
+  }
+
+  Widget _previousButton(_TrialRequestSection previousSection) {
+    return SizedBox(
+      width: 180,
+      height: 48,
+      child: OutlinedButton(
+        onPressed: () => _selectSection(previousSection),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: adminColor,
+          side: const BorderSide(color: adminColor, width: 1.6),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.arrow_back_rounded),
+            SizedBox(width: 8),
+            Text('PRÉCÉDENT', style: TextStyle(fontWeight: FontWeight.w900)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+
+    if (_isLoadingCorrection) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: CircularProgressIndicator(color: adminColor)),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          width < 1000 ? _mobileLayout() : _desktopLayout(),
+
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 22,
+            child: Center(
+              child: Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.transparent,
+                  border: Border.all(color: adminColor, width: 2),
+                ),
+                child: IconButton(
+                  onPressed: () {
+                    FocusScope.of(context).unfocus();
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute<void>(
+                        settings: const RouteSettings(name: '/'),
+                        builder: (_) => const MapPage(),
+                      ),
+                      (route) => false,
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: adminColor,
+                    size: 28,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PhoneNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    String digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+
+    if (digits.length > 10) {
+      digits = digits.substring(0, 10);
+    }
+
+    final buffer = StringBuffer();
+
+    for (int i = 0; i < digits.length; i++) {
+      if (i > 0 && i % 2 == 0) {
+        buffer.write(' ');
+      }
+      buffer.write(digits[i]);
+    }
+
+    final formatted = buffer.toString();
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+,
+        ).hasMatch(_value('institutionEmail'));
+  }
+
+  void _clearInstitutionalEditor() {
+    for (final key in const [
+      'institutionCivilite',
+      'institutionNom',
+      'institutionPrenom',
+      'institutionFonction',
+      'institutionTelephone',
+      'institutionEmail',
+    ]) {
+      _controller(key).clear();
+    }
+    _editingInstitutionalIndex = null;
+  }
+
+  void _editInstitutionalContact(int index) {
+    if (_isCorrectionMode ||
+        index < 0 ||
+        index >= _institutionalContacts.length) {
+      return;
+    }
+
+    final contact = _institutionalContacts[index];
+
+    setState(() {
+      _editingInstitutionalIndex = index;
+      _controller('institutionCivilite').text = contact['civilite'] ?? '';
+      _controller('institutionNom').text = contact['nom'] ?? '';
+      _controller('institutionPrenom').text = contact['prenom'] ?? '';
+      _controller('institutionFonction').text = contact['fonction'] ?? '';
+      _controller('institutionTelephone').text = contact['telephone'] ?? '';
+      _controller('institutionEmail').text = contact['email'] ?? '';
+    });
+  }
+
+  void _saveInstitutionalContact() {
+    if (_isCorrectionMode || !_institutionalEditorComplete) {
+      return;
+    }
+
+    final index = _editingInstitutionalIndex;
+    final existingId = index != null &&
+            index >= 0 &&
+            index < _institutionalContacts.length
+        ? (_institutionalContacts[index]['id'] ?? '')
+        : '';
+
+    final contact = <String, String>{
+      'id': existingId.isNotEmpty
+          ? existingId
+          : DateTime.now().microsecondsSinceEpoch.toString(),
+      'civilite': _value('institutionCivilite'),
+      'nom': _value('institutionNom').toUpperCase(),
+      'prenom': _capitalizeWords(_value('institutionPrenom')),
+      'fonction': _capitalizeWords(_value('institutionFonction')),
+      'telephone': _value('institutionTelephone'),
+      'email': _value('institutionEmail').toLowerCase(),
+    };
+
+    setState(() {
+      if (index != null &&
+          index >= 0 &&
+          index < _institutionalContacts.length) {
+        _institutionalContacts[index] = contact;
+      } else {
+        _institutionalContacts.add(contact);
+      }
+
+      _saved = false;
+      _clearInstitutionalEditor();
+    });
+  }
+
+  void _removeInstitutionalContact(int index) {
+    if (_isCorrectionMode ||
+        index < 0 ||
+        index >= _institutionalContacts.length) {
+      return;
+    }
+
+    setState(() {
+      _institutionalContacts.removeAt(index);
+      _saved = false;
+
+      if (_editingInstitutionalIndex == index) {
+        _clearInstitutionalEditor();
+      } else if (_editingInstitutionalIndex != null &&
+          _editingInstitutionalIndex! > index) {
+        _editingInstitutionalIndex = _editingInstitutionalIndex! - 1;
+      }
+    });
+  }
+
+  Widget _institutionalContactCard(
+    Map<String, String> contact,
+    int index,
+  ) {
+    final identity = [
+      contact['civilite'] ?? '',
+      contact['prenom'] ?? '',
+      contact['nom'] ?? '',
+    ].where((value) => value.trim().isNotEmpty).join(' ');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: adminColor.withOpacity(0.045),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: adminColor.withOpacity(0.22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.account_balance_outlined,
+            color: adminColor,
+            size: 22,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  identity,
+                  style: const TextStyle(
+                    color: adminColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                if ((contact['fonction'] ?? '').trim().isNotEmpty)
+                  Text(
+                    contact['fonction']!,
+                    style: const TextStyle(
+                      color: Colors.black87,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                if ((contact['telephone'] ?? '').trim().isNotEmpty)
+                  Text(
+                    contact['telephone']!,
+                    style: const TextStyle(fontSize: 11.5),
+                  ),
+                if ((contact['email'] ?? '').trim().isNotEmpty)
+                  Text(
+                    contact['email']!,
+                    style: const TextStyle(fontSize: 11.5),
+                  ),
+              ],
+            ),
+          ),
+          if (!_isCorrectionMode) ...[
+            IconButton(
+              tooltip: 'Modifier',
+              onPressed: () => _editInstitutionalContact(index),
+              icon: const Icon(Icons.edit_outlined, color: adminColor),
+            ),
+            IconButton(
+              tooltip: 'Supprimer',
+              onPressed: () => _removeInstitutionalContact(index),
+              icon: const Icon(Icons.delete_outline_rounded, color: redColor),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _institutionnelsPanel() {
+    final editing = _editingInstitutionalIndex != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _pageHeader(
+          'CONTACTS INSTITUTIONNELS',
+          'Renseignez les personnes institutionnelles de référence liées à la gestion du SPHOT.',
+        ),
+        if (_institutionalContacts.isNotEmpty) ...[
+          ..._institutionalContacts.asMap().entries.map(
+                (entry) => _institutionalContactCard(
+                  entry.value,
+                  entry.key,
+                ),
+              ),
+          const SizedBox(height: 8),
+        ],
+        if (!_isCorrectionMode) ...[
+          _dropdownField(
+            'institutionCivilite',
+            'Civilité',
+            civiliteChoices,
+          ),
+          const SizedBox(height: 11),
+          _textField(
+            'institutionNom',
+            'Nom',
+            uppercase: true,
+          ),
+          const SizedBox(height: 11),
+          _textField(
+            'institutionPrenom',
+            'Prénom',
+            capitalizeWords: true,
+          ),
+          const SizedBox(height: 11),
+          _textField(
+            'institutionFonction',
+            'Fonction',
+            capitalizeWords: true,
+          ),
+          const SizedBox(height: 11),
+          _textField(
+            'institutionTelephone',
+            'Téléphone',
+            keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              PhoneNumberFormatter(),
+            ],
+          ),
+          const SizedBox(height: 11),
+          _textField(
+            'institutionEmail',
+            'Email de contact',
+            keyboardType: TextInputType.emailAddress,
+          ),
+          const SizedBox(height: 13),
+          OutlinedButton.icon(
+            onPressed:
+                _institutionalEditorComplete ? _saveInstitutionalContact : null,
+            icon: Icon(
+              editing ? Icons.save_outlined : Icons.person_add_alt_1_outlined,
+            ),
+            label: Text(
+              editing
+                  ? 'ENREGISTRER LA MODIFICATION'
+                  : 'AJOUTER CE CONTACT',
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: adminColor,
+              side: const BorderSide(color: adminColor, width: 1.5),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+          if (editing) ...[
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: () => setState(_clearInstitutionalEditor),
+              child: const Text('ANNULER LA MODIFICATION'),
+            ),
+          ],
+          const SizedBox(height: 8),
+          const Text(
+            'Ajoutez au moins un contact institutionnel pour poursuivre.',
+            style: TextStyle(
+              color: Colors.black54,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+        const SizedBox(height: 22),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _previousButton(_TrialRequestSection.responsable),
+            const SizedBox(width: 20),
+            _nextButton(
               _TrialRequestSection.territoire,
-            ), // adapter selon la page
+              enabled: _institutionnelsComplete,
+            ),
           ],
         ),
       ],
@@ -2596,8 +3865,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             _previousButton(
-              _TrialRequestSection.responsable,
-            ), // adapter selon la page
+              _TrialRequestSection.institutionnels,
+            ),
 
             const SizedBox(width: 20),
 
