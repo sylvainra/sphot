@@ -766,6 +766,10 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   }
 
   bool _correctedFieldIsValid(String key) {
+    if (key == 'logoVille') {
+      return _hasLogo;
+    }
+
     final value = _value(key);
     if (value.isEmpty) return false;
 
@@ -780,8 +784,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value);
       case 'telephoneResponsable':
         return value.replaceAll(RegExp(r'\D'), '').length >= 10;
-      case 'logoVille':
-        return _hasLogo;
       case 'villeLat':
         final latitude = double.tryParse(value.replaceAll(',', '.'));
         return latitude != null && latitude >= -90 && latitude <= 90;
@@ -1389,8 +1391,18 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
       setState(() {
         _isSaving = false;
+
+        if (_selectedLogo != null) {
+          _logoErrorMessage =
+              'Envoi du logo impossible : ${error.toString()}';
+        }
       });
 
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Enregistrement impossible : $error'),
+        ),
+      );
     }
   }
 
