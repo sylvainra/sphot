@@ -14,6 +14,7 @@ import 'web/admin/pages/admin_proconnect_access_page.dart';
 import 'web/admin/pages/admin_trial_request_page.dart';
 import 'pages/professional/professional_login_page.dart';
 import 'web/admin/pages/admin_dashboard_page.dart';
+import 'web/institutional/pages/institutional_main_courante_page.dart';
 import 'web/super_admin/web_super_admin_app.dart';
 import 'services/web_pending_auth_storage.dart';
 
@@ -113,6 +114,15 @@ class SphotApp extends StatelessWidget {
       return MaterialPageRoute(
         settings: settings,
         builder: (_) => const ProfilLoginPage(),
+      );
+    }
+
+    if (uri.path == '/institutionnel-main-courante') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => InstitutionalMainCourantePage(
+          token: uri.queryParameters['token'] ?? '',
+        ),
       );
     }
 
