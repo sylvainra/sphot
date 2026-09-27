@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../models/advertising_pricing_config.dart';
 import '../../../services/admin_logo_storage_service.dart';
+import '../../../services/sphot_media_storage_service.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
@@ -86,6 +87,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   static const String _rescueStationFlagAsset =
       'data/icons/flag_red_yellow_5x3.svg';
 
+  static const String _sphotMediaWebcam = 'webcam';
+  static const String _sphotMediaPhoto = 'photo';
+
   final MapController _mapController = MapController();
   Timer? _mapMovementTimer;
   Timer? _trialEndRefreshTimer;
@@ -137,6 +141,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   final TextEditingController _sphotWebcamUrlController =
       TextEditingController();
+
+  String _sphotMediaMode = _sphotMediaPhoto;
+  SphotPhotoSelection? _selectedSphotPhoto;
+  String _sphotPhotoUrl = '';
+  String _sphotPhotoStoragePath = '';
+  String _sphotPhotoFileName = '';
+  String _sphotPhotoMimeType = '';
+  int? _sphotPhotoFileSizeBytes;
+  String? _sphotPhotoErrorMessage;
 
   final TextEditingController _sauveteurNomController = TextEditingController();
   final TextEditingController _sauveteurPrenomController =
@@ -6868,6 +6881,235 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  bool _looksLikeDirectPhotoUrl(String rawUrl) {
+    final normalized = Uri.decodeFull(rawUrl.trim()).toLowerCase();
+
+    return RegExp(
+      r'\.(jpg|jpeg|png|webp)(?:$|[?&#])',
+    ).hasMatch(normalized);
+  }
+
+  Future<void> _pickSphotPhoto() async {
+    try {
+      final selection = await SphotMediaStorageService.pickPhoto();
+
+      if (selection == null || !mounted) {
+        return;
+      }
+
+      setState(() {
+        _selectedSphotPhoto = selection;
+        _sphotMediaMode = _sphotMediaPhoto;
+        _sphotPhotoFileName = selection.fileName;
+        _sphotPhotoMimeType = selection.mimeType;
+        _sphotPhotoFileSizeBytes = selection.sizeBytes;
+        _sphotPhotoErrorMessage = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _sphotPhotoErrorMessage =
+            error.toString().replaceFirst('Bad state: ', '');
+      });
+    }
+  }
+
+  String _formatSphotPhotoSize(int? bytes) {
+    if (bytes == null || bytes <= 0) return '';
+
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} Mo';
+    }
+
+    return '${(bytes / 1024).toStringAsFixed(1)} Ko';
+  }
+
+  Widget _buildSphotMediaEditor() {
+    final isWebcam = _sphotMediaMode == _sphotMediaWebcam;
+    final selectedPhoto = _selectedSphotPhoto;
+    final hasPhoto =
+        selectedPhoto != null || _sphotPhotoUrl.trim().isNotEmpty;
+
+    Widget photoPreview;
+
+    if (selectedPhoto != null) {
+      photoPreview = Image.memory(
+        selectedPhoto.bytes,
+        fit: BoxFit.cover,
+      );
+    } else if (_sphotPhotoUrl.trim().isNotEmpty) {
+      photoPreview = Image.network(
+        _sphotPhotoUrl,
+        fit: BoxFit.cover,
+        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+        errorBuilder: (_, __, ___) => const Center(
+          child: Icon(
+            Icons.broken_image_outlined,
+            color: Colors.grey,
+            size: 34,
+          ),
+        ),
+      );
+    } else {
+      photoPreview = const Center(
+        child: Icon(
+          Icons.add_photo_alternate_outlined,
+          color: adminColor,
+          size: 38,
+        ),
+      );
+    }
+
+    Widget modeButton({
+      required String mode,
+      required IconData icon,
+      required String label,
+    }) {
+      final selected = _sphotMediaMode == mode;
+
+      return Expanded(
+        child: OutlinedButton.icon(
+          onPressed: () {
+            setState(() {
+              _sphotMediaMode = mode;
+              _sphotPhotoErrorMessage = null;
+            });
+          },
+          icon: Icon(icon, size: 18),
+          label: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: selected ? Colors.white : adminColor,
+            backgroundColor: selected ? adminColor : Colors.white,
+            side: const BorderSide(color: adminColor, width: 1.4),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            modeButton(
+              mode: _sphotMediaWebcam,
+              icon: Icons.videocam_outlined,
+              label: 'WEBCAM',
+            ),
+            const SizedBox(width: 8),
+            modeButton(
+              mode: _sphotMediaPhoto,
+              icon: Icons.photo_outlined,
+              label: 'PHOTO',
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (isWebcam)
+          _sphotEditorField(
+            controller: _sphotWebcamUrlController,
+            label: 'URL de la webcam',
+            keyboardType: TextInputType.url,
+          )
+        else
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _sphotPhotoErrorMessage == null
+                    ? adminColor.withOpacity(0.55)
+                    : redColor,
+                width: 1.3,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  height: 126,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: photoPreview,
+                ),
+                const SizedBox(height: 10),
+                if (_sphotPhotoFileName.trim().isNotEmpty)
+                  Text(
+                    _sphotPhotoFileName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: adminColor,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                if (_formatSphotPhotoSize(_sphotPhotoFileSizeBytes).isNotEmpty)
+                  Text(
+                    _formatSphotPhotoSize(_sphotPhotoFileSizeBytes),
+                    style: TextStyle(
+                      color: adminColor.withOpacity(0.65),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                if (_sphotPhotoFileName.trim().isNotEmpty)
+                  const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _pickSphotPhoto,
+                  icon: const Icon(Icons.upload_file_rounded),
+                  label: Text(
+                    hasPhoto ? 'REMPLACER LA PHOTO' : 'CHOISIR UNE PHOTO',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: adminColor,
+                    side: const BorderSide(color: adminColor, width: 1.4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'PNG, JPG, JPEG ou WebP · 5 Mo maximum.',
+                  style: TextStyle(
+                    color: Colors.black54,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (_sphotPhotoErrorMessage != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _sphotPhotoErrorMessage!,
+                    style: const TextStyle(
+                      color: redColor,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   void _clearSphotEditor() {
     _editingSphotDocId = null;
     _expandedSphotDropdown = null;
@@ -6885,6 +7127,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _sphotOtherLabelController.clear();
     _sphotPhoneController.clear();
     _sphotWebcamUrlController.clear();
+    _sphotMediaMode = _sphotMediaPhoto;
+    _selectedSphotPhoto = null;
+    _sphotPhotoUrl = '';
+    _sphotPhotoStoragePath = '';
+    _sphotPhotoFileName = '';
+    _sphotPhotoMimeType = '';
+    _sphotPhotoFileSizeBytes = null;
+    _sphotPhotoErrorMessage = null;
   }
 
   void _openNewSphotEditor() {
@@ -7202,12 +7452,45 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           )
           .text;
 
-      _sphotWebcamUrlController.text = _cleanText(
+      final storedMediaType = _cleanText(data['mediaType']).toLowerCase();
+      final storedPhotoUrl = _cleanText(data['photoSphotUrl']);
+      final legacyMediaUrl = _cleanText(
         data['adresseWebcam'] ??
             data['webcamUrl'] ??
             data['urlWebcam'] ??
             data['webcam'],
       );
+
+      _selectedSphotPhoto = null;
+      _sphotPhotoUrl = storedPhotoUrl;
+      _sphotPhotoStoragePath = _cleanText(data['photoSphotStoragePath']);
+      _sphotPhotoFileName = _cleanText(data['photoSphotFileName']);
+      _sphotPhotoMimeType = _cleanText(data['photoSphotMimeType']);
+      final storedPhotoSize = data['photoSphotFileSizeBytes'];
+      _sphotPhotoFileSizeBytes =
+          storedPhotoSize is num ? storedPhotoSize.toInt() : null;
+      _sphotPhotoErrorMessage = null;
+
+      if (storedMediaType == _sphotMediaWebcam) {
+        _sphotMediaMode = _sphotMediaWebcam;
+        _sphotWebcamUrlController.text = legacyMediaUrl;
+      } else if (storedMediaType == _sphotMediaPhoto) {
+        _sphotMediaMode = _sphotMediaPhoto;
+        _sphotWebcamUrlController.clear();
+      } else if (storedPhotoUrl.isNotEmpty) {
+        _sphotMediaMode = _sphotMediaPhoto;
+        _sphotWebcamUrlController.clear();
+      } else if (_looksLikeDirectPhotoUrl(legacyMediaUrl)) {
+        _sphotMediaMode = _sphotMediaPhoto;
+        _sphotPhotoUrl = legacyMediaUrl;
+        _sphotWebcamUrlController.clear();
+      } else if (legacyMediaUrl.isNotEmpty) {
+        _sphotMediaMode = _sphotMediaWebcam;
+        _sphotWebcamUrlController.text = legacyMediaUrl;
+      } else {
+        _sphotMediaMode = _sphotMediaPhoto;
+        _sphotWebcamUrlController.clear();
+      }
 
       _showSauveteurEditorPanel = false;
       _showSauveteursManagementPanel = false;
@@ -7323,6 +7606,31 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         );
       }
 
+      var savedPhotoUrl = _sphotPhotoUrl;
+      var savedPhotoStoragePath = _sphotPhotoStoragePath;
+      var savedPhotoFileName = _sphotPhotoFileName;
+      var savedPhotoMimeType = _sphotPhotoMimeType;
+      var savedPhotoFileSizeBytes = _sphotPhotoFileSizeBytes;
+
+      if (_sphotMediaMode == _sphotMediaPhoto &&
+          _selectedSphotPhoto != null) {
+        final uploadResult = await SphotMediaStorageService.uploadPhoto(
+          territoireId: territoireId,
+          spotId: documentId,
+          selection: _selectedSphotPhoto!,
+        );
+
+        savedPhotoUrl = uploadResult.url;
+        savedPhotoStoragePath = uploadResult.storagePath;
+        savedPhotoFileName = uploadResult.fileName;
+        savedPhotoMimeType = uploadResult.mimeType;
+        savedPhotoFileSizeBytes = uploadResult.sizeBytes;
+      }
+
+      final activeWebcamUrl = _sphotMediaMode == _sphotMediaWebcam
+          ? _sphotWebcamUrlController.text.trim()
+          : '';
+
       final territorySnapshot = await FirebaseFirestore.instance
           .collection('territoires')
           .doc(territoireId)
@@ -7359,8 +7667,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         'telephonePoste': _selectedSphotType == _rescueStationType
             ? _sphotPhoneController.text.trim()
             : '',
-        'webcamUrl': _sphotWebcamUrlController.text.trim(),
-        'adresseWebcam': _sphotWebcamUrlController.text.trim(),
+        'mediaType': _sphotMediaMode,
+        'webcamUrl': activeWebcamUrl,
+        'adresseWebcam': activeWebcamUrl,
+        'photoSphotUrl': savedPhotoUrl,
+        'photoSphotStoragePath': savedPhotoStoragePath,
+        'photoSphotFileName': savedPhotoFileName,
+        'photoSphotMimeType': savedPhotoMimeType,
+        'photoSphotFileSizeBytes': savedPhotoFileSizeBytes,
         'pays': territoryData['pays'] ?? '',
         'region': territoryData['region'] ?? '',
         'departement': territoryData['departement'] ?? '',
@@ -10303,16 +10617,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           _selectedSphotType == _rescueStationType)
                       ? 7
                       : 6,
-                  'WEBCAM OU CLICHÉ',
+                  'WEBCAM OU PHOTO',
                 ),
 
                 const SizedBox(height: 5),
 
-                _sphotEditorField(
-                  controller: _sphotWebcamUrlController,
-                  label: 'https://webcam ou URL du cliché',
-                  keyboardType: TextInputType.url,
-                ),
+                _buildSphotMediaEditor(),
 
                 const SizedBox(height: 26),
 
