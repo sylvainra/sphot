@@ -5176,7 +5176,7 @@ async function sendInstitutionalOperationalNotification(options) {
   }
 }
 
-exports.provisionInstitutionalMainCouranteAccess = onDocumentUpdated(
+exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
     {
       document: "territoires/{territoireId}",
       region: "europe-west1",
