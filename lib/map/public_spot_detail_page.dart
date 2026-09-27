@@ -2399,37 +2399,46 @@ class _UnsupervisedWarning extends StatelessWidget {
     this.title = 'BAIGNADE NON SURVEILLÉE',
   });
 
+  Widget _warningLine(String text) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(
+          Icons.warning_amber_rounded,
+          size: 18,
+          color: Color(0xFFFFC107),
+        ),
+        const SizedBox(width: 5),
+        Flexible(
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFFFF0000),
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7E6),
+        color: const Color(0xFFFFF1F1),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF59E0B)),
+        border: Border.all(color: const Color(0xFFFF0000)),
       ),
       child: Column(
         children: [
-          Text(
-            '⚠️ $title',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFFF59E0B),
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          _warningLine(title),
           const SizedBox(height: 3),
-          const Text(
-            '⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFFF59E0B),
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          _warningLine('BAIGNADE À VOS RISQUES ET PÉRILS'),
         ],
       ),
     );
