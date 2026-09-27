@@ -37,6 +37,7 @@ class _SauveteurMainCourantePageState
     extends State<SauveteurMainCourantePage> {
   final _descriptionController = TextEditingController();
   final _actionController = TextEditingController();
+  final _dayScrollController = ScrollController();
 
   final List<Map<String, String>> _spots = [];
   List<Map<String, dynamic>> _entries = [];
@@ -44,9 +45,11 @@ class _SauveteurMainCourantePageState
 
   String? _selectedSpotId;
   String _selectedType = 'Observation';
+  late DateTime _selectedDay;
   bool _restricted = false;
   bool _loading = true;
   bool _saving = false;
+  bool _entryMutationInProgress = false;
   String? _statusMessage;
 
   static const _types = <String>[
@@ -62,15 +65,80 @@ class _SauveteurMainCourantePageState
     'Autre',
   ];
 
+  static const _months = <String>[
+    'JANVIER',
+    'FÉVRIER',
+    'MARS',
+    'AVRIL',
+    'MAI',
+    'JUIN',
+    'JUILLET',
+    'AOÛT',
+    'SEPTEMBRE',
+    'OCTOBRE',
+    'NOVEMBRE',
+    'DÉCEMBRE',
+  ];
+
   bool get _isSphotOn => widget.sphotMode.toUpperCase() == 'ON';
 
   bool get _isSupervisor => widget.canManageRestrictedOperationalData;
 
   bool get _canWrite => _isSphotOn && _isSupervisor;
 
+  DateTime get _today {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  bool get _selectedDayIsToday {
+    final today = _today;
+    return _selectedDay.year == today.year &&
+        _selectedDay.month == today.month &&
+        _selectedDay.day == today.day;
+  }
+
+  String _formatSelectedDay(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$day/$month/${date.year}';
+  }
+
+  void _scrollSelectedDayIntoView() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_dayScrollController.hasClients) return;
+
+      final desiredOffset = ((_selectedDay.day - 3) * 48.0)
+          .clamp(
+            0.0,
+            _dayScrollController.position.maxScrollExtent,
+          )
+          .toDouble();
+
+      _dayScrollController.animateTo(
+        desiredOffset,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  Future<void> _selectDay(DateTime day) async {
+    if (day.isAfter(_today)) return;
+
+    setState(() {
+      _selectedDay = DateTime(day.year, day.month, day.day);
+      _statusMessage = null;
+    });
+
+    _scrollSelectedDayIntoView();
+    await _loadEntries();
+  }
+
   @override
   void initState() {
     super.initState();
+    _selectedDay = _today;
     _loadSpots();
   }
 
@@ -78,6 +146,7 @@ class _SauveteurMainCourantePageState
   void dispose() {
     _descriptionController.dispose();
     _actionController.dispose();
+    _dayScrollController.dispose();
     super.dispose();
   }
 
@@ -162,6 +231,16 @@ class _SauveteurMainCourantePageState
         body: jsonEncode({
           'sauveteurSessionToken': widget.sauveteurSessionToken,
           'spotId': _selectedSpotId,
+          'dayStartMillis': DateTime(
+            _selectedDay.year,
+            _selectedDay.month,
+            _selectedDay.day,
+          ).millisecondsSinceEpoch,
+          'dayEndMillis': DateTime(
+            _selectedDay.year,
+            _selectedDay.month,
+            _selectedDay.day + 1,
+          ).millisecondsSinceEpoch,
         }),
       );
 
@@ -261,6 +340,301 @@ class _SauveteurMainCourantePageState
     }
   }
 
+  Future<void> _updateEntry(
+    Map<String, dynamic> entry, {
+    required String type,
+    required String description,
+    required String actionTaken,
+    required bool restricted,
+  }) async {
+    if (!_canWrite ||
+        _selectedSpotId == null ||
+        _entryMutationInProgress) {
+      return;
+    }
+
+    final entryId = (entry['id'] ?? '').toString().trim();
+    if (entryId.isEmpty) return;
+
+    setState(() {
+      _entryMutationInProgress = true;
+      _statusMessage = null;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+          'updateSauveteurMainCouranteEntry',
+        ),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'sauveteurSessionToken': widget.sauveteurSessionToken,
+          'spotId': _selectedSpotId,
+          'entryId': entryId,
+          'type': type,
+          'description': description,
+          'actionTaken': actionTaken,
+          'visibility': restricted ? 'restricted' : 'operational',
+        }),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        setState(() {
+          _statusMessage =
+              'La modification de cette saisie a été refusée.';
+        });
+        return;
+      }
+
+      setState(() {
+        _statusMessage = 'Saisie modifiée.';
+      });
+      await _loadEntries();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _statusMessage =
+            'Impossible de modifier cette saisie pour le moment.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _entryMutationInProgress = false);
+      }
+    }
+  }
+
+  Future<void> _editEntry(Map<String, dynamic> entry) async {
+    if (!_canWrite || _entryMutationInProgress) return;
+
+    final currentType =
+        (entry['type'] ?? 'Observation').toString().trim();
+    final dialogTypes = <String>{
+      ..._types,
+      if (currentType.isNotEmpty) currentType,
+    }.toList();
+
+    String selectedType =
+        currentType.isEmpty ? 'Observation' : currentType;
+    bool restricted =
+        (entry['visibility'] ?? 'operational').toString() == 'restricted';
+
+    final descriptionController = TextEditingController(
+      text: (entry['description'] ?? '').toString(),
+    );
+    final actionController = TextEditingController(
+      text: (entry['actionTaken'] ?? '').toString(),
+    );
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text(
+                'MODIFIER LA SAISIE',
+                style: TextStyle(
+                  color: Color(0xFF8E24AA),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              content: SizedBox(
+                width: 520,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SauveteurStyledDropdown(
+                        labelText: 'Type de fait',
+                        value: selectedType,
+                        options: dialogTypes
+                            .map(
+                              (type) => SauveteurDropdownOption(
+                                value: type,
+                                label: type,
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) {
+                          setDialogState(() => selectedType = value);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: descriptionController,
+                        minLines: 3,
+                        maxLines: 7,
+                        decoration: const InputDecoration(
+                          labelText: 'Fait du jour',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: actionController,
+                        minLines: 2,
+                        maxLines: 5,
+                        decoration: const InputDecoration(
+                          labelText: 'Action / suite donnée',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Information restreinte',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        value: restricted,
+                        onChanged: (value) {
+                          setDialogState(() => restricted = value);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('ANNULER'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    final description =
+                        descriptionController.text.trim();
+                    if (description.isEmpty) return;
+
+                    Navigator.of(dialogContext).pop({
+                      'type': selectedType,
+                      'description': description,
+                      'actionTaken': actionController.text.trim(),
+                      'restricted': restricted,
+                    });
+                  },
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text(
+                    'ENREGISTRER',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF8E24AA),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    descriptionController.dispose();
+    actionController.dispose();
+
+    if (result == null) return;
+
+    await _updateEntry(
+      entry,
+      type: (result['type'] ?? 'Observation').toString(),
+      description: (result['description'] ?? '').toString(),
+      actionTaken: (result['actionTaken'] ?? '').toString(),
+      restricted: result['restricted'] == true,
+    );
+  }
+
+  Future<void> _deleteEntry(Map<String, dynamic> entry) async {
+    if (!_canWrite || _entryMutationInProgress) return;
+
+    final entryId = (entry['id'] ?? '').toString().trim();
+    if (entryId.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text(
+          'SUPPRIMER LA SAISIE',
+          style: TextStyle(
+            color: Color(0xFFDC2626),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: const Text(
+          'Cette saisie sera retirée de la main courante. '
+          'L’opération sera conservée dans le journal technique d’audit.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('ANNULER'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            icon: const Icon(Icons.delete_outline_rounded),
+            label: const Text(
+              'SUPPRIMER',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _entryMutationInProgress = true;
+      _statusMessage = null;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+          'deleteSauveteurMainCouranteEntry',
+        ),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'sauveteurSessionToken': widget.sauveteurSessionToken,
+          'spotId': _selectedSpotId,
+          'entryId': entryId,
+        }),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        setState(() {
+          _statusMessage =
+              'La suppression de cette saisie a été refusée.';
+        });
+        return;
+      }
+
+      setState(() {
+        _statusMessage = 'Saisie supprimée.';
+      });
+      await _loadEntries();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _statusMessage =
+            'Impossible de supprimer cette saisie pour le moment.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _entryMutationInProgress = false);
+      }
+    }
+  }
+
   String _formatDate(dynamic rawMillis) {
     final millis = rawMillis is num ? rawMillis.toInt() : null;
     if (millis == null) return 'Date non renseignée';
@@ -338,6 +712,113 @@ class _SauveteurMainCourantePageState
         setState(() => _selectedSpotId = value);
         await _loadEntries();
       },
+    );
+  }
+
+  Widget _dayTabs() {
+    final today = _today;
+    final daysInMonth = DateTime(today.year, today.month + 1, 0).day;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF1E3A8A),
+          width: 1.3,
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            '${_months[today.month - 1]} ${today.year}',
+            style: const TextStyle(
+              color: Color(0xFF1E3A8A),
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 40,
+            child: ListView.builder(
+              controller: _dayScrollController,
+              scrollDirection: Axis.horizontal,
+              itemCount: daysInMonth,
+              itemBuilder: (context, index) {
+                final day = index + 1;
+                final date = DateTime(today.year, today.month, day);
+                final selected = _selectedDay.year == date.year &&
+                    _selectedDay.month == date.month &&
+                    _selectedDay.day == date.day;
+                final future = date.isAfter(today);
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 5),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: future ? null : () => _selectDay(date),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      width: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFF8E24AA)
+                            : future
+                                ? Colors.black.withOpacity(0.04)
+                                : Colors.white.withOpacity(0.82),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: selected
+                              ? const Color(0xFF8E24AA)
+                              : const Color(0xFF1E3A8A).withOpacity(0.35),
+                        ),
+                      ),
+                      child: Text(
+                        '$day',
+                        style: TextStyle(
+                          color: selected
+                              ? Colors.white
+                              : future
+                                  ? Colors.black26
+                                  : const Color(0xFF1E3A8A),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _selectedDayHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E3A8A).withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        'JOURNÉE DU ${_formatSelectedDay(_selectedDay)}',
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Color(0xFF1E3A8A),
+          fontSize: 11.5,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.4,
+        ),
+      ),
     );
   }
 
@@ -536,14 +1017,43 @@ class _SauveteurMainCourantePageState
                       ),
                     ),
                     if (visibility == 'restricted')
-                      const Text(
-                        'RESTREINT',
-                        style: TextStyle(
-                          color: Color(0xFF7E22CE),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
+                      const Padding(
+                        padding: EdgeInsets.only(right: 4),
+                        child: Text(
+                          'RESTREINT',
+                          style: TextStyle(
+                            color: Color(0xFF7E22CE),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
+                    if (_canWrite) ...[
+                      IconButton(
+                        tooltip: 'Modifier',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _entryMutationInProgress
+                            ? null
+                            : () => _editEntry(entry),
+                        icon: const Icon(
+                          Icons.edit_outlined,
+                          color: Color(0xFF1E3A8A),
+                          size: 19,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Supprimer',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _entryMutationInProgress
+                            ? null
+                            : () => _deleteEntry(entry),
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: Color(0xFFDC2626),
+                          size: 19,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 3),
@@ -740,11 +1250,37 @@ class _SauveteurMainCourantePageState
                                 )
                               : ListView(
                                   children: [
+                                    _selectedDayHeader(),
+                                    const SizedBox(height: 10),
                                     if (_institutionalContacts.isNotEmpty) ...[
                                       _institutionalContactsCard(),
                                       const SizedBox(height: 12),
                                     ],
-                                    _entryForm(),
+                                    if (_selectedDayIsToday)
+                                      _entryForm()
+                                    else if (_canWrite)
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.65),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: Colors.black12,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Consultation d’une journée passée. '
+                                          'Les saisies existantes restent '
+                                          'modifiables et supprimables.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
                                     if (_canWrite)
                                       const SizedBox(height: 12),
                                     if (_statusMessage != null)
@@ -763,7 +1299,7 @@ class _SauveteurMainCourantePageState
                                       const Padding(
                                         padding: EdgeInsets.all(18),
                                         child: Text(
-                                          'Aucun fait du jour enregistré.',
+                                          'Aucun fait enregistré pour cette journée.',
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                             fontWeight: FontWeight.w800,
@@ -776,6 +1312,8 @@ class _SauveteurMainCourantePageState
                                 ),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  _dayTabs(),
                   const SizedBox(height: 8),
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
