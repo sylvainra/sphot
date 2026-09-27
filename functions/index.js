@@ -5312,14 +5312,34 @@ exports.getSauveteurMainCourante = onRequest(
           return;
         }
 
-        const snapshot = await admin.firestore()
+        let entriesQuery = admin.firestore()
             .collection("territoires")
             .doc(context.territoireId)
             .collection("spots")
             .doc(spotId)
-            .collection("mainCourante")
+            .collection("mainCourante");
+
+        const dayStartMillis = Number(request.body.dayStartMillis);
+        const dayEndMillis = Number(request.body.dayEndMillis);
+        if (Number.isFinite(dayStartMillis) &&
+            Number.isFinite(dayEndMillis) &&
+            dayEndMillis > dayStartMillis) {
+          entriesQuery = entriesQuery
+              .where(
+                  "occurredAt",
+                  ">=",
+                  admin.firestore.Timestamp.fromMillis(dayStartMillis),
+              )
+              .where(
+                  "occurredAt",
+                  "<",
+                  admin.firestore.Timestamp.fromMillis(dayEndMillis),
+              );
+        }
+
+        const snapshot = await entriesQuery
             .orderBy("occurredAt", "desc")
-            .limit(100)
+            .limit(500)
             .get();
 
         const canSeeRestricted =
@@ -5471,6 +5491,262 @@ exports.addSauveteurMainCouranteEntry = onRequest(
         });
       } catch (error) {
         console.error("Erreur écriture main courante:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+
+exports.updateSauveteurMainCouranteEntry = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const session = await resolveSauveteurSession(
+            request.body.sauveteurSessionToken,
+        );
+
+        if (!session) {
+          response.status(401).json({
+            success: false,
+            error: "invalid_session",
+          });
+          return;
+        }
+
+        if (!session.legalAcceptanceCurrent) {
+          response.status(403).json({
+            success: false,
+            error: "legal_acceptance_required",
+          });
+          return;
+        }
+
+        const {context} = session;
+        const spotId = (request.body.spotId || "").toString().trim();
+        const entryId = (request.body.entryId || "").toString().trim();
+
+        if (context.sphotMode !== "ON" ||
+            !context.assignedSpotIds.includes(spotId)) {
+          response.status(403).json({
+            success: false,
+            error: "main_courante_not_available",
+          });
+          return;
+        }
+
+        if (!context.canManageRestrictedOperationalData) {
+          response.status(403).json({
+            success: false,
+            error: "insufficient_role",
+          });
+          return;
+        }
+
+        if (!entryId) {
+          response.status(400).json({
+            success: false,
+            error: "entry_id_required",
+          });
+          return;
+        }
+
+        const description = (request.body.description || "")
+            .toString()
+            .trim();
+
+        if (!description) {
+          response.status(400).json({
+            success: false,
+            error: "description_required",
+          });
+          return;
+        }
+
+        const entryReference = admin.firestore()
+            .collection("territoires")
+            .doc(context.territoireId)
+            .collection("spots")
+            .doc(spotId)
+            .collection("mainCourante")
+            .doc(entryId);
+
+        const entrySnapshot = await entryReference.get();
+        if (!entrySnapshot.exists) {
+          response.status(404).json({
+            success: false,
+            error: "entry_not_found",
+          });
+          return;
+        }
+
+        const visibility = request.body.visibility === "restricted" ?
+          "restricted" :
+          "operational";
+        const nextData = {
+          type: (request.body.type || "Observation").toString().trim() ||
+            "Observation",
+          description,
+          actionTaken: (request.body.actionTaken || "").toString().trim(),
+          visibility,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedBy: {
+            sauveteurId: context.sauveteurId,
+            login: session.login,
+            role: context.userRole,
+          },
+          wasEdited: true,
+        };
+
+        const auditReference = admin.firestore()
+            .collection("mainCouranteAuditLogs")
+            .doc();
+        const batch = admin.firestore().batch();
+
+        batch.set(auditReference, {
+          action: "update",
+          territoireId: context.territoireId,
+          spotId,
+          entryId,
+          previousEntry: entrySnapshot.data() || {},
+          nextEntry: nextData,
+          actor: {
+            sauveteurId: context.sauveteurId,
+            login: session.login,
+            role: context.userRole,
+          },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        batch.set(entryReference, nextData, {merge: true});
+
+        await batch.commit();
+
+        response.status(200).json({success: true});
+      } catch (error) {
+        console.error("Erreur modification main courante:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.deleteSauveteurMainCouranteEntry = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const session = await resolveSauveteurSession(
+            request.body.sauveteurSessionToken,
+        );
+
+        if (!session) {
+          response.status(401).json({
+            success: false,
+            error: "invalid_session",
+          });
+          return;
+        }
+
+        if (!session.legalAcceptanceCurrent) {
+          response.status(403).json({
+            success: false,
+            error: "legal_acceptance_required",
+          });
+          return;
+        }
+
+        const {context} = session;
+        const spotId = (request.body.spotId || "").toString().trim();
+        const entryId = (request.body.entryId || "").toString().trim();
+
+        if (context.sphotMode !== "ON" ||
+            !context.assignedSpotIds.includes(spotId)) {
+          response.status(403).json({
+            success: false,
+            error: "main_courante_not_available",
+          });
+          return;
+        }
+
+        if (!context.canManageRestrictedOperationalData) {
+          response.status(403).json({
+            success: false,
+            error: "insufficient_role",
+          });
+          return;
+        }
+
+        if (!entryId) {
+          response.status(400).json({
+            success: false,
+            error: "entry_id_required",
+          });
+          return;
+        }
+
+        const entryReference = admin.firestore()
+            .collection("territoires")
+            .doc(context.territoireId)
+            .collection("spots")
+            .doc(spotId)
+            .collection("mainCourante")
+            .doc(entryId);
+
+        const entrySnapshot = await entryReference.get();
+        if (!entrySnapshot.exists) {
+          response.status(404).json({
+            success: false,
+            error: "entry_not_found",
+          });
+          return;
+        }
+
+        const auditReference = admin.firestore()
+            .collection("mainCouranteAuditLogs")
+            .doc();
+        const batch = admin.firestore().batch();
+
+        batch.set(auditReference, {
+          action: "delete",
+          territoireId: context.territoireId,
+          spotId,
+          entryId,
+          deletedEntry: entrySnapshot.data() || {},
+          actor: {
+            sauveteurId: context.sauveteurId,
+            login: session.login,
+            role: context.userRole,
+          },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        batch.delete(entryReference);
+
+        await batch.commit();
+
+        response.status(200).json({success: true});
+      } catch (error) {
+        console.error("Erreur suppression main courante:", error);
         response.status(500).json({success: false});
       }
     },
