@@ -3085,7 +3085,7 @@ Widget _warningLineUniform(String text, double size) {
           style: _mapLabelStyle(
             fontSize: size * 0.55,
             fontWeight: FontWeight.w900,
-            color: const Color(0xFFFF0000),
+            color: const Color(0xFFF59E0B),
           ),
         ),
       ),
