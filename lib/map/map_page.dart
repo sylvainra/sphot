@@ -409,23 +409,43 @@ List<Marker> _buildAdminMarkers(
                                     size: 23,
                                   )
                                 : IgnorePointer(
-                                    child: Image.network(
-                                      logoVille,
-                                      key: ValueKey<String>(
-                                        'public-admin-logo-$logoVille',
-                                      ),
-                                      width: 34,
-                                      height: 34,
-                                      fit: BoxFit.contain,
-                                      gaplessPlayback: true,
-                                      webHtmlElementStrategy:
-                                          WebHtmlElementStrategy.prefer,
-                                      errorBuilder: (_, __, ___) => const Icon(
-                                        Icons.account_balance_rounded,
-                                        color: Color(0xFF1E3A8A),
-                                        size: 23,
-                                      ),
-                                    ),
+                                    child: logoVille
+                                            .toLowerCase()
+                                            .contains('.svg')
+                                        ? SvgPicture.network(
+                                            logoVille,
+                                            key: ValueKey<String>(
+                                              'public-admin-svg-logo-$logoVille',
+                                            ),
+                                            width: 34,
+                                            height: 34,
+                                            fit: BoxFit.contain,
+                                            placeholderBuilder: (_) =>
+                                                const Center(
+                                              child:
+                                                  CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            ),
+                                          )
+                                        : Image.network(
+                                            logoVille,
+                                            key: ValueKey<String>(
+                                              'public-admin-logo-$logoVille',
+                                            ),
+                                            width: 34,
+                                            height: 34,
+                                            fit: BoxFit.contain,
+                                            gaplessPlayback: true,
+                                            webHtmlElementStrategy:
+                                                WebHtmlElementStrategy.prefer,
+                                            errorBuilder: (_, __, ___) =>
+                                                const Icon(
+                                              Icons.account_balance_rounded,
+                                              color: Color(0xFF1E3A8A),
+                                              size: 23,
+                                            ),
+                                          ),
                                   ),
                           ),
                         ),
