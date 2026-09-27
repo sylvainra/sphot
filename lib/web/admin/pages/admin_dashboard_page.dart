@@ -552,6 +552,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return earthRadius * c;
   }
 
+  String _capitalizeWords(String value) {
+    return value.replaceAllMapped(
+      RegExp(r"(^|[\\s\\-'])([A-Za-zÀ-ÖØ-öø-ÿ])([A-Za-zÀ-ÖØ-öø-ÿ]*)"),
+      (match) {
+        final separator = match.group(1) ?? '';
+        final firstLetter = match.group(2) ?? '';
+        final remainingLetters = match.group(3) ?? '';
+
+        return separator + firstLetter.toUpperCase() + remainingLetters;
+      },
+    );
+  }
+
   String _cleanText(dynamic value) {
     return (value ?? '').toString().trim();
   }
