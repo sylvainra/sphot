@@ -1887,12 +1887,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       if (uid.isNotEmpty) {
         final requestReferences = await _adminRequestReferencesForUid(uid);
 
+        final nestedLogoData = <String, dynamic>{
+          'territoire.logoVille': uploadResult.url,
+          'territoire.logoStoragePath': uploadResult.storagePath,
+          'territoire.logoFileName': uploadResult.fileName,
+          'territoire.logoMimeType': uploadResult.mimeType,
+          'territoire.logoFileSizeBytes': uploadResult.sizeBytes,
+          'territoire.logoUploadedAt': now,
+          'updatedAt': now,
+        };
+
         for (final reference in requestReferences) {
           await reference.set(
-            {
-              'territoire': logoData,
-              'updatedAt': now,
-            },
+            nestedLogoData,
             SetOptions(merge: true),
           );
         }
@@ -1903,9 +1910,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         if (adminSnapshot.exists) {
           await adminReference.set(
             {
-              'territoire': logoData,
+              ...nestedLogoData,
               'logoVille': uploadResult.url,
-              'updatedAt': now,
             },
             SetOptions(merge: true),
           );
