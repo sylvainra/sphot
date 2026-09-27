@@ -4,8 +4,13 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 class PublicWebcamView extends StatefulWidget {
   final String url;
+  final bool forceImage;
 
-  const PublicWebcamView({super.key, required this.url});
+  const PublicWebcamView({
+    super.key,
+    required this.url,
+    this.forceImage = false,
+  });
 
   @override
   State<PublicWebcamView> createState() => _PublicWebcamViewState();
@@ -20,7 +25,7 @@ class _PublicWebcamViewState extends State<PublicWebcamView> {
   void initState() {
     super.initState();
     _controller = WebViewController();
-    _isDirectImage = _looksLikeImage(widget.url);
+    _isDirectImage = widget.forceImage || _looksLikeImage(widget.url);
 
     if (!_isDirectImage && !kIsWeb) {
       _controller
@@ -119,8 +124,13 @@ class _PublicWebcamViewState extends State<PublicWebcamView> {
 
 class PublicWebcamFullScreenPage extends StatelessWidget {
   final String url;
+  final bool forceImage;
 
-  const PublicWebcamFullScreenPage({super.key, required this.url});
+  const PublicWebcamFullScreenPage({
+    super.key,
+    required this.url,
+    this.forceImage = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -129,15 +139,18 @@ class PublicWebcamFullScreenPage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: const Text(
-          'WEBCAM EN DIRECT',
-          style: TextStyle(fontWeight: FontWeight.w800),
+        title: Text(
+          forceImage ? 'PHOTO DU SPHOT' : 'WEBCAM EN DIRECT',
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: Center(
         child: AspectRatio(
           aspectRatio: 16 / 9,
-          child: PublicWebcamView(url: url),
+          child: PublicWebcamView(
+            url: url,
+            forceImage: forceImage,
+          ),
         ),
       ),
     );
