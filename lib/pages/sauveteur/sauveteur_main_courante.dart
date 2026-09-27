@@ -40,6 +40,7 @@ class _SauveteurMainCourantePageState
 
   final List<Map<String, String>> _spots = [];
   List<Map<String, dynamic>> _entries = [];
+  List<Map<String, dynamic>> _institutionalContacts = [];
 
   String? _selectedSpotId;
   String _selectedType = 'Observation';
@@ -82,9 +83,27 @@ class _SauveteurMainCourantePageState
 
   Future<void> _loadSpots() async {
     final assigned = widget.postesAffectes.toSet();
-    final snapshot = await FirebaseFirestore.instance
+
+    final territoryReference = FirebaseFirestore.instance
         .collection('territoires')
-        .doc(widget.territoireId)
+        .doc(widget.territoireId);
+
+    final territorySnapshot = await territoryReference.get();
+    final territoryData = territorySnapshot.data() ?? <String, dynamic>{};
+    final rawInstitutionalContacts = territoryData['institutionnels'];
+    final institutionalContacts = rawInstitutionalContacts is List
+        ? rawInstitutionalContacts
+            .whereType<Map>()
+            .map((value) => Map<String, dynamic>.from(value))
+            .where((contact) {
+              return (contact['nom'] ?? '').toString().trim().isNotEmpty ||
+                  (contact['prenom'] ?? '').toString().trim().isNotEmpty ||
+                  (contact['fonction'] ?? '').toString().trim().isNotEmpty;
+            })
+            .toList()
+        : <Map<String, dynamic>>[];
+
+    final snapshot = await territoryReference
         .collection('spots')
         .where('typeSphot', isEqualTo: '🚨 POSTE DE SECOURS 🚨')
         .get();
@@ -113,6 +132,7 @@ class _SauveteurMainCourantePageState
         ..clear()
         ..addAll(spots);
       _selectedSpotId = _spots.isEmpty ? null : _spots.first['id'];
+      _institutionalContacts = institutionalContacts;
       _loading = false;
     });
 
@@ -318,6 +338,144 @@ class _SauveteurMainCourantePageState
         setState(() => _selectedSpotId = value);
         await _loadEntries();
       },
+    );
+  }
+
+  Widget _institutionalContactsCard() {
+    if (_institutionalContacts.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF1E3A8A),
+          width: 1.4,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.account_balance_outlined,
+                color: Color(0xFF1E3A8A),
+                size: 20,
+              ),
+              SizedBox(width: 7),
+              Text(
+                'CONTACTS INSTITUTIONNELS',
+                style: TextStyle(
+                  color: Color(0xFF1E3A8A),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Spacer(),
+              Text(
+                'LECTURE SEULE',
+                style: TextStyle(
+                  color: Colors.black45,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ..._institutionalContacts.asMap().entries.map((entry) {
+            final contact = entry.value;
+            final identity = [
+              (contact['civilite'] ?? '').toString().trim(),
+              (contact['prenom'] ?? '').toString().trim(),
+              (contact['nom'] ?? '').toString().trim(),
+            ].where((value) => value.isNotEmpty).join(' ');
+            final fonction = (contact['fonction'] ?? '').toString().trim();
+            final telephone = (contact['telephone'] ?? '').toString().trim();
+            final email = (contact['email'] ?? '').toString().trim();
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: entry.key == _institutionalContacts.length - 1 ? 0 : 9,
+              ),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC).withOpacity(0.88),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.black12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      identity.isEmpty ? 'Contact institutionnel' : identity,
+                      style: const TextStyle(
+                        color: Color(0xFF1E3A8A),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if (fonction.isNotEmpty)
+                      Text(
+                        fonction,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    if (telephone.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.phone_outlined,
+                            size: 15,
+                            color: Color(0xFF1E3A8A),
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              telephone,
+                              style: const TextStyle(fontSize: 11.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (email.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.email_outlined,
+                            size: 15,
+                            color: Color(0xFF1E3A8A),
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              email,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
     );
   }
 
@@ -582,6 +740,10 @@ class _SauveteurMainCourantePageState
                                 )
                               : ListView(
                                   children: [
+                                    if (_institutionalContacts.isNotEmpty) ...[
+                                      _institutionalContactsCard(),
+                                      const SizedBox(height: 12),
+                                    ],
                                     _entryForm(),
                                     if (_canWrite)
                                       const SizedBox(height: 12),
