@@ -13078,6 +13078,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       ]),
     );
 
+    final logoMimeType = _firstCleanText([
+      territoire['logoMimeType'],
+      structure['logoMimeType'],
+      data['logoMimeType'],
+    ]);
+
     return Marker(
       point: LatLng(lat, lng),
       width: 85,
@@ -13124,36 +13130,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       border: Border.all(color: Colors.white, width: 2),
                     ),
                     child: ClipOval(
-                      child: logoUrl.isEmpty
-                          ? const Icon(
-                              Icons.account_balance_rounded,
-                              color: adminColor,
-                              size: 23,
-                            )
-                          : IgnorePointer(
-                              child: Image.network(
-                                logoUrl,
-                                key: ValueKey<String>('admin-logo-$logoUrl'),
-                                width: 34,
-                                height: 34,
-                                fit: BoxFit.contain,
-                                gaplessPlayback: true,
-                                webHtmlElementStrategy:
-                                    WebHtmlElementStrategy.prefer,
-                                errorBuilder:
-                                    (
-                                      BuildContext context,
-                                      Object error,
-                                      StackTrace? stackTrace,
-                                    ) {
-                                      return const Icon(
-                                        Icons.account_balance_rounded,
-                                        color: adminColor,
-                                        size: 23,
-                                      );
-                                    },
-                              ),
-                            ),
+                      child: IgnorePointer(
+                        child: _buildRemoteAdminLogo(
+                          logoUrl: logoUrl,
+                          logoMimeType: logoMimeType,
+                          size: 34,
+                          fallbackSize: 23,
+                        ),
+                      ),
                     ),
                   ),
                 ),
