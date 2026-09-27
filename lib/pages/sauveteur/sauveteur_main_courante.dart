@@ -966,6 +966,8 @@ class _SauveteurMainCourantePageState
         : <String, dynamic>{};
     final role = (createdBy['role'] ?? '').toString();
     final visibility = (entry['visibility'] ?? 'operational').toString();
+    final source = (entry['source'] ?? '').toString().trim();
+    final automatic = source.startsWith('automatic_');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1016,6 +1018,29 @@ class _SauveteurMainCourantePageState
                         ),
                       ),
                     ),
+                    if (automatic)
+                      Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF3E0),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: const Color(0xFFF59E0B),
+                          ),
+                        ),
+                        child: const Text(
+                          'AUTOMATIQUE',
+                          style: TextStyle(
+                            color: Color(0xFFB45309),
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
                     if (visibility == 'restricted')
                       const Padding(
                         padding: EdgeInsets.only(right: 4),
@@ -1028,32 +1053,6 @@ class _SauveteurMainCourantePageState
                           ),
                         ),
                       ),
-                    if (_canWrite) ...[
-                      IconButton(
-                        tooltip: 'Modifier',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: _entryMutationInProgress
-                            ? null
-                            : () => _editEntry(entry),
-                        icon: const Icon(
-                          Icons.edit_outlined,
-                          color: Color(0xFF1E3A8A),
-                          size: 19,
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Supprimer',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: _entryMutationInProgress
-                            ? null
-                            : () => _deleteEntry(entry),
-                        icon: const Icon(
-                          Icons.delete_outline_rounded,
-                          color: Color(0xFFDC2626),
-                          size: 19,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
                 const SizedBox(height: 3),
@@ -1093,6 +1092,53 @@ class _SauveteurMainCourantePageState
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                     ),
+                  ),
+                ],
+                if (_canWrite) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _entryMutationInProgress
+                              ? null
+                              : () => _editEntry(entry),
+                          icon: const Icon(Icons.edit_outlined, size: 17),
+                          label: const Text(
+                            'MODIFIER',
+                            style: TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF1E3A8A),
+                            side: const BorderSide(
+                              color: Color(0xFF1E3A8A),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _entryMutationInProgress
+                              ? null
+                              : () => _deleteEntry(entry),
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            size: 17,
+                          ),
+                          label: const Text(
+                            'SUPPRIMER',
+                            style: TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFDC2626),
+                            side: const BorderSide(
+                              color: Color(0xFFDC2626),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ],
@@ -1190,10 +1236,64 @@ class _SauveteurMainCourantePageState
     );
   }
 
+  Widget _bottomDayNavigation() {
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.94),
+          border: const Border(
+            top: BorderSide(
+              color: Color(0xFF1E3A8A),
+              width: 1.5,
+            ),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.10),
+              blurRadius: 12,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(child: _dayTabs()),
+            const SizedBox(width: 10),
+            InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  border: Border.all(
+                    color: const Color(0xFF1E3A8A),
+                    width: 1.7,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Color(0xFF1E3A8A),
+                  size: 20,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
+      bottomNavigationBar: _bottomDayNavigation(),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -1310,24 +1410,6 @@ class _SauveteurMainCourantePageState
                                       ..._entries.map(_entryCard),
                                   ],
                                 ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _dayTabs(),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.black, width: 2),
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 22,
-                      ),
                     ),
                   ),
                 ],
