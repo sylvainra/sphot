@@ -731,6 +731,7 @@ class _SauveteurMainCourantePageState
         ),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             '${_months[today.month - 1]} ${today.year}',
@@ -1239,8 +1240,10 @@ class _SauveteurMainCourantePageState
   Widget _bottomDayNavigation() {
     return SafeArea(
       top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      child: SizedBox(
+        height: 96,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.94),
           border: const Border(
@@ -1285,6 +1288,7 @@ class _SauveteurMainCourantePageState
             ),
           ],
         ),
+      ),
       ),
     );
   }
