@@ -1799,6 +1799,113 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return references;
   }
 
+  Future<bool> _confirmAdminLogoSelection(
+    AdminLogoSelection selection,
+  ) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final preview = selection.isSvg
+            ? SvgPicture.memory(
+                selection.bytes,
+                fit: BoxFit.contain,
+              )
+            : Image.memory(
+                selection.bytes,
+                fit: BoxFit.contain,
+              );
+
+        final sizeText = selection.sizeBytes >= 1024 * 1024
+            ? '${(selection.sizeBytes / (1024 * 1024)).toStringAsFixed(2)} Mo'
+            : '${(selection.sizeBytes / 1024).toStringAsFixed(1)} Ko';
+
+        return AlertDialog(
+          title: const Text(
+            'REMPLACER LE LOGO',
+            style: TextStyle(
+              color: redColor,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          content: SizedBox(
+            width: 430,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 150,
+                  height: 120,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: adminColor.withOpacity(0.25),
+                    ),
+                  ),
+                  child: preview,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  selection.fileName,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: adminColor,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  sizeText,
+                  style: TextStyle(
+                    color: adminColor.withOpacity(0.70),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Ce fichier deviendra le logo officiel affiché '
+                  'dans le dashboard et sur la carte publique.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.black54,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
+              child: const Text('ANNULER'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
+              icon: const Icon(Icons.upload_file_rounded),
+              label: const Text(
+                'REMPLACER LE LOGO',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: redColor,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result == true;
+  }
+
   Future<void> _replaceAdminLogo() async {
     if (_isUpdatingAdminLogo) {
       return;
@@ -1829,6 +1936,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     if (selection == null || !mounted) {
+      return;
+    }
+
+    final confirmed = await _confirmAdminLogoSelection(selection);
+
+    if (!confirmed || !mounted) {
       return;
     }
 
