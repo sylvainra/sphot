@@ -1,12 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../map/map_page.dart';
+import '../../../services/admin_logo_storage_service.dart';
 
 class AdminTrialRequestPage extends StatefulWidget {
   final String? proConnectUid;
@@ -107,6 +109,13 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
   String? _trialRequestMessage;
   String? _createdRequestId;
+
+  AdminLogoSelection? _selectedLogo;
+  String _logoStoragePath = '';
+  String _logoFileName = '';
+  String _logoMimeType = '';
+  int? _logoFileSizeBytes;
+  String? _logoErrorMessage;
 
   bool _isLoadingCorrection = false;
   bool _isCorrectionMode = false;
@@ -222,6 +231,10 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   }
 
   bool _fieldChangedSinceLoad(String key) {
+    if (key == 'logoVille' && _selectedLogo != null) {
+      return true;
+    }
+
     return _value(key) != (_correctionBaseline[key] ?? '');
   }
 
@@ -321,6 +334,12 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
       _controller('logoVille').text = (territoire['logoVille'] ?? '')
           .toString();
+
+      _logoStoragePath = (territoire['logoStoragePath'] ?? '').toString();
+      _logoFileName = (territoire['logoFileName'] ?? '').toString();
+      _logoMimeType = (territoire['logoMimeType'] ?? '').toString();
+      final rawLogoSize = territoire['logoFileSizeBytes'];
+      _logoFileSizeBytes = rawLogoSize is num ? rawLogoSize.toInt() : null;
 
       _controller('siteInternetVille').text =
           (territoire['siteInternetVille'] ?? '').toString();
@@ -452,15 +471,18 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         _value('codePostal').isNotEmpty;
   }
 
+  bool get _hasLogo {
+    return _selectedLogo != null || _value('logoVille').isNotEmpty;
+  }
+
   bool get _villeComplete {
-    return _value('logoVille').isNotEmpty &&
+    return _hasLogo &&
         _value('siteInternetVille').isNotEmpty &&
         _hasCityPosition;
   }
 
   bool get _cityInfoComplete {
-    return _value('logoVille').isNotEmpty &&
-        _value('siteInternetVille').isNotEmpty;
+    return _hasLogo && _value('siteInternetVille').isNotEmpty;
   }
 
   bool get _canOpenTrialRequest {
@@ -758,6 +780,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value);
       case 'telephoneResponsable':
         return value.replaceAll(RegExp(r'\D'), '').length >= 10;
+      case 'logoVille':
+        return _hasLogo;
       case 'villeLat':
         final latitude = double.tryParse(value.replaceAll(',', '.'));
         return latitude != null && latitude >= -90 && latitude <= 90;
@@ -1137,6 +1161,34 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         }
       }
 
+      if (_selectedLogo != null) {
+        final uploadResult = await AdminLogoStorageService.uploadLogo(
+          territoireId: territoryId,
+          selection: _selectedLogo!,
+          requestId: requestId,
+        );
+
+        _controller('logoVille').text = uploadResult.url;
+        _logoStoragePath = uploadResult.storagePath;
+        _logoFileName = uploadResult.fileName;
+        _logoMimeType = uploadResult.mimeType;
+        _logoFileSizeBytes = uploadResult.sizeBytes;
+      }
+
+      final logoTerritoryFields = <String, dynamic>{
+        'logoVille': _value('logoVille'),
+        if (_logoStoragePath.isNotEmpty)
+          'logoStoragePath': _logoStoragePath,
+        if (_logoFileName.isNotEmpty)
+          'logoFileName': _logoFileName,
+        if (_logoMimeType.isNotEmpty)
+          'logoMimeType': _logoMimeType,
+        if (_logoFileSizeBytes != null)
+          'logoFileSizeBytes': _logoFileSizeBytes,
+        if (_selectedLogo != null)
+          'logoUploadedAt': FieldValue.serverTimestamp(),
+      };
+
       if (_isCorrectionMode) {
         final administrativeTracking = Map<String, dynamic>.from(
           _originalRequestData['administrativeTracking'] ?? {},
@@ -1175,7 +1227,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             'ville': _value('ville'),
             'adresse': _value('adresse'),
             'codePostal': _value('codePostal'),
-            'logoVille': _value('logoVille'),
+            ...logoTerritoryFields,
             'siteInternetVille': _value('siteInternetVille'),
             'arretesMunicipaux': _value('arretesMunicipaux'),
             'villeLat': _toDouble(_value('villeLat')),
@@ -1278,7 +1330,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             'ville': _value('ville'),
             'adresse': _value('adresse'),
             'codePostal': _value('codePostal'),
-            'logoVille': _value('logoVille'),
+            ...logoTerritoryFields,
             'siteInternetVille': _value('siteInternetVille'),
             'arretesMunicipaux': _value('arretesMunicipaux'),
             'villeLat': _toDouble(_value('villeLat')),
@@ -2544,6 +2596,221 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     );
   }
 
+  Future<void> _pickAdminLogo() async {
+    if (!_isFieldEditable('logoVille')) {
+      return;
+    }
+
+    try {
+      final selection = await AdminLogoStorageService.pickLogo();
+
+      if (selection == null || !mounted) {
+        return;
+      }
+
+      setState(() {
+        _selectedLogo = selection;
+        _logoFileName = selection.fileName;
+        _logoMimeType = selection.mimeType;
+        _logoFileSizeBytes = selection.sizeBytes;
+        _logoErrorMessage = null;
+        _saved = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _logoErrorMessage = error.toString().replaceFirst('Bad state: ', '');
+      });
+    }
+  }
+
+  String _formatLogoFileSize(int? bytes) {
+    if (bytes == null || bytes <= 0) return '';
+
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} Mo';
+    }
+
+    return '${(bytes / 1024).toStringAsFixed(1)} Ko';
+  }
+
+  Widget _buildAdminLogoPreview() {
+    final selectedLogo = _selectedLogo;
+    final logoUrl = _value('logoVille');
+    final currentMimeType = _logoMimeType.toLowerCase();
+
+    Widget image;
+
+    if (selectedLogo != null) {
+      image = selectedLogo.isSvg
+          ? SvgPicture.memory(
+              selectedLogo.bytes,
+              fit: BoxFit.contain,
+            )
+          : Image.memory(
+              selectedLogo.bytes,
+              fit: BoxFit.contain,
+            );
+    } else if (logoUrl.isNotEmpty) {
+      final isSvg =
+          currentMimeType == 'image/svg+xml' ||
+          AdminLogoStorageService.isSvgUrl(logoUrl);
+
+      image = isSvg
+          ? SvgPicture.network(
+              logoUrl,
+              fit: BoxFit.contain,
+              placeholderBuilder: (_) => const Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          : Image.network(
+              logoUrl,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.broken_image_outlined,
+                color: Colors.grey,
+                size: 34,
+              ),
+            );
+    } else {
+      image = const Icon(
+        Icons.image_outlined,
+        color: adminColor,
+        size: 38,
+      );
+    }
+
+    return SizedBox(
+      width: 92,
+      height: 72,
+      child: Center(child: image),
+    );
+  }
+
+  Widget _buildAdminLogoPicker() {
+    final editable = _isFieldEditable('logoVille');
+    final hasLogo = _hasLogo;
+    final displayedFileName = _selectedLogo?.fileName ?? _logoFileName;
+    final displayedSize =
+        _selectedLogo?.sizeBytes ?? _logoFileSizeBytes;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: _logoErrorMessage == null ? adminColor : redColor,
+          width: 1.4,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 104,
+                height: 84,
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: adminColor.withOpacity(0.20),
+                  ),
+                ),
+                child: _buildAdminLogoPreview(),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'LOGO OFFICIEL DE LA STRUCTURE',
+                      style: TextStyle(
+                        color: adminColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      displayedFileName.isNotEmpty
+                          ? displayedFileName
+                          : (hasLogo
+                              ? 'Logo déjà enregistré'
+                              : 'Aucun logo sélectionné'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: adminColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (displayedSize != null && displayedSize > 0) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        _formatLogoFileSize(displayedSize),
+                        style: TextStyle(
+                          color: adminColor.withOpacity(0.70),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: editable ? _pickAdminLogo : null,
+            icon: const Icon(Icons.upload_file_rounded),
+            label: Text(
+              hasLogo ? 'REMPLACER LE LOGO' : 'CHOISIR LE LOGO',
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: adminColor,
+              side: const BorderSide(color: adminColor, width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 13),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Formats acceptés : PNG, JPG, JPEG, WebP et SVG · 5 Mo maximum.',
+            style: TextStyle(
+              color: Colors.black54,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (_logoErrorMessage != null) ...[
+            const SizedBox(height: 7),
+            Text(
+              _logoErrorMessage!,
+              style: const TextStyle(
+                color: redColor,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _villePanel() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2560,11 +2827,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
         const SizedBox(height: 11),
 
-        _textField(
-          'logoVille',
-          'https://votre-logo',
-          readOnly: !_isFieldEditable('logoVille'),
-        ),
+        _buildAdminLogoPicker(),
         const SizedBox(height: 11),
         _textField(
           'arretesMunicipaux',
