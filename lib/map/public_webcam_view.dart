@@ -71,6 +71,7 @@ class _PublicWebcamViewState extends State<PublicWebcamView> {
         child: Image.network(
           widget.url,
           fit: BoxFit.cover,
+          webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
           errorBuilder: (_, __, ___) => const Center(
             child: Padding(
               padding: EdgeInsets.all(18),
