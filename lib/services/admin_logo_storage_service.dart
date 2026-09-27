@@ -49,7 +49,7 @@ class AdminLogoStorageService {
   };
 
   static Future<AdminLogoSelection?> pickLogo() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: allowedExtensions.toList(),
       withData: true,
