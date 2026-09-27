@@ -2405,9 +2405,9 @@ class _UnsupervisedWarning extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF1F1),
+        color: const Color(0xFFFFF7E6),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFF0000)),
+        border: Border.all(color: const Color(0xFFF59E0B)),
       ),
       child: Column(
         children: [
@@ -2415,7 +2415,7 @@ class _UnsupervisedWarning extends StatelessWidget {
             '⚠️ $title',
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: Color(0xFFFF0000),
+              color: Color(0xFFF59E0B),
               fontSize: 14,
               fontWeight: FontWeight.w900,
             ),
@@ -2425,7 +2425,7 @@ class _UnsupervisedWarning extends StatelessWidget {
             '⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Color(0xFFFF0000),
+              color: Color(0xFFF59E0B),
               fontSize: 14,
               fontWeight: FontWeight.w900,
             ),
