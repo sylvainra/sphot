@@ -142,11 +142,14 @@ class PublicSpotDetailPage extends StatelessWidget {
                           _LiveOperationalSnapshot(
                             initialSpot: spot,
                           ),
-                          if (spot.adresseWebcam.isNotEmpty) ...[
+                          if (spot.publicMediaUrl.isNotEmpty) ...[
                             const SizedBox(height: 14),
                             const Divider(),
                             const SizedBox(height: 8),
-                            _PublicWebcamSection(url: spot.adresseWebcam),
+                            _PublicWebcamSection(
+                              url: spot.publicMediaUrl,
+                              isPhoto: spot.publicMediaIsPhoto,
+                            ),
                             const SizedBox(height: 14),
                             const Divider(),
                           ],
@@ -669,13 +672,12 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           ),
         ),
 
-        if (spot.adresseWebcam.trim().isNotEmpty) ...[
+        if (spot.publicMediaUrl.isNotEmpty) ...[
           const SizedBox(height: 10),
           _MobilePublicCard(
             child: _PublicWebcamSection(
-              url: spot.adresseWebcam,
-              title: 'WEBCAM / PHOTO',
-              fullscreenLabel: 'AGRANDIR',
+              url: spot.publicMediaUrl,
+              isPhoto: spot.publicMediaIsPhoto,
             ),
           ),
         ],
@@ -1036,9 +1038,12 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           ),
         ],
         const SizedBox(height: 10),
-        if (spot.adresseWebcam.isNotEmpty)
+        if (spot.publicMediaUrl.isNotEmpty)
           _MobilePublicCard(
-            child: _PublicWebcamSection(url: spot.adresseWebcam),
+            child: _PublicWebcamSection(
+              url: spot.publicMediaUrl,
+              isPhoto: spot.publicMediaIsPhoto,
+            ),
           )
         else
           const _MobilePublicCard(
@@ -2301,26 +2306,30 @@ class _LiveDataBlock extends StatelessWidget {
 
 class _PublicWebcamSection extends StatelessWidget {
   final String url;
-  final String title;
-  final String fullscreenLabel;
+  final bool isPhoto;
 
   const _PublicWebcamSection({
     required this.url,
-    this.title = 'WEBCAM',
-    this.fullscreenLabel = 'AGRANDIR LA WEBCAM',
+    this.isPhoto = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final title = isPhoto ? 'PHOTO' : 'WEBCAM';
+    final fullscreenLabel =
+        isPhoto ? 'AGRANDIR LA PHOTO' : 'AGRANDIR LA WEBCAM';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Icon(
-              Icons.videocam_outlined,
+            Icon(
+              isPhoto
+                  ? Icons.photo_outlined
+                  : Icons.videocam_outlined,
               size: 19,
-              color: Color(0xFF1E3A8A),
+              color: const Color(0xFF1E3A8A),
             ),
             const SizedBox(width: 7),
             Text(
@@ -2334,7 +2343,10 @@ class _PublicWebcamSection extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           child: AspectRatio(
             aspectRatio: 16 / 9,
-            child: PublicWebcamView(url: url),
+            child: PublicWebcamView(
+              url: url,
+              forceImage: isPhoto,
+            ),
           ),
         ),
         const SizedBox(height: 9),
@@ -2343,7 +2355,10 @@ class _PublicWebcamSection extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => PublicWebcamFullScreenPage(url: url),
+                builder: (_) => PublicWebcamFullScreenPage(
+                  url: url,
+                  forceImage: isPhoto,
+                ),
               ),
             ),
             icon: const Icon(Icons.fullscreen_rounded),
