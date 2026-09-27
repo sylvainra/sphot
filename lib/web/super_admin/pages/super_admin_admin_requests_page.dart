@@ -39,6 +39,15 @@ class _SuperAdminAdminRequestsPageState
   final territoire =
       Map<String, dynamic>.from(data['territoire'] ?? {});
 
+  final institutionnelsRaw =
+      data['institutionnels'] ?? territoire['institutionnels'];
+  final institutionnels = institutionnelsRaw is List
+      ? institutionnelsRaw
+          .whereType<Map>()
+          .map((value) => Map<String, dynamic>.from(value))
+          .toList()
+      : <Map<String, dynamic>>[];
+
   final facturation =
       Map<String, dynamic>.from(data['facturation'] ?? {});
 
@@ -66,6 +75,11 @@ class _SuperAdminAdminRequestsPageState
       .collection('subscriptions')
       .doc(uid);
 
+  final territoireId = (territoire['territoireId'] ?? '').toString().trim();
+  final territoireRef = territoireId.isEmpty
+      ? null
+      : FirebaseFirestore.instance.collection('territoires').doc(territoireId);
+
   batch.set(
     adminRef,
     {
@@ -87,6 +101,7 @@ class _SuperAdminAdminRequestsPageState
       'region': territoire['region'] ?? '',
       'departement': territoire['departement'] ?? '',
       'ville': territoire['ville'] ?? '',
+      'institutionnels': institutionnels,
       'role': 'admin',
       'accessStatus': 'approved',
       'configurationAccessGranted': true,
@@ -97,6 +112,18 @@ class _SuperAdminAdminRequestsPageState
     },
     SetOptions(merge: true),
   );
+
+  if (territoireRef != null) {
+    batch.set(
+      territoireRef,
+      {
+        ...territoire,
+        'institutionnels': institutionnels,
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+  }
 
   batch.set(
     subscriptionRef,
