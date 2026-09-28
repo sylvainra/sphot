@@ -14,6 +14,7 @@ class SauveteurPlanningPage extends StatefulWidget {
   final String sphotMode;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final String? initialSpotId;
   final bool canManageRestrictedOperationalData;
 
   const SauveteurPlanningPage({
@@ -24,6 +25,7 @@ class SauveteurPlanningPage extends StatefulWidget {
     required this.sphotMode,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    required this.initialSpotId,
     required this.canManageRestrictedOperationalData,
   });
 
@@ -225,8 +227,13 @@ String? selectedSpotId;
     );
 
   if (beachList.isNotEmpty) {
-    selectedBeach = beachList.first['label'];
-    selectedSpotId = beachList.first['id'];
+    final preferredId = widget.initialSpotId?.trim();
+    final initialBeach = beachList.firstWhere(
+      (spot) => spot['id'] == preferredId,
+      orElse: () => beachList.first,
+    );
+    selectedBeach = initialBeach['label'];
+    selectedSpotId = initialBeach['id'];
   } else {
     selectedBeach = null;
     selectedSpotId = null;
@@ -1037,27 +1044,15 @@ Future<void> _savePlanning() async {
                       ),
                       child: Column(
                         children: [
-                          Column(
-  children: [
-    Row(
-      children: [
-        _beachDropdown(),
-      ],
-    ),
-
-    const SizedBox(height: 6),
-
-    Row(
-      children: [
-        _topField(
-          controller: hoursController,
-          icon: Icons.access_time_rounded,
-          keyName: 'hours',
-        ),
-      ],
-    ),
-  ],
-),
+                          Row(
+                            children: [
+                              _topField(
+                                controller: hoursController,
+                                icon: Icons.access_time_rounded,
+                                keyName: 'hours',
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 8),
                           Row(
                             children: [
@@ -1130,7 +1125,7 @@ SizedBox(
             : canPersist
                 ? 'ENREGISTRER LE PLANNING'
                 : canEdit
-                    ? 'SPHOT OFF — TEST NON ENREGISTRÉ'
+                    ? 'TEST NON ENREGISTRÉ'
                     : 'PLANNING EN CONSULTATION',
         maxLines: 1,
         style: TextStyle(
