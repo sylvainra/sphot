@@ -153,16 +153,20 @@ Future<void> _pickPhoto() async {
 
         children: [
           SizedBox(
-            width: 142,
-
-            child: Text(
-              '${labels[index]} :',
-
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w800,
-                height: 1.05,
+            width: 176,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '${labels[index]} :',
+                maxLines: 1,
+                softWrap: false,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  height: 1.0,
+                ),
               ),
             ),
           ),
@@ -186,7 +190,7 @@ maxLines: maxLines,
 
                 contentPadding:
                     const EdgeInsets.symmetric(
-                  horizontal: 8,
+                  horizontal: 6,
                   vertical: 7,
                 ),
 
