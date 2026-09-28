@@ -182,7 +182,7 @@ class _SauveteurMaterielVerificationPageState
           'sauveteurSessionToken': widget.sauveteurSessionToken,
           'spotId': spotId,
           'type': 'Vérification matériel',
-          'description': lines.join(' • '),
+          'description': lines.join('\n'),
           'actionTaken': remarks.isEmpty
               ? 'Contrôle matériel de début de service.'
               : remarks,
