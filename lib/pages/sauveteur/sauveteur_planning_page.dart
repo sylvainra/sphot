@@ -158,7 +158,9 @@ String? selectedSpotId;
       result.add(
         _PlanningColumn(
           key: 'day_$day',
-          label: '$day\n${_shortDay(date.weekday)}',
+          label:
+              '$day ${_shortDay(date.weekday)}\n'
+              '${month.toString().padLeft(2, '0')}/$year',
           date: date,
         ),
       );
@@ -682,7 +684,7 @@ Future<void> _savePlanning() async {
   Widget _headerCell(String text, double width, Color color) {
     return Container(
       width: width,
-      height: 38,
+      height: 46,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: color,
@@ -864,7 +866,7 @@ Future<void> _savePlanning() async {
     return Column(
       children: [
         SizedBox(
-          height: 38,
+          height: 46,
           child: SingleChildScrollView(
             controller: _headerHorizontalController,
             scrollDirection: Axis.horizontal,
@@ -1122,17 +1124,23 @@ Future<void> _savePlanning() async {
                           ),
                           const SizedBox(height: 8),
                           Expanded(
-                            child: Column(
-                              children: [
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(14),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: Colors.black,
+                                  width: 2,
+                                ),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Column(
+                                children: [
+                                  Expanded(
                                     child: _scheduleTable(),
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                _totalWorkersBar(),
-                              ],
+                                  _totalWorkersBar(),
+                                ],
+                              ),
                             ),
                           ),
                         ],
