@@ -83,15 +83,35 @@ String? selectedSpotId;
     ...List.generate(20, (index) => 'Sauveteur ${index + 1}'),
   ];
 
-  late final List<_PlanningColumn> columns;
-  late final Map<String, TextEditingController> nameControllers;
-  late final Map<String, TextEditingController> controllers;
+  late DateTime _selectedMonth;
+  late List<_PlanningColumn> columns;
+  late Map<String, TextEditingController> nameControllers;
+  late Map<String, TextEditingController> controllers;
 
   @override
   void initState() {
     super.initState();
 
     _speech = stt.SpeechToText();
+
+    final now = DateTime.now();
+    _selectedMonth = DateTime(now.year, now.month);
+
+    columns = _generateMonthColumns(
+      _selectedMonth.year,
+      _selectedMonth.month,
+    );
+
+    controllers = {
+      for (final role in roles)
+        for (final col in columns)
+          if (!col.isTotal) '$role-${col.key}': TextEditingController(),
+    };
+
+    nameControllers = {
+      for (final role in roles) role: TextEditingController(),
+    };
+
     _loadBeaches();
 
     void syncFrom(
@@ -133,19 +153,6 @@ String? selectedSpotId;
       );
     });
 
-    final now = DateTime.now();
-
-    columns = _generateMonthColumns(now.year, now.month);
-
-    controllers = {
-      for (final role in roles)
-        for (final col in columns)
-          if (!col.isTotal) '$role-${col.key}': TextEditingController(),
-    };
-
-    nameControllers = {
-      for (final role in roles) role: TextEditingController(),
-    };
   }
 
   List<_PlanningColumn> _generateMonthColumns(int year, int month) {
@@ -294,12 +301,209 @@ String? selectedSpotId;
   }
 
 String get _planningMonthId {
-  final now = DateTime.now();
-  return '${now.year}-${now.month.toString().padLeft(2, '0')}';
+  return '${_selectedMonth.year}-'
+      '${_selectedMonth.month.toString().padLeft(2, '0')}';
 }
+
+  static const List<String> _monthNames = <String>[
+    'JANVIER',
+    'FÉVRIER',
+    'MARS',
+    'AVRIL',
+    'MAI',
+    'JUIN',
+    'JUILLET',
+    'AOÛT',
+    'SEPTEMBRE',
+    'OCTOBRE',
+    'NOVEMBRE',
+    'DÉCEMBRE',
+  ];
+
+  String get _selectedMonthLabel {
+    return '${_monthNames[_selectedMonth.month - 1]} '
+        '${_selectedMonth.year}';
+  }
+
+  void _disposeMonthControllers() {
+    for (final controller in controllers.values) {
+      controller.dispose();
+    }
+
+    for (final controller in nameControllers.values) {
+      controller.dispose();
+    }
+  }
+
+  void _rebuildMonthControllers(DateTime month) {
+    _disposeMonthControllers();
+
+    columns = _generateMonthColumns(month.year, month.month);
+
+    controllers = {
+      for (final role in roles)
+        for (final col in columns)
+          if (!col.isTotal) '$role-${col.key}': TextEditingController(),
+    };
+
+    nameControllers = {
+      for (final role in roles) role: TextEditingController(),
+    };
+  }
+
+  Future<void> _changeMonth(int delta) async {
+    if (_isListening) {
+      await _speech.stop();
+    }
+
+    final nextMonth = DateTime(
+      _selectedMonth.year,
+      _selectedMonth.month + delta,
+    );
+
+    setState(() {
+      _isListening = false;
+      _listeningKey = null;
+      openPlanningCellKey = null;
+      planningEnregistre = false;
+      _selectedMonth = DateTime(nextMonth.year, nextMonth.month);
+      _rebuildMonthControllers(_selectedMonth);
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final controller in <ScrollController>[
+        _headerHorizontalController,
+        _tableHorizontalController,
+        _totalHorizontalController,
+      ]) {
+        if (controller.hasClients) {
+          controller.jumpTo(0);
+        }
+      }
+    });
+
+    await _loadPlanning();
+  }
+
+  Future<void> _goToCurrentMonth() async {
+    final now = DateTime.now();
+    final current = DateTime(now.year, now.month);
+
+    if (_selectedMonth.year == current.year &&
+        _selectedMonth.month == current.month) {
+      return;
+    }
+
+    if (_isListening) {
+      await _speech.stop();
+    }
+
+    setState(() {
+      _isListening = false;
+      _listeningKey = null;
+      openPlanningCellKey = null;
+      planningEnregistre = false;
+      _selectedMonth = current;
+      _rebuildMonthControllers(_selectedMonth);
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final controller in <ScrollController>[
+        _headerHorizontalController,
+        _tableHorizontalController,
+        _totalHorizontalController,
+      ]) {
+        if (controller.hasClients) {
+          controller.jumpTo(0);
+        }
+      }
+    });
+
+    await _loadPlanning();
+  }
+
+  Widget _monthNavigation() {
+    final now = DateTime.now();
+    final isCurrentMonth =
+        _selectedMonth.year == now.year &&
+        _selectedMonth.month == now.month;
+
+    return Container(
+      height: 42,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.42),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.black,
+          width: 1.4,
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Mois précédent',
+            visualDensity: VisualDensity.compact,
+            onPressed: () => _changeMonth(-1),
+            icon: const Icon(
+              Icons.chevron_left_rounded,
+              color: Color(0xFF1E3A8A),
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: isCurrentMonth ? null : _goToCurrentMonth,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _selectedMonthLabel,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF1E3A8A),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  if (!isCurrentMonth)
+                    const Text(
+                      'Toucher pour revenir au mois actuel',
+                      style: TextStyle(
+                        color: Colors.black54,
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Mois suivant',
+            visualDensity: VisualDensity.compact,
+            onPressed: () => _changeMonth(1),
+            icon: const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xFF1E3A8A),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
 Future<void> _loadPlanning() async {
   if (selectedSpotId == null) return;
+
+  setState(() {
+    planningEnregistre = false;
+    for (final controller in controllers.values) {
+      controller.clear();
+    }
+    for (final controller in nameControllers.values) {
+      controller.clear();
+    }
+  });
 
   final doc = await FirebaseFirestore.instance
       .collection('territoires')
@@ -1085,6 +1289,8 @@ Future<void> _savePlanning() async {
                       ),
                       child: Column(
                         children: [
+                          _monthNavigation(),
+                          const SizedBox(height: 8),
                           Row(
                             children: [
                               _topField(
