@@ -18,6 +18,7 @@ class SauveteurActionsRapidesPage extends StatefulWidget {
   final String territoireId;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final String? initialSpotId;
 
   const SauveteurActionsRapidesPage({
     super.key,
@@ -26,6 +27,7 @@ class SauveteurActionsRapidesPage extends StatefulWidget {
     required this.territoireId,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    required this.initialSpotId,
   });
 
   bool get isSphotOn => sphotMode.toUpperCase() == 'ON';
@@ -151,7 +153,12 @@ class _SauveteurActionsRapidesPageState
     });
 
     if (postesSecoursCommune.isNotEmpty) {
-      await _selectSpot(postesSecoursCommune.first);
+      final preferredId = widget.initialSpotId?.trim();
+      final initialPoste = postesSecoursCommune.firstWhere(
+        (poste) => poste['spotId'] == preferredId,
+        orElse: () => postesSecoursCommune.first,
+      );
+      await _selectSpot(initialPoste);
     }
   }
 
@@ -330,8 +337,7 @@ class _SauveteurActionsRapidesPageState
         _liveWriteBlocked = errorCode == 'sphot_off' ||
             errorCode == 'spot_not_assigned';
         _liveStatusMessage = _liveWriteBlocked
-            ? 'SPHOT OFF — cette action reste locale et ne modifie pas '
-                'le poste réel.'
+            ? 'Cette action n’est pas enregistrée sur le poste réel.'
             : 'La modification opérationnelle n’a pas pu être enregistrée.';
       });
 
@@ -680,88 +686,13 @@ class _SauveteurActionsRapidesPageState
                   ),
                 ),
 
-                if (!widget.isSphotOn || _liveWriteBlocked)
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.fromLTRB(16, 2, 16, 4),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF1F2),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFFDC2626),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Text(
-                      _liveWriteBlocked
-                          ? 'SPHOT OFF — l’autorisation opérationnelle a changé. '
-                              'Les actions restent locales et ne modifient pas '
-                              'le poste réel.'
-                          : 'SPHOT OFF - Les changements effectués sur cet '
-                              'écran ne modifient pas l’état opérationnel réel.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Color(0xFFB91C1C),
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-
-                const SizedBox(height: 0),
+                const SizedBox(height: 2),
 
                 Expanded(
   child: Padding(
     padding: const EdgeInsets.fromLTRB(16, 0, 16, 50),
     child: Column(
       children: [
-                          _sectionCard(
-                            title: 'Choix du SPHOT de surveillance',
-                            leading: const AdaptiveAssetImage(
-                              'data/icons/fire_red_icon.svg',
-                              width: 24,
-                              height: 24,
-                            ),
-                            children: [
-                              const SizedBox(height: 5),
-                              SauveteurStyledDropdown(
-                                labelText: 'SPHOT surveillé',
-                                value: selectedSpotId,
-                                enabled: !_loadingSpots,
-                                options: postesSecoursCommune.map((poste) {
-                                  final secours =
-                                      (poste['nomSecours'] ?? '').trim();
-                                  final sphot =
-                                      (poste['nomSphot'] ?? '').trim();
-                                  final label = [
-                                    secours,
-                                    sphot,
-                                  ].where((value) => value.isNotEmpty).join(
-                                        ' - ',
-                                      );
-
-                                  return SauveteurDropdownOption(
-                                    value: poste['spotId'] ?? '',
-                                    label: label,
-                                  );
-                                }).where((option) {
-                                  return option.value.isNotEmpty;
-                                }).toList(),
-                                onChanged: (spotId) {
-                                  final poste =
-                                      postesSecoursCommune.firstWhere(
-                                    (item) => item['spotId'] == spotId,
-                                  );
-                                  unawaited(_selectSpot(poste));
-                                },
-                              ),
-                            ],
-                          ),
-
                           if (_loadingSpots)
                             const Padding(
                               padding: EdgeInsets.only(bottom: 6),
