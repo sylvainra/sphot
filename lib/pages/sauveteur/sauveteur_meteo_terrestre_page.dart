@@ -290,9 +290,8 @@ Widget build(BuildContext context) {
 
                 const SizedBox(height: 4),
 
-                SizedBox(
-  height: 450,
-  child: Container(
+                Expanded(
+                  child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                     decoration: BoxDecoration(
