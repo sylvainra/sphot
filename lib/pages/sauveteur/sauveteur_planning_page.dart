@@ -1035,8 +1035,7 @@ Future<void> _savePlanning() async {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  SizedBox(
-                    height: 445,
+                  Expanded(
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
