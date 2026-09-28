@@ -351,7 +351,10 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                         ),
                       ),
 
-                      child: Transform.translate(
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: Transform.translate(
                         offset: const Offset(0, -12),
 
                         child: SingleChildScrollView(
@@ -575,11 +578,14 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                                   
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              _publishButton(),
+
                             ],
                           ),
                         ),
+                      )),
+                          const SizedBox(height: 8),
+                          _publishButton(),
+                        ],
                       ),
                     ),
                   ),
