@@ -585,7 +585,7 @@ class _SauveteurActionsRapidesPageState
   }
 
   Widget _buildFlagMastControl() {
-    const height = 174.0;
+    const height = 210.0;
 
     return Container(
       height: height,
@@ -637,7 +637,7 @@ class _SauveteurActionsRapidesPageState
                 Padding(
                   padding: const EdgeInsets.only(top: 18, bottom: 18),
                   child: Transform.scale(
-                    scale: 1.08,
+                    scale: 1.28,
                     child: FlagMarker(
                       spot: _previewSpotState(),
                     ),
@@ -659,7 +659,7 @@ class _SauveteurActionsRapidesPageState
                 ),
                 Positioned(
                   right: 6,
-                  top: 66,
+                  top: 84,
                   child: Icon(
                     Icons.unfold_more_rounded,
                     size: 22,
@@ -788,7 +788,7 @@ class _SauveteurActionsRapidesPageState
                           if (!isTemporaryClosed)
                             Container(
                               width: double.infinity,
-                              height: 58,
+                              height: 64,
                               margin: const EdgeInsets.only(
                                 top: 3,
                                 bottom: 6,
@@ -822,7 +822,7 @@ class _SauveteurActionsRapidesPageState
                                   color: flagColor == 'Jaune'
                                       ? Colors.black
                                       : Colors.white,
-                                  fontSize: 14,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),
@@ -837,16 +837,16 @@ class _SauveteurActionsRapidesPageState
                             children: [
                               const SizedBox(height: 8),
                               SizedBox(
-                                height: 174,
+                                height: 210,
                                 child: Row(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
                                     SizedBox(
-                                      width: 132,
+                                      width: 138,
                                       child: _buildFlagMastControl(),
                                     ),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(width: 14),
                                     Expanded(
                                       child: Column(
                                         children: [
@@ -860,7 +860,7 @@ class _SauveteurActionsRapidesPageState
                                               },
                                             ),
                                           ),
-                                          const SizedBox(height: 7),
+                                          const SizedBox(height: 9),
                                           Expanded(
                                             child: _FlagColorButton(
                                               label: 'Jaune',
@@ -871,7 +871,7 @@ class _SauveteurActionsRapidesPageState
                                               },
                                             ),
                                           ),
-                                          const SizedBox(height: 7),
+                                          const SizedBox(height: 9),
                                           Expanded(
                                             child: _FlagColorButton(
                                               label: 'Rouge',
@@ -888,7 +888,7 @@ class _SauveteurActionsRapidesPageState
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 12),
                               _ActionButton(
                                 icon: Icons.warning_amber_rounded,
                                 label: selectedDangers.isEmpty
@@ -898,7 +898,7 @@ class _SauveteurActionsRapidesPageState
                                 color: const Color(0xFFFDE047),
                                 onTap: _openDangersPage,
                               ),
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 12),
                               _ActionButton(
                                 icon: Icons.campaign_rounded,
                                 label: 'Ajouter une notification',
@@ -1438,7 +1438,7 @@ class _SupplementarySignalButton extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        height: 54,
+        height: 64,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: selected
@@ -1464,7 +1464,7 @@ class _SupplementarySignalButton extends StatelessWidget {
           children: [
             Icon(
               selected ? Icons.check_circle_rounded : icon,
-              size: 19,
+              size: 21,
               color: foreground,
             ),
             const SizedBox(width: 6),
@@ -1476,7 +1476,7 @@ class _SupplementarySignalButton extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: foreground,
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w900,
                   height: 1.05,
                 ),
@@ -2180,7 +2180,7 @@ class _ActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 52,
+        height: 60,
         width: double.infinity,
         decoration: BoxDecoration(
   color: color,
@@ -2195,7 +2195,7 @@ class _ActionButton extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 20,
+              size: 22,
               color: isYellow ? Colors.black : Colors.white,
             ),
             const SizedBox(width: 8),
@@ -2206,7 +2206,7 @@ class _ActionButton extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: isYellow ? Colors.black : Colors.white,
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w900,
                 ),
               ),
