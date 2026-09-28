@@ -44,6 +44,12 @@ class _SauveteurMainCourantePageState
   final List<Map<String, String>> _spots = [];
   List<Map<String, dynamic>> _entries = [];
   List<Map<String, dynamic>> _institutionalContacts = [];
+  List<Map<String, dynamic>> _presenceCandidates = [];
+  Set<String> _selectedPresenceLabels = <String>{};
+  Map<String, dynamic>? _presenceEntry;
+  bool _presenceFromPlanning = false;
+  bool _presenceSaving = false;
+  bool _presenceAutoSaveAttempted = false;
 
   String? _selectedSpotId;
   String _selectedType = 'Observation';
@@ -131,6 +137,7 @@ class _SauveteurMainCourantePageState
     setState(() {
       _selectedDay = DateTime(day.year, day.month, day.day);
       _statusMessage = null;
+      _presenceAutoSaveAttempted = false;
     });
 
     _scrollSelectedDayIntoView();
@@ -222,6 +229,519 @@ class _SauveteurMainCourantePageState
     }
   }
 
+  String _normalizePresenceName(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll(RegExp(r"[^a-zà-öø-ÿ0-9]+"), ' ')
+        .trim()
+        .replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  bool _planningCellMeansPresent(String rawValue) {
+    final value = rawValue.trim();
+    if (value.isEmpty || value == '-') return false;
+
+    final normalized = value.toLowerCase();
+    return normalized != 'repos' &&
+        normalized != 'repose' &&
+        normalized != 'absent';
+  }
+
+  String get _selectedPlanningMonthId {
+    return '${_selectedDay.year}-'
+        '${_selectedDay.month.toString().padLeft(2, '0')}';
+  }
+
+  bool _isPresenceEntry(Map<String, dynamic> entry) {
+    final type = (entry['type'] ?? '').toString().trim().toLowerCase();
+    return type == 'présence' || type == 'presence';
+  }
+
+  List<String> _presenceDescriptionLines(Map<String, dynamic> entry) {
+    final description = (entry['description'] ?? '').toString();
+    return description
+        .split(RegExp(r'\r?\n'))
+        .map((value) => value.trim())
+        .where(
+          (value) =>
+              value.isNotEmpty &&
+              value.toLowerCase() != 'aucun sauveteur présent.',
+        )
+        .toList();
+  }
+
+  Future<void> _loadPresenceContext(
+    List<Map<String, dynamic>> entriesForSelectedDay,
+  ) async {
+    final spotId = _selectedSpotId;
+    if (spotId == null || spotId.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          _presenceCandidates = [];
+          _selectedPresenceLabels = <String>{};
+          _presenceEntry = null;
+          _presenceFromPlanning = false;
+        });
+      }
+      return;
+    }
+
+    Map<String, dynamic>? existingPresence;
+    for (final entry in entriesForSelectedDay) {
+      if (_isPresenceEntry(entry)) {
+        existingPresence = entry;
+        break;
+      }
+    }
+
+    final sauveteursSnapshot = await FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(widget.territoireId)
+        .collection('sauveteurs')
+        .get();
+
+    final candidates = <Map<String, dynamic>>[];
+    for (final document in sauveteursSnapshot.docs) {
+      final data = document.data();
+      final assigned = data['postesAffectes'] is List
+          ? (data['postesAffectes'] as List)
+              .map((value) => value.toString())
+              .toSet()
+          : <String>{};
+
+      if (!assigned.contains(spotId)) continue;
+
+      final nom = (data['nom'] ?? '').toString().trim();
+      final prenom = (data['prenom'] ?? '').toString().trim();
+      final label = [prenom, nom]
+          .where((value) => value.isNotEmpty)
+          .join(' ')
+          .trim();
+
+      if (label.isEmpty) continue;
+
+      candidates.add({
+        'id': document.id,
+        'label': label,
+        'planned': false,
+        'aliases': <String>[
+          _normalizePresenceName(label),
+          _normalizePresenceName([nom, prenom].join(' ')),
+        ],
+      });
+    }
+
+    final planningReference = FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(widget.territoireId)
+        .collection('spots')
+        .doc(spotId)
+        .collection('planningSauveteurs')
+        .doc(_selectedPlanningMonthId);
+
+    final planningSnapshot = await planningReference.get();
+    final plannedLabels = <String>{};
+
+    if (planningSnapshot.exists) {
+      final planning = planningSnapshot.data() ?? <String, dynamic>{};
+      final names = planning['names'] is Map
+          ? Map<String, dynamic>.from(planning['names'] as Map)
+          : <String, dynamic>{};
+      final cells = planning['cells'] is Map
+          ? Map<String, dynamic>.from(planning['cells'] as Map)
+          : <String, dynamic>{};
+
+      for (final entry in names.entries) {
+        final role = entry.key.toString();
+        final name = entry.value.toString().trim();
+        if (name.isEmpty) continue;
+
+        final cellKey = '$role-day_${_selectedDay.day}';
+        final cellValue = (cells[cellKey] ?? '').toString();
+        if (!_planningCellMeansPresent(cellValue)) continue;
+
+        final normalizedName = _normalizePresenceName(name);
+        Map<String, dynamic>? matchedCandidate;
+
+        for (final candidate in candidates) {
+          final aliases = (candidate['aliases'] as List)
+              .map((value) => value.toString())
+              .toList();
+          if (aliases.contains(normalizedName)) {
+            matchedCandidate = candidate;
+            break;
+          }
+        }
+
+        if (matchedCandidate != null) {
+          matchedCandidate['planned'] = true;
+          plannedLabels.add(matchedCandidate['label'].toString());
+        } else {
+          candidates.add({
+            'id': 'planning:$role',
+            'label': name,
+            'planned': true,
+            'aliases': <String>[normalizedName],
+          });
+          plannedLabels.add(name);
+        }
+      }
+    }
+
+    candidates.sort(
+      (a, b) => (a['label'] ?? '')
+          .toString()
+          .toLowerCase()
+          .compareTo((b['label'] ?? '').toString().toLowerCase()),
+    );
+
+    Set<String> selected;
+    if (existingPresence != null) {
+      selected = _presenceDescriptionLines(existingPresence).toSet();
+
+      for (final savedLabel in selected.toList()) {
+        final normalized = _normalizePresenceName(savedLabel);
+        final found = candidates.any((candidate) {
+          final aliases = (candidate['aliases'] as List)
+              .map((value) => value.toString())
+              .toList();
+          return aliases.contains(normalized);
+        });
+
+        if (!found) {
+          candidates.add({
+            'id': 'saved:$normalized',
+            'label': savedLabel,
+            'planned': false,
+            'aliases': <String>[normalized],
+          });
+        }
+      }
+    } else {
+      selected = plannedLabels.toSet();
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _presenceCandidates = candidates;
+      _selectedPresenceLabels = selected;
+      _presenceEntry = existingPresence;
+      _presenceFromPlanning = plannedLabels.isNotEmpty;
+    });
+
+    if (_selectedDayIsToday &&
+        existingPresence == null &&
+        plannedLabels.isNotEmpty &&
+        !_presenceAutoSaveAttempted &&
+        _canWrite) {
+      _presenceAutoSaveAttempted = true;
+      await _savePresence(automatic: true);
+    }
+  }
+
+  Future<void> _savePresence({bool automatic = false}) async {
+    if (!_canWrite ||
+        _selectedSpotId == null ||
+        _presenceSaving ||
+        _entryMutationInProgress) {
+      return;
+    }
+
+    final labels = _selectedPresenceLabels.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    final description = labels.isEmpty
+        ? 'Aucun sauveteur présent.'
+        : labels.join('\n');
+
+    final actionTaken = automatic
+        ? 'Présence préremplie automatiquement depuis le planning.'
+        : _presenceFromPlanning
+            ? 'Présence issue du planning, vérifiée ou ajustée manuellement.'
+            : 'Présence renseignée manuellement.';
+
+    setState(() {
+      _presenceSaving = true;
+      _statusMessage = null;
+    });
+
+    try {
+      final existingId = (_presenceEntry?['id'] ?? '').toString().trim();
+      final endpoint = existingId.isEmpty
+          ? 'addSauveteurMainCouranteEntry'
+          : 'updateSauveteurMainCouranteEntry';
+
+      final body = <String, dynamic>{
+        'sauveteurSessionToken': widget.sauveteurSessionToken,
+        'spotId': _selectedSpotId,
+        'type': 'Présence',
+        'description': description,
+        'actionTaken': actionTaken,
+        'visibility': 'operational',
+        if (existingId.isNotEmpty) 'entryId': existingId,
+      };
+
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-sphot-ab80b.cloudfunctions.net/$endpoint',
+        ),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        setState(() {
+          _statusMessage =
+              'La présence n’a pas pu être enregistrée actuellement.';
+        });
+        return;
+      }
+
+      if (!automatic) {
+        setState(() {
+          _statusMessage = 'Présence du jour enregistrée.';
+        });
+      }
+
+      await _loadEntries();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _statusMessage =
+            'Impossible d’enregistrer la présence pour le moment.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _presenceSaving = false);
+      }
+    }
+  }
+
+  Future<void> _openPresenceSelector() async {
+    if (!_canWrite || !_selectedDayIsToday || _presenceSaving) return;
+
+    final workingSelection = _selectedPresenceLabels.toSet();
+
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text(
+                'PRÉSENCE',
+                style: TextStyle(
+                  color: Color(0xFF1E3A8A),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              content: SizedBox(
+                width: 420,
+                child: _presenceCandidates.isEmpty
+                    ? const Text(
+                        'Aucun sauveteur affecté à ce poste. '
+                        'La présence peut être renseignée lorsque les '
+                        'affectations ou le planning sont disponibles.',
+                      )
+                    : ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 430),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: _presenceCandidates.length,
+                          itemBuilder: (context, index) {
+                            final candidate = _presenceCandidates[index];
+                            final label =
+                                (candidate['label'] ?? '').toString();
+                            final planned =
+                                candidate['planned'] == true;
+                            final checked =
+                                workingSelection.contains(label);
+
+                            return CheckboxListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              value: checked,
+                              activeColor: const Color(0xFF1E3A8A),
+                              title: Text(
+                                label,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              subtitle: Text(
+                                planned
+                                    ? 'Prévu présent au planning'
+                                    : 'Non prévu au planning / ajout manuel',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: planned
+                                      ? const Color(0xFF15803D)
+                                      : Colors.black54,
+                                ),
+                              ),
+                              onChanged: (value) {
+                                setDialogState(() {
+                                  if (value == true) {
+                                    workingSelection.add(label);
+                                  } else {
+                                    workingSelection.remove(label);
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('ANNULER'),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(workingSelection);
+                  },
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('ENREGISTRER'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result == null || !mounted) return;
+
+    setState(() {
+      _selectedPresenceLabels = result;
+    });
+    await _savePresence();
+  }
+
+  Widget _presenceSelector() {
+    final count = _selectedPresenceLabels.length;
+    final summary = count == 0
+        ? 'Aucun sauveteur présent'
+        : count == 1
+            ? _selectedPresenceLabels.first
+            : '$count sauveteurs présents';
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: _canWrite && _selectedDayIsToday
+          ? _openPresenceSelector
+          : null,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Présence',
+          isDense: true,
+          contentPadding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(
+              color: Color(0xFF1E3A8A),
+              width: 1.5,
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(
+              color: Color(0xFF1E3A8A),
+              width: 1.5,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.groups_2_outlined,
+              color: Color(0xFFDC2626),
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                summary,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFFDC2626),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (_presenceSaving)
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Color(0xFFDC2626),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _derivedPastPresenceCard() {
+    final labels = _selectedPresenceLabels.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF1E3A8A)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'PRÉSENCE',
+            style: TextStyle(
+              color: Color(0xFF1E3A8A),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            labels.isEmpty
+                ? 'Aucune présence renseignée.'
+                : labels.join('\n'),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+            ),
+          ),
+          if (_presenceFromPlanning) ...[
+            const SizedBox(height: 6),
+            const Text(
+              'Présence issue du planning de cette journée.',
+              style: TextStyle(
+                color: Colors.black54,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Future<void> _loadEntries() async {
     if (!_isSphotOn || _selectedSpotId == null) {
       if (mounted) setState(() => _entries = []);
@@ -299,6 +819,8 @@ class _SauveteurMainCourantePageState
       setState(() {
         _entries = entriesForSelectedDay;
       });
+
+      await _loadPresenceContext(entriesForSelectedDay);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -1141,6 +1663,8 @@ class _SauveteurMainCourantePageState
       ),
       child: Column(
         children: [
+          _presenceSelector(),
+          const SizedBox(height: 10),
           SauveteurStyledDropdown(
             labelText: 'Type de fait',
             value: _selectedType,
@@ -1317,7 +1841,23 @@ class _SauveteurMainCourantePageState
                                                 ),
                                               ),
                                             ),
-                                          if (_entries.isEmpty)
+                                          if (!_selectedDayIsToday &&
+                                              _presenceEntry == null &&
+                                              (_presenceFromPlanning ||
+                                                  _selectedPresenceLabels.isNotEmpty))
+                                            _derivedPastPresenceCard(),
+                                          if (_entries
+                                              .where(
+                                                (entry) =>
+                                                    !_selectedDayIsToday ||
+                                                    !_isPresenceEntry(entry),
+                                              )
+                                              .isEmpty &&
+                                              !(!_selectedDayIsToday &&
+                                                  _presenceEntry == null &&
+                                                  (_presenceFromPlanning ||
+                                                      _selectedPresenceLabels
+                                                          .isNotEmpty)))
                                             const Padding(
                                               padding: EdgeInsets.all(18),
                                               child: Text(
@@ -1329,7 +1869,13 @@ class _SauveteurMainCourantePageState
                                               ),
                                             )
                                           else
-                                            ..._entries.map(_entryCard),
+                                            ..._entries
+                                                .where(
+                                                  (entry) =>
+                                                      !_selectedDayIsToday ||
+                                                      !_isPresenceEntry(entry),
+                                                )
+                                                .map(_entryCard),
                                         ],
                                       ),
                           ),
