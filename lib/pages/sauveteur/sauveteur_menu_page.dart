@@ -402,7 +402,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                               crossAxisCount: 3,
                               crossAxisSpacing: 10,
                               mainAxisSpacing: 10,
-                              childAspectRatio: 0.74,
+                              childAspectRatio: 0.84,
                               children: [
                                 _MenuSquare(
                                   title: 'MÉTÉO TERRESTRE',
