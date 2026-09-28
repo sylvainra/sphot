@@ -1027,9 +1027,31 @@ class _SauveteurMainCourantePageState
                         controller: descriptionController,
                         minLines: 3,
                         maxLines: 7,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Fait du jour',
-                          border: OutlineInputBorder(),
+                          labelStyle: _fieldLabelStyle,
+                          floatingLabelStyle: _fieldLabelStyle,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: SauveteurStyledDropdown.borderColor,
+                              width: 1.6,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: SauveteurStyledDropdown.borderColor,
+                              width: 1.6,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: SauveteurStyledDropdown.borderColor,
+                              width: 1.8,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -1037,9 +1059,31 @@ class _SauveteurMainCourantePageState
                         controller: actionController,
                         minLines: 2,
                         maxLines: 5,
-                        decoration: const InputDecoration(
-                          labelText: 'Action / suite donnée',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: 'Actions / Suite donnée',
+                          labelStyle: _fieldLabelStyle,
+                          floatingLabelStyle: _fieldLabelStyle,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: SauveteurStyledDropdown.borderColor,
+                              width: 1.6,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: SauveteurStyledDropdown.borderColor,
+                              width: 1.6,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: SauveteurStyledDropdown.borderColor,
+                              width: 1.8,
+                            ),
+                          ),
                         ),
                       ),
                       SwitchListTile(
@@ -1781,7 +1825,7 @@ class _SauveteurMainCourantePageState
             minLines: 1,
             maxLines: 3,
             decoration: InputDecoration(
-              labelText: 'Action / suite donnée',
+              labelText: 'Actions / Suite donnée',
               labelStyle: _fieldLabelStyle,
               floatingLabelStyle: _fieldLabelStyle,
               contentPadding: const EdgeInsets.symmetric(
