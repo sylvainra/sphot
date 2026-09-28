@@ -747,7 +747,7 @@ Future<void> _savePlanning() async {
 
   Color _columnBackground(_PlanningColumn col) {
     if (col.isTotal) {
-      return const Color(0xFFFFCDD2).withOpacity(0.78);
+      return const Color(0xFFFF8A80).withOpacity(0.82);
     }
 
     if (col.date?.weekday == DateTime.saturday) {
@@ -983,7 +983,7 @@ Future<void> _savePlanning() async {
       height: 38,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFFBDBDBD).withOpacity(0.55),
+        color: const Color(0xFFFF8A80).withOpacity(0.82),
         border: Border.all(color: Colors.black, width: 1),
       ),
       child: Text(
@@ -1071,51 +1071,78 @@ Future<void> _savePlanning() async {
       children: [
         SizedBox(
           height: 46,
-          child: SingleChildScrollView(
-            controller: _headerHorizontalController,
-            scrollDirection: Axis.horizontal,
-            physics: const ClampingScrollPhysics(),
-            child: Row(
-              children: [
-                _headerCell(
-                  'Fonction',
-                  135,
-                  Colors.white.withOpacity(0.45),
-                ),
-                for (final col in columns)
-                  _headerCell(
-                    col.label,
-                    col.isMonthTotal
-                        ? 88
-                        : col.isTotal
-                            ? 70
-                            : 82,
-                    _columnBackground(col),
+          child: Row(
+            children: [
+              _headerCell(
+                'Fonction',
+                135,
+                Colors.white.withOpacity(0.45),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _headerHorizontalController,
+                  scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
+                  child: Row(
+                    children: [
+                      for (final col in columns)
+                        _headerCell(
+                          col.label,
+                          col.isMonthTotal
+                              ? 88
+                              : col.isTotal
+                                  ? 70
+                                  : 82,
+                          _columnBackground(col),
+                        ),
+                    ],
                   ),
-              ],
-            ),
+                ),
+              ),
+            ],
           ),
         ),
         Expanded(
           child: SingleChildScrollView(
-            controller: _tableHorizontalController,
-            scrollDirection: Axis.horizontal,
-            physics: const ClampingScrollPhysics(),
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  for (int i = 0; i < roles.length; i++)
-                    Row(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  children: [
+                    for (int i = 0; i < roles.length; i++)
+                      _roleCell(roles[i], i),
+                  ],
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: _tableHorizontalController,
+                    scrollDirection: Axis.horizontal,
+                    physics: const ClampingScrollPhysics(),
+                    child: Column(
                       children: [
-                        _roleCell(roles[i], i),
-                        for (int c = 0; c < columns.length; c++)
-                          columns[c].isTotal
-                              ? _totalCell(roles[i], c, columns[c])
-                              : _editableCell(roles[i], columns[c]),
+                        for (int i = 0; i < roles.length; i++)
+                          Row(
+                            children: [
+                              for (int columnIndex = 0;
+                                  columnIndex < columns.length;
+                                  columnIndex++)
+                                columns[columnIndex].isTotal
+                                    ? _totalCell(
+                                        roles[i],
+                                        columnIndex,
+                                        columns[columnIndex],
+                                      )
+                                    : _editableCell(
+                                        roles[i],
+                                        columns[columnIndex],
+                                      ),
+                            ],
+                          ),
                       ],
                     ),
-                ],
-              ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -1124,55 +1151,65 @@ Future<void> _savePlanning() async {
   }
 
   Widget _totalWorkersBar() {
+    const totalRowColor = Color(0xFFFF8A80);
+
     return SizedBox(
       height: 38,
-      child: SingleChildScrollView(
-        controller: _totalHorizontalController,
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            Container(
-              width: 135,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.15),
-                border: Border.all(color: Colors.black, width: 1),
-              ),
-              child: const Text(
-                'TOTAL\nSAUVETEURS',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                ),
+      child: Row(
+        children: [
+          Container(
+            width: 135,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: totalRowColor.withOpacity(0.82),
+              border: Border.all(color: Colors.black, width: 1),
+            ),
+            child: const Text(
+              'TOTAL\nSAUVETEURS',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
               ),
             ),
-            for (final col in columns)
-              Container(
-                width: col.isMonthTotal
-                    ? 88
-                    : col.isTotal
-                        ? 70
-                        : 82,
-                height: 38,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: col.isTotal
-                      ? const Color(0xFFFFCDD2).withOpacity(0.78)
-                      : _columnBackground(col),
-                  border: Border.all(color: Colors.black, width: 1),
-                ),
-                child: Text(
-                  col.isTotal ? '-' : '${_workersForColumn(col)}',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _totalHorizontalController,
+              scrollDirection: Axis.horizontal,
+              physics: const ClampingScrollPhysics(),
+              child: Row(
+                children: [
+                  for (final col in columns)
+                    Container(
+                      width: col.isMonthTotal
+                          ? 88
+                          : col.isTotal
+                              ? 70
+                              : 82,
+                      height: 38,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: totalRowColor.withOpacity(0.82),
+                        border: Border.all(
+                          color: Colors.black,
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        col.isTotal ? '-' : '${_workersForColumn(col)}',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
