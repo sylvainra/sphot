@@ -9,7 +9,7 @@ class SauveteurAdaptiveViewport extends StatelessWidget {
   const SauveteurAdaptiveViewport({
     super.key,
     required this.child,
-    this.minContentHeight = 700,
+    this.minContentHeight = 760,
   });
 
   final Widget child;
