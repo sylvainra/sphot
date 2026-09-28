@@ -927,6 +927,18 @@ class _SauveteurMainCourantePageState
     );
   }
 
+  String _entryDescriptionForDisplay(Map<String, dynamic> entry) {
+    final type = (entry['type'] ?? '').toString().trim().toLowerCase();
+    final description = (entry['description'] ?? '').toString();
+
+    if (type == 'vérification matériel' ||
+        type == 'verification materiel') {
+      return description.replaceAll(' • ', '\n');
+    }
+
+    return description;
+  }
+
   Widget _entryCard(Map<String, dynamic> entry) {
     final createdBy = entry['createdBy'] is Map
         ? Map<String, dynamic>.from(entry['createdBy'] as Map)
@@ -1033,7 +1045,7 @@ class _SauveteurMainCourantePageState
                 ),
                 const SizedBox(height: 9),
                 Text(
-                  (entry['description'] ?? '').toString(),
+                  _entryDescriptionForDisplay(entry),
                   style: const TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
