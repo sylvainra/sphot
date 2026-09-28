@@ -448,7 +448,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                   },
                                 ),
                                 _MenuSquare(
-                                  title: 'ÉPHÉMÉRIDE\nDICTON',
+                                  title: 'DICTON &\nÉPHÉMÉRIDE',
                                   icon: Icons.auto_awesome_rounded,
                                   color: const Color(0xFFF9A825),
                                   onTap: () {
