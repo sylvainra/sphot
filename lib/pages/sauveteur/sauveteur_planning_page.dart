@@ -747,7 +747,7 @@ Future<void> _savePlanning() async {
 
   Color _columnBackground(_PlanningColumn col) {
     if (col.isTotal) {
-      return const Color(0xFFBDBDBD).withOpacity(0.55);
+      return const Color(0xFFFFCDD2).withOpacity(0.78);
     }
 
     if (col.date?.weekday == DateTime.saturday) {
@@ -1159,7 +1159,7 @@ Future<void> _savePlanning() async {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: col.isTotal
-                      ? Colors.grey.withOpacity(0.45)
+                      ? const Color(0xFFFFCDD2).withOpacity(0.78)
                       : _columnBackground(col),
                   border: Border.all(color: Colors.black, width: 1),
                 ),
@@ -1289,8 +1289,6 @@ Future<void> _savePlanning() async {
                       ),
                       child: Column(
                         children: [
-                          _monthNavigation(),
-                          const SizedBox(height: 8),
                           Row(
                             children: [
                               _topField(
@@ -1328,6 +1326,8 @@ Future<void> _savePlanning() async {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 8),
+                          _monthNavigation(),
                           const SizedBox(height: 8),
                           Expanded(
                             child: Container(
