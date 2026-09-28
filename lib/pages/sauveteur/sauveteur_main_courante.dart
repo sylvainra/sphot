@@ -142,6 +142,9 @@ class _SauveteurMainCourantePageState
     super.initState();
     _selectedDay = _today;
     _loadSpots();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollSelectedDayIntoView();
+    });
   }
 
   @override
@@ -1177,67 +1180,10 @@ class _SauveteurMainCourantePageState
     );
   }
 
-  Widget _bottomDayNavigation() {
-    return SafeArea(
-      top: false,
-      child: SizedBox(
-        height: 78,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(8, 4, 8, 5),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.94),
-          border: const Border(
-            top: BorderSide(
-              color: Color(0xFF1E3A8A),
-              width: 1.5,
-            ),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.10),
-              blurRadius: 12,
-              offset: const Offset(0, -3),
-            ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(child: _dayTabs()),
-            const SizedBox(width: 10),
-            InkWell(
-              borderRadius: BorderRadius.circular(999),
-              onTap: () => Navigator.of(context).pop(),
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                  border: Border.all(
-                    color: const Color(0xFF1E3A8A),
-                    width: 1.7,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: Color(0xFF1E3A8A),
-                  size: 18,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      bottomNavigationBar: _bottomDayNavigation(),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -1247,7 +1193,7 @@ class _SauveteurMainCourantePageState
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Column(
                 children: [
                   Image.asset(
@@ -1272,84 +1218,116 @@ class _SauveteurMainCourantePageState
                         borderRadius: BorderRadius.circular(22),
                         border: Border.all(color: Colors.black, width: 2),
                       ),
-                      child: !_isSphotOn
-                          ? const Center(
-                              child: Text(
-                                'La main courante réelle devient accessible '
-                                'uniquement lorsque SPHOT est ON.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Color(0xFFDC2626),
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            )
-                          : _loading
-                              ? const Center(
-                                  child: CircularProgressIndicator(),
-                                )
-                              : ListView(
-                                  children: [
-                                    _selectedDayHeader(),
-                                    const SizedBox(height: 10),
-                                    if (_institutionalContacts.isNotEmpty) ...[
-                                      _institutionalContactsCard(),
-                                      const SizedBox(height: 12),
-                                    ],
-                                    if (_selectedDayIsToday)
-                                      _entryForm()
-                                    else if (_canWrite)
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.65),
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: Colors.black12,
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'Consultation d’une journée passée. '
-                                          'Les saisies existantes restent '
-                                          'modifiables et supprimables.',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: !_isSphotOn
+                                ? const Center(
+                                    child: Text(
+                                      'La main courante réelle devient accessible '
+                                      'uniquement lorsque SPHOT est ON.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Color(0xFFDC2626),
+                                        fontWeight: FontWeight.w900,
                                       ),
-                                    if (_canWrite)
-                                      const SizedBox(height: 12),
-                                    if (_statusMessage != null)
-                                      Padding(
-                                        padding:
-                                            const EdgeInsets.only(bottom: 10),
-                                        child: Text(
-                                          _statusMessage!,
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
-                                      ),
-                                    if (_entries.isEmpty)
-                                      const Padding(
-                                        padding: EdgeInsets.all(18),
-                                        child: Text(
-                                          'Aucun fait enregistré pour cette journée.',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
+                                    ),
+                                  )
+                                : _loading
+                                    ? const Center(
+                                        child: CircularProgressIndicator(),
                                       )
-                                    else
-                                      ..._entries.map(_entryCard),
-                                  ],
-                                ),
+                                    : ListView(
+                                        children: [
+                                          _selectedDayHeader(),
+                                          const SizedBox(height: 10),
+                                          if (_institutionalContacts.isNotEmpty) ...[
+                                            _institutionalContactsCard(),
+                                            const SizedBox(height: 12),
+                                          ],
+                                          if (_selectedDayIsToday)
+                                            _entryForm()
+                                          else if (_canWrite)
+                                            Container(
+                                              width: double.infinity,
+                                              padding: const EdgeInsets.all(10),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white.withOpacity(0.65),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: Colors.black12,
+                                                ),
+                                              ),
+                                              child: const Text(
+                                                'Consultation d’une journée passée. '
+                                                'Les saisies existantes restent '
+                                                'modifiables et supprimables.',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          if (_canWrite)
+                                            const SizedBox(height: 12),
+                                          if (_statusMessage != null)
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                bottom: 10,
+                                              ),
+                                              child: Text(
+                                                _statusMessage!,
+                                                textAlign: TextAlign.center,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                            ),
+                                          if (_entries.isEmpty)
+                                            const Padding(
+                                              padding: EdgeInsets.all(18),
+                                              child: Text(
+                                                'Aucun fait enregistré pour cette journée.',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                            )
+                                          else
+                                            ..._entries.map(_entryCard),
+                                        ],
+                                      ),
+                          ),
+                          if (_isSphotOn) ...[
+                            const SizedBox(height: 8),
+                            _dayTabs(),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.black,
+                          width: 2,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.black,
+                        size: 21,
+                      ),
                     ),
                   ),
                 ],
