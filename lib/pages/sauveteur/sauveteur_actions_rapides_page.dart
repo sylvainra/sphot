@@ -620,6 +620,22 @@ class _SauveteurActionsRapidesPageState
             child: Stack(
               alignment: Alignment.center,
               children: [
+                Positioned(
+                  top: 74,
+                  bottom: 28,
+                  left: (constraints.maxWidth - 6.2) / 2,
+                  child: Container(
+                    width: 6.2,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(
+                        color: Colors.black,
+                        width: 1.2,
+                      ),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
                 const Positioned(
                   top: 7,
                   left: 0,
@@ -746,10 +762,12 @@ class _SauveteurActionsRapidesPageState
 
                 const SizedBox(height: 2),
 
-                Expanded(
+                Flexible(
+  fit: FlexFit.loose,
   child: Padding(
-    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
     child: Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
                           if (_loadingSpots)
                             const Padding(
@@ -952,9 +970,9 @@ class _SauveteurActionsRapidesPageState
                       ),
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 2),
                 _bottomNavBar(),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
               ],
             ),
           ),
