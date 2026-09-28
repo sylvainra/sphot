@@ -11,6 +11,7 @@ import '../../models/flag_state.dart';
 import '../../widgets/adaptive_asset_image.dart';
 import '../../widgets/danger_pictogram.dart';
 import 'widgets/sauveteur_styled_dropdown.dart';
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurActionsRapidesPage extends StatefulWidget {
   final Color profileColor;
@@ -655,7 +656,8 @@ class _SauveteurActionsRapidesPageState
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
+      body: SauveteurAdaptiveViewport(
+        child: Stack(
         fit: StackFit.expand,
         children: [
           Image.asset(
@@ -900,7 +902,7 @@ class _SauveteurActionsRapidesPageState
             child: _bottomNavBar(),
           ),
         ],
-      ),
+      )),
     );
   }
 
