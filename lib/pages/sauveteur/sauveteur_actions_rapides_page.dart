@@ -585,7 +585,7 @@ class _SauveteurActionsRapidesPageState
   }
 
   Widget _buildFlagMastControl() {
-    const height = 210.0;
+    const height = 280.0;
 
     return Container(
       height: height,
@@ -637,7 +637,7 @@ class _SauveteurActionsRapidesPageState
                 Padding(
                   padding: const EdgeInsets.only(top: 18, bottom: 18),
                   child: Transform.scale(
-                    scale: 1.28,
+                    scale: 1.55,
                     child: FlagMarker(
                       spot: _previewSpotState(),
                     ),
@@ -659,7 +659,7 @@ class _SauveteurActionsRapidesPageState
                 ),
                 Positioned(
                   right: 6,
-                  top: 84,
+                  top: 124,
                   child: Icon(
                     Icons.unfold_more_rounded,
                     size: 22,
@@ -788,7 +788,7 @@ class _SauveteurActionsRapidesPageState
                           if (!isTemporaryClosed)
                             Container(
                               width: double.infinity,
-                              height: 64,
+                              height: 68,
                               margin: const EdgeInsets.only(
                                 top: 3,
                                 bottom: 6,
@@ -837,16 +837,16 @@ class _SauveteurActionsRapidesPageState
                             children: [
                               const SizedBox(height: 8),
                               SizedBox(
-                                height: 210,
+                                height: 280,
                                 child: Row(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
                                     SizedBox(
-                                      width: 138,
+                                      width: 132,
                                       child: _buildFlagMastControl(),
                                     ),
-                                    const SizedBox(width: 14),
+                                    const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
                                         children: [
@@ -1217,7 +1217,7 @@ class _SauveteurActionsRapidesPageState
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 3),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
   color: Colors.transparent,
   borderRadius: BorderRadius.circular(18),
@@ -1438,7 +1438,7 @@ class _SupplementarySignalButton extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        height: 64,
+        height: 78,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: selected
@@ -2180,7 +2180,7 @@ class _ActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 60,
+        height: 72,
         width: double.infinity,
         decoration: BoxDecoration(
   color: color,
