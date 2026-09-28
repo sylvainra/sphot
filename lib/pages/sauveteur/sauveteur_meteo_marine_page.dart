@@ -341,7 +341,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                   Expanded(
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                       decoration: BoxDecoration(
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(24),
@@ -511,7 +511,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                               const SizedBox(height: 12),
 
                               SizedBox(
-                                height: 226,
+                                height: 286,
 
                                 child: _SwellFullWidthCard(
                                     borderColor: swellColor,
@@ -583,8 +583,9 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                           ),
                         ),
                       )),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
                           _publishButton(),
+                          const SizedBox(height: 2),
                         ],
                       ),
                     ),
