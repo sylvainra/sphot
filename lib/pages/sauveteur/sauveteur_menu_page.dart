@@ -583,7 +583,10 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                     offset: const Offset(0, 9),
                     child: GestureDetector(
                       onTap: () {
-                        Navigator.of(context).pop();
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          '/login',
+                          (route) => false,
+                        );
                       },
                       child: Container(
                         width: 50,
