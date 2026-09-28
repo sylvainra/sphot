@@ -1143,7 +1143,7 @@ class _SauveteurActionsRapidesPageState
   Widget _dangerBanner() {
     return Container(
       width: double.infinity,
-      height: 58,
+      height: 64,
       margin: const EdgeInsets.only(top: 3, bottom: 6),
       padding: const EdgeInsets.symmetric(
         vertical: 6,
