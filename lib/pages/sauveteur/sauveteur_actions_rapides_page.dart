@@ -1379,16 +1379,16 @@ class _QuickActionsFlagMarkerState extends State<_QuickActionsFlagMarker>
   static const double markerHeight = 220;
 
   static const double poleWidth = 4;
-  static const double poleHeight = 188;
+  static const double poleHeight = 174;
   static const double poleLeft = 24;
 
   static const double flagLeft = poleLeft + poleWidth - 1;
   static const double flagWidth = 38;
   static const double flagHeight = 38;
 
-  static const double flagTopHisse = 16;
+  static const double flagTopHisse = 30;
   static const double flagTopAffale = 158;
-  static const double purpleFlagTop = 48;
+  static const double purpleFlagTop = 62;
 
   static const double windsockWidth = 38;
   static const double windsockHeight = 20;
@@ -1443,9 +1443,9 @@ class _QuickActionsFlagMarkerState extends State<_QuickActionsFlagMarker>
 
   double get _windsockTop {
     if (_purpleFlagActive && _flagIsHisse) {
-      return 88;
+      return 102;
     }
-    return 58;
+    return 72;
   }
 
   @override
@@ -1458,7 +1458,7 @@ class _QuickActionsFlagMarkerState extends State<_QuickActionsFlagMarker>
         children: [
           Positioned(
             left: poleLeft,
-            top: 8,
+            top: 22,
             child: Container(
               width: poleWidth,
               height: poleHeight,
