@@ -692,7 +692,7 @@ class _SauveteurActionsRapidesPageState
 
                 Expanded(
   child: Padding(
-    padding: const EdgeInsets.fromLTRB(16, 0, 16, 50),
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
     child: Column(
       children: [
                           if (_loadingSpots)
