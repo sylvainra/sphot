@@ -14,6 +14,7 @@ class SauveteurMainCourantePage extends StatefulWidget {
   final String sphotMode;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final String? initialSpotId;
   final bool canManageRestrictedOperationalData;
 
   const SauveteurMainCourantePage({
@@ -25,6 +26,7 @@ class SauveteurMainCourantePage extends StatefulWidget {
     required this.sphotMode,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    required this.initialSpotId,
     required this.canManageRestrictedOperationalData,
   });
 
@@ -200,7 +202,14 @@ class _SauveteurMainCourantePageState
       _spots
         ..clear()
         ..addAll(spots);
-      _selectedSpotId = _spots.isEmpty ? null : _spots.first['id'];
+      final preferredId = widget.initialSpotId?.trim();
+      final initialSpot = _spots.isEmpty
+          ? null
+          : _spots.firstWhere(
+              (spot) => spot['id'] == preferredId,
+              orElse: () => _spots.first,
+            );
+      _selectedSpotId = initialSpot?['id'];
       _institutionalContacts = institutionalContacts;
       _loading = false;
     });
@@ -1096,50 +1105,48 @@ class _SauveteurMainCourantePageState
                   ),
                 ],
                 if (_canWrite) ...[
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Modifier',
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 34,
+                            minHeight: 34,
+                          ),
                           onPressed: _entryMutationInProgress
                               ? null
                               : () => _editEntry(entry),
-                          icon: const Icon(Icons.edit_outlined, size: 17),
-                          label: const Text(
-                            'MODIFIER',
-                            style: TextStyle(fontWeight: FontWeight.w900),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF1E3A8A),
-                            side: const BorderSide(
-                              color: Color(0xFF1E3A8A),
-                            ),
+                          icon: const Icon(
+                            Icons.edit_outlined,
+                            color: Color(0xFF1E3A8A),
+                            size: 20,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
+                        IconButton(
+                          tooltip: 'Supprimer',
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 34,
+                            minHeight: 34,
+                          ),
                           onPressed: _entryMutationInProgress
                               ? null
                               : () => _deleteEntry(entry),
                           icon: const Icon(
                             Icons.delete_outline_rounded,
-                            size: 17,
-                          ),
-                          label: const Text(
-                            'SUPPRIMER',
-                            style: TextStyle(fontWeight: FontWeight.w900),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFDC2626),
-                            side: const BorderSide(
-                              color: Color(0xFFDC2626),
-                            ),
+                            color: Color(0xFFDC2626),
+                            size: 20,
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ],
@@ -1241,7 +1248,7 @@ class _SauveteurMainCourantePageState
     return SafeArea(
       top: false,
       child: SizedBox(
-        height: 96,
+        height: 100,
         child: Container(
           padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
         decoration: BoxDecoration(
@@ -1323,10 +1330,6 @@ class _SauveteurMainCourantePageState
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  _modeBanner(),
-                  const SizedBox(height: 8),
-                  _spotSelector(),
                   const SizedBox(height: 8),
                   Expanded(
                     child: Container(
