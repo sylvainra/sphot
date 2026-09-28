@@ -273,6 +273,34 @@ class _SauveteurMainCourantePageState
     return type == 'présence' || type == 'presence';
   }
 
+  bool _isMaterialVerificationEntry(Map<String, dynamic> entry) {
+    final type = (entry['type'] ?? '').toString().trim().toLowerCase();
+    return type == 'vérification matériel' ||
+        type == 'verification materiel';
+  }
+
+  int _entryOccurredAtMillis(Map<String, dynamic> entry) {
+    final raw = entry['occurredAt'];
+    if (raw is num) return raw.toInt();
+    return int.tryParse((raw ?? '').toString()) ?? 0;
+  }
+
+  int _compareFactEntries(
+    Map<String, dynamic> a,
+    Map<String, dynamic> b,
+  ) {
+    final aIsMaterialVerification = _isMaterialVerificationEntry(a);
+    final bIsMaterialVerification = _isMaterialVerificationEntry(b);
+
+    if (aIsMaterialVerification != bIsMaterialVerification) {
+      return aIsMaterialVerification ? -1 : 1;
+    }
+
+    return _entryOccurredAtMillis(a).compareTo(
+      _entryOccurredAtMillis(b),
+    );
+  }
+
   List<String> _presenceDescriptionLines(Map<String, dynamic> entry) {
     final description = (entry['description'] ?? '').toString();
     return description
@@ -1707,6 +1735,14 @@ class _SauveteurMainCourantePageState
           (entry) =>
               !_selectedDayIsToday || !_isPresenceEntry(entry),
         )
+        .toList()
+      ..sort(_compareFactEntries);
+
+    final materialVerificationEntries = visibleEntries
+        .where(_isMaterialVerificationEntry)
+        .toList();
+    final chronologicalEntries = visibleEntries
+        .where((entry) => !_isMaterialVerificationEntry(entry))
         .toList();
 
     final showDerivedPresence = !_selectedDayIsToday &&
@@ -1738,9 +1774,12 @@ class _SauveteurMainCourantePageState
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          ...materialVerificationEntries.map(_entryCard),
           if (showDerivedPresence)
             _derivedPastPresenceCard(),
-          if (visibleEntries.isEmpty && !showDerivedPresence)
+          if (materialVerificationEntries.isEmpty &&
+              chronologicalEntries.isEmpty &&
+              !showDerivedPresence)
             const Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: 8,
@@ -1755,7 +1794,7 @@ class _SauveteurMainCourantePageState
               ),
             )
           else
-            ...visibleEntries.map(_entryCard),
+            ...chronologicalEntries.map(_entryCard),
         ],
       ),
     );
