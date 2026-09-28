@@ -256,7 +256,6 @@ class _SauveteurEphemerideDictonPageState
 
     return Container(
       width: double.infinity,
-      height: 194,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.35),
@@ -322,10 +321,12 @@ class _SauveteurEphemerideDictonPageState
           ),
         ),
         const SizedBox(height: 8),
-        _textZone(
-          hint: hint,
-          zone: zone,
-          controller: controller,
+        Expanded(
+          child: _textZone(
+            hint: hint,
+            zone: zone,
+            controller: controller,
+          ),
         ),
       ],
     );
@@ -357,7 +358,7 @@ class _SauveteurEphemerideDictonPageState
                   ),
 
                   Text(
-                    'ÉPHÉMÉRIDE DICTON',
+                    'DICTON & ÉPHÉMÉRIDE',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
@@ -384,27 +385,22 @@ class _SauveteurEphemerideDictonPageState
                       child: Column(
                         children: [
                           Expanded(
-                            child: SingleChildScrollView(
-                              physics: const BouncingScrollPhysics(),
-                              child: Column(
-                                children: [
-                                  _section(
-                                    title: 'ÉPHÉMÉRIDE',
-                                    hint:
-                                        'Dictez ou saisissez ici l’éphéméride du jour...',
-                                    zone: 0,
-                                    controller: ephemerideController,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  _section(
-                                    title: 'DICTON',
-                                    hint:
-                                        'Dictez ou saisissez ici le dicton du jour...',
-                                    zone: 1,
-                                    controller: dictonController,
-                                  ),
-                                ],
-                              ),
+                            child: _section(
+                              title: 'DICTON',
+                              hint:
+                                  'Dictez ou saisissez ici le dicton du jour...',
+                              zone: 1,
+                              controller: dictonController,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Expanded(
+                            child: _section(
+                              title: 'ÉPHÉMÉRIDE',
+                              hint:
+                                  'Dictez ou saisissez ici l’éphéméride du jour...',
+                              zone: 0,
+                              controller: ephemerideController,
                             ),
                           ),
                           const SizedBox(height: 8),
