@@ -338,10 +338,11 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
 
                   const SizedBox(height: 4),
 
-                  Expanded(
+                  SizedBox(
+                    height: 600,
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                       decoration: BoxDecoration(
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(24),
@@ -583,16 +584,16 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                           ),
                         ),
                       )),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 4),
                           _publishButton(),
-                          const SizedBox(height: 2),
                         ],
                       ),
                     ),
                   ),
 
+                  const SizedBox(height: 6),
                   Transform.translate(
-                    offset: const Offset(0, 12),
+                    offset: const Offset(0, 0),
 
                     child: GestureDetector(
                       onTap: () {
