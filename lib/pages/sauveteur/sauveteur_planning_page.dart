@@ -45,6 +45,7 @@ class _SauveteurPlanningPageState extends State<SauveteurPlanningPage> {
   bool _isListening = false;
   String? _listeningKey;
 
+  final ScrollController _headerHorizontalController = ScrollController();
   final ScrollController _tableHorizontalController = ScrollController();
   final ScrollController _totalHorizontalController = ScrollController();
 
@@ -93,22 +94,43 @@ String? selectedSpotId;
     _speech = stt.SpeechToText();
     _loadBeaches();
 
-    _tableHorizontalController.addListener(() {
-      if (_syncingScroll) return;
-      if (!_totalHorizontalController.hasClients) return;
+    void syncFrom(
+      ScrollController source,
+      List<ScrollController> targets,
+    ) {
+      if (_syncingScroll || !source.hasClients) return;
 
       _syncingScroll = true;
-      _totalHorizontalController.jumpTo(_tableHorizontalController.offset);
+      for (final target in targets) {
+        if (!target.hasClients) continue;
+        final max = target.position.maxScrollExtent;
+        final offset = source.offset.clamp(0.0, max).toDouble();
+        if ((target.offset - offset).abs() > 0.5) {
+          target.jumpTo(offset);
+        }
+      }
       _syncingScroll = false;
+    }
+
+    _headerHorizontalController.addListener(() {
+      syncFrom(
+        _headerHorizontalController,
+        [_tableHorizontalController, _totalHorizontalController],
+      );
+    });
+
+    _tableHorizontalController.addListener(() {
+      syncFrom(
+        _tableHorizontalController,
+        [_headerHorizontalController, _totalHorizontalController],
+      );
     });
 
     _totalHorizontalController.addListener(() {
-      if (_syncingScroll) return;
-      if (!_tableHorizontalController.hasClients) return;
-
-      _syncingScroll = true;
-      _tableHorizontalController.jumpTo(_totalHorizontalController.offset);
-      _syncingScroll = false;
+      syncFrom(
+        _totalHorizontalController,
+        [_headerHorizontalController, _tableHorizontalController],
+      );
     });
 
     final now = DateTime.now();
@@ -252,6 +274,7 @@ String? selectedSpotId;
     work3Controller.dispose();
     restController.dispose();
 
+    _headerHorizontalController.dispose();
     _tableHorizontalController.dispose();
     _totalHorizontalController.dispose();
 
@@ -838,13 +861,15 @@ Future<void> _savePlanning() async {
 }
 
   Widget _scheduleTable() {
-    return SingleChildScrollView(
-      controller: _tableHorizontalController,
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            Row(
+    return Column(
+      children: [
+        SizedBox(
+          height: 38,
+          child: SingleChildScrollView(
+            controller: _headerHorizontalController,
+            scrollDirection: Axis.horizontal,
+            physics: const ClampingScrollPhysics(),
+            child: Row(
               children: [
                 _headerCell(
                   'Fonction',
@@ -863,19 +888,32 @@ Future<void> _savePlanning() async {
                   ),
               ],
             ),
-            for (int i = 0; i < roles.length; i++)
-              Row(
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            controller: _tableHorizontalController,
+            scrollDirection: Axis.horizontal,
+            physics: const ClampingScrollPhysics(),
+            child: SingleChildScrollView(
+              child: Column(
                 children: [
-                  _roleCell(roles[i], i),
-                  for (int c = 0; c < columns.length; c++)
-                    columns[c].isTotal
-                        ? _totalCell(roles[i], c, columns[c])
-                        : _editableCell(roles[i], columns[c]),
+                  for (int i = 0; i < roles.length; i++)
+                    Row(
+                      children: [
+                        _roleCell(roles[i], i),
+                        for (int c = 0; c < columns.length; c++)
+                          columns[c].isTotal
+                              ? _totalCell(roles[i], c, columns[c])
+                              : _editableCell(roles[i], columns[c]),
+                      ],
+                    ),
                 ],
               ),
-          ],
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
