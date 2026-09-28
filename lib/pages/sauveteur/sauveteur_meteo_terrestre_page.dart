@@ -5,6 +5,7 @@ import 'dart:math';
 
 import '../../services/sauveteur_live_publication_service.dart';
 import 'widgets/sauveteur_styled_dropdown.dart';
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurMeteoTerrestrePage extends StatefulWidget {
   final Color profileColor;
@@ -256,7 +257,8 @@ class _SauveteurMeteoTerrestrePageState extends State<SauveteurMeteoTerrestrePag
 Widget build(BuildContext context) {
   return Scaffold(
     backgroundColor: Colors.transparent,
-    body: Stack(
+    body: SauveteurAdaptiveViewport(
+        child: Stack(
       fit: StackFit.expand,
       children: [
         Image.asset(
@@ -471,7 +473,7 @@ Widget build(BuildContext context) {
           ),
         ),
       ],
-    ),
+    )),
   );
 }
 
