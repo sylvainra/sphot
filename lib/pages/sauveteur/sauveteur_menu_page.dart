@@ -12,6 +12,7 @@ import 'sauveteur_recherche_personne_page.dart';
 import 'sauveteur_ephemeride_dicton_page.dart';
 import 'sauveteur_planning_page.dart';
 import 'sauveteur_main_courante.dart';
+import 'sauveteur_materiel_verification_page.dart';
 import '../../services/sauveteur_live_publication_service.dart';
 import 'widgets/sauveteur_styled_dropdown.dart';
 import 'widgets/sauveteur_adaptive_viewport.dart';
@@ -527,10 +528,33 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                           ),
                           const SizedBox(height: 4),
                           _MenuSquare(
+                            title: 'VÉRIFICATION MATÉRIEL',
+                            icon: Icons.fact_check_outlined,
+                            color: const Color(0xFF1E3A8A),
+                            height: 54,
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      SauveteurMaterielVerificationPage(
+                                    profileColor: profileColor,
+                                    territoireId: widget.territoireId,
+                                    sauveteurSessionToken:
+                                        widget.sauveteurSessionToken,
+                                    postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
+                                    sphotMode: _sphotMode,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 6),
+                          _MenuSquare(
                             title: 'MAIN COURANTE',
                             icon: Icons.menu_book_rounded,
                             color: const Color(0xFF8E24AA),
-                            height: 82,
+                            height: 54,
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
