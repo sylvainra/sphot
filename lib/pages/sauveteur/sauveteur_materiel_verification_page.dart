@@ -41,6 +41,7 @@ class _SauveteurMaterielVerificationPageState
       TextEditingController(text: '200');
   final TextEditingController _remarksController = TextEditingController();
 
+  String? _selectedSpotId;
   String? _spotLabel;
   bool _loading = true;
   bool _saving = false;
@@ -90,6 +91,7 @@ class _SauveteurMaterielVerificationPageState
 
       if (!mounted) return;
       setState(() {
+        _selectedSpotId = selected?.id;
         _spotLabel = selected?.label;
         _loading = false;
       });
@@ -120,7 +122,7 @@ class _SauveteurMaterielVerificationPageState
   String _status(bool value) => value ? 'OK' : 'À CONTRÔLER';
 
   Future<void> _saveVerification() async {
-    final spotId = widget.initialSpotId?.trim();
+    final spotId = _selectedSpotId?.trim();
 
     if (!_isSphotOn) {
       setState(() {
