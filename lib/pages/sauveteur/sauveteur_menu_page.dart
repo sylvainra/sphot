@@ -14,6 +14,7 @@ import 'sauveteur_planning_page.dart';
 import 'sauveteur_main_courante.dart';
 import '../../services/sauveteur_live_publication_service.dart';
 import 'widgets/sauveteur_styled_dropdown.dart';
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurMenuPage extends StatefulWidget {
   final Color profileColor;
@@ -283,7 +284,8 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
             fit: BoxFit.cover,
           ),
           SafeArea(
-            child: Padding(
+            child: SauveteurAdaptiveViewport(
+              child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 children: [
@@ -585,6 +587,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
               ),
             ),
           ),
+        ),
         ],
       ),
     );
