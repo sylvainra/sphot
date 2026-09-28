@@ -402,7 +402,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                               crossAxisCount: 3,
                               crossAxisSpacing: 10,
                               mainAxisSpacing: 10,
-                              childAspectRatio: 0.84,
+                              childAspectRatio: 0.72,
                               children: [
                                 _MenuSquare(
                                   title: 'MÉTÉO TERRESTRE',
@@ -531,7 +531,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                             title: 'VÉRIFICATION MATÉRIEL',
                             icon: Icons.fact_check_outlined,
                             color: const Color(0xFF1E3A8A),
-                            height: 54,
+                            height: 64,
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -554,7 +554,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                             title: 'MAIN COURANTE',
                             icon: Icons.menu_book_rounded,
                             color: const Color(0xFF8E24AA),
-                            height: 54,
+                            height: 64,
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -636,12 +636,13 @@ class _MenuSquare extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = height != null && height! <= 66;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         height: height,
         width: double.infinity,
-
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(22),
@@ -650,29 +651,25 @@ class _MenuSquare extends StatelessWidget {
             width: 2.1,
           ),
         ),
-
         child: Padding(
-          padding: const EdgeInsets.all(9),
-
+          padding: EdgeInsets.all(compact ? 4 : 9),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
                 color: iconColor ?? color,
-                size: 34,
+                size: compact ? 25 : 34,
               ),
-
-              const SizedBox(height: 7),
-
+              SizedBox(height: compact ? 2 : 7),
               Text(
                 title,
                 textAlign: TextAlign.center,
-                maxLines: 3,
+                maxLines: compact ? 1 : 3,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: color,
-                  fontSize: 10,
+                  fontSize: compact ? 9.5 : 10,
                   fontWeight: FontWeight.w900,
                   height: 1.0,
                 ),
