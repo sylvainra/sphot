@@ -650,6 +650,34 @@ class _SauveteurActionsRapidesPageState
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
+  Future<void> _openDangersPage() async {
+    final result = await Navigator.of(context).push<_DangerSelectionResult>(
+      MaterialPageRoute(
+        builder: (_) => SauveteurDangersPage(
+          profileColor: widget.profileColor,
+          dangerChoices: List<String>.from(dangerChoices),
+          initialSelectedDangers: Set<String>.from(selectedDangers),
+          initialBaineLevel: baineLevel,
+          initialCaniculeLevel: caniculeLevel,
+        ),
+      ),
+    );
+
+    if (!mounted || result == null) return;
+
+    setState(() {
+      selectedDangers
+        ..clear()
+        ..addAll(result.selectedDangers);
+      baineLevel = result.baineLevel;
+      caniculeLevel = result.caniculeLevel;
+    });
+
+    await _persistLiveChanges({
+      'dangers': _dangerValuesForPublication(),
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isTemporaryClosed = flagPosition == 'Affalé';
@@ -777,6 +805,7 @@ class _SauveteurActionsRapidesPageState
                           _sectionCard(
                             title: 'Actions rapides',
                             icon: Icons.flash_on,
+                            showHeader: false,
                             children: [
                               const SizedBox(height: 8),
                               SizedBox(
@@ -839,11 +868,7 @@ class _SauveteurActionsRapidesPageState
                                     : '${selectedDangers.length} '
                                         'danger(s) sélectionné(s)',
                                 color: const Color(0xFFFDE047),
-                                onTap: () {
-                                  setState(() {
-                                    isDangerMenuOpen = !isDangerMenuOpen;
-                                  });
-                                },
+                                onTap: _openDangersPage,
                               ),
                               const SizedBox(height: 10),
                               _ActionButton(
@@ -856,12 +881,6 @@ class _SauveteurActionsRapidesPageState
                                       builder: (_) =>
                                           SauveteurNotificationPage(
                                         profileColor: widget.profileColor,
-                                        spotLabel: [
-                                          nomSecours,
-                                          nomSphot,
-                                        ].where(
-                                          (value) => value.trim().isNotEmpty,
-                                        ).join(' - '),
                                         onPublish: _publishNotification,
                                       ),
                                     ),
@@ -877,23 +896,6 @@ class _SauveteurActionsRapidesPageState
               ],
             ),
           ),
-
-          if (isDangerMenuOpen)
-            GestureDetector(
-              onTap: () {
-                setState(() => isDangerMenuOpen = false);
-              },
-              child: Container(color: Colors.black.withOpacity(0.15)),
-            ),
-
-          if (isDangerMenuOpen)
-  Positioned(
-    left: 16,
-    right: 16,
-    bottom: 190,
-    height: 470,
-    child: _dangerSidePanel(),
-  ),
 
           Positioned(
             left: 16,
@@ -1149,6 +1151,7 @@ class _SauveteurActionsRapidesPageState
     required String title,
     IconData? icon,
     Widget? leading,
+    bool showHeader = true,
     required List<Widget> children,
   }) {
     assert(icon != null || leading != null);
@@ -1174,27 +1177,28 @@ class _SauveteurActionsRapidesPageState
       child: Column(
   crossAxisAlignment: CrossAxisAlignment.start,
   children: [
-          Row(
-            children: [
-              leading ??
-                  Icon(
-                    icon,
-                    color: widget.profileColor,
-                  ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
+          if (showHeader)
+            Row(
+              children: [
+                leading ??
+                    Icon(
+                      icon,
+                      color: widget.profileColor,
+                    ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-                    ...children,
+              ],
+            ),
+          ...children,
                 ],
       ),
     );
@@ -1732,6 +1736,297 @@ class _CaniculeDangerSelector extends StatelessWidget {
   }
 }
 
+
+class _DangerSelectionResult {
+  final Set<String> selectedDangers;
+  final int baineLevel;
+  final int caniculeLevel;
+
+  const _DangerSelectionResult({
+    required this.selectedDangers,
+    required this.baineLevel,
+    required this.caniculeLevel,
+  });
+}
+
+class SauveteurDangersPage extends StatefulWidget {
+  final Color profileColor;
+  final List<String> dangerChoices;
+  final Set<String> initialSelectedDangers;
+  final int initialBaineLevel;
+  final int initialCaniculeLevel;
+
+  const SauveteurDangersPage({
+    super.key,
+    required this.profileColor,
+    required this.dangerChoices,
+    required this.initialSelectedDangers,
+    required this.initialBaineLevel,
+    required this.initialCaniculeLevel,
+  });
+
+  @override
+  State<SauveteurDangersPage> createState() =>
+      _SauveteurDangersPageState();
+}
+
+class _SauveteurDangersPageState extends State<SauveteurDangersPage> {
+  late final Set<String> _selectedDangers;
+  late int _baineLevel;
+  late int _caniculeLevel;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDangers = Set<String>.from(widget.initialSelectedDangers);
+    _baineLevel = widget.initialBaineLevel;
+    _caniculeLevel = widget.initialCaniculeLevel;
+  }
+
+  String _baineLevelTitle(int level) {
+    switch (level) {
+      case 1:
+      case 2:
+        return 'Risque faible à modéré';
+      case 3:
+        return 'Risque marqué';
+      case 4:
+        return 'Risque très élevé';
+      case 5:
+        return 'Risque maximal (Alerte maximale)';
+      default:
+        return '';
+    }
+  }
+
+  String _caniculeLevelTitle(int level) {
+    switch (level) {
+      case 1:
+        return 'Veille saisonnière';
+      case 2:
+        return 'Avertissement chaleur';
+      case 3:
+        return 'Alerte canicule';
+      case 4:
+        return 'Mobilisation maximale';
+      default:
+        return '';
+    }
+  }
+
+  void _setBaineLevel(int level) {
+    setState(() {
+      _selectedDangers.removeWhere((danger) {
+        final upper = danger.toUpperCase();
+        return upper.contains('BAÏNE') || upper.contains('BAINE');
+      });
+
+      _baineLevel = level;
+
+      if (level > 0) {
+        _selectedDangers.add(
+          'BAÏNES - NIVEAU $level : ${_baineLevelTitle(level)}',
+        );
+      }
+    });
+  }
+
+  void _setCaniculeLevel(int level) {
+    setState(() {
+      _selectedDangers.removeWhere(
+        (danger) => danger.toUpperCase().contains('CANICULE'),
+      );
+
+      _caniculeLevel = level;
+
+      if (level > 0) {
+        _selectedDangers.add(
+          'CANICULE - NIVEAU $level : ${_caniculeLevelTitle(level)}',
+        );
+      }
+    });
+  }
+
+  void _validate() {
+    Navigator.of(context).pop(
+      _DangerSelectionResult(
+        selectedDangers: Set<String>.from(_selectedDangers),
+        baineLevel: _baineLevel,
+        caniculeLevel: _caniculeLevel,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SauveteurAdaptiveViewport(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              'data/images/map_background.jpg',
+              fit: BoxFit.cover,
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                child: Column(
+                  children: [
+                    Image.asset(
+                      'data/icons/title.png',
+                      height: 56,
+                      fit: BoxFit.contain,
+                    ),
+                    Text(
+                      'DANGERS',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: widget.profileColor,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.92),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: Colors.black,
+                            width: 2,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: ListView.builder(
+                                padding: EdgeInsets.zero,
+                                itemCount: widget.dangerChoices.length,
+                                itemBuilder: (context, index) {
+                                  final danger = widget.dangerChoices[index];
+                                  final upper = danger.toUpperCase();
+                                  final isBaine =
+                                      upper.contains('BAÏNE') ||
+                                      upper.contains('BAINE');
+                                  final isCanicule = upper == 'CANICULE';
+
+                                  if (isBaine) {
+                                    return _BaineDangerSelector(
+                                      level: _baineLevel,
+                                      onChanged: _setBaineLevel,
+                                    );
+                                  }
+
+                                  if (isCanicule) {
+                                    return _CaniculeDangerSelector(
+                                      level: _caniculeLevel,
+                                      onChanged: _setCaniculeLevel,
+                                    );
+                                  }
+
+                                  final selected =
+                                      _selectedDangers.contains(danger);
+
+                                  return CheckboxListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    value: selected,
+                                    activeColor: const Color(0xFFFDE047),
+                                    checkColor: Colors.black,
+                                    secondary: DangerPictogram(
+                                      danger: danger,
+                                      size: 28,
+                                    ),
+                                    title: Text(
+                                      danger,
+                                      softWrap: true,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        height: 1.15,
+                                      ),
+                                    ),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        if (value == true) {
+                                          _selectedDangers.add(danger);
+                                        } else {
+                                          _selectedDangers.remove(danger);
+                                        }
+                                      });
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 46,
+                              child: ElevatedButton(
+                                onPressed: _validate,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFEF4444),
+                                  foregroundColor: Colors.white,
+                                  side: const BorderSide(
+                                    color: Colors.black,
+                                    width: 2,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'VALIDER',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 9),
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.black,
+                          width: 2,
+                        ),
+                      ),
+                      child: IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.black,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1792,13 +2087,11 @@ class _ActionButton extends StatelessWidget {
 
 class SauveteurNotificationPage extends StatefulWidget {
   final Color profileColor;
-  final String spotLabel;
   final Future<bool> Function(String message) onPublish;
 
   const SauveteurNotificationPage({
     super.key,
     required this.profileColor,
-    required this.spotLabel,
     required this.onPublish,
   });
 
@@ -1919,49 +2212,13 @@ class _SauveteurNotificationPageState
                     fit: BoxFit.contain,
                   ),
                   Text(
-                    'ÉCRIRE UNE NOTIFICATION',
+                    'NOTIFICATION',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
                       color: widget.profileColor,
                       letterSpacing: 0.6,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 9,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.82),
-                      borderRadius: BorderRadius.circular(13),
-                      border: Border.all(
-                        color: Colors.black.withOpacity(0.35),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.place_rounded,
-                          color: widget.profileColor,
-                          size: 19,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            widget.spotLabel,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                   const SizedBox(height: 10),
