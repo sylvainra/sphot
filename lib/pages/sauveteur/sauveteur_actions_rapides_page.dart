@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -618,28 +619,11 @@ class _SauveteurActionsRapidesPageState
               unawaited(_persistFlagState());
             },
             child: Stack(
-              alignment: Alignment.center,
               children: [
-                Positioned(
-                  top: 74,
-                  bottom: 28,
-                  left: (constraints.maxWidth - 6.2) / 2,
-                  child: Container(
-                    width: 6.2,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(
-                        color: Colors.black,
-                        width: 1.2,
-                      ),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                ),
                 const Positioned(
                   top: 7,
                   left: 0,
-                  right: 0,
+                  width: 72,
                   child: Text(
                     'HISSÉ',
                     textAlign: TextAlign.center,
@@ -650,19 +634,17 @@ class _SauveteurActionsRapidesPageState
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 18, bottom: 18),
-                  child: Transform.scale(
-                    scale: 1.55,
-                    child: FlagMarker(
-                      spot: _previewSpotState(),
-                    ),
+                Positioned(
+                  left: -2,
+                  top: 16,
+                  child: _QuickActionsFlagMarker(
+                    spot: _previewSpotState(),
                   ),
                 ),
                 const Positioned(
                   bottom: 7,
                   left: 0,
-                  right: 0,
+                  width: 72,
                   child: Text(
                     'AFFALÉ',
                     textAlign: TextAlign.center,
@@ -1372,6 +1354,178 @@ class _BottomLogoButton extends StatelessWidget {
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(),
         icon: Icon(icon, color: color, size: 30),
+      ),
+    );
+  }
+}
+
+class _QuickActionsFlagMarker extends StatefulWidget {
+  final SpotFlagState spot;
+
+  const _QuickActionsFlagMarker({
+    required this.spot,
+  });
+
+  @override
+  State<_QuickActionsFlagMarker> createState() =>
+      _QuickActionsFlagMarkerState();
+}
+
+class _QuickActionsFlagMarkerState extends State<_QuickActionsFlagMarker>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  static const double markerWidth = 96;
+  static const double markerHeight = 220;
+
+  static const double poleWidth = 4;
+  static const double poleHeight = 204;
+  static const double poleLeft = 24;
+
+  static const double flagLeft = poleLeft + poleWidth - 1;
+  static const double flagWidth = 38;
+  static const double flagHeight = 38;
+
+  static const double flagTopHisse = 16;
+  static const double flagTopAffale = 158;
+  static const double purpleFlagTop = 48;
+
+  static const double windsockWidth = 38;
+  static const double windsockHeight = 20;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Color get _flagColor {
+    switch (widget.spot.flagColor) {
+      case FlagColor.green:
+        return const Color(0xFF22C55E);
+      case FlagColor.yellow:
+        return const Color(0xFFFDE047);
+      case FlagColor.red:
+        return const Color(0xFFEF4444);
+      case FlagColor.violet:
+        return const Color(0xFFD946EF);
+      case FlagColor.none:
+        return Colors.transparent;
+    }
+  }
+
+  Map<String, dynamic> get _liveFlag =>
+      widget.spot.liveFlag ?? <String, dynamic>{};
+
+  bool get _purpleFlagActive =>
+      _liveFlag['purpleFlagActive'] == true;
+
+  bool get _windsockActive =>
+      _liveFlag['windsockActive'] == true;
+
+  bool get _flagIsHisse =>
+      widget.spot.flagPosition == FlagPosition.hisse;
+
+  double get _flagTop =>
+      widget.spot.flagPosition == FlagPosition.affale
+          ? flagTopAffale
+          : flagTopHisse;
+
+  double get _windsockTop {
+    if (_purpleFlagActive && _flagIsHisse) {
+      return 88;
+    }
+    return 58;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: markerWidth,
+      height: markerHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: poleLeft,
+            top: 8,
+            child: Container(
+              width: poleWidth,
+              height: poleHeight,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(
+                  color: Colors.black,
+                  width: 1,
+                ),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          if (widget.spot.flagColor != FlagColor.none &&
+              widget.spot.flagPosition != FlagPosition.none)
+            Positioned(
+              left: flagLeft,
+              top: _flagTop,
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  return CustomPaint(
+                    size: const Size(
+                      flagWidth,
+                      flagHeight,
+                    ),
+                    painter: WavingFlagPainter(
+                      color: _flagColor,
+                      phase: _controller.value * 2 * math.pi,
+                    ),
+                  );
+                },
+              ),
+            ),
+          if (_purpleFlagActive && _flagIsHisse)
+            Positioned(
+              left: flagLeft,
+              top: purpleFlagTop,
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  return CustomPaint(
+                    size: const Size(
+                      flagWidth,
+                      flagHeight,
+                    ),
+                    painter: WavingFlagPainter(
+                      color: const Color(0xFFD946EF),
+                      phase: _controller.value * 2 * math.pi,
+                    ),
+                  );
+                },
+              ),
+            ),
+          if (_windsockActive)
+            Positioned(
+              left: flagLeft - 1,
+              top: _windsockTop,
+              child: const CustomPaint(
+                size: Size(
+                  windsockWidth,
+                  windsockHeight,
+                ),
+                painter: WindsockPainter(),
+              ),
+            ),
+        ],
       ),
     );
   }
