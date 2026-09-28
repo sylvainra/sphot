@@ -6,6 +6,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:csv/csv.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurPlanningPage extends StatefulWidget {
   final Color profileColor;
@@ -1005,7 +1006,8 @@ Future<void> _savePlanning() async {
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: true,
-      body: Stack(
+      body: SauveteurAdaptiveViewport(
+        child: Stack(
         fit: StackFit.expand,
         children: [
           Image.asset(
@@ -1182,7 +1184,7 @@ SizedBox(
             ),
           ),
         ],
-      ),
+      )),
     );
   }
 }
