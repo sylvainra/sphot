@@ -3,6 +3,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../../services/sauveteur_live_publication_service.dart';
 import 'widgets/sauveteur_styled_dropdown.dart';
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurEphemerideDictonPage extends StatefulWidget {
   final Color profileColor;
@@ -289,7 +290,8 @@ class _SauveteurEphemerideDictonPageState
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: true,
-      body: Stack(
+      body: SauveteurAdaptiveViewport(
+        child: Stack(
         fit: StackFit.expand,
         children: [
           Image.asset(
@@ -394,7 +396,7 @@ class _SauveteurEphemerideDictonPageState
             ),
           ),
         ],
-      ),
+      )),
     );
   }
 }
