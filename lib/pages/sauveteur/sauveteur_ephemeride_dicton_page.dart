@@ -201,6 +201,52 @@ class _SauveteurEphemerideDictonPageState
     );
   }
 
+  @override
+  void dispose() {
+    ephemerideController.dispose();
+    dictonController.dispose();
+    _speech.stop();
+    super.dispose();
+  }
+
+  Future<void> _listenToZone(
+    int zone,
+    TextEditingController controller,
+  ) async {
+    if (_isListening && _listeningZone == zone) {
+      setState(() {
+        _isListening = false;
+        _listeningZone = null;
+      });
+
+      await _speech.stop();
+      return;
+    }
+
+    final bool available = await _speech.initialize();
+
+    if (!available) return;
+
+    setState(() {
+      _isListening = true;
+      _listeningZone = zone;
+    });
+
+    _speech.listen(
+      localeId: 'fr_FR',
+      onResult: (result) {
+        if (!mounted) return;
+
+        setState(() {
+          controller.text = result.recognizedWords;
+          controller.selection = TextSelection.fromPosition(
+            TextPosition(offset: controller.text.length),
+          );
+        });
+      },
+    );
+  }
+
   Widget _textZone({
     required String hint,
     required int zone,
