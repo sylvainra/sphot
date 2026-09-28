@@ -358,7 +358,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                         offset: const Offset(0, -12),
 
                         child: SingleChildScrollView(
-  physics: const NeverScrollableScrollPhysics(),
+  physics: const BouncingScrollPhysics(),
   clipBehavior: Clip.none,
 
                           child: Column(
