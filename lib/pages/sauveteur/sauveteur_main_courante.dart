@@ -60,7 +60,17 @@ class _SauveteurMainCourantePageState
   bool _entryMutationInProgress = false;
   String? _statusMessage;
 
+  // Référence visuelle : le label flottant du menu "Type de fait".
+  // Les InputDecorator/TextField partent de 16 px puis Flutter les réduit
+  // visuellement en label flottant. Les titres déjà posés dans le contenu
+  // utilisent directement la taille visible finale de 12 px.
   static const TextStyle _fieldLabelStyle = TextStyle(
+    color: SauveteurStyledDropdown.borderColor,
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+  );
+
+  static const TextStyle _visibleTitleStyle = TextStyle(
     color: SauveteurStyledDropdown.borderColor,
     fontSize: 12,
     fontWeight: FontWeight.w700,
@@ -718,7 +728,7 @@ class _SauveteurMainCourantePageState
         children: [
           const Text(
             'Présence',
-            style: _fieldLabelStyle,
+            style: _visibleTitleStyle,
           ),
           const SizedBox(height: 6),
           Text(
@@ -1559,7 +1569,7 @@ class _SauveteurMainCourantePageState
                     Expanded(
                       child: Text(
                         (entry['type'] ?? 'Observation').toString(),
-                        style: _fieldLabelStyle,
+                        style: _visibleTitleStyle,
                       ),
                     ),
                     if (automatic)
