@@ -13,6 +13,7 @@ class SauveteurMeteoMarinePage extends StatefulWidget {
   final String sphotMode;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final String? initialSpotId;
 
   const SauveteurMeteoMarinePage({
     super.key,
@@ -21,6 +22,7 @@ class SauveteurMeteoMarinePage extends StatefulWidget {
     required this.sphotMode,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    required this.initialSpotId,
   });
 
   @override
@@ -83,7 +85,15 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
       _assignedSpots
         ..clear()
         ..addAll(spots);
-      _selectedSpotId = _assignedSpots.isEmpty ? null : _assignedSpots.first.id;
+      final preferredId = widget.initialSpotId?.trim();
+      _selectedSpotId = _assignedSpots.isEmpty
+          ? null
+          : _assignedSpots
+              .firstWhere(
+                (spot) => spot.id == preferredId,
+                orElse: () => _assignedSpots.first,
+              )
+              .id;
 
       if (_selectedSpotId != null) {
         await _loadSelectedSpotState();
@@ -234,7 +244,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
       if (mounted) {
         setState(() {
           _liveMessage =
-              'Publication refusée. Vérifiez que SPHOT est ON et le poste affecté.';
+              'Publication refusée. Vérifiez votre autorisation et le poste sélectionné.';
         });
       }
     } finally {
@@ -242,78 +252,41 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
     }
   }
 
-  Widget _livePublicationBar() {
+  Widget _publishButton() {
     final enabled = _isSphotOn && _selectedSpotId != null && !_loadingLive;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 2, 0, 5),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: SauveteurStyledDropdown(
-                  labelText: 'SPHOT surveillé',
-                  value: _selectedSpotId,
-                  enabled: !_loadingLive,
-                  options: _assignedSpots
-                      .map(
-                        (spot) => SauveteurDropdownOption(
-                          value: spot.id,
-                          label: spot.label,
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (spotId) {
-                    _selectSpot(spotId);
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                height: 42,
-                child: ElevatedButton.icon(
-                  onPressed: enabled && !_savingLive ? _publishWeather : null,
-                  icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-                  label: Text(
-                    _savingLive ? '...' : 'PUBLIER',
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0277BD),
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (!_isSphotOn)
-            const Padding(
-              padding: EdgeInsets.only(top: 4),
-              child: Text(
-                'SPHOT OFF — publication réelle désactivée.',
-                style: TextStyle(
-                  color: Color(0xFFB91C1C),
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            )
-          else if (_liveMessage != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                _liveMessage!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF1E3A8A),
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 42,
+          child: ElevatedButton.icon(
+            onPressed: enabled && !_savingLive ? _publishWeather : null,
+            icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+            label: Text(
+              _savingLive ? 'PUBLICATION...' : 'PUBLIER',
+              style: const TextStyle(fontWeight: FontWeight.w900),
             ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0277BD),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.black12,
+            ),
+          ),
+        ),
+        if (_liveMessage != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _liveMessage!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF1E3A8A),
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 
@@ -361,9 +334,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                     ),
                   ),
 
-                  const SizedBox(height: 2),
-
-                  _livePublicationBar(),
+                  const SizedBox(height: 4),
 
                   SizedBox(
                     height: 450,
@@ -603,6 +574,8 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                                   
                                 ),
                               ),
+                              const SizedBox(height: 8),
+                              _publishButton(),
                             ],
                           ),
                         ),
