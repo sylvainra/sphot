@@ -635,7 +635,7 @@ class _SauveteurActionsRapidesPageState
                   ),
                 ),
                 Positioned(
-                  left: -2,
+                  left: 2,
                   top: 16,
                   child: _QuickActionsFlagMarker(
                     spot: _previewSpotState(),
@@ -822,7 +822,7 @@ class _SauveteurActionsRapidesPageState
                                   color: flagColor == 'Jaune'
                                       ? Colors.black
                                       : Colors.white,
-                                  fontSize: 15,
+                                  fontSize: flagColor == 'Jaune' ? 12.5 : 15,
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),
@@ -1379,7 +1379,7 @@ class _QuickActionsFlagMarkerState extends State<_QuickActionsFlagMarker>
   static const double markerHeight = 220;
 
   static const double poleWidth = 4;
-  static const double poleHeight = 204;
+  static const double poleHeight = 188;
   static const double poleLeft = 24;
 
   static const double flagLeft = poleLeft + poleWidth - 1;
