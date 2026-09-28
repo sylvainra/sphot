@@ -272,11 +272,32 @@ class _SauveteurMainCourantePageState
           ? decoded['entries'] as List
           : const [];
 
+      final dayStart = DateTime(
+        _selectedDay.year,
+        _selectedDay.month,
+        _selectedDay.day,
+      ).millisecondsSinceEpoch;
+      final dayEnd = DateTime(
+        _selectedDay.year,
+        _selectedDay.month,
+        _selectedDay.day + 1,
+      ).millisecondsSinceEpoch;
+
+      final entriesForSelectedDay = raw
+          .whereType<Map>()
+          .map((value) => Map<String, dynamic>.from(value))
+          .where((entry) {
+            final rawOccurredAt = entry['occurredAt'];
+            final occurredAt = rawOccurredAt is num
+                ? rawOccurredAt.toInt()
+                : int.tryParse((rawOccurredAt ?? '').toString());
+            if (occurredAt == null) return false;
+            return occurredAt >= dayStart && occurredAt < dayEnd;
+          })
+          .toList();
+
       setState(() {
-        _entries = raw
-            .whereType<Map>()
-            .map((value) => Map<String, dynamic>.from(value))
-            .toList();
+        _entries = entriesForSelectedDay;
       });
     } catch (_) {
       if (!mounted) return;
@@ -1154,8 +1175,7 @@ class _SauveteurMainCourantePageState
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
             subtitle: const Text(
-              'Masquée aux sauveteurs ordinaires. Chef et adjoint '
-              'conservent l’accès.',
+              'Visible uniquement par le chef de poste et l\'adjoint.',
             ),
             value: _restricted,
             onChanged: (value) => setState(() => _restricted = value),
