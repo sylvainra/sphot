@@ -43,6 +43,8 @@ class _SauveteurActionsRapidesPageState
   String flagColor = 'Vert';
   String flagPosition = 'Hissé';
   String status = 'Baignade surveillée';
+  bool purpleFlagActive = false;
+  bool windsockActive = false;
 
   String nomSecours = 'AUCUN POSTE';
   String nomSphot = '';
@@ -181,6 +183,8 @@ class _SauveteurActionsRapidesPageState
         flagColor = 'Vert';
         flagPosition = 'Hissé';
         status = 'Baignade surveillée';
+        purpleFlagActive = false;
+        windsockActive = false;
         selectedDangers.clear();
         baineLevel = 0;
         caniculeLevel = 0;
@@ -208,6 +212,8 @@ class _SauveteurActionsRapidesPageState
       final rawColor = (liveFlag['flagColor'] ?? '').toString().toLowerCase();
       final rawPosition =
           (liveFlag['flagPosition'] ?? '').toString().toLowerCase();
+      final nextPurpleFlagActive = liveFlag['purpleFlagActive'] == true;
+      final nextWindsockActive = liveFlag['windsockActive'] == true;
 
       String? nextColor;
       if (rawColor == 'green' || rawColor == 'vert') {
@@ -230,6 +236,8 @@ class _SauveteurActionsRapidesPageState
       setState(() {
         if (nextColor != null) flagColor = nextColor;
         if (nextPosition != null) flagPosition = nextPosition;
+        purpleFlagActive = nextPurpleFlagActive;
+        windsockActive = nextWindsockActive;
 
         status = flagPosition == 'Affalé'
             ? 'Baignade non surveillée temporairement'
@@ -363,9 +371,27 @@ class _SauveteurActionsRapidesPageState
       'liveFlag': {
         'flagColor': _flagColorValue(flagColor),
         'flagPosition': _flagPositionValue(flagPosition),
+        'purpleFlagActive': purpleFlagActive,
+        'windsockActive': windsockActive,
       },
       'statutBaignade': currentStatus,
     });
+  }
+
+  Future<void> _togglePurpleFlag() async {
+    setState(() {
+      purpleFlagActive = !purpleFlagActive;
+    });
+
+    await _persistFlagState();
+  }
+
+  Future<void> _toggleWindsock() async {
+    setState(() {
+      windsockActive = !windsockActive;
+    });
+
+    await _persistFlagState();
   }
 
   Future<void> _changeFlagColor(String color) async {
@@ -432,6 +458,8 @@ class _SauveteurActionsRapidesPageState
       liveFlag: {
         'flagColor': _flagColorValue(flagColor),
         'flagPosition': _flagPositionValue(flagPosition),
+        'purpleFlagActive': purpleFlagActive,
+        'windsockActive': windsockActive,
       },
     );
   }
@@ -886,6 +914,37 @@ class _SauveteurActionsRapidesPageState
                                     ),
                                   );
                                 },
+                              ),
+                            ],
+                          ),
+
+                          _sectionCard(
+                            title: 'Signaux complémentaires',
+                            icon: Icons.flag_rounded,
+                            showHeader: false,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _SupplementarySignalButton(
+                                      label: 'Drapeau violet',
+                                      icon: Icons.flag_rounded,
+                                      activeColor: const Color(0xFFD946EF),
+                                      selected: purpleFlagActive,
+                                      onTap: _togglePurpleFlag,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _SupplementarySignalButton(
+                                      label: 'Manche à air',
+                                      icon: Icons.air_rounded,
+                                      activeColor: const Color(0xFFFF9800),
+                                      selected: windsockActive,
+                                      onTap: _toggleWindsock,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -1350,6 +1409,80 @@ class _FlagColorButton extends StatelessWidget {
               fontSize: 13,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupplementarySignalButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color activeColor;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SupplementarySignalButton({
+    required this.label,
+    required this.icon,
+    required this.activeColor,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = selected ? Colors.white : Colors.black87;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        height: 54,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? activeColor
+              : Colors.white.withOpacity(0.62),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: Colors.black,
+            width: selected ? 3 : 2,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.20),
+                    blurRadius: 7,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              selected ? Icons.check_circle_rounded : icon,
+              size: 19,
+              color: foreground,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label.toUpperCase(),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: foreground,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  height: 1.05,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2301,7 +2434,7 @@ class _SauveteurNotificationPageState
                               textAlignVertical: TextAlignVertical.top,
                               decoration: InputDecoration(
                                 hintText:
-                                    'Information utile au public sur ce SPHOT...',
+                                    'Information utile au public sur ce SPHOT.',
                                 filled: true,
                                 fillColor: const Color(0xFFF3F7FA),
                                 enabledBorder: OutlineInputBorder(
