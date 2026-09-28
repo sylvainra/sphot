@@ -14,6 +14,8 @@ import '../../widgets/danger_pictogram.dart';
 import 'widgets/sauveteur_styled_dropdown.dart';
 import 'widgets/sauveteur_adaptive_viewport.dart';
 
+const Color sphotViolet = Color(0xFFD946EF);
+
 class SauveteurActionsRapidesPage extends StatefulWidget {
   final Color profileColor;
   final String sphotMode;
@@ -929,7 +931,7 @@ class _SauveteurActionsRapidesPageState
                                     child: _SupplementarySignalButton(
                                       label: 'Drapeau violet',
                                       icon: Icons.flag_rounded,
-                                      activeColor: const Color(0xFFD946EF),
+                                      activeColor: sphotViolet,
                                       selected: purpleFlagActive,
                                       onTap: _togglePurpleFlag,
                                     ),

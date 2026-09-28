@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+const Color sphotViolet = Color(0xFFD946EF);
+
 class DangerPictogram extends StatelessWidget {
   final String danger;
   final double size;
@@ -90,30 +92,30 @@ class DangerPictogram extends StatelessWidget {
     }
 
     if (upper.contains('ALTÉRATION DE LA QUALITÉ DES EAUX') ||
-        upper.contains('ALTERATION DE LA QUALITE DES EAUX') ||
-        upper.contains('ESPÈCES DANGEREUSES') ||
-        upper.contains('ESPECES DANGEREUSES') ||
-        upper.contains('MÉDUSES') ||
-        upper.contains('MEDUSES')) {
-      return SizedBox(
-        width: size * 1.25,
-        height: size,
-        child: Center(
-          child: Container(
-            width: size * 1.05,
-            height: size * 0.58,
-            decoration: BoxDecoration(
-              color: const Color(0xFF8E24AA),
-              borderRadius: BorderRadius.circular(2),
-              border: Border.all(
-                color: const Color(0xFF6A1B9A),
-                width: 1,
-              ),
-            ),
+    upper.contains('ALTERATION DE LA QUALITE DES EAUX') ||
+    upper.contains('ESPÈCES DANGEREUSES') ||
+    upper.contains('ESPECES DANGEREUSES') ||
+    upper.contains('MÉDUSES') ||
+    upper.contains('MEDUSES')) {
+  return SizedBox(
+    width: size * 1.25,
+    height: size,
+    child: Center(
+      child: Container(
+        width: size * 1.05,
+        height: size * 0.58,
+        decoration: BoxDecoration(
+          color: sphotViolet,
+          borderRadius: BorderRadius.circular(2),
+          border: Border.all(
+            color: sphotViolet,
+            width: 1,
           ),
         ),
-      );
-    }
+      ),
+    ),
+  );
+}
 
     if (upper.contains('EAU FROIDE')) {
       return SizedBox(
