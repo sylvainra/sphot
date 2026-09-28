@@ -663,7 +663,7 @@ class _SauveteurMainCourantePageState
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
+      padding: const EdgeInsets.fromLTRB(6, 4, 6, 5),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.72),
         borderRadius: BorderRadius.circular(16),
@@ -679,14 +679,14 @@ class _SauveteurMainCourantePageState
             '${_months[today.month - 1]} ${today.year}',
             style: const TextStyle(
               color: Color(0xFF1E3A8A),
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w900,
-              letterSpacing: 0.8,
+              letterSpacing: 0.7,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 3),
           SizedBox(
-            height: 40,
+            height: 34,
             child: ListView.builder(
               controller: _dayScrollController,
               scrollDirection: Axis.horizontal,
@@ -706,7 +706,7 @@ class _SauveteurMainCourantePageState
                     onTap: future ? null : () => _selectDay(date),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 160),
-                      width: 40,
+                      width: 34,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: selected
@@ -729,7 +729,7 @@ class _SauveteurMainCourantePageState
                               : future
                                   ? Colors.black26
                                   : const Color(0xFF1E3A8A),
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -1181,9 +1181,9 @@ class _SauveteurMainCourantePageState
     return SafeArea(
       top: false,
       child: SizedBox(
-        height: 100,
+        height: 78,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 5),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.94),
           border: const Border(
@@ -1209,8 +1209,8 @@ class _SauveteurMainCourantePageState
               borderRadius: BorderRadius.circular(999),
               onTap: () => Navigator.of(context).pop(),
               child: Container(
-                width: 46,
-                height: 46,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white,
@@ -1222,7 +1222,7 @@ class _SauveteurMainCourantePageState
                 child: const Icon(
                   Icons.arrow_back_ios_new_rounded,
                   color: Color(0xFF1E3A8A),
-                  size: 20,
+                  size: 18,
                 ),
               ),
             ),
