@@ -585,7 +585,7 @@ class _SauveteurActionsRapidesPageState
   }
 
   Widget _buildFlagMastControl() {
-    const height = 280.0;
+    const height = 250.0;
 
     return Container(
       height: height,
@@ -659,7 +659,7 @@ class _SauveteurActionsRapidesPageState
                 ),
                 Positioned(
                   right: 6,
-                  top: 124,
+                  top: 109,
                   child: Icon(
                     Icons.unfold_more_rounded,
                     size: 22,
@@ -788,7 +788,7 @@ class _SauveteurActionsRapidesPageState
                           if (!isTemporaryClosed)
                             Container(
                               width: double.infinity,
-                              height: 68,
+                              height: 64,
                               margin: const EdgeInsets.only(
                                 top: 3,
                                 bottom: 6,
@@ -837,7 +837,7 @@ class _SauveteurActionsRapidesPageState
                             children: [
                               const SizedBox(height: 8),
                               SizedBox(
-                                height: 280,
+                                height: 250,
                                 child: Row(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
@@ -952,15 +952,11 @@ class _SauveteurActionsRapidesPageState
                       ),
                   ),
                 ),
+                const SizedBox(height: 6),
+                _bottomNavBar(),
+                const SizedBox(height: 4),
               ],
             ),
-          ),
-
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 10,
-            child: _bottomNavBar(),
           ),
         ],
       )),
@@ -1438,7 +1434,7 @@ class _SupplementarySignalButton extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        height: 78,
+        height: 72,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: selected
@@ -2180,7 +2176,7 @@ class _ActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 72,
+        height: 68,
         width: double.infinity,
         decoration: BoxDecoration(
   color: color,
