@@ -418,6 +418,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -438,6 +439,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -458,6 +460,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -494,6 +497,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
                                           canManageRestrictedOperationalData:
                                               _canManageRestrictedOperationalData,
                                         ),
@@ -538,6 +542,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                     sauveteurSessionToken:
                                         widget.sauveteurSessionToken,
                                     postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                     canManageRestrictedOperationalData:
                                         _canManageRestrictedOperationalData,
                                   ),
