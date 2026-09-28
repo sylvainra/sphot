@@ -359,8 +359,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                   const SizedBox(height: 6),
                   _spotSelector(),
                   const SizedBox(height: 6),
-                  SizedBox(
-                    height: 386,
+                  Expanded(
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
