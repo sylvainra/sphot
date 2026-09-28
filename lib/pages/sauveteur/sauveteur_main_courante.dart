@@ -60,6 +60,12 @@ class _SauveteurMainCourantePageState
   bool _entryMutationInProgress = false;
   String? _statusMessage;
 
+  static const TextStyle _fieldLabelStyle = TextStyle(
+    color: SauveteurStyledDropdown.borderColor,
+    fontSize: 12,
+    fontWeight: FontWeight.w700,
+  );
+
   static const _types = <String>[
     'Observation',
     'Incident',
@@ -639,6 +645,8 @@ class _SauveteurMainCourantePageState
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: 'Présence',
+          labelStyle: _fieldLabelStyle,
+          floatingLabelStyle: _fieldLabelStyle,
           isDense: true,
           contentPadding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
           border: OutlineInputBorder(
@@ -709,11 +717,8 @@ class _SauveteurMainCourantePageState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'PRÉSENCE',
-            style: TextStyle(
-              color: Color(0xFF1E3A8A),
-              fontWeight: FontWeight.w900,
-            ),
+            'Présence',
+            style: _fieldLabelStyle,
           ),
           const SizedBox(height: 6),
           Text(
@@ -1509,14 +1514,8 @@ class _SauveteurMainCourantePageState
                   children: [
                     Expanded(
                       child: Text(
-                        (entry['type'] ?? 'Observation')
-                            .toString()
-                            .toUpperCase(),
-                        style: const TextStyle(
-                          color: Color(0xFF8E24AA),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
+                        (entry['type'] ?? 'Observation').toString(),
+                        style: _fieldLabelStyle,
                       ),
                     ),
                     if (automatic)
@@ -1648,6 +1647,66 @@ class _SauveteurMainCourantePageState
     );
   }
 
+  Widget _factsSection() {
+    final visibleEntries = _entries
+        .where(
+          (entry) =>
+              !_selectedDayIsToday || !_isPresenceEntry(entry),
+        )
+        .toList();
+
+    final showDerivedPresence = !_selectedDayIsToday &&
+        _presenceEntry == null &&
+        (_presenceFromPlanning || _selectedPresenceLabels.isNotEmpty);
+
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: 'Faits',
+        labelStyle: _fieldLabelStyle,
+        floatingLabelStyle: _fieldLabelStyle,
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        contentPadding: const EdgeInsets.fromLTRB(10, 14, 10, 4),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: SauveteurStyledDropdown.borderColor,
+            width: 1.6,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: SauveteurStyledDropdown.borderColor,
+            width: 1.6,
+          ),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showDerivedPresence)
+            _derivedPastPresenceCard(),
+          if (visibleEntries.isEmpty && !showDerivedPresence)
+            const Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 16,
+              ),
+              child: Text(
+                'Aucun fait enregistré pour cette journée.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            )
+          else
+            ...visibleEntries.map(_entryCard),
+        ],
+      ),
+    );
+  }
+
   Widget _entryForm() {
     if (!_canWrite) return const SizedBox.shrink();
 
@@ -1687,8 +1746,32 @@ class _SauveteurMainCourantePageState
             maxLines: 5,
             decoration: InputDecoration(
               labelText: 'Fait du jour',
+              labelStyle: _fieldLabelStyle,
+              floatingLabelStyle: _fieldLabelStyle,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: SauveteurStyledDropdown.borderColor,
+                  width: 1.6,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: SauveteurStyledDropdown.borderColor,
+                  width: 1.6,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: SauveteurStyledDropdown.borderColor,
+                  width: 1.8,
+                ),
               ),
             ),
           ),
@@ -1699,8 +1782,32 @@ class _SauveteurMainCourantePageState
             maxLines: 3,
             decoration: InputDecoration(
               labelText: 'Action / suite donnée',
+              labelStyle: _fieldLabelStyle,
+              floatingLabelStyle: _fieldLabelStyle,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: SauveteurStyledDropdown.borderColor,
+                  width: 1.6,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: SauveteurStyledDropdown.borderColor,
+                  width: 1.6,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: SauveteurStyledDropdown.borderColor,
+                  width: 1.8,
+                ),
               ),
             ),
           ),
@@ -1841,41 +1948,7 @@ class _SauveteurMainCourantePageState
                                                 ),
                                               ),
                                             ),
-                                          if (!_selectedDayIsToday &&
-                                              _presenceEntry == null &&
-                                              (_presenceFromPlanning ||
-                                                  _selectedPresenceLabels.isNotEmpty))
-                                            _derivedPastPresenceCard(),
-                                          if (_entries
-                                              .where(
-                                                (entry) =>
-                                                    !_selectedDayIsToday ||
-                                                    !_isPresenceEntry(entry),
-                                              )
-                                              .isEmpty &&
-                                              !(!_selectedDayIsToday &&
-                                                  _presenceEntry == null &&
-                                                  (_presenceFromPlanning ||
-                                                      _selectedPresenceLabels
-                                                          .isNotEmpty)))
-                                            const Padding(
-                                              padding: EdgeInsets.all(18),
-                                              child: Text(
-                                                'Aucun fait enregistré pour cette journée.',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w800,
-                                                ),
-                                              ),
-                                            )
-                                          else
-                                            ..._entries
-                                                .where(
-                                                  (entry) =>
-                                                      !_selectedDayIsToday ||
-                                                      !_isPresenceEntry(entry),
-                                                )
-                                                .map(_entryCard),
+                                          _factsSection(),
                                         ],
                                       ),
                           ),
