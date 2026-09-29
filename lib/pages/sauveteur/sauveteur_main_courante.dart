@@ -44,6 +44,10 @@ class _SauveteurMainCourantePageState
     extends State<SauveteurMainCourantePage> {
   final _descriptionController = TextEditingController();
   final _actionController = TextEditingController();
+  final _victimAgeController = TextEditingController();
+  final _victimBirthDateController = TextEditingController();
+  final _victimResidenceController = TextEditingController();
+  final _victimPhoneController = TextEditingController();
   final _dayScrollController = ScrollController();
 
   final List<Map<String, String>> _spots = [];
@@ -59,6 +63,8 @@ class _SauveteurMainCourantePageState
 
   String? _selectedSpotId;
   String _selectedType = 'Observation';
+  String _victimSex = 'Non renseigné';
+  String _victimQualification = 'Idem';
   late DateTime _selectedDay;
   bool _restricted = false;
   bool _loading = true;
@@ -82,6 +88,19 @@ class _SauveteurMainCourantePageState
     fontSize: 12,
     fontWeight: FontWeight.w700,
   );
+
+  static const _victimSexOptions = <String>[
+    'Non renseigné',
+    'Féminin',
+    'Masculin',
+  ];
+
+  static const _victimQualificationOptions = <String>[
+    'Idem',
+    'Urgence Relative',
+    'Urgence Absolue',
+    'Décédée',
+  ];
 
   static const _types = <String>[
     'Observation',
@@ -181,6 +200,10 @@ class _SauveteurMainCourantePageState
   void dispose() {
     _descriptionController.dispose();
     _actionController.dispose();
+    _victimAgeController.dispose();
+    _victimBirthDateController.dispose();
+    _victimResidenceController.dispose();
+    _victimPhoneController.dispose();
     _dayScrollController.dispose();
     super.dispose();
   }
@@ -1144,6 +1167,15 @@ class _SauveteurMainCourantePageState
           'description': description,
           'actionTaken': _actionController.text.trim(),
           'visibility': _restricted ? 'restricted' : 'operational',
+          if (_selectedType == 'Secours')
+            'victim': {
+              'sexe': _victimSex,
+              'age': _victimAgeController.text.trim(),
+              'dateNaissance': _victimBirthDateController.text.trim(),
+              'lieuHabitation': _victimResidenceController.text.trim(),
+              'telephone': _victimPhoneController.text.trim(),
+              'qualification': _victimQualification,
+            },
         }),
       );
 
@@ -1160,9 +1192,15 @@ class _SauveteurMainCourantePageState
 
       _descriptionController.clear();
       _actionController.clear();
+      _victimAgeController.clear();
+      _victimBirthDateController.clear();
+      _victimResidenceController.clear();
+      _victimPhoneController.clear();
       setState(() {
         _restricted = false;
         _selectedType = 'Observation';
+        _victimSex = 'Non renseigné';
+        _victimQualification = 'Idem';
         _statusMessage = 'Fait du jour enregistré dans la main courante.';
       });
       await _loadEntries();
@@ -2250,6 +2288,62 @@ class _SauveteurMainCourantePageState
                     height: 1.3,
                   ),
                 ),
+                if ((entry['type'] ?? '').toString().toLowerCase() == 'secours' &&
+                    entry['victim'] is Map) ...[
+                  const SizedBox(height: 8),
+                  Builder(
+                    builder: (context) {
+                      final victim =
+                          Map<String, dynamic>.from(entry['victim'] as Map);
+                      final lines = <String>[
+                        if ((victim['sexe'] ?? '').toString().trim().isNotEmpty)
+                          'Sexe : ${victim['sexe']}',
+                        if ((victim['age'] ?? '').toString().trim().isNotEmpty)
+                          'Age : ${victim['age']}',
+                        if ((victim['dateNaissance'] ?? '')
+                            .toString()
+                            .trim()
+                            .isNotEmpty)
+                          'Date de naissance : ${victim['dateNaissance']}',
+                        if ((victim['lieuHabitation'] ?? '')
+                            .toString()
+                            .trim()
+                            .isNotEmpty)
+                          'Lieu d’habitation : ${victim['lieuHabitation']}',
+                        if ((victim['telephone'] ?? '')
+                            .toString()
+                            .trim()
+                            .isNotEmpty)
+                          'Téléphone : ${victim['telephone']}',
+                        if ((victim['qualification'] ?? '')
+                            .toString()
+                            .trim()
+                            .isNotEmpty)
+                          'Qualification : ${victim['qualification']}',
+                      ];
+
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(9),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF1F2).withOpacity(0.88),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: const Color(0xFFDC2626).withOpacity(0.45),
+                          ),
+                        ),
+                        child: Text(
+                          lines.join('\n'),
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            height: 1.35,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
                 if ((entry['actionTaken'] ?? '').toString().trim().isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -2427,6 +2521,126 @@ class _SauveteurMainCourantePageState
               setState(() => _selectedType = value);
             },
           ),
+          if (_selectedType == 'Secours') ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.58),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: const Color(0xFFDC2626),
+                  width: 1.3,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'VICTIME',
+                    style: TextStyle(
+                      color: Color(0xFFDC2626),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SauveteurStyledDropdown(
+                    labelText: 'Sexe',
+                    value: _victimSex,
+                    options: _victimSexOptions
+                        .map(
+                          (value) => SauveteurDropdownOption(
+                            value: value,
+                            label: value,
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() => _victimSex = value);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _victimAgeController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Age',
+                            labelStyle: _fieldLabelStyle,
+                            floatingLabelStyle: _fieldLabelStyle,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _victimBirthDateController,
+                          keyboardType: TextInputType.datetime,
+                          decoration: InputDecoration(
+                            labelText: 'Date de naissance',
+                            hintText: 'JJ/MM/AAAA',
+                            labelStyle: _fieldLabelStyle,
+                            floatingLabelStyle: _fieldLabelStyle,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _victimResidenceController,
+                    decoration: InputDecoration(
+                      labelText: 'Lieu d’habitation',
+                      labelStyle: _fieldLabelStyle,
+                      floatingLabelStyle: _fieldLabelStyle,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _victimPhoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: 'Numéro de téléphone',
+                      labelStyle: _fieldLabelStyle,
+                      floatingLabelStyle: _fieldLabelStyle,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SauveteurStyledDropdown(
+                    labelText: 'Qualification',
+                    value: _victimQualification,
+                    options: _victimQualificationOptions
+                        .map(
+                          (value) => SauveteurDropdownOption(
+                            value: value,
+                            label: value,
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() => _victimQualification = value);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           TextField(
             controller: _descriptionController,
