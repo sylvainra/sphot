@@ -2867,29 +2867,7 @@ class _PublicAdvertisingMarkerState extends State<_PublicAdvertisingMarker> {
                 height: 48,
                 fit: BoxFit.contain,
               ),
-              if (showAutomaticName)
-                Positioned(
-                  top: 48,
-                  left: -92,
-                  child: Opacity(
-                    opacity: 1,
-                    child: SizedBox(
-                      width: 240,
-                      child: Text(
-                        spot.mapDisplayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: _mapLabelStyle(
-                          fontSize: _labelSize(11),
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              if (showFullText)
+              if (showText)
                 Positioned(
                   top: 50,
                   left: -160,
@@ -2989,13 +2967,31 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
             alignment: Alignment.center,
             children: [
               AdaptiveAssetImage(
-
                 widget.iconPath,
                 width: spot.isNaturisme ? 52 : 48,
                 height: spot.isNaturisme ? 52 : 48,
                 fit: BoxFit.contain,
               ),
-              if (showText)
+              if (showAutomaticName)
+                Positioned(
+                  top: 48,
+                  left: -92,
+                  child: SizedBox(
+                    width: 240,
+                    child: Text(
+                      spot.mapDisplayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: _mapLabelStyle(
+                        fontSize: _labelSize(11),
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ),
+              if (showFullText)
                 Positioned(
                   top: 50,
                   left: -160,
@@ -3017,15 +3013,16 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                           ),
                           SizedBox(height: _lineSpacing() + 1.5),
                           Text(
-  spot.typeSphot,
-  textAlign: TextAlign.center,
-  style: _mapLabelStyle(
-    fontSize: _labelSize(12),
-    fontWeight: FontWeight.w700,
-    color: widget.typeTextColor,
-    useBlackOutline: spot.normalizedType.contains('ACCES PLAGE'),
-  ),
-),
+                            spot.typeSphot,
+                            textAlign: TextAlign.center,
+                            style: _mapLabelStyle(
+                              fontSize: _labelSize(12),
+                              fontWeight: FontWeight.w700,
+                              color: widget.typeTextColor,
+                              useBlackOutline:
+                                  spot.normalizedType.contains('ACCES PLAGE'),
+                            ),
+                          ),
                           SizedBox(height: _lineSpacing() - 1.8),
                           _warningLineUniform(
                             'BAIGNADE NON SURVEILLÉE',
