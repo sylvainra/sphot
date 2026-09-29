@@ -600,15 +600,43 @@ async function territoryDiffusionAccessGranted(db, territoireId) {
 }
 
 /**
- * Vérifie que le territoire dispose d'un administrateur approuvé
- * dont les droits de diffusion SPHOT sont actuellement ouverts.
+ * Vérifie qu'au moins un administrateur ou une demande du territoire
+ * a été approuvé par le Super Admin.
+ *
+ * La présence du territoire sur la carte publique ne dépend pas de
+ * diffusionAccessGranted, de l'essai ou de l'abonnement. Ces droits
+ * commerciaux restent gérés séparément des données géographiques publiques.
  *
  * @param {string} territoireId Identifiant du territoire.
  * @return {Promise<boolean>}
  */
 async function isTerritoryPublic(territoireId) {
+  if (!territoireId) return false;
+
   const db = admin.firestore();
-  return territoryDiffusionAccessGranted(db, territoireId);
+  const adminDocuments = await territoryAdminDocuments(db, territoireId);
+
+  const approvedAdmin = adminDocuments.some((document) => {
+    return (document.data() || {}).accessStatus === "approved";
+  });
+
+  if (approvedAdmin) return true;
+
+  const [requestsSnapshot, legacyRequestsSnapshot] = await Promise.all([
+    db.collection("adminRequests")
+        .where("territoire.territoireId", "==", territoireId)
+        .get(),
+    db.collection("adminRequests")
+        .where("territoireId", "==", territoireId)
+        .get(),
+  ]);
+
+  return [
+    ...requestsSnapshot.docs,
+    ...legacyRequestsSnapshot.docs,
+  ].some((document) => {
+    return isApprovedAdminRequest(document.data() || {});
+  });
 }
 
 /**
