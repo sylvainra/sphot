@@ -1420,7 +1420,7 @@ class _SauveteurMainCourantePageState
                               SauveteurStyledDropdown(
                                 labelText: 'Sexe',
                                 value: victimSex,
-                                selectedColor: _victimBlue,
+                                valueColor: _victimBlue,
                                 options: _victimSexOptions
                                     .map(
                                       (value) => SauveteurDropdownOption(
@@ -1487,7 +1487,7 @@ class _SauveteurMainCourantePageState
                               SauveteurStyledDropdown(
                                 labelText: 'Qualification',
                                 value: victimQualification,
-                                selectedColor: _victimBlue,
+                                valueColor: _victimBlue,
                                 options: _victimQualificationOptions
                                     .map(
                                       (value) => SauveteurDropdownOption(
@@ -2979,7 +2979,7 @@ class _SauveteurMainCourantePageState
                   SauveteurStyledDropdown(
                     labelText: 'Sexe',
                     value: _victimSex,
-                    selectedColor: _victimBlue,
+                    valueColor: _victimBlue,
                     options: _victimSexOptions
                         .map(
                           (value) => SauveteurDropdownOption(
@@ -3045,7 +3045,7 @@ class _SauveteurMainCourantePageState
                   SauveteurStyledDropdown(
                     labelText: 'Qualification',
                     value: _victimQualification,
-                    selectedColor: _victimBlue,
+                    valueColor: _victimBlue,
                     options: _victimQualificationOptions
                         .map(
                           (value) => SauveteurDropdownOption(
