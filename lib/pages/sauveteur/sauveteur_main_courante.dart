@@ -551,12 +551,14 @@ class _SauveteurMainCourantePageState
     } else {
       selected = plannedLabels.toSet();
 
-      for (final candidate in candidates) {
-        if (candidate['connected'] == true) {
-          final connectedLabel =
-              (candidate['label'] ?? '').toString().trim();
-          if (connectedLabel.isNotEmpty) {
-            selected.add(connectedLabel);
+      if (_selectedDayIsToday) {
+        for (final candidate in candidates) {
+          if (candidate['connected'] == true) {
+            final connectedLabel =
+                (candidate['label'] ?? '').toString().trim();
+            if (connectedLabel.isNotEmpty) {
+              selected.add(connectedLabel);
+            }
           }
         }
       }
@@ -632,7 +634,7 @@ class _SauveteurMainCourantePageState
 
     if (_selectedDayIsToday &&
         existingPresence == null &&
-        plannedLabels.isNotEmpty &&
+        selected.isNotEmpty &&
         !_presenceAutoSaveAttempted &&
         _canWrite) {
       _presenceAutoSaveAttempted = true;
@@ -656,7 +658,9 @@ class _SauveteurMainCourantePageState
         : labels.join('\n');
 
     final actionTaken = automatic
-        ? 'Présence préremplie automatiquement depuis le planning.'
+        ? _presenceFromPlanning
+            ? 'Présence préremplie automatiquement depuis le planning.'
+            : 'Présence initialisée automatiquement depuis la session sauveteur active.'
         : _presenceFromPlanning
             ? 'Présence issue du planning, vérifiée ou ajustée manuellement.'
             : 'Présence renseignée manuellement.';
