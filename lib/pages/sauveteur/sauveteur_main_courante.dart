@@ -1,10 +1,15 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
 
 import 'widgets/sauveteur_styled_dropdown.dart';
-import 'package:http/http.dart' as http;
 
 class SauveteurMainCourantePage extends StatefulWidget {
   final Color profileColor;
@@ -59,6 +64,7 @@ class _SauveteurMainCourantePageState
   bool _loading = true;
   bool _saving = false;
   bool _entryMutationInProgress = false;
+  bool _sharingMainCourante = false;
   String? _statusMessage;
 
   // Référence visuelle : le label flottant du menu "Type de fait".
@@ -1509,6 +1515,363 @@ class _SauveteurMainCourantePageState
     }
   }
 
+  String get _selectedSpotLabel {
+    final spotId = _selectedSpotId;
+    if (spotId == null || spotId.isEmpty) return 'Poste non renseigné';
+
+    for (final spot in _spots) {
+      if (spot['id'] == spotId) {
+        final label = (spot['label'] ?? '').trim();
+        if (label.isNotEmpty) return label;
+      }
+    }
+
+    return spotId;
+  }
+
+  String _mainCouranteExportFileName() {
+    final rawSpot = _selectedSpotLabel
+        .replaceAll(RegExp(r'[^A-Za-z0-9À-ÿ_-]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+
+    final day = _selectedDay.day.toString().padLeft(2, '0');
+    final month = _selectedDay.month.toString().padLeft(2, '0');
+
+    return 'SPHOT_Main_courante_${rawSpot.isEmpty ? 'poste' : rawSpot}_'
+        '${_selectedDay.year}-§month-§day.pdf';
+  }
+
+  List<Map<String, dynamic>> _entriesForExport() {
+    final entries = _entries
+        .where(
+          (entry) =>
+              !_selectedDayIsToday || !_isPresenceEntry(entry),
+        )
+        .toList()
+      ..sort(_compareFactEntries);
+
+    return entries;
+  }
+
+  Future<Uint8List> _buildMainCourantePdf() async {
+    final document = pw.Document();
+    final exportEntries = _entriesForExport();
+
+    pw.Widget sectionTitle(String title) {
+      return pw.Container(
+        width: double.infinity,
+        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: pw.BoxDecoration(
+          color: PdfColors.grey300,
+          border: pw.Border.all(color: PdfColors.black, width: 0.7),
+        ),
+        child: pw.Text(
+          title,
+          style: pw.TextStyle(
+            fontSize: 11,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+      );
+    }
+
+    pw.Widget personnelLine(Map<String, String> row) {
+      final status = (row['status'] ?? '').trim();
+      final present = status == 'PRÉSENT';
+
+      return pw.Container(
+        padding: const pw.EdgeInsets.symmetric(vertical: 3),
+        decoration: const pw.BoxDecoration(
+          border: pw.Border(
+            bottom: pw.BorderSide(
+              color: PdfColors.grey300,
+              width: 0.4,
+            ),
+          ),
+        ),
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              flex: 4,
+              child: pw.Text(
+                (row['name'] ?? '').trim(),
+                style: pw.TextStyle(
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ),
+            pw.Expanded(
+              flex: 4,
+              child: pw.Text(
+                (row['quality'] ?? 'Sauveteur').trim(),
+                style: const pw.TextStyle(fontSize: 8.5),
+              ),
+            ),
+            pw.Expanded(
+              flex: 3,
+              child: pw.Text(
+                status,
+                textAlign: pw.TextAlign.right,
+                style: pw.TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: pw.FontWeight.bold,
+                  color: present ? PdfColors.green : PdfColors.red,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    pw.Widget factCard(Map<String, dynamic> entry) {
+      final createdBy = entry['createdBy'] is Map
+          ? Map<String, dynamic>.from(entry['createdBy'] as Map)
+          : <String, dynamic>{};
+      final role = (createdBy['role'] ?? '').toString().trim();
+      final action = (entry['actionTaken'] ?? '').toString().trim();
+      final visibility = (entry['visibility'] ?? 'operational').toString();
+      final restricted = visibility == 'restricted';
+
+      return pw.Container(
+        margin: const pw.EdgeInsets.only(bottom: 8),
+        padding: const pw.EdgeInsets.all(9),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(
+            color: restricted ? PdfColors.purple : PdfColors.grey600,
+            width: restricted ? 1 : 0.6,
+          ),
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(7)),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Row(
+              children: [
+                pw.Expanded(
+                  child: pw.Text(
+                    (entry['type'] ?? 'Observation').toString(),
+                    style: pw.TextStyle(
+                      fontSize: 10,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (restricted)
+                  pw.Text(
+                    'RESTREINT',
+                    style: pw.TextStyle(
+                      fontSize: 7.5,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.purple,
+                    ),
+                  ),
+              ],
+            ),
+            pw.SizedBox(height: 2),
+            pw.Text(
+              _formatDate(entry['occurredAt']),
+              style: const pw.TextStyle(
+                fontSize: 8,
+                color: PdfColors.grey700,
+              ),
+            ),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              _entryDescriptionForDisplay(entry),
+              style: const pw.TextStyle(fontSize: 9),
+            ),
+            if (action.isNotEmpty) ...[
+              pw.SizedBox(height: 5),
+              pw.Text(
+                'Suite donnée : $action',
+                style: pw.TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ],
+            if (role.isNotEmpty) ...[
+              pw.SizedBox(height: 5),
+              pw.Text(
+                'Saisi par : $role',
+                style: const pw.TextStyle(
+                  fontSize: 7.5,
+                  color: PdfColors.grey700,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    document.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.fromLTRB(28, 26, 28, 28),
+        build: (context) => [
+          pw.Text(
+            'SPHOT - MAIN COURANTE',
+            style: pw.TextStyle(
+              fontSize: 17,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'Poste : $_selectedSpotLabel',
+            style: const pw.TextStyle(fontSize: 9.5),
+          ),
+          pw.Text(
+            'Journée du ${_formatSelectedDay(_selectedDay)}',
+            style: const pw.TextStyle(fontSize: 9.5),
+          ),
+          pw.SizedBox(height: 12),
+
+          if (_institutionalContacts.isNotEmpty) ...[
+            sectionTitle('CONTACTS INSTITUTIONNELS'),
+            pw.SizedBox(height: 5),
+            ..._institutionalContacts.map((contact) {
+              final identity = [
+                (contact['civilite'] ?? '').toString().trim(),
+                (contact['prenom'] ?? '').toString().trim(),
+                (contact['nom'] ?? '').toString().trim(),
+              ].where((value) => value.isNotEmpty).join(' ');
+              final fonction =
+                  (contact['fonction'] ?? '').toString().trim();
+              final telephone =
+                  (contact['telephone'] ?? '').toString().trim();
+              final email = (contact['email'] ?? '').toString().trim();
+
+              return pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 4),
+                child: pw.Text(
+                  [
+                    identity,
+                    fonction,
+                    telephone,
+                    email,
+                  ].where((value) => value.isNotEmpty).join(' - '),
+                  style: const pw.TextStyle(fontSize: 8.5),
+                ),
+              );
+            }),
+            pw.SizedBox(height: 10),
+          ],
+
+          if (_personnelRows.isNotEmpty) ...[
+            sectionTitle('PERSONNELS'),
+            pw.SizedBox(height: 5),
+            pw.Row(
+              children: [
+                pw.Expanded(
+                  flex: 4,
+                  child: pw.Text(
+                    'Nom',
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+                pw.Expanded(
+                  flex: 4,
+                  child: pw.Text(
+                    'Qualité',
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+                pw.Expanded(
+                  flex: 3,
+                  child: pw.Text(
+                    'Situation',
+                    textAlign: pw.TextAlign.right,
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 2),
+            ..._personnelRows.map(personnelLine),
+            pw.SizedBox(height: 12),
+          ],
+
+          sectionTitle('FAITS'),
+          pw.SizedBox(height: 7),
+
+          if (exportEntries.isEmpty)
+            pw.Text(
+              'Aucun fait enregistré pour cette journée.',
+              style: const pw.TextStyle(fontSize: 9),
+            )
+          else
+            ...exportEntries.map(factCard),
+
+          pw.SizedBox(height: 8),
+          pw.Divider(color: PdfColors.grey500),
+          pw.Text(
+            'Document généré depuis SPHOT.',
+            style: const pw.TextStyle(
+              fontSize: 7.5,
+              color: PdfColors.grey700,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return document.save();
+  }
+
+  Future<void> _shareMainCourante() async {
+    if (_sharingMainCourante || _selectedSpotId == null) return;
+
+    setState(() => _sharingMainCourante = true);
+
+    try {
+      final bytes = await _buildMainCourantePdf();
+      final fileName = _mainCouranteExportFileName();
+
+      Rect? shareOrigin;
+      final renderObject = context.findRenderObject();
+      if (renderObject is RenderBox && renderObject.hasSize) {
+        shareOrigin =
+            renderObject.localToGlobal(Offset.zero) & renderObject.size;
+      }
+
+      await SharePlus.instance.share(
+        ShareParams(
+          subject:
+              'Main courante SPHOT - ${_formatSelectedDay(_selectedDay)}',
+          text: 'Main courante SPHOT du poste $_selectedSpotLabel - '
+              '${_formatSelectedDay(_selectedDay)}.',
+          files: [
+            XFile.fromData(
+              bytes,
+              mimeType: 'application/pdf',
+              name: fileName,
+            ),
+          ],
+          sharePositionOrigin: shareOrigin,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _sharingMainCourante = false);
+      }
+    }
+  }
+
   String _formatDate(dynamic rawMillis) {
     final millis = rawMillis is num ? rawMillis.toInt() : null;
     if (millis == null) return 'Date non renseignée';
@@ -2278,6 +2641,63 @@ class _SauveteurMainCourantePageState
                                             const SizedBox(height: 12),
                                           ],
                                           _factsSection(),
+                                          const SizedBox(height: 12),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            height: 46,
+                                            child: ElevatedButton.icon(
+                                              onPressed:
+                                                  _sharingMainCourante
+                                                      ? null
+                                                      : _shareMainCourante,
+                                              icon: _sharingMainCourante
+                                                  ? const SizedBox(
+                                                      width: 18,
+                                                      height: 18,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        color:
+                                                            Color(0xFF1E3A8A),
+                                                      ),
+                                                    )
+                                                  : const Icon(
+                                                      Icons.share_rounded,
+                                                      color:
+                                                          Color(0xFF1E3A8A),
+                                                      size: 20,
+                                                    ),
+                                              label: const Text(
+                                                'PARTAGER',
+                                                style: TextStyle(
+                                                  color: Color(0xFF1E3A8A),
+                                                  fontWeight:
+                                                      FontWeight.w900,
+                                                ),
+                                              ),
+                                              style:
+                                                  ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    Colors.transparent,
+                                                foregroundColor:
+                                                    const Color(0xFF1E3A8A),
+                                                disabledBackgroundColor:
+                                                    Colors.transparent,
+                                                elevation: 0,
+                                                side: const BorderSide(
+                                                  color: Color(0xFF1E3A8A),
+                                                  width: 2,
+                                                ),
+                                                shape:
+                                                    RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                    14,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
                                         ],
                                       ),
                           ),
