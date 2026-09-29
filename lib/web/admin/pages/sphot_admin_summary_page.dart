@@ -1,10 +1,9 @@
-// ignore_for_file: avoid_web_libraries_in_flutter
 import 'dart:convert';
-import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 
 import '../../../widgets/adaptive_asset_image.dart';
+import '../utils/web_print_bridge.dart';
 
 class SphotAdminSummaryPage extends StatefulWidget {
   final Map<String, dynamic> summary;
@@ -143,7 +142,7 @@ class _SphotAdminSummaryPageState extends State<SphotAdminSummaryPage> {
       widget.summary['otherSpots'] ?? const [],
     );
 
-    final origin = html.window.location.origin;
+    final origin = getWebOrigin();
     final escape = const HtmlEscape();
 
     String e(dynamic value) => escape.convert(_clean(value));
@@ -596,23 +595,7 @@ class _SphotAdminSummaryPageState extends State<SphotAdminSummaryPage> {
 </html>
     ''';
 
-    final blob = html.Blob(
-      [documentHtml],
-      'text/html;charset=utf-8',
-    );
-
-    final url = html.Url.createObjectUrlFromBlob(blob);
-
-    html.window.open(
-      url,
-      '_blank',
-      'noopener,noreferrer',
-    );
-
-    Future<void>.delayed(
-      const Duration(seconds: 10),
-      () => html.Url.revokeObjectUrl(url),
-    );
+    await openHtmlPrintDocument(documentHtml);
   }
 
   @override
