@@ -45,6 +45,7 @@ class _SauveteurMainCourantePageState
   List<Map<String, dynamic>> _entries = [];
   List<Map<String, dynamic>> _institutionalContacts = [];
   List<Map<String, dynamic>> _presenceCandidates = [];
+  List<Map<String, String>> _personnelRows = [];
   Set<String> _selectedPresenceLabels = <String>{};
   Map<String, dynamic>? _presenceEntry;
   bool _presenceFromPlanning = false;
@@ -260,7 +261,32 @@ class _SauveteurMainCourantePageState
     final normalized = value.toLowerCase();
     return normalized != 'repos' &&
         normalized != 'repose' &&
-        normalized != 'absent';
+        normalized != 'absent' &&
+        !normalized.contains('congé') &&
+        !normalized.contains('conge');
+  }
+
+  String _planningPersonnelStatus(String rawValue) {
+    final value = rawValue.trim();
+    final normalized = value.toLowerCase();
+
+    if (_planningCellMeansPresent(value)) {
+      return 'PRÉSENT';
+    }
+
+    if (normalized.contains('congé') || normalized.contains('conge')) {
+      return 'ABSENT — CONGÉ';
+    }
+
+    if (normalized.contains('repos') || normalized.contains('repose')) {
+      return 'ABSENT — REPOS';
+    }
+
+    if (normalized.contains('absent')) {
+      return 'ABSENT';
+    }
+
+    return 'ABSENT — NON PLANIFIÉ';
   }
 
   String get _selectedPlanningMonthId {
@@ -322,6 +348,7 @@ class _SauveteurMainCourantePageState
       if (mounted) {
         setState(() {
           _presenceCandidates = [];
+          _personnelRows = [];
           _selectedPresenceLabels = <String>{};
           _presenceEntry = null;
           _presenceFromPlanning = false;
@@ -357,6 +384,13 @@ class _SauveteurMainCourantePageState
 
       final nom = (data['nom'] ?? '').toString().trim();
       final prenom = (data['prenom'] ?? '').toString().trim();
+      final rawFunctions = data['fonctions'];
+      final functions = rawFunctions is Iterable
+          ? rawFunctions
+              .map((value) => value.toString().trim())
+              .where((value) => value.isNotEmpty)
+              .toList()
+          : <String>[];
       final label = [prenom, nom]
           .where((value) => value.isNotEmpty)
           .join(' ')
@@ -367,6 +401,7 @@ class _SauveteurMainCourantePageState
       candidates.add({
         'id': document.id,
         'label': label,
+        'quality': functions.isEmpty ? 'Sauveteur' : functions.join(' / '),
         'planned': false,
         'aliases': <String>[
           _normalizePresenceName(label),
@@ -385,6 +420,7 @@ class _SauveteurMainCourantePageState
 
     final planningSnapshot = await planningReference.get();
     final plannedLabels = <String>{};
+    final personnelRows = <Map<String, String>>[];
 
     if (planningSnapshot.exists) {
       final planning = planningSnapshot.data() ?? <String, dynamic>{};
@@ -402,7 +438,13 @@ class _SauveteurMainCourantePageState
 
         final cellKey = '$role-day_${_selectedDay.day}';
         final cellValue = (cells[cellKey] ?? '').toString();
-        if (!_planningCellMeansPresent(cellValue)) continue;
+        final plannedPresent = _planningCellMeansPresent(cellValue);
+
+        personnelRows.add({
+          'name': name,
+          'quality': role,
+          'planningStatus': _planningPersonnelStatus(cellValue),
+        });
 
         final normalizedName = _normalizePresenceName(name);
         Map<String, dynamic>? matchedCandidate;
@@ -418,16 +460,23 @@ class _SauveteurMainCourantePageState
         }
 
         if (matchedCandidate != null) {
-          matchedCandidate['planned'] = true;
-          plannedLabels.add(matchedCandidate['label'].toString());
+          matchedCandidate['planningRole'] = role;
+          if (plannedPresent) {
+            matchedCandidate['planned'] = true;
+            plannedLabels.add(matchedCandidate['label'].toString());
+          }
         } else {
           candidates.add({
             'id': 'planning:$role',
             'label': name,
-            'planned': true,
+            'quality': role,
+            'planningRole': role,
+            'planned': plannedPresent,
             'aliases': <String>[normalizedName],
           });
-          plannedLabels.add(name);
+          if (plannedPresent) {
+            plannedLabels.add(name);
+          }
         }
       }
     }
@@ -456,6 +505,7 @@ class _SauveteurMainCourantePageState
           candidates.add({
             'id': 'saved:$normalized',
             'label': savedLabel,
+            'quality': 'Sauveteur',
             'planned': false,
             'aliases': <String>[normalized],
           });
@@ -465,10 +515,69 @@ class _SauveteurMainCourantePageState
       selected = plannedLabels.toSet();
     }
 
+    final normalizedSelected = selected
+        .map(_normalizePresenceName)
+        .toSet();
+
+    for (final row in personnelRows) {
+      final name = row['name'] ?? '';
+      final isPresent = normalizedSelected.contains(
+        _normalizePresenceName(name),
+      );
+      final planningStatus = row['planningStatus'] ?? 'ABSENT';
+
+      row['status'] = isPresent
+          ? 'PRÉSENT'
+          : planningStatus == 'PRÉSENT'
+              ? 'ABSENT'
+              : planningStatus;
+    }
+
+    for (final selectedLabel in selected) {
+      final normalized = _normalizePresenceName(selectedLabel);
+      final alreadyListed = personnelRows.any(
+        (row) => _normalizePresenceName(row['name'] ?? '') == normalized,
+      );
+      if (alreadyListed) continue;
+
+      Map<String, dynamic>? candidate;
+      for (final value in candidates) {
+        final aliases = (value['aliases'] as List)
+            .map((item) => item.toString())
+            .toList();
+        if (aliases.contains(normalized)) {
+          candidate = value;
+          break;
+        }
+      }
+
+      personnelRows.add({
+        'name': selectedLabel,
+        'quality': (candidate?['planningRole'] ??
+                candidate?['quality'] ??
+                'Sauveteur')
+            .toString(),
+        'planningStatus': 'PRÉSENT',
+        'status': 'PRÉSENT',
+      });
+    }
+
+    personnelRows.sort((a, b) {
+      final aPresent = a['status'] == 'PRÉSENT';
+      final bPresent = b['status'] == 'PRÉSENT';
+      if (aPresent != bPresent) return aPresent ? -1 : 1;
+
+      final qualityCompare =
+          (a['quality'] ?? '').compareTo(b['quality'] ?? '');
+      if (qualityCompare != 0) return qualityCompare;
+      return (a['name'] ?? '').compareTo(b['name'] ?? '');
+    });
+
     if (!mounted) return;
 
     setState(() {
       _presenceCandidates = candidates;
+      _personnelRows = personnelRows;
       _selectedPresenceLabels = selected;
       _presenceEntry = existingPresence;
       _presenceFromPlanning = plannedLabels.isNotEmpty;
@@ -734,6 +843,129 @@ class _SauveteurMainCourantePageState
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _personnelCard() {
+    final presents = _personnelRows
+        .where((row) => row['status'] == 'PRÉSENT')
+        .toList();
+    final absents = _personnelRows
+        .where((row) => row['status'] != 'PRÉSENT')
+        .toList();
+
+    Widget personnelLine(Map<String, String> row, {required bool present}) {
+      final name = (row['name'] ?? '').trim();
+      final quality = (row['quality'] ?? 'Sauveteur').trim();
+      final status = (row['status'] ?? '').trim();
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              present
+                  ? Icons.check_circle_rounded
+                  : Icons.remove_circle_outline_rounded,
+              color: present
+                  ? const Color(0xFF15803D)
+                  : const Color(0xFFDC2626),
+              size: 17,
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    quality,
+                    style: const TextStyle(
+                      color: Color(0xFF1E3A8A),
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              status,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                color: present
+                    ? const Color(0xFF15803D)
+                    : const Color(0xFFDC2626),
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: 'Personnels',
+        labelStyle: _fieldLabelStyle,
+        floatingLabelStyle: _fieldLabelStyle,
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        contentPadding: const EdgeInsets.fromLTRB(10, 14, 10, 8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: SauveteurStyledDropdown.borderColor,
+            width: 1.6,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: SauveteurStyledDropdown.borderColor,
+            width: 1.6,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (presents.isNotEmpty) ...[
+            const Text(
+              'PRÉSENTS',
+              style: TextStyle(
+                color: Color(0xFF15803D),
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 2),
+            ...presents.map((row) => personnelLine(row, present: true)),
+          ],
+          if (presents.isNotEmpty && absents.isNotEmpty)
+            const Divider(height: 14),
+          if (absents.isNotEmpty) ...[
+            const Text(
+              'ABSENTS',
+              style: TextStyle(
+                color: Color(0xFFDC2626),
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 2),
+            ...absents.map((row) => personnelLine(row, present: false)),
+          ],
+        ],
       ),
     );
   }
@@ -2041,6 +2273,10 @@ class _SauveteurMainCourantePageState
                                                 ),
                                               ),
                                             ),
+                                          if (_personnelRows.isNotEmpty) ...[
+                                            _personnelCard(),
+                                            const SizedBox(height: 12),
+                                          ],
                                           _factsSection(),
                                         ],
                                       ),
