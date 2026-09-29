@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:share_plus/share_plus.dart';
@@ -387,6 +388,95 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     await launchUrl(Uri(scheme: 'tel', path: phone));
   }
 
+  Future<void> _openAdvertiserWebsite() async {
+    final uri = kIsWeb
+        ? Uri.base.replace(fragment: '/advertiser')
+        : Uri.parse('https://sphot.app/#/advertiser');
+
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: kIsWeb ? '_blank' : null,
+    );
+
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible d’ouvrir l’espace annonceur.'),
+        ),
+      );
+    }
+  }
+
+  Widget _buildAdvertisingSpace() {
+    return GestureDetector(
+      onTap: _openAdvertiserWebsite,
+      child: Container(
+        width: double.infinity,
+        height: 90,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.72),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: Colors.black.withOpacity(0.08),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.10),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 52,
+              height: 52,
+              child: SvgPicture.asset(
+                'data/icons/fire_red_icon.svg',
+                fit: BoxFit.contain,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'AJOUTE TON SPHOT PUBLICITAIRE ICI !',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black87,
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  const Text(
+                    'Visuel : PNG, JPG ou WEBP\n'
+                    '1200 × 600 px - 2 Mo max',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: Colors.black54,
+                      fontWeight: FontWeight.w600,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _selectPage(int index) {
     if (_selectedPage == index) return;
     setState(() => _selectedPage = index);
@@ -454,6 +544,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           ),
         ],
         const SizedBox(height: 12),
+        _buildAdvertisingSpace(),
+        const SizedBox(height: 10),
         _buildSpotActions(context, spot),
       ],
     );
@@ -768,6 +860,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         ],
 
         const SizedBox(height: 12),
+        _buildAdvertisingSpace(),
+        const SizedBox(height: 10),
         _buildSpotActions(context, spot),
       ],
     );
@@ -1050,6 +1144,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             child: _MobileMediaPlaceholder(),
           ),
         const SizedBox(height: 12),
+        _buildAdvertisingSpace(),
+        const SizedBox(height: 10),
         _buildSpotActions(context, spot),
       ],
     );
@@ -1190,6 +1286,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           ),
         ],
         const SizedBox(height: 12),
+        _buildAdvertisingSpace(),
+        const SizedBox(height: 10),
         _buildSpotActions(context, spot),
       ],
     );
