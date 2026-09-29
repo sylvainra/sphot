@@ -31,7 +31,7 @@ class SauveteurStyledDropdown extends StatefulWidget {
     required this.onChanged,
     this.enabled = true,
     this.maxMenuHeight = 245,
-    this.selectedColor = widget.selectedColor,
+    this.selectedColor = SauveteurStyledDropdown.selectedColor,
   });
 
   @override
@@ -184,8 +184,7 @@ class _SauveteurStyledDropdownState extends State<SauveteurStyledDropdown> {
                                         fontSize: 13,
                                         fontWeight: FontWeight.w800,
                                         color: selected
-                                            ? SauveteurStyledDropdown
-                                                .selectedColor
+                                            ? widget.selectedColor
                                             : SauveteurStyledDropdown
                                                 .borderColor,
                                       ),
