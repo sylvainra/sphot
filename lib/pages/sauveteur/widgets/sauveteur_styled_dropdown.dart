@@ -21,7 +21,7 @@ class SauveteurStyledDropdown extends StatefulWidget {
   final ValueChanged<String> onChanged;
   final bool enabled;
   final double maxMenuHeight;
-  final Color selectedColor;
+  final Color valueColor;
 
   const SauveteurStyledDropdown({
     super.key,
@@ -31,7 +31,7 @@ class SauveteurStyledDropdown extends StatefulWidget {
     required this.onChanged,
     this.enabled = true,
     this.maxMenuHeight = 245,
-    this.selectedColor = SauveteurStyledDropdown.selectedColor,
+    this.valueColor = SauveteurStyledDropdown.selectedColor,
   });
 
   @override
@@ -170,7 +170,7 @@ class _SauveteurStyledDropdownState extends State<SauveteurStyledDropdown> {
                                         ? Icons.check_box_rounded
                                         : Icons.check_box_outline_blank_rounded,
                                     color: selected
-                                        ? widget.selectedColor
+                                        ? widget.valueColor
                                         : SauveteurStyledDropdown.borderColor,
                                     size: 22,
                                   ),
@@ -184,7 +184,7 @@ class _SauveteurStyledDropdownState extends State<SauveteurStyledDropdown> {
                                         fontSize: 13,
                                         fontWeight: FontWeight.w800,
                                         color: selected
-                                            ? widget.selectedColor
+                                            ? widget.valueColor
                                             : SauveteurStyledDropdown
                                                 .borderColor,
                                       ),
@@ -260,7 +260,7 @@ class _SauveteurStyledDropdownState extends State<SauveteurStyledDropdown> {
                   fontWeight: FontWeight.w800,
                   color: muted
                       ? Colors.black38
-                      : widget.selectedColor,
+                      : widget.valueColor,
                 ),
               ),
             ),
@@ -268,7 +268,7 @@ class _SauveteurStyledDropdownState extends State<SauveteurStyledDropdown> {
               Icons.checklist_rounded,
               color: muted
                   ? Colors.black26
-                  : widget.selectedColor,
+                  : widget.valueColor,
               size: 22,
             ),
             const SizedBox(width: 2),
@@ -276,7 +276,7 @@ class _SauveteurStyledDropdownState extends State<SauveteurStyledDropdown> {
               Icons.keyboard_arrow_down_rounded,
               color: muted
                   ? Colors.black26
-                  : widget.selectedColor,
+                  : widget.valueColor,
               size: 26,
             ),
           ],
