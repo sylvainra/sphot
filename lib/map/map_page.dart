@@ -320,17 +320,54 @@ List<Marker> _buildAdminMarkers(
 
   if (zoom < 12) return markers;
 
+  String cityKey(String value) {
+    return value
+        .trim()
+        .toUpperCase()
+        .replaceAll('É', 'E')
+        .replaceAll('È', 'E')
+        .replaceAll('Ê', 'E')
+        .replaceAll('À', 'A')
+        .replaceAll('Â', 'A')
+        .replaceAll('Î', 'I')
+        .replaceAll('Ï', 'I')
+        .replaceAll('Ô', 'O')
+        .replaceAll('Û', 'U')
+        .replaceAll('Ù', 'U');
+  }
+
+  final cityCoordinates = <String, LatLng>{};
+
+  for (final spot in spots) {
+    final ville = spot.ville.trim();
+    if (ville.isEmpty) continue;
+
+    if (spot.villeLat != 0 && spot.villeLng != 0) {
+      cityCoordinates.putIfAbsent(
+        cityKey(ville),
+        () => LatLng(spot.villeLat, spot.villeLng),
+      );
+    }
+  }
+
   final admins = <String, SpotFlagState>{};
 
   for (final spot in spots) {
     final ville = spot.ville.trim();
-
     if (ville.isEmpty) continue;
-    if (spot.villeLat == 0 || spot.villeLng == 0) continue;
+
+    final directCoordinatesValid =
+        spot.villeLat != 0 && spot.villeLng != 0;
+    final fallbackCoordinates =
+        cityCoordinates[cityKey(ville)];
+
+    if (!directCoordinatesValid && fallbackCoordinates == null) {
+      continue;
+    }
 
     final adminKey = spot.territoireId.trim().isNotEmpty
         ? spot.territoireId.trim()
-        : ville.toUpperCase();
+        : cityKey(ville);
 
     final currentSpot = admins[adminKey];
 
@@ -348,10 +385,23 @@ List<Marker> _buildAdminMarkers(
   for (final spot in admins.values) {
     final logoVille = spot.logoVille.trim();
     final siteInternetVille = spot.siteInternetVille.trim();
+    final fallbackCoordinates =
+        cityCoordinates[cityKey(spot.ville)];
+
+    final markerLat = spot.villeLat != 0
+        ? spot.villeLat
+        : fallbackCoordinates?.latitude;
+    final markerLng = spot.villeLng != 0
+        ? spot.villeLng
+        : fallbackCoordinates?.longitude;
+
+    if (markerLat == null || markerLng == null) {
+      continue;
+    }
 
     markers.add(
       Marker(
-        point: LatLng(spot.villeLat, spot.villeLng),
+        point: LatLng(markerLat, markerLng),
         width: 85,
         height: 85,
         alignment: Alignment.topCenter,
