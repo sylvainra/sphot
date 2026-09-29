@@ -1,11 +1,16 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:csv/csv.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
 import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurPlanningPage extends StatefulWidget {
@@ -51,6 +56,7 @@ class _SauveteurPlanningPageState extends State<SauveteurPlanningPage> {
 
   bool _syncingScroll = false;
   bool planningEnregistre = false;
+  bool _sharingPlanning = false;
 
   final List<Map<String, String>> beachList = [];
 
@@ -585,6 +591,207 @@ Future<void> _savePlanning() async {
     planningEnregistre = false;
   });
 }
+
+  String _planningExportFileName() {
+    final rawSpot = (selectedBeach ?? 'SPHOT')
+        .replaceAll(RegExp(r'[^A-Za-z0-9À-ÿ_-]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+
+    return 'SPHOT_Planning_${rawSpot.isEmpty ? 'poste' : rawSpot}_'
+        '${_selectedMonth.year}-'
+        '${_selectedMonth.month.toString().padLeft(2, '0')}.pdf';
+  }
+
+  String _planningCellExportValue(String role, int columnIndex) {
+    final column = columns[columnIndex];
+
+    if (!column.isTotal) {
+      return (controllers['$role-${column.key}']?.text ?? '').trim();
+    }
+
+    if (column.isMonthTotal) {
+      return _formatHours(_monthTotalForRole(role));
+    }
+
+    return _formatHours(_weekTotalForRole(role, columnIndex));
+  }
+
+  Future<Uint8List> _buildPlanningPdf() async {
+    final document = pw.Document();
+
+    final activeRoles = roles.where((role) {
+      final name = (nameControllers[role]?.text ?? '').trim();
+      final hasPlanning = columns.any((column) {
+        if (column.isTotal) return false;
+        return (controllers['$role-${column.key}']?.text ?? '')
+            .trim()
+            .isNotEmpty;
+      });
+      return name.isNotEmpty || hasPlanning;
+    }).toList();
+
+    final exportRoles =
+        activeRoles.isEmpty ? roles.take(2).toList() : activeRoles;
+
+    const dayWidth = 24.0;
+    const roleWidth = 92.0;
+    const nameWidth = 92.0;
+
+    pw.Widget cell(
+      String text, {
+      bool header = false,
+      PdfColor? background,
+      pw.Alignment alignment = pw.Alignment.center,
+    }) {
+      return pw.Container(
+        alignment: alignment,
+        padding: const pw.EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+        color: background,
+        child: pw.Text(
+          text,
+          textAlign: pw.TextAlign.center,
+          maxLines: 3,
+          style: pw.TextStyle(
+            fontSize: header ? 6.2 : 5.8,
+            fontWeight: header ? pw.FontWeight.bold : pw.FontWeight.normal,
+          ),
+        ),
+      );
+    }
+
+    final tableRows = <pw.TableRow>[
+      pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+        children: [
+          cell('Fonction', header: true),
+          cell('Personnel', header: true),
+          ...columns.map((column) {
+            final label = column.isTotal
+                ? (column.isMonthTotal ? 'TOTAL\nMOIS' : 'TOTAL')
+                : '${column.date!.day}\n${_shortDay(column.date!.weekday)}';
+            return cell(label, header: true);
+          }),
+        ],
+      ),
+      ...exportRoles.map((role) {
+        final roleIndex = roles.indexOf(role);
+        final name = (nameControllers[role]?.text ?? '').trim();
+
+        return pw.TableRow(
+          decoration: pw.BoxDecoration(
+            color: roleIndex == 0
+                ? PdfColors.amber100
+                : roleIndex == 1
+                    ? PdfColors.blue100
+                    : PdfColors.white,
+          ),
+          children: [
+            cell(role, alignment: pw.Alignment.centerLeft),
+            cell(name.isEmpty ? '-' : name, alignment: pw.Alignment.centerLeft),
+            ...columns.asMap().entries.map(
+              (entry) => cell(
+                _planningCellExportValue(role, entry.key).replaceAll('\n', ' / '),
+                background:
+                    entry.value.isTotal ? PdfColors.red100 : null,
+              ),
+            ),
+          ],
+        );
+      }),
+    ];
+
+    document.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a3.landscape,
+        margin: const pw.EdgeInsets.all(18),
+        build: (context) => [
+          pw.Text(
+            'SPHOT — EMPLOI DU TEMPS',
+            style: pw.TextStyle(
+              fontSize: 16,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.SizedBox(height: 5),
+          pw.Text(
+            'Poste : ${selectedBeach ?? '-'}',
+            style: const pw.TextStyle(fontSize: 9),
+          ),
+          pw.Text(
+            'Période : $_selectedMonthLabel',
+            style: const pw.TextStyle(fontSize: 9),
+          ),
+          pw.Text(
+            'Horaires d’ouverture : ${hoursController.text.trim()}',
+            style: const pw.TextStyle(fontSize: 9),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Table(
+            border: pw.TableBorder.all(
+              color: PdfColors.black,
+              width: 0.45,
+            ),
+            columnWidths: {
+              0: const pw.FixedColumnWidth(roleWidth),
+              1: const pw.FixedColumnWidth(nameWidth),
+              for (var i = 0; i < columns.length; i++)
+                i + 2: const pw.FixedColumnWidth(dayWidth),
+            },
+            children: tableRows,
+          ),
+          pw.SizedBox(height: 8),
+          pw.Text(
+            'Document généré depuis SPHOT.',
+            style: const pw.TextStyle(
+              fontSize: 7,
+              color: PdfColors.grey700,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return document.save();
+  }
+
+  Future<void> _sharePlanning() async {
+    if (_sharingPlanning || selectedSpotId == null) return;
+
+    setState(() => _sharingPlanning = true);
+
+    try {
+      final bytes = await _buildPlanningPdf();
+      final fileName = _planningExportFileName();
+
+      Rect? shareOrigin;
+      final renderObject = context.findRenderObject();
+      if (renderObject is RenderBox && renderObject.hasSize) {
+        shareOrigin =
+            renderObject.localToGlobal(Offset.zero) & renderObject.size;
+      }
+
+      await SharePlus.instance.share(
+        ShareParams(
+          subject: 'Planning SPHOT — $_selectedMonthLabel',
+          text: 'Planning SPHOT du poste '
+              '${selectedBeach ?? ''} — $_selectedMonthLabel.',
+          files: [
+            XFile.fromData(
+              bytes,
+              mimeType: 'application/pdf',
+              name: fileName,
+            ),
+          ],
+          sharePositionOrigin: shareOrigin,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _sharingPlanning = false);
+      }
+    }
+  }
 
   Future<void> _listenToCell(
     String key,
@@ -1393,54 +1600,113 @@ Future<void> _savePlanning() async {
 
 const SizedBox(height: 8),
 
-SizedBox(
-  width: double.infinity,
-  height: 46,
-  child: ElevatedButton.icon(
-    onPressed: canPersist ? _savePlanning : null,
-    icon: Icon(
-      planningEnregistre
-          ? Icons.check_rounded
-          : canPersist
-              ? Icons.save_rounded
-              : Icons.visibility_rounded,
-      color: planningEnregistre ? Colors.white : const Color(0xFFFF0000),
-      size: 20,
-    ),
-    label: FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Text(
-        planningEnregistre
-            ? 'PLANNING ENREGISTRÉ'
-            : canPersist
-                ? 'ENREGISTRER LE PLANNING'
-                : canEdit
-                    ? 'TEST NON ENREGISTRÉ'
-                    : 'PLANNING EN CONSULTATION',
-        maxLines: 1,
-        style: TextStyle(
-          fontWeight: FontWeight.w900,
-          fontSize: 14,
-          color: planningEnregistre ? Colors.white : const Color(0xFFFF0000),
+Row(
+  children: [
+    Expanded(
+      child: SizedBox(
+        height: 46,
+        child: ElevatedButton.icon(
+          onPressed: canPersist ? _savePlanning : null,
+          icon: Icon(
+            planningEnregistre
+                ? Icons.check_rounded
+                : canPersist
+                    ? Icons.save_rounded
+                    : Icons.visibility_rounded,
+            color:
+                planningEnregistre ? Colors.white : const Color(0xFFFF0000),
+            size: 19,
+          ),
+          label: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              planningEnregistre
+                  ? 'ENREGISTRÉ'
+                  : canPersist
+                      ? 'ENREGISTRER'
+                      : canEdit
+                          ? 'TEST'
+                          : 'CONSULTATION',
+              maxLines: 1,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
+                color: planningEnregistre
+                    ? Colors.white
+                    : const Color(0xFFFF0000),
+              ),
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: planningEnregistre
+                ? const Color(0xFFFF0000)
+                : Colors.transparent,
+            foregroundColor: planningEnregistre
+                ? Colors.white
+                : const Color(0xFFFF0000),
+            disabledBackgroundColor: Colors.transparent,
+            elevation: 0,
+            side: const BorderSide(
+              color: Color(0xFFFF0000),
+              width: 2,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
         ),
       ),
     ),
-    style: ElevatedButton.styleFrom(
-      backgroundColor:
-          planningEnregistre ? const Color(0xFFFF0000) : Colors.transparent,
-      foregroundColor:
-          planningEnregistre ? Colors.white : const Color(0xFFFF0000),
-      disabledBackgroundColor: Colors.transparent,
-      elevation: 0,
-      side: const BorderSide(
-        color: Color(0xFFFF0000),
-        width: 2,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+    const SizedBox(width: 8),
+    Expanded(
+      child: SizedBox(
+        height: 46,
+        child: ElevatedButton.icon(
+          onPressed:
+              selectedSpotId == null || _sharingPlanning ? null : _sharePlanning,
+          icon: _sharingPlanning
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF1E3A8A),
+                  ),
+                )
+              : const Icon(
+                  Icons.share_rounded,
+                  color: Color(0xFF1E3A8A),
+                  size: 19,
+                ),
+          label: const FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'PARTAGER',
+              maxLines: 1,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
+                color: Color(0xFF1E3A8A),
+              ),
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: const Color(0xFF1E3A8A),
+            disabledBackgroundColor: Colors.transparent,
+            elevation: 0,
+            side: const BorderSide(
+              color: Color(0xFF1E3A8A),
+              width: 2,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
       ),
     ),
-  ),
+  ],
 ),
 
                   Transform.translate(
