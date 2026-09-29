@@ -5042,6 +5042,11 @@ exports.saveSauveteurPlanning = onRequest(
 const INSTITUTIONAL_MAIN_COURANTE_URL =
   SPHOT_LOGIN_URL + "/#/institutionnel-main-courante";
 
+/**
+ * Calcule l'empreinte SHA-256 d'un jeton d'accès institutionnel.
+ * @param {string} token Jeton d'accès brut.
+ * @return {string} Empreinte hexadécimale du jeton.
+ */
 function hashInstitutionalAccessToken(token) {
   return crypto
       .createHash("sha256")
@@ -5049,6 +5054,11 @@ function hashInstitutionalAccessToken(token) {
       .digest("hex");
 }
 
+/**
+ * Normalise les préférences de notification d'un contact institutionnel.
+ * @param {Object} contact Contact institutionnel.
+ * @return {Object} Préférences opérationnelles normalisées.
+ */
 function institutionalNotificationPreferences(contact) {
   const raw = contact &&
       typeof contact.notificationPreferences === "object" &&
@@ -5063,6 +5073,11 @@ function institutionalNotificationPreferences(contact) {
   };
 }
 
+/**
+ * Envoie une notification opérationnelle aux contacts institutionnels.
+ * @param {Object} options Paramètres de la notification.
+ * @return {Promise<void>} Promesse résolue après traitement.
+ */
 async function sendInstitutionalOperationalNotification(options) {
   const territoireId = (options.territoireId || "").toString();
   const spotId = (options.spotId || "").toString();
@@ -5972,6 +5987,11 @@ exports.getSauveteurMainCourante = onRequest(
 );
 
 
+/**
+ * Nettoie et limite les données d'identification d'une victime.
+ * @param {Object} rawVictim Données victime reçues du client.
+ * @return {?Object} Données victime nettoyées, ou null si elles sont vides.
+ */
 function sanitizeMainCouranteVictim(rawVictim) {
   if (!rawVictim || typeof rawVictim !== "object") return null;
 
