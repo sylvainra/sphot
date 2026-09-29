@@ -5936,6 +5936,8 @@ exports.getSauveteurMainCourante = onRequest(
               description: entry.description || "",
               actionTaken: entry.actionTaken || "",
               visibility: entry.visibility || "operational",
+              victim: entry.victim && typeof entry.victim === "object" ?
+                entry.victim : null,
               source: entry.source || "",
               wasEdited: entry.wasEdited === true,
               occurredAt: entry.occurredAt &&
@@ -5968,6 +5970,26 @@ exports.getSauveteurMainCourante = onRequest(
       }
     },
 );
+
+
+function sanitizeMainCouranteVictim(rawVictim) {
+  if (!rawVictim || typeof rawVictim !== "object") return null;
+
+  const clean = (value, maxLength = 160) =>
+    (value || "").toString().trim().slice(0, maxLength);
+
+  const victim = {
+    sexe: clean(rawVictim.sexe, 40),
+    age: clean(rawVictim.age, 20),
+    dateNaissance: clean(rawVictim.dateNaissance, 20),
+    lieuHabitation: clean(rawVictim.lieuHabitation, 180),
+    telephone: clean(rawVictim.telephone, 40),
+    qualification: clean(rawVictim.qualification, 60),
+  };
+
+  const hasValue = Object.values(victim).some((value) => value.length > 0);
+  return hasValue ? victim : null;
+}
 
 exports.addSauveteurMainCouranteEntry = onRequest(
     {
@@ -6053,12 +6075,16 @@ exports.addSauveteurMainCouranteEntry = onRequest(
         const entryType =
           (request.body.type || "Observation").toString().trim() ||
           "Observation";
+        const victim = entryType.toLowerCase() === "secours" ?
+          sanitizeMainCouranteVictim(request.body.victim) :
+          null;
 
         await entryReference.set({
           type: entryType,
           description,
           actionTaken: (request.body.actionTaken || "").toString().trim(),
           visibility,
+          ...(victim ? {victim} : {}),
           occurredAt: admin.firestore.FieldValue.serverTimestamp(),
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           createdBy: {
@@ -6198,12 +6224,18 @@ exports.updateSauveteurMainCouranteEntry = onRequest(
         const visibility = request.body.visibility === "restricted" ?
           "restricted" :
           "operational";
+        const nextType =
+          (request.body.type || "Observation").toString().trim() ||
+          "Observation";
+        const victim = nextType.toLowerCase() === "secours" ?
+          sanitizeMainCouranteVictim(request.body.victim) :
+          null;
         const nextData = {
-          type: (request.body.type || "Observation").toString().trim() ||
-            "Observation",
+          type: nextType,
           description,
           actionTaken: (request.body.actionTaken || "").toString().trim(),
           visibility,
+          victim: victim || admin.firestore.FieldValue.delete(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBy: {
             sauveteurId: context.sauveteurId,
