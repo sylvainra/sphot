@@ -1220,6 +1220,7 @@ class _SauveteurMainCourantePageState
     required String description,
     required String actionTaken,
     required bool restricted,
+    Map<String, dynamic>? victim,
   }) async {
     if (!_canWrite ||
         _selectedSpotId == null ||
@@ -1250,6 +1251,7 @@ class _SauveteurMainCourantePageState
           'description': description,
           'actionTaken': actionTaken,
           'visibility': restricted ? 'restricted' : 'operational',
+          if (type == 'Secours') 'victim': victim ?? <String, dynamic>{},
         }),
       );
 
@@ -1301,6 +1303,31 @@ class _SauveteurMainCourantePageState
     final actionController = TextEditingController(
       text: (entry['actionTaken'] ?? '').toString(),
     );
+    final currentVictim = entry['victim'] is Map
+        ? Map<String, dynamic>.from(entry['victim'] as Map)
+        : <String, dynamic>{};
+    String victimSex =
+        (currentVictim['sexe'] ?? 'Non renseigné').toString();
+    if (!_victimSexOptions.contains(victimSex)) {
+      victimSex = 'Non renseigné';
+    }
+    String victimQualification =
+        (currentVictim['qualification'] ?? 'Idem').toString();
+    if (!_victimQualificationOptions.contains(victimQualification)) {
+      victimQualification = 'Idem';
+    }
+    final victimAgeController = TextEditingController(
+      text: (currentVictim['age'] ?? '').toString(),
+    );
+    final victimBirthDateController = TextEditingController(
+      text: (currentVictim['dateNaissance'] ?? '').toString(),
+    );
+    final victimResidenceController = TextEditingController(
+      text: (currentVictim['lieuHabitation'] ?? '').toString(),
+    );
+    final victimPhoneController = TextEditingController(
+      text: (currentVictim['telephone'] ?? '').toString(),
+    );
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -1336,6 +1363,102 @@ class _SauveteurMainCourantePageState
                           setDialogState(() => selectedType = value);
                         },
                       ),
+                      if (selectedType == 'Secours') ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF1F2),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: const Color(0xFFDC2626),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              SauveteurStyledDropdown(
+                                labelText: 'Sexe',
+                                value: victimSex,
+                                options: _victimSexOptions
+                                    .map(
+                                      (value) => SauveteurDropdownOption(
+                                        value: value,
+                                        label: value,
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (value) {
+                                  setDialogState(() => victimSex = value);
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: victimAgeController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Age',
+                                        border: OutlineInputBorder(),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: victimBirthDateController,
+                                      keyboardType: TextInputType.datetime,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Date de naissance',
+                                        hintText: 'JJ/MM/AAAA',
+                                        border: OutlineInputBorder(),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: victimResidenceController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Lieu d’habitation',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: victimPhoneController,
+                                keyboardType: TextInputType.phone,
+                                decoration: const InputDecoration(
+                                  labelText: 'Numéro de téléphone',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SauveteurStyledDropdown(
+                                labelText: 'Qualification',
+                                value: victimQualification,
+                                options: _victimQualificationOptions
+                                    .map(
+                                      (value) => SauveteurDropdownOption(
+                                        value: value,
+                                        label: value,
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (value) {
+                                  setDialogState(
+                                    () => victimQualification = value,
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       TextField(
                         controller: descriptionController,
@@ -1431,6 +1554,17 @@ class _SauveteurMainCourantePageState
                       'description': description,
                       'actionTaken': actionController.text.trim(),
                       'restricted': restricted,
+                      if (selectedType == 'Secours')
+                        'victim': {
+                          'sexe': victimSex,
+                          'age': victimAgeController.text.trim(),
+                          'dateNaissance':
+                              victimBirthDateController.text.trim(),
+                          'lieuHabitation':
+                              victimResidenceController.text.trim(),
+                          'telephone': victimPhoneController.text.trim(),
+                          'qualification': victimQualification,
+                        },
                     });
                   },
                   icon: const Icon(Icons.save_outlined),
@@ -1452,6 +1586,10 @@ class _SauveteurMainCourantePageState
 
     descriptionController.dispose();
     actionController.dispose();
+    victimAgeController.dispose();
+    victimBirthDateController.dispose();
+    victimResidenceController.dispose();
+    victimPhoneController.dispose();
 
     if (result == null) return;
 
@@ -1461,6 +1599,9 @@ class _SauveteurMainCourantePageState
       description: (result['description'] ?? '').toString(),
       actionTaken: (result['actionTaken'] ?? '').toString(),
       restricted: result['restricted'] == true,
+      victim: result['victim'] is Map
+          ? Map<String, dynamic>.from(result['victim'] as Map)
+          : null,
     );
   }
 
