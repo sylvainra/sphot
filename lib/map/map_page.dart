@@ -328,7 +328,6 @@ List<Marker> _buildAdminMarkers(
 
     if (ville.isEmpty) continue;
     if (spot.villeLat == 0 || spot.villeLng == 0) continue;
-    if (siteInternetVille.isEmpty) continue;
 
     final adminKey = spot.territoireId.trim().isNotEmpty
         ? spot.territoireId.trim()
