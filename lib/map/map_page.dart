@@ -324,7 +324,6 @@ List<Marker> _buildAdminMarkers(
 
   for (final spot in spots) {
     final ville = spot.ville.trim();
-    final siteInternetVille = spot.siteInternetVille.trim();
 
     if (ville.isEmpty) continue;
     if (spot.villeLat == 0 || spot.villeLng == 0) continue;
