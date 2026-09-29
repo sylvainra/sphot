@@ -427,11 +427,17 @@ class _SauveteurMainCourantePageState
 
       if (label.isEmpty) continue;
 
+      final login = (data['login'] ?? '').toString().trim().toLowerCase();
+      final connected =
+          login.isNotEmpty && login == widget.login.trim().toLowerCase();
+
       candidates.add({
         'id': document.id,
         'label': label,
+        'login': login,
         'quality': functions.isEmpty ? 'Sauveteur' : functions.join(' / '),
         'planned': false,
+        'connected': connected,
         'aliases': <String>[
           _normalizePresenceName(label),
           _normalizePresenceName([nom, prenom].join(' ')),
@@ -501,6 +507,7 @@ class _SauveteurMainCourantePageState
             'quality': role,
             'planningRole': role,
             'planned': plannedPresent,
+            'connected': false,
             'aliases': <String>[normalizedName],
           });
           if (plannedPresent) {
@@ -536,12 +543,23 @@ class _SauveteurMainCourantePageState
             'label': savedLabel,
             'quality': 'Sauveteur',
             'planned': false,
+            'connected': false,
             'aliases': <String>[normalized],
           });
         }
       }
     } else {
       selected = plannedLabels.toSet();
+
+      for (final candidate in candidates) {
+        if (candidate['connected'] == true) {
+          final connectedLabel =
+              (candidate['label'] ?? '').toString().trim();
+          if (connectedLabel.isNotEmpty) {
+            selected.add(connectedLabel);
+          }
+        }
+      }
     }
 
     final normalizedSelected = selected
@@ -739,6 +757,8 @@ class _SauveteurMainCourantePageState
                                 (candidate['label'] ?? '').toString();
                             final planned =
                                 candidate['planned'] == true;
+                            final connected =
+                                candidate['connected'] == true;
                             final checked =
                                 workingSelection.contains(label);
 
@@ -756,7 +776,9 @@ class _SauveteurMainCourantePageState
                               subtitle: Text(
                                 planned
                                     ? 'Prévu présent au planning'
-                                    : 'Non prévu au planning / ajout manuel',
+                                    : connected
+                                        ? 'Sauveteur connecté à ce poste'
+                                        : 'Non prévu au planning / ajout manuel',
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: planned
@@ -1327,6 +1349,10 @@ class _SauveteurMainCourantePageState
     final victimPhoneController = TextEditingController(
       text: _formatFrenchPhone((currentVictim['telephone'] ?? '').toString()),
     );
+    _syncVictimAge(
+      victimBirthDateController,
+      victimAgeController,
+    );
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -1387,52 +1413,42 @@ class _SauveteurMainCourantePageState
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              _victimDropdown(
-                                label: 'Sexe',
+                              SauveteurStyledDropdown(
+                                labelText: 'Sexe',
                                 value: victimSex,
-                                options: _victimSexOptions,
+                                selectedColor: _victimBlue,
+                                options: _victimSexOptions
+                                    .map(
+                                      (value) => SauveteurDropdownOption(
+                                        value: value,
+                                        label: value,
+                                      ),
+                                    )
+                                    .toList(),
                                 onChanged: (value) {
                                   setDialogState(() => victimSex = value);
                                 },
                               ),
                               const SizedBox(height: 8),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  SizedBox(
-                                    width: 78,
-                                    child: TextField(
-                                      controller: victimAgeController,
-                                      keyboardType: TextInputType.number,
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.digitsOnly,
-                                        LengthLimitingTextInputFormatter(3),
-                                      ],
-                                      style: const TextStyle(
-                                        color: _victimBlue,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                      decoration: _victimInputDecoration('Age'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: victimBirthDateController,
-                                      keyboardType: TextInputType.datetime,
-                                      style: const TextStyle(
-                                        color: _victimBlue,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                      decoration: _victimInputDecoration(
-                                        'Date de naissance',
-                                        hintText: 'JJ/MM/AAAA',
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              _victimBirthDateAgeRow(
+                                birthDateController: victimBirthDateController,
+                                ageController: victimAgeController,
+                                onBirthDateTap: () async {
+                                  final picked = await _pickVictimBirthDate(
+                                    dialogContext,
+                                    victimBirthDateController.text,
+                                  );
+                                  if (picked == null) return;
+
+                                  setDialogState(() {
+                                    victimBirthDateController.text =
+                                        _formatVictimBirthDate(picked);
+                                    _syncVictimAge(
+                                      victimBirthDateController,
+                                      victimAgeController,
+                                    );
+                                  });
+                                },
                               ),
                               const SizedBox(height: 8),
                               TextField(
@@ -1464,12 +1480,19 @@ class _SauveteurMainCourantePageState
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              _victimDropdown(
-                                label: 'Qualification',
+                              SauveteurStyledDropdown(
+                                labelText: 'Qualification',
                                 value: victimQualification,
-                                options: _victimQualificationOptions,
+                                selectedColor: _victimBlue,
+                                options: _victimQualificationOptions
+                                    .map(
+                                      (value) => SauveteurDropdownOption(
+                                        value: value,
+                                        label: value,
+                                      ),
+                                    )
+                                    .toList(),
                                 onChanged: (value) {
-                                  if (value == null) return;
                                   setDialogState(
                                     () => victimQualification = value,
                                   );
@@ -2707,18 +2730,21 @@ class _SauveteurMainCourantePageState
   InputDecoration _victimInputDecoration(
     String label, {
     String? hintText,
+    double labelFontSize = 16,
+    FloatingLabelBehavior? floatingLabelBehavior,
   }) {
     return InputDecoration(
       labelText: label,
       hintText: hintText,
-      labelStyle: const TextStyle(
+      floatingLabelBehavior: floatingLabelBehavior,
+      labelStyle: TextStyle(
         color: _victimBlue,
-        fontSize: 16,
+        fontSize: labelFontSize,
         fontWeight: FontWeight.w700,
       ),
-      floatingLabelStyle: const TextStyle(
+      floatingLabelStyle: TextStyle(
         color: _victimBlue,
-        fontSize: 16,
+        fontSize: labelFontSize,
         fontWeight: FontWeight.w700,
       ),
       hintStyle: TextStyle(
@@ -2744,47 +2770,148 @@ class _SauveteurMainCourantePageState
     );
   }
 
-  Widget _victimDropdown({
-    required String label,
-    required String? value,
-    required List<String> options,
-    required ValueChanged<String?> onChanged,
+  DateTime? _parseVictimBirthDate(String value) {
+    final match = RegExp(
+      r'^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$',
+    ).firstMatch(value.trim());
+
+    if (match == null) return null;
+
+    final day = int.tryParse(match.group(1)!);
+    final month = int.tryParse(match.group(2)!);
+    final year = int.tryParse(match.group(3)!);
+    if (day == null || month == null || year == null) return null;
+
+    final date = DateTime(year, month, day);
+    if (date.year != year || date.month != month || date.day != day) {
+      return null;
+    }
+
+    return date;
+  }
+
+  String _formatVictimBirthDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return day + '/' + month + '/' + date.year.toString();
+  }
+
+  int _victimAgeAt(DateTime birthDate, DateTime referenceDate) {
+    var age = referenceDate.year - birthDate.year;
+    final birthdayPassed = referenceDate.month > birthDate.month ||
+        (referenceDate.month == birthDate.month &&
+            referenceDate.day >= birthDate.day);
+
+    if (!birthdayPassed) age -= 1;
+    return age < 0 ? 0 : age;
+  }
+
+  void _syncVictimAge(
+    TextEditingController birthDateController,
+    TextEditingController ageController,
+  ) {
+    final birthDate = _parseVictimBirthDate(birthDateController.text);
+    if (birthDate == null) {
+      ageController.clear();
+      return;
+    }
+
+    ageController.text = _victimAgeAt(birthDate, _selectedDay).toString();
+  }
+
+  Future<DateTime?> _pickVictimBirthDate(
+    BuildContext pickerContext,
+    String currentValue,
+  ) async {
+    final current = _parseVictimBirthDate(currentValue);
+    final reference = _selectedDay;
+    final suggestedYear = reference.year - 30;
+    final initial = current ??
+        DateTime(
+          suggestedYear < 1900 ? 1900 : suggestedYear,
+          reference.month,
+          reference.day,
+        );
+
+    return showDatePicker(
+      context: pickerContext,
+      initialDate: initial.isAfter(reference) ? reference : initial,
+      firstDate: DateTime(1900),
+      lastDate: reference,
+      helpText: 'DATE DE NAISSANCE',
+      cancelText: 'ANNULER',
+      confirmText: 'VALIDER',
+    );
+  }
+
+  Widget _victimBirthDateAgeRow({
+    required TextEditingController birthDateController,
+    required TextEditingController ageController,
+    required VoidCallback onBirthDateTap,
   }) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      isExpanded: true,
-      dropdownColor: Colors.white,
-      iconEnabledColor: _victimBlue,
-      style: const TextStyle(
-        color: _victimBlue,
-        fontSize: 14,
-        fontWeight: FontWeight.w800,
-      ),
-      decoration: _victimInputDecoration(label),
-      hint: const Text(
-        'Sélectionner',
-        style: TextStyle(
-          color: _victimBlue,
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      items: options
-          .map(
-            (option) => DropdownMenuItem<String>(
-              value: option,
-              child: Text(
-                option,
-                style: const TextStyle(
+    final birthDateText = birthDateController.text.trim();
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: onBirthDateTap,
+            child: InputDecorator(
+              decoration: _victimInputDecoration(
+                'Date de naissance',
+                labelFontSize: 11.5,
+                floatingLabelBehavior: FloatingLabelBehavior.always,
+              ).copyWith(
+                suffixIcon: const Icon(
+                  Icons.calendar_month_outlined,
                   color: _victimBlue,
+                  size: 19,
+                ),
+                suffixIconConstraints: const BoxConstraints(
+                  minWidth: 34,
+                  minHeight: 34,
+                ),
+              ),
+              child: Text(
+                birthDateText.isEmpty ? 'JJ/MM/AAAA' : birthDateText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: birthDateText.isEmpty
+                      ? _victimBlue.withOpacity(0.55)
+                      : _victimBlue,
                   fontSize: 14,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-          )
-          .toList(),
-      onChanged: onChanged,
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 62,
+          child: InputDecorator(
+            decoration: _victimInputDecoration(
+              'Age',
+              labelFontSize: 12,
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+            ),
+            child: Text(
+              ageController.text.trim().isEmpty
+                  ? '—'
+                  : ageController.text.trim(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: _victimBlue,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -2845,52 +2972,42 @@ class _SauveteurMainCourantePageState
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _victimDropdown(
-                    label: 'Sexe',
+                  SauveteurStyledDropdown(
+                    labelText: 'Sexe',
                     value: _victimSex,
-                    options: _victimSexOptions,
+                    selectedColor: _victimBlue,
+                    options: _victimSexOptions
+                        .map(
+                          (value) => SauveteurDropdownOption(
+                            value: value,
+                            label: value,
+                          ),
+                        )
+                        .toList(),
                     onChanged: (value) {
                       setState(() => _victimSex = value);
                     },
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: 78,
-                        child: TextField(
-                          controller: _victimAgeController,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(3),
-                          ],
-                          style: const TextStyle(
-                            color: _victimBlue,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          decoration: _victimInputDecoration('Age'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: _victimBirthDateController,
-                          keyboardType: TextInputType.datetime,
-                          style: const TextStyle(
-                            color: _victimBlue,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          decoration: _victimInputDecoration(
-                            'Date de naissance',
-                            hintText: 'JJ/MM/AAAA',
-                          ),
-                        ),
-                      ),
-                    ],
+                  _victimBirthDateAgeRow(
+                    birthDateController: _victimBirthDateController,
+                    ageController: _victimAgeController,
+                    onBirthDateTap: () async {
+                      final picked = await _pickVictimBirthDate(
+                        context,
+                        _victimBirthDateController.text,
+                      );
+                      if (picked == null || !mounted) return;
+
+                      setState(() {
+                        _victimBirthDateController.text =
+                            _formatVictimBirthDate(picked);
+                        _syncVictimAge(
+                          _victimBirthDateController,
+                          _victimAgeController,
+                        );
+                      });
+                    },
                   ),
                   const SizedBox(height: 8),
                   TextField(
@@ -2921,12 +3038,19 @@ class _SauveteurMainCourantePageState
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _victimDropdown(
-                    label: 'Qualification',
+                  SauveteurStyledDropdown(
+                    labelText: 'Qualification',
                     value: _victimQualification,
-                    options: _victimQualificationOptions,
+                    selectedColor: _victimBlue,
+                    options: _victimQualificationOptions
+                        .map(
+                          (value) => SauveteurDropdownOption(
+                            value: value,
+                            label: value,
+                          ),
+                        )
+                        .toList(),
                     onChanged: (value) {
-                      if (value == null) return;
                       setState(() => _victimQualification = value);
                     },
                   ),
