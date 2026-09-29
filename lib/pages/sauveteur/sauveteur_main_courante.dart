@@ -1539,7 +1539,7 @@ class _SauveteurMainCourantePageState
     final month = _selectedDay.month.toString().padLeft(2, '0');
 
     return 'SPHOT_Main_courante_${rawSpot.isEmpty ? 'poste' : rawSpot}_'
-        '${_selectedDay.year}-§month-§day.pdf';
+        '${_selectedDay.year}-$month-$day.pdf';
   }
 
   List<Map<String, dynamic>> _entriesForExport() {
