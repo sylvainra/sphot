@@ -1814,6 +1814,9 @@ class _SauveteurMainCourantePageState
       final action = (entry['actionTaken'] ?? '').toString().trim();
       final visibility = (entry['visibility'] ?? 'operational').toString();
       final restricted = visibility == 'restricted';
+      final victim = entry['victim'] is Map
+          ? Map<String, dynamic>.from(entry['victim'] as Map)
+          : <String, dynamic>{};
 
       return pw.Container(
         margin: const pw.EdgeInsets.only(bottom: 8),
@@ -1863,6 +1866,44 @@ class _SauveteurMainCourantePageState
               _entryDescriptionForDisplay(entry),
               style: const pw.TextStyle(fontSize: 9),
             ),
+            if ((entry['type'] ?? '').toString().toLowerCase() == 'secours' &&
+                victim.isNotEmpty) ...[
+              pw.SizedBox(height: 6),
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.all(6),
+                color: PdfColors.red50,
+                child: pw.Text(
+                  [
+                    if ((victim['sexe'] ?? '').toString().trim().isNotEmpty)
+                      'Sexe : ${victim['sexe']}',
+                    if ((victim['age'] ?? '').toString().trim().isNotEmpty)
+                      'Age : ${victim['age']}',
+                    if ((victim['dateNaissance'] ?? '')
+                        .toString()
+                        .trim()
+                        .isNotEmpty)
+                      'Date de naissance : ${victim['dateNaissance']}',
+                    if ((victim['lieuHabitation'] ?? '')
+                        .toString()
+                        .trim()
+                        .isNotEmpty)
+                      'Lieu d’habitation : ${victim['lieuHabitation']}',
+                    if ((victim['telephone'] ?? '')
+                        .toString()
+                        .trim()
+                        .isNotEmpty)
+                      'Téléphone : ${victim['telephone']}',
+                    if ((victim['qualification'] ?? '')
+                        .toString()
+                        .trim()
+                        .isNotEmpty)
+                      'Qualification : ${victim['qualification']}',
+                  ].join('\n'),
+                  style: const pw.TextStyle(fontSize: 8.2),
+                ),
+              ),
+            ],
             if (action.isNotEmpty) ...[
               pw.SizedBox(height: 5),
               pw.Text(
