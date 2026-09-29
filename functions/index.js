@@ -286,20 +286,22 @@ async function reconcilePublicTerritory(territoireId, publish) {
       .collection("adminRequests")
       .where("territoire.territoireId", "==", territoireId)
       .get() : null;
-  let approvedRequest = requestSnapshot ? requestSnapshot.docs.find(
+  const requestDocuments = requestSnapshot ? requestSnapshot.docs : [];
+
+  const legacyRequestSnapshot = publish ? await db
+      .collection("adminRequests")
+      .where("territoireId", "==", territoireId)
+      .get() : null;
+  const legacyRequestDocuments = legacyRequestSnapshot ?
+    legacyRequestSnapshot.docs :
+    [];
+
+  let approvedRequest = [
+    ...requestDocuments,
+    ...legacyRequestDocuments,
+  ].find(
       (document) => isApprovedAdminRequest(document.data()),
-  ) : null;
-
-  if (publish && !approvedRequest) {
-    const legacyRequestSnapshot = await db
-        .collection("adminRequests")
-        .where("territoireId", "==", territoireId)
-        .get();
-
-    approvedRequest = legacyRequestSnapshot.docs.find(
-        (document) => isApprovedAdminRequest(document.data()),
-    ) || null;
-  }
+  ) || null;
 
   if (publish && !approvedRequest) {
     const adminSnapshot = await db
@@ -337,9 +339,21 @@ async function reconcilePublicTerritory(territoireId, publish) {
   }
 
   const approvedRequestData = approvedRequest ? approvedRequest.data() : {};
+  const requestTerritorySources = [
+    ...requestDocuments,
+    ...legacyRequestDocuments,
+  ].flatMap((document) => {
+    const data = document.data() || {};
+    return [
+      data.territoire || {},
+      data,
+    ];
+  });
+
   const territorySources = [
     approvedRequestData.territoire || {},
     approvedRequestData,
+    ...requestTerritorySources,
     territorySnapshot && territorySnapshot.exists ?
       territorySnapshot.data() : {},
     ...(spotSnapshot ? spotSnapshot.docs.map((document) => {
@@ -353,7 +367,7 @@ async function reconcilePublicTerritory(territoireId, publish) {
   territorySources.forEach((source) => {
     territoryData = mergePublicTerritoryData(territoryData, source);
   });
-  if (publish && (!territorySnapshot || !territorySnapshot.exists)) {
+  if (publish) {
     const parentTerritoryData = {territoireId};
     const parentTerritoryFields = [
       "pays",
@@ -375,8 +389,12 @@ async function reconcilePublicTerritory(territoireId, publish) {
         !(typeof value === "string" && value.trim() === "");
       if (hasValue) parentTerritoryData[field] = value;
     });
-    parentTerritoryData.publicProjectionCreatedAt =
+    parentTerritoryData.publicProjectionUpdatedAt =
       admin.firestore.FieldValue.serverTimestamp();
+    if (!territorySnapshot || !territorySnapshot.exists) {
+      parentTerritoryData.publicProjectionCreatedAt =
+        admin.firestore.FieldValue.serverTimestamp();
+    }
     await territoryReference.set(parentTerritoryData, {merge: true});
   }
   const historicalSpots = new Map();
