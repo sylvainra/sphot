@@ -4328,7 +4328,10 @@ async function resolveSauveteurAssignmentPeriods(
  * SPHOT ON exige :
  * - un compte actif ;
  * - au moins une affectation à un SPHOT ;
- * - des droits de diffusion ouverts par l'administration de tutelle.
+ * - une période d'affectation active.
+ *
+ * Les droits de diffusion de l'administration restent calculés et exposés
+ * séparément, mais ne coupent pas le mode opérationnel du sauveteur.
  *
  * @param {Object} accountData Données sauveteurAccounts.
  * @param {string} login Identifiant du compte.
@@ -4405,7 +4408,6 @@ async function resolveSauveteurOperationalContext(accountData, login) {
 
   const accountActive = accountData.accountStatus === "ACTIVE";
   const sphotOn = accountActive &&
-    diffusionAccessGranted &&
     assignedSpotIds.length > 0 &&
     assignmentPeriods.active;
 
@@ -4414,8 +4416,6 @@ async function resolveSauveteurOperationalContext(accountData, login) {
     modeReason = "account_inactive";
   } else if (assignedSpotIds.length === 0) {
     modeReason = "no_active_assignment";
-  } else if (!diffusionAccessGranted) {
-    modeReason = "administration_diffusion_off";
   } else if (!assignmentPeriods.active) {
     modeReason = assignmentPeriods.reason;
   }
