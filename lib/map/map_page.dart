@@ -200,6 +200,46 @@ Future<void> _toggleFavoritesFilter() async {
     return Offset(x, y);
   }
 
+  LatLng _latLngFromMercatorPixelPoint(
+    Offset point,
+    double zoom,
+  ) {
+    final worldSize = 256.0 * pow(2.0, zoom).toDouble();
+    final lng = (point.dx / worldSize) * 360.0 - 180.0;
+    final n = pi - (2.0 * pi * point.dy / worldSize);
+    final lat =
+        180.0 /
+        pi *
+        atan((exp(n) - exp(-n)) / 2.0);
+
+    return LatLng(lat, lng);
+  }
+
+  LatLng _selectedSpotCameraCenter(
+    SpotFlagState spot,
+    double zoom,
+    double rotation,
+  ) {
+    final spotPoint = _mercatorPixelPoint(spot, zoom);
+    const desiredScreenOffset = Offset(0, -225);
+    final angle = rotation * pi / 180.0;
+
+    // Le décalage doit rester vertical à l'écran même si la carte est tournée.
+    final mapDx =
+        desiredScreenOffset.dx * cos(angle) +
+        desiredScreenOffset.dy * sin(angle);
+    final mapDy =
+        -desiredScreenOffset.dx * sin(angle) +
+        desiredScreenOffset.dy * cos(angle);
+
+    final centerPoint = Offset(
+      spotPoint.dx - mapDx,
+      spotPoint.dy - mapDy,
+    );
+
+    return _latLngFromMercatorPixelPoint(centerPoint, zoom);
+  }
+
   Set<String> _automaticTouchLabelIds(
     List<SpotFlagState> spots,
     double zoom,
@@ -956,14 +996,16 @@ SpotFlagState? _findBestSpotMatch(
       _selectedPublicSpotId = spot.id;
     });
 
-    final selectedSpotCenter = LatLng(
-      spot.lat - 0.00145,
-      spot.lng,
+    const selectedSpotZoom = 17.2;
+    final selectedSpotCenter = _selectedSpotCameraCenter(
+      spot,
+      selectedSpotZoom,
+      _currentRotation,
     );
 
     _mapController.move(
       selectedSpotCenter,
-      17.2,
+      selectedSpotZoom,
     );
 
     unawaited(
@@ -973,7 +1015,7 @@ SpotFlagState? _findBestSpotMatch(
           if (!mounted || _selectedPublicSpotId != spot.id) return;
           _mapController.move(
             selectedSpotCenter,
-            17.2,
+            selectedSpotZoom,
           );
         },
       ),
@@ -3066,7 +3108,7 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                             ),
                           ),
                           if (spot.ville.trim().isNotEmpty) ...[
-                            SizedBox(height: _lineSpacing()),
+                            SizedBox(height: _lineSpacing() + 3),
                             Text(
                               spot.ville.toUpperCase(),
                               textAlign: TextAlign.center,
@@ -3248,7 +3290,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                             ),
                           ),
                           if (spot.ville.trim().isNotEmpty) ...[
-                            SizedBox(height: _lineSpacing()),
+                            SizedBox(height: _lineSpacing() + 3),
                             Text(
                               spot.ville.toUpperCase(),
                               textAlign: TextAlign.center,
