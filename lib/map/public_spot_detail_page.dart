@@ -1531,15 +1531,11 @@ class _BathingSignalSymbol extends StatelessWidget {
       case _BathingSignalVisual.redYellowFlag:
         return const _RedYellowSignalFlag();
       case _BathingSignalVisual.purpleFlag:
-        return const _SolidSignalFlag(color: sphotViolet);
+        return const _SolidSignalFlag(color: Color(0xFFD946EF));
       case _BathingSignalVisual.orangeWindsock:
-        return const SizedBox(
+        return const WindsockGlyph(
           width: 54,
           height: 32,
-          child: CustomPaint(
-            size: Size(54, 32),
-            painter: WindsockPainter(),
-          ),
         );
       case _BathingSignalVisual.checkeredFlag:
         return const _CheckeredSignalFlag();
