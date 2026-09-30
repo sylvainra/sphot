@@ -221,7 +221,10 @@ Future<void> _toggleFavoritesFilter() async {
     double rotation,
   ) {
     final spotPoint = _mercatorPixelPoint(spot, zoom);
-    const desiredScreenOffset = Offset(0, -225);
+    final desiredScreenOffset = Offset(
+      0,
+      spot.isPosteSecours ? -225 : -255,
+    );
     final angle = rotation * pi / 180.0;
 
     // Le décalage doit rester vertical à l'écran même si la carte est tournée.
@@ -1030,17 +1033,60 @@ SpotFlagState? _findBestSpotMatch(
       isDismissible: true,
       enableDrag: false,
       builder: (sheetContext) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.60,
-          minChildSize: 0.18,
-          maxChildSize: 0.78,
-          snap: true,
-          snapSizes: const [0.60, 0.78],
-          builder: (_, scrollController) {
-            return PublicSpotMobileSheet(
-              spot: spot,
-              sheetScrollController: scrollController,
+        final sheetController = DraggableScrollableController();
+        var selectedPage = 0;
+
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final isShortEphemeridePage =
+                spot.isPosteSecours && selectedPage == 3;
+            final maxChildSize =
+                isShortEphemeridePage ? 0.60 : 0.78;
+
+            return DraggableScrollableSheet(
+              controller: sheetController,
+              expand: false,
+              initialChildSize: 0.60,
+              minChildSize: 0.18,
+              maxChildSize: maxChildSize,
+              snap: !isShortEphemeridePage,
+              snapSizes: isShortEphemeridePage
+                  ? null
+                  : const [0.60, 0.78],
+              builder: (_, scrollController) {
+                return PublicSpotMobileSheet(
+                  spot: spot,
+                  sheetScrollController: scrollController,
+                  onSelectedPageChanged: (page) {
+                    if (page == selectedPage) return;
+
+                    if (page == 3 &&
+                        sheetController.isAttached &&
+                        sheetController.size > 0.60) {
+                      unawaited(
+                        sheetController
+                            .animateTo(
+                              0.60,
+                              duration:
+                                  const Duration(milliseconds: 180),
+                              curve: Curves.easeOutCubic,
+                            )
+                            .then((_) {
+                              if (!sheetContext.mounted) return;
+                              setSheetState(() {
+                                selectedPage = page;
+                              });
+                            }),
+                      );
+                      return;
+                    }
+
+                    setSheetState(() {
+                      selectedPage = page;
+                    });
+                  },
+                );
+              },
             );
           },
         );
