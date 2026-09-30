@@ -1034,9 +1034,9 @@ SpotFlagState? _findBestSpotMatch(
           expand: false,
           initialChildSize: 0.60,
           minChildSize: 0.18,
-          maxChildSize: 0.94,
+          maxChildSize: 0.78,
           snap: true,
-          snapSizes: const [0.60, 0.94],
+          snapSizes: const [0.60, 0.78],
           builder: (_, scrollController) {
             return PublicSpotMobileSheet(
               spot: spot,
