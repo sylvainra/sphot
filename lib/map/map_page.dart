@@ -1553,7 +1553,8 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   return Positioned(
     left: 8,
     right: 8,
-    top: MediaQuery.of(context).padding.top + 64,
+    top: MediaQuery.of(context).padding.top +
+        (_useAutomaticTouchLabels ? 64 : 50),
     child: Row(
       children: [
         Expanded(
