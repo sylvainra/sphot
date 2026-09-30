@@ -956,9 +956,27 @@ SpotFlagState? _findBestSpotMatch(
       _selectedPublicSpotId = spot.id;
     });
 
+    final selectedSpotCenter = LatLng(
+      spot.lat - 0.00145,
+      spot.lng,
+    );
+
     _mapController.move(
-      LatLng(spot.lat - 0.00145, spot.lng),
+      selectedSpotCenter,
       17.2,
+    );
+
+    unawaited(
+      Future<void>.delayed(
+        const Duration(milliseconds: 300),
+        () {
+          if (!mounted || _selectedPublicSpotId != spot.id) return;
+          _mapController.move(
+            selectedSpotCenter,
+            17.2,
+          );
+        },
+      ),
     );
 
     await showModalBottomSheet<void>(
@@ -2994,15 +3012,33 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                   child: SizedBox(
                     width:
                         min(300.0, MediaQuery.sizeOf(context).width - 24),
-                    child: Text(
-                      spot.mapDisplayName,
-                      textAlign: TextAlign.center,
-                      softWrap: true,
-                      style: _mapLabelStyle(
-                        fontSize: _labelSize(11),
-                        fontWeight: FontWeight.w800,
-                        color: Colors.black,
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          spot.mapDisplayName,
+                          textAlign: TextAlign.center,
+                          softWrap: true,
+                          style: _mapLabelStyle(
+                            fontSize: _labelSize(11),
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black,
+                          ),
+                        ),
+                        if (spot.ville.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            spot.ville.toUpperCase(),
+                            textAlign: TextAlign.center,
+                            softWrap: true,
+                            style: _mapLabelStyle(
+                              fontSize: _labelSize(10),
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF1E3A8A),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ),
@@ -3030,7 +3066,7 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                             ),
                           ),
                           if (spot.ville.trim().isNotEmpty) ...[
-                            SizedBox(height: _lineSpacing() - 0.5),
+                            SizedBox(height: _lineSpacing()),
                             Text(
                               spot.ville.toUpperCase(),
                               textAlign: TextAlign.center,
@@ -3041,7 +3077,7 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                               ),
                             ),
                           ],
-                          SizedBox(height: _lineSpacing() + 1.5),
+                          SizedBox(height: _lineSpacing()),
                           Text(
                             spot.typeSphot,
                             textAlign: TextAlign.center,
@@ -3053,12 +3089,12 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                                   spot.normalizedType.contains('ACCES PLAGE'),
                             ),
                           ),
-                          SizedBox(height: _lineSpacing() - 1.8),
+                          SizedBox(height: _lineSpacing()),
                           _warningLineUniform(
                             'BAIGNADE NON SURVEILLÉE',
                             _labelSize(22),
                           ),
-                          SizedBox(height: _lineSpacing() - 1.8),
+                          SizedBox(height: _lineSpacing()),
                           _warningLineUniform(
                             'BAIGNADE À VOS RISQUES ET PÉRILS',
                             _labelSize(22),
@@ -3157,15 +3193,33 @@ class _HoverMarkerState extends State<_HoverMarker> {
                     child: SizedBox(
                       width:
                           min(320.0, MediaQuery.sizeOf(context).width - 24),
-                      child: Text(
-                        spot.mapDisplayName,
-                        textAlign: TextAlign.center,
-                        softWrap: true,
-                        style: _mapLabelStyle(
-                          fontSize: _labelSize(11),
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            spot.mapDisplayName,
+                            textAlign: TextAlign.center,
+                            softWrap: true,
+                            style: _mapLabelStyle(
+                              fontSize: _labelSize(11),
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          if (spot.ville.trim().isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              spot.ville.toUpperCase(),
+                              textAlign: TextAlign.center,
+                              softWrap: true,
+                              style: _mapLabelStyle(
+                                fontSize: _labelSize(10),
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF1E3A8A),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
@@ -3194,7 +3248,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                             ),
                           ),
                           if (spot.ville.trim().isNotEmpty) ...[
-                            SizedBox(height: _lineSpacing() - 0.5),
+                            SizedBox(height: _lineSpacing()),
                             Text(
                               spot.ville.toUpperCase(),
                               textAlign: TextAlign.center,
@@ -3206,7 +3260,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                             ),
                           ],
 
-                          SizedBox(height: _lineSpacing() + 5),
+                          SizedBox(height: _lineSpacing()),
 
                           Row(
                             mainAxisSize: MainAxisSize.min,
@@ -3236,7 +3290,7 @@ const SizedBox(width: 2),
                             ],
                           ),
 
-                          SizedBox(height: _lineSpacing() - 1.8),
+                          SizedBox(height: _lineSpacing()),
 
                           _rescueStatusUnderMarker(
                             spot,
