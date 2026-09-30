@@ -957,7 +957,7 @@ SpotFlagState? _findBestSpotMatch(
     });
 
     _mapController.move(
-      LatLng(spot.lat - 0.0013, spot.lng),
+      LatLng(spot.lat - 0.00145, spot.lng),
       17.2,
     );
 
@@ -3029,6 +3029,18 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                               color: Colors.black,
                             ),
                           ),
+                          if (spot.ville.trim().isNotEmpty) ...[
+                            SizedBox(height: _lineSpacing() - 0.5),
+                            Text(
+                              spot.ville.toUpperCase(),
+                              textAlign: TextAlign.center,
+                              style: _mapLabelStyle(
+                                fontSize: _labelSize(10),
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF1E3A8A),
+                              ),
+                            ),
+                          ],
                           SizedBox(height: _lineSpacing() + 1.5),
                           Text(
                             spot.typeSphot,
@@ -3181,6 +3193,18 @@ class _HoverMarkerState extends State<_HoverMarker> {
                               color: Colors.black,
                             ),
                           ),
+                          if (spot.ville.trim().isNotEmpty) ...[
+                            SizedBox(height: _lineSpacing() - 0.5),
+                            Text(
+                              spot.ville.toUpperCase(),
+                              textAlign: TextAlign.center,
+                              style: _mapLabelStyle(
+                                fontSize: _labelSize(10),
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF1E3A8A),
+                              ),
+                            ),
+                          ],
 
                           SizedBox(height: _lineSpacing() + 5),
 
