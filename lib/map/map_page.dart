@@ -945,7 +945,7 @@ SpotFlagState? _findBestSpotMatch(
     });
 
     _mapController.move(
-      LatLng(spot.lat - 0.0018, spot.lng),
+      LatLng(spot.lat - 0.0013, spot.lng),
       17.2,
     );
 
