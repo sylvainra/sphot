@@ -389,6 +389,7 @@ Future<void> _toggleFavoritesFilter() async {
   final opened = await launchUrl(
     uri,
     mode: LaunchMode.externalApplication,
+    webOnlyWindowName: kIsWeb ? '_blank' : null,
   );
 
   if (!opened) {
@@ -405,15 +406,6 @@ List<Marker> _buildAdminMarkers(
 
   if (zoom < 12) return markers;
 
-  final isMobileMap = _useAutomaticTouchLabels;
-  final adminScale = isMobileMap ? (50.0 / 38.0) : 1.0;
-  final adminMarkerSize = 85.0 * adminScale;
-  final adminLogoSize = 38.0 * adminScale;
-  final adminLogoTop = 23.0 * adminScale;
-  final adminLogoInnerSize = 34.0 * adminScale;
-  final adminFallbackIconSize = 23.0 * adminScale;
-  final adminLogoPadding = 2.0 * adminScale;
-  final adminLogoBorderWidth = 2.0 * adminScale;
 
   String cityKey(String value) {
     return value
@@ -497,14 +489,24 @@ List<Marker> _buildAdminMarkers(
     markers.add(
       Marker(
         point: LatLng(markerLat, markerLng),
-        width: adminMarkerSize,
-        height: adminMarkerSize,
+        width: 85,
+        height: 85,
         alignment: Alignment.topCenter,
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => _openCityWebsite(siteInternetVille, spot),
+            onTap: () {
+              _mapController.move(
+                LatLng(markerLat, markerLng),
+                max(zoom, 15.5),
+              );
+
+              Future<void>.delayed(
+                const Duration(milliseconds: 350),
+                () => _openCityWebsite(siteInternetVille, spot),
+              );
+            },
             child: Tooltip(
               message: spot.ville.toUpperCase(),
               preferBelow: true,
@@ -521,48 +523,35 @@ List<Marker> _buildAdminMarkers(
               child: Transform.rotate(
                 angle: -rotation * pi / 180,
                 child: SizedBox(
-                  width: adminMarkerSize,
-                  height: adminMarkerSize,
+                  width: 85,
+                  height: 85,
                   child: Stack(
                     alignment: Alignment.topCenter,
                     children: [
                       Image.asset(
                         'data/icons/fire_red_icon.png',
-                        width: adminMarkerSize,
-                        height: adminMarkerSize,
+                        width: 85,
+                        height: 85,
                         fit: BoxFit.contain,
                         filterQuality: FilterQuality.high,
                       ),
                       Positioned(
-                        top: adminLogoTop,
+                        top: 23,
                         child: Container(
-                          width: adminLogoSize,
-                          height: adminLogoSize,
-                          padding: EdgeInsets.all(adminLogoPadding),
+                          width: 38,
+                          height: 38,
+                          padding: const EdgeInsets.all(2),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white,
-                              width: adminLogoBorderWidth,
-                            ),
-                            boxShadow: isMobileMap
-                                ? const [
-                                    BoxShadow(
-                                      color: Color(0x55000000),
-                                      blurRadius: 5,
-                                      spreadRadius: 1,
-                                      offset: Offset(0, 1),
-                                    ),
-                                  ]
-                                : null,
+                            border: Border.all(color: Colors.white, width: 2),
                           ),
                           child: ClipOval(
                             child: logoVille.isEmpty
-                                ? Icon(
+                                ? const Icon(
                                     Icons.account_balance_rounded,
-                                    color: const Color(0xFF1E3A8A),
-                                    size: adminFallbackIconSize,
+                                    color: Color(0xFF1E3A8A),
+                                    size: 23,
                                   )
                                 : IgnorePointer(
                                     child: logoVille
@@ -573,8 +562,8 @@ List<Marker> _buildAdminMarkers(
                                             key: ValueKey<String>(
                                               'public-admin-svg-logo-$logoVille',
                                             ),
-                                            width: adminLogoInnerSize,
-                                            height: adminLogoInnerSize,
+                                            width: 34,
+                                            height: 34,
                                             fit: BoxFit.contain,
                                             placeholderBuilder: (_) =>
                                                 const Center(
@@ -589,17 +578,17 @@ List<Marker> _buildAdminMarkers(
                                             key: ValueKey<String>(
                                               'public-admin-logo-$logoVille',
                                             ),
-                                            width: adminLogoInnerSize,
-                                            height: adminLogoInnerSize,
+                                            width: 34,
+                                            height: 34,
                                             fit: BoxFit.contain,
                                             gaplessPlayback: true,
                                             webHtmlElementStrategy:
                                                 WebHtmlElementStrategy.prefer,
                                             errorBuilder: (_, __, ___) =>
-                                                Icon(
+                                                const Icon(
                                               Icons.account_balance_rounded,
-                                              color: const Color(0xFF1E3A8A),
-                                              size: adminFallbackIconSize,
+                                              color: Color(0xFF1E3A8A),
+                                              size: 23,
                                             ),
                                           ),
                                   ),
