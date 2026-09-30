@@ -406,11 +406,14 @@ List<Marker> _buildAdminMarkers(
   if (zoom < 12) return markers;
 
   final isMobileMap = _useAutomaticTouchLabels;
-  final adminMarkerSize = isMobileMap ? 104.0 : 85.0;
-  final adminLogoSize = isMobileMap ? 50.0 : 38.0;
-  final adminLogoTop = isMobileMap ? 28.0 : 23.0;
-  final adminLogoInnerSize = isMobileMap ? 46.0 : 34.0;
-  final adminFallbackIconSize = isMobileMap ? 29.0 : 23.0;
+  final adminScale = isMobileMap ? (50.0 / 38.0) : 1.0;
+  final adminMarkerSize = 85.0 * adminScale;
+  final adminLogoSize = 38.0 * adminScale;
+  final adminLogoTop = 23.0 * adminScale;
+  final adminLogoInnerSize = 34.0 * adminScale;
+  final adminFallbackIconSize = 23.0 * adminScale;
+  final adminLogoPadding = 2.0 * adminScale;
+  final adminLogoBorderWidth = 2.0 * adminScale;
 
   String cityKey(String value) {
     return value
@@ -535,13 +538,13 @@ List<Marker> _buildAdminMarkers(
                         child: Container(
                           width: adminLogoSize,
                           height: adminLogoSize,
-                          padding: EdgeInsets.all(isMobileMap ? 1 : 2),
+                          padding: EdgeInsets.all(adminLogoPadding),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             shape: BoxShape.circle,
                             border: Border.all(
                               color: Colors.white,
-                              width: isMobileMap ? 2.5 : 2,
+                              width: adminLogoBorderWidth,
                             ),
                             boxShadow: isMobileMap
                                 ? const [
