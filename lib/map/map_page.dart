@@ -405,6 +405,13 @@ List<Marker> _buildAdminMarkers(
 
   if (zoom < 12) return markers;
 
+  final isMobileMap = _useAutomaticTouchLabels;
+  final adminMarkerSize = isMobileMap ? 104.0 : 85.0;
+  final adminLogoSize = isMobileMap ? 50.0 : 38.0;
+  final adminLogoTop = isMobileMap ? 28.0 : 23.0;
+  final adminLogoInnerSize = isMobileMap ? 46.0 : 34.0;
+  final adminFallbackIconSize = isMobileMap ? 29.0 : 23.0;
+
   String cityKey(String value) {
     return value
         .trim()
@@ -487,8 +494,8 @@ List<Marker> _buildAdminMarkers(
     markers.add(
       Marker(
         point: LatLng(markerLat, markerLng),
-        width: 85,
-        height: 85,
+        width: adminMarkerSize,
+        height: adminMarkerSize,
         alignment: Alignment.topCenter,
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
@@ -511,35 +518,48 @@ List<Marker> _buildAdminMarkers(
               child: Transform.rotate(
                 angle: -rotation * pi / 180,
                 child: SizedBox(
-                  width: 85,
-                  height: 85,
+                  width: adminMarkerSize,
+                  height: adminMarkerSize,
                   child: Stack(
                     alignment: Alignment.topCenter,
                     children: [
                       Image.asset(
                         'data/icons/fire_red_icon.png',
-                        width: 85,
-                        height: 85,
+                        width: adminMarkerSize,
+                        height: adminMarkerSize,
                         fit: BoxFit.contain,
                         filterQuality: FilterQuality.high,
                       ),
                       Positioned(
-                        top: 23,
+                        top: adminLogoTop,
                         child: Container(
-                          width: 38,
-                          height: 38,
-                          padding: const EdgeInsets.all(2),
+                          width: adminLogoSize,
+                          height: adminLogoSize,
+                          padding: EdgeInsets.all(isMobileMap ? 1 : 2),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
+                            border: Border.all(
+                              color: Colors.white,
+                              width: isMobileMap ? 2.5 : 2,
+                            ),
+                            boxShadow: isMobileMap
+                                ? const [
+                                    BoxShadow(
+                                      color: Color(0x55000000),
+                                      blurRadius: 5,
+                                      spreadRadius: 1,
+                                      offset: Offset(0, 1),
+                                    ),
+                                  ]
+                                : null,
                           ),
                           child: ClipOval(
                             child: logoVille.isEmpty
-                                ? const Icon(
+                                ? Icon(
                                     Icons.account_balance_rounded,
-                                    color: Color(0xFF1E3A8A),
-                                    size: 23,
+                                    color: const Color(0xFF1E3A8A),
+                                    size: adminFallbackIconSize,
                                   )
                                 : IgnorePointer(
                                     child: logoVille
@@ -550,8 +570,8 @@ List<Marker> _buildAdminMarkers(
                                             key: ValueKey<String>(
                                               'public-admin-svg-logo-$logoVille',
                                             ),
-                                            width: 34,
-                                            height: 34,
+                                            width: adminLogoInnerSize,
+                                            height: adminLogoInnerSize,
                                             fit: BoxFit.contain,
                                             placeholderBuilder: (_) =>
                                                 const Center(
@@ -566,17 +586,17 @@ List<Marker> _buildAdminMarkers(
                                             key: ValueKey<String>(
                                               'public-admin-logo-$logoVille',
                                             ),
-                                            width: 34,
-                                            height: 34,
+                                            width: adminLogoInnerSize,
+                                            height: adminLogoInnerSize,
                                             fit: BoxFit.contain,
                                             gaplessPlayback: true,
                                             webHtmlElementStrategy:
                                                 WebHtmlElementStrategy.prefer,
                                             errorBuilder: (_, __, ___) =>
-                                                const Icon(
+                                                Icon(
                                               Icons.account_balance_rounded,
-                                              color: Color(0xFF1E3A8A),
-                                              size: 23,
+                                              color: const Color(0xFF1E3A8A),
+                                              size: adminFallbackIconSize,
                                             ),
                                           ),
                                   ),
