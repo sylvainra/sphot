@@ -945,7 +945,7 @@ SpotFlagState? _findBestSpotMatch(
     });
 
     _mapController.move(
-      LatLng(spot.lat - 0.0012, spot.lng),
+      LatLng(spot.lat - 0.0018, spot.lng),
       17.2,
     );
 
@@ -2975,14 +2975,16 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
               if (showAutomaticName)
                 Positioned(
                   top: 48,
-                  left: -92,
+                  left:
+                      (56 - min(300.0, MediaQuery.sizeOf(context).width - 24)) /
+                      2,
                   child: SizedBox(
-                    width: 240,
+                    width:
+                        min(300.0, MediaQuery.sizeOf(context).width - 24),
                     child: Text(
                       spot.mapDisplayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
+                      softWrap: true,
                       style: _mapLabelStyle(
                         fontSize: _labelSize(11),
                         fontWeight: FontWeight.w800,
@@ -2994,11 +2996,14 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
               if (showFullText)
                 Positioned(
                   top: 50,
-                  left: -160,
+                  left:
+                      (56 - min(380.0, MediaQuery.sizeOf(context).width - 24)) /
+                      2,
                   child: Opacity(
                     opacity: widget.labelOpacity,
                     child: SizedBox(
-                      width: 380,
+                      width:
+                          min(380.0, MediaQuery.sizeOf(context).width - 24),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -3119,16 +3124,18 @@ class _HoverMarkerState extends State<_HoverMarker> {
               if (showAutomaticName)
                 Positioned(
                   top: 52,
-                  left: -105,
+                  left:
+                      (70 - min(320.0, MediaQuery.sizeOf(context).width - 24)) /
+                      2,
                   child: Opacity(
                     opacity: 1,
                     child: SizedBox(
-                      width: 280,
+                      width:
+                          min(320.0, MediaQuery.sizeOf(context).width - 24),
                       child: Text(
                         spot.mapDisplayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
+                        softWrap: true,
                         style: _mapLabelStyle(
                           fontSize: _labelSize(11),
                           fontWeight: FontWeight.bold,
@@ -3141,11 +3148,14 @@ class _HoverMarkerState extends State<_HoverMarker> {
               if (showFullText)
                 Positioned(
                   top: 54,
-                  left: -175,
+                  left:
+                      (70 - min(420.0, MediaQuery.sizeOf(context).width - 24)) /
+                      2,
                   child: Opacity(
                     opacity: widget.labelOpacity,
                     child: SizedBox(
-                      width: 420,
+                      width:
+                          min(420.0, MediaQuery.sizeOf(context).width - 24),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
