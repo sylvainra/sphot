@@ -967,7 +967,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                   SizedBox(
                     height: 48,
                     child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+                      padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
                       scrollDirection: Axis.horizontal,
                       itemCount: _pages.length,
                       separatorBuilder: (_, __) => const SizedBox(width: 8),
