@@ -964,62 +964,65 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                   ),
                 ),
                 if (currentSpot.isPosteSecours)
-                  SizedBox(
-                    height: 48,
-                    child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _pages.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final page = _pages[index];
-                        final selected = _selectedPage == index;
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: SizedBox(
+                      height: 48,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _pages.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final page = _pages[index];
+                          final selected = _selectedPage == index;
 
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(99),
-                          onTap: () => _selectPage(index),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 13,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? const Color(0xFF1E3A8A)
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(99),
-                              border: Border.all(
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(99),
+                            onTap: () => _selectPage(index),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 13,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
                                 color: selected
                                     ? const Color(0xFF1E3A8A)
-                                    : const Color(0xFFD5DEE7),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  page.$2,
-                                  size: 17,
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(99),
+                                border: Border.all(
                                   color: selected
-                                      ? Colors.white
-                                      : const Color(0xFF1E3A8A),
+                                      ? const Color(0xFF1E3A8A)
+                                      : const Color(0xFFD5DEE7),
                                 ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  page.$1.toUpperCase(),
-                                  style: TextStyle(
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    page.$2,
+                                    size: 17,
                                     color: selected
                                         ? Colors.white
                                         : const Color(0xFF1E3A8A),
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w900,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    page.$1.toUpperCase(),
+                                    style: TextStyle(
+                                      color: selected
+                                          ? Colors.white
+                                          : const Color(0xFF1E3A8A),
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
                 Expanded(
