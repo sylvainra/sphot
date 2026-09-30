@@ -1476,8 +1476,8 @@ class _BathingSignalRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         SizedBox(
-          width: 64,
-          height: 52,
+          width: 72,
+          height: data.visual == _BathingSignalVisual.temporaryBan ? 78 : 56,
           child: Center(
             child: _BathingSignalSymbol(visual: data.visual),
           ),
@@ -1660,59 +1660,12 @@ class _CheckeredSignalFlag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const black = Colors.black;
-    const white = Colors.white;
-
     return SizedBox(
-      width: 60,
-      height: 50,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            left: 8,
-            top: 3,
-            bottom: 1,
-            child: Container(
-              width: 3,
-              decoration: BoxDecoration(
-                color: const Color(0xFF8A8A8A),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 11,
-            top: 5,
-            child: Container(
-              width: 43,
-              height: 26,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black54, width: 0.8),
-              ),
-              child: const Column(
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Expanded(child: ColoredBox(color: black)),
-                        Expanded(child: ColoredBox(color: white)),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Expanded(child: ColoredBox(color: white)),
-                        Expanded(child: ColoredBox(color: black)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+      width: 68,
+      height: 56,
+      child: SvgPicture.asset(
+        'data/icons/signal_checkered_flag.svg',
+        fit: BoxFit.contain,
       ),
     );
   }
@@ -1723,129 +1676,14 @@ class _TemporarySwimmingBanSymbol extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
-      width: 62,
-      height: 54,
-      child: CustomPaint(
-        size: Size(62, 54),
-        painter: _TemporarySwimmingBanPainter(),
+    return SizedBox(
+      width: 70,
+      height: 78,
+      child: SvgPicture.asset(
+        'data/icons/signal_temporary_swimming_ban.svg',
+        fit: BoxFit.contain,
       ),
     );
-  }
-}
-
-class _TemporarySwimmingBanPainter extends CustomPainter {
-  const _TemporarySwimmingBanPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final polePaint = Paint()
-      ..color = const Color(0xFF7A7A7A)
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawLine(
-      const Offset(9, 5),
-      Offset(9, size.height - 3),
-      polePaint,
-    );
-
-    final flagPaint = Paint()
-      ..color = const Color(0xFFE31B13)
-      ..style = PaintingStyle.fill;
-
-    final flagPath = Path()
-      ..moveTo(10.5, 6)
-      ..lineTo(42, 6)
-      ..lineTo(42, 20)
-      ..lineTo(10.5, 20)
-      ..close();
-
-    canvas.drawPath(flagPath, flagPaint);
-
-    final center = Offset(size.width - 18, size.height - 18);
-
-    final signFill = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    final signBorder = Paint()
-      ..color = const Color(0xFFE31B13)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4;
-
-    canvas.drawCircle(center, 15, signFill);
-    canvas.drawCircle(center, 15, signBorder);
-
-    final pictogram = Paint()
-      ..color = Colors.black87
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.7
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawCircle(
-      Offset(center.dx - 5.5, center.dy - 4.5),
-      1.8,
-      Paint()..color = Colors.black87,
-    );
-
-    final swimmer = Path()
-      ..moveTo(center.dx - 9, center.dy - 1)
-      ..quadraticBezierTo(
-        center.dx - 4,
-        center.dy - 6,
-        center.dx + 1,
-        center.dy - 1,
-      )
-      ..quadraticBezierTo(
-        center.dx + 5,
-        center.dy + 2,
-        center.dx + 9,
-        center.dy - 1,
-      );
-    canvas.drawPath(swimmer, pictogram);
-
-    for (final offsetY in [4.0, 8.0]) {
-      final wave = Path()
-        ..moveTo(center.dx - 10, center.dy + offsetY)
-        ..quadraticBezierTo(
-          center.dx - 6,
-          center.dy + offsetY - 2,
-          center.dx - 2,
-          center.dy + offsetY,
-        )
-        ..quadraticBezierTo(
-          center.dx + 2,
-          center.dy + offsetY + 2,
-          center.dx + 6,
-          center.dy + offsetY,
-        )
-        ..quadraticBezierTo(
-          center.dx + 8,
-          center.dy + offsetY - 1,
-          center.dx + 10,
-          center.dy + offsetY,
-        );
-      canvas.drawPath(wave, pictogram);
-    }
-
-    final slashPaint = Paint()
-      ..color = const Color(0xFFE31B13)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawLine(
-      Offset(center.dx - 10.5, center.dy - 10.5),
-      Offset(center.dx + 10.5, center.dy + 10.5),
-      slashPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(
-    covariant _TemporarySwimmingBanPainter oldDelegate,
-  ) {
-    return false;
   }
 }
 
