@@ -294,6 +294,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     ('Météo marine', Icons.water_rounded),
     ('Dicton & Éphéméride', Icons.calendar_today_outlined),
     ('Infos', Icons.info_outline_rounded),
+    ('Signaux', Icons.flag_outlined),
   ];
 
   @override
@@ -896,6 +897,12 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           spot,
           widget.sheetScrollController,
         );
+      case 5:
+        return _buildSignalsPage(
+          context,
+          spot,
+          widget.sheetScrollController,
+        );
       default:
         return _buildActionsPage(
           context,
@@ -1151,6 +1158,58 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     );
   }
 
+  Widget _buildSignalsPage(
+    BuildContext context,
+    SpotFlagState spot,
+    ScrollController controller,
+  ) {
+    return ListView(
+      controller: controller,
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
+      children: [
+        const _MobilePublicCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.flag_outlined,
+                    size: 19,
+                    color: Color(0xFF1E3A8A),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'SIGNIFICATION DES SIGNAUX DE BAIGNADE',
+                      style: _publicSectionTitleStyle,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Repérez le signal affiché sur le SPHOT et consultez sa signification.',
+                style: TextStyle(
+                  color: Color(0xFF526077),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        const _BathingSignalsLegend(),
+        const SizedBox(height: 12),
+        _buildAdvertisingSpace(),
+        const SizedBox(height: 10),
+        _buildSpotActions(context, spot),
+      ],
+    );
+  }
+
   Widget _buildInfoPage(
     BuildContext context,
     SpotFlagState spot,
@@ -1290,6 +1349,414 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         const SizedBox(height: 10),
         _buildSpotActions(context, spot),
       ],
+    );
+  }
+}
+
+class _BathingSignalsLegend extends StatelessWidget {
+  const _BathingSignalsLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    const signals = <_BathingSignalData>[
+      _BathingSignalData(
+        visual: _BathingSignalVisual.greenFlag,
+        title: 'Drapeau vert',
+        description: 'Baignade surveillée sans danger apparent.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.yellowFlag,
+        title: 'Drapeau jaune',
+        description:
+            'Baignade surveillée avec danger limité ou marqué.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.redFlag,
+        title: 'Drapeau rouge',
+        description: 'Baignade interdite.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.redYellowFlag,
+        title: 'Drapeau rouge et jaune',
+        description:
+            'Zone de baignade surveillée pendant les horaires d’ouverture du poste de secours.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.purpleFlag,
+        title: 'Drapeau violet',
+        description:
+            'Pollution ou présence d’espèces aquatiques dangereuses, ou zone marine et sous-marine protégée (faune aquatique, récifs…).',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.orangeWindsock,
+        title: 'Manche à air orange',
+        description:
+            'Conditions défavorables de vent pour certains équipements nautiques (ex. : gonflables).',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.checkeredFlag,
+        title: 'Drapeau à damier noir et blanc',
+        description:
+            'Zone de pratiques aquatiques et nautiques.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.temporaryBan,
+        title: 'Interdiction temporaire',
+        description:
+            'Interdiction temporaire de la baignade, hors zone surveillée.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.blueObligation,
+        title: 'Disque bleu',
+        description: 'Obligation ou autorisation.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.prohibition,
+        title: 'Cercle rouge barré',
+        description: 'Interdiction.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.warning,
+        title: 'Triangle jaune',
+        description: 'Avertissement.',
+      ),
+    ];
+
+    return _MobilePublicCard(
+      child: Column(
+        children: [
+          for (var index = 0; index < signals.length; index++) ...[
+            _BathingSignalRow(data: signals[index]),
+            if (index < signals.length - 1)
+              const Divider(
+                height: 18,
+                color: Color(0xFFE2E8F0),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+enum _BathingSignalVisual {
+  greenFlag,
+  yellowFlag,
+  redFlag,
+  redYellowFlag,
+  purpleFlag,
+  orangeWindsock,
+  checkeredFlag,
+  temporaryBan,
+  blueObligation,
+  prohibition,
+  warning,
+}
+
+class _BathingSignalData {
+  final _BathingSignalVisual visual;
+  final String title;
+  final String description;
+
+  const _BathingSignalData({
+    required this.visual,
+    required this.title,
+    required this.description,
+  });
+}
+
+class _BathingSignalRow extends StatelessWidget {
+  final _BathingSignalData data;
+
+  const _BathingSignalRow({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 64,
+          height: 52,
+          child: Center(
+            child: _BathingSignalSymbol(visual: data.visual),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                data.title.toUpperCase(),
+                style: const TextStyle(
+                  color: Color(0xFF172033),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                data.description,
+                style: const TextStyle(
+                  color: Color(0xFF526077),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BathingSignalSymbol extends StatelessWidget {
+  final _BathingSignalVisual visual;
+
+  const _BathingSignalSymbol({required this.visual});
+
+  @override
+  Widget build(BuildContext context) {
+    switch (visual) {
+      case _BathingSignalVisual.greenFlag:
+        return const _SolidSignalFlag(color: Color(0xFF49B43B));
+      case _BathingSignalVisual.yellowFlag:
+        return const _SolidSignalFlag(color: Color(0xFFFFE500));
+      case _BathingSignalVisual.redFlag:
+        return const _SolidSignalFlag(color: Color(0xFFE31B13));
+      case _BathingSignalVisual.redYellowFlag:
+        return const _RedYellowSignalFlag();
+      case _BathingSignalVisual.purpleFlag:
+        return const _SolidSignalFlag(color: Color(0xFF8A0061));
+      case _BathingSignalVisual.orangeWindsock:
+        return const Icon(
+          Icons.change_history_rounded,
+          size: 43,
+          color: Color(0xFFF39200),
+        );
+      case _BathingSignalVisual.checkeredFlag:
+        return const _CheckeredSignalFlag();
+      case _BathingSignalVisual.temporaryBan:
+        return const _TemporarySwimmingBanSymbol();
+      case _BathingSignalVisual.blueObligation:
+        return Container(
+          width: 42,
+          height: 42,
+          decoration: const BoxDecoration(
+            color: Color(0xFF365FA8),
+            shape: BoxShape.circle,
+          ),
+        );
+      case _BathingSignalVisual.prohibition:
+        return const _ProhibitionSymbol();
+      case _BathingSignalVisual.warning:
+        return const Icon(
+          Icons.warning_amber_rounded,
+          size: 49,
+          color: Color(0xFFFFE500),
+          shadows: [
+            Shadow(
+              color: Colors.black,
+              blurRadius: 0,
+            ),
+          ],
+        );
+    }
+  }
+}
+
+class _SolidSignalFlag extends StatelessWidget {
+  final Color color;
+
+  const _SolidSignalFlag({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 50,
+      height: 30,
+      decoration: BoxDecoration(
+        color: color,
+        border: Border.all(
+          color: Colors.black.withOpacity(0.12),
+          width: 0.8,
+        ),
+      ),
+    );
+  }
+}
+
+class _RedYellowSignalFlag extends StatelessWidget {
+  const _RedYellowSignalFlag();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 50,
+      height: 30,
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: Colors.black.withOpacity(0.12),
+          width: 0.8,
+        ),
+      ),
+      child: const Column(
+        children: [
+          Expanded(
+            child: ColoredBox(color: Color(0xFFE31B13)),
+          ),
+          Expanded(
+            child: ColoredBox(color: Color(0xFFFFE500)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckeredSignalFlag extends StatelessWidget {
+  const _CheckeredSignalFlag();
+
+  @override
+  Widget build(BuildContext context) {
+    const black = Colors.black;
+    const white = Colors.white;
+
+    return Container(
+      width: 50,
+      height: 30,
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black54, width: 0.8),
+      ),
+      child: const Column(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: ColoredBox(color: black)),
+                Expanded(child: ColoredBox(color: white)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: ColoredBox(color: white)),
+                Expanded(child: ColoredBox(color: black)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TemporarySwimmingBanSymbol extends StatelessWidget {
+  const _TemporarySwimmingBanSymbol();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 56,
+      height: 50,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 7,
+            top: 0,
+            child: Container(
+              width: 36,
+              height: 18,
+              color: const Color(0xFFE31B13),
+            ),
+          ),
+          const Positioned(
+            left: 3,
+            top: 13,
+            child: SizedBox(
+              width: 4,
+              height: 30,
+              child: ColoredBox(color: Color(0xFF6B7280)),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFFE31B13),
+                  width: 5,
+                ),
+              ),
+              child: const Icon(
+                Icons.pool_rounded,
+                size: 19,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+          Positioned(
+            right: 14,
+            bottom: -1,
+            child: Transform.rotate(
+              angle: -0.78,
+              child: Container(
+                width: 5,
+                height: 36,
+                color: const Color(0xFFE31B13),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProhibitionSymbol extends StatelessWidget {
+  const _ProhibitionSymbol();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 46,
+      height: 46,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFE31B13),
+                width: 5,
+              ),
+            ),
+          ),
+          Transform.rotate(
+            angle: -0.78,
+            child: Container(
+              width: 5,
+              height: 48,
+              color: const Color(0xFFE31B13),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
