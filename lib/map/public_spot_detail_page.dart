@@ -1190,16 +1190,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                   ),
                 ],
               ),
-              SizedBox(height: 8),
-              Text(
-                'Repérez le signal affiché sur le SPHOT et consultez sa signification.',
-                style: TextStyle(
-                  color: Color(0xFF526077),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  height: 1.35,
-                ),
-              ),
             ],
           ),
         ),
