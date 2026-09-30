@@ -972,7 +972,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                         padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
                         scrollDirection: Axis.horizontal,
                         itemCount: _pages.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        separatorBuilder: (_, __) => const SizedBox(width: 4),
                         itemBuilder: (context, index) {
                           final page = _pages[index];
                           final selected = _selectedPage == index;
@@ -983,7 +983,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 180),
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 13,
+                                horizontal: 12,
                                 vertical: 8,
                               ),
                               decoration: BoxDecoration(
