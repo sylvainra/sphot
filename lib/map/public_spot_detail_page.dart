@@ -507,7 +507,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     if (tabContext != null) {
       await Scrollable.ensureVisible(
         tabContext,
-        alignment: 0,
+        alignment: 0.5,
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
       );
@@ -1795,7 +1795,7 @@ class _MobileSpotActionBarState extends State<_MobileSpotActionBar> {
     if (actionContext != null) {
       await Scrollable.ensureVisible(
         actionContext,
-        alignment: 0,
+        alignment: 0.5,
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
       );
