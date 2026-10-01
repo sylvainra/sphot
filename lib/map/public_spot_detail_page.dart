@@ -287,6 +287,7 @@ class PublicSpotMobileSheet extends StatefulWidget {
 class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   int _selectedPage = 0;
   bool _isSaved = false;
+  late final List<GlobalKey> _pageTabKeys;
 
   static const List<(String, IconData)> _pages = [
     ('Live', Icons.sensors_rounded),
@@ -300,6 +301,10 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   @override
   void initState() {
     super.initState();
+    _pageTabKeys = List<GlobalKey>.generate(
+      _pages.length,
+      (_) => GlobalKey(),
+    );
     _loadSavedState();
   }
 
@@ -478,9 +483,35 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     );
   }
 
-  void _selectPage(int index) {
-    if (_selectedPage == index) return;
-    setState(() => _selectedPage = index);
+  Future<void> _selectPage(int index) async {
+    if (widget.sheetScrollController.hasClients) {
+      widget.sheetScrollController.jumpTo(
+        widget.sheetScrollController.position.minScrollExtent,
+      );
+    }
+
+    if (_selectedPage != index) {
+      setState(() => _selectedPage = index);
+    }
+
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
+    if (widget.sheetScrollController.hasClients) {
+      widget.sheetScrollController.jumpTo(
+        widget.sheetScrollController.position.minScrollExtent,
+      );
+    }
+
+    final tabContext = _pageTabKeys[index].currentContext;
+    if (tabContext != null) {
+      await Scrollable.ensureVisible(
+        tabContext,
+        alignment: 0,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   Widget _buildSpotActions(
@@ -969,7 +1000,12 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                     child: SizedBox(
                       height: 48,
                       child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
+                        padding: EdgeInsets.fromLTRB(
+                          0,
+                          2,
+                          MediaQuery.sizeOf(context).width * 0.55,
+                          8,
+                        ),
                         scrollDirection: Axis.horizontal,
                         itemCount: _pages.length,
                         separatorBuilder: (_, __) => const SizedBox(width: 4),
@@ -981,6 +1017,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                             borderRadius: BorderRadius.circular(99),
                             onTap: () => _selectPage(index),
                             child: AnimatedContainer(
+                              key: _pageTabKeys[index],
                               duration: const Duration(milliseconds: 180),
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12,
@@ -1717,7 +1754,7 @@ class _ProhibitionSymbol extends StatelessWidget {
   }
 }
 
-class _MobileSpotActionBar extends StatelessWidget {
+class _MobileSpotActionBar extends StatefulWidget {
   final bool isSaved;
   final VoidCallback onDirections;
   final VoidCallback onStart;
@@ -1733,38 +1770,103 @@ class _MobileSpotActionBar extends StatelessWidget {
   });
 
   @override
+  State<_MobileSpotActionBar> createState() =>
+      _MobileSpotActionBarState();
+}
+
+class _MobileSpotActionBarState extends State<_MobileSpotActionBar> {
+  late final List<GlobalKey> _actionKeys;
+
+  @override
+  void initState() {
+    super.initState();
+    _actionKeys = List<GlobalKey>.generate(
+      4,
+      (_) => GlobalKey(),
+    );
+  }
+
+  Future<void> _activateAction(
+    int index,
+    VoidCallback action,
+  ) async {
+    final actionContext = _actionKeys[index].currentContext;
+
+    if (actionContext != null) {
+      await Scrollable.ensureVisible(
+        actionContext,
+        alignment: 0,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    }
+
+    if (!mounted) return;
+    action();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: 48,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
+        padding: EdgeInsets.fromLTRB(
+          0,
+          2,
+          MediaQuery.sizeOf(context).width * 0.55,
+          8,
+        ),
         children: [
-          _MobileSpotActionButton(
-            icon: Icons.directions_rounded,
-            label: 'ITINÉRAIRE',
-            onTap: onDirections,
+          KeyedSubtree(
+            key: _actionKeys[0],
+            child: _MobileSpotActionButton(
+              icon: Icons.directions_rounded,
+              label: 'ITINÉRAIRE',
+              onTap: () => _activateAction(
+                0,
+                widget.onDirections,
+              ),
+            ),
           ),
           const SizedBox(width: 8),
-          _MobileSpotActionButton(
-            icon: Icons.navigation_rounded,
-            label: 'DÉMARRER',
-            onTap: onStart,
+          KeyedSubtree(
+            key: _actionKeys[1],
+            child: _MobileSpotActionButton(
+              icon: Icons.navigation_rounded,
+              label: 'DÉMARRER',
+              onTap: () => _activateAction(
+                1,
+                widget.onStart,
+              ),
+            ),
           ),
           const SizedBox(width: 8),
-          _MobileSpotActionButton(
-            icon: Icons.share_rounded,
-            label: 'PARTAGER',
-            onTap: onShare,
+          KeyedSubtree(
+            key: _actionKeys[2],
+            child: _MobileSpotActionButton(
+              icon: Icons.share_rounded,
+              label: 'PARTAGER',
+              onTap: () => _activateAction(
+                2,
+                widget.onShare,
+              ),
+            ),
           ),
           const SizedBox(width: 8),
-          _MobileSpotActionButton(
-            icon: isSaved
-                ? Icons.bookmark_rounded
-                : Icons.bookmark_border_rounded,
-            label: isSaved ? 'ENREGISTRÉ' : 'ENREGISTRER',
-            selected: isSaved,
-            onTap: onSave,
+          KeyedSubtree(
+            key: _actionKeys[3],
+            child: _MobileSpotActionButton(
+              icon: widget.isSaved
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+              label: widget.isSaved ? 'ENREGISTRÉ' : 'ENREGISTRER',
+              selected: widget.isSaved,
+              onTap: () => _activateAction(
+                3,
+                widget.onSave,
+              ),
+            ),
           ),
         ],
       ),
