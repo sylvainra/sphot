@@ -272,13 +272,11 @@ class PublicSpotDetailPage extends StatelessWidget {
 class PublicSpotMobileSheet extends StatefulWidget {
   final SpotFlagState spot;
   final ScrollController sheetScrollController;
-  final ValueChanged<int>? onSelectedPageChanged;
 
   const PublicSpotMobileSheet({
     super.key,
     required this.spot,
     required this.sheetScrollController,
-    this.onSelectedPageChanged,
   });
 
   @override
@@ -483,7 +481,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   void _selectPage(int index) {
     if (_selectedPage == index) return;
     setState(() => _selectedPage = index);
-    widget.onSelectedPageChanged?.call(index);
   }
 
   Widget _buildSpotActions(
