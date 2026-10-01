@@ -35,6 +35,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
   int waterMax = 22;
 
   int seaStateIndex = 3;
+  bool tidesPresent = true;
 
   int highTideHour1 = 6;
   int highTideMinute1 = 42;
@@ -131,6 +132,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
       waterMin = readInt('Température eau min', waterMin);
       waterMax = readInt('Température eau max', waterMax);
       seaStateIndex = readInt('État de la mer index', seaStateIndex);
+      tidesPresent = weather['Marées présentes'] != false;
 
       highTideHour1 = readInt('Pleine mer 1 heure', highTideHour1);
       highTideMinute1 = readInt('Pleine mer 1 minute', highTideMinute1);
@@ -198,6 +200,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
             'Température eau max': waterMax,
             'État de la mer': seaStateLabels[seaStateIndex],
             'État de la mer index': seaStateIndex,
+            'Marées présentes': tidesPresent,
             'Pleine mer 1':
                 '${highTideHour1.toString().padLeft(2, '0')}:'
                 '${highTideMinute1.toString().padLeft(2, '0')}',
@@ -433,6 +436,12 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
 
                                 child: _TidesFullWidthCard(
                                   borderColor: tideColor,
+                                  tidesPresent: tidesPresent,
+                                  onTidesPresentChanged: (value) {
+                                    setState(() {
+                                      tidesPresent = value;
+                                    });
+                                  },
 
                                   highHour1: highTideHour1,
                                   highMinute1: highTideMinute1,
@@ -511,7 +520,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                               const SizedBox(height: 12),
 
                               SizedBox(
-                                height: 286,
+                                height: 370,
 
                                 child: _SwellFullWidthCard(
                                     borderColor: swellColor,
@@ -858,6 +867,8 @@ class _SeaStateCard extends StatelessWidget {
 
 class _TidesFullWidthCard extends StatelessWidget {
   final Color borderColor;
+  final bool tidesPresent;
+  final ValueChanged<bool> onTidesPresentChanged;
 
   final int highHour1;
   final int highMinute1;
@@ -885,6 +896,8 @@ class _TidesFullWidthCard extends StatelessWidget {
 
   const _TidesFullWidthCard({
     required this.borderColor,
+    required this.tidesPresent,
+    required this.onTidesPresentChanged,
     required this.highHour1,
     required this.highMinute1,
     required this.highHour2,
@@ -924,7 +937,7 @@ class _TidesFullWidthCard extends StatelessWidget {
       child: Column(
         children: [
           SizedBox(
-            height: 34,
+            height: 36,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -934,7 +947,7 @@ class _TidesFullWidthCard extends StatelessWidget {
                   height: 26,
                   color: const Color(0xFF0277BD),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 7),
                 const Text(
                   'MARÉES',
                   style: TextStyle(
@@ -944,43 +957,80 @@ class _TidesFullWidthCard extends StatelessWidget {
                     letterSpacing: 0.8,
                   ),
                 ),
+                const SizedBox(width: 8),
+                const Text(
+                  'PRÉSENTES',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Transform.scale(
+                  scale: 0.82,
+                  child: Checkbox(
+                    value: tidesPresent,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize:
+                        MaterialTapTargetSize.shrinkWrap,
+                    activeColor: const Color(0xFF0277BD),
+                    onChanged: (value) {
+                      if (value != null) {
+                        onTidesPresentChanged(value);
+                      }
+                    },
+                  ),
+                ),
               ],
             ),
           ),
 
-          _TideLine(
-            isHigh: true,
-            hour1: highHour1,
-            minute1: highMinute1,
-            hour2: highHour2,
-            minute2: highMinute2,
-            coef: highCoef,
-            color: _tideColor(highCoef),
-            onHour1Changed: onHighHour1Changed,
-            onMinute1Changed: onHighMinute1Changed,
-            onHour2Changed: onHighHour2Changed,
-            onMinute2Changed: onHighMinute2Changed,
-            onCoefChanged: onHighCoefChanged,
-          ),
-
-          Transform.translate(
-  offset: const Offset(0, 6),
-
-  child: _TideLine(
-    isHigh: false,
-    hour1: lowHour1,
-            minute1: lowMinute1,
-            hour2: lowHour2,
-            minute2: lowMinute2,
-            coef: lowCoef,
-            color: _tideColor(lowCoef),
-            onHour1Changed: onLowHour1Changed,
-            onMinute1Changed: onLowMinute1Changed,
-            onHour2Changed: onLowHour2Changed,
-            onMinute2Changed: onLowMinute2Changed,
-            onCoefChanged: onLowCoefChanged,
-          ),
-          ),
+          if (tidesPresent) ...[
+            _TideLine(
+              isHigh: true,
+              hour1: highHour1,
+              minute1: highMinute1,
+              hour2: highHour2,
+              minute2: highMinute2,
+              coef: highCoef,
+              color: _tideColor(highCoef),
+              onHour1Changed: onHighHour1Changed,
+              onMinute1Changed: onHighMinute1Changed,
+              onHour2Changed: onHighHour2Changed,
+              onMinute2Changed: onHighMinute2Changed,
+              onCoefChanged: onHighCoefChanged,
+            ),
+            Transform.translate(
+              offset: const Offset(0, 6),
+              child: _TideLine(
+                isHigh: false,
+                hour1: lowHour1,
+                minute1: lowMinute1,
+                hour2: lowHour2,
+                minute2: lowMinute2,
+                coef: lowCoef,
+                color: _tideColor(lowCoef),
+                onHour1Changed: onLowHour1Changed,
+                onMinute1Changed: onLowMinute1Changed,
+                onHour2Changed: onLowHour2Changed,
+                onMinute2Changed: onLowMinute2Changed,
+                onCoefChanged: onLowCoefChanged,
+              ),
+            ),
+          ] else
+            const Expanded(
+              child: Center(
+                child: Text(
+                  'MARÉES ABSENTES OU NON SIGNIFICATIVES',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF546E7A),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
