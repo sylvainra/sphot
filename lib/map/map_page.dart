@@ -223,7 +223,7 @@ Future<void> _toggleFavoritesFilter() async {
     final spotPoint = _mercatorPixelPoint(spot, zoom);
     final desiredScreenOffset = Offset(
       0,
-      spot.isPosteSecours ? -225 : -255,
+      spot.isPosteSecours ? -210 : -255,
     );
     final angle = rotation * pi / 180.0;
 
@@ -1033,60 +1033,19 @@ SpotFlagState? _findBestSpotMatch(
       isDismissible: true,
       enableDrag: false,
       builder: (sheetContext) {
-        final sheetController = DraggableScrollableController();
-        var selectedPage = 0;
+        final fixedChildSize =
+            spot.isPosteSecours ? 0.60 : 0.64;
 
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final isShortEphemeridePage =
-                spot.isPosteSecours && selectedPage == 3;
-            final maxChildSize =
-                isShortEphemeridePage ? 0.60 : 0.78;
-
-            return DraggableScrollableSheet(
-              controller: sheetController,
-              expand: false,
-              initialChildSize: 0.60,
-              minChildSize: 0.18,
-              maxChildSize: maxChildSize,
-              snap: !isShortEphemeridePage,
-              snapSizes: isShortEphemeridePage
-                  ? null
-                  : const [0.60, 0.78],
-              builder: (_, scrollController) {
-                return PublicSpotMobileSheet(
-                  spot: spot,
-                  sheetScrollController: scrollController,
-                  onSelectedPageChanged: (page) {
-                    if (page == selectedPage) return;
-
-                    if (page == 3 &&
-                        sheetController.isAttached &&
-                        sheetController.size > 0.60) {
-                      unawaited(
-                        sheetController
-                            .animateTo(
-                              0.60,
-                              duration:
-                                  const Duration(milliseconds: 180),
-                              curve: Curves.easeOutCubic,
-                            )
-                            .then((_) {
-                              if (!sheetContext.mounted) return;
-                              setSheetState(() {
-                                selectedPage = page;
-                              });
-                            }),
-                      );
-                      return;
-                    }
-
-                    setSheetState(() {
-                      selectedPage = page;
-                    });
-                  },
-                );
-              },
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: fixedChildSize,
+          minChildSize: fixedChildSize,
+          maxChildSize: fixedChildSize,
+          snap: false,
+          builder: (_, scrollController) {
+            return PublicSpotMobileSheet(
+              spot: spot,
+              sheetScrollController: scrollController,
             );
           },
         );
