@@ -324,37 +324,24 @@ maxLines: maxLines,
                   const SizedBox(height: 2),
 
                   Expanded(
-                    child: Container(
-                      width: double.infinity,
-
-                      padding:
-                          const EdgeInsets.fromLTRB(
-                        12,
-                        10,
-                        12,
-                        10,
-                      ),
-
-                      decoration: BoxDecoration(
-                        color:
-                            Colors.transparent,
-
-                        borderRadius:
-                            BorderRadius.circular(
-                          24,
+                    child: SingleChildScrollView(
+                      physics: const ClampingScrollPhysics(),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(
+                          12,
+                          10,
+                          12,
+                          10,
                         ),
-
-                        border: Border.all(
-                          color: Colors.black,
-                          width: 2,
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: Colors.black,
+                            width: 2,
+                          ),
                         ),
-                      ),
-
-                      child:
-                          SingleChildScrollView(
-                        physics:
-                            const ClampingScrollPhysics(),
-
                         child: Stack(
                           children: [
 
