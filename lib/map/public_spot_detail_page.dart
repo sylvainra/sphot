@@ -658,6 +658,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     SpotFlagState spot,
     ScrollController controller,
   ) {
+    final marineData =
+        _PublicLiveDataSection._asStringMap(spot.meteoMarine);
+    final tidesPresent = marineData['Marées présentes'] != false;
     final values = _PublicLiveDataSection._formatMarineValues(
       spot.meteoMarine,
     );
@@ -707,15 +710,17 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         (
           Icons.tsunami_rounded,
           'Marées et coefficients',
-          _valuesForPrefixes(
-            values,
-            const [
-              'Basses mer',
-              'Pleines mer',
-              'Coefficient basse mer',
-              'Coefficient haute mer',
-            ],
-          ),
+          tidesPresent
+              ? _valuesForPrefixes(
+                  values,
+                  const [
+                    'Basses mer',
+                    'Pleines mer',
+                    'Coefficient basse mer',
+                    'Coefficient haute mer',
+                  ],
+                )
+              : const ['Absentes ou non significatives'],
         ),
       ],
     );
