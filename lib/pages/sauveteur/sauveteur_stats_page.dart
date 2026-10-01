@@ -46,8 +46,6 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
   bool _sharing = false;
   String? _error;
 
-  bool get _isSphotOn => widget.sphotMode.toUpperCase() == 'ON';
-
   static const List<String> _monthNames = <String>[
     'JANVIER',
     'FÉVRIER',
@@ -147,14 +145,12 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
   Future<void> _loadStats() async {
     final spotId = _selectedSpotId;
 
-    if (!_isSphotOn || spotId == null || spotId.isEmpty) {
+    if (spotId == null || spotId.isEmpty) {
       if (!mounted) return;
       setState(() {
         _entries = [];
         _loading = false;
-        _error = !_isSphotOn
-            ? 'Les statistiques opérationnelles sont accessibles lorsque SPHOT est ON.'
-            : null;
+        _error = null;
       });
       return;
     }
@@ -171,7 +167,7 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
       final response = await http.post(
         Uri.parse(
           'https://us-central1-sphot-ab80b.cloudfunctions.net/'
-          'getSauveteurMainCourante',
+          'getSauveteurStats',
         ),
         headers: const {'Content-Type': 'application/json'},
         body: jsonEncode({
