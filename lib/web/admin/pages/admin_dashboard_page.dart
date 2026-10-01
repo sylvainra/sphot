@@ -20,6 +20,7 @@ import 'package:flutter/services.dart';
 import 'sphot_admin_summary_page.dart';
 import 'admin_subscription_panel.dart';
 import 'admin_statistics_panel.dart';
+import '../../institutional/pages/institutional_main_courante_page.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -69,11 +70,13 @@ class _SuperAdminTileStyle {
 class AdminDashboardPage extends StatefulWidget {
   final String adminUid;
   final String territoireId;
+  final String mainCouranteToken;
 
   const AdminDashboardPage({
     super.key,
     this.adminUid = '',
     this.territoireId = '',
+    this.mainCouranteToken = '',
   });
 
   @override
@@ -5703,6 +5706,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     });
   }
 
+  void _openMainCourante() {
+    final token = widget.mainCouranteToken.trim();
+    if (token.isEmpty) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => InstitutionalMainCourantePage(token: token),
+      ),
+    );
+  }
+
   Widget _buildCommercialPanelHeader({
     required String title,
     required VoidCallback onClose,
@@ -6223,6 +6237,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             showValue: false,
                             isActive: _showStatisticsPanel,
                             onTap: _openStatisticsPanel,
+                          ),
+                          _summaryCard(
+                            title: 'MAIN COURANTE',
+                            value: '',
+                            color: widget.mainCouranteToken.trim().isNotEmpty
+                                ? adminColor
+                                : pendingColor,
+                            iconPath: 'data/icons/fire_red_icon.svg',
+                            stepNumber: 9,
+                            titleFontSize: 16,
+                            titleLetterSpacing: 0.5,
+                            showValue: false,
+                            grayscaleIcon:
+                                widget.mainCouranteToken.trim().isEmpty,
+                            onTap: widget.mainCouranteToken.trim().isNotEmpty
+                                ? _openMainCourante
+                                : null,
                           ),
                         ],
                       ),
