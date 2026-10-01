@@ -223,7 +223,7 @@ Future<void> _toggleFavoritesFilter() async {
     final spotPoint = _mercatorPixelPoint(spot, zoom);
     final desiredScreenOffset = Offset(
       0,
-      spot.isPosteSecours ? -210 : -255,
+      spot.isPosteSecours ? -216 : -255,
     );
     final angle = rotation * pi / 180.0;
 
