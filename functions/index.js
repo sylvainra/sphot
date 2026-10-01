@@ -6033,6 +6033,135 @@ exports.getSauveteurMainCourante = onRequest(
 );
 
 
+exports.getSauveteurStats = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const session = await resolveSauveteurSession(
+            request.body.sauveteurSessionToken,
+        );
+
+        if (!session) {
+          response.status(401).json({
+            success: false,
+            error: "invalid_session",
+          });
+          return;
+        }
+
+        if (!session.legalAcceptanceCurrent) {
+          response.status(403).json({
+            success: false,
+            error: "legal_acceptance_required",
+          });
+          return;
+        }
+
+        const {context} = session;
+        const spotId = (request.body.spotId || "").toString().trim();
+
+        if (!context.assignedSpotIds.includes(spotId)) {
+          response.status(403).json({
+            success: false,
+            error: "spot_not_assigned",
+          });
+          return;
+        }
+
+        let entriesQuery = admin.firestore()
+            .collection("territoires")
+            .doc(context.territoireId)
+            .collection("spots")
+            .doc(spotId)
+            .collection("mainCourante");
+
+        const dayStartMillis = Number(request.body.dayStartMillis);
+        const dayEndMillis = Number(request.body.dayEndMillis);
+        if (Number.isFinite(dayStartMillis) &&
+            Number.isFinite(dayEndMillis) &&
+            dayEndMillis > dayStartMillis) {
+          entriesQuery = entriesQuery
+              .where(
+                  "occurredAt",
+                  ">=",
+                  admin.firestore.Timestamp.fromMillis(dayStartMillis),
+              )
+              .where(
+                  "occurredAt",
+                  "<",
+                  admin.firestore.Timestamp.fromMillis(dayEndMillis),
+              );
+        }
+
+        const snapshot = await entriesQuery
+            .orderBy("occurredAt", "desc")
+            .limit(500)
+            .get();
+
+        const canSeeRestricted =
+          context.canManageRestrictedOperationalData;
+
+        const entries = snapshot.docs
+            .map((document) => {
+              const data = document.data() || {};
+              return {id: document.id, ...data};
+            })
+            .filter((entry) => {
+              return entry.visibility !== "restricted" || canSeeRestricted;
+            })
+            .map((entry) => ({
+              id: entry.id,
+              type: entry.type || "Observation",
+              description: entry.description || "",
+              actionTaken: entry.actionTaken || "",
+              visibility: entry.visibility || "operational",
+              victim: entry.victim && typeof entry.victim === "object" ?
+                entry.victim : null,
+              source: entry.source || "",
+              wasEdited: entry.wasEdited === true,
+              occurredAt: entry.occurredAt &&
+                  typeof entry.occurredAt.toMillis === "function" ?
+                entry.occurredAt.toMillis() : null,
+              createdBy: entry.createdBy || {},
+            }));
+
+        await admin.firestore()
+            .collection("mainCouranteAccessLogs")
+            .add({
+              territoireId: context.territoireId,
+              spotId,
+              viewerId: context.sauveteurId,
+              viewerLogin: session.login,
+              viewerRole: context.userRole,
+              viewerType: "sauveteur",
+              action: "stats_view",
+              viewedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+        response.status(200).json({
+          success: true,
+          entries,
+        });
+      } catch (error) {
+        console.error("Erreur lecture statistiques sauveteur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+
 /**
  * Nettoie et limite les données d'identification d'une victime.
  * @param {Object} rawVictim Données victime reçues du client.
