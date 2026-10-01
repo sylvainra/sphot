@@ -5620,7 +5620,9 @@ exports.getInstitutionalMainCourante = onRequest(
         }
 
         const statusOnly = request.body.statusOnly === true;
+        const allSpotsStatus = request.body.allSpots === true;
         let operationalAlert = {};
+        let activeOperationalAlerts = [];
         let entries = [];
 
         if (spotId) {
@@ -5699,6 +5701,42 @@ exports.getInstitutionalMainCourante = onRequest(
           }
         }
 
+        if (statusOnly && allSpotsStatus && spots.length > 0) {
+          const liveReferences = spots.map((spot) => {
+            return admin.firestore().collection("spots").doc(spot.id);
+          });
+          const liveSnapshots = await admin.firestore().getAll(
+              ...liveReferences,
+          );
+
+          activeOperationalAlerts = liveSnapshots
+              .map((snapshot, index) => {
+                const liveSpot = snapshot.data() || {};
+                const rawAlert = liveSpot.operationalAlert &&
+                    typeof liveSpot.operationalAlert === "object" &&
+                    !Array.isArray(liveSpot.operationalAlert) ?
+                  liveSpot.operationalAlert :
+                  {};
+                if (rawAlert.active !== true) return null;
+
+                return {
+                  spotId: spots[index].id,
+                  spotLabel: spots[index].label,
+                  type: rawAlert.type || "",
+                  active: true,
+                  message: rawAlert.message || "",
+                  flagColor: rawAlert.flagColor || "",
+                  triggeredAt: rawAlert.triggeredAt &&
+                      typeof rawAlert.triggeredAt.toMillis === "function" ?
+                    rawAlert.triggeredAt.toMillis() : null,
+                };
+              })
+              .filter((alert) => alert)
+              .sort((a, b) => {
+                return Number(b.triggeredAt || 0) - Number(a.triggeredAt || 0);
+              });
+        }
+
         await admin.firestore()
             .collection("mainCouranteAccessLogs")
             .add({
@@ -5734,6 +5772,7 @@ exports.getInstitutionalMainCourante = onRequest(
           entries,
           viewerType: (access.viewerType || "institutionnel").toString(),
           operationalAlert,
+          activeOperationalAlerts,
           notificationPreferences:
             institutionalNotificationPreferences(access),
         });
