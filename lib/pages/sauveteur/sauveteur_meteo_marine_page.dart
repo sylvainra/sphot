@@ -354,16 +354,11 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                         ),
                       ),
 
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: Transform.translate(
+                      child: Transform.translate(
                         offset: const Offset(0, -12),
-
                         child: SingleChildScrollView(
-  physics: const BouncingScrollPhysics(),
-  clipBehavior: Clip.none,
-
+                          physics: const BouncingScrollPhysics(),
+                          clipBehavior: Clip.none,
                           child: Column(
                             children: [
                               Transform.translate(
@@ -517,16 +512,12 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                                 ),
                               ),
 
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 18),
 
                               SizedBox(
-                                height: 390,
-                                child: Align(
-                                  alignment: Alignment.bottomCenter,
-                                  child: SizedBox(
-                                    height: 310,
-                                    child: _SwellFullWidthCard(
-                                      borderColor: swellColor,
+                                height: 300,
+                                child: _SwellFullWidthCard(
+                                  borderColor: swellColor,
 
                                     directionMorning: swellDirectionMorning,
                                     directionAfternoon: swellDirectionAfternoon,
@@ -587,22 +578,17 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                                         periodMax = value;
                                       });
                                     },
-                                  ),
                                 ),
                               ),
-                            ),
-
                             ],
                           ),
                         ),
-                      )),
-                          const SizedBox(height: 4),
-                          _publishButton(),
-                        ],
                       ),
                     ),
                   ),
 
+                  const SizedBox(height: 4),
+                  _publishButton(),
                   const SizedBox(height: 6),
                   Transform.translate(
                     offset: const Offset(0, 0),
@@ -928,8 +914,8 @@ class _TidesFullWidthCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 138,
-      padding: const EdgeInsets.fromLTRB(4, 0, 4, 2),
+      height: 150,
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
       decoration: BoxDecoration(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
@@ -990,6 +976,7 @@ class _TidesFullWidthCard extends StatelessWidget {
           ),
 
           if (tidesPresent) ...[
+            const SizedBox(height: 4),
             _TideLine(
               isHigh: true,
               hour1: highHour1,
@@ -1004,9 +991,8 @@ class _TidesFullWidthCard extends StatelessWidget {
               onMinute2Changed: onHighMinute2Changed,
               onCoefChanged: onHighCoefChanged,
             ),
-            Transform.translate(
-              offset: const Offset(0, 6),
-              child: _TideLine(
+            const SizedBox(height: 8),
+            _TideLine(
                 isHigh: false,
                 hour1: lowHour1,
                 minute1: lowMinute1,
@@ -1020,7 +1006,6 @@ class _TidesFullWidthCard extends StatelessWidget {
                 onMinute2Changed: onLowMinute2Changed,
                 onCoefChanged: onLowCoefChanged,
               ),
-            ),
           ] else
             const Expanded(
               child: Center(
@@ -1238,15 +1223,15 @@ class _TidePicker extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: width,
-      height: 38,
+      height: 30,
 
       child: OverflowBox(
-        minHeight: 76,
-        maxHeight: 76,
+        minHeight: 60,
+        maxHeight: 60,
         alignment: Alignment.topCenter,
 
         child: Transform.translate(
-          offset: const Offset(0, -40),
+          offset: const Offset(0, -32),
 
           child: NumberPicker(
             value: value,
@@ -1352,7 +1337,7 @@ class _SwellFullWidthCard extends StatelessWidget {
           ),
 
           Positioned(
-            top: 24,
+            top: 34,
             left: 0,
             right: 0,
             height: 136,
@@ -1383,7 +1368,7 @@ class _SwellFullWidthCard extends StatelessWidget {
           ),
 
           Positioned(
-            top: 150,
+            top: 188,
             left: 0,
             right: 0,
             child: Row(
