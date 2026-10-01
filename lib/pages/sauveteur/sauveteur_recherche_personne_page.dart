@@ -353,7 +353,7 @@ maxLines: maxLines,
                       child:
                           SingleChildScrollView(
                         physics:
-                            const BouncingScrollPhysics(),
+                            const ClampingScrollPhysics(),
 
                         child: Stack(
                           children: [
@@ -478,9 +478,6 @@ maxLines: maxLines,
   ),
 ),
 
-                                const SizedBox(
-                                  height: 120,
-                                ),
                               ],
                             ),
                           ],
