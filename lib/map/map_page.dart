@@ -1036,18 +1036,15 @@ SpotFlagState? _findBestSpotMatch(
         final fixedChildSize =
             spot.isPosteSecours ? 0.60 : 0.64;
 
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: fixedChildSize,
-          minChildSize: fixedChildSize,
-          maxChildSize: fixedChildSize,
-          snap: false,
-          builder: (_, scrollController) {
-            return PublicSpotMobileSheet(
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: FractionallySizedBox(
+            widthFactor: 1,
+            heightFactor: fixedChildSize,
+            child: PublicSpotMobileSheet(
               spot: spot,
-              sheetScrollController: scrollController,
-            );
-          },
+            ),
+          ),
         );
       },
     );
