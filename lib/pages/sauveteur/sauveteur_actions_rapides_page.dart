@@ -58,6 +58,7 @@ class _SauveteurActionsRapidesPageState
   bool _loadingSpots = true;
   bool _liveWriteBlocked = false;
   String? _liveStatusMessage;
+  String _currentPublicNotification = '';
 
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
       _liveSubscription;
@@ -235,12 +236,17 @@ class _SauveteurActionsRapidesPageState
       }
 
       final rawDangers = data['dangers'];
+      final rawNotification = data['notificationPublique'];
+      final nextPublicNotification = rawNotification is Map
+          ? (rawNotification['message'] ?? '').toString().trim()
+          : '';
 
       setState(() {
         if (nextColor != null) flagColor = nextColor;
         if (nextPosition != null) flagPosition = nextPosition;
         purpleFlagActive = nextPurpleFlagActive;
         windsockActive = nextWindsockActive;
+        _currentPublicNotification = nextPublicNotification;
 
         status = flagPosition == 'Affalé'
             ? 'Baignade non surveillée temporairement'
@@ -924,6 +930,8 @@ class _SauveteurActionsRapidesPageState
                                       builder: (_) =>
                                           SauveteurNotificationPage(
                                         profileColor: widget.profileColor,
+                                        initialMessage:
+                                            _currentPublicNotification,
                                         onPublish: _publishNotification,
                                       ),
                                     ),
@@ -2449,11 +2457,13 @@ class _ActionButton extends StatelessWidget {
 
 class SauveteurNotificationPage extends StatefulWidget {
   final Color profileColor;
+  final String initialMessage;
   final Future<bool> Function(String message) onPublish;
 
   const SauveteurNotificationPage({
     super.key,
     required this.profileColor,
+    required this.initialMessage,
     required this.onPublish,
   });
 
@@ -2476,6 +2486,10 @@ class _SauveteurNotificationPageState
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
+    controller.text = widget.initialMessage;
+    controller.selection = TextSelection.fromPosition(
+      TextPosition(offset: controller.text.length),
+    );
   }
 
   @override
