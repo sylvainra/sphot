@@ -503,7 +503,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                               const SizedBox(height: 12),
 
                               SizedBox(
-                                height: 288,
+                                height: 276,
                                 child: _SwellFullWidthCard(
                                   borderColor: swellColor,
 
@@ -1355,7 +1355,7 @@ class _SwellFullWidthCard extends StatelessWidget {
           ),
 
           Positioned(
-            top: 188,
+            top: 176,
             left: 0,
             right: 0,
             child: Row(
