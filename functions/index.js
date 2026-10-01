@@ -5101,6 +5101,96 @@ function hashInstitutionalAccessToken(token) {
 }
 
 /**
+ * Crée une session temporaire de lecture seule de la MAIN COURANTE
+ * pour l'administrateur connecté.
+ *
+ * @param {FirebaseFirestore.DocumentReference} accountReference
+ * Référence du compte administrateur.
+ * @param {Object} accountData Données du compte administrateur.
+ * @return {Promise<string>} Jeton brut à remettre au client.
+ */
+async function createAdminMainCouranteSession(
+    accountReference,
+    accountData,
+) {
+  const territoireId = (accountData.territoireId || "").toString().trim();
+  const email = (
+    accountData.email ||
+    accountData.login ||
+    accountReference.id ||
+    ""
+  ).toString().trim().toLowerCase();
+
+  if (!territoireId || !email ||
+      (accountData.accountStatus || "").toString().toUpperCase() !== "ACTIVE") {
+    return "";
+  }
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashInstitutionalAccessToken(rawToken);
+  const previousHash =
+    (accountData.mainCouranteSessionHash || "").toString().trim();
+  const preferences = institutionalNotificationPreferences(accountData);
+  const db = admin.firestore();
+  const batch = db.batch();
+  const now = admin.firestore.Timestamp.now();
+  const expiresAt = admin.firestore.Timestamp.fromMillis(
+      Date.now() + (12 * 60 * 60 * 1000),
+  );
+
+  if (previousHash && previousHash !== tokenHash) {
+    batch.set(
+        db.collection("institutionalMainCouranteAccess").doc(previousHash),
+        {
+          enabled: false,
+          disabledAt: now,
+          updatedAt: now,
+        },
+        {merge: true},
+    );
+  }
+
+  batch.set(
+      db.collection("institutionalMainCouranteAccess").doc(tokenHash),
+      {
+        territoireId,
+        contactId: (accountData.adminUid || accountReference.id)
+            .toString()
+            .trim(),
+        email,
+        civilite: (accountData.civilite || "").toString(),
+        nom: (accountData.nom || "").toString(),
+        prenom: (accountData.prenom || "").toString(),
+        fonction: (accountData.fonction || "Administrateur SPHOT").toString(),
+        viewerType: "admin",
+        accountLogin: accountReference.id,
+        enabled: true,
+        mainCouranteReadOnly: true,
+        notificationPreferences: preferences,
+        createdAt: now,
+        updatedAt: now,
+        expiresAt,
+      },
+      {merge: true},
+  );
+
+  batch.set(
+      accountReference,
+      {
+        mainCouranteSessionHash: tokenHash,
+        mainCouranteReadOnly: true,
+        notificationPreferences: preferences,
+        mainCouranteSessionUpdatedAt: now,
+        updatedAt: now,
+      },
+      {merge: true},
+  );
+
+  await batch.commit();
+  return rawToken;
+}
+
+/**
  * Normalise les préférences de notification d'un contact institutionnel.
  * @param {Object} contact Contact institutionnel.
  * @return {Object} Préférences opérationnelles normalisées.
@@ -5130,6 +5220,10 @@ async function sendInstitutionalOperationalNotification(options) {
   const eventType = (options.eventType || "").toString();
   const title = (options.title || "Information SPHOT").toString();
   const description = (options.description || "").toString();
+  const sphotMode = (options.sphotMode || "").toString().toUpperCase();
+
+  // Règle métier absolue : SPHOT OFF ne déclenche aucune alerte sortante.
+  if (sphotMode !== "ON") return;
 
   try {
     const territorySnapshot = await admin.firestore()
@@ -5153,7 +5247,42 @@ async function sendInstitutionalOperationalNotification(options) {
       return preferences[eventType] === true;
     });
 
-    if (enabledContacts.length === 0) return;
+    const adminAccountsSnapshot = await admin.firestore()
+        .collection("adminAccounts")
+        .where("territoireId", "==", territoireId)
+        .get();
+
+    const enabledAdmins = adminAccountsSnapshot.docs
+        .map((document) => {
+          const data = document.data() || {};
+          return {
+            ...data,
+            email: (data.email || data.login || document.id)
+                .toString()
+                .trim()
+                .toLowerCase(),
+            viewerType: "admin",
+          };
+        })
+        .filter((contact) => {
+          if (!contact.email) return false;
+          if ((contact.accountStatus || "").toString().toUpperCase() !==
+              "ACTIVE") {
+            return false;
+          }
+          const preferences = institutionalNotificationPreferences(contact);
+          return preferences[eventType] === true;
+        });
+
+    const recipientsByEmail = new Map();
+    [...enabledContacts, ...enabledAdmins].forEach((contact) => {
+      const email = (contact.email || "").toString().trim().toLowerCase();
+      if (!email || recipientsByEmail.has(email)) return;
+      recipientsByEmail.set(email, contact);
+    });
+    const recipients = [...recipientsByEmail.values()];
+
+    if (recipients.length === 0) return;
 
     let spotLabel = spotId;
     try {
@@ -5182,7 +5311,7 @@ async function sendInstitutionalOperationalNotification(options) {
       },
     });
 
-    for (const rawContact of enabledContacts) {
+    for (const rawContact of recipients) {
       const contact = rawContact || {};
       const email = (contact.email || "").toString().trim().toLowerCase();
       const firstName = (contact.prenom || "").toString().trim();
@@ -5438,9 +5567,15 @@ exports.getInstitutionalMainCourante = onRequest(
         const accessSnapshot = await accessReference.get();
         const access = accessSnapshot.data() || {};
 
+        const expiresAt = access.expiresAt;
+        const expired = expiresAt &&
+            typeof expiresAt.toMillis === "function" &&
+            expiresAt.toMillis() <= Date.now();
+
         if (!accessSnapshot.exists ||
             access.enabled !== true ||
-            access.mainCouranteReadOnly !== true) {
+            access.mainCouranteReadOnly !== true ||
+            expired) {
           response.status(403).json({success: false, error: "access_denied"});
           return;
         }
@@ -5484,12 +5619,42 @@ exports.getInstitutionalMainCourante = onRequest(
           return;
         }
 
+        const statusOnly = request.body.statusOnly === true;
+        let operationalAlert = {};
         let entries = [];
+
         if (spotId) {
-          let entriesQuery = territoryReference
+          const liveSpotSnapshot = await admin.firestore()
               .collection("spots")
               .doc(spotId)
-              .collection("mainCourante");
+              .get();
+          const liveSpot = liveSpotSnapshot.data() || {};
+          const rawAlert = liveSpot.operationalAlert &&
+              typeof liveSpot.operationalAlert === "object" &&
+              !Array.isArray(liveSpot.operationalAlert) ?
+            liveSpot.operationalAlert :
+            {};
+
+          if (rawAlert && Object.keys(rawAlert).length > 0) {
+            operationalAlert = {
+              type: rawAlert.type || "",
+              active: rawAlert.active === true,
+              message: rawAlert.message || "",
+              flagColor: rawAlert.flagColor || "",
+              triggeredAt: rawAlert.triggeredAt &&
+                  typeof rawAlert.triggeredAt.toMillis === "function" ?
+                rawAlert.triggeredAt.toMillis() : null,
+              endedAt: rawAlert.endedAt &&
+                  typeof rawAlert.endedAt.toMillis === "function" ?
+                rawAlert.endedAt.toMillis() : null,
+            };
+          }
+
+          if (!statusOnly) {
+            let entriesQuery = territoryReference
+                .collection("spots")
+                .doc(spotId)
+                .collection("mainCourante");
 
           const dayStartMillis = Number(request.body.dayStartMillis);
           const dayEndMillis = Number(request.body.dayEndMillis);
@@ -5514,23 +5679,24 @@ exports.getInstitutionalMainCourante = onRequest(
               .limit(500)
               .get();
 
-          entries = entriesSnapshot.docs
-              .map((document) => {
-                const data = document.data() || {};
-                return {
-                  id: document.id,
-                  type: data.type || "Observation",
-                  description: data.description || "",
-                  actionTaken: data.actionTaken || "",
-                  visibility: data.visibility || "operational",
-                  source: data.source || "",
-                  wasEdited: data.wasEdited === true,
-                  occurredAt: data.occurredAt &&
-                      typeof data.occurredAt.toMillis === "function" ?
-                    data.occurredAt.toMillis() : null,
-                };
-              })
-              .filter((entry) => entry.visibility !== "restricted");
+            entries = entriesSnapshot.docs
+                .map((document) => {
+                  const data = document.data() || {};
+                  return {
+                    id: document.id,
+                    type: data.type || "Observation",
+                    description: data.description || "",
+                    actionTaken: data.actionTaken || "",
+                    visibility: data.visibility || "operational",
+                    source: data.source || "",
+                    wasEdited: data.wasEdited === true,
+                    occurredAt: data.occurredAt &&
+                        typeof data.occurredAt.toMillis === "function" ?
+                      data.occurredAt.toMillis() : null,
+                  };
+                })
+                .filter((entry) => entry.visibility !== "restricted");
+          }
         }
 
         await admin.firestore()
@@ -5566,6 +5732,8 @@ exports.getInstitutionalMainCourante = onRequest(
           spots,
           selectedSpotId: spotId,
           entries,
+          viewerType: (access.viewerType || "institutionnel").toString(),
+          operationalAlert,
           notificationPreferences:
             institutionalNotificationPreferences(access),
         });
@@ -5605,7 +5773,12 @@ exports.updateInstitutionalMainCourantePreferences = onRequest(
         const accessSnapshot = await accessReference.get();
         const access = accessSnapshot.data() || {};
 
-        if (!accessSnapshot.exists || access.enabled !== true) {
+        const expiresAt = access.expiresAt;
+        const expired = expiresAt &&
+            typeof expiresAt.toMillis === "function" &&
+            expiresAt.toMillis() <= Date.now();
+
+        if (!accessSnapshot.exists || access.enabled !== true || expired) {
           response.status(403).json({success: false, error: "access_denied"});
           return;
         }
@@ -5624,7 +5797,25 @@ exports.updateInstitutionalMainCourantePreferences = onRequest(
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, {merge: true});
 
-        if (territoireId && contactId) {
+        const viewerType = (access.viewerType || "institutionnel")
+            .toString()
+            .toLowerCase();
+
+        if (viewerType === "admin") {
+          const accountLogin = (access.accountLogin || access.email || "")
+              .toString()
+              .trim()
+              .toLowerCase();
+          if (accountLogin) {
+            await admin.firestore()
+                .collection("adminAccounts")
+                .doc(accountLogin)
+                .set({
+                  notificationPreferences: preferences,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                }, {merge: true});
+          }
+        } else if (territoireId && contactId) {
           const territoryReference = admin.firestore()
               .collection("territoires")
               .doc(territoireId);
@@ -5803,6 +5994,8 @@ exports.updateSauveteurLiveState = onRequest(
 
         const flagJournalLines = [];
         let flagWasLowered = false;
+        let flagWasRaised = false;
+        let loweredFlagColor = "";
         const nextLiveFlag = sanitizedChanges.liveFlag;
 
         if (nextLiveFlag &&
@@ -5855,11 +6048,62 @@ exports.updateSauveteurLiveState = onRequest(
 
           flagWasLowered =
             oldPosition !== "Affalé" && newPosition === "Affalé";
+          flagWasRaised =
+            oldPosition === "Affalé" && newPosition === "Hissé";
+          if (flagWasLowered) loweredFlagColor = newColor;
+        }
+
+        let operationalAlertUpdate = null;
+        let operationalAlertMessage = "";
+
+        if (flagWasLowered || flagWasRaised) {
+          let spotLabel = spotId;
+          try {
+            const territorySpotSnapshot = await db
+                .collection("territoires")
+                .doc(context.territoireId)
+                .collection("spots")
+                .doc(spotId)
+                .get();
+            const territorySpot = territorySpotSnapshot.data() || {};
+            spotLabel = (
+              territorySpot.nomSecours ||
+              territorySpot.nomSphot ||
+              territorySpot.idSphot ||
+              spotId
+            ).toString().trim();
+          } catch (_) {
+            // Le numéro technique du poste reste exploitable en secours.
+          }
+
+          if (flagWasLowered) {
+            operationalAlertMessage =
+              `Drapeau du poste de secours ${spotLabel} affalé`;
+            operationalAlertUpdate = {
+              type: "flag_lowered",
+              active: true,
+              message: operationalAlertMessage,
+              flagColor: loweredFlagColor,
+              triggeredAt: admin.firestore.FieldValue.serverTimestamp(),
+              endedAt: null,
+              source: "automatic_flag_event",
+            };
+          } else if (flagWasRaised) {
+            operationalAlertUpdate = {
+              type: "flag_lowered",
+              active: false,
+              message: `Drapeau du poste de secours ${spotLabel} hissé`,
+              endedAt: admin.firestore.FieldValue.serverTimestamp(),
+              source: "automatic_flag_event",
+            };
+          }
         }
 
         const batch = db.batch();
         batch.set(spotReference, {
           ...sanitizedChanges,
+          ...(operationalAlertUpdate ?
+            {operationalAlert: operationalAlertUpdate} : {}),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBySauveteurId: context.sauveteurId,
         }, {merge: true});
@@ -5936,8 +6180,10 @@ exports.updateSauveteurLiveState = onRequest(
             territoireId: context.territoireId,
             spotId,
             eventType: "flagLowered",
-            title: "Affalage du drapeau",
-            description: flagJournalLines.join(" • "),
+            title: "Drapeau affalé",
+            description: operationalAlertMessage ||
+              "Drapeau du poste de secours affalé",
+            sphotMode: context.sphotMode,
           });
         }
 
@@ -6347,6 +6593,7 @@ exports.addSauveteurMainCouranteEntry = onRequest(
             eventType: "incident",
             title: "Incident",
             description,
+            sphotMode: context.sphotMode,
           });
         } else if (normalizedType === "intervention") {
           await sendInstitutionalOperationalNotification({
@@ -6355,6 +6602,7 @@ exports.addSauveteurMainCouranteEntry = onRequest(
             eventType: "intervention",
             title: "Intervention",
             description,
+            sphotMode: context.sphotMode,
           });
         }
 
@@ -7825,16 +8073,35 @@ L'équipe SPHOT`,
             {merge: true},
         );
 
+        const refreshedAccountSnapshot = await accountDoc.ref.get();
+        const refreshedAccountData = refreshedAccountSnapshot.data() || data;
+        let mainCouranteToken = "";
+
+        try {
+          mainCouranteToken = await createAdminMainCouranteSession(
+              accountDoc.ref,
+              refreshedAccountData,
+          );
+        } catch (mainCouranteError) {
+          console.error(
+              "Erreur création session MAIN COURANTE administrateur:",
+              mainCouranteError,
+          );
+        }
+
         response.status(200).json({
           success: true,
           adminId: accountDoc.id,
-          adminUid: (data.adminUid || "").toString(),
-          territoireId: (data.territoireId || "").toString(),
-          userRole: (data.role || "ADMIN").toString(),
-          mustChangePassword: data.mustChangePassword === true,
-          civilite: (data.civilite || "").toString(),
-          prenom: (data.prenom || "").toString(),
-          nom: (data.nom || "").toString(),
+          adminUid: (refreshedAccountData.adminUid || "").toString(),
+          territoireId:
+            (refreshedAccountData.territoireId || "").toString(),
+          userRole: (refreshedAccountData.role || "ADMIN").toString(),
+          mustChangePassword:
+            refreshedAccountData.mustChangePassword === true,
+          civilite: (refreshedAccountData.civilite || "").toString(),
+          prenom: (refreshedAccountData.prenom || "").toString(),
+          nom: (refreshedAccountData.nom || "").toString(),
+          mainCouranteToken,
         });
       } catch (error) {
         console.error("Erreur login admin:", error);
