@@ -5746,11 +5746,20 @@ exports.updateSauveteurLiveState = onRequest(
           return;
         }
 
+        let automaticNotificationMainCourante = null;
+
         if (sanitizedChanges.notificationPublique !== undefined) {
           const notification = sanitizedChanges.notificationPublique || {};
           const message = (notification.message || "")
               .toString()
               .trim();
+          const notificationSource = (notification.source || "")
+              .toString()
+              .trim();
+          const mainCouranteDescription =
+              (notification.mainCouranteDescription || "")
+                  .toString()
+                  .trim();
 
           if (!message) {
             delete sanitizedChanges.notificationPublique;
@@ -5766,6 +5775,14 @@ exports.updateSauveteurLiveState = onRequest(
                 role: context.userRole,
               },
             };
+
+            if (notificationSource === "recherche_personne" &&
+                mainCouranteDescription) {
+              automaticNotificationMainCourante = {
+                description: mainCouranteDescription.substring(0, 6000),
+                publicMessage: message.substring(0, 1500),
+              };
+            }
           }
         }
 
@@ -5878,6 +5895,36 @@ exports.updateSauveteurLiveState = onRequest(
               role: context.userRole,
             },
             source: "automatic_flag_event",
+            immutableOriginal: true,
+          });
+        }
+
+        if (automaticNotificationMainCourante) {
+          const mainCouranteReference = db
+              .collection("territoires")
+              .doc(context.territoireId)
+              .collection("spots")
+              .doc(spotId)
+              .collection("mainCourante")
+              .doc();
+
+          batch.set(mainCouranteReference, {
+            type: "Personne recherchée",
+            description: automaticNotificationMainCourante.description,
+            actionTaken:
+              "Notification publique publiée automatiquement depuis " +
+              "RECHERCHE DE PERSONNE",
+            visibility: "operational",
+            occurredAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdBy: {
+              sauveteurId: context.sauveteurId,
+              login: session.login,
+              role: context.userRole,
+            },
+            source: "automatic_person_search_publication",
+            publicNotificationMessage:
+              automaticNotificationMainCourante.publicMessage,
             immutableOriginal: true,
           });
         }
