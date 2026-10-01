@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../pages/sauveteur/widgets/sauveteur_styled_dropdown.dart';
+import '../services/operational_alert_sound.dart';
 
 class InstitutionalMainCourantePage extends StatefulWidget {
   const InstitutionalMainCourantePage({
@@ -25,6 +27,7 @@ class _InstitutionalMainCourantePageState
   static const _purple = Color(0xFF8E24AA);
 
   final ScrollController _dayScrollController = ScrollController();
+  Timer? _operationalStatusTimer;
 
   bool _loading = true;
   bool _savingPreferences = false;
@@ -37,6 +40,10 @@ class _InstitutionalMainCourantePageState
   List<Map<String, dynamic>> _entries = [];
   Map<String, dynamic> _contact = {};
   Map<String, dynamic> _territory = {};
+  Map<String, dynamic> _operationalAlert = {};
+  String _viewerType = 'institutionnel';
+  int? _lastAlertTriggeredAt;
+  bool _soundEnabled = true;
 
   bool _notifyFlagLowered = true;
   bool _notifyIncident = true;
@@ -67,10 +74,15 @@ class _InstitutionalMainCourantePageState
     super.initState();
     _selectedDay = _today;
     _load();
+    _operationalStatusTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _refreshOperationalStatus(),
+    );
   }
 
   @override
   void dispose() {
+    _operationalStatusTimer?.cancel();
     _dayScrollController.dispose();
     super.dispose();
   }
@@ -150,6 +162,14 @@ class _InstitutionalMainCourantePageState
               decoded['notificationPreferences'] as Map,
             )
           : <String, dynamic>{};
+      final operationalAlert = decoded['operationalAlert'] is Map
+          ? Map<String, dynamic>.from(
+              decoded['operationalAlert'] as Map,
+            )
+          : <String, dynamic>{};
+      final triggeredAt = operationalAlert['triggeredAt'] is num
+          ? (operationalAlert['triggeredAt'] as num).toInt()
+          : null;
 
       setState(() {
         _spots = spots;
@@ -164,6 +184,14 @@ class _InstitutionalMainCourantePageState
         _territory = decoded['territory'] is Map
             ? Map<String, dynamic>.from(decoded['territory'] as Map)
             : <String, dynamic>{};
+        _operationalAlert = operationalAlert;
+        _viewerType =
+            (decoded['viewerType'] ?? 'institutionnel').toString().toLowerCase();
+        if (_lastAlertTriggeredAt == null &&
+            operationalAlert['active'] == true &&
+            triggeredAt != null) {
+          _lastAlertTriggeredAt = triggeredAt;
+        }
         _notifyFlagLowered = preferences['flagLowered'] != false;
         _notifyIncident = preferences['incident'] != false;
         _notifyIntervention = preferences['intervention'] != false;
@@ -178,6 +206,78 @@ class _InstitutionalMainCourantePageState
         _errorMessage =
             'Impossible de joindre le service MAIN COURANTE actuellement.';
       });
+    }
+  }
+
+
+  Future<void> _refreshOperationalStatus() async {
+    if (!mounted || widget.token.trim().isEmpty || _selectedSpotId == null) {
+      return;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+          'getInstitutionalMainCourante',
+        ),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'token': widget.token,
+          'spotId': _selectedSpotId,
+          'statusOnly': true,
+        }),
+      );
+
+      if (!mounted || response.statusCode < 200 || response.statusCode >= 300) {
+        return;
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
+        return;
+      }
+
+      final nextAlert = decoded['operationalAlert'] is Map
+          ? Map<String, dynamic>.from(
+              decoded['operationalAlert'] as Map,
+            )
+          : <String, dynamic>{};
+      final triggeredAt = nextAlert['triggeredAt'] is num
+          ? (nextAlert['triggeredAt'] as num).toInt()
+          : null;
+      final isNewActiveAlert =
+          nextAlert['active'] == true &&
+          triggeredAt != null &&
+          triggeredAt != _lastAlertTriggeredAt;
+
+      if (triggeredAt != null && nextAlert['active'] == true) {
+        _lastAlertTriggeredAt = triggeredAt;
+      }
+
+      setState(() {
+        _operationalAlert = nextAlert;
+      });
+
+      if (isNewActiveAlert && _soundEnabled) {
+        await playOperationalFogHorn();
+      }
+
+      if (isNewActiveAlert && mounted) {
+        final message = (nextAlert['message'] ?? 'Drapeau affalé').toString();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: _red,
+            duration: const Duration(seconds: 6),
+            content: Text(
+              message,
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      // Le polling silencieux ne doit jamais interrompre la consultation.
     }
   }
 
@@ -429,6 +529,80 @@ class _InstitutionalMainCourantePageState
     );
   }
 
+
+  Widget _operationalAlertBanner() {
+    if (_operationalAlert['active'] != true) {
+      return const SizedBox.shrink();
+    }
+
+    final message = (_operationalAlert['message'] ?? '')
+        .toString()
+        .trim();
+    final triggeredAt = _operationalAlert['triggeredAt'];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _red, width: 1.8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.crisis_alert_rounded, color: _red, size: 22),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'ÉVÉNEMENT OPÉRATIONNEL EN COURS',
+                  style: TextStyle(
+                    color: _red,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Text(
+            message.isEmpty ? 'Drapeau du poste de secours affalé' : message,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontWeight: FontWeight.w900,
+              fontSize: 13,
+            ),
+          ),
+          if (triggeredAt is num) ...[
+            const SizedBox(height: 3),
+            Text(
+              'Déclenché le ${_formatDate(triggeredAt)}',
+              style: const TextStyle(
+                color: Colors.black54,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          const SizedBox(height: 7),
+          const Text(
+            'Les informations complémentaires seront renseignées dans la '
+            'MAIN COURANTE dès que la situation opérationnelle le permettra.',
+            style: TextStyle(
+              color: Colors.black54,
+              fontSize: 10.5,
+              height: 1.3,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _preferencesCard() {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -471,6 +645,22 @@ class _InstitutionalMainCourantePageState
             onChanged: (value) {
               setState(() => _notifyFlagLowered = value);
               _savePreferences();
+            },
+          ),
+          SwitchListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Corne de brume sur cette page'),
+            subtitle: const Text(
+              'Le navigateur doit autoriser la lecture du son.',
+              style: TextStyle(fontSize: 10.5),
+            ),
+            value: _soundEnabled,
+            onChanged: (value) async {
+              setState(() => _soundEnabled = value);
+              if (value) {
+                await playOperationalFogHorn();
+              }
             },
           ),
           SwitchListTile(
@@ -546,10 +736,12 @@ class _InstitutionalMainCourantePageState
                           height: 52,
                           fit: BoxFit.contain,
                         ),
-                        const Text(
-                          'MAIN COURANTE — ACCÈS INSTITUTIONNEL',
+                        Text(
+                          _viewerType == 'admin'
+                              ? 'MAIN COURANTE — ACCÈS ADMIN'
+                              : 'MAIN COURANTE — ACCÈS INSTITUTIONNEL',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             color: _red,
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
@@ -578,6 +770,9 @@ class _InstitutionalMainCourantePageState
                             ),
                           ),
                         const SizedBox(height: 10),
+                        _operationalAlertBanner(),
+                        if (_operationalAlert['active'] == true)
+                          const SizedBox(height: 10),
                         _preferencesCard(),
                         const SizedBox(height: 10),
                         if (_spots.isNotEmpty)
