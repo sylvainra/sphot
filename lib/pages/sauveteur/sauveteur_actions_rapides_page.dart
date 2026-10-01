@@ -602,9 +602,9 @@ class _SauveteurActionsRapidesPageState
           const baseMarkerHeight =
               _QuickActionsFlagMarkerState.markerHeight;
           final availableMarkerHeight =
-              (constraints.maxHeight - 56).clamp(
+              (constraints.maxHeight - 42).clamp(
             baseMarkerHeight,
-            baseMarkerHeight * 1.55,
+            baseMarkerHeight * 1.75,
           ).toDouble();
           final markerScaleY =
               availableMarkerHeight / baseMarkerHeight;
