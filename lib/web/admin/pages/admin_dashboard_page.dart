@@ -21,6 +21,7 @@ import 'sphot_admin_summary_page.dart';
 import 'admin_subscription_panel.dart';
 import 'admin_statistics_panel.dart';
 import '../../institutional/pages/institutional_main_courante_page.dart';
+import '../../institutional/services/operational_alert_sound.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -97,7 +98,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final MapController _mapController = MapController();
   Timer? _mapMovementTimer;
   Timer? _trialEndRefreshTimer;
+  Timer? _operationalAlertTimer;
   DateTime? _scheduledTrialEndDate;
+  int? _lastOperationalAlertAt;
   OverlayEntry? _sphotHoverOverlayEntry;
   Timer? _sphotHoverExitTimer;
 
@@ -13488,6 +13491,78 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+
+  Future<void> _pollOperationalAlerts() async {
+    final token = widget.mainCouranteToken.trim();
+    if (!mounted || token.isEmpty) return;
+
+    try {
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+          'getInstitutionalMainCourante',
+        ),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'token': token,
+          'statusOnly': true,
+          'allSpots': true,
+        }),
+      );
+
+      if (!mounted || response.statusCode < 200 || response.statusCode >= 300) {
+        return;
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
+        return;
+      }
+
+      final alerts = decoded['activeOperationalAlerts'] is List
+          ? (decoded['activeOperationalAlerts'] as List)
+              .whereType<Map>()
+              .map((value) => Map<String, dynamic>.from(value))
+              .toList()
+          : <Map<String, dynamic>>[];
+
+      if (alerts.isEmpty) return;
+
+      final alert = alerts.first;
+      final triggeredAt = alert['triggeredAt'] is num
+          ? (alert['triggeredAt'] as num).toInt()
+          : null;
+
+      if (triggeredAt == null || triggeredAt == _lastOperationalAlertAt) {
+        return;
+      }
+
+      _lastOperationalAlertAt = triggeredAt;
+      await playOperationalFogHorn();
+
+      if (!mounted) return;
+
+      final message = (alert['message'] ?? 'Drapeau affalé').toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: redColor,
+          duration: const Duration(seconds: 8),
+          content: Text(
+            message,
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+          action: SnackBarAction(
+            label: 'MAIN COURANTE',
+            textColor: Colors.white,
+            onPressed: _openMainCourante,
+          ),
+        ),
+      );
+    } catch (_) {
+      // Une perte réseau ne doit pas interrompre le dashboard Admin.
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -13503,12 +13578,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _loadAllLegalChaptersFromFirebase();
 
     _loadAdministratorTerritoryCenter();
+
+    if (widget.mainCouranteToken.trim().isNotEmpty) {
+      Future<void>.delayed(
+        const Duration(seconds: 2),
+        _pollOperationalAlerts,
+      );
+      _operationalAlertTimer = Timer.periodic(
+        const Duration(seconds: 5),
+        (_) => _pollOperationalAlerts(),
+      );
+    }
   }
 
   @override
   void dispose() {
     _mapMovementTimer?.cancel();
     _trialEndRefreshTimer?.cancel();
+    _operationalAlertTimer?.cancel();
 
     _sphotHoverExitTimer?.cancel();
     _removeSphotHoverLabel();
