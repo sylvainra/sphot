@@ -67,6 +67,7 @@ class _MapPageState extends State<MapPage> {
 
   double _currentRotation = 0;
   int _selectedTileStyle = 0;
+  int _mapTileRefreshVersion = 0;
   int _selectedBottomIndex = 1;
   String? _selectedPublicSpotId;
   Set<String> _favoriteSpotIds = <String>{};
@@ -1055,6 +1056,15 @@ SpotFlagState? _findBestSpotMatch(
         if (_selectedPublicSpotId == spot.id) {
           _selectedPublicSpotId = null;
         }
+        _mapTileRefreshVersion++;
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _mapController.move(
+          selectedSpotCenter,
+          selectedSpotZoom,
+        );
       });
     }
   }
@@ -2430,7 +2440,9 @@ onPositionChanged: (position, hasGesture) {
 ),
                 children: [
                   TileLayer(
-  key: ValueKey('tile_style_$_selectedTileStyle'),
+  key: ValueKey(
+    'tile_style_${_selectedTileStyle}_$_mapTileRefreshVersion',
+  ),
   urlTemplate: _tileStyles[_selectedTileStyle].url,
   subdomains: _tileStyles[_selectedTileStyle].subdomains,
   maxZoom: _tileStyles[_selectedTileStyle].maxZoom.toDouble(),
