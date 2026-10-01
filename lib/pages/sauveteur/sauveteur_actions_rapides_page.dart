@@ -588,10 +588,8 @@ class _SauveteurActionsRapidesPageState
   }
 
   Widget _buildFlagMastControl() {
-    const height = 250.0;
-
     return Container(
-      height: height,
+      height: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.45),
         borderRadius: BorderRadius.circular(18),
@@ -601,6 +599,18 @@ class _SauveteurActionsRapidesPageState
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
+          const baseMarkerHeight =
+              _QuickActionsFlagMarkerState.markerHeight;
+          final availableMarkerHeight =
+              (constraints.maxHeight - 56).clamp(
+            baseMarkerHeight,
+            baseMarkerHeight * 1.55,
+          ).toDouble();
+          final markerScaleY =
+              availableMarkerHeight / baseMarkerHeight;
+          final markerTop =
+              (constraints.maxHeight - availableMarkerHeight) / 2;
+
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapUp: (details) {
@@ -638,9 +648,14 @@ class _SauveteurActionsRapidesPageState
                 ),
                 Positioned(
                   left: 2,
-                  top: 16,
-                  child: _QuickActionsFlagMarker(
-                    spot: _previewSpotState(),
+                  top: markerTop,
+                  child: Transform.scale(
+                    scaleX: 1,
+                    scaleY: markerScaleY,
+                    alignment: Alignment.topCenter,
+                    child: _QuickActionsFlagMarker(
+                      spot: _previewSpotState(),
+                    ),
                   ),
                 ),
                 const Positioned(
