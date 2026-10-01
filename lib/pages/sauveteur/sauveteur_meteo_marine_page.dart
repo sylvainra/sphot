@@ -574,7 +574,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                     ),
                   ),
 
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 12),
                   _publishButton(),
                   const SizedBox(height: 6),
                   Transform.translate(
