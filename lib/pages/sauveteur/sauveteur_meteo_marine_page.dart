@@ -590,6 +590,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                                   ),
                                 ),
                               ),
+                            ),
 
                             ],
                           ),
