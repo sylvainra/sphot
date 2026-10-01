@@ -659,7 +659,7 @@ class _SauveteurActionsRapidesPageState
                 ),
                 Positioned(
                   right: 6,
-                  top: 109,
+                  top: constraints.maxHeight / 2 - 11,
                   child: Icon(
                     Icons.unfold_more_rounded,
                     size: 22,
@@ -746,12 +746,10 @@ class _SauveteurActionsRapidesPageState
 
                 const SizedBox(height: 2),
 
-                Flexible(
-  fit: FlexFit.loose,
+                Expanded(
   child: Padding(
     padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
     child: Column(
-      mainAxisSize: MainAxisSize.min,
       children: [
                           if (_loadingSpots)
                             const Padding(
@@ -832,14 +830,14 @@ class _SauveteurActionsRapidesPageState
 
                           if (isTemporaryClosed) _dangerBanner(),
 
-                          _sectionCard(
+                          Expanded(
+                            child: _sectionCard(
                             title: 'Actions rapides',
                             icon: Icons.flash_on,
                             showHeader: false,
                             children: [
                               const SizedBox(height: 8),
-                              SizedBox(
-                                height: 250,
+                              Expanded(
                                 child: Row(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
@@ -918,6 +916,7 @@ class _SauveteurActionsRapidesPageState
                                 },
                               ),
                             ],
+                          ),
                           ),
 
                           _sectionCard(
