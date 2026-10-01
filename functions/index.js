@@ -5737,18 +5737,22 @@ exports.getInstitutionalMainCourante = onRequest(
               });
         }
 
-        await admin.firestore()
-            .collection("mainCouranteAccessLogs")
-            .add({
-              territoireId,
-              spotId,
-              viewerId: access.contactId || tokenHash,
-              viewerLogin: access.email || "",
-              viewerRole: "institutionnel",
-              viewerType: "institutionnel",
-              action: "view",
-              viewedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
+        if (!statusOnly) {
+          await admin.firestore()
+              .collection("mainCouranteAccessLogs")
+              .add({
+                territoireId,
+                spotId,
+                viewerId: access.contactId || tokenHash,
+                viewerLogin: access.email || "",
+                viewerRole:
+                  (access.viewerType || "institutionnel").toString(),
+                viewerType:
+                  (access.viewerType || "institutionnel").toString(),
+                action: "view",
+                viewedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+        }
 
         response.status(200).json({
           success: true,
