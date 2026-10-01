@@ -186,6 +186,53 @@ class _SauveteurMainCourantePageState
     await _loadEntries();
   }
 
+  bool get _selectedMonthIsCurrentMonth {
+    final today = _today;
+    return _selectedDay.year == today.year &&
+        _selectedDay.month == today.month;
+  }
+
+  Future<void> _changeMonth(int delta) async {
+    final today = _today;
+    final currentMonth = DateTime(today.year, today.month);
+    final targetMonth = DateTime(
+      _selectedDay.year,
+      _selectedDay.month + delta,
+    );
+
+    if (targetMonth.isAfter(currentMonth)) return;
+
+    final daysInTargetMonth = DateTime(
+      targetMonth.year,
+      targetMonth.month + 1,
+      0,
+    ).day;
+
+    var targetDay = _selectedDay.day;
+    if (targetDay > daysInTargetMonth) {
+      targetDay = daysInTargetMonth;
+    }
+
+    if (targetMonth.year == today.year &&
+        targetMonth.month == today.month &&
+        targetDay > today.day) {
+      targetDay = today.day;
+    }
+
+    setState(() {
+      _selectedDay = DateTime(
+        targetMonth.year,
+        targetMonth.month,
+        targetDay,
+      );
+      _statusMessage = null;
+      _presenceAutoSaveAttempted = false;
+    });
+
+    _scrollSelectedDayIntoView();
+    await _loadEntries();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -270,7 +317,7 @@ class _SauveteurMainCourantePageState
       _loading = false;
     });
 
-    if (_isSphotOn && _selectedSpotId != null) {
+    if (_selectedSpotId != null) {
       await _loadEntries();
     }
   }
@@ -1073,7 +1120,7 @@ class _SauveteurMainCourantePageState
   }
 
   Future<void> _loadEntries() async {
-    if (!_isSphotOn || _selectedSpotId == null) {
+    if (_selectedSpotId == null) {
       if (mounted) setState(() => _entries = []);
       return;
     }
@@ -2154,11 +2201,19 @@ class _SauveteurMainCourantePageState
 
   Widget _dayTabs() {
     final today = _today;
-    final daysInMonth = DateTime(today.year, today.month + 1, 0).day;
+    final selectedMonth = DateTime(
+      _selectedDay.year,
+      _selectedDay.month,
+    );
+    final daysInMonth = DateTime(
+      selectedMonth.year,
+      selectedMonth.month + 1,
+      0,
+    ).day;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(6, 4, 6, 5),
+      padding: const EdgeInsets.fromLTRB(6, 5, 6, 6),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.72),
         borderRadius: BorderRadius.circular(16),
@@ -2170,16 +2225,59 @@ class _SauveteurMainCourantePageState
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '${_months[today.month - 1]} ${today.year}',
-            style: const TextStyle(
-              color: Color(0xFF1E3A8A),
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.7,
+          SizedBox(
+            height: 30,
+            child: Row(
+              children: [
+                IconButton(
+                  tooltip: 'Mois précédent',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 34,
+                    minHeight: 30,
+                  ),
+                  onPressed: () => _changeMonth(-1),
+                  icon: const Icon(
+                    Icons.chevron_left_rounded,
+                    color: Color(0xFF1E3A8A),
+                    size: 24,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    '${_months[selectedMonth.month - 1]} '
+                    '${selectedMonth.year}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF1E3A8A),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.7,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Mois suivant',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 34,
+                    minHeight: 30,
+                  ),
+                  onPressed: _selectedMonthIsCurrentMonth
+                      ? null
+                      : () => _changeMonth(1),
+                  icon: Icon(
+                    Icons.chevron_right_rounded,
+                    color: _selectedMonthIsCurrentMonth
+                        ? Colors.black26
+                        : const Color(0xFF1E3A8A),
+                    size: 24,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           SizedBox(
             height: 34,
             child: ListView.builder(
@@ -2188,7 +2286,11 @@ class _SauveteurMainCourantePageState
               itemCount: daysInMonth,
               itemBuilder: (context, index) {
                 final day = index + 1;
-                final date = DateTime(today.year, today.month, day);
+                final date = DateTime(
+                  selectedMonth.year,
+                  selectedMonth.month,
+                  day,
+                );
                 final selected = _selectedDay.year == date.year &&
                     _selectedDay.month == date.month &&
                     _selectedDay.day == date.day;
@@ -3207,26 +3309,41 @@ class _SauveteurMainCourantePageState
                       child: Column(
                         children: [
                           Expanded(
-                            child: !_isSphotOn
+                            child: _loading
                                 ? const Center(
-                                    child: Text(
-                                      'La main courante réelle devient accessible '
-                                      'uniquement lorsque SPHOT est ON.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Color(0xFFDC2626),
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
+                                    child: CircularProgressIndicator(),
                                   )
-                                : _loading
-                                    ? const Center(
-                                        child: CircularProgressIndicator(),
-                                      )
-                                    : ListView(
+                                : ListView(
                                         children: [
                                           _selectedDayHeader(),
                                           const SizedBox(height: 10),
+                                          if (!_isSphotOn) ...[
+                                            Container(
+                                              width: double.infinity,
+                                              padding: const EdgeInsets.all(10),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white.withOpacity(0.68),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: const Color(0xFF1E3A8A)
+                                                      .withOpacity(0.35),
+                                                ),
+                                              ),
+                                              child: const Text(
+                                                'CONSULTATION HISTORIQUE — '
+                                                'SPHOT est OFF. Les mains courantes '
+                                                'restent consultables en lecture seule.',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  color: Color(0xFF1E3A8A),
+                                                  fontSize: 10.5,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                            ),
+                                            SizedBox(height: 10),
+                                          ],
                                           if (_institutionalContacts.isNotEmpty) ...[
                                             _institutionalContactsCard(),
                                             const SizedBox(height: 12),
@@ -3336,10 +3453,8 @@ class _SauveteurMainCourantePageState
                                         ],
                                       ),
                           ),
-                          if (_isSphotOn) ...[
-                            const SizedBox(height: 8),
-                            _dayTabs(),
-                          ],
+                          const SizedBox(height: 8),
+                          _dayTabs(),
                         ],
                       ),
                     ),
