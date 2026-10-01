@@ -338,8 +338,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
 
                   const SizedBox(height: 4),
 
-                  SizedBox(
-                    height: 600,
+                  Expanded(
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
