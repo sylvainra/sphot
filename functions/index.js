@@ -5658,28 +5658,28 @@ exports.getInstitutionalMainCourante = onRequest(
                 .doc(spotId)
                 .collection("mainCourante");
 
-          const dayStartMillis = Number(request.body.dayStartMillis);
-          const dayEndMillis = Number(request.body.dayEndMillis);
-          if (Number.isFinite(dayStartMillis) &&
-              Number.isFinite(dayEndMillis) &&
-              dayEndMillis > dayStartMillis) {
-            entriesQuery = entriesQuery
-                .where(
-                    "occurredAt",
-                    ">=",
-                    admin.firestore.Timestamp.fromMillis(dayStartMillis),
-                )
-                .where(
-                    "occurredAt",
-                    "<",
-                    admin.firestore.Timestamp.fromMillis(dayEndMillis),
-                );
-          }
+            const dayStartMillis = Number(request.body.dayStartMillis);
+            const dayEndMillis = Number(request.body.dayEndMillis);
+            if (Number.isFinite(dayStartMillis) &&
+                Number.isFinite(dayEndMillis) &&
+                dayEndMillis > dayStartMillis) {
+              entriesQuery = entriesQuery
+                  .where(
+                      "occurredAt",
+                      ">=",
+                      admin.firestore.Timestamp.fromMillis(dayStartMillis),
+                  )
+                  .where(
+                      "occurredAt",
+                      "<",
+                      admin.firestore.Timestamp.fromMillis(dayEndMillis),
+                  );
+            }
 
-          const entriesSnapshot = await entriesQuery
-              .orderBy("occurredAt", "desc")
-              .limit(500)
-              .get();
+            const entriesSnapshot = await entriesQuery
+                .orderBy("occurredAt", "desc")
+                .limit(500)
+                .get();
 
             entries = entriesSnapshot.docs
                 .map((document) => {
