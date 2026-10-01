@@ -271,12 +271,10 @@ class PublicSpotDetailPage extends StatelessWidget {
 
 class PublicSpotMobileSheet extends StatefulWidget {
   final SpotFlagState spot;
-  final ScrollController sheetScrollController;
 
   const PublicSpotMobileSheet({
     super.key,
     required this.spot,
-    required this.sheetScrollController,
   });
 
   @override
@@ -288,6 +286,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   int _selectedPage = 0;
   bool _isSaved = false;
   late final List<GlobalKey> _pageTabKeys;
+  late final ScrollController _contentScrollController;
 
   static const List<(String, IconData)> _pages = [
     ('Live', Icons.sensors_rounded),
@@ -305,7 +304,14 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
       _pages.length,
       (_) => GlobalKey(),
     );
+    _contentScrollController = ScrollController();
     _loadSavedState();
+  }
+
+  @override
+  void dispose() {
+    _contentScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSavedState() async {
@@ -484,9 +490,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   }
 
   Future<void> _selectPage(int index) async {
-    if (widget.sheetScrollController.hasClients) {
-      widget.sheetScrollController.jumpTo(
-        widget.sheetScrollController.position.minScrollExtent,
+    if (_contentScrollController.hasClients) {
+      _contentScrollController.jumpTo(
+        _contentScrollController.position.minScrollExtent,
       );
     }
 
@@ -497,9 +503,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
 
-    if (widget.sheetScrollController.hasClients) {
-      widget.sheetScrollController.jumpTo(
-        widget.sheetScrollController.position.minScrollExtent,
+    if (_contentScrollController.hasClients) {
+      _contentScrollController.jumpTo(
+        _contentScrollController.position.minScrollExtent,
       );
     }
 
@@ -563,6 +569,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   }) {
     return ListView(
       controller: controller,
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
         for (var index = 0; index < groups.length; index++) ...[
@@ -763,6 +772,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
 
     return ListView(
       controller: controller,
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
         _UnsupervisedWarning(title: warningTitle),
@@ -908,37 +920,37 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         return _buildTerrestrialPage(
           context,
           spot,
-          widget.sheetScrollController,
+          _contentScrollController,
         );
       case 2:
         return _buildMarinePage(
           context,
           spot,
-          widget.sheetScrollController,
+          _contentScrollController,
         );
       case 3:
         return _buildEphemeridePage(
           context,
           spot,
-          widget.sheetScrollController,
+          _contentScrollController,
         );
       case 4:
         return _buildInfoPage(
           context,
           spot,
-          widget.sheetScrollController,
+          _contentScrollController,
         );
       case 5:
         return _buildSignalsPage(
           context,
           spot,
-          widget.sheetScrollController,
+          _contentScrollController,
         );
       default:
         return _buildActionsPage(
           context,
           spot,
-          widget.sheetScrollController,
+          _contentScrollController,
         );
     }
   }
@@ -1068,7 +1080,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                       : _buildUnsupervisedSpotPage(
                           context,
                           currentSpot,
-                          widget.sheetScrollController,
+                          _contentScrollController,
                         ),
                 ),
               ],
@@ -1129,6 +1141,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
 
     return ListView(
       controller: controller,
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
         _MobilePublicCard(
@@ -1205,6 +1220,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   ) {
     return ListView(
       controller: controller,
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
         const _MobilePublicCard(
@@ -1253,6 +1271,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
 
     return ListView(
       controller: controller,
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
         _MobilePublicCard(
