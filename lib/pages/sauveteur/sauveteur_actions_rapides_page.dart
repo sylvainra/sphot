@@ -1042,25 +1042,9 @@ class _SauveteurActionsRapidesPageState
 
                 final bool selected = selectedDangers.contains(danger);
 
-                return CheckboxListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  value: selected,
-                  activeColor: const Color(0xFFFDE047),
-                  checkColor: Colors.black,
-                  secondary: DangerPictogram(
-                    danger: danger,
-                    size: 28,
-                  ),
-                  title: Text(
-                    danger,
-                    softWrap: true,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      height: 1.15,
-                    ),
-                  ),
+                return _DangerCheckboxRow(
+                  danger: danger,
+                  selected: selected,
                   onChanged: (value) {
                     setState(() {
                       if (value == true) {
@@ -1809,13 +1793,19 @@ class _BaineDangerSelector extends StatelessWidget {
                   ),
                 ),
               ),
-              Checkbox(
-                value: enabled,
-                activeColor: const Color(0xFFFDE047),
-                checkColor: Colors.black,
-                onChanged: (value) {
-                  onChanged(value == true ? displayLevel : 0);
-                },
+              SizedBox(
+                width: 48,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Checkbox(
+                    value: enabled,
+                    activeColor: const Color(0xFFFDE047),
+                    checkColor: Colors.black,
+                    onChanged: (value) {
+                      onChanged(value == true ? displayLevel : 0);
+                    },
+                  ),
+                ),
               ),
             ],
           ),
@@ -1958,13 +1948,19 @@ class _CaniculeDangerSelector extends StatelessWidget {
                   ),
                 ),
               ),
-              Checkbox(
-                value: enabled,
-                activeColor: const Color(0xFFFDE047),
-                checkColor: Colors.black,
-                onChanged: (value) {
-                  onChanged(value == true ? displayLevel : 0);
-                },
+              SizedBox(
+                width: 48,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Checkbox(
+                    value: enabled,
+                    activeColor: const Color(0xFFFDE047),
+                    checkColor: Colors.black,
+                    onChanged: (value) {
+                      onChanged(value == true ? displayLevel : 0);
+                    },
+                  ),
+                ),
               ),
             ],
           ),
@@ -2039,6 +2035,71 @@ class _CaniculeDangerSelector extends StatelessWidget {
   }
 }
 
+
+class _DangerCheckboxRow extends StatelessWidget {
+  final String danger;
+  final bool selected;
+  final ValueChanged<bool?> onChanged;
+
+  const _DangerCheckboxRow({
+    required this.danger,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 48),
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.black.withOpacity(0.08),
+          ),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 34,
+            child: Center(
+              child: DangerPictogram(
+                danger: danger,
+                size: 28,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              danger,
+              softWrap: true,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                height: 1.15,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 48,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Checkbox(
+                value: selected,
+                activeColor: const Color(0xFFFDE047),
+                checkColor: Colors.black,
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _DangerSelectionResult {
   final Set<String> selectedDangers;
@@ -2236,25 +2297,9 @@ class _SauveteurDangersPageState extends State<SauveteurDangersPage> {
                                   final selected =
                                       _selectedDangers.contains(danger);
 
-                                  return CheckboxListTile(
-                                    dense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                    value: selected,
-                                    activeColor: const Color(0xFFFDE047),
-                                    checkColor: Colors.black,
-                                    secondary: DangerPictogram(
-                                      danger: danger,
-                                      size: 28,
-                                    ),
-                                    title: Text(
-                                      danger,
-                                      softWrap: true,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        height: 1.15,
-                                      ),
-                                    ),
+                                  return _DangerCheckboxRow(
+                                    danger: danger,
+                                    selected: selected,
                                     onChanged: (value) {
                                       setState(() {
                                         if (value == true) {
