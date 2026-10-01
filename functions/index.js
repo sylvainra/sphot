@@ -5941,11 +5941,10 @@ exports.getSauveteurMainCourante = onRequest(
         const {context} = session;
         const spotId = (request.body.spotId || "").toString().trim();
 
-        if (context.sphotMode !== "ON" ||
-            !context.assignedSpotIds.includes(spotId)) {
+        if (!context.assignedSpotIds.includes(spotId)) {
           response.status(403).json({
             success: false,
-            error: "main_courante_not_available",
+            error: "spot_not_assigned",
           });
           return;
         }
@@ -6023,7 +6022,9 @@ exports.getSauveteurMainCourante = onRequest(
         response.status(200).json({
           success: true,
           entries,
-          canWrite: context.canManageRestrictedOperationalData,
+          canWrite:
+            context.sphotMode === "ON" &&
+            context.canManageRestrictedOperationalData,
         });
       } catch (error) {
         console.error("Erreur lecture main courante:", error);
