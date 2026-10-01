@@ -1035,15 +1035,14 @@ SpotFlagState? _findBestSpotMatch(
       builder: (sheetContext) {
         final fixedChildSize =
             spot.isPosteSecours ? 0.60 : 0.64;
+        final sheetHeight =
+            MediaQuery.sizeOf(sheetContext).height * fixedChildSize;
 
-        return Align(
-          alignment: Alignment.bottomCenter,
-          child: FractionallySizedBox(
-            widthFactor: 1,
-            heightFactor: fixedChildSize,
-            child: PublicSpotMobileSheet(
-              spot: spot,
-            ),
+        return SizedBox(
+          width: double.infinity,
+          height: sheetHeight,
+          child: PublicSpotMobileSheet(
+            spot: spot,
           ),
         );
       },
