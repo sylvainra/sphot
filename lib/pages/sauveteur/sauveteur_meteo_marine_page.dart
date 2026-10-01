@@ -344,7 +344,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                   Expanded(
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                       decoration: BoxDecoration(
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(24),
@@ -354,32 +354,22 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                         ),
                       ),
 
-                      child: Transform.translate(
-                        offset: const Offset(0, -12),
-                        child: SingleChildScrollView(
-                          physics: const BouncingScrollPhysics(),
-                          clipBehavior: Clip.none,
-                          child: Column(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        clipBehavior: Clip.none,
+                        child: Column(
                             children: [
-                              Transform.translate(
-                                offset: const Offset(0, 10),
-
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 2),
-
-                                  child: Text(
-                                    'PRÉVISIONS',
-                                    style: TextStyle(
-                                      color: Color(0xFF0277BD),
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.8,
-                                    ),
-                                  ),
+                              const Text(
+                                'PRÉVISIONS',
+                                style: TextStyle(
+                                  color: Color(0xFF0277BD),
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.8,
                                 ),
                               ),
 
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 12),
 
                               Row(
                                 children: [
@@ -426,10 +416,9 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                                 ],
                               ),
 
-                              Transform.translate(
-                                offset: const Offset(0, 6),
+                              const SizedBox(height: 12),
 
-                                child: _TidesFullWidthCard(
+                              _TidesFullWidthCard(
                                   borderColor: tideColor,
                                   tidesPresent: tidesPresent,
                                   onTidesPresentChanged: (value) {
@@ -510,9 +499,8 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                                     });
                                   },
                                 ),
-                              ),
 
-                              const SizedBox(height: 18),
+                              const SizedBox(height: 12),
 
                               SizedBox(
                                 height: 300,
@@ -583,7 +571,6 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                             ],
                           ),
                         ),
-                      ),
                     ),
                   ),
 
