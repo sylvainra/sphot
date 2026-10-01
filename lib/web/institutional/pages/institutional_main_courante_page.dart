@@ -226,6 +226,7 @@ class _InstitutionalMainCourantePageState
           'token': widget.token,
           'spotId': _selectedSpotId,
           'statusOnly': true,
+          'allSpots': true,
         }),
       );
 
@@ -243,15 +244,23 @@ class _InstitutionalMainCourantePageState
               decoded['operationalAlert'] as Map,
             )
           : <String, dynamic>{};
-      final triggeredAt = nextAlert['triggeredAt'] is num
-          ? (nextAlert['triggeredAt'] as num).toInt()
+      final activeAlerts = decoded['activeOperationalAlerts'] is List
+          ? (decoded['activeOperationalAlerts'] as List)
+              .whereType<Map>()
+              .map((value) => Map<String, dynamic>.from(value))
+              .toList()
+          : <Map<String, dynamic>>[];
+      final alertForSound =
+          activeAlerts.isNotEmpty ? activeAlerts.first : nextAlert;
+      final triggeredAt = alertForSound['triggeredAt'] is num
+          ? (alertForSound['triggeredAt'] as num).toInt()
           : null;
       final isNewActiveAlert =
-          nextAlert['active'] == true &&
+          alertForSound['active'] == true &&
           triggeredAt != null &&
           triggeredAt != _lastAlertTriggeredAt;
 
-      if (triggeredAt != null && nextAlert['active'] == true) {
+      if (triggeredAt != null && alertForSound['active'] == true) {
         _lastAlertTriggeredAt = triggeredAt;
       }
 
@@ -264,7 +273,8 @@ class _InstitutionalMainCourantePageState
       }
 
       if (isNewActiveAlert && mounted) {
-        final message = (nextAlert['message'] ?? 'Drapeau affalé').toString();
+        final message =
+            (alertForSound['message'] ?? 'Drapeau affalé').toString();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: _red,
