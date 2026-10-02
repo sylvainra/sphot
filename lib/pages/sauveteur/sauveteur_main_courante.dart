@@ -64,6 +64,7 @@ class _SauveteurMainCourantePageState
 
   String? _selectedSpotId;
   String _selectedType = 'Observation';
+  final Set<String> _selectedInterventionZones = <String>{};
   String? _victimSex;
   String _victimQualification = 'Idem';
   late DateTime _selectedDay;
@@ -106,13 +107,19 @@ class _SauveteurMainCourantePageState
     'Observation',
     'Incident',
     'Intervention',
-    'Secours',
     'Personne recherchée',
     'Danger',
     'Météo exceptionnelle',
     'Matériel',
     'Information administrative',
     'Autre',
+  ];
+
+  static const _interventionZoneOptions = <String>[
+    'Zone de bain surveillée',
+    'Hors zone de bain surveillée',
+    'Zone réglementée',
+    'Hors zone réglementée',
   ];
 
   static const _months = <String>[
@@ -1240,7 +1247,9 @@ class _SauveteurMainCourantePageState
           'description': description,
           'actionTaken': _actionController.text.trim(),
           'visibility': _restricted ? 'restricted' : 'operational',
-          if (_selectedType == 'Secours')
+          if (_selectedType == 'Intervention')
+            'interventionZones': _selectedInterventionZones.toList(),
+          if (_selectedType == 'Intervention')
             'victim': {
               'sexe': _victimSex ?? '',
               'age': _victimAgeController.text.trim(),
@@ -1272,6 +1281,7 @@ class _SauveteurMainCourantePageState
       setState(() {
         _restricted = false;
         _selectedType = 'Observation';
+        _selectedInterventionZones.clear();
         _victimSex = null;
         _victimQualification = 'Idem';
         _statusMessage = 'Fait du jour enregistré dans la main courante.';
@@ -1294,6 +1304,7 @@ class _SauveteurMainCourantePageState
     required String actionTaken,
     required bool restricted,
     Map<String, dynamic>? victim,
+    List<String>? interventionZones,
   }) async {
     if (!_canWrite ||
         _selectedSpotId == null ||
@@ -1324,7 +1335,10 @@ class _SauveteurMainCourantePageState
           'description': description,
           'actionTaken': actionTaken,
           'visibility': restricted ? 'restricted' : 'operational',
-          if (type == 'Secours') 'victim': victim ?? <String, dynamic>{},
+          if (type == 'Intervention')
+            'interventionZones': interventionZones ?? <String>[],
+          if (type == 'Intervention' || type == 'Secours')
+            'victim': victim ?? <String, dynamic>{},
         }),
       );
 
@@ -1367,6 +1381,12 @@ class _SauveteurMainCourantePageState
 
     String selectedType =
         currentType.isEmpty ? 'Observation' : currentType;
+    final selectedInterventionZones = entry['interventionZones'] is List
+        ? (entry['interventionZones'] as List)
+            .map((value) => value.toString())
+            .where(_interventionZoneOptions.contains)
+            .toSet()
+        : <String>{};
     bool restricted =
         (entry['visibility'] ?? 'operational').toString() == 'restricted';
 
@@ -1439,7 +1459,21 @@ class _SauveteurMainCourantePageState
                           setDialogState(() => selectedType = value);
                         },
                       ),
-                      if (selectedType == 'Secours') ...[
+                      if (selectedType == 'Intervention') ...[
+                        const SizedBox(height: 12),
+                        _interventionZonesSelector(
+                          selected: selectedInterventionZones,
+                          onToggle: (option) {
+                            setDialogState(() {
+                              if (!selectedInterventionZones.add(option)) {
+                                selectedInterventionZones.remove(option);
+                              }
+                            });
+                          },
+                        ),
+                      ],
+                      if (selectedType == 'Intervention' ||
+                          selectedType == 'Secours') ...[
                         const SizedBox(height: 12),
                         Container(
                           width: double.infinity,
@@ -1648,7 +1682,11 @@ class _SauveteurMainCourantePageState
                       'description': description,
                       'actionTaken': actionController.text.trim(),
                       'restricted': restricted,
-                      if (selectedType == 'Secours')
+                      if (selectedType == 'Intervention')
+                        'interventionZones':
+                            selectedInterventionZones.toList(),
+                      if (selectedType == 'Intervention' ||
+                          selectedType == 'Secours')
                         'victim': {
                           'sexe': victimSex ?? '',
                           'age': victimAgeController.text.trim(),
@@ -1695,6 +1733,11 @@ class _SauveteurMainCourantePageState
       restricted: result['restricted'] == true,
       victim: result['victim'] is Map
           ? Map<String, dynamic>.from(result['victim'] as Map)
+          : null,
+      interventionZones: result['interventionZones'] is List
+          ? (result['interventionZones'] as List)
+              .map((value) => value.toString())
+              .toList()
           : null,
     );
   }
@@ -1960,7 +2003,23 @@ class _SauveteurMainCourantePageState
               _entryDescriptionForDisplay(entry),
               style: const pw.TextStyle(fontSize: 9),
             ),
-            if ((entry['type'] ?? '').toString().toLowerCase() == 'secours' &&
+            if (entry['interventionZones'] is List &&
+                (entry['interventionZones'] as List).isNotEmpty) ...[
+              pw.SizedBox(height: 5),
+              pw.Text(
+                'Zone : ' +
+                    (entry['interventionZones'] as List)
+                        .map((value) => value.toString())
+                        .join(' • '),
+                style: pw.TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ],
+            if (<String>{'intervention', 'secours'}.contains(
+                  (entry['type'] ?? '').toString().toLowerCase(),
+                ) &&
                 victim.isNotEmpty) ...[
               pw.SizedBox(height: 6),
               pw.Container(
@@ -2619,7 +2678,43 @@ class _SauveteurMainCourantePageState
                     height: 1.3,
                   ),
                 ),
-                if ((entry['type'] ?? '').toString().toLowerCase() == 'secours' &&
+                if (entry['interventionZones'] is List &&
+                    (entry['interventionZones'] as List).isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: (entry['interventionZones'] as List)
+                        .map(
+                          (value) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: const Color(0xFF1E3A8A)
+                                    .withOpacity(0.35),
+                              ),
+                            ),
+                            child: Text(
+                              value.toString(),
+                              style: const TextStyle(
+                                color: Color(0xFF1E3A8A),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+                if (<String>{'intervention', 'secours'}.contains(
+                      (entry['type'] ?? '').toString().toLowerCase(),
+                    ) &&
                     entry['victim'] is Map) ...[
                   const SizedBox(height: 8),
                   Builder(
@@ -3021,6 +3116,73 @@ class _SauveteurMainCourantePageState
     );
   }
 
+  Widget _interventionZonesSelector({
+    required Set<String> selected,
+    required ValueChanged<String> onToggle,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.58),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFF1E3A8A),
+          width: 1.3,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'ZONE D’INTERVENTION',
+            style: TextStyle(
+              color: Color(0xFF1E3A8A),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Plusieurs choix peuvent être associés à la même intervention.',
+            style: TextStyle(
+              color: Colors.black54,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: _interventionZoneOptions.map((option) {
+              final isSelected = selected.contains(option);
+              return FilterChip(
+                selected: isSelected,
+                label: Text(
+                  option,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : const Color(0xFF1E3A8A),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                selectedColor: const Color(0xFF1E3A8A),
+                checkmarkColor: Colors.white,
+                side: BorderSide(
+                  color: isSelected
+                      ? const Color(0xFF1E3A8A)
+                      : const Color(0xFF1E3A8A).withOpacity(0.45),
+                ),
+                onSelected: (_) => onToggle(option),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _entryForm() {
     if (!_canWrite) return const SizedBox.shrink();
 
@@ -3053,7 +3215,18 @@ class _SauveteurMainCourantePageState
               setState(() => _selectedType = value);
             },
           ),
-          if (_selectedType == 'Secours') ...[
+          if (_selectedType == 'Intervention') ...[
+            const SizedBox(height: 10),
+            _interventionZonesSelector(
+              selected: _selectedInterventionZones,
+              onToggle: (option) {
+                setState(() {
+                  if (!_selectedInterventionZones.add(option)) {
+                    _selectedInterventionZones.remove(option);
+                  }
+                });
+              },
+            ),
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
