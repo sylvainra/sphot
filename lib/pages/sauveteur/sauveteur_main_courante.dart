@@ -1228,6 +1228,16 @@ class _SauveteurMainCourantePageState
       return;
     }
 
+    if (_selectedType == 'Intervention' &&
+        !_hasCompleteInterventionZones(_selectedInterventionZones)) {
+      setState(() {
+        _statusMessage =
+            'Pour une intervention, indiquez la situation de baignade '
+            'et la situation réglementaire.';
+      });
+      return;
+    }
+
     setState(() {
       _saving = true;
       _statusMessage = null;
@@ -1465,9 +1475,10 @@ class _SauveteurMainCourantePageState
                           selected: selectedInterventionZones,
                           onToggle: (option) {
                             setDialogState(() {
-                              if (!selectedInterventionZones.add(option)) {
-                                selectedInterventionZones.remove(option);
-                              }
+                              _toggleInterventionZone(
+                                selectedInterventionZones,
+                                option,
+                              );
                             });
                           },
                         ),
@@ -1676,6 +1687,20 @@ class _SauveteurMainCourantePageState
                     final description =
                         descriptionController.text.trim();
                     if (description.isEmpty) return;
+                    if (selectedType == 'Intervention' &&
+                        !_hasCompleteInterventionZones(
+                          selectedInterventionZones,
+                        )) {
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Indiquez la situation de baignade et la '
+                            'situation réglementaire.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
 
                     Navigator.of(dialogContext).pop({
                       'type': selectedType,
@@ -3116,6 +3141,36 @@ class _SauveteurMainCourantePageState
     );
   }
 
+  bool _hasCompleteInterventionZones(Set<String> selected) {
+    final bathingKnown =
+        selected.contains('Zone de bain surveillée') ||
+        selected.contains('Hors zone de bain surveillée');
+    final regulationKnown =
+        selected.contains('Zone réglementée') ||
+        selected.contains('Hors zone réglementée');
+    return bathingKnown && regulationKnown;
+  }
+
+  void _toggleInterventionZone(
+    Set<String> selected,
+    String option,
+  ) {
+    const opposites = <String, String>{
+      'Zone de bain surveillée': 'Hors zone de bain surveillée',
+      'Hors zone de bain surveillée': 'Zone de bain surveillée',
+      'Zone réglementée': 'Hors zone réglementée',
+      'Hors zone réglementée': 'Zone réglementée',
+    };
+
+    if (selected.contains(option)) {
+      selected.remove(option);
+      return;
+    }
+
+    selected.remove(opposites[option]);
+    selected.add(option);
+  }
+
   Widget _interventionZonesSelector({
     required Set<String> selected,
     required ValueChanged<String> onToggle,
@@ -3144,7 +3199,7 @@ class _SauveteurMainCourantePageState
           ),
           const SizedBox(height: 4),
           const Text(
-            'Plusieurs choix peuvent être associés à la même intervention.',
+            'Choisissez la situation de baignade et la situation réglementaire.',
             style: TextStyle(
               color: Colors.black54,
               fontSize: 10.5,
@@ -3221,9 +3276,10 @@ class _SauveteurMainCourantePageState
               selected: _selectedInterventionZones,
               onToggle: (option) {
                 setState(() {
-                  if (!_selectedInterventionZones.add(option)) {
-                    _selectedInterventionZones.remove(option);
-                  }
+                  _toggleInterventionZone(
+                    _selectedInterventionZones,
+                    option,
+                  );
                 });
               },
             ),
