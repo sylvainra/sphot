@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import 'widgets/sauveteur_styled_dropdown.dart';
 
@@ -44,7 +45,6 @@ class SauveteurMainCourantePage extends StatefulWidget {
 class _SauveteurMainCourantePageState
     extends State<SauveteurMainCourantePage> {
   final _descriptionController = TextEditingController();
-  final _actionController = TextEditingController();
   final _victimNameController = TextEditingController();
   final _victimFirstNameController = TextEditingController();
   final _victimAgeController = TextEditingController();
@@ -52,6 +52,8 @@ class _SauveteurMainCourantePageState
   final _victimResidenceController = TextEditingController();
   final _victimPhoneController = TextEditingController();
   final _dayScrollController = ScrollController();
+  late stt.SpeechToText _speech;
+  String? _listeningFieldKey;
 
   final List<Map<String, String>> _spots = [];
   List<Map<String, dynamic>> _entries = [];
@@ -245,6 +247,7 @@ class _SauveteurMainCourantePageState
   @override
   void initState() {
     super.initState();
+    _speech = stt.SpeechToText();
     _selectedDay = _today;
     _loadSpots();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -255,7 +258,6 @@ class _SauveteurMainCourantePageState
   @override
   void dispose() {
     _descriptionController.dispose();
-    _actionController.dispose();
     _victimNameController.dispose();
     _victimFirstNameController.dispose();
     _victimAgeController.dispose();
@@ -263,6 +265,7 @@ class _SauveteurMainCourantePageState
     _victimResidenceController.dispose();
     _victimPhoneController.dispose();
     _dayScrollController.dispose();
+    _speech.stop();
     super.dispose();
   }
 
@@ -3003,6 +3006,122 @@ class _SauveteurMainCourantePageState
 
   static const Color _victimBlue = Color(0xFF1E3A8A);
 
+  String _capitalizeVictimFirstName(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return '';
+    final lower = trimmed.toLowerCase();
+    return lower[0].toUpperCase() + lower.substring(1);
+  }
+
+  String _formatSpokenFrenchPhone(String value) {
+    final directDigits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (directDigits.isNotEmpty) {
+      return _formatFrenchPhone(directDigits);
+    }
+
+    const digitWords = <String, String>{
+      'zero': '0',
+      'zéro': '0',
+      'un': '1',
+      'une': '1',
+      'deux': '2',
+      'trois': '3',
+      'quatre': '4',
+      'cinq': '5',
+      'six': '6',
+      'sept': '7',
+      'huit': '8',
+      'neuf': '9',
+    };
+
+    final tokens = value
+        .toLowerCase()
+        .replaceAll(RegExp(r"[^a-zà-öø-ÿ0-9]+"), ' ')
+        .trim()
+        .split(RegExp(r'\s+'));
+
+    final digits = tokens
+        .map((token) => digitWords[token] ?? '')
+        .join();
+
+    return _formatFrenchPhone(digits);
+  }
+
+  Future<void> _listenToTextField(
+    String fieldKey,
+    TextEditingController controller, {
+    String Function(String value)? transform,
+  }) async {
+    if (_speech.isListening && _listeningFieldKey == fieldKey) {
+      await _speech.stop();
+      if (mounted) {
+        setState(() => _listeningFieldKey = null);
+      }
+      return;
+    }
+
+    if (_speech.isListening) {
+      await _speech.stop();
+    }
+
+    final available = await _speech.initialize(
+      onStatus: (status) {
+        if (!mounted) return;
+        if (status == 'done' || status == 'notListening') {
+          setState(() => _listeningFieldKey = null);
+        }
+      },
+    );
+
+    if (!available || !mounted) return;
+
+    setState(() => _listeningFieldKey = fieldKey);
+
+    await _speech.listen(
+      localeId: 'fr_FR',
+      onResult: (result) {
+        if (!mounted) return;
+
+        var text = result.recognizedWords;
+        if (transform != null) {
+          text = transform(text);
+        }
+
+        controller.value = TextEditingValue(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        );
+
+        if (result.finalResult) {
+          setState(() => _listeningFieldKey = null);
+        }
+      },
+    );
+  }
+
+  Widget _microphoneButton(
+    String fieldKey,
+    TextEditingController controller, {
+    String Function(String value)? transform,
+  }) {
+    final listening =
+        _speech.isListening && _listeningFieldKey == fieldKey;
+
+    return IconButton(
+      tooltip: 'Dicter',
+      onPressed: () => _listenToTextField(
+        fieldKey,
+        controller,
+        transform: transform,
+      ),
+      icon: Icon(
+        listening ? Icons.mic_rounded : Icons.mic_none_rounded,
+        color: listening ? Colors.red : _victimBlue,
+        size: 21,
+      ),
+    );
+  }
+
   String _formatFrenchPhone(String value) {
     final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
     final limited = digits.length > 10 ? digits.substring(0, 10) : digits;
@@ -3019,10 +3138,12 @@ class _SauveteurMainCourantePageState
     String? hintText,
     double labelFontSize = 16,
     FloatingLabelBehavior? floatingLabelBehavior,
+    Widget? suffixIcon,
   }) {
     return InputDecoration(
       labelText: label,
       hintText: hintText,
+      suffixIcon: suffixIcon,
       floatingLabelBehavior: floatingLabelBehavior,
       labelStyle: TextStyle(
         color: _victimBlue,
@@ -3268,29 +3389,40 @@ class _SauveteurMainCourantePageState
             ),
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 7,
-            runSpacing: 7,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: _interventionZoneOptions.map((option) {
               final isSelected = selected.contains(option);
-              return FilterChip(
-                selected: isSelected,
-                label: Text(
-                  option,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : const Color(0xFF1E3A8A),
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilterChip(
+                    selected: isSelected,
+                    label: SizedBox(
+                      width: double.infinity,
+                      child: Text(
+                        option,
+                        textAlign: TextAlign.left,
+                        style: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF1E3A8A),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    selectedColor: const Color(0xFF1E3A8A),
+                    checkmarkColor: Colors.white,
+                    side: BorderSide(
+                      color: isSelected
+                          ? const Color(0xFF1E3A8A)
+                          : const Color(0xFF1E3A8A).withOpacity(0.45),
+                    ),
+                    onSelected: (_) => onToggle(option),
                   ),
                 ),
-                selectedColor: const Color(0xFF1E3A8A),
-                checkmarkColor: Colors.white,
-                side: BorderSide(
-                  color: isSelected
-                      ? const Color(0xFF1E3A8A)
-                      : const Color(0xFF1E3A8A).withOpacity(0.45),
-                ),
-                onSelected: (_) => onToggle(option),
               );
             }).toList(),
           ),
