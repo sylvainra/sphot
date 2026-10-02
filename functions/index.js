@@ -6570,10 +6570,16 @@ function sanitizeMainCouranteVictim(rawVictim) {
   const clean = (value, maxLength = 160) =>
     (value || "").toString().trim().slice(0, maxLength);
 
+  const rawNom = clean(rawVictim.nom, 100);
+  const rawPrenom = clean(rawVictim.prenom, 100).toLowerCase();
+  const prenom = rawPrenom ?
+    rawPrenom.charAt(0).toUpperCase() + rawPrenom.slice(1) :
+    "";
+
   const victim = {
     sexe: clean(rawVictim.sexe, 40),
-    nom: clean(rawVictim.nom, 100),
-    prenom: clean(rawVictim.prenom, 100),
+    nom: rawNom.toUpperCase(),
+    prenom,
     age: clean(rawVictim.age, 20),
     dateNaissance: clean(rawVictim.dateNaissance, 20),
     lieuHabitation: clean(rawVictim.lieuHabitation, 180),
