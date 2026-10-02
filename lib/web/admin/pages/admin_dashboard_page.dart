@@ -117,6 +117,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _showSubscriptionPanel = false;
   bool _showBillingDocumentsPanel = false;
   bool _showStatisticsPanel = false;
+  bool _showMainCourantePanel = false;
+  bool _operationalAlertActive = false;
+  String _operationalAlertMessage = '';
   bool _trialSummaryDialogOpen = false;
   Future<Map<String, dynamic>>? _trialSummaryPanelFuture;
   bool _placingSphotOnMap = false;
@@ -1338,7 +1341,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: _sphotHoverColor,
-                      fontSize: 13,
+                      fontSize: 11,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -5467,6 +5470,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _trialSummaryDialogOpen = true;
       _showTrialSummaryPanel = false;
       _showSubscriptionPanel = false;
@@ -5502,6 +5506,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _trialSummaryPanelFuture = _loadTrialSummaryData();
       _showTrialSummaryPanel = true;
       _showSubscriptionPanel = false;
@@ -5637,6 +5642,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _openSubscriptionPanel() {
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _showSubscriptionPanel = true;
       _showBillingDocumentsPanel = false;
       _showTrialSummaryPanel = false;
@@ -5656,6 +5662,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _openBillingDocumentsPanel() {
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _showBillingDocumentsPanel = true;
       _showSubscriptionPanel = false;
       _showTrialSummaryPanel = false;
@@ -5706,6 +5713,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _closeStatisticsPanel() {
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
     });
   }
 
@@ -5713,10 +5721,36 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final token = widget.mainCouranteToken.trim();
     if (token.isEmpty) return;
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => InstitutionalMainCourantePage(token: token),
-      ),
+    setState(() {
+      _showStatisticsPanel = false;
+      _showMainCourantePanel = true;
+      _showSubscriptionPanel = false;
+      _showBillingDocumentsPanel = false;
+      _showTrialSummaryPanel = false;
+      _trialSummaryPanelFuture = null;
+      _showSauveteursManagementPanel = false;
+      _showSurveillancePeriodsPanel = false;
+      _showSauveteurEditorPanel = false;
+      _showSphotEditorPanel = false;
+      _placingSphotOnMap = false;
+      _selectedSpot = null;
+      _selectedAdmin = null;
+      _selectedAdvertiser = null;
+      _showLegalDocumentsPanel = false;
+    });
+  }
+
+  void _closeMainCourantePanel() {
+    setState(() {
+      _showMainCourantePanel = false;
+    });
+  }
+
+  Widget _buildMainCourantePanel() {
+    return InstitutionalMainCourantePage(
+      token: widget.mainCouranteToken,
+      embedded: true,
+      onClose: _closeMainCourantePanel,
     );
   }
 
@@ -6080,11 +6114,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required int visibleSpots,
     required bool canRequestTrial,
   }) {
-    return Container(
-      width: 360,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 350),
+      width: 330,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.96),
+        color: _operationalAlertActive
+            ? const Color(0xFFFFECEF).withOpacity(0.98)
+            : Colors.white.withOpacity(0.96),
         border: Border(
           right: BorderSide(color: adminColor.withOpacity(0.25), width: 1.5),
         ),
@@ -6126,7 +6163,38 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+
+            if (_operationalAlertActive) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: redColor.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: redColor.withOpacity(0.55),
+                  ),
+                ),
+                child: Text(
+                  _operationalAlertMessage.isEmpty
+                      ? 'DRAPEAU AFFALÉ'
+                      : _operationalAlertMessage,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: redColor,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
 
             Expanded(
               child: LayoutBuilder(
@@ -6254,6 +6322,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             showValue: false,
                             grayscaleIcon:
                                 widget.mainCouranteToken.trim().isEmpty,
+                            isActive: _showMainCourantePanel,
                             onTap: widget.mainCouranteToken.trim().isNotEmpty
                                 ? _openMainCourante
                                 : null,
@@ -6293,25 +6362,25 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     final icon = AdaptiveAssetImage(
       iconPath,
-      width: 44,
-      height: 56,
+      width: 34,
+      height: 42,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.high,
     );
 
     final card = Container(
-      height: 72,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: isActive ? redColor.withOpacity(0.04) : Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: effectiveColor, width: isActive ? 2 : 1.6),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: effectiveColor, width: isActive ? 2 : 1.5),
       ),
       child: Row(
         children: [
           SizedBox(
-            width: 48,
-            height: 56,
+            width: 38,
+            height: 44,
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -6354,7 +6423,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 9),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -6787,6 +6856,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
@@ -7796,6 +7866,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _openNewSphotEditor() {
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
@@ -7825,6 +7896,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
@@ -8056,6 +8128,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
@@ -13526,9 +13599,25 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               .toList()
           : <Map<String, dynamic>>[];
 
-      if (alerts.isEmpty) return;
+      final hasActiveAlert = alerts.isNotEmpty;
+      final alert = hasActiveAlert ? alerts.first : <String, dynamic>{};
+      final message = hasActiveAlert
+          ? (alert['message'] ?? 'Drapeau affalé').toString()
+          : '';
 
-      final alert = alerts.first;
+      if (_operationalAlertActive != hasActiveAlert ||
+          _operationalAlertMessage != message) {
+        setState(() {
+          _operationalAlertActive = hasActiveAlert;
+          _operationalAlertMessage = message;
+        });
+      }
+
+      if (!hasActiveAlert) {
+        _lastOperationalAlertAt = null;
+        return;
+      }
+
       final triggeredAt = alert['triggeredAt'] is num
           ? (alert['triggeredAt'] as num).toInt()
           : null;
@@ -13539,25 +13628,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       _lastOperationalAlertAt = triggeredAt;
       await playOperationalFogHorn();
-
-      if (!mounted) return;
-
-      final message = (alert['message'] ?? 'Drapeau affalé').toString();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: redColor,
-          duration: const Duration(seconds: 8),
-          content: Text(
-            message,
-            style: const TextStyle(fontWeight: FontWeight.w900),
-          ),
-          action: SnackBarAction(
-            label: 'MAIN COURANTE',
-            textColor: Colors.white,
-            onPressed: _openMainCourante,
-          ),
-        ),
-      );
     } catch (_) {
       // Une perte réseau ne doit pas interrompre le dashboard Admin.
     }
@@ -14209,6 +14279,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _selectedSpot = type == 'spot' ? data : null;
       _selectedAdmin = type == 'admin' ? data : null;
       _selectedAdvertiser = type == 'advertiser' ? data : null;
@@ -14265,6 +14336,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           onTap: () {
             setState(() {
               _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
               _selectedSpot = null;
               _selectedAdmin = Map<String, dynamic>.from(data);
               _selectedAdvertiser = null;
@@ -14348,6 +14420,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         onTap: () {
           setState(() {
             _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
             _selectedSpot = null;
             _selectedAdmin = null;
             _selectedAdvertiser = data;
@@ -14633,6 +14706,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
                                     setState(() {
                                       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
                                       _selectedSpot = null;
                                       _selectedAdmin = null;
                                       _selectedAdvertiser = null;
@@ -14843,6 +14917,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             territoireId: _resolvedTerritoireId,
                             onClose: _closeStatisticsPanel,
                           )
+                        else if (_showMainCourantePanel)
+                          _buildMainCourantePanel()
                         else if (_showTrialSummaryPanel)
                           _buildTrialSummaryPanel()
                         else if (_showSauveteursManagementPanel)
