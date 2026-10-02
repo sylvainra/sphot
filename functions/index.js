@@ -6605,6 +6605,24 @@ function sanitizeMainCouranteInterventionZones(rawZones) {
   )];
 }
 
+/**
+ * Vérifie que l'intervention est qualifiée sur les deux axes terrain.
+ * @param {Array<string>} zones Catégories d'intervention normalisées.
+ * @return {boolean} Vrai si un choix cohérent existe pour chaque axe.
+ */
+function hasCompleteMainCouranteInterventionZones(zones) {
+  const bathingCount = [
+    "Zone de bain surveillée",
+    "Hors zone de bain surveillée",
+  ].filter((value) => zones.includes(value)).length;
+  const regulationCount = [
+    "Zone réglementée",
+    "Hors zone réglementée",
+  ].filter((value) => zones.includes(value)).length;
+
+  return bathingCount === 1 && regulationCount === 1;
+}
+
 exports.addSauveteurMainCouranteEntry = onRequest(
     {
       secrets: ["GMAIL_APP_PASSWORD"],
@@ -6701,6 +6719,15 @@ exports.addSauveteurMainCouranteEntry = onRequest(
               request.body.interventionZones,
           ) :
           [];
+
+        if (normalizedType === "intervention" &&
+            !hasCompleteMainCouranteInterventionZones(interventionZones)) {
+          response.status(400).json({
+            success: false,
+            error: "intervention_zones_required",
+          });
+          return;
+        }
 
         await entryReference.set({
           type: entryType,
@@ -6856,6 +6883,16 @@ exports.updateSauveteurMainCouranteEntry = onRequest(
                 request.body.interventionZones,
             ) :
             [];
+
+        if (normalizedNextType === "intervention" &&
+            !hasCompleteMainCouranteInterventionZones(interventionZones)) {
+          response.status(400).json({
+            success: false,
+            error: "intervention_zones_required",
+          });
+          return;
+        }
+
         const nextData = {
           type: nextType,
           description,
