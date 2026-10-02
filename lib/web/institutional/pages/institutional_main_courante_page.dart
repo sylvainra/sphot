@@ -50,7 +50,6 @@ class _InstitutionalMainCourantePageState
   bool _soundEnabled = true;
 
   bool _notifyFlagLowered = true;
-  bool _notifyIncident = true;
   bool _notifyIntervention = true;
 
   static const _months = <String>[
@@ -242,7 +241,6 @@ class _InstitutionalMainCourantePageState
           _lastAlertTriggeredAt = triggeredAt;
         }
         _notifyFlagLowered = preferences['flagLowered'] != false;
-        _notifyIncident = preferences['incident'] != false;
         _notifyIntervention = preferences['intervention'] != false;
         _loading = false;
       });
@@ -342,7 +340,6 @@ class _InstitutionalMainCourantePageState
         body: jsonEncode({
           'token': widget.token,
           'flagLowered': _notifyFlagLowered,
-          'incident': _notifyIncident,
           'intervention': _notifyIntervention,
         }),
       );
@@ -765,16 +762,6 @@ class _InstitutionalMainCourantePageState
                 }
               },
             ),
-          SwitchListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Incident'),
-            value: _notifyIncident,
-            onChanged: (value) {
-              setState(() => _notifyIncident = value);
-              _savePreferences();
-            },
-          ),
           SwitchListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
