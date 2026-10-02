@@ -73,6 +73,51 @@ class _InstitutionalMainCourantePageState
     return DateTime(now.year, now.month, now.day);
   }
 
+  bool get _selectedMonthIsCurrentMonth {
+    final today = _today;
+    return _selectedDay.year == today.year &&
+        _selectedDay.month == today.month;
+  }
+
+  Future<void> _changeMonth(int delta) async {
+    final today = _today;
+    final currentMonth = DateTime(today.year, today.month);
+    final targetMonth = DateTime(
+      _selectedDay.year,
+      _selectedDay.month + delta,
+    );
+
+    if (targetMonth.isAfter(currentMonth)) return;
+
+    final daysInTargetMonth = DateTime(
+      targetMonth.year,
+      targetMonth.month + 1,
+      0,
+    ).day;
+
+    var targetDay = _selectedDay.day;
+    if (targetDay > daysInTargetMonth) {
+      targetDay = daysInTargetMonth;
+    }
+
+    if (targetMonth.year == today.year &&
+        targetMonth.month == today.month &&
+        targetDay > today.day) {
+      targetDay = today.day;
+    }
+
+    setState(() {
+      _selectedDay = DateTime(
+        targetMonth.year,
+        targetMonth.month,
+        targetDay,
+      );
+    });
+
+    _scrollSelectedDayIntoView();
+    await _load();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -366,11 +411,19 @@ class _InstitutionalMainCourantePageState
 
   Widget _dayTabs() {
     final today = _today;
-    final daysInMonth = DateTime(today.year, today.month + 1, 0).day;
+    final selectedMonth = DateTime(
+      _selectedDay.year,
+      _selectedDay.month,
+    );
+    final daysInMonth = DateTime(
+      selectedMonth.year,
+      selectedMonth.month + 1,
+      0,
+    ).day;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -379,16 +432,56 @@ class _InstitutionalMainCourantePageState
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '${_months[today.month - 1]} ${today.year}',
-            style: const TextStyle(
-              color: _blue,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.8,
-            ),
+          Row(
+            children: [
+              IconButton(
+                tooltip: 'Mois précédent',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 34,
+                  minHeight: 30,
+                ),
+                onPressed: () => _changeMonth(-1),
+                icon: const Icon(
+                  Icons.chevron_left_rounded,
+                  color: _blue,
+                  size: 24,
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  '${_months[selectedMonth.month - 1]} '
+                  '${selectedMonth.year}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: _blue,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Mois suivant',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 34,
+                  minHeight: 30,
+                ),
+                onPressed: _selectedMonthIsCurrentMonth
+                    ? null
+                    : () => _changeMonth(1),
+                icon: Icon(
+                  Icons.chevron_right_rounded,
+                  color: _selectedMonthIsCurrentMonth
+                      ? Colors.black26
+                      : _blue,
+                  size: 24,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           SizedBox(
             height: 40,
             child: ListView.builder(
@@ -396,7 +489,11 @@ class _InstitutionalMainCourantePageState
               scrollDirection: Axis.horizontal,
               itemCount: daysInMonth,
               itemBuilder: (context, index) {
-                final date = DateTime(today.year, today.month, index + 1);
+                final date = DateTime(
+                  selectedMonth.year,
+                  selectedMonth.month,
+                  index + 1,
+                );
                 final selected =
                     _selectedDay.year == date.year &&
                     _selectedDay.month == date.month &&
@@ -694,11 +791,6 @@ class _InstitutionalMainCourantePageState
 
 
   Widget _buildEmbeddedPanel() {
-    final identity = [
-      (_contact['civilite'] ?? '').toString().trim(),
-      (_contact['prenom'] ?? '').toString().trim(),
-      (_contact['nom'] ?? '').toString().trim(),
-    ].where((value) => value.isNotEmpty).join(' ');
     final alertActive = _operationalAlert['active'] == true;
 
     return AnimatedContainer(
@@ -794,33 +886,6 @@ class _InstitutionalMainCourantePageState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (identity.isNotEmpty)
-                        Text(
-                          identity,
-                          style: const TextStyle(
-                            color: _blue,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      if ((_territory['organisation'] ?? '')
-                          .toString()
-                          .trim()
-                          .isNotEmpty)
-                        Text(
-                          (_territory['organisation'] ?? '').toString(),
-                          style: const TextStyle(
-                            color: Colors.black54,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      if (identity.isNotEmpty ||
-                          (_territory['organisation'] ?? '')
-                              .toString()
-                              .trim()
-                              .isNotEmpty)
-                        const SizedBox(height: 10),
                       _operationalAlertBanner(),
                       if (alertActive) const SizedBox(height: 10),
                       if (_spots.isNotEmpty)
