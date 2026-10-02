@@ -11,9 +11,13 @@ class InstitutionalMainCourantePage extends StatefulWidget {
   const InstitutionalMainCourantePage({
     super.key,
     required this.token,
+    this.embedded = false,
+    this.onClose,
   });
 
   final String token;
+  final bool embedded;
+  final VoidCallback? onClose;
 
   @override
   State<InstitutionalMainCourantePage> createState() =>
@@ -270,21 +274,6 @@ class _InstitutionalMainCourantePageState
 
       if (isNewActiveAlert && _soundEnabled) {
         await playOperationalFogHorn();
-      }
-
-      if (isNewActiveAlert && mounted) {
-        final message =
-            (alertForSound['message'] ?? 'Drapeau affalé').toString();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: _red,
-            duration: const Duration(seconds: 6),
-            content: Text(
-              message,
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-          ),
-        );
       }
     } catch (_) {
       // Le polling silencieux ne doit jamais interrompre la consultation.
@@ -700,8 +689,229 @@ class _InstitutionalMainCourantePageState
     );
   }
 
+
+  Widget _buildEmbeddedPanel() {
+    final identity = [
+      (_contact['civilite'] ?? '').toString().trim(),
+      (_contact['prenom'] ?? '').toString().trim(),
+      (_contact['nom'] ?? '').toString().trim(),
+    ].where((value) => value.isNotEmpty).join(' ');
+    final alertActive = _operationalAlert['active'] == true;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: 500,
+      decoration: BoxDecoration(
+        color: alertActive
+            ? const Color(0xFFFFECEF)
+            : Colors.white.withOpacity(0.98),
+        border: Border(
+          left: BorderSide(
+            color: alertActive ? _red : _blue.withOpacity(0.45),
+            width: alertActive ? 2 : 1.5,
+          ),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 14, 12, 12),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.menu_book_rounded,
+                      color: _red,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'MAIN COURANTE',
+                        style: TextStyle(
+                          color: _blue,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Actualiser',
+                      onPressed: _loading ? null : _load,
+                      icon: const Icon(
+                        Icons.refresh_rounded,
+                        color: _blue,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Fermer',
+                      onPressed: widget.onClose,
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: _blue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(
+                height: 1,
+                color: alertActive
+                    ? _red.withOpacity(0.35)
+                    : _blue.withOpacity(0.18),
+              ),
+              if (_loading)
+                const Expanded(
+                  child: Center(
+                    child: CircularProgressIndicator(color: _blue),
+                  ),
+                )
+              else if (_errorMessage != null && _spots.isEmpty)
+                Expanded(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: _red,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (identity.isNotEmpty)
+                        Text(
+                          identity,
+                          style: const TextStyle(
+                            color: _blue,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      if ((_territory['organisation'] ?? '')
+                          .toString()
+                          .trim()
+                          .isNotEmpty)
+                        Text(
+                          (_territory['organisation'] ?? '').toString(),
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      if (identity.isNotEmpty ||
+                          (_territory['organisation'] ?? '')
+                              .toString()
+                              .trim()
+                              .isNotEmpty)
+                        const SizedBox(height: 10),
+                      _operationalAlertBanner(),
+                      if (alertActive) const SizedBox(height: 10),
+                      if (_spots.isNotEmpty)
+                        SauveteurStyledDropdown(
+                          labelText: 'Poste de secours',
+                          value: _selectedSpotId,
+                          options: _spots
+                              .map(
+                                (spot) => SauveteurDropdownOption(
+                                  value: (spot['id'] ?? '').toString(),
+                                  label: (spot['label'] ?? '').toString(),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) async {
+                            setState(() => _selectedSpotId = value);
+                            await _load();
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: alertActive
+                            ? Colors.white.withOpacity(0.72)
+                            : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: alertActive
+                              ? _red.withOpacity(0.32)
+                              : _blue.withOpacity(0.22),
+                        ),
+                      ),
+                      child: ListView(
+                        children: [
+                          if (_errorMessage != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                _errorMessage!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: _red,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          _preferencesCard(),
+                          const SizedBox(height: 10),
+                          if (_entries.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.all(20),
+                              child: Text(
+                                'Aucun fait enregistré pour cette journée.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            )
+                          else
+                            ..._entries.map(_entryCard),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 94,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: _dayTabs(),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.embedded) {
+      return _buildEmbeddedPanel();
+    }
+
     final identity = [
       (_contact['civilite'] ?? '').toString().trim(),
       (_contact['prenom'] ?? '').toString().trim(),
@@ -709,7 +919,9 @@ class _InstitutionalMainCourantePageState
     ].where((value) => value.isNotEmpty).join(' ');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F6FB),
+      backgroundColor: _operationalAlert['active'] == true
+          ? const Color(0xFFFFECEF)
+          : const Color(0xFFF3F6FB),
       bottomNavigationBar: SafeArea(
         top: false,
         child: SizedBox(
