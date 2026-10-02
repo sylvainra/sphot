@@ -45,6 +45,8 @@ class _SauveteurMainCourantePageState
     extends State<SauveteurMainCourantePage> {
   final _descriptionController = TextEditingController();
   final _actionController = TextEditingController();
+  final _victimNameController = TextEditingController();
+  final _victimFirstNameController = TextEditingController();
   final _victimAgeController = TextEditingController();
   final _victimBirthDateController = TextEditingController();
   final _victimResidenceController = TextEditingController();
@@ -254,6 +256,8 @@ class _SauveteurMainCourantePageState
   void dispose() {
     _descriptionController.dispose();
     _actionController.dispose();
+    _victimNameController.dispose();
+    _victimFirstNameController.dispose();
     _victimAgeController.dispose();
     _victimBirthDateController.dispose();
     _victimResidenceController.dispose();
@@ -1262,6 +1266,8 @@ class _SauveteurMainCourantePageState
           if (_selectedType == 'Intervention')
             'victim': {
               'sexe': _victimSex ?? '',
+              'nom': _victimNameController.text.trim(),
+              'prenom': _victimFirstNameController.text.trim(),
               'age': _victimAgeController.text.trim(),
               'dateNaissance': _victimBirthDateController.text.trim(),
               'lieuHabitation': _victimResidenceController.text.trim(),
@@ -1284,6 +1290,8 @@ class _SauveteurMainCourantePageState
 
       _descriptionController.clear();
       _actionController.clear();
+      _victimNameController.clear();
+      _victimFirstNameController.clear();
       _victimAgeController.clear();
       _victimBirthDateController.clear();
       _victimResidenceController.clear();
@@ -1418,6 +1426,12 @@ class _SauveteurMainCourantePageState
     if (!_victimQualificationOptions.contains(victimQualification)) {
       victimQualification = 'Idem';
     }
+    final victimNameController = TextEditingController(
+      text: (currentVictim['nom'] ?? '').toString(),
+    );
+    final victimFirstNameController = TextEditingController(
+      text: (currentVictim['prenom'] ?? '').toString(),
+    );
     final victimAgeController = TextEditingController(
       text: (currentVictim['age'] ?? '').toString(),
     );
@@ -1524,6 +1538,29 @@ class _SauveteurMainCourantePageState
                                 onChanged: (value) {
                                   setDialogState(() => victimSex = value);
                                 },
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: victimNameController,
+                                textCapitalization:
+                                    TextCapitalization.characters,
+                                style: const TextStyle(
+                                  color: _victimBlue,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                decoration: _victimInputDecoration('Nom'),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: victimFirstNameController,
+                                textCapitalization: TextCapitalization.words,
+                                style: const TextStyle(
+                                  color: _victimBlue,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                decoration: _victimInputDecoration('Prénom'),
                               ),
                               const SizedBox(height: 8),
                               _victimBirthDateAgeRow(
@@ -1714,6 +1751,8 @@ class _SauveteurMainCourantePageState
                           selectedType == 'Secours')
                         'victim': {
                           'sexe': victimSex ?? '',
+                          'nom': victimNameController.text.trim(),
+                          'prenom': victimFirstNameController.text.trim(),
                           'age': victimAgeController.text.trim(),
                           'dateNaissance':
                               victimBirthDateController.text.trim(),
@@ -1743,6 +1782,8 @@ class _SauveteurMainCourantePageState
 
     descriptionController.dispose();
     actionController.dispose();
+    victimNameController.dispose();
+    victimFirstNameController.dispose();
     victimAgeController.dispose();
     victimBirthDateController.dispose();
     victimResidenceController.dispose();
@@ -3322,6 +3363,28 @@ class _SauveteurMainCourantePageState
                     onChanged: (value) {
                       setState(() => _victimSex = value);
                     },
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _victimNameController,
+                    textCapitalization: TextCapitalization.characters,
+                    style: const TextStyle(
+                      color: _victimBlue,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    decoration: _victimInputDecoration('Nom'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _victimFirstNameController,
+                    textCapitalization: TextCapitalization.words,
+                    style: const TextStyle(
+                      color: _victimBlue,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    decoration: _victimInputDecoration('Prénom'),
                   ),
                   const SizedBox(height: 8),
                   _victimBirthDateAgeRow(
