@@ -2096,6 +2096,13 @@ class _SauveteurMainCourantePageState
                   [
                     if ((victim['sexe'] ?? '').toString().trim().isNotEmpty)
                       'Sexe : ${victim['sexe']}',
+                    if ((victim['nom'] ?? '').toString().trim().isNotEmpty)
+                      'Nom : ${victim['nom']}',
+                    if ((victim['prenom'] ?? '')
+                        .toString()
+                        .trim()
+                        .isNotEmpty)
+                      'Prénom : ${victim['prenom']}',
                     if ((victim['age'] ?? '').toString().trim().isNotEmpty)
                       'Age : ${victim['age']}',
                     if ((victim['dateNaissance'] ?? '')
@@ -2790,6 +2797,13 @@ class _SauveteurMainCourantePageState
                       final lines = <String>[
                         if ((victim['sexe'] ?? '').toString().trim().isNotEmpty)
                           'Sexe : ${victim['sexe']}',
+                        if ((victim['nom'] ?? '').toString().trim().isNotEmpty)
+                          'Nom : ${victim['nom']}',
+                        if ((victim['prenom'] ?? '')
+                            .toString()
+                            .trim()
+                            .isNotEmpty)
+                          'Prénom : ${victim['prenom']}',
                         if ((victim['age'] ?? '').toString().trim().isNotEmpty)
                           'Age : ${victim['age']}',
                         if ((victim['dateNaissance'] ?? '')
