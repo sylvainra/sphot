@@ -612,6 +612,39 @@ class _InstitutionalMainCourantePageState
               height: 1.3,
             ),
           ),
+          if (entry['interventionZones'] is List &&
+              (entry['interventionZones'] as List).isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: (entry['interventionZones'] as List)
+                  .map(
+                    (value) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: _blue.withOpacity(0.30),
+                        ),
+                      ),
+                      child: Text(
+                        value.toString(),
+                        style: const TextStyle(
+                          color: _blue,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
           if ((entry['actionTaken'] ?? '').toString().trim().isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
