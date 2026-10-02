@@ -5248,12 +5248,12 @@ function operationalNotificationGreeting(contact) {
 
   if (!nom) return "Bonjour,";
 
-  const civilite =
-    rawCivilite === "madame" ||
-    rawCivilite === "mme" ||
-    rawCivilite === "femme" ?
-      "Madame" :
-      "Monsieur";
+  let civilite = "Monsieur";
+  if (rawCivilite === "madame" ||
+      rawCivilite === "mme" ||
+      rawCivilite === "femme") {
+    civilite = "Madame";
+  }
 
   return "Bonjour " + civilite + " " + nom + ",";
 }
