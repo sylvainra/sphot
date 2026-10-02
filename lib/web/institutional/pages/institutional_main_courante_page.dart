@@ -269,7 +269,9 @@ class _InstitutionalMainCourantePageState
       }
 
       setState(() {
-        _operationalAlert = nextAlert;
+        _operationalAlert = widget.embedded && activeAlerts.isNotEmpty
+            ? alertForSound
+            : nextAlert;
       });
 
       if (isNewActiveAlert && _soundEnabled && !widget.embedded) {
