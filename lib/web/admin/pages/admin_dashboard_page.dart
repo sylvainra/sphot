@@ -6115,14 +6115,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required int visibleSpots,
     required bool canRequestTrial,
   }) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 350),
+    return Container(
       width: 330,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: _operationalAlertActive
-            ? const Color(0xFFFFECEF).withOpacity(0.98)
-            : Colors.white.withOpacity(0.96),
+        color: Colors.white.withOpacity(0.96),
         border: Border(
           right: BorderSide(color: adminColor.withOpacity(0.25), width: 1.5),
         ),
@@ -6165,37 +6162,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ),
 
             const SizedBox(height: 8),
-
-            if (_operationalAlertActive) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: redColor.withOpacity(0.10),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: redColor.withOpacity(0.55),
-                  ),
-                ),
-                child: Text(
-                  _operationalAlertMessage.isEmpty
-                      ? 'DRAPEAU AFFALÉ'
-                      : _operationalAlertMessage,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: redColor,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
 
             Expanded(
               child: LayoutBuilder(
@@ -6324,6 +6290,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             grayscaleIcon:
                                 widget.mainCouranteToken.trim().isEmpty,
                             isActive: _showMainCourantePanel,
+                            alertHighlight: _operationalAlertActive,
                             onTap: widget.mainCouranteToken.trim().isNotEmpty
                                 ? _openMainCourante
                                 : null,
@@ -6352,12 +6319,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     bool showValue = true,
     bool grayscaleIcon = false,
     bool isActive = false,
+    bool alertHighlight = false,
     VoidCallback? onTap,
   }) {
-    final effectiveColor = isActive ? redColor : color;
+    final effectiveColor = isActive || alertHighlight ? redColor : color;
     final displayedStepNumberColor = grayscaleIcon
         ? pendingColor
-        : isActive
+        : isActive || alertHighlight
         ? redColor
         : color;
 
@@ -6373,9 +6341,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: isActive ? redColor.withOpacity(0.04) : Colors.transparent,
+        color: alertHighlight
+            ? const Color(0xFFFFDDE3)
+            : isActive
+            ? redColor.withOpacity(0.04)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: effectiveColor, width: isActive ? 2 : 1.5),
+        border: Border.all(
+          color: effectiveColor,
+          width: isActive || alertHighlight ? 2 : 1.5,
+        ),
       ),
       child: Row(
         children: [
