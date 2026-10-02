@@ -1262,7 +1262,7 @@ class _SauveteurMainCourantePageState
           'spotId': _selectedSpotId,
           'type': _selectedType,
           'description': description,
-          'actionTaken': _actionController.text.trim(),
+          'actionTaken': '',
           'visibility': _restricted ? 'restricted' : 'operational',
           if (_selectedType == 'Intervention')
             'interventionZones': _selectedInterventionZones.toList(),
@@ -1292,7 +1292,6 @@ class _SauveteurMainCourantePageState
       }
 
       _descriptionController.clear();
-      _actionController.clear();
       _victimNameController.clear();
       _victimFirstNameController.clear();
       _victimAgeController.clear();
@@ -1414,9 +1413,8 @@ class _SauveteurMainCourantePageState
     final descriptionController = TextEditingController(
       text: (entry['description'] ?? '').toString(),
     );
-    final actionController = TextEditingController(
-      text: (entry['actionTaken'] ?? '').toString(),
-    );
+    final existingActionTaken =
+        (entry['actionTaken'] ?? '').toString();
     final currentVictim = entry['victim'] is Map
         ? Map<String, dynamic>.from(entry['victim'] as Map)
         : <String, dynamic>{};
@@ -1555,7 +1553,14 @@ class _SauveteurMainCourantePageState
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                 ),
-                                decoration: _victimInputDecoration('Nom'),
+                                decoration: _victimInputDecoration(
+                                  'Nom',
+                                  suffixIcon: _microphoneButton(
+                                    'editVictimName',
+                                    victimNameController,
+                                    transform: (value) => value.toUpperCase(),
+                                  ),
+                                ),
                               ),
                               const SizedBox(height: 8),
                               TextField(
@@ -1569,7 +1574,14 @@ class _SauveteurMainCourantePageState
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                 ),
-                                decoration: _victimInputDecoration('Prénom'),
+                                decoration: _victimInputDecoration(
+                                  'Prénom',
+                                  suffixIcon: _microphoneButton(
+                                    'editVictimFirstName',
+                                    victimFirstNameController,
+                                    transform: _capitalizeVictimFirstName,
+                                  ),
+                                ),
                               ),
                               const SizedBox(height: 8),
                               _victimBirthDateAgeRow(
@@ -1600,8 +1612,13 @@ class _SauveteurMainCourantePageState
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                 ),
-                                decoration:
-                                    _victimInputDecoration('Lieu d’habitation'),
+                                decoration: _victimInputDecoration(
+                                  'Lieu d’habitation',
+                                  suffixIcon: _microphoneButton(
+                                    'editVictimResidence',
+                                    victimResidenceController,
+                                  ),
+                                ),
                               ),
                               const SizedBox(height: 8),
                               TextField(
@@ -1619,6 +1636,11 @@ class _SauveteurMainCourantePageState
                                 decoration: _victimInputDecoration(
                                   'Numéro de téléphone',
                                   hintText: '06 12 34 56 78',
+                                  suffixIcon: _microphoneButton(
+                                    'editVictimPhone',
+                                    victimPhoneController,
+                                    transform: _formatSpokenFrenchPhone,
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -1651,38 +1673,10 @@ class _SauveteurMainCourantePageState
                         maxLines: 7,
                         decoration: InputDecoration(
                           labelText: 'Fait du jour',
-                          labelStyle: _fieldLabelStyle,
-                          floatingLabelStyle: _fieldLabelStyle,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: SauveteurStyledDropdown.borderColor,
-                              width: 1.6,
-                            ),
+                          suffixIcon: _microphoneButton(
+                            'editFact',
+                            descriptionController,
                           ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: SauveteurStyledDropdown.borderColor,
-                              width: 1.6,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: SauveteurStyledDropdown.borderColor,
-                              width: 1.8,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: actionController,
-                        minLines: 2,
-                        maxLines: 5,
-                        decoration: InputDecoration(
-                          labelText: 'Actions / Suite donnée',
                           labelStyle: _fieldLabelStyle,
                           floatingLabelStyle: _fieldLabelStyle,
                           border: OutlineInputBorder(
@@ -1751,7 +1745,7 @@ class _SauveteurMainCourantePageState
                     Navigator.of(dialogContext).pop({
                       'type': selectedType,
                       'description': description,
-                      'actionTaken': actionController.text.trim(),
+                      'actionTaken': existingActionTaken,
                       'restricted': restricted,
                       if (selectedType == 'Intervention')
                         'interventionZones':
@@ -1790,7 +1784,6 @@ class _SauveteurMainCourantePageState
     );
 
     descriptionController.dispose();
-    actionController.dispose();
     victimNameController.dispose();
     victimFirstNameController.dispose();
     victimAgeController.dispose();
@@ -3528,7 +3521,14 @@ class _SauveteurMainCourantePageState
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
-                    decoration: _victimInputDecoration('Nom'),
+                    decoration: _victimInputDecoration(
+                      'Nom',
+                      suffixIcon: _microphoneButton(
+                        'newVictimName',
+                        _victimNameController,
+                        transform: (value) => value.toUpperCase(),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
@@ -3542,7 +3542,14 @@ class _SauveteurMainCourantePageState
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
-                    decoration: _victimInputDecoration('Prénom'),
+                    decoration: _victimInputDecoration(
+                      'Prénom',
+                      suffixIcon: _microphoneButton(
+                        'newVictimFirstName',
+                        _victimFirstNameController,
+                        transform: _capitalizeVictimFirstName,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   _victimBirthDateAgeRow(
@@ -3573,7 +3580,13 @@ class _SauveteurMainCourantePageState
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
-                    decoration: _victimInputDecoration('Lieu d’habitation'),
+                    decoration: _victimInputDecoration(
+                      'Lieu d’habitation',
+                      suffixIcon: _microphoneButton(
+                        'newVictimResidence',
+                        _victimResidenceController,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
@@ -3591,6 +3604,11 @@ class _SauveteurMainCourantePageState
                     decoration: _victimInputDecoration(
                       'Numéro de téléphone',
                       hintText: '06 12 34 56 78',
+                      suffixIcon: _microphoneButton(
+                        'newVictimPhone',
+                        _victimPhoneController,
+                        transform: _formatSpokenFrenchPhone,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -3621,42 +3639,10 @@ class _SauveteurMainCourantePageState
             maxLines: 5,
             decoration: InputDecoration(
               labelText: 'Fait du jour',
-              labelStyle: _fieldLabelStyle,
-              floatingLabelStyle: _fieldLabelStyle,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
+              suffixIcon: _microphoneButton(
+                'newFact',
+                _descriptionController,
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: SauveteurStyledDropdown.borderColor,
-                  width: 1.6,
-                ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: SauveteurStyledDropdown.borderColor,
-                  width: 1.6,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: SauveteurStyledDropdown.borderColor,
-                  width: 1.8,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _actionController,
-            minLines: 1,
-            maxLines: 3,
-            decoration: InputDecoration(
-              labelText: 'Actions / Suite donnée',
               labelStyle: _fieldLabelStyle,
               floatingLabelStyle: _fieldLabelStyle,
               contentPadding: const EdgeInsets.symmetric(
