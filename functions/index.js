@@ -5204,7 +5204,6 @@ function institutionalNotificationPreferences(contact) {
 
   return {
     flagLowered: raw.flagLowered !== false,
-    incident: raw.incident !== false,
     intervention: raw.intervention !== false,
   };
 }
@@ -5558,7 +5557,7 @@ exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
               "<p>Cet accès vous permet de consulter la " +
               "<strong>MAIN COURANTE</strong> en lecture seule et de choisir " +
               "les notifications que vous souhaitez recevoir : affalage du " +
-              "drapeau, incident et intervention.</p>" +
+              "drapeau et intervention.</p>" +
               "<div style=\"text-align:center;margin:28px 0;\">" +
               "<a href=\"" + accessUrl + "\" style=\"display:inline-block;" +
               "padding:14px 24px;border-radius:12px;background:#1e3a8a;" +
@@ -5571,7 +5570,7 @@ exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
               "Votre structure vous a habilité comme contact institutionnel " +
               "SPHOT.\n\nAccès lecture seule à la MAIN COURANTE :\n" +
               accessUrl + "\n\nVous pourrez y régler vos notifications " +
-              "d'affalage du drapeau, d'incident et d'intervention.\n\n" +
+              "d'affalage du drapeau et d'intervention.\n\n" +
               "L'équipe SPHOT",
           });
         } catch (mailError) {
@@ -5738,6 +5737,10 @@ exports.getInstitutionalMainCourante = onRequest(
                     description: data.description || "",
                     actionTaken: data.actionTaken || "",
                     visibility: data.visibility || "operational",
+                    interventionZones:
+                      sanitizeMainCouranteInterventionZones(
+                          data.interventionZones,
+                      ),
                     source: data.source || "",
                     wasEdited: data.wasEdited === true,
                     occurredAt: data.occurredAt &&
@@ -5876,7 +5879,6 @@ exports.updateInstitutionalMainCourantePreferences = onRequest(
 
         const preferences = {
           flagLowered: request.body.flagLowered === true,
-          incident: request.body.incident === true,
           intervention: request.body.intervention === true,
         };
 
@@ -6384,6 +6386,10 @@ exports.getSauveteurMainCourante = onRequest(
               visibility: entry.visibility || "operational",
               victim: entry.victim && typeof entry.victim === "object" ?
                 entry.victim : null,
+              interventionZones:
+                sanitizeMainCouranteInterventionZones(
+                    entry.interventionZones,
+                ),
               source: entry.source || "",
               wasEdited: entry.wasEdited === true,
               occurredAt: entry.occurredAt &&
@@ -6516,6 +6522,10 @@ exports.getSauveteurStats = onRequest(
               visibility: entry.visibility || "operational",
               victim: entry.victim && typeof entry.victim === "object" ?
                 entry.victim : null,
+              interventionZones:
+                sanitizeMainCouranteInterventionZones(
+                    entry.interventionZones,
+                ),
               source: entry.source || "",
               wasEdited: entry.wasEdited === true,
               occurredAt: entry.occurredAt &&
@@ -6571,6 +6581,28 @@ function sanitizeMainCouranteVictim(rawVictim) {
 
   const hasValue = Object.values(victim).some((value) => value.length > 0);
   return hasValue ? victim : null;
+}
+
+/**
+ * Nettoie les catégories terrain d'une intervention.
+ * @param {Array<*>} rawZones Catégories reçues du client.
+ * @return {Array<string>} Catégories reconnues et dédupliquées.
+ */
+function sanitizeMainCouranteInterventionZones(rawZones) {
+  const allowed = new Set([
+    "Zone de bain surveillée",
+    "Hors zone de bain surveillée",
+    "Zone réglementée",
+    "Hors zone réglementée",
+  ]);
+
+  if (!Array.isArray(rawZones)) return [];
+
+  return [...new Set(
+      rawZones
+          .map((value) => (value || "").toString().trim())
+          .filter((value) => allowed.has(value)),
+  )];
 }
 
 exports.addSauveteurMainCouranteEntry = onRequest(
@@ -6657,9 +6689,18 @@ exports.addSauveteurMainCouranteEntry = onRequest(
         const entryType =
           (request.body.type || "Observation").toString().trim() ||
           "Observation";
-        const victim = entryType.toLowerCase() === "secours" ?
+        const normalizedType = entryType.toLowerCase();
+        const supportsVictim =
+          normalizedType === "intervention" ||
+          normalizedType === "secours";
+        const victim = supportsVictim ?
           sanitizeMainCouranteVictim(request.body.victim) :
           null;
+        const interventionZones = normalizedType === "intervention" ?
+          sanitizeMainCouranteInterventionZones(
+              request.body.interventionZones,
+          ) :
+          [];
 
         await entryReference.set({
           type: entryType,
@@ -6667,6 +6708,7 @@ exports.addSauveteurMainCouranteEntry = onRequest(
           actionTaken: (request.body.actionTaken || "").toString().trim(),
           visibility,
           ...(victim ? {victim} : {}),
+          ...(interventionZones.length > 0 ? {interventionZones} : {}),
           occurredAt: admin.firestore.FieldValue.serverTimestamp(),
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           createdBy: {
@@ -6678,17 +6720,7 @@ exports.addSauveteurMainCouranteEntry = onRequest(
           immutableOriginal: true,
         });
 
-        const normalizedType = entryType.toLowerCase();
-        if (normalizedType === "incident") {
-          await sendInstitutionalOperationalNotification({
-            territoireId: context.territoireId,
-            spotId,
-            eventType: "incident",
-            title: "Incident",
-            description,
-            sphotMode: context.sphotMode,
-          });
-        } else if (normalizedType === "intervention") {
+        if (normalizedType === "intervention") {
           await sendInstitutionalOperationalNotification({
             territoireId: context.territoireId,
             spotId,
@@ -6811,15 +6843,28 @@ exports.updateSauveteurMainCouranteEntry = onRequest(
         const nextType =
           (request.body.type || "Observation").toString().trim() ||
           "Observation";
-        const victim = nextType.toLowerCase() === "secours" ?
+        const normalizedNextType = nextType.toLowerCase();
+        const supportsVictim =
+          normalizedNextType === "intervention" ||
+          normalizedNextType === "secours";
+        const victim = supportsVictim ?
           sanitizeMainCouranteVictim(request.body.victim) :
           null;
+        const interventionZones =
+          normalizedNextType === "intervention" ?
+            sanitizeMainCouranteInterventionZones(
+                request.body.interventionZones,
+            ) :
+            [];
         const nextData = {
           type: nextType,
           description,
           actionTaken: (request.body.actionTaken || "").toString().trim(),
           visibility,
           victim: victim || admin.firestore.FieldValue.delete(),
+          interventionZones: interventionZones.length > 0 ?
+            interventionZones :
+            admin.firestore.FieldValue.delete(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBy: {
             sauveteurId: context.sauveteurId,
