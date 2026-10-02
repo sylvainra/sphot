@@ -1544,6 +1544,9 @@ class _SauveteurMainCourantePageState
                                 controller: victimNameController,
                                 textCapitalization:
                                     TextCapitalization.characters,
+                                inputFormatters: const [
+                                  _UpperCaseTextFormatter(),
+                                ],
                                 style: const TextStyle(
                                   color: _victimBlue,
                                   fontSize: 14,
@@ -1555,6 +1558,9 @@ class _SauveteurMainCourantePageState
                               TextField(
                                 controller: victimFirstNameController,
                                 textCapitalization: TextCapitalization.words,
+                                inputFormatters: const [
+                                  _FirstLetterUpperCaseTextFormatter(),
+                                ],
                                 style: const TextStyle(
                                   color: _victimBlue,
                                   fontSize: 14,
@@ -3382,6 +3388,9 @@ class _SauveteurMainCourantePageState
                   TextField(
                     controller: _victimNameController,
                     textCapitalization: TextCapitalization.characters,
+                    inputFormatters: const [
+                      _UpperCaseTextFormatter(),
+                    ],
                     style: const TextStyle(
                       color: _victimBlue,
                       fontSize: 14,
@@ -3393,6 +3402,9 @@ class _SauveteurMainCourantePageState
                   TextField(
                     controller: _victimFirstNameController,
                     textCapitalization: TextCapitalization.words,
+                    inputFormatters: const [
+                      _FirstLetterUpperCaseTextFormatter(),
+                    ],
                     style: const TextStyle(
                       color: _victimBlue,
                       fontSize: 14,
@@ -3792,6 +3804,46 @@ class _SauveteurMainCourantePageState
           ),
         ],
       ),
+    );
+  }
+}
+
+class _UpperCaseTextFormatter extends TextInputFormatter {
+  const _UpperCaseTextFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final formatted = newValue.text.toUpperCase();
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+      composing: TextRange.empty,
+    );
+  }
+}
+
+class _FirstLetterUpperCaseTextFormatter extends TextInputFormatter {
+  const _FirstLetterUpperCaseTextFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final raw = newValue.text;
+    if (raw.isEmpty) return newValue;
+
+    final lower = raw.toLowerCase();
+    final formatted = lower[0].toUpperCase() + lower.substring(1);
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+      composing: TextRange.empty,
     );
   }
 }
