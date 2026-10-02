@@ -1965,7 +1965,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           )
         : <String, dynamic>{};
     bool notifyFlagLowered = rawPreferences['flagLowered'] != false;
-    bool notifyIncidents = rawPreferences['incident'] != false;
     bool notifyInterventions = rawPreferences['intervention'] != false;
 
     final result = await showDialog<Map<String, dynamic>>(
@@ -2088,15 +2087,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             SwitchListTile(
                               dense: true,
                               contentPadding: EdgeInsets.zero,
-                              title: const Text('Alerte lors d’un incident'),
-                              value: notifyIncidents,
-                              onChanged: (value) {
-                                setDialogState(() => notifyIncidents = value);
-                              },
-                            ),
-                            SwitchListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
                               title: const Text('Alerte lors d’une intervention'),
                               value: notifyInterventions,
                               onChanged: (value) {
@@ -2149,7 +2139,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       'mainCouranteReadOnly': true,
                       'notificationPreferences': {
                         'flagLowered': notifyFlagLowered,
-                        'incident': notifyIncidents,
                         'intervention': notifyInterventions,
                       },
                       if (_cleanText(existing['accessTokenHash']).isNotEmpty)
