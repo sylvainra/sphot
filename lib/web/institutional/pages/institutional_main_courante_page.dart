@@ -272,7 +272,7 @@ class _InstitutionalMainCourantePageState
         _operationalAlert = nextAlert;
       });
 
-      if (isNewActiveAlert && _soundEnabled) {
+      if (isNewActiveAlert && _soundEnabled && !widget.embedded) {
         await playOperationalFogHorn();
       }
     } catch (_) {
@@ -646,22 +646,23 @@ class _InstitutionalMainCourantePageState
               _savePreferences();
             },
           ),
-          SwitchListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Corne de brume sur cette page'),
-            subtitle: const Text(
-              'Le navigateur doit autoriser la lecture du son.',
-              style: TextStyle(fontSize: 10.5),
+          if (!widget.embedded)
+            SwitchListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Corne de brume sur cette page'),
+              subtitle: const Text(
+                'Le navigateur doit autoriser la lecture du son.',
+                style: TextStyle(fontSize: 10.5),
+              ),
+              value: _soundEnabled,
+              onChanged: (value) async {
+                setState(() => _soundEnabled = value);
+                if (value) {
+                  await playOperationalFogHorn();
+                }
+              },
             ),
-            value: _soundEnabled,
-            onChanged: (value) async {
-              setState(() => _soundEnabled = value);
-              if (value) {
-                await playOperationalFogHorn();
-              }
-            },
-          ),
           SwitchListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
