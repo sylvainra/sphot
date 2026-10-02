@@ -5210,6 +5210,55 @@ function institutionalNotificationPreferences(contact) {
 }
 
 /**
+ * Formate l'heure opérationnelle dans le fuseau français.
+ * @param {Date} value Date à formater.
+ * @return {string} Heure au format 14h37.
+ */
+function formatFrenchOperationalTime(value = new Date()) {
+  const parts = new Intl.DateTimeFormat(
+      "fr-FR",
+      {
+        timeZone: "Europe/Paris",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      },
+  ).formatToParts(value);
+
+  const hour = parts.find((part) => part.type === "hour")?.value || "00";
+  const minute = parts.find((part) => part.type === "minute")?.value || "00";
+  return hour + "h" + minute;
+}
+
+/**
+ * Construit la formule d'appel d'une alerte opérationnelle.
+ * @param {Object} contact Destinataire.
+ * @return {string} Formule de politesse.
+ */
+function operationalNotificationGreeting(contact) {
+  const rawCivilite = (contact.civilite || "")
+      .toString()
+      .trim()
+      .toLowerCase();
+  const nom = (
+    contact.nom ||
+    contact.nomResponsable ||
+    ""
+  ).toString().trim().toUpperCase();
+
+  if (!nom) return "Bonjour,";
+
+  const civilite =
+    rawCivilite === "madame" ||
+    rawCivilite === "mme" ||
+    rawCivilite === "femme" ?
+      "Madame" :
+      "Monsieur";
+
+  return "Bonjour " + civilite + " " + nom + ",";
+}
+
+/**
  * Envoie une notification opérationnelle aux contacts institutionnels.
  * @param {Object} options Paramètres de la notification.
  * @return {Promise<void>} Promesse résolue après traitement.
@@ -5314,8 +5363,7 @@ async function sendInstitutionalOperationalNotification(options) {
     for (const rawContact of recipients) {
       const contact = rawContact || {};
       const email = (contact.email || "").toString().trim().toLowerCase();
-      const firstName = (contact.prenom || "").toString().trim();
-      const greeting = firstName ? "Bonjour " + firstName + "," : "Bonjour,";
+      const greeting = operationalNotificationGreeting(contact);
 
       try {
         await sendSphotMail(transporter, {
@@ -6120,8 +6168,10 @@ exports.updateSauveteurLiveState = onRequest(
           }
 
           if (flagWasLowered) {
+            const loweringTime = formatFrenchOperationalTime(new Date());
             operationalAlertMessage =
-              `Drapeau du poste de secours ${spotLabel} affalé`;
+              `Drapeau du poste de secours ${spotLabel} affalé à ` +
+              `${loweringTime}.`;
             operationalAlertUpdate = {
               type: "flag_lowered",
               active: true,
