@@ -6572,6 +6572,8 @@ function sanitizeMainCouranteVictim(rawVictim) {
 
   const victim = {
     sexe: clean(rawVictim.sexe, 40),
+    nom: clean(rawVictim.nom, 100),
+    prenom: clean(rawVictim.prenom, 100),
     age: clean(rawVictim.age, 20),
     dateNaissance: clean(rawVictim.dateNaissance, 20),
     lieuHabitation: clean(rawVictim.lieuHabitation, 180),
