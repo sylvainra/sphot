@@ -5694,6 +5694,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _openStatisticsPanel() {
     setState(() {
       _showStatisticsPanel = true;
+      _showMainCourantePanel = false;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
       _showTrialSummaryPanel = false;
