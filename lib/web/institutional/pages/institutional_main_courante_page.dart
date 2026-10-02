@@ -423,7 +423,7 @@ class _InstitutionalMainCourantePageState
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+      padding: const EdgeInsets.fromLTRB(6, 5, 6, 6),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -432,8 +432,10 @@ class _InstitutionalMainCourantePageState
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
+          SizedBox(
+            height: 30,
+            child: Row(
+              children: [
               IconButton(
                 tooltip: 'Mois précédent',
                 padding: EdgeInsets.zero,
@@ -480,10 +482,11 @@ class _InstitutionalMainCourantePageState
                 ),
               ),
             ],
+            ),
           ),
           const SizedBox(height: 4),
           SizedBox(
-            height: 40,
+            height: 34,
             child: ListView.builder(
               controller: _dayScrollController,
               scrollDirection: Axis.horizontal,
@@ -507,7 +510,7 @@ class _InstitutionalMainCourantePageState
                     onTap: future ? null : () => _selectDay(date),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 150),
-                      width: 40,
+                      width: 34,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: selected
@@ -993,7 +996,7 @@ class _InstitutionalMainCourantePageState
       bottomNavigationBar: SafeArea(
         top: false,
         child: SizedBox(
-          height: 94,
+          height: 98,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
             child: _dayTabs(),
