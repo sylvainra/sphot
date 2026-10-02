@@ -7922,6 +7922,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     setState(() {
+      _showMainCourantePanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
