@@ -5086,7 +5086,7 @@ exports.saveSauveteurPlanning = onRequest(
 
 
 const INSTITUTIONAL_MAIN_COURANTE_URL =
-  SPHOT_LOGIN_URL + "/#/institutionnel-main-courante";
+  SPHOT_LOGIN_URL + "/?institutionnelMainCouranteToken=";
 
 /**
  * Calcule l'empreinte SHA-256 d'un jeton d'accès institutionnel.
@@ -5697,14 +5697,73 @@ exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
         }
 
         let tokenHash = (contact.accessTokenHash || "").toString().trim();
-        let rawToken = "";
 
         if (!tokenHash) {
-          rawToken = crypto.randomBytes(32).toString("hex");
-          tokenHash = hashInstitutionalAccessToken(rawToken);
+          const ledgerId = crypto
+              .createHash("sha256")
+              .update(territoireId + "|" + contactId + "|" + email)
+              .digest("hex");
+          const ledgerReference = admin.firestore()
+              .collection("institutionalMainCouranteMailLedger")
+              .doc(ledgerId);
+
+          const claim = await admin.firestore().runTransaction(
+              async (transaction) => {
+                const ledgerSnapshot = await transaction.get(
+                    ledgerReference,
+                );
+                const ledger = ledgerSnapshot.data() || {};
+
+                if (ledgerSnapshot.exists &&
+                    (ledger.tokenHash || "").toString().trim()) {
+                  return {
+                    claimed: false,
+                    tokenHash: (ledger.tokenHash || "")
+                        .toString()
+                        .trim(),
+                    rawToken: "",
+                  };
+                }
+
+                const generatedRawToken =
+                  crypto.randomBytes(32).toString("hex");
+                const generatedTokenHash =
+                  hashInstitutionalAccessToken(generatedRawToken);
+
+                transaction.set(
+                    ledgerReference,
+                    {
+                      territoireId,
+                      contactId,
+                      email,
+                      tokenHash: generatedTokenHash,
+                      rawToken: generatedRawToken,
+                      status: "claimed",
+                      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    },
+                    {merge: true},
+                );
+
+                return {
+                  claimed: true,
+                  tokenHash: generatedTokenHash,
+                  rawToken: generatedRawToken,
+                };
+              },
+          );
+
+          tokenHash = claim.tokenHash;
           contact.accessTokenHash = tokenHash;
           territoryNeedsUpdate = true;
-          onboarding.push({contact: {...contact}, rawToken});
+
+          if (claim.claimed === true && claim.rawToken) {
+            onboarding.push({
+              contact: {...contact},
+              rawToken: claim.rawToken,
+              ledgerId,
+            });
+          }
         }
 
         await admin.firestore()
@@ -5771,12 +5830,12 @@ exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
         if (!email) continue;
 
         const accessUrl =
-          INSTITUTIONAL_MAIN_COURANTE_URL + "?token=" +
+          INSTITUTIONAL_MAIN_COURANTE_URL +
           encodeURIComponent(item.rawToken);
         const greeting = operationalNotificationGreeting(contact);
 
         try {
-          await sendSphotMail(transporter, {
+          const mailResult = await sendSphotMail(transporter, {
             from: MAIL_FROM,
             to: email,
             subject: "SPHOT - Votre accès institutionnel à la MAIN COURANTE",
@@ -5792,7 +5851,7 @@ exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
               "<a href=\"" + accessUrl + "\" style=\"display:inline-block;" +
               "padding:14px 24px;border-radius:12px;background:#1e3a8a;" +
               "color:#ffffff;text-decoration:none;font-weight:900;\">" +
-              "OUVRIR MA MAIN COURANTE SPHOT</a></div>" +
+              "OUVRIR LA MAIN COURANTE SPHOT</a></div>" +
               "<p>Ce lien est personnel. Ne le transférez pas.</p>" +
               "<p>L'équipe SPHOT</p>",
             text:
@@ -5803,6 +5862,19 @@ exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
               "d'affalage du drapeau et d'intervention.\n\n" +
               "L'équipe SPHOT",
           });
+
+          if (item.ledgerId) {
+            await admin.firestore()
+                .collection("institutionalMainCouranteMailLedger")
+                .doc(item.ledgerId)
+                .set({
+                  status: "sent",
+                  messageId: mailResult.messageId || null,
+                  sentAt: admin.firestore.FieldValue.serverTimestamp(),
+                  rawToken: admin.firestore.FieldValue.delete(),
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                }, {merge: true});
+          }
         } catch (mailError) {
           console.error(
               "Erreur email habilitation institutionnelle:",
@@ -5810,6 +5882,19 @@ exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
               email,
               mailError,
           );
+
+          if (item.ledgerId) {
+            await admin.firestore()
+                .collection("institutionalMainCouranteMailLedger")
+                .doc(item.ledgerId)
+                .set({
+                  status: "failed",
+                  error: (mailError && mailError.message) ?
+                    mailError.message :
+                    String(mailError),
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                }, {merge: true});
+          }
         }
       }
     },
