@@ -57,10 +57,10 @@ class _SauveteurMainCourantePageState
 
   final List<Map<String, String>> _spots = [];
   List<Map<String, dynamic>> _entries = [];
-  List<Map<String, dynamic>> _institutionalContacts = [];
   List<Map<String, dynamic>> _presenceCandidates = [];
   List<Map<String, String>> _personnelRows = [];
   Set<String> _selectedPresenceLabels = <String>{};
+  Map<String, String> _presenceHoursByLabel = <String, String>{};
   Map<String, dynamic>? _presenceEntry;
   bool _presenceFromPlanning = false;
   bool _presenceSaving = false;
@@ -276,21 +276,6 @@ class _SauveteurMainCourantePageState
         .collection('territoires')
         .doc(widget.territoireId);
 
-    final territorySnapshot = await territoryReference.get();
-    final territoryData = territorySnapshot.data() ?? <String, dynamic>{};
-    final rawInstitutionalContacts = territoryData['institutionnels'];
-    final institutionalContacts = rawInstitutionalContacts is List
-        ? rawInstitutionalContacts
-            .whereType<Map>()
-            .map((value) => Map<String, dynamic>.from(value))
-            .where((contact) {
-              return (contact['nom'] ?? '').toString().trim().isNotEmpty ||
-                  (contact['prenom'] ?? '').toString().trim().isNotEmpty ||
-                  (contact['fonction'] ?? '').toString().trim().isNotEmpty;
-            })
-            .toList()
-        : <Map<String, dynamic>>[];
-
     final snapshot = await territoryReference
         .collection('spots')
         .where('typeSphot', isEqualTo: '🚨 POSTE DE SECOURS 🚨')
@@ -327,7 +312,6 @@ class _SauveteurMainCourantePageState
               orElse: () => _spots.first,
             );
       _selectedSpotId = initialSpot?['id'];
-      _institutionalContacts = institutionalContacts;
       _loading = false;
     });
 
@@ -2195,37 +2179,6 @@ class _SauveteurMainCourantePageState
           ),
           pw.SizedBox(height: 12),
 
-          if (_institutionalContacts.isNotEmpty) ...[
-            sectionTitle('CONTACTS INSTITUTIONNELS'),
-            pw.SizedBox(height: 5),
-            ..._institutionalContacts.map((contact) {
-              final identity = [
-                (contact['civilite'] ?? '').toString().trim(),
-                (contact['prenom'] ?? '').toString().trim(),
-                (contact['nom'] ?? '').toString().trim(),
-              ].where((value) => value.isNotEmpty).join(' ');
-              final fonction =
-                  (contact['fonction'] ?? '').toString().trim();
-              final telephone =
-                  (contact['telephone'] ?? '').toString().trim();
-              final email = (contact['email'] ?? '').toString().trim();
-
-              return pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 4),
-                child: pw.Text(
-                  [
-                    identity,
-                    fonction,
-                    telephone,
-                    email,
-                  ].where((value) => value.isNotEmpty).join(' - '),
-                  style: const pw.TextStyle(fontSize: 8.5),
-                ),
-              );
-            }),
-            pw.SizedBox(height: 10),
-          ],
-
           if (_personnelRows.isNotEmpty) ...[
             sectionTitle('PERSONNELS'),
             pw.SizedBox(height: 5),
@@ -2507,144 +2460,6 @@ class _SauveteurMainCourantePageState
           fontWeight: FontWeight.w900,
           letterSpacing: 0.4,
         ),
-      ),
-    );
-  }
-
-  Widget _institutionalContactsCard() {
-    if (_institutionalContacts.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.72),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFF1E3A8A),
-          width: 1.4,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.account_balance_outlined,
-                color: Color(0xFF1E3A8A),
-                size: 20,
-              ),
-              SizedBox(width: 7),
-              Text(
-                'CONTACTS INSTITUTIONNELS',
-                style: TextStyle(
-                  color: Color(0xFF1E3A8A),
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              Spacer(),
-              Text(
-                'LECTURE SEULE',
-                style: TextStyle(
-                  color: Colors.black45,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ..._institutionalContacts.asMap().entries.map((entry) {
-            final contact = entry.value;
-            final identity = [
-              (contact['civilite'] ?? '').toString().trim(),
-              (contact['prenom'] ?? '').toString().trim(),
-              (contact['nom'] ?? '').toString().trim(),
-            ].where((value) => value.isNotEmpty).join(' ');
-            final fonction = (contact['fonction'] ?? '').toString().trim();
-            final telephone = (contact['telephone'] ?? '').toString().trim();
-            final email = (contact['email'] ?? '').toString().trim();
-
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: entry.key == _institutionalContacts.length - 1 ? 0 : 9,
-              ),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC).withOpacity(0.88),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.black12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      identity.isEmpty ? 'Contact institutionnel' : identity,
-                      style: const TextStyle(
-                        color: Color(0xFF1E3A8A),
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    if (fonction.isNotEmpty)
-                      Text(
-                        fonction,
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    if (telephone.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.phone_outlined,
-                            size: 15,
-                            color: Color(0xFF1E3A8A),
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              telephone,
-                              style: const TextStyle(fontSize: 11.5),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (email.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.email_outlined,
-                            size: 15,
-                            color: Color(0xFF1E3A8A),
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              email,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 11.5),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          }),
-        ],
       ),
     );
   }
@@ -4088,10 +3903,6 @@ class _SauveteurMainCourantePageState
                                               ),
                                             ),
                                             SizedBox(height: 10),
-                                          ],
-                                          if (_institutionalContacts.isNotEmpty) ...[
-                                            _institutionalContactsCard(),
-                                            const SizedBox(height: 12),
                                           ],
                                           if (_selectedDayIsToday)
                                             _entryForm()
