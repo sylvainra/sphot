@@ -57,6 +57,8 @@ class _SauveteurMaterielVerificationPageState
   bool _oxygenMaskAdultOk = true;
   bool _oxygenMaskChildOk = true;
   bool _manualResuscitatorOk = true;
+  bool _spinalBoardOk = true;
+  bool _splintsOk = true;
 
   bool get _isSphotOn => widget.sphotMode.toUpperCase() == 'ON';
 
@@ -168,6 +170,8 @@ class _SauveteurMaterielVerificationPageState
       'Masque O² adulte : ' + _status(_oxygenMaskAdultOk),
       'Masque O² pédiatrique : ' + _status(_oxygenMaskChildOk),
       'BAVU / insufflateur : ' + _status(_manualResuscitatorOk),
+      'Plan dur : ' + _status(_spinalBoardOk),
+      'Attelles : ' + _status(_splintsOk),
     ];
 
     final remarks = _remarksController.text.trim();
@@ -185,7 +189,7 @@ class _SauveteurMaterielVerificationPageState
         body: jsonEncode({
           'sauveteurSessionToken': widget.sauveteurSessionToken,
           'spotId': spotId,
-          'type': 'Vérification matériel',
+          'type': 'Vérifications',
           'description': lines.join('\n'),
           'actionTaken': '',
           'visibility': 'operational',
@@ -417,6 +421,20 @@ class _SauveteurMaterielVerificationPageState
           icon: Icons.emergency_rounded,
           onChanged: (value) =>
               setState(() => _manualResuscitatorOk = value),
+        ),
+        _booleanCheck(
+          title: 'Plan dur',
+          subtitle: 'Présent et fonctionnel',
+          value: _spinalBoardOk,
+          icon: Icons.airline_seat_flat_rounded,
+          onChanged: (value) => setState(() => _spinalBoardOk = value),
+        ),
+        _booleanCheck(
+          title: 'Attelles',
+          subtitle: 'Présentes, complètes et fonctionnelles',
+          value: _splintsOk,
+          icon: Icons.healing_rounded,
+          onChanged: (value) => setState(() => _splintsOk = value),
         ),
         TextField(
           controller: _remarksController,
