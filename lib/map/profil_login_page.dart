@@ -733,23 +733,44 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
             fontWeight: FontWeight.w900,
           ),
         ),
-        content: const Text(
-          'Choisissez l’espace professionnel que vous souhaitez créer.',
-          textAlign: TextAlign.center,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Text(
+              'Choisissez l’espace professionnel que vous souhaitez créer.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 22),
+            Center(
+              child: SizedBox(
+                width: 190,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(dialogContext)
+                      .pop(_LoginAudience.admin),
+                  child: const Text(
+                    'SPHOT ADMIN',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Center(
+              child: SizedBox(
+                width: 190,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(dialogContext)
+                      .pop(_LoginAudience.advertiser),
+                  child: const Text(
+                    'SPHOT PUBLICITAIRE',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          OutlinedButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(_LoginAudience.admin),
-            child: const Text('SPHOT ADMIN'),
-          ),
-          OutlinedButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(_LoginAudience.advertiser),
-            child: const Text('SPHOT PUBLICITAIRE'),
-          ),
-        ],
       ),
     );
 
