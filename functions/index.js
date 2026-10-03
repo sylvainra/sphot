@@ -5413,6 +5413,237 @@ async function sendInstitutionalOperationalNotification(options) {
   }
 }
 
+exports.saveAdminInstitutionalContacts = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const token = (request.body.mainCouranteToken || "")
+            .toString()
+            .trim();
+
+        if (!token) {
+          response.status(401).json({
+            success: false,
+            error: "missing_admin_session",
+          });
+          return;
+        }
+
+        const tokenHash = hashInstitutionalAccessToken(token);
+        const accessReference = admin.firestore()
+            .collection("institutionalMainCouranteAccess")
+            .doc(tokenHash);
+        const accessSnapshot = await accessReference.get();
+        const access = accessSnapshot.data() || {};
+
+        const expiresAt = access.expiresAt;
+        const expired = expiresAt &&
+            typeof expiresAt.toMillis === "function" &&
+            expiresAt.toMillis() <= Date.now();
+
+        if (!accessSnapshot.exists ||
+            access.enabled !== true ||
+            access.mainCouranteReadOnly !== true ||
+            (access.viewerType || "").toString().toLowerCase() !== "admin" ||
+            expired) {
+          response.status(403).json({
+            success: false,
+            error: "admin_session_denied",
+          });
+          return;
+        }
+
+        const territoireId = (access.territoireId || "")
+            .toString()
+            .trim();
+        const adminUid = (access.contactId || "")
+            .toString()
+            .trim();
+
+        if (!territoireId) {
+          response.status(403).json({
+            success: false,
+            error: "territory_missing",
+          });
+          return;
+        }
+
+        const rawContacts = Array.isArray(request.body.contacts) ?
+          request.body.contacts :
+          [];
+
+        if (rawContacts.length > 50) {
+          response.status(400).json({
+            success: false,
+            error: "too_many_contacts",
+          });
+          return;
+        }
+
+        const territoryReference = admin.firestore()
+            .collection("territoires")
+            .doc(territoireId);
+        const territorySnapshot = await territoryReference.get();
+        const territoryData = territorySnapshot.data() || {};
+        const existingContacts =
+          Array.isArray(territoryData.institutionnels) ?
+            territoryData.institutionnels :
+            [];
+
+        const existingById = new Map(
+            existingContacts
+                .map((contact) => {
+                  const id = (contact && contact.id || "")
+                      .toString()
+                      .trim();
+                  return id ? [id, contact || {}] : null;
+                })
+                .filter((value) => value),
+        );
+
+        const cleanText = (value, maxLength = 180) =>
+          (value || "").toString().trim().slice(0, maxLength);
+
+        const normalizedContacts = [];
+
+        for (const rawContact of rawContacts) {
+          const source = rawContact &&
+              typeof rawContact === "object" &&
+              !Array.isArray(rawContact) ?
+            rawContact :
+            {};
+
+          const id = cleanText(source.id, 120) || crypto.randomUUID();
+          const civilite =
+            cleanText(source.civilite, 20).toLowerCase() === "madame" ?
+              "Madame" :
+              "Monsieur";
+          const nom = cleanText(source.nom, 100).toUpperCase();
+          const rawPrenom = cleanText(source.prenom, 100).toLowerCase();
+          const prenom = rawPrenom ?
+            rawPrenom.charAt(0).toUpperCase() + rawPrenom.slice(1) :
+            "";
+          const fonction = cleanText(source.fonction, 140);
+          const telephone = cleanText(source.telephone, 40);
+          const email = cleanText(source.email, 180).toLowerCase();
+
+          if (!nom || !prenom || !fonction || !email ||
+              !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+            response.status(400).json({
+              success: false,
+              error: "invalid_contact",
+            });
+            return;
+          }
+
+          const normalized = {
+            id,
+            civilite,
+            nom,
+            prenom,
+            fonction,
+            telephone,
+            email,
+            mainCouranteReadOnly: true,
+            notificationPreferences:
+              institutionalNotificationPreferences(source),
+          };
+
+          const previous = existingById.get(id) || {};
+          const previousEmail = (previous.email || "")
+              .toString()
+              .trim()
+              .toLowerCase();
+          const previousHash = (previous.accessTokenHash || "")
+              .toString()
+              .trim();
+
+          if (previousHash && previousEmail === email) {
+            normalized.accessTokenHash = previousHash;
+          }
+
+          normalizedContacts.push(normalized);
+        }
+
+        const db = admin.firestore();
+        const batch = db.batch();
+        const now = admin.firestore.FieldValue.serverTimestamp();
+
+        batch.set(
+            territoryReference,
+            {
+              institutionnels: normalizedContacts,
+              updatedAt: now,
+            },
+            {merge: true},
+        );
+
+        if (adminUid) {
+          const adminReference = db.collection("admins").doc(adminUid);
+          const adminSnapshot = await adminReference.get();
+
+          if (adminSnapshot.exists) {
+            batch.set(
+                adminReference,
+                {
+                  institutionnels: normalizedContacts,
+                  "territoire.institutionnels": normalizedContacts,
+                  updatedAt: now,
+                },
+                {merge: true},
+            );
+          }
+
+          const requestsSnapshot = await db
+              .collection("adminRequests")
+              .where("uid", "==", adminUid)
+              .get();
+
+          for (const document of requestsSnapshot.docs) {
+            batch.set(
+                document.ref,
+                {
+                  institutionnels: normalizedContacts,
+                  "territoire.institutionnels": normalizedContacts,
+                  updatedAt: now,
+                },
+                {merge: true},
+            );
+          }
+        }
+
+        await batch.commit();
+
+        response.status(200).json({
+          success: true,
+          contactsCount: normalizedContacts.length,
+        });
+      } catch (error) {
+        console.error(
+            "Erreur sauvegarde contacts institutionnels Admin:",
+            error,
+        );
+        response.status(500).json({
+          success: false,
+          error: "save_failed",
+        });
+      }
+    },
+);
+
+
 exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
     {
       document: "territoires/{territoireId}",
