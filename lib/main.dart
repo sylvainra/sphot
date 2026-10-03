@@ -81,7 +81,9 @@ class SphotApp extends StatelessWidget {
     if (uri.path == '/advertiser') {
       return MaterialPageRoute(
         settings: settings,
-        builder: (_) => const WebAdvertiserAccessPage(),
+        builder: (_) => WebAdvertiserAccessPage(
+          autoStart: uri.queryParameters['start'] == '1',
+        ),
       );
     }
 
