@@ -175,19 +175,9 @@ Future<void> _toggleFavoritesFilter() async {
   }
 
   Future<void> _openAdvertiserWebsite() async {
-    final uri = kIsWeb
-        ? Uri.base.replace(fragment: '/advertiser')
-        : Uri.parse('https://sphot.app/#/advertiser');
+    if (!mounted) return;
 
-    final opened = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-      webOnlyWindowName: kIsWeb ? '_blank' : null,
-    );
-
-    if (!opened) {
-      _showMapMessage('Impossible d’ouvrir l’espace annonceur.');
-    }
+    await Navigator.of(context).pushNamed('/advertiser');
   }
 
   double _publicAdvertisingDouble(Object? value) {
