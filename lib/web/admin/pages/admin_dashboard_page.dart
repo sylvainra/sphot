@@ -6475,7 +6475,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     '$stepNumber',
                     style: TextStyle(
                       color: displayedStepNumberColor,
-                      fontSize: 10,
+                      fontSize: 8,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
