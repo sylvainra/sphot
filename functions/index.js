@@ -6059,6 +6059,10 @@ exports.getInstitutionalMainCourante = onRequest(
                       sanitizeMainCouranteInterventionZones(
                           data.interventionZones,
                       ),
+                    presencePersonnel:
+                      sanitizeMainCourantePresencePersonnel(
+                          data.presencePersonnel,
+                      ),
                     source: data.source || "",
                     wasEdited: data.wasEdited === true,
                     occurredAt: data.occurredAt &&
@@ -6708,6 +6712,10 @@ exports.getSauveteurMainCourante = onRequest(
                 sanitizeMainCouranteInterventionZones(
                     entry.interventionZones,
                 ),
+              presencePersonnel:
+                sanitizeMainCourantePresencePersonnel(
+                    entry.presencePersonnel,
+                ),
               source: entry.source || "",
               wasEdited: entry.wasEdited === true,
               occurredAt: entry.occurredAt &&
@@ -6844,6 +6852,10 @@ exports.getSauveteurStats = onRequest(
                 sanitizeMainCouranteInterventionZones(
                     entry.interventionZones,
                 ),
+              presencePersonnel:
+                sanitizeMainCourantePresencePersonnel(
+                    entry.presencePersonnel,
+                ),
               source: entry.source || "",
               wasEdited: entry.wasEdited === true,
               occurredAt: entry.occurredAt &&
@@ -6907,6 +6919,34 @@ function sanitizeMainCouranteVictim(rawVictim) {
 
   const hasValue = Object.values(victim).some((value) => value.length > 0);
   return hasValue ? victim : null;
+}
+
+/**
+ * Nettoie les personnels présents et leurs horaires.
+ * @param {Array<*>} rawPersonnel Personnels reçus du client.
+ * @return {Array<Object>} Personnels présents normalisés.
+ */
+function sanitizeMainCourantePresencePersonnel(rawPersonnel) {
+  if (!Array.isArray(rawPersonnel)) return [];
+
+  const clean = (value, maxLength = 160) =>
+    (value || "").toString().trim().slice(0, maxLength);
+
+  return rawPersonnel
+      .map((raw) => {
+        const source = raw &&
+            typeof raw === "object" &&
+            !Array.isArray(raw) ?
+          raw :
+          {};
+
+        return {
+          name: clean(source.name, 140),
+          quality: clean(source.quality, 140),
+          hours: clean(source.hours, 180),
+        };
+      })
+      .filter((person) => person.name && person.hours);
 }
 
 /**
@@ -7045,6 +7085,13 @@ exports.addSauveteurMainCouranteEntry = onRequest(
               request.body.interventionZones,
           ) :
           [];
+        const presencePersonnel =
+          normalizedType === "présence" ||
+          normalizedType === "presence" ?
+            sanitizeMainCourantePresencePersonnel(
+                request.body.presencePersonnel,
+            ) :
+            [];
 
         if (normalizedType === "intervention" &&
             !hasCompleteMainCouranteInterventionZones(interventionZones)) {
@@ -7062,6 +7109,7 @@ exports.addSauveteurMainCouranteEntry = onRequest(
           visibility,
           ...(victim ? {victim} : {}),
           ...(interventionZones.length > 0 ? {interventionZones} : {}),
+          ...(presencePersonnel.length > 0 ? {presencePersonnel} : {}),
           occurredAt: admin.firestore.FieldValue.serverTimestamp(),
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           createdBy: {
@@ -7209,6 +7257,13 @@ exports.updateSauveteurMainCouranteEntry = onRequest(
                 request.body.interventionZones,
             ) :
             [];
+        const presencePersonnel =
+          normalizedNextType === "présence" ||
+          normalizedNextType === "presence" ?
+            sanitizeMainCourantePresencePersonnel(
+                request.body.presencePersonnel,
+            ) :
+            [];
 
         if (normalizedNextType === "intervention" &&
             !hasCompleteMainCouranteInterventionZones(interventionZones)) {
@@ -7227,6 +7282,9 @@ exports.updateSauveteurMainCouranteEntry = onRequest(
           victim: victim || admin.firestore.FieldValue.delete(),
           interventionZones: interventionZones.length > 0 ?
             interventionZones :
+            admin.firestore.FieldValue.delete(),
+          presencePersonnel: presencePersonnel.length > 0 ?
+            presencePersonnel :
             admin.firestore.FieldValue.delete(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBy: {
