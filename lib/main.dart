@@ -12,7 +12,6 @@ import 'web/advertiser/web_advertiser_app.dart';
 import 'web/advertiser/pages/advertiser_first_access_page.dart';
 import 'web/admin/pages/admin_proconnect_access_page.dart';
 import 'web/admin/pages/admin_trial_request_page.dart';
-import 'pages/professional/professional_login_page.dart';
 import 'web/admin/pages/admin_dashboard_page.dart';
 import 'web/super_admin/web_super_admin_app.dart';
 import 'services/web_pending_auth_storage.dart';
@@ -103,9 +102,7 @@ class SphotApp extends StatelessWidget {
     if (uri.path == '/professional-login') {
       return MaterialPageRoute(
         settings: settings,
-        builder: (_) => ProfessionalLoginPage(
-          advertiserAccess: uri.queryParameters['audience'] == 'advertiser',
-        ),
+        builder: (_) => const ProfilLoginPage(),
       );
     }
 
