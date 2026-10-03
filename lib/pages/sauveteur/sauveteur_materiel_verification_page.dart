@@ -155,6 +155,7 @@ class _SauveteurMaterielVerificationPageState
     final backupBar = _parseBar(_oxygenBackupController)!;
 
     final lines = <String>[
+      'Catégorie : Oxygénothérapie & DSA',
       'O² bouteille principale : ' + mainBar.toString() + ' bar',
       'O² bouteille secours : ' + backupBar.toString() + ' bar',
       'Aspirateur de mucosités : ' + _status(_aspiratorWorking),
@@ -170,6 +171,9 @@ class _SauveteurMaterielVerificationPageState
     ];
 
     final remarks = _remarksController.text.trim();
+    if (remarks.isNotEmpty) {
+      lines.add('Observation : ' + remarks);
+    }
 
     try {
       final response = await http.post(
@@ -183,9 +187,7 @@ class _SauveteurMaterielVerificationPageState
           'spotId': spotId,
           'type': 'Vérification matériel',
           'description': lines.join('\n'),
-          'actionTaken': remarks.isEmpty
-              ? 'Contrôle matériel de début de service.'
-              : remarks,
+          'actionTaken': '',
           'visibility': 'operational',
         }),
       );
@@ -456,7 +458,7 @@ class _SauveteurMaterielVerificationPageState
                       fit: BoxFit.contain,
                     ),
                     const Text(
-                      'VÉRIFICATION MATÉRIEL',
+                      'OXYGÉNOTHÉRAPIE & DSA',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFFD50000),
