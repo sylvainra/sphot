@@ -544,6 +544,14 @@ class _InstitutionalMainCourantePageState
     );
   }
 
+  bool _isPresenceEntry(Map<String, dynamic> entry) {
+    final type = (entry['type'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    return type == 'présence' || type == 'presence';
+  }
+
   bool _isMaterialVerificationEntry(
     Map<String, dynamic> entry,
   ) {
@@ -768,10 +776,17 @@ class _InstitutionalMainCourantePageState
   List<Widget> _factWidgets() {
     final verificationGroups = _materialVerificationGroups();
     final otherEntries = _chronologicalNonVerificationEntries();
+    final presenceEntries = otherEntries
+        .where(_isPresenceEntry)
+        .toList();
+    final chronologicalEntries = otherEntries
+        .where((entry) => !_isPresenceEntry(entry))
+        .toList();
 
     return <Widget>[
+      ...presenceEntries.map(_entryCard),
       ...verificationGroups.map(_verificationGroupCard),
-      ...otherEntries.map(_entryCard),
+      ...chronologicalEntries.map(_entryCard),
     ];
   }
 
