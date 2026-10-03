@@ -544,6 +544,235 @@ class _InstitutionalMainCourantePageState
     );
   }
 
+  bool _isMaterialVerificationEntry(
+    Map<String, dynamic> entry,
+  ) {
+    final type = (entry['type'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    return type == 'vérification matériel' ||
+        type == 'verification materiel' ||
+        type == 'vérifications' ||
+        type == 'verifications';
+  }
+
+  int _entryOccurredAtMillis(Map<String, dynamic> entry) {
+    final raw = entry['occurredAt'];
+    if (raw is num) return raw.toInt();
+    return int.tryParse((raw ?? '').toString()) ?? 0;
+  }
+
+  String _materialVerificationCategory(
+    Map<String, dynamic> entry,
+  ) {
+    final description =
+        (entry['description'] ?? '').toString().toLowerCase();
+
+    if (description.contains('catégorie : oxy') ||
+        description.contains('categorie : oxy') ||
+        description.contains('dsa') ||
+        description.contains('bouteille principale')) {
+      return 'OXYGÈNE / DSA';
+    }
+
+    if (description.contains('catégorie : phonie') ||
+        description.contains('categorie : phonie') ||
+        description.contains('communication') ||
+        description.contains('vhf')) {
+      return 'PHONIE';
+    }
+
+    if (description.contains('catégorie : matériel roulant') ||
+        description.contains('categorie : materiel roulant') ||
+        description.contains('véhicules / quads') ||
+        description.contains('vehicules / quads')) {
+      return 'MATÉRIEL ROULANT';
+    }
+
+    if (description.contains('catégorie : matériel flottant') ||
+        description.contains('categorie : materiel flottant') ||
+        description.contains('embarcations / jets') ||
+        description.contains('rescue tubes')) {
+      return 'MATÉRIEL FLOTTANT';
+    }
+
+    return 'VÉRIFICATION';
+  }
+
+  String _materialVerificationBody(
+    Map<String, dynamic> entry,
+  ) {
+    final description = (entry['description'] ?? '').toString();
+    final lines = description.split(RegExp(r'\r?\n')).toList();
+
+    if (lines.isNotEmpty) {
+      final first = lines.first.trim().toLowerCase();
+      if (first.startsWith('catégorie :') ||
+          first.startsWith('categorie :')) {
+        lines.removeAt(0);
+      }
+    }
+
+    return lines.join('\n').replaceAll(' • ', '\n').trim();
+  }
+
+  String _verificationTime(Map<String, dynamic> entry) {
+    final millis = _entryOccurredAtMillis(entry);
+    if (millis <= 0) return '--:--';
+
+    final date = DateTime.fromMillisecondsSinceEpoch(millis).toLocal();
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  List<List<Map<String, dynamic>>> _materialVerificationGroups() {
+    final entries = _entries
+        .where(_isMaterialVerificationEntry)
+        .toList()
+      ..sort(
+        (a, b) => _entryOccurredAtMillis(a).compareTo(
+          _entryOccurredAtMillis(b),
+        ),
+      );
+
+    final categoryOccurrences = <String, int>{};
+    final groups = <List<Map<String, dynamic>>>[];
+
+    for (final entry in entries) {
+      final category = _materialVerificationCategory(entry);
+      final occurrence = categoryOccurrences[category] ?? 0;
+      categoryOccurrences[category] = occurrence + 1;
+
+      while (groups.length <= occurrence) {
+        groups.add(<Map<String, dynamic>>[]);
+      }
+
+      groups[occurrence].add(entry);
+    }
+
+    for (final group in groups) {
+      group.sort(
+        (a, b) => _entryOccurredAtMillis(a).compareTo(
+          _entryOccurredAtMillis(b),
+        ),
+      );
+    }
+
+    return groups;
+  }
+
+  List<Map<String, dynamic>> _chronologicalNonVerificationEntries() {
+    final entries = _entries
+        .where((entry) => !_isMaterialVerificationEntry(entry))
+        .toList()
+      ..sort(
+        (a, b) => _entryOccurredAtMillis(a).compareTo(
+          _entryOccurredAtMillis(b),
+        ),
+      );
+    return entries;
+  }
+
+  Widget _verificationGroupCard(
+    List<Map<String, dynamic>> group,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _purple.withOpacity(0.42),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'VÉRIFICATIONS',
+            style: TextStyle(
+              color: _purple,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 9),
+          ...group.map((entry) {
+            final category = _materialVerificationCategory(entry);
+            final body = _materialVerificationBody(entry);
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 11),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _blue.withOpacity(0.22),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            category,
+                            style: const TextStyle(
+                              color: _blue,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          _verificationTime(entry),
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (body.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        body,
+                        style: const TextStyle(
+                          fontSize: 11.2,
+                          fontWeight: FontWeight.w700,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _factWidgets() {
+    final verificationGroups = _materialVerificationGroups();
+    final otherEntries = _chronologicalNonVerificationEntries();
+
+    return <Widget>[
+      ...verificationGroups.map(_verificationGroupCard),
+      ...otherEntries.map(_entryCard),
+    ];
+  }
+
   Widget _entryCard(Map<String, dynamic> entry) {
     final source = (entry['source'] ?? '').toString();
     final automatic = source.startsWith('automatic_');
@@ -976,7 +1205,7 @@ class _InstitutionalMainCourantePageState
                               ),
                             )
                           else
-                            ..._entries.map(_entryCard),
+                            ..._factWidgets(),
                         ],
                       ),
                     ),
@@ -1141,7 +1370,7 @@ class _InstitutionalMainCourantePageState
                                     ),
                                   )
                                 else
-                                  ..._entries.map(_entryCard),
+                                  ..._factWidgets(),
                               ],
                             ),
                           ),
