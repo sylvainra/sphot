@@ -223,10 +223,12 @@ class _StartPage extends StatelessWidget {
         ),
         if (!correction) ...[
           const SizedBox(height: 16),
-          const Text(
-            "Professionnels, créez votre SPHOT PUBLICITAIRE en quelques clics, après validation de votre demande préalable auprès de l'équipe SPHOT.",
+          Text(
+            kIsWeb
+                ? "Professionnels, créez votre SPHOT PUBLICITAIRE en quelques clics, après validation de votre demande préalable auprès de l'équipe SPHOT."
+                : "Pour créer votre SPHOT PUBLICITAIRE dans de meilleures conditions de confort et de lisibilité, vous allez être redirigé vers le site SPHOT afin de compléter votre demande.",
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               color: WebColors.blue,
               fontSize: 16,
               height: 1.35,
@@ -258,7 +260,11 @@ class _StartPage extends StatelessWidget {
         SphotAccessButton(
           loading: loading,
           onPressed: onStart,
-          label: correction ? 'ACCÉDER À MA DEMANDE' : 'COMMENCER MA DEMANDE',
+          label: correction
+              ? 'ACCÉDER À MA DEMANDE'
+              : kIsWeb
+                  ? 'COMMENCER MA DEMANDE'
+                  : 'CONTINUER SUR LE SITE SPHOT',
         ),
       ],
     ),
