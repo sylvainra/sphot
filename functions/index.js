@@ -5773,8 +5773,7 @@ exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
         const accessUrl =
           INSTITUTIONAL_MAIN_COURANTE_URL + "?token=" +
           encodeURIComponent(item.rawToken);
-        const firstName = (contact.prenom || "").toString().trim();
-        const greeting = firstName ? "Bonjour " + firstName + "," : "Bonjour,";
+        const greeting = operationalNotificationGreeting(contact);
 
         try {
           await sendSphotMail(transporter, {
