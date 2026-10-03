@@ -544,7 +544,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                             children: [
                               Expanded(
                                 child: _MaterialVerificationSquare(
-                                  title: 'OXYGÈNE\n& DSA',
+                                  title: 'SECOURS',
                                   icon: Icons.monitor_heart_outlined,
                                   onTap: () {
                                     Navigator.of(context).push(
