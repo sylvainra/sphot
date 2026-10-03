@@ -327,7 +327,7 @@ class _SauveteurMaterielCategoryVerificationPageState
         body: jsonEncode({
           'sauveteurSessionToken': widget.sauveteurSessionToken,
           'spotId': spotId,
-          'type': 'Vérification matériel',
+          'type': 'Vérifications',
           'description': _verificationLines().join('\n'),
           'actionTaken': '',
           'visibility': 'operational',
