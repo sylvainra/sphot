@@ -3184,22 +3184,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           'LIEU',
           'Positionnez le lieu du SPHOT ADMIN sur la carte centrale.',
         ),
-        _textField(
-          'siteInternetVille',
-          'https://www.votre-site.fr',
-          readOnly: !_isFieldEditable('siteInternetVille'),
-        ),
-
-        const SizedBox(height: 11),
-
-        _buildAdminLogoPicker(),
-        const SizedBox(height: 11),
-        _textField(
-          'arretesMunicipaux',
-          'https://réglements-de-baignade',
-          readOnly: !_isFieldEditable('arretesMunicipaux'),
-        ),
-        const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -3208,7 +3192,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             border: Border.all(color: adminColor, width: 1.4),
           ),
           child: const Text(
-            'Cliquez sur la carte pour positionner le lieu du SPHOT ADMIN.\n\nAstuce : les coordonnées GPS seront enregistrées automatiquement.',
+            'Cliquez sur la carte pour positionner le lieu du SPHOT ADMIN.\n\n'
+            'Astuce : les coordonnées GPS seront enregistrées automatiquement.',
             style: TextStyle(
               color: adminColor,
               fontSize: 12,
@@ -3267,6 +3252,20 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 14),
+        _buildAdminLogoPicker(),
+        const SizedBox(height: 14),
+        _textField(
+          'siteInternetVille',
+          'Site internet du lieu',
+          readOnly: !_isFieldEditable('siteInternetVille'),
+        ),
+        const SizedBox(height: 11),
+        _textField(
+          'arretesMunicipaux',
+          'Règlements de baignade',
+          readOnly: !_isFieldEditable('arretesMunicipaux'),
         ),
         const SizedBox(height: 22),
         Row(
