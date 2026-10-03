@@ -10,7 +10,6 @@ import 'map/map_page.dart';
 import 'map/profil_login_page.dart';
 import 'web/advertiser/web_advertiser_app.dart';
 import 'web/advertiser/pages/advertiser_first_access_page.dart';
-import 'web/admin/pages/admin_proconnect_access_page.dart';
 import 'web/admin/pages/admin_trial_request_page.dart';
 import 'web/admin/pages/admin_dashboard_page.dart';
 import 'web/super_admin/web_super_admin_app.dart';
@@ -116,7 +115,7 @@ class SphotApp extends StatelessWidget {
     if (uri.path == '/admin-request') {
       return MaterialPageRoute(
         settings: settings,
-        builder: (_) => const AdminProConnectAccessPage(),
+        builder: (_) => const AdminTrialRequestPage(),
       );
     }
 
