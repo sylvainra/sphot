@@ -1974,7 +1974,7 @@ Widget _buildBottomBar() {
                                   width: 22,
                                   height: 5,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF1E3A8A),
+                                    color: const Color(0xFFFF0000),
                                     borderRadius: BorderRadius.circular(1.5),
                                   ),
                                 ),
@@ -2001,35 +2001,15 @@ Widget _buildBottomBar() {
                   const SizedBox(height: 2),
 
                   index == 4
-    ? RichText(
-        text: const TextSpan(
-          style: TextStyle(
-            fontSize: 10.4,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.2,
-          ),
-          children: [
-            TextSpan(
-              text: 'L',
-              style: TextStyle(color: Color(0xFFFF0000)),
-            ),
-            TextSpan(
-              text: 'O',
-              style: TextStyle(color: Color(0xFF1E3A8A)),
-            ),
-            TextSpan(
-              text: 'G',
-              style: TextStyle(color: Color(0xFFFF0000)),
-            ),
-            TextSpan(
-              text: 'I',
-              style: TextStyle(color: Color(0xFF1E3A8A)),
-            ),
-            TextSpan(
-              text: 'N',
-              style: TextStyle(color: Color(0xFFFF0000)),
-            ),
-          ],
+    ? const Text(
+        'LOGIN',
+        maxLines: 1,
+        overflow: TextOverflow.visible,
+        style: TextStyle(
+          fontSize: 10.4,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -0.2,
+          color: Color(0xFFFF0000),
         ),
       )
     : Text(
