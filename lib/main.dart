@@ -71,6 +71,13 @@ class SphotApp extends StatelessWidget {
 
     final uri = Uri.parse(routeName);
 
+    if (uri.path == '/map') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => const MapPage(),
+      );
+    }
+
     if (uri.path == '/advertiser') {
       return MaterialPageRoute(
         settings: settings,
