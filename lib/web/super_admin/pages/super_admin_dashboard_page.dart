@@ -7204,7 +7204,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                                       onPressed: () {
                                         Navigator.of(context)
                                             .pushNamedAndRemoveUntil(
-                                          '/',
+                                          '/map',
                                           (route) => false,
                                         );
                                       },
