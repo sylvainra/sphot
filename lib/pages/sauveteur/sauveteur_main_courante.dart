@@ -1186,27 +1186,22 @@ class _SauveteurMainCourantePageState
     final presents = _personnelRows
         .where((row) => row['status'] == 'PRÉSENT')
         .toList();
-    final absents = _personnelRows
-        .where((row) => row['status'] != 'PRÉSENT')
-        .toList();
 
-    Widget personnelLine(Map<String, String> row, {required bool present}) {
+    Widget personnelLine(Map<String, String> row) {
       final name = (row['name'] ?? '').trim();
       final quality = (row['quality'] ?? 'Sauveteur').trim();
-      final status = (row['status'] ?? '').trim();
+      final hours = _presenceHoursDisplay(
+        (row['hours'] ?? '').trim(),
+      );
 
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
+        padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              present
-                  ? Icons.check_circle_rounded
-                  : Icons.remove_circle_outline_rounded,
-              color: present
-                  ? const Color(0xFF15803D)
-                  : const Color(0xFFDC2626),
+            const Icon(
+              Icons.check_circle_rounded,
+              color: Color(0xFF15803D),
               size: 17,
             ),
             const SizedBox(width: 7),
@@ -1229,17 +1224,28 @@ class _SauveteurMainCourantePageState
                       fontWeight: FontWeight.w800,
                     ),
                   ),
+                  const SizedBox(height: 2),
+                  Text(
+                    hours.isEmpty
+                        ? 'Horaires à renseigner'
+                        : 'Horaires : $hours',
+                    style: TextStyle(
+                      color: hours.isEmpty
+                          ? const Color(0xFFDC2626)
+                          : Colors.black87,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(width: 6),
-            Text(
-              status,
+            const Text(
+              'PRÉSENT',
               textAlign: TextAlign.right,
               style: TextStyle(
-                color: present
-                    ? const Color(0xFF15803D)
-                    : const Color(0xFFDC2626),
+                color: Color(0xFF15803D),
                 fontSize: 9,
                 fontWeight: FontWeight.w900,
               ),
@@ -1274,75 +1280,38 @@ class _SauveteurMainCourantePageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (presents.isNotEmpty) ...[
-            const Text(
-              'PRÉSENTS',
-              style: TextStyle(
-                color: Color(0xFF15803D),
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 2),
-            ...presents.map((row) => personnelLine(row, present: true)),
-          ],
-          if (presents.isNotEmpty && absents.isNotEmpty)
-            const Divider(height: 14),
-          if (absents.isNotEmpty) ...[
-            const Text(
-              'ABSENTS',
-              style: TextStyle(
-                color: Color(0xFFDC2626),
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 2),
-            ...absents.map((row) => personnelLine(row, present: false)),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _derivedPastPresenceCard() {
-    final labels = _selectedPresenceLabels.toList()
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.72),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1E3A8A)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+          _presenceSelector(),
+          const SizedBox(height: 10),
           const Text(
-            'Présence',
-            style: _visibleTitleStyle,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            labels.isEmpty
-                ? 'Aucune présence renseignée.'
-                : labels.join('\n'),
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              height: 1.25,
+            'PRÉSENTS',
+            style: TextStyle(
+              color: Color(0xFF15803D),
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
             ),
           ),
+          const SizedBox(height: 2),
+          if (presents.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text(
+                'Aucune présence validée pour cette journée.',
+                style: TextStyle(
+                  color: Colors.black54,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            )
+          else
+            ...presents.map(personnelLine),
           if (_presenceFromPlanning) ...[
             const SizedBox(height: 6),
             const Text(
-              'Présence issue du planning de cette journée.',
+              'Horaires préremplis depuis le planning lorsqu’ils sont disponibles.',
               style: TextStyle(
                 color: Colors.black54,
-                fontSize: 10,
+                fontSize: 9.5,
                 fontWeight: FontWeight.w700,
               ),
             ),
