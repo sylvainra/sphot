@@ -756,7 +756,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
     if (choice == null || !mounted) return;
 
     if (choice == _LoginAudience.admin) {
-      Navigator.of(context).pushNamed('/admin-request');
+      Navigator.of(context).pushNamed('/admin-request-form');
     } else {
       Navigator.of(context).pushNamed('/advertiser');
     }
