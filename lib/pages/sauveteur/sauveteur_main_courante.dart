@@ -403,7 +403,25 @@ class _SauveteurMainCourantePageState
     );
   }
 
-  List<String> _presenceDescriptionLines(Map<String, dynamic> entry) {
+  List<Map<String, String>> _presencePersonnelFromEntry(
+    Map<String, dynamic> entry,
+  ) {
+    final rawPersonnel = entry['presencePersonnel'];
+    if (rawPersonnel is List) {
+      return rawPersonnel
+          .whereType<Map>()
+          .map((raw) => Map<String, dynamic>.from(raw))
+          .map(
+            (raw) => <String, String>{
+              'name': (raw['name'] ?? '').toString().trim(),
+              'quality': (raw['quality'] ?? '').toString().trim(),
+              'hours': (raw['hours'] ?? '').toString().trim(),
+            },
+          )
+          .where((row) => (row['name'] ?? '').isNotEmpty)
+          .toList();
+    }
+
     final description = (entry['description'] ?? '').toString();
     return description
         .split(RegExp(r'\r?\n'))
@@ -413,7 +431,51 @@ class _SauveteurMainCourantePageState
               value.isNotEmpty &&
               value.toLowerCase() != 'aucun sauveteur présent.',
         )
+        .map((line) {
+          final separatorIndex = line.indexOf(' — ');
+          if (separatorIndex < 0) {
+            return <String, String>{
+              'name': line,
+              'quality': '',
+              'hours': '',
+            };
+          }
+
+          return <String, String>{
+            'name': line.substring(0, separatorIndex).trim(),
+            'quality': '',
+            'hours': line.substring(separatorIndex + 3).trim(),
+          };
+        })
         .toList();
+  }
+
+  String _presenceHoursDisplay(String value) {
+    return value
+        .trim()
+        .split(RegExp(r'\r?\n'))
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .join(' / ');
+  }
+
+  Map<String, dynamic>? _presenceCandidateForLabel(
+    List<Map<String, dynamic>> candidates,
+    String label,
+  ) {
+    final normalized = _normalizePresenceName(label);
+
+    for (final candidate in candidates) {
+      final aliases = (candidate['aliases'] as List?)
+              ?.map((value) => value.toString())
+              .toList() ??
+          <String>[];
+      if (aliases.contains(normalized)) {
+        return candidate;
+      }
+    }
+
+    return null;
   }
 
   Future<void> _loadPresenceContext(
@@ -426,6 +488,7 @@ class _SauveteurMainCourantePageState
           _presenceCandidates = [];
           _personnelRows = [];
           _selectedPresenceLabels = <String>{};
+          _presenceHoursByLabel = <String, String>{};
           _presenceEntry = null;
           _presenceFromPlanning = false;
         });
@@ -484,6 +547,7 @@ class _SauveteurMainCourantePageState
         'login': login,
         'quality': functions.isEmpty ? 'Sauveteur' : functions.join(' / '),
         'planned': false,
+        'hours': '',
         'connected': connected,
         'aliases': <String>[
           _normalizePresenceName(label),
@@ -502,7 +566,6 @@ class _SauveteurMainCourantePageState
 
     final planningSnapshot = await planningReference.get();
     final plannedLabels = <String>{};
-    final personnelRows = <Map<String, String>>[];
 
     if (planningSnapshot.exists) {
       final planning = planningSnapshot.data() ?? <String, dynamic>{};
@@ -519,33 +582,22 @@ class _SauveteurMainCourantePageState
         if (name.isEmpty) continue;
 
         final cellKey = '$role-day_${_selectedDay.day}';
-        final cellValue = (cells[cellKey] ?? '').toString();
+        final cellValue = (cells[cellKey] ?? '').toString().trim();
         final plannedPresent = _planningCellMeansPresent(cellValue);
-
-        personnelRows.add({
-          'name': name,
-          'quality': role,
-          'planningStatus': _planningPersonnelStatus(cellValue),
-        });
-
         final normalizedName = _normalizePresenceName(name);
-        Map<String, dynamic>? matchedCandidate;
-
-        for (final candidate in candidates) {
-          final aliases = (candidate['aliases'] as List)
-              .map((value) => value.toString())
-              .toList();
-          if (aliases.contains(normalizedName)) {
-            matchedCandidate = candidate;
-            break;
-          }
-        }
+        final matchedCandidate = _presenceCandidateForLabel(
+          candidates,
+          name,
+        );
 
         if (matchedCandidate != null) {
           matchedCandidate['planningRole'] = role;
+          matchedCandidate['planned'] = plannedPresent;
           if (plannedPresent) {
-            matchedCandidate['planned'] = true;
-            plannedLabels.add(matchedCandidate['label'].toString());
+            matchedCandidate['hours'] = cellValue;
+            plannedLabels.add(
+              (matchedCandidate['label'] ?? name).toString(),
+            );
           }
         } else {
           candidates.add({
@@ -554,6 +606,7 @@ class _SauveteurMainCourantePageState
             'quality': role,
             'planningRole': role,
             'planned': plannedPresent,
+            'hours': plannedPresent ? cellValue : '',
             'connected': false,
             'aliases': <String>[normalizedName],
           });
@@ -571,80 +624,101 @@ class _SauveteurMainCourantePageState
           .compareTo((b['label'] ?? '').toString().toLowerCase()),
     );
 
-    Set<String> selected;
+    final selected = <String>{};
+    final hoursByLabel = <String, String>{};
+
     if (existingPresence != null) {
-      selected = _presenceDescriptionLines(existingPresence).toSet();
+      final savedPersonnel =
+          _presencePersonnelFromEntry(existingPresence);
 
-      for (final savedLabel in selected.toList()) {
-        final normalized = _normalizePresenceName(savedLabel);
-        final found = candidates.any((candidate) {
-          final aliases = (candidate['aliases'] as List)
-              .map((value) => value.toString())
-              .toList();
-          return aliases.contains(normalized);
-        });
+      for (final saved in savedPersonnel) {
+        final savedLabel = (saved['name'] ?? '').trim();
+        if (savedLabel.isEmpty) continue;
 
-        if (!found) {
+        selected.add(savedLabel);
+        final savedHours = (saved['hours'] ?? '').trim();
+        if (savedHours.isNotEmpty) {
+          hoursByLabel[savedLabel] = savedHours;
+        }
+
+        final found = _presenceCandidateForLabel(
+          candidates,
+          savedLabel,
+        );
+        if (found == null) {
           candidates.add({
-            'id': 'saved:$normalized',
+            'id': 'saved:${_normalizePresenceName(savedLabel)}',
             'label': savedLabel,
-            'quality': 'Sauveteur',
+            'quality': (saved['quality'] ?? '').trim().isEmpty
+                ? 'Sauveteur'
+                : (saved['quality'] ?? '').trim(),
             'planned': false,
+            'hours': savedHours,
             'connected': false,
-            'aliases': <String>[normalized],
+            'aliases': <String>[
+              _normalizePresenceName(savedLabel),
+            ],
           });
+        } else {
+          if (savedHours.isNotEmpty) {
+            found['hours'] = savedHours;
+          }
+          final savedQuality = (saved['quality'] ?? '').trim();
+          if (savedQuality.isNotEmpty &&
+              (found['planningRole'] ?? '').toString().trim().isEmpty) {
+            found['quality'] = savedQuality;
+          }
         }
       }
     } else {
-      selected = plannedLabels.toSet();
+      selected.addAll(plannedLabels);
+
+      for (final label in plannedLabels) {
+        final candidate = _presenceCandidateForLabel(
+          candidates,
+          label,
+        );
+        final plannedHours =
+            (candidate?['hours'] ?? '').toString().trim();
+        if (plannedHours.isNotEmpty) {
+          hoursByLabel[label] = plannedHours;
+        }
+      }
 
       if (_selectedDayIsToday) {
         for (final candidate in candidates) {
-          if (candidate['connected'] == true) {
-            final connectedLabel =
-                (candidate['label'] ?? '').toString().trim();
-            if (connectedLabel.isNotEmpty) {
-              selected.add(connectedLabel);
-            }
+          if (candidate['connected'] != true) continue;
+
+          final connectedLabel =
+              (candidate['label'] ?? '').toString().trim();
+          if (connectedLabel.isEmpty) continue;
+
+          selected.add(connectedLabel);
+          final candidateHours =
+              (candidate['hours'] ?? '').toString().trim();
+          if (candidateHours.isNotEmpty) {
+            hoursByLabel.putIfAbsent(
+              connectedLabel,
+              () => candidateHours,
+            );
           }
         }
       }
     }
 
-    final normalizedSelected = selected
-        .map(_normalizePresenceName)
-        .toSet();
-
-    for (final row in personnelRows) {
-      final name = row['name'] ?? '';
-      final isPresent = normalizedSelected.contains(
-        _normalizePresenceName(name),
-      );
-      final planningStatus = row['planningStatus'] ?? 'ABSENT';
-
-      row['status'] = isPresent
-          ? 'PRÉSENT'
-          : planningStatus == 'PRÉSENT'
-              ? 'ABSENT'
-              : planningStatus;
-    }
-
+    final personnelRows = <Map<String, String>>[];
     for (final selectedLabel in selected) {
-      final normalized = _normalizePresenceName(selectedLabel);
-      final alreadyListed = personnelRows.any(
-        (row) => _normalizePresenceName(row['name'] ?? '') == normalized,
+      final candidate = _presenceCandidateForLabel(
+        candidates,
+        selectedLabel,
       );
-      if (alreadyListed) continue;
+      final hours = (
+        hoursByLabel[selectedLabel] ??
+        (candidate?['hours'] ?? '').toString()
+      ).trim();
 
-      Map<String, dynamic>? candidate;
-      for (final value in candidates) {
-        final aliases = (value['aliases'] as List)
-            .map((item) => item.toString())
-            .toList();
-        if (aliases.contains(normalized)) {
-          candidate = value;
-          break;
-        }
+      if (hours.isNotEmpty) {
+        hoursByLabel[selectedLabel] = hours;
       }
 
       personnelRows.add({
@@ -653,16 +727,12 @@ class _SauveteurMainCourantePageState
                 candidate?['quality'] ??
                 'Sauveteur')
             .toString(),
-        'planningStatus': 'PRÉSENT',
+        'hours': hours,
         'status': 'PRÉSENT',
       });
     }
 
     personnelRows.sort((a, b) {
-      final aPresent = a['status'] == 'PRÉSENT';
-      final bPresent = b['status'] == 'PRÉSENT';
-      if (aPresent != bPresent) return aPresent ? -1 : 1;
-
       final qualityCompare =
           (a['quality'] ?? '').compareTo(b['quality'] ?? '');
       if (qualityCompare != 0) return qualityCompare;
@@ -675,13 +745,20 @@ class _SauveteurMainCourantePageState
       _presenceCandidates = candidates;
       _personnelRows = personnelRows;
       _selectedPresenceLabels = selected;
+      _presenceHoursByLabel = hoursByLabel;
       _presenceEntry = existingPresence;
       _presenceFromPlanning = plannedLabels.isNotEmpty;
     });
 
+    final allSelectedHaveHours = selected.isNotEmpty &&
+        selected.every(
+          (label) =>
+              (hoursByLabel[label] ?? '').trim().isNotEmpty,
+        );
+
     if (_selectedDayIsToday &&
         existingPresence == null &&
-        selected.isNotEmpty &&
+        allSelectedHaveHours &&
         !_presenceAutoSaveAttempted &&
         _canWrite) {
       _presenceAutoSaveAttempted = true;
@@ -700,9 +777,53 @@ class _SauveteurMainCourantePageState
     final labels = _selectedPresenceLabels.toList()
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
-    final description = labels.isEmpty
-        ? 'Aucun sauveteur présent.'
-        : labels.join('\n');
+    if (labels.isEmpty) {
+      if (!automatic && mounted) {
+        setState(() {
+          _statusMessage =
+              'Sélectionnez au moins un personnel présent.';
+        });
+      }
+      return;
+    }
+
+    final presencePersonnel = <Map<String, String>>[];
+    for (final label in labels) {
+      final candidate = _presenceCandidateForLabel(
+        _presenceCandidates,
+        label,
+      );
+      final hours = (
+        _presenceHoursByLabel[label] ??
+        (candidate?['hours'] ?? '').toString()
+      ).trim();
+
+      if (hours.isEmpty) {
+        if (!automatic && mounted) {
+          setState(() {
+            _statusMessage =
+                'Renseignez les horaires de chaque personnel présent.';
+          });
+        }
+        return;
+      }
+
+      presencePersonnel.add({
+        'name': label,
+        'quality': (candidate?['planningRole'] ??
+                candidate?['quality'] ??
+                'Sauveteur')
+            .toString(),
+        'hours': hours,
+      });
+    }
+
+    final description = presencePersonnel
+        .map(
+          (row) =>
+              '${row['name']} — ${_presenceHoursDisplay(row['hours'] ?? '')}',
+        )
+        .join('\n');
 
     final actionTaken = automatic
         ? _presenceFromPlanning
@@ -730,6 +851,7 @@ class _SauveteurMainCourantePageState
         'description': description,
         'actionTaken': actionTaken,
         'visibility': 'operational',
+        'presencePersonnel': presencePersonnel,
         if (existingId.isNotEmpty) 'entryId': existingId,
       };
 
@@ -753,7 +875,8 @@ class _SauveteurMainCourantePageState
 
       if (!automatic) {
         setState(() {
-          _statusMessage = 'Présence du jour enregistrée.';
+          _statusMessage =
+              'Présence et horaires du jour enregistrés.';
         });
       }
 
@@ -775,30 +898,33 @@ class _SauveteurMainCourantePageState
     if (!_canWrite || !_selectedDayIsToday || _presenceSaving) return;
 
     final workingSelection = _selectedPresenceLabels.toSet();
+    final workingHours =
+        Map<String, String>.from(_presenceHoursByLabel);
+    String? validationMessage;
 
-    final result = await showDialog<Set<String>>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
               title: const Text(
-                'PRÉSENCE',
+                'PERSONNELS PRÉSENTS',
                 style: TextStyle(
                   color: Color(0xFF1E3A8A),
                   fontWeight: FontWeight.w900,
                 ),
               ),
               content: SizedBox(
-                width: 420,
+                width: 440,
                 child: _presenceCandidates.isEmpty
                     ? const Text(
-                        'Aucun sauveteur affecté à ce poste. '
-                        'La présence peut être renseignée lorsque les '
-                        'affectations ou le planning sont disponibles.',
+                        'Aucun sauveteur n’est affecté à ce poste. '
+                        'Vérifiez les affectations enregistrées par '
+                        'l’administrateur.',
                       )
                     : ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 430),
+                        constraints: const BoxConstraints(maxHeight: 470),
                         child: ListView.builder(
                           shrinkWrap: true,
                           itemCount: _presenceCandidates.length,
@@ -806,62 +932,164 @@ class _SauveteurMainCourantePageState
                             final candidate = _presenceCandidates[index];
                             final label =
                                 (candidate['label'] ?? '').toString();
+                            final quality =
+                                (candidate['planningRole'] ??
+                                        candidate['quality'] ??
+                                        'Sauveteur')
+                                    .toString();
                             final planned =
                                 candidate['planned'] == true;
                             final connected =
                                 candidate['connected'] == true;
                             final checked =
                                 workingSelection.contains(label);
+                            final plannedHours =
+                                (candidate['hours'] ?? '')
+                                    .toString()
+                                    .trim();
 
-                            return CheckboxListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              value: checked,
-                              activeColor: const Color(0xFF1E3A8A),
-                              title: Text(
-                                label,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
+                            final sourceText = planned
+                                ? plannedHours.isEmpty
+                                    ? 'Prévu au planning'
+                                    : 'Planning : ${_presenceHoursDisplay(plannedHours)}'
+                                : connected
+                                    ? 'Sauveteur connecté — horaires à confirmer'
+                                    : 'Affectation administrateur — horaires à renseigner';
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.fromLTRB(
+                                4,
+                                2,
+                                4,
+                                8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.72),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: checked
+                                      ? const Color(0xFF1E3A8A)
+                                      : Colors.black12,
                                 ),
                               ),
-                              subtitle: Text(
-                                planned
-                                    ? 'Prévu présent au planning'
-                                    : connected
-                                        ? 'Sauveteur connecté à ce poste'
-                                        : 'Non prévu au planning / ajout manuel',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: planned
-                                      ? const Color(0xFF15803D)
-                                      : Colors.black54,
-                                ),
+                              child: Column(
+                                children: [
+                                  CheckboxListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    value: checked,
+                                    activeColor:
+                                        const Color(0xFF1E3A8A),
+                                    title: Text(
+                                      label,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      '$quality\n$sourceText',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: planned
+                                            ? const Color(0xFF15803D)
+                                            : Colors.black54,
+                                      ),
+                                    ),
+                                    onChanged: (value) {
+                                      setDialogState(() {
+                                        validationMessage = null;
+                                        if (value == true) {
+                                          workingSelection.add(label);
+                                          if ((workingHours[label] ?? '')
+                                                  .trim()
+                                                  .isEmpty &&
+                                              plannedHours.isNotEmpty) {
+                                            workingHours[label] =
+                                                plannedHours;
+                                          }
+                                        } else {
+                                          workingSelection.remove(label);
+                                        }
+                                      });
+                                    },
+                                  ),
+                                  if (checked)
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                      ),
+                                      child: TextFormField(
+                                        key: ValueKey(
+                                          'presence-hours-$label',
+                                        ),
+                                        initialValue:
+                                            workingHours[label] ??
+                                                plannedHours,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Horaires affectés',
+                                          hintText:
+                                              'ex. 13h00 - 19h30',
+                                          isDense: true,
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          workingHours[label] = value;
+                                        },
+                                      ),
+                                    ),
+                                ],
                               ),
-                              onChanged: (value) {
-                                setDialogState(() {
-                                  if (value == true) {
-                                    workingSelection.add(label);
-                                  } else {
-                                    workingSelection.remove(label);
-                                  }
-                                });
-                              },
                             );
                           },
                         ),
                       ),
               ),
               actions: [
+                if (validationMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      validationMessage!,
+                      style: const TextStyle(
+                        color: Color(0xFFDC2626),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
                 TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
                   child: const Text('ANNULER'),
                 ),
                 FilledButton.icon(
                   onPressed: () {
-                    Navigator.of(dialogContext).pop(workingSelection);
+                    if (workingSelection.isEmpty) {
+                      setDialogState(() {
+                        validationMessage =
+                            'Sélectionnez au moins un personnel présent.';
+                      });
+                      return;
+                    }
+
+                    final missingHours = workingSelection.any(
+                      (label) =>
+                          (workingHours[label] ?? '').trim().isEmpty,
+                    );
+
+                    if (missingHours) {
+                      setDialogState(() {
+                        validationMessage =
+                            'Renseignez les horaires de chaque présent.';
+                      });
+                      return;
+                    }
+
+                    Navigator.of(dialogContext).pop(true);
                   },
                   icon: const Icon(Icons.save_outlined),
-                  label: const Text('ENREGISTRER'),
+                  label: const Text('VALIDER LA PRÉSENCE'),
                 ),
               ],
             );
@@ -870,11 +1098,16 @@ class _SauveteurMainCourantePageState
       },
     );
 
-    if (result == null || !mounted) return;
+    if (result != true || !mounted) return;
 
     setState(() {
-      _selectedPresenceLabels = result;
+      _selectedPresenceLabels = workingSelection;
+      _presenceHoursByLabel = {
+        for (final label in workingSelection)
+          label: (workingHours[label] ?? '').trim(),
+      };
     });
+
     await _savePresence();
   }
 
