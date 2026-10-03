@@ -2,10 +2,8 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 
 import '../pages/sauveteur/change_password_page.dart';
 import '../pages/sauveteur/sauveteur_legal_acceptance_page.dart';
@@ -758,22 +756,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
     if (choice == null || !mounted) return;
 
     if (choice == _LoginAudience.admin) {
-      if (kIsWeb) {
-        Navigator.of(context).pushNamed('/admin-request-form');
-        return;
-      }
-
-      final opened = await launchUrl(
-        Uri.parse('https://sphot.app/#/admin-request-form'),
-        mode: LaunchMode.externalApplication,
-      );
-
-      if (!opened && mounted) {
-        setState(() {
-          _errorMessage =
-              'Impossible d’ouvrir la demande d’accès SPHOT ADMIN.';
-        });
-      }
+      Navigator.of(context).pushNamed('/admin-request');
       return;
     }
 
