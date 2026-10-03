@@ -1854,51 +1854,38 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Future<void> _persistInstitutionalContacts(
     List<Map<String, dynamic>> contacts,
   ) async {
-    final territoireId = _resolvedTerritoireId.trim();
-    final uid = widget.adminUid.trim();
+    final token = widget.mainCouranteToken.trim();
 
-    if (territoireId.isEmpty) {
-      throw StateError('Territoire introuvable.');
+    if (token.isEmpty) {
+      throw StateError(
+        'Session administrateur expirée. Reconnectez-vous à SPHOT ADMIN.',
+      );
     }
 
-    final firestore = FirebaseFirestore.instance;
-    final now = FieldValue.serverTimestamp();
-
-    await firestore.collection('territoires').doc(territoireId).set(
-      {
-        'institutionnels': contacts,
-        'updatedAt': now,
-      },
-      SetOptions(merge: true),
+    final response = await http.post(
+      Uri.parse(
+        'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+        'saveAdminInstitutionalContacts',
+      ),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'mainCouranteToken': token,
+        'contacts': contacts,
+      }),
     );
 
-    if (uid.isNotEmpty) {
-      final requestReferences = await _adminRequestReferencesForUid(uid);
+    final decoded = response.body.trim().isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body);
 
-      for (final reference in requestReferences) {
-        await reference.set(
-          {
-            'institutionnels': contacts,
-            'territoire.institutionnels': contacts,
-            'updatedAt': now,
-          },
-          SetOptions(merge: true),
-        );
-      }
-
-      final adminReference = firestore.collection('admins').doc(uid);
-      final adminSnapshot = await adminReference.get();
-
-      if (adminSnapshot.exists) {
-        await adminReference.set(
-          {
-            'institutionnels': contacts,
-            'territoire.institutionnels': contacts,
-            'updatedAt': now,
-          },
-          SetOptions(merge: true),
-        );
-      }
+    if (response.statusCode < 200 ||
+        response.statusCode >= 300 ||
+        decoded is! Map<String, dynamic> ||
+        decoded['success'] != true) {
+      final error = decoded is Map<String, dynamic>
+          ? (decoded['error'] ?? 'save_failed').toString()
+          : 'save_failed';
+      throw StateError(error);
     }
 
     if (!mounted) return;
@@ -2182,7 +2169,41 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       updated.add(result);
     }
 
-    await _persistInstitutionalContacts(updated);
+    final emailChanged = index == null ||
+        _cleanText(existing['email']).toLowerCase() !=
+            _cleanText(result['email']).toLowerCase();
+
+    try {
+      await _persistInstitutionalContacts(updated);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF15803D),
+          content: Text(
+            emailChanged
+                ? 'Contact enregistré. Son accès personnel à la MAIN COURANTE '
+                    'va être envoyé automatiquement par email.'
+                : 'Contact institutionnel enregistré.',
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: redColor,
+          content: Text(
+            'Impossible d’enregistrer ce contact institutionnel. '
+            'Reconnectez-vous puis réessayez.',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _deleteInstitutionalContact({
@@ -2243,7 +2264,31 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         .map((entry) => Map<String, dynamic>.from(entry.value))
         .toList();
 
-    await _persistInstitutionalContacts(updated);
+    try {
+      await _persistInstitutionalContacts(updated);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFF15803D),
+          content: Text(
+            'Contact institutionnel supprimé.',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: redColor,
+          content: Text(
+            'Impossible de supprimer ce contact institutionnel.',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildInstitutionalContactsAdminSection(
@@ -2387,6 +2432,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 _cleanText(contact['email']),
                                 style: const TextStyle(fontSize: 11.5),
                               ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _cleanText(contact['accessTokenHash']).isNotEmpty
+                                  ? 'ACCÈS MAIN COURANTE ACTIF'
+                                  : 'ENVOI DE L’ACCÈS EN COURS',
+                              style: TextStyle(
+                                color: _cleanText(
+                                  contact['accessTokenHash'],
+                                ).isNotEmpty
+                                    ? const Color(0xFF15803D)
+                                    : const Color(0xFFF59E0B),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
                           ],
                         ),
                       ),
