@@ -5844,9 +5844,9 @@ exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
               "<p>Votre structure vous a habilité comme contact " +
               "institutionnel SPHOT.</p>" +
               "<p>Cet accès vous permet de consulter la " +
-              "<strong>MAIN COURANTE</strong> en lecture seule et de choisir " +
-              "les notifications que vous souhaitez recevoir : affalage du " +
-              "drapeau et intervention.</p>" +
+              "<strong>MAIN COURANTE</strong> de vos SPHOTS surveillés en " +
+              "lecture seule et de choisir les notifications que vous " +
+              "souhaitez recevoir : affalage du drapeau et intervention.</p>" +
               "<div style=\"text-align:center;margin:28px 0;\">" +
               "<a href=\"" + accessUrl + "\" style=\"display:inline-block;" +
               "padding:14px 24px;border-radius:12px;background:#1e3a8a;" +
@@ -5857,9 +5857,12 @@ exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
             text:
               greeting + "\n\n" +
               "Votre structure vous a habilité comme contact institutionnel " +
-              "SPHOT.\n\nAccès lecture seule à la MAIN COURANTE :\n" +
-              accessUrl + "\n\nVous pourrez y régler vos notifications " +
-              "d'affalage du drapeau et d'intervention.\n\n" +
+              "SPHOT.\n\nCet accès vous permet de consulter la MAIN " +
+              "COURANTE de vos SPHOTS surveillés en lecture seule et de " +
+              "choisir les notifications que vous souhaitez recevoir : " +
+              "affalage du drapeau et intervention.\n\n" +
+              "Accès à la MAIN COURANTE :\n" +
+              accessUrl + "\n\n" +
               "L'équipe SPHOT",
           });
 
