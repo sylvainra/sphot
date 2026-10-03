@@ -5598,9 +5598,9 @@ exports.saveAdminInstitutionalContacts = onRequest(
             batch.set(
                 adminReference,
                 {
-                  institutionnels: normalizedContacts,
+                  "institutionnels": normalizedContacts,
                   "territoire.institutionnels": normalizedContacts,
-                  updatedAt: now,
+                  "updatedAt": now,
                 },
                 {merge: true},
             );
@@ -5615,9 +5615,9 @@ exports.saveAdminInstitutionalContacts = onRequest(
             batch.set(
                 document.ref,
                 {
-                  institutionnels: normalizedContacts,
+                  "institutionnels": normalizedContacts,
                   "territoire.institutionnels": normalizedContacts,
-                  updatedAt: now,
+                  "updatedAt": now,
                 },
                 {merge: true},
             );
