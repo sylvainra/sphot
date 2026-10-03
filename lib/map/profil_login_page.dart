@@ -8,7 +8,6 @@ import 'package:http/http.dart' as http;
 import '../pages/sauveteur/change_password_page.dart';
 import '../pages/sauveteur/sauveteur_legal_acceptance_page.dart';
 import '../pages/sauveteur/sauveteur_menu_page.dart';
-import '../pages/professional/professional_login_page.dart' show ProfessionalLoginPage;
 import '../web/admin/pages/admin_change_password_page.dart';
 import '../web/admin/pages/admin_dashboard_page.dart';
 import '../web/advertiser/pages/advertiser_change_password_page.dart';
