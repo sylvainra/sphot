@@ -2788,7 +2788,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       children: [
         _pageHeader(
           'CONTACTS INSTITUTIONNELS',
-          'Vous pouvez renseigner les personnes institutionnelles de référence liées à la gestion du SPHOT. Cette étape est facultative.',
+          'Vous pouvez renseigner les personnes institutionnelles de référence liées à la gestion de votre SPHOT, telles qu’un élu, la Police municipale, un service communal ou intercommunal, un office de tourisme ou tout autre interlocuteur institutionnel concerné. Cette étape est facultative.',
         ),
         if (_institutionalContacts.isNotEmpty) ...[
           ..._institutionalContacts.asMap().entries.map(
