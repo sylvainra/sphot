@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+const Color sphotViolet = Color(0xFFD946EF);
+
 class DangerPictogram extends StatelessWidget {
   final String danger;
   final double size;
@@ -90,30 +92,30 @@ class DangerPictogram extends StatelessWidget {
     }
 
     if (upper.contains('ALTÉRATION DE LA QUALITÉ DES EAUX') ||
-        upper.contains('ALTERATION DE LA QUALITE DES EAUX') ||
-        upper.contains('ESPÈCES DANGEREUSES') ||
-        upper.contains('ESPECES DANGEREUSES') ||
-        upper.contains('MÉDUSES') ||
-        upper.contains('MEDUSES')) {
-      return SizedBox(
-        width: size * 1.25,
-        height: size,
-        child: Center(
-          child: Container(
-            width: size * 1.05,
-            height: size * 0.58,
-            decoration: BoxDecoration(
-              color: const Color(0xFF8E24AA),
-              borderRadius: BorderRadius.circular(2),
-              border: Border.all(
-                color: const Color(0xFF6A1B9A),
-                width: 1,
-              ),
-            ),
+    upper.contains('ALTERATION DE LA QUALITE DES EAUX') ||
+    upper.contains('ESPÈCES DANGEREUSES') ||
+    upper.contains('ESPECES DANGEREUSES') ||
+    upper.contains('MÉDUSES') ||
+    upper.contains('MEDUSES')) {
+  return SizedBox(
+    width: size * 1.25,
+    height: size,
+    child: Center(
+      child: Container(
+        width: size * 1.05,
+        height: size * 0.58,
+        decoration: BoxDecoration(
+          color: sphotViolet,
+          borderRadius: BorderRadius.circular(2),
+          border: Border.all(
+            color: sphotViolet,
+            width: 1,
           ),
         ),
-      );
-    }
+      ),
+    ),
+  );
+}
 
     if (upper.contains('EAU FROIDE')) {
       return SizedBox(
@@ -146,10 +148,9 @@ class DangerPictogram extends StatelessWidget {
     }
 
     if (upper.contains('VENT')) {
-      return _icon(
-        Icons.air_rounded,
-        const Color(0xFF64748B),
-        size,
+      return WindsockGlyph(
+        width: size * 1.55,
+        height: size,
       );
     }
 
@@ -231,6 +232,155 @@ class DangerPictogram extends StatelessWidget {
       height: size,
       child: CustomPaint(painter: painter),
     );
+  }
+}
+
+class WindsockGlyph extends StatelessWidget {
+  final double width;
+  final double height;
+
+  const WindsockGlyph({
+    super.key,
+    this.width = 44,
+    this.height = 28,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size(width, height),
+      painter: const _WindsockGlyphPainter(),
+    );
+  }
+}
+
+class _WindsockGlyphPainter extends CustomPainter {
+  const _WindsockGlyphPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final armPaint = Paint()
+      ..color = const Color(0xFF616161)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(1.1, size.height * 0.045)
+      ..strokeCap = StrokeCap.round;
+
+    final midY = size.height / 2;
+    final ringX = size.width * 0.16;
+
+    canvas.drawLine(
+      Offset(0, midY),
+      Offset(ringX - size.width * 0.025, midY),
+      armPaint,
+    );
+
+    final ringFillPaint = Paint()
+      ..color = const Color(0xFFE5E7EB)
+      ..style = PaintingStyle.fill;
+
+    final ringBorderPaint = Paint()
+      ..color = const Color(0xFF9CA3AF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.8, size.height * 0.03);
+
+    final ring = Rect.fromCenter(
+      center: Offset(ringX, midY),
+      width: size.width * 0.10,
+      height: size.height * 0.48,
+    );
+
+    canvas.drawOval(ring, ringFillPaint);
+    canvas.drawOval(ring, ringBorderPaint);
+
+    final sockLeft = ringX + size.width * 0.035;
+    final sockRight = size.width * 0.98;
+
+    final sockPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [
+          Color(0xFFFFA000),
+          Color(0xFFF59E0B),
+          Color(0xFFE58A00),
+        ],
+      ).createShader(
+        Rect.fromLTWH(
+          sockLeft,
+          0,
+          sockRight - sockLeft,
+          size.height,
+        ),
+      )
+      ..style = PaintingStyle.fill;
+
+    final sockBorderPaint = Paint()
+      ..color = const Color(0xFFB45309)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.7, size.height * 0.025);
+
+    final path = Path()
+      ..moveTo(sockLeft, size.height * 0.17)
+      ..cubicTo(
+        size.width * 0.42,
+        size.height * 0.14,
+        size.width * 0.74,
+        size.height * 0.25,
+        sockRight,
+        size.height * 0.34,
+      )
+      ..lineTo(sockRight, size.height * 0.66)
+      ..cubicTo(
+        size.width * 0.74,
+        size.height * 0.75,
+        size.width * 0.42,
+        size.height * 0.86,
+        sockLeft,
+        size.height * 0.83,
+      )
+      ..close();
+
+    canvas.drawPath(path, sockPaint);
+    canvas.drawPath(path, sockBorderPaint);
+
+    final openingPaint = Paint()
+      ..color = const Color(0xFFE5E7EB)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.9, size.height * 0.035);
+
+    canvas.drawArc(
+      Rect.fromLTWH(
+        sockLeft - size.width * 0.02,
+        size.height * 0.17,
+        size.width * 0.10,
+        size.height * 0.66,
+      ),
+      -math.pi / 2,
+      math.pi,
+      false,
+      openingPaint,
+    );
+
+    final foldPaint = Paint()
+      ..color = const Color(0xFFB45309).withOpacity(0.22)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.45, size.height * 0.018);
+
+    canvas.drawLine(
+      Offset(size.width * 0.46, size.height * 0.25),
+      Offset(size.width * 0.48, size.height * 0.75),
+      foldPaint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.68, size.height * 0.29),
+      Offset(size.width * 0.70, size.height * 0.71),
+      foldPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _WindsockGlyphPainter oldDelegate) {
+    return false;
   }
 }
 

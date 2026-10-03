@@ -3,6 +3,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../../services/sauveteur_live_publication_service.dart';
 import 'widgets/sauveteur_styled_dropdown.dart';
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurEphemerideDictonPage extends StatefulWidget {
   final Color profileColor;
@@ -10,6 +11,7 @@ class SauveteurEphemerideDictonPage extends StatefulWidget {
   final String sphotMode;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final String? initialSpotId;
 
   const SauveteurEphemerideDictonPage({
     super.key,
@@ -18,6 +20,7 @@ class SauveteurEphemerideDictonPage extends StatefulWidget {
     required this.sphotMode,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    required this.initialSpotId,
   });
 
   @override
@@ -65,7 +68,15 @@ class _SauveteurEphemerideDictonPageState
       _assignedSpots
         ..clear()
         ..addAll(spots);
-      _selectedSpotId = _assignedSpots.isEmpty ? null : _assignedSpots.first.id;
+      final preferredId = widget.initialSpotId?.trim();
+      _selectedSpotId = _assignedSpots.isEmpty
+          ? null
+          : _assignedSpots
+              .firstWhere(
+                (spot) => spot.id == preferredId,
+                orElse: () => _assignedSpots.first,
+              )
+              .id;
 
       if (_selectedSpotId != null) {
         await _loadSelectedSpotState();
@@ -144,7 +155,7 @@ class _SauveteurEphemerideDictonPageState
       if (mounted) {
         setState(() {
           _liveMessage =
-              'Publication refusée. Vérifiez que SPHOT est ON et le poste affecté.';
+              'Publication refusée. Vérifiez votre autorisation et le poste sélectionné.';
         });
       }
     } finally {
@@ -152,80 +163,41 @@ class _SauveteurEphemerideDictonPageState
     }
   }
 
-  Widget _livePublicationBar() {
+  Widget _publishButton() {
     final enabled = _isSphotOn && _selectedSpotId != null && !_loadingLive;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 2, 0, 6),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: SauveteurStyledDropdown(
-                  labelText: 'SPHOT surveillé',
-                  value: _selectedSpotId,
-                  enabled: !_loadingLive,
-                  options: _assignedSpots
-                      .map(
-                        (spot) => SauveteurDropdownOption(
-                          value: spot.id,
-                          label: spot.label,
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (spotId) {
-                    _selectSpot(spotId);
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                height: 42,
-                child: ElevatedButton.icon(
-                  onPressed: enabled && !_savingLive
-                      ? _publishEphemeride
-                      : null,
-                  icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-                  label: Text(
-                    _savingLive ? '...' : 'PUBLIER',
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF9A825),
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (!_isSphotOn)
-            const Padding(
-              padding: EdgeInsets.only(top: 4),
-              child: Text(
-                'SPHOT OFF — publication réelle désactivée.',
-                style: TextStyle(
-                  color: Color(0xFFB91C1C),
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            )
-          else if (_liveMessage != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                _liveMessage!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF1E3A8A),
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 42,
+          child: ElevatedButton.icon(
+            onPressed: enabled && !_savingLive ? _publishEphemeride : null,
+            icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+            label: Text(
+              _savingLive ? 'PUBLICATION...' : 'PUBLIER',
+              style: const TextStyle(fontWeight: FontWeight.w900),
             ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF9A825),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.black12,
+            ),
+          ),
+        ),
+        if (_liveMessage != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _liveMessage!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF1E3A8A),
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 
@@ -263,6 +235,8 @@ class _SauveteurEphemerideDictonPageState
     _speech.listen(
       localeId: 'fr_FR',
       onResult: (result) {
+        if (!mounted) return;
+
         setState(() {
           controller.text = result.recognizedWords;
           controller.selection = TextSelection.fromPosition(
@@ -282,7 +256,6 @@ class _SauveteurEphemerideDictonPageState
 
     return Container(
       width: double.infinity,
-      height: 194,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.35),
@@ -348,10 +321,12 @@ class _SauveteurEphemerideDictonPageState
           ),
         ),
         const SizedBox(height: 8),
-        _textZone(
-          hint: hint,
-          zone: zone,
-          controller: controller,
+        Expanded(
+          child: _textZone(
+            hint: hint,
+            zone: zone,
+            controller: controller,
+          ),
         ),
       ],
     );
@@ -362,7 +337,8 @@ class _SauveteurEphemerideDictonPageState
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: true,
-      body: Stack(
+      body: SauveteurAdaptiveViewport(
+        child: Stack(
         fit: StackFit.expand,
         children: [
           Image.asset(
@@ -382,7 +358,7 @@ class _SauveteurEphemerideDictonPageState
                   ),
 
                   Text(
-                    'ÉPHÉMÉRIDE DICTON',
+                    'DICTON & ÉPHÉMÉRIDE',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
@@ -392,9 +368,7 @@ class _SauveteurEphemerideDictonPageState
                     ),
                   ),
 
-                  const SizedBox(height: 2),
-
-                  _livePublicationBar(),
+                  const SizedBox(height: 4),
 
                   Expanded(
                     child: Container(
@@ -408,29 +382,30 @@ class _SauveteurEphemerideDictonPageState
                           width: 2,
                         ),
                       ),
-                      child: SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        child: Column(
-                          children: [
-                            _section(
-                              title: 'ÉPHÉMÉRIDE',
-                              hint: 'Dictez ou saisissez ici l’éphéméride du jour...',
-                              zone: 0,
-                              controller: ephemerideController,
-                            ),
-
-                            const SizedBox(height: 10),
-
-                            _section(
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: _section(
                               title: 'DICTON',
-                              hint: 'Dictez ou saisissez ici le dicton du jour...',
+                              hint:
+                                  'Dictez ou saisissez ici le dicton du jour...',
                               zone: 1,
                               controller: dictonController,
                             ),
-
-                            const SizedBox(height: 60),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 10),
+                          Expanded(
+                            child: _section(
+                              title: 'ÉPHÉMÉRIDE',
+                              hint:
+                                  'Dictez ou saisissez ici l’éphéméride du jour...',
+                              zone: 0,
+                              controller: ephemerideController,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _publishButton(),
+                        ],
                       ),
                     ),
                   ),
@@ -467,7 +442,7 @@ class _SauveteurEphemerideDictonPageState
             ),
           ),
         ],
-      ),
+      )),
     );
   }
 }

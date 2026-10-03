@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:share_plus/share_plus.dart';
@@ -270,12 +271,10 @@ class PublicSpotDetailPage extends StatelessWidget {
 
 class PublicSpotMobileSheet extends StatefulWidget {
   final SpotFlagState spot;
-  final ScrollController sheetScrollController;
 
   const PublicSpotMobileSheet({
     super.key,
     required this.spot,
-    required this.sheetScrollController,
   });
 
   @override
@@ -286,6 +285,8 @@ class PublicSpotMobileSheet extends StatefulWidget {
 class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   int _selectedPage = 0;
   bool _isSaved = false;
+  late final List<GlobalKey> _pageTabKeys;
+  late final ScrollController _contentScrollController;
 
   static const List<(String, IconData)> _pages = [
     ('Live', Icons.sensors_rounded),
@@ -293,12 +294,24 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     ('Météo marine', Icons.water_rounded),
     ('Dicton & Éphéméride', Icons.calendar_today_outlined),
     ('Infos', Icons.info_outline_rounded),
+    ('Signaux', Icons.flag_outlined),
   ];
 
   @override
   void initState() {
     super.initState();
+    _pageTabKeys = List<GlobalKey>.generate(
+      _pages.length,
+      (_) => GlobalKey(),
+    );
+    _contentScrollController = ScrollController();
     _loadSavedState();
+  }
+
+  @override
+  void dispose() {
+    _contentScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSavedState() async {
@@ -387,9 +400,124 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     await launchUrl(Uri(scheme: 'tel', path: phone));
   }
 
-  void _selectPage(int index) {
-    if (_selectedPage == index) return;
-    setState(() => _selectedPage = index);
+  Future<void> _openAdvertiserWebsite() async {
+    final uri = kIsWeb
+        ? Uri.base.replace(fragment: '/advertiser')
+        : Uri.parse('https://sphot.app/#/advertiser');
+
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: kIsWeb ? '_blank' : null,
+    );
+
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible d’ouvrir l’espace annonceur.'),
+        ),
+      );
+    }
+  }
+
+  Widget _buildAdvertisingSpace() {
+    return GestureDetector(
+      onTap: _openAdvertiserWebsite,
+      child: Container(
+        width: double.infinity,
+        height: 90,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.72),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: Colors.black.withOpacity(0.08),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.10),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 52,
+              height: 52,
+              child: SvgPicture.asset(
+                'data/icons/fire_red_icon.svg',
+                fit: BoxFit.contain,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'AJOUTE TON SPHOT PUBLICITAIRE ICI !',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black87,
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  const Text(
+                    'Visuel : PNG, JPG ou WEBP\n'
+                    '1200 × 600 px - 2 Mo max',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: Colors.black54,
+                      fontWeight: FontWeight.w600,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectPage(int index) async {
+    if (_contentScrollController.hasClients) {
+      _contentScrollController.jumpTo(
+        _contentScrollController.position.minScrollExtent,
+      );
+    }
+
+    if (_selectedPage != index) {
+      setState(() => _selectedPage = index);
+    }
+
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
+    if (_contentScrollController.hasClients) {
+      _contentScrollController.jumpTo(
+        _contentScrollController.position.minScrollExtent,
+      );
+    }
+
+    final tabContext = _pageTabKeys[index].currentContext;
+    if (tabContext != null) {
+      await Scrollable.ensureVisible(
+        tabContext,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   Widget _buildSpotActions(
@@ -441,6 +569,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   }) {
     return ListView(
       controller: controller,
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
         for (var index = 0; index < groups.length; index++) ...[
@@ -454,6 +585,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           ),
         ],
         const SizedBox(height: 12),
+        _buildAdvertisingSpace(),
+        const SizedBox(height: 10),
         _buildSpotActions(context, spot),
       ],
     );
@@ -525,6 +658,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     SpotFlagState spot,
     ScrollController controller,
   ) {
+    final marineData =
+        _PublicLiveDataSection._asStringMap(spot.meteoMarine);
+    final tidesPresent = marineData['Marées présentes'] != false;
     final values = _PublicLiveDataSection._formatMarineValues(
       spot.meteoMarine,
     );
@@ -574,15 +710,17 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         (
           Icons.tsunami_rounded,
           'Marées et coefficients',
-          _valuesForPrefixes(
-            values,
-            const [
-              'Basses mer',
-              'Pleines mer',
-              'Coefficient basse mer',
-              'Coefficient haute mer',
-            ],
-          ),
+          tidesPresent
+              ? _valuesForPrefixes(
+                  values,
+                  const [
+                    'Basses mer',
+                    'Pleines mer',
+                    'Coefficient basse mer',
+                    'Coefficient haute mer',
+                  ],
+                )
+              : const ['Absentes ou non significatives'],
         ),
       ],
     );
@@ -639,6 +777,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
 
     return ListView(
       controller: controller,
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
         _UnsupervisedWarning(title: warningTitle),
@@ -768,6 +909,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         ],
 
         const SizedBox(height: 12),
+        _buildAdvertisingSpace(),
+        const SizedBox(height: 10),
         _buildSpotActions(context, spot),
       ],
     );
@@ -782,31 +925,37 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         return _buildTerrestrialPage(
           context,
           spot,
-          widget.sheetScrollController,
+          _contentScrollController,
         );
       case 2:
         return _buildMarinePage(
           context,
           spot,
-          widget.sheetScrollController,
+          _contentScrollController,
         );
       case 3:
         return _buildEphemeridePage(
           context,
           spot,
-          widget.sheetScrollController,
+          _contentScrollController,
         );
       case 4:
         return _buildInfoPage(
           context,
           spot,
-          widget.sheetScrollController,
+          _contentScrollController,
+        );
+      case 5:
+        return _buildSignalsPage(
+          context,
+          spot,
+          _contentScrollController,
         );
       default:
         return _buildActionsPage(
           context,
           spot,
-          widget.sheetScrollController,
+          _contentScrollController,
         );
     }
   }
@@ -863,62 +1012,71 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                   ),
                 ),
                 if (currentSpot.isPosteSecours)
-                  SizedBox(
-                    height: 48,
-                    child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _pages.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final page = _pages[index];
-                        final selected = _selectedPage == index;
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: SizedBox(
+                      height: 48,
+                      child: ListView.separated(
+                        padding: EdgeInsets.fromLTRB(
+                          0,
+                          2,
+                          MediaQuery.sizeOf(context).width * 0.55,
+                          8,
+                        ),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _pages.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 4),
+                        itemBuilder: (context, index) {
+                          final page = _pages[index];
+                          final selected = _selectedPage == index;
 
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(99),
-                          onTap: () => _selectPage(index),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 13,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? const Color(0xFF1E3A8A)
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(99),
-                              border: Border.all(
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(99),
+                            onTap: () => _selectPage(index),
+                            child: AnimatedContainer(
+                              key: _pageTabKeys[index],
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
                                 color: selected
                                     ? const Color(0xFF1E3A8A)
-                                    : const Color(0xFFD5DEE7),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  page.$2,
-                                  size: 17,
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(99),
+                                border: Border.all(
                                   color: selected
-                                      ? Colors.white
-                                      : const Color(0xFF1E3A8A),
+                                      ? const Color(0xFF1E3A8A)
+                                      : const Color(0xFFD5DEE7),
                                 ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  page.$1.toUpperCase(),
-                                  style: TextStyle(
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    page.$2,
+                                    size: 17,
                                     color: selected
                                         ? Colors.white
                                         : const Color(0xFF1E3A8A),
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w900,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    page.$1.toUpperCase(),
+                                    style: TextStyle(
+                                      color: selected
+                                          ? Colors.white
+                                          : const Color(0xFF1E3A8A),
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
                 Expanded(
@@ -927,7 +1085,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                       : _buildUnsupervisedSpotPage(
                           context,
                           currentSpot,
-                          widget.sheetScrollController,
+                          _contentScrollController,
                         ),
                 ),
               ],
@@ -988,6 +1146,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
 
     return ListView(
       controller: controller,
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
         _MobilePublicCard(
@@ -1050,6 +1211,53 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             child: _MobileMediaPlaceholder(),
           ),
         const SizedBox(height: 12),
+        _buildAdvertisingSpace(),
+        const SizedBox(height: 10),
+        _buildSpotActions(context, spot),
+      ],
+    );
+  }
+
+  Widget _buildSignalsPage(
+    BuildContext context,
+    SpotFlagState spot,
+    ScrollController controller,
+  ) {
+    return ListView(
+      controller: controller,
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
+      children: [
+        const _MobilePublicCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.flag_outlined,
+                    size: 19,
+                    color: Color(0xFF1E3A8A),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'SIGNIFICATION DES SIGNAUX DE BAIGNADE',
+                      style: _publicSectionTitleStyle,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        const _BathingSignalsLegend(),
+        const SizedBox(height: 12),
+        _buildAdvertisingSpace(),
+        const SizedBox(height: 10),
         _buildSpotActions(context, spot),
       ],
     );
@@ -1068,6 +1276,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
 
     return ListView(
       controller: controller,
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
         _MobilePublicCard(
@@ -1190,13 +1401,386 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           ),
         ],
         const SizedBox(height: 12),
+        _buildAdvertisingSpace(),
+        const SizedBox(height: 10),
         _buildSpotActions(context, spot),
       ],
     );
   }
 }
 
-class _MobileSpotActionBar extends StatelessWidget {
+class _BathingSignalsLegend extends StatelessWidget {
+  const _BathingSignalsLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    const signals = <_BathingSignalData>[
+      _BathingSignalData(
+        visual: _BathingSignalVisual.greenFlag,
+        title: 'Drapeau vert',
+        description: 'Baignade surveillée sans danger apparent.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.yellowFlag,
+        title: 'Drapeau jaune',
+        description:
+            'Baignade surveillée avec danger limité ou marqué.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.redFlag,
+        title: 'Drapeau rouge',
+        description: 'Baignade interdite.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.redYellowFlag,
+        title: 'Drapeau rouge et jaune',
+        description:
+            'Zone de baignade surveillée pendant les horaires d’ouverture du poste de secours.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.purpleFlag,
+        title: 'Drapeau violet',
+        description:
+            'Pollution ou présence d’espèces aquatiques dangereuses, ou zone marine et sous-marine protégée (faune aquatique, récifs…).',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.orangeWindsock,
+        title: 'Manche à air orange',
+        description:
+            'Conditions défavorables de vent pour certains équipements nautiques (ex. : gonflables).',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.checkeredFlag,
+        title: 'Drapeau à damier noir et blanc',
+        description:
+            'Zone de pratiques aquatiques et nautiques.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.temporaryBan,
+        title: 'Interdiction temporaire',
+        description:
+            'Interdiction temporaire de la baignade, hors zone surveillée.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.blueObligation,
+        title: 'Disque bleu',
+        description: 'Obligation ou autorisation.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.prohibition,
+        title: 'Cercle rouge barré',
+        description: 'Interdiction.',
+      ),
+      _BathingSignalData(
+        visual: _BathingSignalVisual.warning,
+        title: 'Triangle jaune',
+        description: 'Avertissement.',
+      ),
+    ];
+
+    return _MobilePublicCard(
+      child: Column(
+        children: [
+          for (var index = 0; index < signals.length; index++) ...[
+            _BathingSignalRow(data: signals[index]),
+            if (index < signals.length - 1)
+              const Divider(
+                height: 18,
+                color: Color(0xFFE2E8F0),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+enum _BathingSignalVisual {
+  greenFlag,
+  yellowFlag,
+  redFlag,
+  redYellowFlag,
+  purpleFlag,
+  orangeWindsock,
+  checkeredFlag,
+  temporaryBan,
+  blueObligation,
+  prohibition,
+  warning,
+}
+
+class _BathingSignalData {
+  final _BathingSignalVisual visual;
+  final String title;
+  final String description;
+
+  const _BathingSignalData({
+    required this.visual,
+    required this.title,
+    required this.description,
+  });
+}
+
+class _BathingSignalRow extends StatelessWidget {
+  final _BathingSignalData data;
+
+  const _BathingSignalRow({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 72,
+          height: data.visual == _BathingSignalVisual.temporaryBan ? 78 : 56,
+          child: Center(
+            child: _BathingSignalSymbol(visual: data.visual),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                data.title.toUpperCase(),
+                style: const TextStyle(
+                  color: Color(0xFF172033),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                data.description,
+                style: const TextStyle(
+                  color: Color(0xFF526077),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BathingSignalSymbol extends StatelessWidget {
+  final _BathingSignalVisual visual;
+
+  const _BathingSignalSymbol({required this.visual});
+
+  @override
+  Widget build(BuildContext context) {
+    switch (visual) {
+      case _BathingSignalVisual.greenFlag:
+        return const _SolidSignalFlag(color: Color(0xFF49B43B));
+      case _BathingSignalVisual.yellowFlag:
+        return const _SolidSignalFlag(color: Color(0xFFFFE500));
+      case _BathingSignalVisual.redFlag:
+        return const _SolidSignalFlag(color: Color(0xFFE31B13));
+      case _BathingSignalVisual.redYellowFlag:
+        return const _RedYellowSignalFlag();
+      case _BathingSignalVisual.purpleFlag:
+        return const _SolidSignalFlag(color: Color(0xFFD946EF));
+      case _BathingSignalVisual.orangeWindsock:
+        return const WindsockGlyph(
+          width: 54,
+          height: 32,
+        );
+      case _BathingSignalVisual.checkeredFlag:
+        return const _CheckeredSignalFlag();
+      case _BathingSignalVisual.temporaryBan:
+        return const _TemporarySwimmingBanSymbol();
+      case _BathingSignalVisual.blueObligation:
+        return Container(
+          width: 42,
+          height: 42,
+          decoration: const BoxDecoration(
+            color: Color(0xFF365FA8),
+            shape: BoxShape.circle,
+          ),
+        );
+      case _BathingSignalVisual.prohibition:
+        return const _ProhibitionSymbol();
+      case _BathingSignalVisual.warning:
+        return const Icon(
+          Icons.warning_amber_rounded,
+          size: 49,
+          color: Color(0xFFFFE500),
+          shadows: [
+            Shadow(
+              color: Colors.black,
+              blurRadius: 0,
+            ),
+          ],
+        );
+    }
+  }
+}
+
+class _SolidSignalFlag extends StatelessWidget {
+  final Color color;
+
+  const _SolidSignalFlag({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 58,
+      height: 48,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 9,
+            top: 4,
+            bottom: 2,
+            child: Container(
+              width: 3,
+              decoration: BoxDecoration(
+                color: const Color(0xFF8A8A8A),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 12,
+            top: 6,
+            child: Container(
+              width: 39,
+              height: 24,
+              decoration: BoxDecoration(
+                color: color,
+                border: Border.all(
+                  color: Colors.black.withOpacity(0.20),
+                  width: 0.8,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RedYellowSignalFlag extends StatelessWidget {
+  const _RedYellowSignalFlag();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 60,
+      height: 50,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 8,
+            top: 3,
+            bottom: 1,
+            child: Container(
+              width: 3,
+              decoration: BoxDecoration(
+                color: const Color(0xFF8A8A8A),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 11,
+            top: 5,
+            child: SizedBox(
+              width: 43,
+              height: 26,
+              child: SvgPicture.asset(
+                'data/icons/flag_red_yellow_5x3.svg',
+                fit: BoxFit.fill,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckeredSignalFlag extends StatelessWidget {
+  const _CheckeredSignalFlag();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 68,
+      height: 56,
+      child: SvgPicture.asset(
+        'data/icons/signal_checkered_flag.svg',
+        fit: BoxFit.contain,
+      ),
+    );
+  }
+}
+
+class _TemporarySwimmingBanSymbol extends StatelessWidget {
+  const _TemporarySwimmingBanSymbol();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 70,
+      height: 78,
+      child: SvgPicture.asset(
+        'data/icons/signal_temporary_swimming_ban.svg',
+        fit: BoxFit.contain,
+      ),
+    );
+  }
+}
+
+class _ProhibitionSymbol extends StatelessWidget {
+  const _ProhibitionSymbol();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 46,
+      height: 46,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFE31B13),
+                width: 5,
+              ),
+            ),
+          ),
+          Transform.rotate(
+            angle: -0.78,
+            child: Container(
+              width: 5,
+              height: 48,
+              color: const Color(0xFFE31B13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileSpotActionBar extends StatefulWidget {
   final bool isSaved;
   final VoidCallback onDirections;
   final VoidCallback onStart;
@@ -1212,38 +1796,103 @@ class _MobileSpotActionBar extends StatelessWidget {
   });
 
   @override
+  State<_MobileSpotActionBar> createState() =>
+      _MobileSpotActionBarState();
+}
+
+class _MobileSpotActionBarState extends State<_MobileSpotActionBar> {
+  late final List<GlobalKey> _actionKeys;
+
+  @override
+  void initState() {
+    super.initState();
+    _actionKeys = List<GlobalKey>.generate(
+      4,
+      (_) => GlobalKey(),
+    );
+  }
+
+  Future<void> _activateAction(
+    int index,
+    VoidCallback action,
+  ) async {
+    final actionContext = _actionKeys[index].currentContext;
+
+    if (actionContext != null) {
+      await Scrollable.ensureVisible(
+        actionContext,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    }
+
+    if (!mounted) return;
+    action();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: 48,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
+        padding: EdgeInsets.fromLTRB(
+          0,
+          2,
+          MediaQuery.sizeOf(context).width * 0.55,
+          8,
+        ),
         children: [
-          _MobileSpotActionButton(
-            icon: Icons.directions_rounded,
-            label: 'ITINÉRAIRE',
-            onTap: onDirections,
+          KeyedSubtree(
+            key: _actionKeys[0],
+            child: _MobileSpotActionButton(
+              icon: Icons.directions_rounded,
+              label: 'ITINÉRAIRE',
+              onTap: () => _activateAction(
+                0,
+                widget.onDirections,
+              ),
+            ),
           ),
           const SizedBox(width: 8),
-          _MobileSpotActionButton(
-            icon: Icons.navigation_rounded,
-            label: 'DÉMARRER',
-            onTap: onStart,
+          KeyedSubtree(
+            key: _actionKeys[1],
+            child: _MobileSpotActionButton(
+              icon: Icons.navigation_rounded,
+              label: 'DÉMARRER',
+              onTap: () => _activateAction(
+                1,
+                widget.onStart,
+              ),
+            ),
           ),
           const SizedBox(width: 8),
-          _MobileSpotActionButton(
-            icon: Icons.share_rounded,
-            label: 'PARTAGER',
-            onTap: onShare,
+          KeyedSubtree(
+            key: _actionKeys[2],
+            child: _MobileSpotActionButton(
+              icon: Icons.share_rounded,
+              label: 'PARTAGER',
+              onTap: () => _activateAction(
+                2,
+                widget.onShare,
+              ),
+            ),
           ),
           const SizedBox(width: 8),
-          _MobileSpotActionButton(
-            icon: isSaved
-                ? Icons.bookmark_rounded
-                : Icons.bookmark_border_rounded,
-            label: isSaved ? 'ENREGISTRÉ' : 'ENREGISTRER',
-            selected: isSaved,
-            onTap: onSave,
+          KeyedSubtree(
+            key: _actionKeys[3],
+            child: _MobileSpotActionButton(
+              icon: widget.isSaved
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+              label: widget.isSaved ? 'ENREGISTRÉ' : 'ENREGISTRER',
+              selected: widget.isSaved,
+              onTap: () => _activateAction(
+                3,
+                widget.onSave,
+              ),
+            ),
           ),
         ],
       ),

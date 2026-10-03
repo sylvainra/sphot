@@ -67,6 +67,7 @@ class _MapPageState extends State<MapPage> {
 
   double _currentRotation = 0;
   int _selectedTileStyle = 0;
+  int _mapTileRefreshVersion = 0;
   int _selectedBottomIndex = 1;
   String? _selectedPublicSpotId;
   Set<String> _favoriteSpotIds = <String>{};
@@ -167,6 +168,134 @@ Future<void> _toggleFavoritesFilter() async {
     if (zoom >= 13.8) return 0.88;
     if (zoom >= 13.0) return 0.72;
     return 0.0;
+  }
+
+  bool get _useAutomaticTouchLabels {
+    if (kIsWeb) return false;
+
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+  }
+
+  double _automaticLabelMinimumDistance(double zoom) {
+    if (zoom >= 17.5) return 82;
+    if (zoom >= 17.0) return 92;
+    if (zoom >= 16.5) return 108;
+    if (zoom >= 16.0) return 124;
+    if (zoom >= 15.5) return 145;
+    if (zoom >= 15.0) return 170;
+    return 200;
+  }
+
+  Offset _mercatorPixelPoint(SpotFlagState spot, double zoom) {
+    final worldSize = 256.0 * pow(2.0, zoom);
+    final latitude = spot.lat.clamp(-85.05112878, 85.05112878);
+    final sinLatitude = sin(latitude * pi / 180);
+
+    final x = (spot.lng + 180.0) / 360.0 * worldSize;
+    final y = (0.5 -
+            log((1 + sinLatitude) / (1 - sinLatitude)) /
+                (4 * pi)) *
+        worldSize;
+
+    return Offset(x, y);
+  }
+
+  LatLng _latLngFromMercatorPixelPoint(
+    Offset point,
+    double zoom,
+  ) {
+    final worldSize = 256.0 * pow(2.0, zoom).toDouble();
+    final lng = (point.dx / worldSize) * 360.0 - 180.0;
+    final n = pi - (2.0 * pi * point.dy / worldSize);
+    final lat =
+        180.0 /
+        pi *
+        atan((exp(n) - exp(-n)) / 2.0);
+
+    return LatLng(lat, lng);
+  }
+
+  LatLng _selectedSpotCameraCenter(
+    SpotFlagState spot,
+    double zoom,
+    double rotation,
+  ) {
+    final spotPoint = _mercatorPixelPoint(spot, zoom);
+    final desiredScreenOffset = Offset(
+      0,
+      spot.isPosteSecours ? -216 : -255,
+    );
+    final angle = rotation * pi / 180.0;
+
+    // Le décalage doit rester vertical à l'écran même si la carte est tournée.
+    final mapDx =
+        desiredScreenOffset.dx * cos(angle) +
+        desiredScreenOffset.dy * sin(angle);
+    final mapDy =
+        -desiredScreenOffset.dx * sin(angle) +
+        desiredScreenOffset.dy * cos(angle);
+
+    final centerPoint = Offset(
+      spotPoint.dx - mapDx,
+      spotPoint.dy - mapDy,
+    );
+
+    return _latLngFromMercatorPixelPoint(centerPoint, zoom);
+  }
+
+  Set<String> _automaticTouchLabelIds(
+    List<SpotFlagState> spots,
+    double zoom,
+  ) {
+    if (!_useAutomaticTouchLabels || zoom < 14.7) {
+      return const <String>{};
+    }
+
+    final candidates = spots
+        .where(
+          (spot) =>
+              spot.lat.isFinite &&
+              spot.lng.isFinite &&
+              spot.mapDisplayName.trim().isNotEmpty,
+        )
+        .toList()
+      ..sort((a, b) {
+        if (a.id == _selectedPublicSpotId) return -1;
+        if (b.id == _selectedPublicSpotId) return 1;
+
+        if (a.isPosteSecours != b.isPosteSecours) {
+          return a.isPosteSecours ? -1 : 1;
+        }
+
+        final latitudeCompare = a.lat.compareTo(b.lat);
+        if (latitudeCompare != 0) return latitudeCompare;
+
+        final longitudeCompare = a.lng.compareTo(b.lng);
+        if (longitudeCompare != 0) return longitudeCompare;
+
+        return a.id.compareTo(b.id);
+      });
+
+    final minimumDistance = _automaticLabelMinimumDistance(zoom);
+    final acceptedPoints = <Offset>[];
+    final acceptedIds = <String>{};
+
+    for (final spot in candidates) {
+      final point = _mercatorPixelPoint(spot, zoom);
+      final selected = spot.id == _selectedPublicSpotId;
+
+      final overlaps = acceptedPoints.any(
+        (accepted) => (accepted - point).distance < minimumDistance,
+      );
+
+      if (!selected && overlaps) continue;
+
+      acceptedIds.add(spot.id);
+      acceptedPoints.add(point);
+    }
+
+    return acceptedIds;
   }
 
   Future<void> _openLoginPage() async {
@@ -304,6 +433,7 @@ Future<void> _toggleFavoritesFilter() async {
   final opened = await launchUrl(
     uri,
     mode: LaunchMode.externalApplication,
+    webOnlyWindowName: kIsWeb ? '_blank' : null,
   );
 
   if (!opened) {
@@ -320,19 +450,55 @@ List<Marker> _buildAdminMarkers(
 
   if (zoom < 12) return markers;
 
+
+  String cityKey(String value) {
+    return value
+        .trim()
+        .toUpperCase()
+        .replaceAll('É', 'E')
+        .replaceAll('È', 'E')
+        .replaceAll('Ê', 'E')
+        .replaceAll('À', 'A')
+        .replaceAll('Â', 'A')
+        .replaceAll('Î', 'I')
+        .replaceAll('Ï', 'I')
+        .replaceAll('Ô', 'O')
+        .replaceAll('Û', 'U')
+        .replaceAll('Ù', 'U');
+  }
+
+  final cityCoordinates = <String, LatLng>{};
+
+  for (final spot in spots) {
+    final ville = spot.ville.trim();
+    if (ville.isEmpty) continue;
+
+    if (spot.villeLat != 0 && spot.villeLng != 0) {
+      cityCoordinates.putIfAbsent(
+        cityKey(ville),
+        () => LatLng(spot.villeLat, spot.villeLng),
+      );
+    }
+  }
+
   final admins = <String, SpotFlagState>{};
 
   for (final spot in spots) {
     final ville = spot.ville.trim();
-    final siteInternetVille = spot.siteInternetVille.trim();
-
     if (ville.isEmpty) continue;
-    if (spot.villeLat == 0 || spot.villeLng == 0) continue;
-    if (siteInternetVille.isEmpty) continue;
+
+    final directCoordinatesValid =
+        spot.villeLat != 0 && spot.villeLng != 0;
+    final fallbackCoordinates =
+        cityCoordinates[cityKey(ville)];
+
+    if (!directCoordinatesValid && fallbackCoordinates == null) {
+      continue;
+    }
 
     final adminKey = spot.territoireId.trim().isNotEmpty
         ? spot.territoireId.trim()
-        : ville.toUpperCase();
+        : cityKey(ville);
 
     final currentSpot = admins[adminKey];
 
@@ -350,10 +516,23 @@ List<Marker> _buildAdminMarkers(
   for (final spot in admins.values) {
     final logoVille = spot.logoVille.trim();
     final siteInternetVille = spot.siteInternetVille.trim();
+    final fallbackCoordinates =
+        cityCoordinates[cityKey(spot.ville)];
+
+    final markerLat = spot.villeLat != 0
+        ? spot.villeLat
+        : fallbackCoordinates?.latitude;
+    final markerLng = spot.villeLng != 0
+        ? spot.villeLng
+        : fallbackCoordinates?.longitude;
+
+    if (markerLat == null || markerLng == null) {
+      continue;
+    }
 
     markers.add(
       Marker(
-        point: LatLng(spot.villeLat, spot.villeLng),
+        point: LatLng(markerLat, markerLng),
         width: 85,
         height: 85,
         alignment: Alignment.topCenter,
@@ -361,7 +540,17 @@ List<Marker> _buildAdminMarkers(
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => _openCityWebsite(siteInternetVille, spot),
+            onTap: () {
+              _mapController.move(
+                LatLng(markerLat, markerLng),
+                max(zoom, 15.5),
+              );
+
+              Future<void>.delayed(
+                const Duration(milliseconds: 350),
+                () => _openCityWebsite(siteInternetVille, spot),
+              );
+            },
             child: Tooltip(
               message: spot.ville.toUpperCase(),
               preferBelow: true,
@@ -811,9 +1000,29 @@ SpotFlagState? _findBestSpotMatch(
       _selectedPublicSpotId = spot.id;
     });
 
+    const selectedSpotZoom = 17.2;
+    final selectedSpotCenter = _selectedSpotCameraCenter(
+      spot,
+      selectedSpotZoom,
+      _currentRotation,
+    );
+
     _mapController.move(
-      LatLng(spot.lat - 0.0012, spot.lng),
-      17.2,
+      selectedSpotCenter,
+      selectedSpotZoom,
+    );
+
+    unawaited(
+      Future<void>.delayed(
+        const Duration(milliseconds: 300),
+        () {
+          if (!mounted || _selectedPublicSpotId != spot.id) return;
+          _mapController.move(
+            selectedSpotCenter,
+            selectedSpotZoom,
+          );
+        },
+      ),
     );
 
     await showModalBottomSheet<void>(
@@ -825,19 +1034,17 @@ SpotFlagState? _findBestSpotMatch(
       isDismissible: true,
       enableDrag: false,
       builder: (sheetContext) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.60,
-          minChildSize: 0.18,
-          maxChildSize: 0.94,
-          snap: true,
-          snapSizes: const [0.60, 0.94],
-          builder: (_, scrollController) {
-            return PublicSpotMobileSheet(
-              spot: spot,
-              sheetScrollController: scrollController,
-            );
-          },
+        final fixedChildSize =
+            spot.isPosteSecours ? 0.60 : 0.64;
+        final sheetHeight =
+            MediaQuery.sizeOf(sheetContext).height * fixedChildSize;
+
+        return SizedBox(
+          width: double.infinity,
+          height: sheetHeight,
+          child: PublicSpotMobileSheet(
+            spot: spot,
+          ),
         );
       },
     );
@@ -849,6 +1056,15 @@ SpotFlagState? _findBestSpotMatch(
         if (_selectedPublicSpotId == spot.id) {
           _selectedPublicSpotId = null;
         }
+        _mapTileRefreshVersion++;
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _mapController.move(
+          selectedSpotCenter,
+          selectedSpotZoom,
+        );
       });
     }
   }
@@ -1420,7 +1636,8 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   return Positioned(
     left: 8,
     right: 8,
-    top: MediaQuery.of(context).padding.top + 50,
+    top: MediaQuery.of(context).padding.top +
+        (_useAutomaticTouchLabels ? 64 : 50),
     child: Row(
       children: [
         Expanded(
@@ -1513,6 +1730,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   Marker _buildOtherSpotMarker(
     SpotFlagState spot,
     bool showText,
+    bool autoShowName,
     double zoom,
     double rotation,
   ) {
@@ -1529,6 +1747,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
           iconPath: _getMarkerIconPath(spot),
           showTextAllowed: showText,
           forceShowText: _selectedPublicSpotId == spot.id,
+          autoShowName: autoShowName,
           zoom: zoom,
           rotation: rotation,
           labelOpacity: _labelOpacity(zoom),
@@ -1541,6 +1760,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   Marker _buildSecoursMarker(
     SpotFlagState spot,
     bool showText,
+    bool autoShowName,
     double zoom,
     double rotation,
   ) {
@@ -1562,6 +1782,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
                 spot: spot,
                 showTextAllowed: showText,
                 forceShowText: _selectedPublicSpotId == spot.id,
+                autoShowName: autoShowName,
                 zoom: zoom,
                 rotation: rotation,
                 labelOpacity: _labelOpacity(zoom),
@@ -1574,41 +1795,55 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
   }
 
   List<Marker> _buildMarkers(
-  List<SpotFlagState> spots,
-  double zoom,
-  double rotation,
-) {
-  final showText = _showTextForZoom(zoom);
+    List<SpotFlagState> spots,
+    Set<String> automaticLabelIds,
+    double zoom,
+    double rotation,
+  ) {
+    final showText = _showTextForZoom(zoom);
 
-  debugPrint('MARKERS À AFFICHER : ${spots.length}');
+    debugPrint('MARKERS À AFFICHER : ${spots.length}');
 
-  return spots
-      .where((spot) => spot.lat.isFinite && spot.lng.isFinite)
-      .map((spot) {
-    if (spot.isPosteSecours) {
-      return _buildSecoursMarker(spot, showText, zoom, rotation);
-    }
-    return _buildOtherSpotMarker(spot, showText, zoom, rotation);
-  }).toList();
-}
+    return spots
+        .where((spot) => spot.lat.isFinite && spot.lng.isFinite)
+        .map(
+          (spot) => _buildOtherSpotMarker(
+            spot,
+            showText,
+            automaticLabelIds.contains(spot.id),
+            zoom,
+            rotation,
+          ),
+        )
+        .toList();
+  }
 
-List<Marker> _buildSecoursMarkers(
-  List<SpotFlagState> spots,
-  double zoom,
-  double rotation,
-) {
-  final showText = _showTextForZoom(zoom);
+  List<Marker> _buildSecoursMarkers(
+    List<SpotFlagState> spots,
+    Set<String> automaticLabelIds,
+    double zoom,
+    double rotation,
+  ) {
+    final showText = _showTextForZoom(zoom);
 
-  return spots
-      .where(
-        (spot) =>
-            spot.isPosteSecours && spot.lat.isFinite && spot.lng.isFinite,
-      )
-      .map(
-        (spot) => _buildSecoursMarker(spot, showText, zoom, rotation),
-      )
-      .toList();
-}
+    return spots
+        .where(
+          (spot) =>
+              spot.isPosteSecours &&
+              spot.lat.isFinite &&
+              spot.lng.isFinite,
+        )
+        .map(
+          (spot) => _buildSecoursMarker(
+            spot,
+            showText,
+            automaticLabelIds.contains(spot.id),
+            zoom,
+            rotation,
+          ),
+        )
+        .toList();
+  }
 
   Widget _buildDrawer() {
   return Drawer(
@@ -2205,7 +2440,9 @@ onPositionChanged: (position, hasGesture) {
 ),
                 children: [
                   TileLayer(
-  key: ValueKey('tile_style_$_selectedTileStyle'),
+  key: ValueKey(
+    'tile_style_${_selectedTileStyle}_$_mapTileRefreshVersion',
+  ),
   urlTemplate: _tileStyles[_selectedTileStyle].url,
   subdomains: _tileStyles[_selectedTileStyle].subdomains,
   maxZoom: _tileStyles[_selectedTileStyle].maxZoom.toDouble(),
@@ -2246,8 +2483,14 @@ onPositionChanged: (position, hasGesture) {
                       final otherSpots = spots
                           .where((spot) => !spot.isPosteSecours)
                           .toList();
-                      final markers =
-                          _buildMarkers(otherSpots, zoom, rotation);
+                      final automaticLabelIds =
+                          _automaticTouchLabelIds(spots, zoom);
+                      final markers = _buildMarkers(
+                        otherSpots,
+                        automaticLabelIds,
+                        zoom,
+                        rotation,
+                      );
 
                       return MarkerClusterLayerWidget(
                         options: MarkerClusterLayerOptions(
@@ -2265,9 +2508,13 @@ onPositionChanged: (position, hasGesture) {
                       final zoom = MapCamera.of(context).zoom;
                       final rotation = MapCamera.of(context).rotation;
 
+                      final automaticLabelIds =
+                          _automaticTouchLabelIds(spots, zoom);
+
                       return MarkerLayer(
                         markers: _buildSecoursMarkers(
                           spots,
+                          automaticLabelIds,
                           zoom,
                           rotation,
                         ),
@@ -2739,6 +2986,7 @@ class _OtherSpotMarker extends StatefulWidget {
   final String iconPath;
   final bool showTextAllowed;
   final bool forceShowText;
+  final bool autoShowName;
   final double zoom;
   final double rotation;
   final double labelOpacity;
@@ -2749,6 +2997,7 @@ class _OtherSpotMarker extends StatefulWidget {
     required this.iconPath,
     required this.showTextAllowed,
     required this.forceShowText,
+    required this.autoShowName,
     required this.zoom,
     required this.rotation,
     required this.labelOpacity,
@@ -2785,8 +3034,10 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
         Theme.of(context).platform == TargetPlatform.android ||
             Theme.of(context).platform == TargetPlatform.iOS;
 
-    final showText = widget.forceShowText ||
-        (widget.showTextAllowed && (isTouchDevice || isHovering));
+    final showFullText = widget.forceShowText ||
+        (widget.showTextAllowed && !isTouchDevice && isHovering);
+    final showAutomaticName =
+        !showFullText && isTouchDevice && widget.autoShowName;
 
     return MouseRegion(
       onEnter: (_) => setState(() => isHovering = true),
@@ -2802,20 +3053,61 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
             alignment: Alignment.center,
             children: [
               AdaptiveAssetImage(
-
                 widget.iconPath,
                 width: spot.isNaturisme ? 52 : 48,
                 height: spot.isNaturisme ? 52 : 48,
                 fit: BoxFit.contain,
               ),
-              if (showText)
+              if (showAutomaticName)
+                Positioned(
+                  top: 48,
+                  left:
+                      (56 - min(300.0, MediaQuery.sizeOf(context).width - 24)) /
+                      2,
+                  child: SizedBox(
+                    width:
+                        min(300.0, MediaQuery.sizeOf(context).width - 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          spot.mapDisplayName,
+                          textAlign: TextAlign.center,
+                          softWrap: true,
+                          style: _mapLabelStyle(
+                            fontSize: _labelSize(11),
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black,
+                          ),
+                        ),
+                        if (spot.ville.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            spot.ville.toUpperCase(),
+                            textAlign: TextAlign.center,
+                            softWrap: true,
+                            style: _mapLabelStyle(
+                              fontSize: _labelSize(10),
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF1E3A8A),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              if (showFullText)
                 Positioned(
                   top: 50,
-                  left: -160,
+                  left:
+                      (56 - min(380.0, MediaQuery.sizeOf(context).width - 24)) /
+                      2,
                   child: Opacity(
                     opacity: widget.labelOpacity,
                     child: SizedBox(
-                      width: 380,
+                      width:
+                          min(380.0, MediaQuery.sizeOf(context).width - 24),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -2828,23 +3120,36 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                               color: Colors.black,
                             ),
                           ),
-                          SizedBox(height: _lineSpacing() + 1.5),
+                          if (spot.ville.trim().isNotEmpty) ...[
+                            SizedBox(height: _lineSpacing() + 3),
+                            Text(
+                              spot.ville.toUpperCase(),
+                              textAlign: TextAlign.center,
+                              style: _mapLabelStyle(
+                                fontSize: _labelSize(10),
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF1E3A8A),
+                              ),
+                            ),
+                          ],
+                          SizedBox(height: _lineSpacing()),
                           Text(
-  spot.typeSphot,
-  textAlign: TextAlign.center,
-  style: _mapLabelStyle(
-    fontSize: _labelSize(12),
-    fontWeight: FontWeight.w700,
-    color: widget.typeTextColor,
-    useBlackOutline: spot.normalizedType.contains('ACCES PLAGE'),
-  ),
-),
-                          SizedBox(height: _lineSpacing() - 1.8),
+                            spot.typeSphot,
+                            textAlign: TextAlign.center,
+                            style: _mapLabelStyle(
+                              fontSize: _labelSize(12),
+                              fontWeight: FontWeight.w700,
+                              color: widget.typeTextColor,
+                              useBlackOutline:
+                                  spot.normalizedType.contains('ACCES PLAGE'),
+                            ),
+                          ),
+                          SizedBox(height: _lineSpacing()),
                           _warningLineUniform(
                             'BAIGNADE NON SURVEILLÉE',
                             _labelSize(22),
                           ),
-                          SizedBox(height: _lineSpacing() - 1.8),
+                          SizedBox(height: _lineSpacing()),
                           _warningLineUniform(
                             'BAIGNADE À VOS RISQUES ET PÉRILS',
                             _labelSize(22),
@@ -2866,6 +3171,7 @@ class _HoverMarker extends StatefulWidget {
   final SpotFlagState spot;
   final bool showTextAllowed;
   final bool forceShowText;
+  final bool autoShowName;
   final double zoom;
   final double rotation;
   final double labelOpacity;
@@ -2874,6 +3180,7 @@ class _HoverMarker extends StatefulWidget {
     required this.spot,
     required this.showTextAllowed,
     required this.forceShowText,
+    required this.autoShowName,
     required this.zoom,
     required this.rotation,
     required this.labelOpacity,
@@ -2909,8 +3216,10 @@ class _HoverMarkerState extends State<_HoverMarker> {
         Theme.of(context).platform == TargetPlatform.android ||
         Theme.of(context).platform == TargetPlatform.iOS;
 
-    final showText = widget.forceShowText ||
-        (widget.showTextAllowed && (isTouchDevice || isHovering));
+    final showFullText = widget.forceShowText ||
+        (widget.showTextAllowed && !isTouchDevice && isHovering);
+    final showAutomaticName =
+        !showFullText && isTouchDevice && widget.autoShowName;
 
     return MouseRegion(
       onEnter: (_) => setState(() => isHovering = true),
@@ -2928,14 +3237,59 @@ class _HoverMarkerState extends State<_HoverMarker> {
                 offset: const Offset(0, -47.5),
                 child: FlagMarker(spot: spot),
               ),
-              if (showText)
+              if (showAutomaticName)
+                Positioned(
+                  top: 52,
+                  left:
+                      (70 - min(320.0, MediaQuery.sizeOf(context).width - 24)) /
+                      2,
+                  child: Opacity(
+                    opacity: 1,
+                    child: SizedBox(
+                      width:
+                          min(320.0, MediaQuery.sizeOf(context).width - 24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            spot.mapDisplayName,
+                            textAlign: TextAlign.center,
+                            softWrap: true,
+                            style: _mapLabelStyle(
+                              fontSize: _labelSize(11),
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          if (spot.ville.trim().isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              spot.ville.toUpperCase(),
+                              textAlign: TextAlign.center,
+                              softWrap: true,
+                              style: _mapLabelStyle(
+                                fontSize: _labelSize(10),
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF1E3A8A),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              if (showFullText)
                 Positioned(
                   top: 54,
-                  left: -175,
+                  left:
+                      (70 - min(420.0, MediaQuery.sizeOf(context).width - 24)) /
+                      2,
                   child: Opacity(
                     opacity: widget.labelOpacity,
                     child: SizedBox(
-                      width: 420,
+                      width:
+                          min(420.0, MediaQuery.sizeOf(context).width - 24),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -2948,8 +3302,20 @@ class _HoverMarkerState extends State<_HoverMarker> {
                               color: Colors.black,
                             ),
                           ),
+                          if (spot.ville.trim().isNotEmpty) ...[
+                            SizedBox(height: _lineSpacing() + 3),
+                            Text(
+                              spot.ville.toUpperCase(),
+                              textAlign: TextAlign.center,
+                              style: _mapLabelStyle(
+                                fontSize: _labelSize(10),
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF1E3A8A),
+                              ),
+                            ),
+                          ],
 
-                          SizedBox(height: _lineSpacing() + 5),
+                          SizedBox(height: _lineSpacing()),
 
                           Row(
                             mainAxisSize: MainAxisSize.min,
@@ -2979,7 +3345,7 @@ const SizedBox(width: 2),
                             ],
                           ),
 
-                          SizedBox(height: _lineSpacing() - 1.8),
+                          SizedBox(height: _lineSpacing()),
 
                           _rescueStatusUnderMarker(
                             spot,

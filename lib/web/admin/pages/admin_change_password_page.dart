@@ -16,6 +16,7 @@ class AdminChangePasswordPage extends StatefulWidget {
   final String civilite;
   final String prenom;
   final String nom;
+  final String mainCouranteToken;
 
   const AdminChangePasswordPage({
     super.key,
@@ -26,6 +27,7 @@ class AdminChangePasswordPage extends StatefulWidget {
     required this.civilite,
     required this.prenom,
     required this.nom,
+    this.mainCouranteToken = '',
   });
 
   @override
@@ -177,6 +179,7 @@ class _AdminChangePasswordPageState extends State<AdminChangePasswordPage> {
     builder: (_) => AdminDashboardPage(
       adminUid: widget.adminUid,
       territoireId: widget.territoireId,
+      mainCouranteToken: widget.mainCouranteToken,
     ),
   ),
 );

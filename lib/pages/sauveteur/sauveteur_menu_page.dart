@@ -11,7 +11,13 @@ import 'sauveteur_meteo_marine_page.dart';
 import 'sauveteur_recherche_personne_page.dart';
 import 'sauveteur_ephemeride_dicton_page.dart';
 import 'sauveteur_planning_page.dart';
+import 'sauveteur_stats_page.dart';
 import 'sauveteur_main_courante.dart';
+import 'sauveteur_materiel_verification_page.dart';
+import 'sauveteur_materiel_category_verification_page.dart';
+import '../../services/sauveteur_live_publication_service.dart';
+import 'widgets/sauveteur_styled_dropdown.dart';
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurMenuPage extends StatefulWidget {
   final Color profileColor;
@@ -51,6 +57,9 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
 
   Timer? _modeRefreshTimer;
   bool _refreshingMode = false;
+  bool _loadingSpots = true;
+  final List<SauveteurAssignedSpot> _assignedSpots = [];
+  String? _selectedSpotId;
 
   bool get _isSphotOn => _sphotMode.toUpperCase() == 'ON';
 
@@ -99,6 +108,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
     _canManageRestrictedOperationalData =
         widget.canManageRestrictedOperationalData;
 
+    _loadAssignedSpots();
     _refreshMode();
     _modeRefreshTimer = Timer.periodic(
       const Duration(seconds: 30),
@@ -167,12 +177,67 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
         _canManageRestrictedOperationalData =
             decoded['canManageRestrictedOperationalData'] == true;
       });
+
+      await _loadAssignedSpots();
     } catch (_) {
       // Le dernier état connu reste affiché. Les écritures sensibles sont
       // de toute façon revérifiées côté Cloud Functions.
     } finally {
       _refreshingMode = false;
     }
+  }
+
+  Future<void> _loadAssignedSpots() async {
+    try {
+      final spots = await SauveteurLivePublicationService.loadAssignedSpots(
+        territoireId: widget.territoireId,
+        postesAffectes: _postesAffectes,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _assignedSpots
+          ..clear()
+          ..addAll(spots);
+
+        final currentStillAvailable = _selectedSpotId != null &&
+            _assignedSpots.any((spot) => spot.id == _selectedSpotId);
+
+        if (!currentStillAvailable) {
+          _selectedSpotId =
+              _assignedSpots.isEmpty ? null : _assignedSpots.first.id;
+        }
+
+        _loadingSpots = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _assignedSpots.clear();
+        _selectedSpotId = null;
+        _loadingSpots = false;
+      });
+    }
+  }
+
+  Widget _spotSelector() {
+    return SauveteurStyledDropdown(
+      labelText: 'Poste de secours',
+      value: _selectedSpotId,
+      enabled: !_loadingSpots,
+      options: _assignedSpots
+          .map(
+            (spot) => SauveteurDropdownOption(
+              value: spot.id,
+              label: spot.label,
+            ),
+          )
+          .toList(),
+      onChanged: (spotId) {
+        setState(() => _selectedSpotId = spotId);
+      },
+    );
   }
 
   Future<void> _showModeInfo() async {
@@ -222,7 +287,8 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
             fit: BoxFit.cover,
           ),
           SafeArea(
-            child: Padding(
+            child: SauveteurAdaptiveViewport(
+              child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 children: [
@@ -294,8 +360,9 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                     ),
                   ),
                   const SizedBox(height: 6),
-                  SizedBox(
-                    height: 430,
+                  _spotSelector(),
+                  const SizedBox(height: 6),
+                  Expanded(
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -324,6 +391,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                     sauveteurSessionToken:
                                         widget.sauveteurSessionToken,
                                     postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                   ),
                                 ),
                               );
@@ -336,7 +404,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                               crossAxisCount: 3,
                               crossAxisSpacing: 10,
                               mainAxisSpacing: 10,
-                              childAspectRatio: 0.74,
+                              childAspectRatio: 0.72,
                               children: [
                                 _MenuSquare(
                                   title: 'MÉTÉO TERRESTRE',
@@ -354,6 +422,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -374,13 +443,14 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
                                   },
                                 ),
                                 _MenuSquare(
-                                  title: 'ÉPHÉMÉRIDE\nDICTON',
+                                  title: 'DICTON &\nÉPHÉMÉRIDE',
                                   icon: Icons.auto_awesome_rounded,
                                   color: const Color(0xFFF9A825),
                                   onTap: () {
@@ -394,6 +464,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -409,6 +480,12 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                         builder: (_) =>
                                             SauveteurRecherchePersonnePage(
                                           profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sphotMode: _sphotMode,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -430,6 +507,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
                                           canManageRestrictedOperationalData:
                                               _canManageRestrictedOperationalData,
                                         ),
@@ -444,10 +522,15 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                   onTap: () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (_) =>
-                                            SauveteurEspaceReservePage(
-                                          title: 'STATS',
-                                          profileColor: profileColor,
+                                        builder: (_) => SauveteurStatsPage(
+                                          profileColor:
+                                              const Color(0xFF546E7A),
+                                          territoireId: widget.territoireId,
+                                          sphotMode: _sphotMode,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -457,11 +540,113 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                             ),
                           ),
                           const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _MaterialVerificationSquare(
+                                  title: 'SECOURS',
+                                  icon: Icons.monitor_heart_outlined,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            SauveteurMaterielVerificationPage(
+                                          profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
+                                          sphotMode: _sphotMode,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _MaterialVerificationSquare(
+                                  title: 'PHONIE',
+                                  icon: Icons.wifi_tethering_rounded,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            SauveteurMaterielCategoryVerificationPage(
+                                          category:
+                                              SauveteurMaterielCategory.phonie,
+                                          profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
+                                          sphotMode: _sphotMode,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _MaterialVerificationSquare(
+                                  title: 'MATÉRIEL\nROULANT',
+                                  icon: Icons.directions_car_filled_rounded,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            SauveteurMaterielCategoryVerificationPage(
+                                          category:
+                                              SauveteurMaterielCategory.roulant,
+                                          profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
+                                          sphotMode: _sphotMode,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _MaterialVerificationSquare(
+                                  title: 'MATÉRIEL\nFLOTTANT',
+                                  icon: Icons.directions_boat_filled_rounded,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            SauveteurMaterielCategoryVerificationPage(
+                                          category:
+                                              SauveteurMaterielCategory.flottant,
+                                          profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
+                                          sphotMode: _sphotMode,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
                           _MenuSquare(
                             title: 'MAIN COURANTE',
                             icon: Icons.menu_book_rounded,
                             color: const Color(0xFF8E24AA),
-                            height: 82,
+                            height: 64,
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -474,6 +659,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                     sauveteurSessionToken:
                                         widget.sauveteurSessionToken,
                                     postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                     canManageRestrictedOperationalData:
                                         _canManageRestrictedOperationalData,
                                   ),
@@ -489,7 +675,10 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                     offset: const Offset(0, 9),
                     child: GestureDetector(
                       onTap: () {
-                        Navigator.of(context).pop();
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          '/login',
+                          (route) => false,
+                        );
                       },
                       child: Container(
                         width: 50,
@@ -516,7 +705,67 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
               ),
             ),
           ),
+        ),
         ],
+      ),
+    );
+  }
+}
+
+class _MaterialVerificationSquare extends StatelessWidget {
+  const _MaterialVerificationSquare({
+    required this.title,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  static const Color _color = Color(0xFF1E3A8A);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 78,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.18),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: _color,
+            width: 1.7,
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 3,
+          vertical: 5,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: _color,
+              size: 23,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: _color,
+                fontSize: 8.2,
+                fontWeight: FontWeight.w900,
+                height: 1.0,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -541,12 +790,13 @@ class _MenuSquare extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = height != null && height! <= 66;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         height: height,
         width: double.infinity,
-
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(22),
@@ -555,29 +805,25 @@ class _MenuSquare extends StatelessWidget {
             width: 2.1,
           ),
         ),
-
         child: Padding(
-          padding: const EdgeInsets.all(9),
-
+          padding: EdgeInsets.all(compact ? 4 : 9),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
                 color: iconColor ?? color,
-                size: 34,
+                size: compact ? 25 : 34,
               ),
-
-              const SizedBox(height: 7),
-
+              SizedBox(height: compact ? 2 : 7),
               Text(
                 title,
                 textAlign: TextAlign.center,
-                maxLines: 3,
+                maxLines: compact ? 1 : 3,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: color,
-                  fontSize: 10,
+                  fontSize: compact ? 9.5 : 10,
                   fontWeight: FontWeight.w900,
                   height: 1.0,
                 ),

@@ -5,6 +5,7 @@ import 'dart:math';
 
 import '../../services/sauveteur_live_publication_service.dart';
 import 'widgets/sauveteur_styled_dropdown.dart';
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurMeteoTerrestrePage extends StatefulWidget {
   final Color profileColor;
@@ -12,6 +13,7 @@ class SauveteurMeteoTerrestrePage extends StatefulWidget {
   final String sphotMode;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final String? initialSpotId;
 
   const SauveteurMeteoTerrestrePage({
     super.key,
@@ -20,6 +22,7 @@ class SauveteurMeteoTerrestrePage extends StatefulWidget {
     required this.sphotMode,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    required this.initialSpotId,
   });
 
   @override
@@ -84,7 +87,15 @@ class _SauveteurMeteoTerrestrePageState extends State<SauveteurMeteoTerrestrePag
       _assignedSpots
         ..clear()
         ..addAll(spots);
-      _selectedSpotId = _assignedSpots.isEmpty ? null : _assignedSpots.first.id;
+      final preferredId = widget.initialSpotId?.trim();
+      _selectedSpotId = _assignedSpots.isEmpty
+          ? null
+          : _assignedSpots
+              .firstWhere(
+                (spot) => spot.id == preferredId,
+                orElse: () => _assignedSpots.first,
+              )
+              .id;
 
       if (_selectedSpotId != null) {
         await _loadSelectedSpotState();
@@ -196,7 +207,7 @@ class _SauveteurMeteoTerrestrePageState extends State<SauveteurMeteoTerrestrePag
       if (mounted) {
         setState(() {
           _liveMessage =
-              'Publication refusée. Vérifiez que SPHOT est ON et le poste affecté.';
+              'Publication refusée. Vérifiez votre autorisation et le poste sélectionné.';
         });
       }
     } finally {
@@ -204,78 +215,41 @@ class _SauveteurMeteoTerrestrePageState extends State<SauveteurMeteoTerrestrePag
     }
   }
 
-  Widget _livePublicationBar() {
+  Widget _publishButton() {
     final enabled = _isSphotOn && _selectedSpotId != null && !_loadingLive;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 2, 0, 5),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: SauveteurStyledDropdown(
-                  labelText: 'SPHOT surveillé',
-                  value: _selectedSpotId,
-                  enabled: !_loadingLive,
-                  options: _assignedSpots
-                      .map(
-                        (spot) => SauveteurDropdownOption(
-                          value: spot.id,
-                          label: spot.label,
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (spotId) {
-                    _selectSpot(spotId);
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                height: 42,
-                child: ElevatedButton.icon(
-                  onPressed: enabled && !_savingLive ? _publishWeather : null,
-                  icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-                  label: Text(
-                    _savingLive ? '...' : 'PUBLIER',
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF5D4037),
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (!_isSphotOn)
-            const Padding(
-              padding: EdgeInsets.only(top: 4),
-              child: Text(
-                'SPHOT OFF — publication réelle désactivée.',
-                style: TextStyle(
-                  color: Color(0xFFB91C1C),
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            )
-          else if (_liveMessage != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                _liveMessage!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF1E3A8A),
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 42,
+          child: ElevatedButton.icon(
+            onPressed: enabled && !_savingLive ? _publishWeather : null,
+            icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+            label: Text(
+              _savingLive ? 'PUBLICATION...' : 'PUBLIER',
+              style: const TextStyle(fontWeight: FontWeight.w900),
             ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6D4C41),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.black12,
+            ),
+          ),
+        ),
+        if (_liveMessage != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _liveMessage!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF1E3A8A),
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 
@@ -283,7 +257,8 @@ class _SauveteurMeteoTerrestrePageState extends State<SauveteurMeteoTerrestrePag
 Widget build(BuildContext context) {
   return Scaffold(
     backgroundColor: Colors.transparent,
-    body: Stack(
+    body: SauveteurAdaptiveViewport(
+        child: Stack(
       fit: StackFit.expand,
       children: [
         Image.asset(
@@ -313,20 +288,17 @@ Widget build(BuildContext context) {
                   ),
                 ),
 
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
 
-                _livePublicationBar(),
-
-                SizedBox(
-  height: 450,
-  child: Container(
+                Expanded(
+                  child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                     decoration: BoxDecoration(
                       color: Colors.transparent,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: const Color(0xFF5D4037),
+                        color: const Color(0xFF6D4C41),
                         width: 2,
                       ),
                     ),
@@ -341,7 +313,7 @@ Widget build(BuildContext context) {
                               child: Text(
                                 'PRÉVISIONS',
                                 style: TextStyle(
-                                  color: Color(0xFF5D4037),
+                                  color: Color(0xFF6D4C41),
                                   fontSize: 28,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 0.8,
@@ -432,34 +404,35 @@ Widget build(BuildContext context) {
                           const SizedBox(height: 6),
 
                           Expanded(
-                            child: GridView.count(
-                              physics:
-                                  const NeverScrollableScrollPhysics(),
-                              childAspectRatio: 1.45,
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                _UVCard(
-                                  uvIndex: uvIndex,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      uvIndex = value;
-                                    });
-                                  },
+                                Expanded(
+                                  child: _UVCard(
+                                    uvIndex: uvIndex,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        uvIndex = value;
+                                      });
+                                    },
+                                  ),
                                 ),
-
-                                _HeatwaveCard(
-                                  level: heatwaveLevel,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      heatwaveLevel = value;
-                                    });
-                                  },
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _HeatwaveCard(
+                                    level: heatwaveLevel,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        heatwaveLevel = value;
+                                      });
+                                    },
+                                  ),
                                 ),
                               ],
                             ),
                           ),
+                          const SizedBox(height: 6),
+                          _publishButton(),
                         ],
                       ),
                     ),
@@ -498,7 +471,7 @@ Widget build(BuildContext context) {
           ),
         ),
       ],
-    ),
+    )),
   );
 }
 
@@ -771,7 +744,7 @@ const SizedBox(width: 8),
         fontWeight: FontWeight.w900,
         fontSize: 17,
         height: 1.4,
-        color: Color(0xFF5D4037),
+        color: Color(0xFF6D4C41),
       ),
     ),
   ],
