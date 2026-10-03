@@ -1996,18 +1996,27 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       TextField(
                         controller: nomController,
                         textCapitalization: TextCapitalization.characters,
+                        inputFormatters: const [
+                          UpperCaseTextFormatter(),
+                        ],
                         decoration: const InputDecoration(labelText: 'Nom'),
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: prenomController,
-                        textCapitalization: TextCapitalization.words,
+                        textCapitalization: TextCapitalization.sentences,
+                        inputFormatters: const [
+                          FirstLetterUpperCaseTextFormatter(),
+                        ],
                         decoration: const InputDecoration(labelText: 'Prénom'),
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: fonctionController,
-                        textCapitalization: TextCapitalization.words,
+                        textCapitalization: TextCapitalization.sentences,
+                        inputFormatters: const [
+                          FirstLetterUpperCaseTextFormatter(),
+                        ],
                         decoration: const InputDecoration(labelText: 'Fonction'),
                       ),
                       const SizedBox(height: 10),
@@ -6441,7 +6450,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     '$stepNumber',
                     style: TextStyle(
                       color: displayedStepNumberColor,
-                      fontSize: 13,
+                      fontSize: 10,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -14995,6 +15004,44 @@ class DashboardSpotMarker extends StatelessWidget {
       errorBuilder: (_, __, ___) {
         return Icon(Icons.place, color: typeColor, size: 34);
       },
+    );
+  }
+}
+
+class UpperCaseTextFormatter extends TextInputFormatter {
+  const UpperCaseTextFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return newValue.copyWith(
+      text: newValue.text.toUpperCase(),
+      composing: TextRange.empty,
+    );
+  }
+}
+
+class FirstLetterUpperCaseTextFormatter extends TextInputFormatter {
+  const FirstLetterUpperCaseTextFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    if (text.isEmpty) {
+      return newValue;
+    }
+
+    final formatted =
+        text[0].toUpperCase() + text.substring(1).toLowerCase();
+
+    return newValue.copyWith(
+      text: formatted,
+      composing: TextRange.empty,
     );
   }
 }
