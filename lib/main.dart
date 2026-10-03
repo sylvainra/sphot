@@ -33,6 +33,22 @@ Future<void> main() async {
     }
   }
 
+  final institutionalToken =
+      Uri.base.queryParameters['institutionnelMainCouranteToken']
+          ?.trim() ??
+      '';
+
+  if (institutionalToken.isNotEmpty) {
+    final encodedToken = Uri.encodeQueryComponent(institutionalToken);
+    runApp(
+      SphotApp(
+        initialRoute:
+            '/institutionnel-main-courante?token=$encodedToken',
+      ),
+    );
+    return;
+  }
+
   /*
    * Avec une adresse comme :
    *
