@@ -562,19 +562,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return earthRadius * c;
   }
 
-  String _capitalizeWords(String value) {
-    return value.replaceAllMapped(
-      RegExp(r"(^|[\\s\\-'])([A-Za-zÀ-ÖØ-öø-ÿ])([A-Za-zÀ-ÖØ-öø-ÿ]*)"),
-      (match) {
-        final separator = match.group(1) ?? '';
-        final firstLetter = match.group(2) ?? '';
-        final remainingLetters = match.group(3) ?? '';
-
-        return separator + firstLetter.toUpperCase() + remainingLetters;
-      },
-    );
-  }
-
   String _cleanText(dynamic value) {
     return (value ?? '').toString().trim();
   }
@@ -1953,6 +1940,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         : <String, dynamic>{};
     bool notifyFlagLowered = rawPreferences['flagLowered'] != false;
     bool notifyInterventions = rawPreferences['intervention'] != false;
+    String? validationMessage;
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -2097,6 +2085,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
               ),
               actions: [
+                if (validationMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Text(
+                      validationMessage!,
+                      style: const TextStyle(
+                        color: redColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
                 TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(),
                   child: const Text('ANNULER'),
@@ -2114,11 +2114,36 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
                     ).hasMatch(email);
 
-                    if (nom.isEmpty ||
-                        prenom.isEmpty ||
-                        fonction.isEmpty ||
-                        !phoneValid ||
-                        !emailValid) {
+                    if (nom.isEmpty) {
+                      setDialogState(() {
+                        validationMessage = 'Renseignez le nom.';
+                      });
+                      return;
+                    }
+                    if (prenom.isEmpty) {
+                      setDialogState(() {
+                        validationMessage = 'Renseignez le prénom.';
+                      });
+                      return;
+                    }
+                    if (fonction.isEmpty) {
+                      setDialogState(() {
+                        validationMessage = 'Renseignez la fonction.';
+                      });
+                      return;
+                    }
+                    if (!phoneValid) {
+                      setDialogState(() {
+                        validationMessage =
+                            'Renseignez un numéro de téléphone valide.';
+                      });
+                      return;
+                    }
+                    if (!emailValid) {
+                      setDialogState(() {
+                        validationMessage =
+                            'Renseignez une adresse email valide.';
+                      });
                       return;
                     }
 
@@ -2128,8 +2153,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           : DateTime.now().microsecondsSinceEpoch.toString(),
                       'civilite': civilite,
                       'nom': nom.toUpperCase(),
-                      'prenom': _capitalizeWords(prenom),
-                      'fonction': _capitalizeWords(fonction),
+                      'prenom': prenom,
+                      'fonction': fonction,
                       'telephone': telephone,
                       'email': email,
                       'mainCouranteReadOnly': true,
