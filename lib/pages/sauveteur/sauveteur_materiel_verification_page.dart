@@ -157,7 +157,7 @@ class _SauveteurMaterielVerificationPageState
     final backupBar = _parseBar(_oxygenBackupController)!;
 
     final lines = <String>[
-      'Catégorie : Oxygénothérapie & DSA',
+      'Catégorie : Secours',
       'O² bouteille principale : ' + mainBar.toString() + ' bar',
       'O² bouteille secours : ' + backupBar.toString() + ' bar',
       'Aspirateur de mucosités : ' + _status(_aspiratorWorking),
@@ -476,7 +476,7 @@ class _SauveteurMaterielVerificationPageState
                       fit: BoxFit.contain,
                     ),
                     const Text(
-                      'OXYGÉNOTHÉRAPIE & DSA',
+                      'SECOURS',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFFD50000),
