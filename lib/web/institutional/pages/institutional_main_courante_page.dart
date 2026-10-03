@@ -569,11 +569,13 @@ class _InstitutionalMainCourantePageState
     final description =
         (entry['description'] ?? '').toString().toLowerCase();
 
-    if (description.contains('catégorie : oxy') ||
+    if (description.contains('catégorie : secours') ||
+        description.contains('categorie : secours') ||
+        description.contains('catégorie : oxy') ||
         description.contains('categorie : oxy') ||
         description.contains('dsa') ||
         description.contains('bouteille principale')) {
-      return 'OXYGÈNE / DSA';
+      return 'SECOURS';
     }
 
     if (description.contains('catégorie : phonie') ||
