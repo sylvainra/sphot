@@ -1,9 +1,11 @@
 import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../shared/sphot_access_page.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../shared/web_colors.dart';
 import 'pages/advertiser_dashboard_page.dart';
@@ -37,10 +39,12 @@ class WebAdvertiserAccessPage extends StatefulWidget {
     super.key,
     this.correctionRequestId,
     this.correctionToken,
+    this.autoStart = false,
   });
 
   final String? correctionRequestId;
   final String? correctionToken;
+  final bool autoStart;
 
   @override
   State<WebAdvertiserAccessPage> createState() =>
@@ -62,13 +66,38 @@ class _WebAdvertiserAccessPageState extends State<WebAdvertiserAccessPage> {
   @override
   void initState() {
     super.initState();
-    if (_isCorrection || _advertiserDevBypassEnabled) {
+    if (_isCorrection ||
+        _advertiserDevBypassEnabled ||
+        (kIsWeb && widget.autoStart)) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _open());
     }
   }
 
   Future<void> _open() async {
     if (_starting) return;
+
+    if (!kIsWeb && !_isCorrection && !_advertiserDevBypassEnabled) {
+      setState(() {
+        _starting = true;
+        _error = null;
+      });
+
+      final opened = await launchUrl(
+        Uri.parse('https://sphot.app/#/advertiser?start=1'),
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _starting = false;
+        if (!opened) {
+          _error = 'Impossible d’ouvrir la demande SPHOT PUBLICITAIRE.';
+        }
+      });
+      return;
+    }
+
     setState(() {
       _starting = true;
       _error = null;
@@ -174,7 +203,7 @@ class _StartPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SphotAccessPage(
     title: 'SPHOT PUBLICITAIRE',
-    onBack: () => Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false),
+    onBack: () => Navigator.of(context).pushNamedAndRemoveUntil('/map', (route) => false),
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
