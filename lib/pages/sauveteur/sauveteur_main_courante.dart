@@ -2116,10 +2116,7 @@ class _SauveteurMainCourantePageState
 
   List<Map<String, dynamic>> _entriesForExport() {
     final visibleEntries = _entries
-        .where(
-          (entry) =>
-              !_selectedDayIsToday || !_isPresenceEntry(entry),
-        )
+        .where((entry) => !_isPresenceEntry(entry))
         .toList();
 
     final verificationEntries = visibleEntries
@@ -2162,8 +2159,9 @@ class _SauveteurMainCourantePageState
     }
 
     pw.Widget personnelLine(Map<String, String> row) {
-      final status = (row['status'] ?? '').trim();
-      final present = status == 'PRÉSENT';
+      final hours = _presenceHoursDisplay(
+        (row['hours'] ?? '').trim(),
+      );
 
       return pw.Container(
         padding: const pw.EdgeInsets.symmetric(vertical: 3),
@@ -2189,7 +2187,7 @@ class _SauveteurMainCourantePageState
               ),
             ),
             pw.Expanded(
-              flex: 4,
+              flex: 3,
               child: pw.Text(
                 (row['quality'] ?? 'Sauveteur').trim(),
                 style: const pw.TextStyle(fontSize: 8.5),
@@ -2198,12 +2196,19 @@ class _SauveteurMainCourantePageState
             pw.Expanded(
               flex: 3,
               child: pw.Text(
-                status,
+                hours.isEmpty ? 'Non renseignés' : hours,
+                style: const pw.TextStyle(fontSize: 8.5),
+              ),
+            ),
+            pw.Expanded(
+              flex: 2,
+              child: pw.Text(
+                'PRÉSENT',
                 textAlign: pw.TextAlign.right,
                 style: pw.TextStyle(
                   fontSize: 8.5,
                   fontWeight: pw.FontWeight.bold,
-                  color: present ? PdfColors.green : PdfColors.red,
+                  color: PdfColors.green,
                 ),
               ),
             ),
@@ -2397,7 +2402,7 @@ class _SauveteurMainCourantePageState
                   ),
                 ),
                 pw.Expanded(
-                  flex: 4,
+                  flex: 3,
                   child: pw.Text(
                     'Qualité',
                     style: pw.TextStyle(
@@ -2408,6 +2413,16 @@ class _SauveteurMainCourantePageState
                 ),
                 pw.Expanded(
                   flex: 3,
+                  child: pw.Text(
+                    'Horaires',
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+                pw.Expanded(
+                  flex: 2,
                   child: pw.Text(
                     'Situation',
                     textAlign: pw.TextAlign.right,
@@ -3252,10 +3267,7 @@ class _SauveteurMainCourantePageState
 
   Widget _factsSection() {
     final visibleEntries = _entries
-        .where(
-          (entry) =>
-              !_selectedDayIsToday || !_isPresenceEntry(entry),
-        )
+        .where((entry) => !_isPresenceEntry(entry))
         .toList()
       ..sort(_compareFactEntries);
 
@@ -3267,10 +3279,6 @@ class _SauveteurMainCourantePageState
     final chronologicalEntries = visibleEntries
         .where((entry) => !_isMaterialVerificationEntry(entry))
         .toList();
-
-    final showDerivedPresence = !_selectedDayIsToday &&
-        _presenceEntry == null &&
-        (_presenceFromPlanning || _selectedPresenceLabels.isNotEmpty);
 
     return InputDecorator(
       decoration: InputDecoration(
@@ -3298,11 +3306,8 @@ class _SauveteurMainCourantePageState
         mainAxisSize: MainAxisSize.min,
         children: [
           ...materialVerificationGroups.map(_verificationGroupCard),
-          if (showDerivedPresence)
-            _derivedPastPresenceCard(),
           if (materialVerificationEntries.isEmpty &&
-              chronologicalEntries.isEmpty &&
-              !showDerivedPresence)
+              chronologicalEntries.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: 8,
@@ -3765,8 +3770,6 @@ class _SauveteurMainCourantePageState
       ),
       child: Column(
         children: [
-          _presenceSelector(),
-          const SizedBox(height: 10),
           SauveteurStyledDropdown(
             labelText: 'Type de fait',
             value: _selectedType,
@@ -4106,6 +4109,8 @@ class _SauveteurMainCourantePageState
                                             ),
                                             SizedBox(height: 10),
                                           ],
+                                          _personnelCard(),
+                                          const SizedBox(height: 12),
                                           if (_selectedDayIsToday)
                                             _entryForm()
                                           else if (_canWrite)
@@ -4146,10 +4151,6 @@ class _SauveteurMainCourantePageState
                                                 ),
                                               ),
                                             ),
-                                          if (_personnelRows.isNotEmpty) ...[
-                                            _personnelCard(),
-                                            const SizedBox(height: 12),
-                                          ],
                                           _factsSection(),
                                           const SizedBox(height: 12),
                                           SizedBox(
