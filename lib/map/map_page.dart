@@ -170,27 +170,9 @@ Future<void> _toggleFavoritesFilter() async {
   }
 
   Future<void> _openLoginPage() async {
-    if (kIsWeb) {
-      final uri = Uri.base.replace(fragment: '/login');
-      final opened = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-        webOnlyWindowName: '_blank',
-      );
-
-      if (!opened) {
-        _showMapMessage('Impossible d’ouvrir la page de connexion.');
-      }
-      return;
-    }
-
     if (!mounted) return;
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const ProfilLoginPage(),
-      ),
-    );
+    await Navigator.of(context).pushNamed('/login');
   }
 
   Future<void> _openAdvertiserWebsite() async {
