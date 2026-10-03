@@ -1,10 +1,8 @@
-// ignore_for_file: avoid_web_libraries_in_flutter
 import 'dart:convert';
-import 'dart:html' as html;
-
 import 'package:flutter/material.dart';
 
 import '../../../widgets/adaptive_asset_image.dart';
+import '../../../services/web_print_service.dart';
 
 class SphotAdminSummaryPage extends StatefulWidget {
   final Map<String, dynamic> summary;
@@ -135,6 +133,19 @@ class _SphotAdminSummaryPageState extends State<SphotAdminSummaryPage> {
   }
 
   Future<void> _printPortrait() async {
+    if (!WebPrintService.isSupported) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'L’impression de cette fiche est disponible depuis la version Web de SPHOT.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final monitoredSpots = List<Map<String, dynamic>>.from(
       widget.summary['monitoredSpots'] ?? const [],
     );
@@ -143,7 +154,7 @@ class _SphotAdminSummaryPageState extends State<SphotAdminSummaryPage> {
       widget.summary['otherSpots'] ?? const [],
     );
 
-    final origin = html.window.location.origin;
+    final origin = WebPrintService.origin;
     final escape = const HtmlEscape();
 
     String e(dynamic value) => escape.convert(_clean(value));
@@ -596,23 +607,17 @@ class _SphotAdminSummaryPageState extends State<SphotAdminSummaryPage> {
 </html>
     ''';
 
-    final blob = html.Blob(
-      [documentHtml],
-      'text/html;charset=utf-8',
-    );
+    final opened = WebPrintService.openPrintableHtml(documentHtml);
 
-    final url = html.Url.createObjectUrlFromBlob(blob);
-
-    html.window.open(
-      url,
-      '_blank',
-      'noopener,noreferrer',
-    );
-
-    Future<void>.delayed(
-      const Duration(seconds: 10),
-      () => html.Url.revokeObjectUrl(url),
-    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Impossible d’ouvrir la version imprimable de cette fiche.',
+          ),
+        ),
+      );
+    }
   }
 
   @override

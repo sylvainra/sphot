@@ -496,7 +496,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         _value('emailResponsable').isNotEmpty;
   }
 
-  bool get _institutionnelsComplete => _institutionalContacts.isNotEmpty;
+  bool get _institutionnelsComplete => true;
 
   bool get _territoireComplete {
     return _value('pays').isNotEmpty &&
@@ -524,7 +524,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   bool get _canOpenTrialRequest {
     return _structureComplete &&
         _responsableComplete &&
-        _institutionnelsComplete &&
         _territoireComplete &&
         _villeComplete;
   }
@@ -2789,7 +2788,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       children: [
         _pageHeader(
           'CONTACTS INSTITUTIONNELS',
-          'Renseignez les personnes institutionnelles de référence liées à la gestion du SPHOT.',
+          'Vous pouvez renseigner les personnes institutionnelles de référence liées à la gestion du SPHOT. Cette étape est facultative.',
         ),
         if (_institutionalContacts.isNotEmpty) ...[
           ..._institutionalContacts.asMap().entries.map(
@@ -2872,7 +2871,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           ],
           const SizedBox(height: 8),
           const Text(
-            'Ajoutez au moins un contact institutionnel pour poursuivre.',
+            'Cette étape est facultative. Vous pouvez poursuivre sans ajouter de contact institutionnel.',
             style: TextStyle(
               color: Colors.black54,
               fontSize: 11.5,
@@ -2888,7 +2887,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             const SizedBox(width: 20),
             _nextButton(
               _TrialRequestSection.territoire,
-              enabled: _institutionnelsComplete,
             ),
           ],
         ),
@@ -3186,22 +3184,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           'LIEU',
           'Positionnez le lieu du SPHOT ADMIN sur la carte centrale.',
         ),
-        _textField(
-          'siteInternetVille',
-          'https://www.votre-site.fr',
-          readOnly: !_isFieldEditable('siteInternetVille'),
-        ),
-
-        const SizedBox(height: 11),
-
-        _buildAdminLogoPicker(),
-        const SizedBox(height: 11),
-        _textField(
-          'arretesMunicipaux',
-          'https://réglements-de-baignade',
-          readOnly: !_isFieldEditable('arretesMunicipaux'),
-        ),
-        const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -3210,7 +3192,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             border: Border.all(color: adminColor, width: 1.4),
           ),
           child: const Text(
-            'Cliquez sur la carte pour positionner le lieu du SPHOT ADMIN.\n\nAstuce : les coordonnées GPS seront enregistrées automatiquement.',
+            'Cliquez sur la carte pour positionner le lieu du SPHOT ADMIN.\n\n'
+            'Astuce : les coordonnées GPS seront enregistrées automatiquement.',
             style: TextStyle(
               color: adminColor,
               fontSize: 12,
@@ -3269,6 +3252,20 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 14),
+        _buildAdminLogoPicker(),
+        const SizedBox(height: 14),
+        _textField(
+          'siteInternetVille',
+          'https://www.votre-site.fr',
+          readOnly: !_isFieldEditable('siteInternetVille'),
+        ),
+        const SizedBox(height: 11),
+        _textField(
+          'arretesMunicipaux',
+          'https://réglements-de-baignade',
+          readOnly: !_isFieldEditable('arretesMunicipaux'),
         ),
         const SizedBox(height: 22),
         Row(

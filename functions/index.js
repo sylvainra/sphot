@@ -4606,6 +4606,103 @@ function sauveteurLegalAcceptanceIsCurrent(accountData, legalPack) {
     professionalDecisionResponsibilityAccepted;
 }
 
+/**
+ * Résout un identifiant de connexion SPHOT sans demander le mot de passe.
+ *
+ * Cette fonction sert uniquement à orienter l'écran de connexion commun.
+ * Elle ne crée aucune session et ne retourne aucune donnée personnelle.
+ */
+exports.resolveLoginIdentity = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      if (request.method !== "POST") {
+        response.status(405).json({success: false});
+        return;
+      }
+
+      try {
+        const login = (request.body.login || "")
+            .toString()
+            .trim()
+            .toLowerCase();
+
+        if (!login || login.includes("/")) {
+          response.status(400).json({
+            success: false,
+            error: "invalid_identifier",
+          });
+          return;
+        }
+
+        const db = admin.firestore();
+
+        const [
+          sauveteurSnapshot,
+          adminSnapshot,
+          advertiserSnapshot,
+        ] = await Promise.all([
+          db.collection("sauveteurAccounts").doc(login).get(),
+          db.collection("adminAccounts").doc(login).get(),
+          db.collection("advertiserAccounts").doc(login).get(),
+        ]);
+
+        const accountTypes = [];
+
+        if (sauveteurSnapshot.exists) {
+          const data = sauveteurSnapshot.data() || {};
+          if (data.accountStatus === "ACTIVE") {
+            accountTypes.push("SAUVETEUR");
+          }
+        }
+
+        if (adminSnapshot.exists) {
+          const data = adminSnapshot.data() || {};
+          if (data.accountStatus === "ACTIVE") {
+            accountTypes.push("ADMIN");
+          }
+        }
+
+        if (advertiserSnapshot.exists) {
+          const data = advertiserSnapshot.data() || {};
+          if (data.accountStatus === "ACTIVE") {
+            accountTypes.push("ANNONCEUR");
+          }
+        }
+
+        if (accountTypes.length === 0) {
+          response.status(404).json({
+            success: false,
+            error: "unknown_identifier",
+          });
+          return;
+        }
+
+        response.status(200).json({
+          success: true,
+          accountTypes,
+        });
+      } catch (error) {
+        console.error("Erreur résolution identifiant SPHOT:", error);
+        response.status(500).json({
+          success: false,
+          error: "internal_error",
+        });
+      }
+    },
+);
+
 exports.loginSauveteur = onRequest(
     {
       cpu: 1,

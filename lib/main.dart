@@ -10,9 +10,7 @@ import 'map/map_page.dart';
 import 'map/profil_login_page.dart';
 import 'web/advertiser/web_advertiser_app.dart';
 import 'web/advertiser/pages/advertiser_first_access_page.dart';
-import 'web/admin/pages/admin_proconnect_access_page.dart';
 import 'web/admin/pages/admin_trial_request_page.dart';
-import 'pages/professional/professional_login_page.dart';
 import 'web/admin/pages/admin_dashboard_page.dart';
 import 'web/super_admin/web_super_admin_app.dart';
 import 'services/web_pending_auth_storage.dart';
@@ -73,6 +71,13 @@ class SphotApp extends StatelessWidget {
 
     final uri = Uri.parse(routeName);
 
+    if (uri.path == '/map') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => const MapPage(),
+      );
+    }
+
     if (uri.path == '/advertiser') {
       return MaterialPageRoute(
         settings: settings,
@@ -103,9 +108,7 @@ class SphotApp extends StatelessWidget {
     if (uri.path == '/professional-login') {
       return MaterialPageRoute(
         settings: settings,
-        builder: (_) => ProfessionalLoginPage(
-          advertiserAccess: uri.queryParameters['audience'] == 'advertiser',
-        ),
+        builder: (_) => const ProfilLoginPage(),
       );
     }
 
@@ -119,7 +122,7 @@ class SphotApp extends StatelessWidget {
     if (uri.path == '/admin-request') {
       return MaterialPageRoute(
         settings: settings,
-        builder: (_) => const AdminProConnectAccessPage(),
+        builder: (_) => const AdminTrialRequestPage(),
       );
     }
 

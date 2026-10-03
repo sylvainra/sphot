@@ -7202,7 +7202,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                                     ),
                                     child: IconButton(
                                       onPressed: () {
-                                        Navigator.of(context).pop();
+                                        Navigator.of(context)
+                                            .pushNamedAndRemoveUntil(
+                                          '/map',
+                                          (route) => false,
+                                        );
                                       },
                                       icon: const Icon(
                                         Icons.arrow_back_ios_new_rounded,
