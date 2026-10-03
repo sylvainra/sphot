@@ -3258,13 +3258,13 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         const SizedBox(height: 14),
         _textField(
           'siteInternetVille',
-          'Site internet du lieu',
+          'https://www.votre-site.fr',
           readOnly: !_isFieldEditable('siteInternetVille'),
         ),
         const SizedBox(height: 11),
         _textField(
           'arretesMunicipaux',
-          'Règlements de baignade',
+          'https://réglements-de-baignade',
           readOnly: !_isFieldEditable('arretesMunicipaux'),
         ),
         const SizedBox(height: 22),
