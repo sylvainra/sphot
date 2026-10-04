@@ -134,8 +134,10 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   final Map<String, String> _correctionBaseline = {};
   final Set<String> _fieldsToCorrect = <String>{};
 
-  final List<Map<String, String>> _institutionalContacts = [];
+  final List<Map<String, dynamic>> _institutionalContacts = [];
   int? _editingInstitutionalIndex;
+  bool _institutionNotifyFlagLowered = true;
+  bool _institutionNotifyIntervention = true;
 
   Map<String, dynamic>? _cguDoc;
   Map<String, dynamic>? _privacyDoc;
@@ -284,7 +286,13 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                 .whereType<Map>()
                 .map((raw) {
                   final contact = Map<String, dynamic>.from(raw);
-                  return <String, String>{
+                  final preferences =
+                      contact['notificationPreferences'] is Map
+                          ? Map<String, dynamic>.from(
+                              contact['notificationPreferences'] as Map,
+                            )
+                          : <String, dynamic>{};
+                  return <String, dynamic>{
                     'id': (contact['id'] ?? '').toString(),
                     'civilite': (contact['civilite'] ?? '').toString(),
                     'nom': (contact['nom'] ?? '').toString(),
@@ -292,10 +300,22 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                     'fonction': (contact['fonction'] ?? '').toString(),
                     'telephone': (contact['telephone'] ?? '').toString(),
                     'email': (contact['email'] ?? '').toString(),
+                    'mainCouranteReadOnly':
+                        contact['mainCouranteReadOnly'] != false,
+                    'notificationPreferences': {
+                      'flagLowered': preferences['flagLowered'] != false,
+                      'intervention': preferences['intervention'] != false,
+                    },
+                    if ((contact['accessTokenHash'] ?? '')
+                        .toString()
+                        .trim()
+                        .isNotEmpty)
+                      'accessTokenHash':
+                          (contact['accessTokenHash'] ?? '').toString().trim(),
                   };
                 })
                 .toList()
-          : <Map<String, String>>[];
+          : <Map<String, dynamic>>[];
 
       final trialRequest = Map<String, dynamic>.from(
         data['trialRequest'] ?? {},
@@ -2622,6 +2642,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       _controller(key).clear();
     }
     _editingInstitutionalIndex = null;
+    _institutionNotifyFlagLowered = true;
+    _institutionNotifyIntervention = true;
   }
 
   void _editInstitutionalContact(int index) {
@@ -2635,12 +2657,27 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
     setState(() {
       _editingInstitutionalIndex = index;
-      _controller('institutionCivilite').text = contact['civilite'] ?? '';
-      _controller('institutionNom').text = contact['nom'] ?? '';
-      _controller('institutionPrenom').text = contact['prenom'] ?? '';
-      _controller('institutionFonction').text = contact['fonction'] ?? '';
-      _controller('institutionTelephone').text = contact['telephone'] ?? '';
-      _controller('institutionEmail').text = contact['email'] ?? '';
+      _controller('institutionCivilite').text =
+          (contact['civilite'] ?? '').toString();
+      _controller('institutionNom').text =
+          (contact['nom'] ?? '').toString();
+      _controller('institutionPrenom').text =
+          (contact['prenom'] ?? '').toString();
+      _controller('institutionFonction').text =
+          (contact['fonction'] ?? '').toString();
+      _controller('institutionTelephone').text =
+          (contact['telephone'] ?? '').toString();
+      _controller('institutionEmail').text =
+          (contact['email'] ?? '').toString();
+
+      final preferences = contact['notificationPreferences'] is Map
+          ? Map<String, dynamic>.from(
+              contact['notificationPreferences'] as Map,
+            )
+          : <String, dynamic>{};
+      _institutionNotifyFlagLowered = preferences['flagLowered'] != false;
+      _institutionNotifyIntervention =
+          preferences['intervention'] != false;
     });
   }
 
@@ -2653,10 +2690,16 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     final existingId = index != null &&
             index >= 0 &&
             index < _institutionalContacts.length
-        ? (_institutionalContacts[index]['id'] ?? '')
+        ? (_institutionalContacts[index]['id'] ?? '').toString()
         : '';
 
-    final contact = <String, String>{
+    final existing = index != null &&
+            index >= 0 &&
+            index < _institutionalContacts.length
+        ? _institutionalContacts[index]
+        : <String, dynamic>{};
+
+    final contact = <String, dynamic>{
       'id': existingId.isNotEmpty
           ? existingId
           : DateTime.now().microsecondsSinceEpoch.toString(),
@@ -2666,6 +2709,14 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       'fonction': _capitalizeWords(_value('institutionFonction')),
       'telephone': _value('institutionTelephone'),
       'email': _value('institutionEmail').toLowerCase(),
+      'mainCouranteReadOnly': true,
+      'notificationPreferences': {
+        'flagLowered': _institutionNotifyFlagLowered,
+        'intervention': _institutionNotifyIntervention,
+      },
+      if ((existing['accessTokenHash'] ?? '').toString().trim().isNotEmpty)
+        'accessTokenHash':
+            (existing['accessTokenHash'] ?? '').toString().trim(),
     };
 
     setState(() {
@@ -2703,7 +2754,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   }
 
   Widget _institutionalContactCard(
-    Map<String, String> contact,
+    Map<String, dynamic> contact,
     int index,
   ) {
     final identity = [
@@ -2838,6 +2889,60 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             'institutionEmail',
             'Email de contact',
             keyboardType: TextInputType.emailAddress,
+          ),
+          const SizedBox(height: 13),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: adminColor.withOpacity(0.045),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: adminColor.withOpacity(0.22)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'ACCÈS & NOTIFICATIONS MAIN COURANTE',
+                  style: TextStyle(
+                    color: adminColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Le contact disposera d’un accès personnel en lecture seule '
+                  'à la Main Courante et pourra ensuite modifier ses alertes.',
+                  style: TextStyle(
+                    color: Colors.black54,
+                    fontSize: 11,
+                    height: 1.25,
+                  ),
+                ),
+                SwitchListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Alerte lors de l’affalage du drapeau',
+                  ),
+                  value: _institutionNotifyFlagLowered,
+                  onChanged: (value) {
+                    setState(() => _institutionNotifyFlagLowered = value);
+                  },
+                ),
+                SwitchListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Alerte lors d’une intervention',
+                  ),
+                  value: _institutionNotifyIntervention,
+                  onChanged: (value) {
+                    setState(() => _institutionNotifyIntervention = value);
+                  },
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 13),
           OutlinedButton.icon(
