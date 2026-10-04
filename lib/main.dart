@@ -13,6 +13,7 @@ import 'web/advertiser/pages/advertiser_first_access_page.dart';
 import 'web/admin/pages/admin_access_page.dart';
 import 'web/admin/pages/admin_trial_request_page.dart';
 import 'web/admin/pages/admin_dashboard_page.dart';
+import 'web/institutional/pages/institutional_main_courante_page.dart';
 import 'web/super_admin/web_super_admin_app.dart';
 import 'services/web_pending_auth_storage.dart';
 
@@ -29,6 +30,22 @@ Future<void> main() async {
       runApp(const SphotApp(initialRoute: '/advertiser'));
       return;
     }
+  }
+
+  final institutionalToken =
+      Uri.base.queryParameters['institutionnelMainCouranteToken']
+          ?.trim() ??
+      '';
+
+  if (institutionalToken.isNotEmpty) {
+    final encodedToken = Uri.encodeQueryComponent(institutionalToken);
+    runApp(
+      SphotApp(
+        initialRoute:
+            '/institutionnel-main-courante?token=$encodedToken',
+      ),
+    );
+    return;
   }
 
   /*
@@ -119,6 +136,15 @@ class SphotApp extends StatelessWidget {
       return MaterialPageRoute(
         settings: settings,
         builder: (_) => const ProfilLoginPage(),
+      );
+    }
+
+    if (uri.path == '/institutionnel-main-courante') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => InstitutionalMainCourantePage(
+          token: uri.queryParameters['token'] ?? '',
+        ),
       );
     }
 
