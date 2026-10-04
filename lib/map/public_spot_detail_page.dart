@@ -289,11 +289,11 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
 
   static const List<(String, IconData)> _pages = [
     ('Live', Icons.sensors_rounded),
+    ('Signaux', Icons.flag_outlined),
     ('Météo terrestre', Icons.wb_sunny_outlined),
     ('Météo marine', Icons.water_rounded),
     ('Dicton & Éphéméride', Icons.calendar_today_outlined),
     ('Infos', Icons.info_outline_rounded),
-    ('Signaux', Icons.flag_outlined),
   ];
 
   @override
@@ -907,31 +907,31 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   ) {
     switch (_selectedPage) {
       case 1:
-        return _buildTerrestrialPage(
+        return _buildSignalsPage(
           context,
           spot,
           _contentScrollController,
         );
       case 2:
-        return _buildMarinePage(
+        return _buildTerrestrialPage(
           context,
           spot,
           _contentScrollController,
         );
       case 3:
-        return _buildEphemeridePage(
+        return _buildMarinePage(
           context,
           spot,
           _contentScrollController,
         );
       case 4:
-        return _buildInfoPage(
+        return _buildEphemeridePage(
           context,
           spot,
           _contentScrollController,
         );
       case 5:
-        return _buildSignalsPage(
+        return _buildInfoPage(
           context,
           spot,
           _contentScrollController,
