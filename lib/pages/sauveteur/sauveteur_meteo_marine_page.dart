@@ -5,6 +5,7 @@ import 'package:numberpicker/numberpicker.dart';
 
 import '../../services/sauveteur_live_publication_service.dart';
 import 'widgets/sauveteur_styled_dropdown.dart';
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 
 class SauveteurMeteoMarinePage extends StatefulWidget {
@@ -34,6 +35,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
   int waterMax = 22;
 
   int seaStateIndex = 3;
+  bool tidesPresent = true;
 
   int highTideHour1 = 6;
   int highTideMinute1 = 42;
@@ -130,6 +132,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
       waterMin = readInt('Température eau min', waterMin);
       waterMax = readInt('Température eau max', waterMax);
       seaStateIndex = readInt('État de la mer index', seaStateIndex);
+      tidesPresent = weather['Marées présentes'] != false;
 
       highTideHour1 = readInt('Pleine mer 1 heure', highTideHour1);
       highTideMinute1 = readInt('Pleine mer 1 minute', highTideMinute1);
@@ -197,6 +200,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
             'Température eau max': waterMax,
             'État de la mer': seaStateLabels[seaStateIndex],
             'État de la mer index': seaStateIndex,
+            'Marées présentes': tidesPresent,
             'Pleine mer 1':
                 '${highTideHour1.toString().padLeft(2, '0')}:'
                 '${highTideMinute1.toString().padLeft(2, '0')}',
@@ -244,7 +248,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
       if (mounted) {
         setState(() {
           _liveMessage =
-              'Publication refusée. Vérifiez que SPHOT est ON et le poste affecté.';
+              'Publication refusée. Vérifiez votre autorisation et le poste sélectionné.';
         });
       }
     } finally {
@@ -340,7 +344,8 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
+      body: SauveteurAdaptiveViewport(
+        child: Stack(
         fit: StackFit.expand,
         children: [
           Image.asset(
@@ -371,15 +376,12 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                     ),
                   ),
 
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
 
-                  _livePublicationBar(),
-
-                  SizedBox(
-                    height: 450,
+                  Expanded(
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                       decoration: BoxDecoration(
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(24),
@@ -389,34 +391,22 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                         ),
                       ),
 
-                      child: Transform.translate(
-                        offset: const Offset(0, -12),
-
-                        child: SingleChildScrollView(
-  physics: const NeverScrollableScrollPhysics(),
-  clipBehavior: Clip.none,
-
-                          child: Column(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        clipBehavior: Clip.none,
+                        child: Column(
                             children: [
-                              Transform.translate(
-                                offset: const Offset(0, 10),
-
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 2),
-
-                                  child: Text(
-                                    'PRÉVISIONS',
-                                    style: TextStyle(
-                                      color: Color(0xFF0277BD),
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.8,
-                                    ),
-                                  ),
+                              const Text(
+                                'PRÉVISIONS',
+                                style: TextStyle(
+                                  color: Color(0xFF0277BD),
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.8,
                                 ),
                               ),
 
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 12),
 
                               Row(
                                 children: [
@@ -463,11 +453,16 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                                 ],
                               ),
 
-                              Transform.translate(
-                                offset: const Offset(0, 6),
+                              const SizedBox(height: 12),
 
-                                child: _TidesFullWidthCard(
+                              _TidesFullWidthCard(
                                   borderColor: tideColor,
+                                  tidesPresent: tidesPresent,
+                                  onTidesPresentChanged: (value) {
+                                    setState(() {
+                                      tidesPresent = value;
+                                    });
+                                  },
 
                                   highHour1: highTideHour1,
                                   highMinute1: highTideMinute1,
@@ -541,15 +536,13 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                                     });
                                   },
                                 ),
-                              ),
 
                               const SizedBox(height: 12),
 
                               SizedBox(
-                                height: 226,
-
+                                height: 276,
                                 child: _SwellFullWidthCard(
-                                    borderColor: swellColor,
+                                  borderColor: swellColor,
 
                                     directionMorning: swellDirectionMorning,
                                     directionAfternoon: swellDirectionAfternoon,
@@ -610,18 +603,19 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                                         periodMax = value;
                                       });
                                     },
-                                  
                                 ),
                               ),
+                              const SizedBox(height: 12),
+                              _livePublicationBar(),
                             ],
                           ),
                         ),
-                      ),
                     ),
                   ),
 
+                  const SizedBox(height: 6),
                   Transform.translate(
-                    offset: const Offset(0, 12),
+                    offset: const Offset(0, 0),
 
                     child: GestureDetector(
                       onTap: () {
@@ -655,7 +649,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
             ),
           ),
         ],
-      ),
+      )),
     );
   }
 }
@@ -887,6 +881,8 @@ class _SeaStateCard extends StatelessWidget {
 
 class _TidesFullWidthCard extends StatelessWidget {
   final Color borderColor;
+  final bool tidesPresent;
+  final ValueChanged<bool> onTidesPresentChanged;
 
   final int highHour1;
   final int highMinute1;
@@ -914,6 +910,8 @@ class _TidesFullWidthCard extends StatelessWidget {
 
   const _TidesFullWidthCard({
     required this.borderColor,
+    required this.tidesPresent,
+    required this.onTidesPresentChanged,
     required this.highHour1,
     required this.highMinute1,
     required this.highHour2,
@@ -940,8 +938,8 @@ class _TidesFullWidthCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 120,
-      padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
+      height: 150,
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
       decoration: BoxDecoration(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
@@ -953,7 +951,7 @@ class _TidesFullWidthCard extends StatelessWidget {
       child: Column(
         children: [
           SizedBox(
-            height: 34,
+            height: 38,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -963,7 +961,7 @@ class _TidesFullWidthCard extends StatelessWidget {
                   height: 26,
                   color: const Color(0xFF0277BD),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 7),
                 const Text(
                   'MARÉES',
                   style: TextStyle(
@@ -973,43 +971,79 @@ class _TidesFullWidthCard extends StatelessWidget {
                     letterSpacing: 0.8,
                   ),
                 ),
+                const SizedBox(width: 8),
+                const Text(
+                  'PRÉSENTES',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Transform.scale(
+                  scale: 0.82,
+                  child: Checkbox(
+                    value: tidesPresent,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize:
+                        MaterialTapTargetSize.shrinkWrap,
+                    activeColor: const Color(0xFF0277BD),
+                    onChanged: (value) {
+                      if (value != null) {
+                        onTidesPresentChanged(value);
+                      }
+                    },
+                  ),
+                ),
               ],
             ),
           ),
 
-          _TideLine(
-            isHigh: true,
-            hour1: highHour1,
-            minute1: highMinute1,
-            hour2: highHour2,
-            minute2: highMinute2,
-            coef: highCoef,
-            color: _tideColor(highCoef),
-            onHour1Changed: onHighHour1Changed,
-            onMinute1Changed: onHighMinute1Changed,
-            onHour2Changed: onHighHour2Changed,
-            onMinute2Changed: onHighMinute2Changed,
-            onCoefChanged: onHighCoefChanged,
-          ),
-
-          Transform.translate(
-  offset: const Offset(0, 6),
-
-  child: _TideLine(
-    isHigh: false,
-    hour1: lowHour1,
-            minute1: lowMinute1,
-            hour2: lowHour2,
-            minute2: lowMinute2,
-            coef: lowCoef,
-            color: _tideColor(lowCoef),
-            onHour1Changed: onLowHour1Changed,
-            onMinute1Changed: onLowMinute1Changed,
-            onHour2Changed: onLowHour2Changed,
-            onMinute2Changed: onLowMinute2Changed,
-            onCoefChanged: onLowCoefChanged,
-          ),
-          ),
+          if (tidesPresent) ...[
+            const SizedBox(height: 4),
+            _TideLine(
+              isHigh: true,
+              hour1: highHour1,
+              minute1: highMinute1,
+              hour2: highHour2,
+              minute2: highMinute2,
+              coef: highCoef,
+              color: _tideColor(highCoef),
+              onHour1Changed: onHighHour1Changed,
+              onMinute1Changed: onHighMinute1Changed,
+              onHour2Changed: onHighHour2Changed,
+              onMinute2Changed: onHighMinute2Changed,
+              onCoefChanged: onHighCoefChanged,
+            ),
+            const SizedBox(height: 8),
+            _TideLine(
+                isHigh: false,
+                hour1: lowHour1,
+                minute1: lowMinute1,
+                hour2: lowHour2,
+                minute2: lowMinute2,
+                coef: lowCoef,
+                color: _tideColor(lowCoef),
+                onHour1Changed: onLowHour1Changed,
+                onMinute1Changed: onLowMinute1Changed,
+                onHour2Changed: onLowHour2Changed,
+                onMinute2Changed: onLowMinute2Changed,
+                onCoefChanged: onLowCoefChanged,
+              ),
+          ] else
+            const Expanded(
+              child: Center(
+                child: Text(
+                  'MARÉES ABSENTES OU NON SIGNIFICATIVES',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF546E7A),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1049,7 +1083,7 @@ class _TideLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 30,
+      height: 38,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -1327,7 +1361,7 @@ class _SwellFullWidthCard extends StatelessWidget {
           ),
 
           Positioned(
-            top: 24,
+            top: 34,
             left: 0,
             right: 0,
             height: 136,
@@ -1358,7 +1392,7 @@ class _SwellFullWidthCard extends StatelessWidget {
           ),
 
           Positioned(
-            top: 150,
+            top: 176,
             left: 0,
             right: 0,
             child: Row(

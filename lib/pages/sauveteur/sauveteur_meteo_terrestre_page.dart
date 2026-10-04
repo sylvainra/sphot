@@ -5,6 +5,7 @@ import 'dart:math';
 
 import '../../services/sauveteur_live_publication_service.dart';
 import 'widgets/sauveteur_styled_dropdown.dart';
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurMeteoTerrestrePage extends StatefulWidget {
   final Color profileColor;
@@ -206,7 +207,7 @@ class _SauveteurMeteoTerrestrePageState extends State<SauveteurMeteoTerrestrePag
       if (mounted) {
         setState(() {
           _liveMessage =
-              'Publication refusée. Vérifiez que SPHOT est ON et le poste affecté.';
+              'Publication refusée. Vérifiez votre autorisation et le poste sélectionné.';
         });
       }
     } finally {
@@ -293,7 +294,8 @@ class _SauveteurMeteoTerrestrePageState extends State<SauveteurMeteoTerrestrePag
 Widget build(BuildContext context) {
   return Scaffold(
     backgroundColor: Colors.transparent,
-    body: Stack(
+    body: SauveteurAdaptiveViewport(
+        child: Stack(
       fit: StackFit.expand,
       children: [
         Image.asset(
@@ -323,20 +325,17 @@ Widget build(BuildContext context) {
                   ),
                 ),
 
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
 
-                _livePublicationBar(),
-
-                SizedBox(
-  height: 450,
-  child: Container(
+                Expanded(
+                  child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                     decoration: BoxDecoration(
                       color: Colors.transparent,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: const Color(0xFF5D4037),
+                        color: const Color(0xFF6D4C41),
                         width: 2,
                       ),
                     ),
@@ -351,7 +350,7 @@ Widget build(BuildContext context) {
                               child: Text(
                                 'PRÉVISIONS',
                                 style: TextStyle(
-                                  color: Color(0xFF5D4037),
+                                  color: Color(0xFF6D4C41),
                                   fontSize: 28,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 0.8,
@@ -442,34 +441,35 @@ Widget build(BuildContext context) {
                           const SizedBox(height: 6),
 
                           Expanded(
-                            child: GridView.count(
-                              physics:
-                                  const NeverScrollableScrollPhysics(),
-                              childAspectRatio: 1.45,
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                _UVCard(
-                                  uvIndex: uvIndex,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      uvIndex = value;
-                                    });
-                                  },
+                                Expanded(
+                                  child: _UVCard(
+                                    uvIndex: uvIndex,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        uvIndex = value;
+                                      });
+                                    },
+                                  ),
                                 ),
-
-                                _HeatwaveCard(
-                                  level: heatwaveLevel,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      heatwaveLevel = value;
-                                    });
-                                  },
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _HeatwaveCard(
+                                    level: heatwaveLevel,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        heatwaveLevel = value;
+                                      });
+                                    },
+                                  ),
                                 ),
                               ],
                             ),
                           ),
+                          const SizedBox(height: 6),
+                          _livePublicationBar(),
                         ],
                       ),
                     ),
@@ -508,7 +508,7 @@ Widget build(BuildContext context) {
           ),
         ),
       ],
-    ),
+    )),
   );
 }
 
@@ -781,7 +781,7 @@ const SizedBox(width: 8),
         fontWeight: FontWeight.w900,
         fontSize: 17,
         height: 1.4,
-        color: Color(0xFF5D4037),
+        color: Color(0xFF6D4C41),
       ),
     ),
   ],
