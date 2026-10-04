@@ -783,7 +783,7 @@ SpotFlagState? _findBestSpotMatch(
     });
 
     _mapController.move(
-      LatLng(spot.lat - 0.0012, spot.lng),
+      LatLng(spot.lat - 0.0019, spot.lng),
       17.2,
     );
 
@@ -800,9 +800,9 @@ SpotFlagState? _findBestSpotMatch(
           expand: false,
           initialChildSize: 0.60,
           minChildSize: 0.18,
-          maxChildSize: 0.94,
+          maxChildSize: 0.60,
           snap: true,
-          snapSizes: const [0.60, 0.94],
+          snapSizes: const [0.18, 0.60],
           builder: (_, scrollController) {
             return PublicSpotMobileSheet(
               spot: spot,
