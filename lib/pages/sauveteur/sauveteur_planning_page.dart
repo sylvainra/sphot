@@ -1,11 +1,17 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:csv/csv.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurPlanningPage extends StatefulWidget {
   final Color profileColor;
@@ -44,11 +50,13 @@ class _SauveteurPlanningPageState extends State<SauveteurPlanningPage> {
   bool _isListening = false;
   String? _listeningKey;
 
+  final ScrollController _headerHorizontalController = ScrollController();
   final ScrollController _tableHorizontalController = ScrollController();
   final ScrollController _totalHorizontalController = ScrollController();
 
   bool _syncingScroll = false;
   bool planningEnregistre = false;
+  bool _sharingPlanning = false;
 
   final List<Map<String, String>> beachList = [];
 
@@ -81,38 +89,24 @@ String? selectedSpotId;
     ...List.generate(20, (index) => 'Sauveteur ${index + 1}'),
   ];
 
-  late final List<_PlanningColumn> columns;
-  late final Map<String, TextEditingController> nameControllers;
-  late final Map<String, TextEditingController> controllers;
+  late DateTime _selectedMonth;
+  late List<_PlanningColumn> columns;
+  late Map<String, TextEditingController> nameControllers;
+  late Map<String, TextEditingController> controllers;
 
   @override
   void initState() {
     super.initState();
 
     _speech = stt.SpeechToText();
-    _loadBeaches();
-
-    _tableHorizontalController.addListener(() {
-      if (_syncingScroll) return;
-      if (!_totalHorizontalController.hasClients) return;
-
-      _syncingScroll = true;
-      _totalHorizontalController.jumpTo(_tableHorizontalController.offset);
-      _syncingScroll = false;
-    });
-
-    _totalHorizontalController.addListener(() {
-      if (_syncingScroll) return;
-      if (!_tableHorizontalController.hasClients) return;
-
-      _syncingScroll = true;
-      _tableHorizontalController.jumpTo(_totalHorizontalController.offset);
-      _syncingScroll = false;
-    });
 
     final now = DateTime.now();
+    _selectedMonth = DateTime(now.year, now.month);
 
-    columns = _generateMonthColumns(now.year, now.month);
+    columns = _generateMonthColumns(
+      _selectedMonth.year,
+      _selectedMonth.month,
+    );
 
     controllers = {
       for (final role in roles)
@@ -123,6 +117,48 @@ String? selectedSpotId;
     nameControllers = {
       for (final role in roles) role: TextEditingController(),
     };
+
+    _loadBeaches();
+
+    void syncFrom(
+      ScrollController source,
+      List<ScrollController> targets,
+    ) {
+      if (_syncingScroll || !source.hasClients) return;
+
+      _syncingScroll = true;
+      for (final target in targets) {
+        if (!target.hasClients) continue;
+        final max = target.position.maxScrollExtent;
+        final offset = source.offset.clamp(0.0, max).toDouble();
+        if ((target.offset - offset).abs() > 0.5) {
+          target.jumpTo(offset);
+        }
+      }
+      _syncingScroll = false;
+    }
+
+    _headerHorizontalController.addListener(() {
+      syncFrom(
+        _headerHorizontalController,
+        [_tableHorizontalController, _totalHorizontalController],
+      );
+    });
+
+    _tableHorizontalController.addListener(() {
+      syncFrom(
+        _tableHorizontalController,
+        [_headerHorizontalController, _totalHorizontalController],
+      );
+    });
+
+    _totalHorizontalController.addListener(() {
+      syncFrom(
+        _totalHorizontalController,
+        [_headerHorizontalController, _tableHorizontalController],
+      );
+    });
+
   }
 
   List<_PlanningColumn> _generateMonthColumns(int year, int month) {
@@ -135,7 +171,9 @@ String? selectedSpotId;
       result.add(
         _PlanningColumn(
           key: 'day_$day',
-          label: '$day\n${_shortDay(date.weekday)}',
+          label:
+              '$day ${_shortDay(date.weekday)}\n'
+              '${month.toString().padLeft(2, '0')}/$year',
           date: date,
         ),
       );
@@ -251,6 +289,7 @@ String? selectedSpotId;
     work3Controller.dispose();
     restController.dispose();
 
+    _headerHorizontalController.dispose();
     _tableHorizontalController.dispose();
     _totalHorizontalController.dispose();
 
@@ -268,12 +307,209 @@ String? selectedSpotId;
   }
 
 String get _planningMonthId {
-  final now = DateTime.now();
-  return '${now.year}-${now.month.toString().padLeft(2, '0')}';
+  return '${_selectedMonth.year}-'
+      '${_selectedMonth.month.toString().padLeft(2, '0')}';
 }
+
+  static const List<String> _monthNames = <String>[
+    'JANVIER',
+    'FÉVRIER',
+    'MARS',
+    'AVRIL',
+    'MAI',
+    'JUIN',
+    'JUILLET',
+    'AOÛT',
+    'SEPTEMBRE',
+    'OCTOBRE',
+    'NOVEMBRE',
+    'DÉCEMBRE',
+  ];
+
+  String get _selectedMonthLabel {
+    return '${_monthNames[_selectedMonth.month - 1]} '
+        '${_selectedMonth.year}';
+  }
+
+  void _disposeMonthControllers() {
+    for (final controller in controllers.values) {
+      controller.dispose();
+    }
+
+    for (final controller in nameControllers.values) {
+      controller.dispose();
+    }
+  }
+
+  void _rebuildMonthControllers(DateTime month) {
+    _disposeMonthControllers();
+
+    columns = _generateMonthColumns(month.year, month.month);
+
+    controllers = {
+      for (final role in roles)
+        for (final col in columns)
+          if (!col.isTotal) '$role-${col.key}': TextEditingController(),
+    };
+
+    nameControllers = {
+      for (final role in roles) role: TextEditingController(),
+    };
+  }
+
+  Future<void> _changeMonth(int delta) async {
+    if (_isListening) {
+      await _speech.stop();
+    }
+
+    final nextMonth = DateTime(
+      _selectedMonth.year,
+      _selectedMonth.month + delta,
+    );
+
+    setState(() {
+      _isListening = false;
+      _listeningKey = null;
+      openPlanningCellKey = null;
+      planningEnregistre = false;
+      _selectedMonth = DateTime(nextMonth.year, nextMonth.month);
+      _rebuildMonthControllers(_selectedMonth);
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final controller in <ScrollController>[
+        _headerHorizontalController,
+        _tableHorizontalController,
+        _totalHorizontalController,
+      ]) {
+        if (controller.hasClients) {
+          controller.jumpTo(0);
+        }
+      }
+    });
+
+    await _loadPlanning();
+  }
+
+  Future<void> _goToCurrentMonth() async {
+    final now = DateTime.now();
+    final current = DateTime(now.year, now.month);
+
+    if (_selectedMonth.year == current.year &&
+        _selectedMonth.month == current.month) {
+      return;
+    }
+
+    if (_isListening) {
+      await _speech.stop();
+    }
+
+    setState(() {
+      _isListening = false;
+      _listeningKey = null;
+      openPlanningCellKey = null;
+      planningEnregistre = false;
+      _selectedMonth = current;
+      _rebuildMonthControllers(_selectedMonth);
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final controller in <ScrollController>[
+        _headerHorizontalController,
+        _tableHorizontalController,
+        _totalHorizontalController,
+      ]) {
+        if (controller.hasClients) {
+          controller.jumpTo(0);
+        }
+      }
+    });
+
+    await _loadPlanning();
+  }
+
+  Widget _monthNavigation() {
+    final now = DateTime.now();
+    final isCurrentMonth =
+        _selectedMonth.year == now.year &&
+        _selectedMonth.month == now.month;
+
+    return Container(
+      height: 42,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.42),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.black,
+          width: 1.4,
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Mois précédent',
+            visualDensity: VisualDensity.compact,
+            onPressed: () => _changeMonth(-1),
+            icon: const Icon(
+              Icons.chevron_left_rounded,
+              color: Color(0xFF1E3A8A),
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: isCurrentMonth ? null : _goToCurrentMonth,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _selectedMonthLabel,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF1E3A8A),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  if (!isCurrentMonth)
+                    const Text(
+                      'Toucher pour revenir au mois actuel',
+                      style: TextStyle(
+                        color: Colors.black54,
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Mois suivant',
+            visualDensity: VisualDensity.compact,
+            onPressed: () => _changeMonth(1),
+            icon: const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xFF1E3A8A),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
 Future<void> _loadPlanning() async {
   if (selectedSpotId == null) return;
+
+  setState(() {
+    planningEnregistre = false;
+    for (final controller in controllers.values) {
+      controller.clear();
+    }
+    for (final controller in nameControllers.values) {
+      controller.clear();
+    }
+  });
 
   final doc = await FirebaseFirestore.instance
       .collection('territoires')
@@ -355,6 +591,207 @@ Future<void> _savePlanning() async {
     planningEnregistre = false;
   });
 }
+
+  String _planningExportFileName() {
+    final rawSpot = (selectedBeach ?? 'SPHOT')
+        .replaceAll(RegExp(r'[^A-Za-z0-9À-ÿ_-]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+
+    return 'SPHOT_Planning_${rawSpot.isEmpty ? 'poste' : rawSpot}_'
+        '${_selectedMonth.year}-'
+        '${_selectedMonth.month.toString().padLeft(2, '0')}.pdf';
+  }
+
+  String _planningCellExportValue(String role, int columnIndex) {
+    final column = columns[columnIndex];
+
+    if (!column.isTotal) {
+      return (controllers['$role-${column.key}']?.text ?? '').trim();
+    }
+
+    if (column.isMonthTotal) {
+      return _formatHours(_monthTotalForRole(role));
+    }
+
+    return _formatHours(_weekTotalForRole(role, columnIndex));
+  }
+
+  Future<Uint8List> _buildPlanningPdf() async {
+    final document = pw.Document();
+
+    final activeRoles = roles.where((role) {
+      final name = (nameControllers[role]?.text ?? '').trim();
+      final hasPlanning = columns.any((column) {
+        if (column.isTotal) return false;
+        return (controllers['$role-${column.key}']?.text ?? '')
+            .trim()
+            .isNotEmpty;
+      });
+      return name.isNotEmpty || hasPlanning;
+    }).toList();
+
+    final exportRoles =
+        activeRoles.isEmpty ? roles.take(2).toList() : activeRoles;
+
+    const dayWidth = 24.0;
+    const roleWidth = 92.0;
+    const nameWidth = 92.0;
+
+    pw.Widget cell(
+      String text, {
+      bool header = false,
+      PdfColor? background,
+      pw.Alignment alignment = pw.Alignment.center,
+    }) {
+      return pw.Container(
+        alignment: alignment,
+        padding: const pw.EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+        color: background,
+        child: pw.Text(
+          text,
+          textAlign: pw.TextAlign.center,
+          maxLines: 3,
+          style: pw.TextStyle(
+            fontSize: header ? 6.2 : 5.8,
+            fontWeight: header ? pw.FontWeight.bold : pw.FontWeight.normal,
+          ),
+        ),
+      );
+    }
+
+    final tableRows = <pw.TableRow>[
+      pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+        children: [
+          cell('Fonction', header: true),
+          cell('Personnel', header: true),
+          ...columns.map((column) {
+            final label = column.isTotal
+                ? (column.isMonthTotal ? 'TOTAL\nMOIS' : 'TOTAL')
+                : '${column.date!.day}\n${_shortDay(column.date!.weekday)}';
+            return cell(label, header: true);
+          }),
+        ],
+      ),
+      ...exportRoles.map((role) {
+        final roleIndex = roles.indexOf(role);
+        final name = (nameControllers[role]?.text ?? '').trim();
+
+        return pw.TableRow(
+          decoration: pw.BoxDecoration(
+            color: roleIndex == 0
+                ? PdfColors.amber100
+                : roleIndex == 1
+                    ? PdfColors.blue100
+                    : PdfColors.white,
+          ),
+          children: [
+            cell(role, alignment: pw.Alignment.centerLeft),
+            cell(name.isEmpty ? '-' : name, alignment: pw.Alignment.centerLeft),
+            ...columns.asMap().entries.map(
+              (entry) => cell(
+                _planningCellExportValue(role, entry.key).replaceAll('\n', ' / '),
+                background:
+                    entry.value.isTotal ? PdfColors.red100 : null,
+              ),
+            ),
+          ],
+        );
+      }),
+    ];
+
+    document.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a3.landscape,
+        margin: const pw.EdgeInsets.all(18),
+        build: (context) => [
+          pw.Text(
+            'SPHOT — EMPLOI DU TEMPS',
+            style: pw.TextStyle(
+              fontSize: 16,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.SizedBox(height: 5),
+          pw.Text(
+            'Poste : ${selectedBeach ?? '-'}',
+            style: const pw.TextStyle(fontSize: 9),
+          ),
+          pw.Text(
+            'Période : $_selectedMonthLabel',
+            style: const pw.TextStyle(fontSize: 9),
+          ),
+          pw.Text(
+            'Horaires d’ouverture : ${hoursController.text.trim()}',
+            style: const pw.TextStyle(fontSize: 9),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Table(
+            border: pw.TableBorder.all(
+              color: PdfColors.black,
+              width: 0.45,
+            ),
+            columnWidths: {
+              0: const pw.FixedColumnWidth(roleWidth),
+              1: const pw.FixedColumnWidth(nameWidth),
+              for (var i = 0; i < columns.length; i++)
+                i + 2: const pw.FixedColumnWidth(dayWidth),
+            },
+            children: tableRows,
+          ),
+          pw.SizedBox(height: 8),
+          pw.Text(
+            'Document généré depuis SPHOT.',
+            style: const pw.TextStyle(
+              fontSize: 7,
+              color: PdfColors.grey700,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return document.save();
+  }
+
+  Future<void> _sharePlanning() async {
+    if (_sharingPlanning || selectedSpotId == null) return;
+
+    setState(() => _sharingPlanning = true);
+
+    try {
+      final bytes = await _buildPlanningPdf();
+      final fileName = _planningExportFileName();
+
+      Rect? shareOrigin;
+      final renderObject = context.findRenderObject();
+      if (renderObject is RenderBox && renderObject.hasSize) {
+        shareOrigin =
+            renderObject.localToGlobal(Offset.zero) & renderObject.size;
+      }
+
+      await SharePlus.instance.share(
+        ShareParams(
+          subject: 'Planning SPHOT — $_selectedMonthLabel',
+          text: 'Planning SPHOT du poste '
+              '${selectedBeach ?? ''} — $_selectedMonthLabel.',
+          files: [
+            XFile.fromData(
+              bytes,
+              mimeType: 'application/pdf',
+              name: fileName,
+            ),
+          ],
+          sharePositionOrigin: shareOrigin,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _sharingPlanning = false);
+      }
+    }
+  }
 
   Future<void> _listenToCell(
     String key,
@@ -517,7 +954,7 @@ Future<void> _savePlanning() async {
 
   Color _columnBackground(_PlanningColumn col) {
     if (col.isTotal) {
-      return const Color(0xFFBDBDBD).withOpacity(0.55);
+      return const Color(0xFFFF8A80).withOpacity(0.82);
     }
 
     if (col.date?.weekday == DateTime.saturday) {
@@ -658,7 +1095,7 @@ Future<void> _savePlanning() async {
   Widget _headerCell(String text, double width, Color color) {
     return Container(
       width: width,
-      height: 38,
+      height: 46,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: color,
@@ -753,7 +1190,7 @@ Future<void> _savePlanning() async {
       height: 38,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFFBDBDBD).withOpacity(0.55),
+        color: const Color(0xFFFF8A80).withOpacity(0.82),
         border: Border.all(color: Colors.black, width: 1),
       ),
       child: Text(
@@ -837,97 +1274,149 @@ Future<void> _savePlanning() async {
 }
 
   Widget _scheduleTable() {
-    return SingleChildScrollView(
-      controller: _tableHorizontalController,
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            Row(
-              children: [
-                _headerCell(
-                  'Fonction',
-                  135,
-                  Colors.white.withOpacity(0.45),
-                ),
-                for (final col in columns)
-                  _headerCell(
-                    col.label,
-                    col.isMonthTotal
-                        ? 88
-                        : col.isTotal
-                            ? 70
-                            : 82,
-                    _columnBackground(col),
+    return Column(
+      children: [
+        SizedBox(
+          height: 46,
+          child: Row(
+            children: [
+              _headerCell(
+                'Fonction',
+                135,
+                Colors.white.withOpacity(0.45),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _headerHorizontalController,
+                  scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
+                  child: Row(
+                    children: [
+                      for (final col in columns)
+                        _headerCell(
+                          col.label,
+                          col.isMonthTotal
+                              ? 88
+                              : col.isTotal
+                                  ? 70
+                                  : 82,
+                          _columnBackground(col),
+                        ),
+                    ],
                   ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  children: [
+                    for (int i = 0; i < roles.length; i++)
+                      _roleCell(roles[i], i),
+                  ],
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: _tableHorizontalController,
+                    scrollDirection: Axis.horizontal,
+                    physics: const ClampingScrollPhysics(),
+                    child: Column(
+                      children: [
+                        for (int i = 0; i < roles.length; i++)
+                          Row(
+                            children: [
+                              for (int columnIndex = 0;
+                                  columnIndex < columns.length;
+                                  columnIndex++)
+                                columns[columnIndex].isTotal
+                                    ? _totalCell(
+                                        roles[i],
+                                        columnIndex,
+                                        columns[columnIndex],
+                                      )
+                                    : _editableCell(
+                                        roles[i],
+                                        columns[columnIndex],
+                                      ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
-            for (int i = 0; i < roles.length; i++)
-              Row(
-                children: [
-                  _roleCell(roles[i], i),
-                  for (int c = 0; c < columns.length; c++)
-                    columns[c].isTotal
-                        ? _totalCell(roles[i], c, columns[c])
-                        : _editableCell(roles[i], columns[c]),
-                ],
-              ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _totalWorkersBar() {
+    const totalRowColor = Color(0xFFFF8A80);
+
     return SizedBox(
       height: 38,
-      child: SingleChildScrollView(
-        controller: _totalHorizontalController,
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            Container(
-              width: 135,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.15),
-                border: Border.all(color: Colors.black, width: 1),
-              ),
-              child: const Text(
-                'TOTAL\nSAUVETEURS',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                ),
+      child: Row(
+        children: [
+          Container(
+            width: 135,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: totalRowColor.withOpacity(0.82),
+              border: Border.all(color: Colors.black, width: 1),
+            ),
+            child: const Text(
+              'TOTAL\nSAUVETEURS',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
               ),
             ),
-            for (final col in columns)
-              Container(
-                width: col.isMonthTotal
-                    ? 88
-                    : col.isTotal
-                        ? 70
-                        : 82,
-                height: 38,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: col.isTotal
-                      ? Colors.grey.withOpacity(0.45)
-                      : _columnBackground(col),
-                  border: Border.all(color: Colors.black, width: 1),
-                ),
-                child: Text(
-                  col.isTotal ? '-' : '${_workersForColumn(col)}',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _totalHorizontalController,
+              scrollDirection: Axis.horizontal,
+              physics: const ClampingScrollPhysics(),
+              child: Row(
+                children: [
+                  for (final col in columns)
+                    Container(
+                      width: col.isMonthTotal
+                          ? 88
+                          : col.isTotal
+                              ? 70
+                              : 82,
+                      height: 38,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: totalRowColor.withOpacity(0.82),
+                        border: Border.all(
+                          color: Colors.black,
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        col.isTotal ? '-' : '${_workersForColumn(col)}',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1005,7 +1494,8 @@ Future<void> _savePlanning() async {
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: true,
-      body: Stack(
+      body: SauveteurAdaptiveViewport(
+        child: Stack(
         fit: StackFit.expand,
         children: [
           Image.asset(
@@ -1033,8 +1523,7 @@ Future<void> _savePlanning() async {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  SizedBox(
-                    height: 445,
+                  Expanded(
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
@@ -1044,27 +1533,15 @@ Future<void> _savePlanning() async {
                       ),
                       child: Column(
                         children: [
-                          Column(
-  children: [
-    Row(
-      children: [
-        _beachDropdown(),
-      ],
-    ),
-
-    const SizedBox(height: 6),
-
-    Row(
-      children: [
-        _topField(
-          controller: hoursController,
-          icon: Icons.access_time_rounded,
-          keyName: 'hours',
-        ),
-      ],
-    ),
-  ],
-),
+                          Row(
+                            children: [
+                              _topField(
+                                controller: hoursController,
+                                icon: Icons.access_time_rounded,
+                                keyName: 'hours',
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 8),
                           Row(
                             children: [
@@ -1094,18 +1571,26 @@ Future<void> _savePlanning() async {
                             ],
                           ),
                           const SizedBox(height: 8),
+                          _monthNavigation(),
+                          const SizedBox(height: 8),
                           Expanded(
-                            child: Column(
-                              children: [
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(14),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: Colors.black,
+                                  width: 2,
+                                ),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Column(
+                                children: [
+                                  Expanded(
                                     child: _scheduleTable(),
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                _totalWorkersBar(),
-                              ],
+                                  _totalWorkersBar(),
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -1115,54 +1600,113 @@ Future<void> _savePlanning() async {
 
 const SizedBox(height: 8),
 
-SizedBox(
-  width: double.infinity,
-  height: 46,
-  child: ElevatedButton.icon(
-    onPressed: canPersist ? _savePlanning : null,
-    icon: Icon(
-      planningEnregistre
-          ? Icons.check_rounded
-          : canPersist
-              ? Icons.save_rounded
-              : Icons.visibility_rounded,
-      color: planningEnregistre ? Colors.white : const Color(0xFFFF0000),
-      size: 20,
-    ),
-    label: FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Text(
-        planningEnregistre
-            ? 'PLANNING ENREGISTRÉ'
-            : canPersist
-                ? 'ENREGISTRER LE PLANNING'
-                : canEdit
-                    ? 'SPHOT OFF — TEST NON ENREGISTRÉ'
-                    : 'PLANNING EN CONSULTATION',
-        maxLines: 1,
-        style: TextStyle(
-          fontWeight: FontWeight.w900,
-          fontSize: 14,
-          color: planningEnregistre ? Colors.white : const Color(0xFFFF0000),
+Row(
+  children: [
+    Expanded(
+      child: SizedBox(
+        height: 46,
+        child: ElevatedButton.icon(
+          onPressed: canPersist ? _savePlanning : null,
+          icon: Icon(
+            planningEnregistre
+                ? Icons.check_rounded
+                : canPersist
+                    ? Icons.save_rounded
+                    : Icons.visibility_rounded,
+            color:
+                planningEnregistre ? Colors.white : const Color(0xFFFF0000),
+            size: 19,
+          ),
+          label: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              planningEnregistre
+                  ? 'ENREGISTRÉ'
+                  : canPersist
+                      ? 'ENREGISTRER'
+                      : canEdit
+                          ? 'TEST'
+                          : 'CONSULTATION',
+              maxLines: 1,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
+                color: planningEnregistre
+                    ? Colors.white
+                    : const Color(0xFFFF0000),
+              ),
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: planningEnregistre
+                ? const Color(0xFFFF0000)
+                : Colors.transparent,
+            foregroundColor: planningEnregistre
+                ? Colors.white
+                : const Color(0xFFFF0000),
+            disabledBackgroundColor: Colors.transparent,
+            elevation: 0,
+            side: const BorderSide(
+              color: Color(0xFFFF0000),
+              width: 2,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
         ),
       ),
     ),
-    style: ElevatedButton.styleFrom(
-      backgroundColor:
-          planningEnregistre ? const Color(0xFFFF0000) : Colors.transparent,
-      foregroundColor:
-          planningEnregistre ? Colors.white : const Color(0xFFFF0000),
-      disabledBackgroundColor: Colors.transparent,
-      elevation: 0,
-      side: const BorderSide(
-        color: Color(0xFFFF0000),
-        width: 2,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+    const SizedBox(width: 8),
+    Expanded(
+      child: SizedBox(
+        height: 46,
+        child: ElevatedButton.icon(
+          onPressed:
+              selectedSpotId == null || _sharingPlanning ? null : _sharePlanning,
+          icon: _sharingPlanning
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF1E3A8A),
+                  ),
+                )
+              : const Icon(
+                  Icons.share_rounded,
+                  color: Color(0xFF1E3A8A),
+                  size: 19,
+                ),
+          label: const FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'PARTAGER',
+              maxLines: 1,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
+                color: Color(0xFF1E3A8A),
+              ),
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: const Color(0xFF1E3A8A),
+            disabledBackgroundColor: Colors.transparent,
+            elevation: 0,
+            side: const BorderSide(
+              color: Color(0xFF1E3A8A),
+              width: 2,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
       ),
     ),
-  ),
+  ],
 ),
 
                   Transform.translate(
@@ -1194,7 +1738,7 @@ SizedBox(
             ),
           ),
         ],
-      ),
+      )),
     );
   }
 }
