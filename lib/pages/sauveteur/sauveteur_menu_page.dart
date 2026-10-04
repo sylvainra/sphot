@@ -12,6 +12,8 @@ import 'sauveteur_recherche_personne_page.dart';
 import 'sauveteur_ephemeride_dicton_page.dart';
 import 'sauveteur_planning_page.dart';
 import 'sauveteur_main_courante.dart';
+import 'sauveteur_materiel_verification_page.dart';
+import 'sauveteur_materiel_category_verification_page.dart';
 import '../../services/sauveteur_live_publication_service.dart';
 import 'widgets/sauveteur_styled_dropdown.dart';
 import 'widgets/sauveteur_adaptive_viewport.dart';
@@ -526,6 +528,108 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                             ),
                           ),
                           const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _MaterialVerificationSquare(
+                                  title: 'SECOURS',
+                                  icon: Icons.monitor_heart_outlined,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            SauveteurMaterielVerificationPage(
+                                          profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
+                                          sphotMode: _sphotMode,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _MaterialVerificationSquare(
+                                  title: 'PHONIE',
+                                  icon: Icons.wifi_tethering_rounded,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            SauveteurMaterielCategoryVerificationPage(
+                                          category:
+                                              SauveteurMaterielCategory.phonie,
+                                          profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
+                                          sphotMode: _sphotMode,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _MaterialVerificationSquare(
+                                  title: 'MATÉRIEL\nROULANT',
+                                  icon: Icons.directions_car_filled_rounded,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            SauveteurMaterielCategoryVerificationPage(
+                                          category:
+                                              SauveteurMaterielCategory.roulant,
+                                          profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
+                                          sphotMode: _sphotMode,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _MaterialVerificationSquare(
+                                  title: 'MATÉRIEL\nFLOTTANT',
+                                  icon: Icons.directions_boat_filled_rounded,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            SauveteurMaterielCategoryVerificationPage(
+                                          category:
+                                              SauveteurMaterielCategory.flottant,
+                                          profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
+                                          sphotMode: _sphotMode,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
                           _MenuSquare(
                             title: 'MAIN COURANTE',
                             icon: Icons.menu_book_rounded,
@@ -588,6 +692,62 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
           ),
         ),
         ],
+      ),
+    );
+  }
+}
+
+class _MaterialVerificationSquare extends StatelessWidget {
+  const _MaterialVerificationSquare({
+    required this.title,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  static const Color _color = Color(0xFF1E3A8A);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 78,
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: _color,
+            width: 2,
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: _color,
+              size: 27,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: _color,
+                fontSize: 8.5,
+                fontWeight: FontWeight.w900,
+                height: 1.0,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
