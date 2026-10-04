@@ -5,12 +5,24 @@ import 'package:image_picker/image_picker.dart';
 
 import 'dart:io';
 
+import '../../services/sauveteur_live_publication_service.dart';
+
 class SauveteurRecherchePersonnePage extends StatefulWidget {
   final Color profileColor;
+  final String territoireId;
+  final String sphotMode;
+  final String sauveteurSessionToken;
+  final List<String> postesAffectes;
+  final String? initialSpotId;
 
   const SauveteurRecherchePersonnePage({
     super.key,
     required this.profileColor,
+    required this.territoireId,
+    required this.sphotMode,
+    required this.sauveteurSessionToken,
+    required this.postesAffectes,
+    required this.initialSpotId,
   });
 
   @override
@@ -25,6 +37,14 @@ class _SauveteurRecherchePersonnePageState
   bool _isListening = false;
   int? _listeningIndex;
   String? _photoPath;
+
+  final List<SauveteurAssignedSpot> _assignedSpots = [];
+  String? _selectedSpotId;
+  bool _loadingLive = true;
+  bool _publishing = false;
+  String? _publishMessage;
+
+  bool get _isSphotOn => widget.sphotMode.toUpperCase() == 'ON';
 
   final List<String> labels = [
     'Recherché(e) depuis',
@@ -59,6 +79,8 @@ class _SauveteurRecherchePersonnePageState
       labels.length,
       (_) => TextEditingController(),
     );
+
+    _loadLiveContext();
   }
 
   @override
@@ -133,6 +155,196 @@ Future<void> _pickPhoto() async {
   }
 }
 
+
+  Future<void> _loadLiveContext() async {
+    try {
+      final spots = await SauveteurLivePublicationService.loadAssignedSpots(
+        territoireId: widget.territoireId,
+        postesAffectes: widget.postesAffectes,
+      );
+
+      if (!mounted) return;
+
+      final initialSpotId = widget.initialSpotId;
+      setState(() {
+        _assignedSpots
+          ..clear()
+          ..addAll(spots);
+        _selectedSpotId =
+            initialSpotId != null &&
+                    spots.any((spot) => spot.id == initialSpotId)
+                ? initialSpotId
+                : (spots.isEmpty ? null : spots.first.id);
+        _loadingLive = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingLive = false;
+        _publishMessage = 'Impossible de charger le poste affecté.';
+      });
+    }
+  }
+
+  String _fieldValue(int index) => controllers[index].text.trim();
+
+  String _buildPublicNotificationMessage() {
+    final parts = <String>['RECHERCHE DE PERSONNE EN COURS'];
+
+    final identity = _fieldValue(3);
+    final identityDetails = _fieldValue(4);
+    final since = _fieldValue(0);
+    final lostPlace = _fieldValue(1);
+    final stationPlace = _fieldValue(2);
+
+    if (identity.isNotEmpty) parts.add(identity);
+    if (identityDetails.isNotEmpty) parts.add(identityDetails);
+    if (since.isNotEmpty) parts.add('Recherché(e) depuis : $since');
+    if (lostPlace.isNotEmpty) {
+      parts.add('Dernier lieu connu : $lostPlace');
+    }
+    if (stationPlace.isNotEmpty) {
+      parts.add('Lieu de station : $stationPlace');
+    }
+
+    final description = <String>[];
+    for (final index in const [5, 6, 7, 8, 9, 10, 11, 12]) {
+      final value = _fieldValue(index);
+      if (value.isNotEmpty) {
+        description.add('${labels[index]} : $value');
+      }
+    }
+    if (description.isNotEmpty) {
+      parts.add(description.join(', '));
+    }
+
+    return parts.join(' • ');
+  }
+
+  String _buildMainCouranteDescription() {
+    final details = <String>[];
+
+    for (var index = 0; index <= 15; index++) {
+      final value = _fieldValue(index);
+      if (value.isNotEmpty) {
+        details.add('${labels[index]} : $value');
+      }
+    }
+
+    details.add(
+      'Photo prise sur l’appareil : ${_photoPath == null ? 'non' : 'oui'}',
+    );
+
+    return details.join('\n');
+  }
+
+  Future<void> _publishSearch() async {
+    if (_publishing || _loadingLive) return;
+
+    if (!_isSphotOn) {
+      setState(() {
+        _publishMessage =
+            'SPHOT OFF — la publication opérationnelle est désactivée.';
+      });
+      return;
+    }
+
+    if (_selectedSpotId == null) {
+      setState(() {
+        _publishMessage = 'Aucun poste de secours affecté.';
+      });
+      return;
+    }
+
+    final publicMessage = _buildPublicNotificationMessage();
+    if (publicMessage == 'RECHERCHE DE PERSONNE EN COURS') {
+      setState(() {
+        _publishMessage =
+            'Renseignez au moins l’identité, le signalement ou le lieu de disparition.';
+      });
+      return;
+    }
+
+    setState(() {
+      _publishing = true;
+      _publishMessage = null;
+    });
+
+    try {
+      await SauveteurLivePublicationService.publish(
+        sauveteurSessionToken: widget.sauveteurSessionToken,
+        spotId: _selectedSpotId!,
+        changes: {
+          'notificationPublique': {
+            'message': publicMessage,
+            'active': true,
+            'source': 'recherche_personne',
+            'mainCouranteDescription': _buildMainCouranteDescription(),
+          },
+        },
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _publishMessage =
+            'Recherche publiée dans la notification publique et la main courante.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _publishMessage =
+            'Publication refusée. Vérifiez votre autorisation et le poste sélectionné.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _publishing = false;
+        });
+      }
+    }
+  }
+
+  Widget _publishButton() {
+    final enabled =
+        _isSphotOn && _selectedSpotId != null && !_loadingLive && !_publishing;
+
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 42,
+          child: ElevatedButton.icon(
+            onPressed: enabled ? _publishSearch : null,
+            icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+            label: Text(
+              _publishing ? 'PUBLICATION...' : 'PUBLIER',
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: widget.profileColor,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.black12,
+            ),
+          ),
+        ),
+        if (_publishMessage != null) ...[
+          const SizedBox(height: 5),
+          Text(
+            _publishMessage!,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _publishMessage!.startsWith('Recherche publiée')
+                  ? const Color(0xFF15803D)
+                  : const Color(0xFFB91C1C),
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _field(
   int index, {
   int minLines = 1,
@@ -153,16 +365,20 @@ Future<void> _pickPhoto() async {
 
         children: [
           SizedBox(
-            width: 142,
-
-            child: Text(
-              '${labels[index]} :',
-
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w800,
-                height: 1.05,
+            width: 176,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '${labels[index]} :',
+                maxLines: 1,
+                softWrap: false,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  height: 1.0,
+                ),
               ),
             ),
           ),
@@ -186,7 +402,7 @@ maxLines: maxLines,
 
                 contentPadding:
                     const EdgeInsets.symmetric(
-                  horizontal: 8,
+                  horizontal: 6,
                   vertical: 7,
                 ),
 
@@ -322,35 +538,23 @@ maxLines: maxLines,
                   Expanded(
                     child: Container(
                       width: double.infinity,
-
-                      padding:
-                          const EdgeInsets.fromLTRB(
+                      padding: const EdgeInsets.fromLTRB(
                         12,
                         10,
                         12,
                         10,
                       ),
-
                       decoration: BoxDecoration(
-                        color:
-                            Colors.transparent,
-
-                        borderRadius:
-                            BorderRadius.circular(
-                          24,
-                        ),
-
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(24),
                         border: Border.all(
                           color: Colors.black,
                           width: 2,
                         ),
                       ),
-
-                      child:
-                          SingleChildScrollView(
-                        physics:
-                            const BouncingScrollPhysics(),
-
+                      child: SingleChildScrollView(
+                        physics: const ClampingScrollPhysics(),
+                        padding: EdgeInsets.zero,
                         child: Stack(
                           children: [
 
@@ -474,9 +678,9 @@ maxLines: maxLines,
   ),
 ),
 
-                                const SizedBox(
-                                  height: 120,
-                                ),
+                                const SizedBox(height: 12),
+                                _publishButton(),
+                                const SizedBox(height: 16),
                               ],
                             ),
                           ],

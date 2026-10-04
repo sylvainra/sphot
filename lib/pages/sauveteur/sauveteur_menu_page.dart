@@ -480,6 +480,12 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                         builder: (_) =>
                                             SauveteurRecherchePersonnePage(
                                           profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sphotMode: _sphotMode,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
