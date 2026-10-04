@@ -1011,70 +1011,43 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
   }
 
   Widget _buildAudienceChoice() {
-    final choices = <Widget>[];
-
-    if (_hasAdmin) {
-      choices.add(
-        RadioListTile<_LoginAudience>(
-          value: _LoginAudience.admin,
-          groupValue: _selectedAudience,
-          onChanged: _isLoggingIn
-              ? null
-              : (value) => setState(() => _selectedAudience = value),
-          activeColor: _red,
-          contentPadding: EdgeInsets.zero,
-          title: const Text(
-            'SPHOT ADMIN',
-            style: TextStyle(
-              color: _blue,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_hasAdvertiser) {
-      choices.add(
-        RadioListTile<_LoginAudience>(
-          value: _LoginAudience.advertiser,
-          groupValue: _selectedAudience,
-          onChanged: _isLoggingIn
-              ? null
-              : (value) => setState(() => _selectedAudience = value),
-          activeColor: _red,
-          contentPadding: EdgeInsets.zero,
-          title: const Text(
-            'SPHOT PUBLICITAIRE',
-            style: TextStyle(
-              color: _blue,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (choices.isEmpty) {
+    if (!(_hasAdmin && _hasAdvertiser) || _selectedAudience != null) {
       return const SizedBox.shrink();
     }
 
-    return Column(
-      children: [
-        const SizedBox(height: 8),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Espace de connexion',
-            style: TextStyle(
-              color: _blue,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: _isLoggingIn
+                  ? null
+                  : () => setState(
+                        () => _selectedAudience = _LoginAudience.admin,
+                      ),
+              child: const Text(
+                'ADMIN',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
             ),
           ),
-        ),
-        ...choices,
-      ],
+          const SizedBox(width: 10),
+          Expanded(
+            child: OutlinedButton(
+              onPressed: _isLoggingIn
+                  ? null
+                  : () => setState(
+                        () => _selectedAudience = _LoginAudience.advertiser,
+                      ),
+              child: const Text(
+                'PUBLICITAIRE',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1187,10 +1160,25 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
     );
   }
 
+  String get _connectionTitle {
+    if (_step != 1) {
+      return 'CONNEXION SPHOT';
+    }
+
+    switch (_selectedAudience) {
+      case _LoginAudience.admin:
+        return 'CONNEXION SPHOT ADMIN';
+      case _LoginAudience.advertiser:
+        return 'CONNEXION SPHOT PUBLICITAIRE';
+      case null:
+        return 'CONNEXION SPHOT';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SphotAccessPage(
-      title: 'CONNEXION SPHOT',
+      title: _connectionTitle,
       onBackgroundTap: _closeKeyboard,
       onBack: _goBack,
       child: AnimatedSwitcher(
