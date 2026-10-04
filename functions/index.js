@@ -286,22 +286,20 @@ async function reconcilePublicTerritory(territoireId, publish) {
       .collection("adminRequests")
       .where("territoire.territoireId", "==", territoireId)
       .get() : null;
-  const requestDocuments = requestSnapshot ? requestSnapshot.docs : [];
-
-  const legacyRequestSnapshot = publish ? await db
-      .collection("adminRequests")
-      .where("territoireId", "==", territoireId)
-      .get() : null;
-  const legacyRequestDocuments = legacyRequestSnapshot ?
-    legacyRequestSnapshot.docs :
-    [];
-
-  let approvedRequest = [
-    ...requestDocuments,
-    ...legacyRequestDocuments,
-  ].find(
+  let approvedRequest = requestSnapshot ? requestSnapshot.docs.find(
       (document) => isApprovedAdminRequest(document.data()),
-  ) || null;
+  ) : null;
+
+  if (publish && !approvedRequest) {
+    const legacyRequestSnapshot = await db
+        .collection("adminRequests")
+        .where("territoireId", "==", territoireId)
+        .get();
+
+    approvedRequest = legacyRequestSnapshot.docs.find(
+        (document) => isApprovedAdminRequest(document.data()),
+    ) || null;
+  }
 
   if (publish && !approvedRequest) {
     const adminSnapshot = await db
@@ -339,21 +337,9 @@ async function reconcilePublicTerritory(territoireId, publish) {
   }
 
   const approvedRequestData = approvedRequest ? approvedRequest.data() : {};
-  const requestTerritorySources = [
-    ...requestDocuments,
-    ...legacyRequestDocuments,
-  ].flatMap((document) => {
-    const data = document.data() || {};
-    return [
-      data.territoire || {},
-      data,
-    ];
-  });
-
   const territorySources = [
     approvedRequestData.territoire || {},
     approvedRequestData,
-    ...requestTerritorySources,
     territorySnapshot && territorySnapshot.exists ?
       territorySnapshot.data() : {},
     ...(spotSnapshot ? spotSnapshot.docs.map((document) => {
@@ -367,7 +353,7 @@ async function reconcilePublicTerritory(territoireId, publish) {
   territorySources.forEach((source) => {
     territoryData = mergePublicTerritoryData(territoryData, source);
   });
-  if (publish) {
+  if (publish && (!territorySnapshot || !territorySnapshot.exists)) {
     const parentTerritoryData = {territoireId};
     const parentTerritoryFields = [
       "pays",
@@ -389,12 +375,8 @@ async function reconcilePublicTerritory(territoireId, publish) {
         !(typeof value === "string" && value.trim() === "");
       if (hasValue) parentTerritoryData[field] = value;
     });
-    parentTerritoryData.publicProjectionUpdatedAt =
+    parentTerritoryData.publicProjectionCreatedAt =
       admin.firestore.FieldValue.serverTimestamp();
-    if (!territorySnapshot || !territorySnapshot.exists) {
-      parentTerritoryData.publicProjectionCreatedAt =
-        admin.firestore.FieldValue.serverTimestamp();
-    }
     await territoryReference.set(parentTerritoryData, {merge: true});
   }
   const historicalSpots = new Map();
@@ -618,43 +600,15 @@ async function territoryDiffusionAccessGranted(db, territoireId) {
 }
 
 /**
- * Vérifie qu'au moins un administrateur ou une demande du territoire
- * a été approuvé par le Super Admin.
- *
- * La présence du territoire sur la carte publique ne dépend pas de
- * diffusionAccessGranted, de l'essai ou de l'abonnement. Ces droits
- * commerciaux restent gérés séparément des données géographiques publiques.
+ * Vérifie que le territoire dispose d'un administrateur approuvé
+ * dont les droits de diffusion SPHOT sont actuellement ouverts.
  *
  * @param {string} territoireId Identifiant du territoire.
  * @return {Promise<boolean>}
  */
 async function isTerritoryPublic(territoireId) {
-  if (!territoireId) return false;
-
   const db = admin.firestore();
-  const adminDocuments = await territoryAdminDocuments(db, territoireId);
-
-  const approvedAdmin = adminDocuments.some((document) => {
-    return (document.data() || {}).accessStatus === "approved";
-  });
-
-  if (approvedAdmin) return true;
-
-  const [requestsSnapshot, legacyRequestsSnapshot] = await Promise.all([
-    db.collection("adminRequests")
-        .where("territoire.territoireId", "==", territoireId)
-        .get(),
-    db.collection("adminRequests")
-        .where("territoireId", "==", territoireId)
-        .get(),
-  ]);
-
-  return [
-    ...requestsSnapshot.docs,
-    ...legacyRequestsSnapshot.docs,
-  ].some((document) => {
-    return isApprovedAdminRequest(document.data() || {});
-  });
+  return territoryDiffusionAccessGranted(db, territoireId);
 }
 
 /**
@@ -4374,10 +4328,7 @@ async function resolveSauveteurAssignmentPeriods(
  * SPHOT ON exige :
  * - un compte actif ;
  * - au moins une affectation à un SPHOT ;
- * - une période d'affectation active.
- *
- * Les droits de diffusion de l'administration restent calculés et exposés
- * séparément, mais ne coupent pas le mode opérationnel du sauveteur.
+ * - des droits de diffusion ouverts par l'administration de tutelle.
  *
  * @param {Object} accountData Données sauveteurAccounts.
  * @param {string} login Identifiant du compte.
@@ -4454,6 +4405,7 @@ async function resolveSauveteurOperationalContext(accountData, login) {
 
   const accountActive = accountData.accountStatus === "ACTIVE";
   const sphotOn = accountActive &&
+    diffusionAccessGranted &&
     assignedSpotIds.length > 0 &&
     assignmentPeriods.active;
 
@@ -4462,6 +4414,8 @@ async function resolveSauveteurOperationalContext(accountData, login) {
     modeReason = "account_inactive";
   } else if (assignedSpotIds.length === 0) {
     modeReason = "no_active_assignment";
+  } else if (!diffusionAccessGranted) {
+    modeReason = "administration_diffusion_off";
   } else if (!assignmentPeriods.active) {
     modeReason = assignmentPeriods.reason;
   }
@@ -5180,7 +5134,6 @@ exports.saveSauveteurPlanning = onRequest(
       }
     },
 );
-
 
 const INSTITUTIONAL_MAIN_COURANTE_URL =
   SPHOT_LOGIN_URL + "/?institutionnelMainCouranteToken=";
@@ -6748,42 +6701,23 @@ exports.getSauveteurMainCourante = onRequest(
         const {context} = session;
         const spotId = (request.body.spotId || "").toString().trim();
 
-        if (!context.assignedSpotIds.includes(spotId)) {
+        if (context.sphotMode !== "ON" ||
+            !context.assignedSpotIds.includes(spotId)) {
           response.status(403).json({
             success: false,
-            error: "spot_not_assigned",
+            error: "main_courante_not_available",
           });
           return;
         }
 
-        let entriesQuery = admin.firestore()
+        const snapshot = await admin.firestore()
             .collection("territoires")
             .doc(context.territoireId)
             .collection("spots")
             .doc(spotId)
-            .collection("mainCourante");
-
-        const dayStartMillis = Number(request.body.dayStartMillis);
-        const dayEndMillis = Number(request.body.dayEndMillis);
-        if (Number.isFinite(dayStartMillis) &&
-            Number.isFinite(dayEndMillis) &&
-            dayEndMillis > dayStartMillis) {
-          entriesQuery = entriesQuery
-              .where(
-                  "occurredAt",
-                  ">=",
-                  admin.firestore.Timestamp.fromMillis(dayStartMillis),
-              )
-              .where(
-                  "occurredAt",
-                  "<",
-                  admin.firestore.Timestamp.fromMillis(dayEndMillis),
-              );
-        }
-
-        const snapshot = await entriesQuery
+            .collection("mainCourante")
             .orderBy("occurredAt", "desc")
-            .limit(500)
+            .limit(100)
             .get();
 
         const canSeeRestricted =
@@ -6803,18 +6737,6 @@ exports.getSauveteurMainCourante = onRequest(
               description: entry.description || "",
               actionTaken: entry.actionTaken || "",
               visibility: entry.visibility || "operational",
-              victim: entry.victim && typeof entry.victim === "object" ?
-                entry.victim : null,
-              interventionZones:
-                sanitizeMainCouranteInterventionZones(
-                    entry.interventionZones,
-                ),
-              presencePersonnel:
-                sanitizeMainCourantePresencePersonnel(
-                    entry.presencePersonnel,
-                ),
-              source: entry.source || "",
-              wasEdited: entry.wasEdited === true,
               occurredAt: entry.occurredAt &&
                   typeof entry.occurredAt.toMillis === "function" ?
                 entry.occurredAt.toMillis() : null,
@@ -6837,9 +6759,7 @@ exports.getSauveteurMainCourante = onRequest(
         response.status(200).json({
           success: true,
           entries,
-          canWrite:
-            context.sphotMode === "ON" &&
-            context.canManageRestrictedOperationalData,
+          canWrite: context.canManageRestrictedOperationalData,
         });
       } catch (error) {
         console.error("Erreur lecture main courante:", error);
@@ -6848,181 +6768,6 @@ exports.getSauveteurMainCourante = onRequest(
     },
 );
 
-
-exports.getSauveteurStats = onRequest(
-    {
-      cpu: 1,
-      memory: "256MiB",
-    },
-    async (request, response) => {
-      response.set("Access-Control-Allow-Origin", "*");
-      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-      response.set("Access-Control-Allow-Headers", "Content-Type");
-
-      if (request.method === "OPTIONS") {
-        response.status(204).send("");
-        return;
-      }
-
-      try {
-        const session = await resolveSauveteurSession(
-            request.body.sauveteurSessionToken,
-        );
-
-        if (!session) {
-          response.status(401).json({
-            success: false,
-            error: "invalid_session",
-          });
-          return;
-        }
-
-        if (!session.legalAcceptanceCurrent) {
-          response.status(403).json({
-            success: false,
-            error: "legal_acceptance_required",
-          });
-          return;
-        }
-
-        const {context} = session;
-        const spotId = (request.body.spotId || "").toString().trim();
-
-        if (!context.assignedSpotIds.includes(spotId)) {
-          response.status(403).json({
-            success: false,
-            error: "spot_not_assigned",
-          });
-          return;
-        }
-
-        let entriesQuery = admin.firestore()
-            .collection("territoires")
-            .doc(context.territoireId)
-            .collection("spots")
-            .doc(spotId)
-            .collection("mainCourante");
-
-        const dayStartMillis = Number(request.body.dayStartMillis);
-        const dayEndMillis = Number(request.body.dayEndMillis);
-        if (Number.isFinite(dayStartMillis) &&
-            Number.isFinite(dayEndMillis) &&
-            dayEndMillis > dayStartMillis) {
-          entriesQuery = entriesQuery
-              .where(
-                  "occurredAt",
-                  ">=",
-                  admin.firestore.Timestamp.fromMillis(dayStartMillis),
-              )
-              .where(
-                  "occurredAt",
-                  "<",
-                  admin.firestore.Timestamp.fromMillis(dayEndMillis),
-              );
-        }
-
-        const snapshot = await entriesQuery
-            .orderBy("occurredAt", "desc")
-            .limit(500)
-            .get();
-
-        const canSeeRestricted =
-          context.canManageRestrictedOperationalData;
-
-        const entries = snapshot.docs
-            .map((document) => {
-              const data = document.data() || {};
-              return {id: document.id, ...data};
-            })
-            .filter((entry) => {
-              return entry.visibility !== "restricted" || canSeeRestricted;
-            })
-            .map((entry) => ({
-              id: entry.id,
-              type: entry.type || "Observation",
-              description: entry.description || "",
-              actionTaken: entry.actionTaken || "",
-              visibility: entry.visibility || "operational",
-              victim: entry.victim && typeof entry.victim === "object" ?
-                entry.victim : null,
-              interventionZones:
-                sanitizeMainCouranteInterventionZones(
-                    entry.interventionZones,
-                ),
-              presencePersonnel:
-                sanitizeMainCourantePresencePersonnel(
-                    entry.presencePersonnel,
-                ),
-              source: entry.source || "",
-              wasEdited: entry.wasEdited === true,
-              occurredAt: entry.occurredAt &&
-                  typeof entry.occurredAt.toMillis === "function" ?
-                entry.occurredAt.toMillis() : null,
-              createdBy: entry.createdBy || {},
-            }));
-
-        await admin.firestore()
-            .collection("mainCouranteAccessLogs")
-            .add({
-              territoireId: context.territoireId,
-              spotId,
-              viewerId: context.sauveteurId,
-              viewerLogin: session.login,
-              viewerRole: context.userRole,
-              viewerType: "sauveteur",
-              action: "stats_view",
-              viewedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-
-        response.status(200).json({
-          success: true,
-          entries,
-        });
-      } catch (error) {
-        console.error("Erreur lecture statistiques sauveteur:", error);
-        response.status(500).json({success: false});
-      }
-    },
-);
-
-
-/**
- * Nettoie et limite les données d'identification d'une victime.
- * @param {Object} rawVictim Données victime reçues du client.
- * @return {?Object} Données victime nettoyées, ou null si elles sont vides.
- */
-function sanitizeMainCouranteVictim(rawVictim) {
-  if (!rawVictim || typeof rawVictim !== "object") return null;
-
-  const clean = (value, maxLength = 160) =>
-    (value || "").toString().trim().slice(0, maxLength);
-
-  const rawNom = clean(rawVictim.nom, 100);
-  const rawPrenom = clean(rawVictim.prenom, 100).toLowerCase();
-  const prenom = rawPrenom ?
-    rawPrenom.charAt(0).toUpperCase() + rawPrenom.slice(1) :
-    "";
-
-  const victim = {
-    sexe: clean(rawVictim.sexe, 40),
-    nom: rawNom.toUpperCase(),
-    prenom,
-    age: clean(rawVictim.age, 20),
-    dateNaissance: clean(rawVictim.dateNaissance, 20),
-    lieuHabitation: clean(rawVictim.lieuHabitation, 180),
-    telephone: clean(rawVictim.telephone, 40),
-    qualification: clean(rawVictim.qualification, 60),
-  };
-
-  const hasValue = Object.values(victim).some((value) => value.length > 0);
-  return hasValue ? victim : null;
-}
-
-/**
- * Nettoie les personnels présents et leurs horaires.
- * @param {Array<*>} rawPersonnel Personnels reçus du client.
- * @return {Array<Object>} Personnels présents normalisés.
- */
 function sanitizeMainCourantePresencePersonnel(rawPersonnel) {
   if (!Array.isArray(rawPersonnel)) return [];
 
@@ -7125,7 +6870,6 @@ exports.addSauveteurMainCouranteEntry = onRequest(
 
         const {context} = session;
         const spotId = (request.body.spotId || "").toString().trim();
-        const entryId = (request.body.entryId || "").toString().trim();
 
         if (context.sphotMode !== "ON" ||
             !context.assignedSpotIds.includes(spotId)) {
@@ -7160,6 +6904,11 @@ exports.addSauveteurMainCouranteEntry = onRequest(
           "restricted" :
           "operational";
 
+        const entryType =
+          (request.body.type || "Observation").toString().trim() ||
+          "Observation";
+        const normalizedType = entryType.toLowerCase();
+
         const entryReference = admin.firestore()
             .collection("territoires")
             .doc(context.territoireId)
@@ -7168,46 +6917,11 @@ exports.addSauveteurMainCouranteEntry = onRequest(
             .collection("mainCourante")
             .doc();
 
-        const entryType =
-          (request.body.type || "Observation").toString().trim() ||
-          "Observation";
-        const normalizedType = entryType.toLowerCase();
-        const supportsVictim =
-          normalizedType === "intervention" ||
-          normalizedType === "secours";
-        const victim = supportsVictim ?
-          sanitizeMainCouranteVictim(request.body.victim) :
-          null;
-        const interventionZones = normalizedType === "intervention" ?
-          sanitizeMainCouranteInterventionZones(
-              request.body.interventionZones,
-          ) :
-          [];
-        const presencePersonnel =
-          normalizedType === "présence" ||
-          normalizedType === "presence" ?
-            sanitizeMainCourantePresencePersonnel(
-                request.body.presencePersonnel,
-            ) :
-            [];
-
-        if (normalizedType === "intervention" &&
-            !hasCompleteMainCouranteInterventionZones(interventionZones)) {
-          response.status(400).json({
-            success: false,
-            error: "intervention_zones_required",
-          });
-          return;
-        }
-
         await entryReference.set({
           type: entryType,
           description,
           actionTaken: (request.body.actionTaken || "").toString().trim(),
           visibility,
-          ...(victim ? {victim} : {}),
-          ...(interventionZones.length > 0 ? {interventionZones} : {}),
-          ...(presencePersonnel.length > 0 ? {presencePersonnel} : {}),
           occurredAt: admin.firestore.FieldValue.serverTimestamp(),
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           createdBy: {
@@ -7215,7 +6929,6 @@ exports.addSauveteurMainCouranteEntry = onRequest(
             login: session.login,
             role: context.userRole,
           },
-          source: "manual_sauveteur_entry",
           immutableOriginal: true,
         });
 
@@ -7236,300 +6949,6 @@ exports.addSauveteurMainCouranteEntry = onRequest(
         });
       } catch (error) {
         console.error("Erreur écriture main courante:", error);
-        response.status(500).json({success: false});
-      }
-    },
-);
-
-
-exports.updateSauveteurMainCouranteEntry = onRequest(
-    {
-      cpu: 1,
-      memory: "256MiB",
-    },
-    async (request, response) => {
-      response.set("Access-Control-Allow-Origin", "*");
-      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-      response.set("Access-Control-Allow-Headers", "Content-Type");
-
-      if (request.method === "OPTIONS") {
-        response.status(204).send("");
-        return;
-      }
-
-      try {
-        const session = await resolveSauveteurSession(
-            request.body.sauveteurSessionToken,
-        );
-
-        if (!session) {
-          response.status(401).json({
-            success: false,
-            error: "invalid_session",
-          });
-          return;
-        }
-
-        if (!session.legalAcceptanceCurrent) {
-          response.status(403).json({
-            success: false,
-            error: "legal_acceptance_required",
-          });
-          return;
-        }
-
-        const {context} = session;
-        const spotId = (request.body.spotId || "").toString().trim();
-
-        if (context.sphotMode !== "ON" ||
-            !context.assignedSpotIds.includes(spotId)) {
-          response.status(403).json({
-            success: false,
-            error: "main_courante_not_available",
-          });
-          return;
-        }
-
-        if (!context.canManageRestrictedOperationalData) {
-          response.status(403).json({
-            success: false,
-            error: "insufficient_role",
-          });
-          return;
-        }
-
-        if (!entryId) {
-          response.status(400).json({
-            success: false,
-            error: "entry_id_required",
-          });
-          return;
-        }
-
-        const description = (request.body.description || "")
-            .toString()
-            .trim();
-
-        if (!description) {
-          response.status(400).json({
-            success: false,
-            error: "description_required",
-          });
-          return;
-        }
-
-        const entryReference = admin.firestore()
-            .collection("territoires")
-            .doc(context.territoireId)
-            .collection("spots")
-            .doc(spotId)
-            .collection("mainCourante")
-            .doc(entryId);
-
-        const entrySnapshot = await entryReference.get();
-        if (!entrySnapshot.exists) {
-          response.status(404).json({
-            success: false,
-            error: "entry_not_found",
-          });
-          return;
-        }
-
-        const visibility = request.body.visibility === "restricted" ?
-          "restricted" :
-          "operational";
-        const nextType =
-          (request.body.type || "Observation").toString().trim() ||
-          "Observation";
-        const normalizedNextType = nextType.toLowerCase();
-        const supportsVictim =
-          normalizedNextType === "intervention" ||
-          normalizedNextType === "secours";
-        const victim = supportsVictim ?
-          sanitizeMainCouranteVictim(request.body.victim) :
-          null;
-        const interventionZones =
-          normalizedNextType === "intervention" ?
-            sanitizeMainCouranteInterventionZones(
-                request.body.interventionZones,
-            ) :
-            [];
-        const presencePersonnel =
-          normalizedNextType === "présence" ||
-          normalizedNextType === "presence" ?
-            sanitizeMainCourantePresencePersonnel(
-                request.body.presencePersonnel,
-            ) :
-            [];
-
-        if (normalizedNextType === "intervention" &&
-            !hasCompleteMainCouranteInterventionZones(interventionZones)) {
-          response.status(400).json({
-            success: false,
-            error: "intervention_zones_required",
-          });
-          return;
-        }
-
-        const nextData = {
-          type: nextType,
-          description,
-          actionTaken: (request.body.actionTaken || "").toString().trim(),
-          visibility,
-          victim: victim || admin.firestore.FieldValue.delete(),
-          interventionZones: interventionZones.length > 0 ?
-            interventionZones :
-            admin.firestore.FieldValue.delete(),
-          presencePersonnel: presencePersonnel.length > 0 ?
-            presencePersonnel :
-            admin.firestore.FieldValue.delete(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedBy: {
-            sauveteurId: context.sauveteurId,
-            login: session.login,
-            role: context.userRole,
-          },
-          wasEdited: true,
-        };
-
-        const auditReference = admin.firestore()
-            .collection("mainCouranteAuditLogs")
-            .doc();
-        const batch = admin.firestore().batch();
-
-        batch.set(auditReference, {
-          action: "update",
-          territoireId: context.territoireId,
-          spotId,
-          entryId,
-          previousEntry: entrySnapshot.data() || {},
-          nextEntry: nextData,
-          actor: {
-            sauveteurId: context.sauveteurId,
-            login: session.login,
-            role: context.userRole,
-          },
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        batch.set(entryReference, nextData, {merge: true});
-
-        await batch.commit();
-
-        response.status(200).json({success: true});
-      } catch (error) {
-        console.error("Erreur modification main courante:", error);
-        response.status(500).json({success: false});
-      }
-    },
-);
-
-exports.deleteSauveteurMainCouranteEntry = onRequest(
-    {
-      cpu: 1,
-      memory: "256MiB",
-    },
-    async (request, response) => {
-      response.set("Access-Control-Allow-Origin", "*");
-      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-      response.set("Access-Control-Allow-Headers", "Content-Type");
-
-      if (request.method === "OPTIONS") {
-        response.status(204).send("");
-        return;
-      }
-
-      try {
-        const session = await resolveSauveteurSession(
-            request.body.sauveteurSessionToken,
-        );
-
-        if (!session) {
-          response.status(401).json({
-            success: false,
-            error: "invalid_session",
-          });
-          return;
-        }
-
-        if (!session.legalAcceptanceCurrent) {
-          response.status(403).json({
-            success: false,
-            error: "legal_acceptance_required",
-          });
-          return;
-        }
-
-        const {context} = session;
-        const spotId = (request.body.spotId || "").toString().trim();
-        const entryId = (request.body.entryId || "").toString().trim();
-
-        if (context.sphotMode !== "ON" ||
-            !context.assignedSpotIds.includes(spotId)) {
-          response.status(403).json({
-            success: false,
-            error: "main_courante_not_available",
-          });
-          return;
-        }
-
-        if (!context.canManageRestrictedOperationalData) {
-          response.status(403).json({
-            success: false,
-            error: "insufficient_role",
-          });
-          return;
-        }
-
-        if (!entryId) {
-          response.status(400).json({
-            success: false,
-            error: "entry_id_required",
-          });
-          return;
-        }
-
-        const entryReference = admin.firestore()
-            .collection("territoires")
-            .doc(context.territoireId)
-            .collection("spots")
-            .doc(spotId)
-            .collection("mainCourante")
-            .doc(entryId);
-
-        const entrySnapshot = await entryReference.get();
-        if (!entrySnapshot.exists) {
-          response.status(404).json({
-            success: false,
-            error: "entry_not_found",
-          });
-          return;
-        }
-
-        const auditReference = admin.firestore()
-            .collection("mainCouranteAuditLogs")
-            .doc();
-        const batch = admin.firestore().batch();
-
-        batch.set(auditReference, {
-          action: "delete",
-          territoireId: context.territoireId,
-          spotId,
-          entryId,
-          deletedEntry: entrySnapshot.data() || {},
-          actor: {
-            sauveteurId: context.sauveteurId,
-            login: session.login,
-            role: context.userRole,
-          },
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        batch.delete(entryReference);
-
-        await batch.commit();
-
-        response.status(200).json({success: true});
-      } catch (error) {
-        console.error("Erreur suppression main courante:", error);
         response.status(500).json({success: false});
       }
     },
