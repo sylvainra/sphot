@@ -6768,6 +6768,11 @@ exports.getSauveteurMainCourante = onRequest(
     },
 );
 
+/**
+ * Nettoie les informations de présence du personnel dans la main courante.
+ * @param {Array<*>} rawPersonnel Personnel reçu du client.
+ * @return {Array<Object>} Présences normalisées avec identité et horaires.
+ */
 function sanitizeMainCourantePresencePersonnel(rawPersonnel) {
   if (!Array.isArray(rawPersonnel)) return [];
 
@@ -6811,24 +6816,6 @@ function sanitizeMainCouranteInterventionZones(rawZones) {
           .map((value) => (value || "").toString().trim())
           .filter((value) => allowed.has(value)),
   )];
-}
-
-/**
- * Vérifie que l'intervention est qualifiée sur les deux axes terrain.
- * @param {Array<string>} zones Catégories d'intervention normalisées.
- * @return {boolean} Vrai si un choix cohérent existe pour chaque axe.
- */
-function hasCompleteMainCouranteInterventionZones(zones) {
-  const bathingCount = [
-    "Zone de bain surveillée",
-    "Hors zone de bain surveillée",
-  ].filter((value) => zones.includes(value)).length;
-  const regulationCount = [
-    "Zone réglementée",
-    "Hors zone réglementée",
-  ].filter((value) => zones.includes(value)).length;
-
-  return bathingCount === 1 && regulationCount === 1;
 }
 
 exports.addSauveteurMainCouranteEntry = onRequest(
