@@ -11,6 +11,7 @@ import 'sauveteur_meteo_marine_page.dart';
 import 'sauveteur_recherche_personne_page.dart';
 import 'sauveteur_ephemeride_dicton_page.dart';
 import 'sauveteur_planning_page.dart';
+import 'sauveteur_stats_page.dart';
 import 'sauveteur_main_courante.dart';
 import 'sauveteur_materiel_verification_page.dart';
 import 'sauveteur_materiel_category_verification_page.dart';
@@ -515,10 +516,15 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                   onTap: () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (_) =>
-                                            SauveteurEspaceReservePage(
-                                          title: 'STATS',
-                                          profileColor: profileColor,
+                                        builder: (_) => SauveteurStatsPage(
+                                          profileColor:
+                                              const Color(0xFF546E7A),
+                                          territoireId: widget.territoireId,
+                                          sphotMode: _sphotMode,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
