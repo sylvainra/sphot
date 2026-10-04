@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 
 import 'web_colors.dart';
 
-import '../home/web_home_page.dart';
-
 class WebTopBar extends StatelessWidget {
   const WebTopBar({super.key});
 
@@ -62,10 +60,8 @@ class WebTopBar extends StatelessWidget {
 
   if (!context.mounted) return;
 
-  Navigator.of(context).pushAndRemoveUntil(
-    MaterialPageRoute(
-      builder: (_) => const WebHomePage(),
-    ),
+  Navigator.of(context).pushNamedAndRemoveUntil(
+    '/professional-login',
     (route) => false,
   );
 },

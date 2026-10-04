@@ -11,25 +11,10 @@ import '../../../map/map_page.dart';
 import '../../../services/admin_logo_storage_service.dart';
 
 class AdminTrialRequestPage extends StatefulWidget {
-  final String? proConnectUid;
-  final String? proConnectEmail;
-  final String? proConnectNom;
-  final String? proConnectPrenom;
-  final String? proConnectOrganisation;
-  final String? proConnectSiret;
-  final String? proConnectSiren;
-
   final String? correctionRequestId;
 
   const AdminTrialRequestPage({
     super.key,
-    this.proConnectUid,
-    this.proConnectEmail,
-    this.proConnectNom,
-    this.proConnectPrenom,
-    this.proConnectOrganisation,
-    this.proConnectSiret,
-    this.proConnectSiren,
     this.correctionRequestId,
   });
 
@@ -174,19 +159,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     if (_isCorrectionMode) {
       _loadExistingRequest();
     } else {
-      _controller('nomStructure').text = widget.proConnectOrganisation ?? '';
-
       _controller('typeStructure').text = 'MAIRIE';
-
-      _controller('siretStructure').text = widget.proConnectSiret ?? '';
-
-      _controller('sirenStructure').text = widget.proConnectSiren ?? '';
-
-      _controller('nomResponsable').text = widget.proConnectNom ?? '';
-
-      _controller('prenomResponsable').text = widget.proConnectPrenom ?? '';
-
-      _controller('emailResponsable').text = widget.proConnectEmail ?? '';
     }
 
     _loadLegalDocuments();
@@ -1358,16 +1331,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         await requestReference.set({
           'uid': requestId,
 
-          'proConnect': {
-            'uid': widget.proConnectUid,
-            'email': widget.proConnectEmail,
-            'nom': widget.proConnectNom,
-            'prenom': widget.proConnectPrenom,
-            'organisation': widget.proConnectOrganisation,
-            'siret': widget.proConnectSiret,
-            'siren': widget.proConnectSiren,
-          },
-
           'institutionnels': _institutionalContacts,
 
           'profile': {
@@ -1713,91 +1676,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _certifiedBlock() {
-    final hasCertifiedData =
-        widget.proConnectEmail != null ||
-        widget.proConnectNom != null ||
-        widget.proConnectPrenom != null ||
-        widget.proConnectOrganisation != null ||
-        widget.proConnectSiret != null ||
-        widget.proConnectSiren != null;
-
-    if (!hasCertifiedData) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: adminColor.withOpacity(0.055),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: adminColor.withOpacity(0.35), width: 1.3),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.verified_user_rounded, color: redColor, size: 20),
-              SizedBox(width: 8),
-              Text(
-                'IDENTITÉ CERTIFIÉE PROCONNECT',
-                style: TextStyle(
-                  color: redColor,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          _smallInfo('Nom', widget.proConnectNom),
-          _smallInfo('Prénom', widget.proConnectPrenom),
-          _smallInfo('Email', widget.proConnectEmail),
-          _smallInfo('Organisation', widget.proConnectOrganisation),
-          _smallInfo('SIRET', widget.proConnectSiret),
-          _smallInfo('SIREN', widget.proConnectSiren),
-        ],
-      ),
-    );
-  }
-
-  Widget _smallInfo(String label, String? value) {
-    final display = (value == null || value.isEmpty) ? 'Non renseigné' : value;
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 5),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 92,
-            child: Text(
-              '$label :',
-              style: const TextStyle(
-                color: adminColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              display,
-              style: const TextStyle(
-                color: adminColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -2513,9 +2391,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             'nomStructure',
             'Nom de la structure',
             uppercase: true,
-            readOnly:
-                !_isFieldEditable('nomStructure') ||
-                (!_isCorrectionMode && widget.proConnectOrganisation != null),
+            readOnly: !_isFieldEditable('nomStructure'),
           ),
         ],
         const SizedBox(height: 11),
@@ -2523,18 +2399,14 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           'siretStructure',
           'SIRET',
           keyboardType: TextInputType.number,
-          readOnly:
-              !_isFieldEditable('siretStructure') ||
-              (!_isCorrectionMode && widget.proConnectSiret != null),
+          readOnly: !_isFieldEditable('siretStructure'),
         ),
         const SizedBox(height: 11),
         _textField(
           'sirenStructure',
           'SIREN',
           keyboardType: TextInputType.number,
-          readOnly:
-              !_isFieldEditable('sirenStructure') ||
-              (!_isCorrectionMode && widget.proConnectSiren != null),
+          readOnly: !_isFieldEditable('sirenStructure'),
         ),
         const SizedBox(height: 22),
         _nextButton(_TrialRequestSection.responsable),
@@ -2547,7 +2419,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _pageHeader('RESPONSABLE', 'Identité du référent SPHOT ADMIN.'),
-        _certifiedBlock(),
 
         _dropdownField(
           'civiliteResponsable',
