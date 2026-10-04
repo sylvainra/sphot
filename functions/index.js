@@ -5135,8 +5135,1191 @@ exports.saveSauveteurPlanning = onRequest(
     },
 );
 
+const INSTITUTIONAL_MAIN_COURANTE_URL =
+  SPHOT_LOGIN_URL + "/?institutionnelMainCouranteToken=";
+
+/**
+ * Calcule l'empreinte SHA-256 d'un jeton d'accès institutionnel.
+ * @param {string} token Jeton d'accès brut.
+ * @return {string} Empreinte hexadécimale du jeton.
+ */
+function hashInstitutionalAccessToken(token) {
+  return crypto
+      .createHash("sha256")
+      .update((token || "").toString())
+      .digest("hex");
+}
+
+/**
+ * Crée une session temporaire de lecture seule de la MAIN COURANTE
+ * pour l'administrateur connecté.
+ *
+ * @param {FirebaseFirestore.DocumentReference} accountReference
+ * Référence du compte administrateur.
+ * @param {Object} accountData Données du compte administrateur.
+ * @return {Promise<string>} Jeton brut à remettre au client.
+ */
+async function createAdminMainCouranteSession(
+    accountReference,
+    accountData,
+) {
+  const territoireId = (accountData.territoireId || "").toString().trim();
+  const email = (
+    accountData.email ||
+    accountData.login ||
+    accountReference.id ||
+    ""
+  ).toString().trim().toLowerCase();
+
+  if (!territoireId || !email ||
+      (accountData.accountStatus || "").toString().toUpperCase() !== "ACTIVE") {
+    return "";
+  }
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashInstitutionalAccessToken(rawToken);
+  const previousHash =
+    (accountData.mainCouranteSessionHash || "").toString().trim();
+  const preferences = institutionalNotificationPreferences(accountData);
+  const db = admin.firestore();
+  const batch = db.batch();
+  const now = admin.firestore.Timestamp.now();
+  const expiresAt = admin.firestore.Timestamp.fromMillis(
+      Date.now() + (12 * 60 * 60 * 1000),
+  );
+
+  if (previousHash && previousHash !== tokenHash) {
+    batch.set(
+        db.collection("institutionalMainCouranteAccess").doc(previousHash),
+        {
+          enabled: false,
+          disabledAt: now,
+          updatedAt: now,
+        },
+        {merge: true},
+    );
+  }
+
+  batch.set(
+      db.collection("institutionalMainCouranteAccess").doc(tokenHash),
+      {
+        territoireId,
+        contactId: (accountData.adminUid || accountReference.id)
+            .toString()
+            .trim(),
+        email,
+        civilite: (accountData.civilite || "").toString(),
+        nom: (accountData.nom || "").toString(),
+        prenom: (accountData.prenom || "").toString(),
+        fonction: (accountData.fonction || "Administrateur SPHOT").toString(),
+        viewerType: "admin",
+        accountLogin: accountReference.id,
+        enabled: true,
+        mainCouranteReadOnly: true,
+        notificationPreferences: preferences,
+        createdAt: now,
+        updatedAt: now,
+        expiresAt,
+      },
+      {merge: true},
+  );
+
+  batch.set(
+      accountReference,
+      {
+        mainCouranteSessionHash: tokenHash,
+        mainCouranteReadOnly: true,
+        notificationPreferences: preferences,
+        mainCouranteSessionUpdatedAt: now,
+        updatedAt: now,
+      },
+      {merge: true},
+  );
+
+  await batch.commit();
+  return rawToken;
+}
+
+/**
+ * Normalise les préférences de notification d'un contact institutionnel.
+ * @param {Object} contact Contact institutionnel.
+ * @return {Object} Préférences opérationnelles normalisées.
+ */
+function institutionalNotificationPreferences(contact) {
+  const raw = contact &&
+      typeof contact.notificationPreferences === "object" &&
+      !Array.isArray(contact.notificationPreferences) ?
+    contact.notificationPreferences :
+    {};
+
+  return {
+    flagLowered: raw.flagLowered !== false,
+    intervention: raw.intervention !== false,
+  };
+}
+
+/**
+ * Formate l'heure opérationnelle dans le fuseau français.
+ * @param {Date} value Date à formater.
+ * @return {string} Heure au format 14h37.
+ */
+function formatFrenchOperationalTime(value = new Date()) {
+  const parts = new Intl.DateTimeFormat(
+      "fr-FR",
+      {
+        timeZone: "Europe/Paris",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      },
+  ).formatToParts(value);
+
+  const hour = parts.find((part) => part.type === "hour")?.value || "00";
+  const minute = parts.find((part) => part.type === "minute")?.value || "00";
+  return hour + "h" + minute;
+}
+
+/**
+ * Construit la formule d'appel d'une alerte opérationnelle.
+ * @param {Object} contact Destinataire.
+ * @return {string} Formule de politesse.
+ */
+function operationalNotificationGreeting(contact) {
+  const rawCivilite = (contact.civilite || "")
+      .toString()
+      .trim()
+      .toLowerCase();
+  const nom = (
+    contact.nom ||
+    contact.nomResponsable ||
+    ""
+  ).toString().trim().toUpperCase();
+
+  if (!nom) return "Bonjour,";
+
+  let civilite = "Monsieur";
+  if (rawCivilite === "madame" ||
+      rawCivilite === "mme" ||
+      rawCivilite === "femme") {
+    civilite = "Madame";
+  }
+
+  return "Bonjour " + civilite + " " + nom + ",";
+}
+
+/**
+ * Envoie une notification opérationnelle aux contacts institutionnels.
+ * @param {Object} options Paramètres de la notification.
+ * @return {Promise<void>} Promesse résolue après traitement.
+ */
+async function sendInstitutionalOperationalNotification(options) {
+  const territoireId = (options.territoireId || "").toString();
+  const spotId = (options.spotId || "").toString();
+  const eventType = (options.eventType || "").toString();
+  const title = (options.title || "Information SPHOT").toString();
+  const description = (options.description || "").toString();
+  const sphotMode = (options.sphotMode || "").toString().toUpperCase();
+
+  // Règle métier absolue : SPHOT OFF ne déclenche aucune alerte sortante.
+  if (sphotMode !== "ON") return;
+
+  try {
+    const territorySnapshot = await admin.firestore()
+        .collection("territoires")
+        .doc(territoireId)
+        .get();
+
+    if (!territorySnapshot.exists) return;
+
+    const territoryData = territorySnapshot.data() || {};
+    const contacts = Array.isArray(territoryData.institutionnels) ?
+      territoryData.institutionnels :
+      [];
+
+    const enabledContacts = contacts.filter((rawContact) => {
+      const contact = rawContact || {};
+      const email = (contact.email || "").toString().trim().toLowerCase();
+      if (!email || contact.mainCouranteReadOnly === false) return false;
+
+      const preferences = institutionalNotificationPreferences(contact);
+      return preferences[eventType] === true;
+    });
+
+    const adminAccountsSnapshot = await admin.firestore()
+        .collection("adminAccounts")
+        .where("territoireId", "==", territoireId)
+        .get();
+
+    const enabledAdmins = adminAccountsSnapshot.docs
+        .map((document) => {
+          const data = document.data() || {};
+          return {
+            ...data,
+            email: (data.email || data.login || document.id)
+                .toString()
+                .trim()
+                .toLowerCase(),
+            viewerType: "admin",
+          };
+        })
+        .filter((contact) => {
+          if (!contact.email) return false;
+          if ((contact.accountStatus || "").toString().toUpperCase() !==
+              "ACTIVE") {
+            return false;
+          }
+          const preferences = institutionalNotificationPreferences(contact);
+          return preferences[eventType] === true;
+        });
+
+    const recipientsByEmail = new Map();
+    [...enabledContacts, ...enabledAdmins].forEach((contact) => {
+      const email = (contact.email || "").toString().trim().toLowerCase();
+      if (!email || recipientsByEmail.has(email)) return;
+      recipientsByEmail.set(email, contact);
+    });
+    const recipients = [...recipientsByEmail.values()];
+
+    if (recipients.length === 0) return;
+
+    let spotLabel = spotId;
+    try {
+      const spotSnapshot = await admin.firestore()
+          .collection("territoires")
+          .doc(territoireId)
+          .collection("spots")
+          .doc(spotId)
+          .get();
+      const spotData = spotSnapshot.data() || {};
+      spotLabel = (
+        spotData.nomSecours ||
+        spotData.nomSphot ||
+        spotData.nom ||
+        spotId
+      ).toString();
+    } catch (_) {
+      // Le libellé technique suffit si la fiche SPHOT n'est pas disponible.
+    }
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: SMTP_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+    });
+
+    for (const rawContact of recipients) {
+      const contact = rawContact || {};
+      const email = (contact.email || "").toString().trim().toLowerCase();
+      const greeting = operationalNotificationGreeting(contact);
+
+      try {
+        await sendSphotMail(transporter, {
+          from: MAIL_FROM,
+          to: email,
+          subject: "SPHOT - " + title + " - " + spotLabel,
+          html:
+            "<p>" + escapeHtml(greeting) + "</p>" +
+            "<p>Une information opérationnelle vient d'être enregistrée " +
+            "pour <strong>" + escapeHtml(spotLabel) + "</strong>.</p>" +
+            "<div style=\"margin:22px 0;padding:16px;border:1px solid " +
+            "#1e3a8a;border-radius:12px;background:#f7f9fc;\">" +
+            "<strong>" + escapeHtml(title) + "</strong><br>" +
+            escapeHtml(description) + "</div>" +
+            "<p>Vous disposez d'un accès personnel SPHOT à la MAIN COURANTE " +
+            "en lecture seule. Vous pouvez également y modifier vos " +
+            "préférences de notification.</p>" +
+            "<p>Conservez le lien d'accès sécurisé qui vous a été adressé " +
+            "lors de votre habilitation.</p>" +
+            "<p>L'équipe SPHOT</p>",
+          text:
+            greeting + "\n\n" +
+            "Une information opérationnelle vient d'être enregistrée pour " +
+            spotLabel + ".\n\n" +
+            title + "\n" + description + "\n\n" +
+            "Vous disposez d'un accès personnel SPHOT à la MAIN COURANTE " +
+            "en lecture seule et pouvez y modifier vos préférences.\n\n" +
+            "L'équipe SPHOT",
+        });
+      } catch (mailError) {
+        console.error(
+            "Erreur notification institutionnelle:",
+            territoireId,
+            spotId,
+            email,
+            mailError,
+        );
+      }
+    }
+  } catch (error) {
+    console.error(
+        "Erreur préparation notifications institutionnelles:",
+        territoireId,
+        spotId,
+        eventType,
+        error,
+    );
+  }
+}
+
+exports.saveAdminInstitutionalContacts = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const token = (request.body.mainCouranteToken || "")
+            .toString()
+            .trim();
+
+        if (!token) {
+          response.status(401).json({
+            success: false,
+            error: "missing_admin_session",
+          });
+          return;
+        }
+
+        const tokenHash = hashInstitutionalAccessToken(token);
+        const accessReference = admin.firestore()
+            .collection("institutionalMainCouranteAccess")
+            .doc(tokenHash);
+        const accessSnapshot = await accessReference.get();
+        const access = accessSnapshot.data() || {};
+
+        const expiresAt = access.expiresAt;
+        const expired = expiresAt &&
+            typeof expiresAt.toMillis === "function" &&
+            expiresAt.toMillis() <= Date.now();
+
+        if (!accessSnapshot.exists ||
+            access.enabled !== true ||
+            access.mainCouranteReadOnly !== true ||
+            (access.viewerType || "").toString().toLowerCase() !== "admin" ||
+            expired) {
+          response.status(403).json({
+            success: false,
+            error: "admin_session_denied",
+          });
+          return;
+        }
+
+        const territoireId = (access.territoireId || "")
+            .toString()
+            .trim();
+        const adminUid = (access.contactId || "")
+            .toString()
+            .trim();
+
+        if (!territoireId) {
+          response.status(403).json({
+            success: false,
+            error: "territory_missing",
+          });
+          return;
+        }
+
+        const rawContacts = Array.isArray(request.body.contacts) ?
+          request.body.contacts :
+          [];
+
+        if (rawContacts.length > 50) {
+          response.status(400).json({
+            success: false,
+            error: "too_many_contacts",
+          });
+          return;
+        }
+
+        const territoryReference = admin.firestore()
+            .collection("territoires")
+            .doc(territoireId);
+        const territorySnapshot = await territoryReference.get();
+        const territoryData = territorySnapshot.data() || {};
+        const existingContacts =
+          Array.isArray(territoryData.institutionnels) ?
+            territoryData.institutionnels :
+            [];
+
+        const existingById = new Map(
+            existingContacts
+                .map((contact) => {
+                  const id = (contact && contact.id || "")
+                      .toString()
+                      .trim();
+                  return id ? [id, contact || {}] : null;
+                })
+                .filter((value) => value),
+        );
+
+        const cleanText = (value, maxLength = 180) =>
+          (value || "").toString().trim().slice(0, maxLength);
+
+        const normalizedContacts = [];
+
+        for (const rawContact of rawContacts) {
+          const source = rawContact &&
+              typeof rawContact === "object" &&
+              !Array.isArray(rawContact) ?
+            rawContact :
+            {};
+
+          const id = cleanText(source.id, 120) || crypto.randomUUID();
+          const civilite =
+            cleanText(source.civilite, 20).toLowerCase() === "madame" ?
+              "Madame" :
+              "Monsieur";
+          const nom = cleanText(source.nom, 100).toUpperCase();
+          const rawPrenom = cleanText(source.prenom, 100).toLowerCase();
+          const prenom = rawPrenom ?
+            rawPrenom.charAt(0).toUpperCase() + rawPrenom.slice(1) :
+            "";
+          const fonction = cleanText(source.fonction, 140);
+          const telephone = cleanText(source.telephone, 40);
+          const email = cleanText(source.email, 180).toLowerCase();
+
+          if (!nom || !prenom || !fonction || !email ||
+              !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+            response.status(400).json({
+              success: false,
+              error: "invalid_contact",
+            });
+            return;
+          }
+
+          const normalized = {
+            id,
+            civilite,
+            nom,
+            prenom,
+            fonction,
+            telephone,
+            email,
+            mainCouranteReadOnly: true,
+            notificationPreferences:
+              institutionalNotificationPreferences(source),
+          };
+
+          const previous = existingById.get(id) || {};
+          const previousEmail = (previous.email || "")
+              .toString()
+              .trim()
+              .toLowerCase();
+          const previousHash = (previous.accessTokenHash || "")
+              .toString()
+              .trim();
+
+          if (previousHash && previousEmail === email) {
+            normalized.accessTokenHash = previousHash;
+          }
+
+          normalizedContacts.push(normalized);
+        }
+
+        const db = admin.firestore();
+        const batch = db.batch();
+        const now = admin.firestore.FieldValue.serverTimestamp();
+
+        batch.set(
+            territoryReference,
+            {
+              institutionnels: normalizedContacts,
+              updatedAt: now,
+            },
+            {merge: true},
+        );
+
+        if (adminUid) {
+          const adminReference = db.collection("admins").doc(adminUid);
+          const adminSnapshot = await adminReference.get();
+
+          if (adminSnapshot.exists) {
+            batch.set(
+                adminReference,
+                {
+                  "institutionnels": normalizedContacts,
+                  "territoire.institutionnels": normalizedContacts,
+                  "updatedAt": now,
+                },
+                {merge: true},
+            );
+          }
+
+          const requestsSnapshot = await db
+              .collection("adminRequests")
+              .where("uid", "==", adminUid)
+              .get();
+
+          for (const document of requestsSnapshot.docs) {
+            batch.set(
+                document.ref,
+                {
+                  "institutionnels": normalizedContacts,
+                  "territoire.institutionnels": normalizedContacts,
+                  "updatedAt": now,
+                },
+                {merge: true},
+            );
+          }
+        }
+
+        await batch.commit();
+
+        response.status(200).json({
+          success: true,
+          contactsCount: normalizedContacts.length,
+        });
+      } catch (error) {
+        console.error(
+            "Erreur sauvegarde contacts institutionnels Admin:",
+            error,
+        );
+        response.status(500).json({
+          success: false,
+          error: "save_failed",
+        });
+      }
+    },
+);
+
+
+exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
+    {
+      document: "territoires/{territoireId}",
+      region: "europe-west1",
+      secrets: ["GMAIL_APP_PASSWORD"],
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (event) => {
+      const territoireId = event.params.territoireId;
+      const beforeData = event.data.before.data() || {};
+      const afterData = event.data.after.data() || {};
+      const beforeContacts = Array.isArray(beforeData.institutionnels) ?
+        beforeData.institutionnels :
+        [];
+      const rawContacts = Array.isArray(afterData.institutionnels) ?
+        afterData.institutionnels :
+        [];
+
+      const normalizedContacts = [];
+      const onboarding = [];
+      let territoryNeedsUpdate = false;
+
+      for (let index = 0; index < rawContacts.length; index += 1) {
+        const original = rawContacts[index] || {};
+        const contact = {...original};
+        const email = (contact.email || "").toString().trim().toLowerCase();
+
+        let contactId = (contact.id || "").toString().trim();
+        if (!contactId) {
+          contactId = crypto.randomUUID();
+          contact.id = contactId;
+          territoryNeedsUpdate = true;
+        }
+
+        const preferences = institutionalNotificationPreferences(contact);
+        if (JSON.stringify(contact.notificationPreferences || {}) !==
+            JSON.stringify(preferences)) {
+          contact.notificationPreferences = preferences;
+          territoryNeedsUpdate = true;
+        }
+
+        if (contact.mainCouranteReadOnly !== true) {
+          contact.mainCouranteReadOnly = true;
+          territoryNeedsUpdate = true;
+        }
+
+        if (!email) {
+          normalizedContacts.push(contact);
+          continue;
+        }
+
+        let tokenHash = (contact.accessTokenHash || "").toString().trim();
+
+        if (!tokenHash) {
+          const ledgerId = crypto
+              .createHash("sha256")
+              .update(territoireId + "|" + contactId + "|" + email)
+              .digest("hex");
+          const ledgerReference = admin.firestore()
+              .collection("institutionalMainCouranteMailLedger")
+              .doc(ledgerId);
+
+          const claim = await admin.firestore().runTransaction(
+              async (transaction) => {
+                const ledgerSnapshot = await transaction.get(
+                    ledgerReference,
+                );
+                const ledger = ledgerSnapshot.data() || {};
+
+                if (ledgerSnapshot.exists &&
+                    (ledger.tokenHash || "").toString().trim()) {
+                  return {
+                    claimed: false,
+                    tokenHash: (ledger.tokenHash || "")
+                        .toString()
+                        .trim(),
+                    rawToken: "",
+                  };
+                }
+
+                const generatedRawToken =
+                  crypto.randomBytes(32).toString("hex");
+                const generatedTokenHash =
+                  hashInstitutionalAccessToken(generatedRawToken);
+
+                transaction.set(
+                    ledgerReference,
+                    {
+                      territoireId,
+                      contactId,
+                      email,
+                      tokenHash: generatedTokenHash,
+                      rawToken: generatedRawToken,
+                      status: "claimed",
+                      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    },
+                    {merge: true},
+                );
+
+                return {
+                  claimed: true,
+                  tokenHash: generatedTokenHash,
+                  rawToken: generatedRawToken,
+                };
+              },
+          );
+
+          tokenHash = claim.tokenHash;
+          contact.accessTokenHash = tokenHash;
+          territoryNeedsUpdate = true;
+
+          if (claim.claimed === true && claim.rawToken) {
+            onboarding.push({
+              contact: {...contact},
+              rawToken: claim.rawToken,
+              ledgerId,
+            });
+          }
+        }
+
+        await admin.firestore()
+            .collection("institutionalMainCouranteAccess")
+            .doc(tokenHash)
+            .set({
+              territoireId,
+              contactId,
+              email,
+              civilite: (contact.civilite || "").toString(),
+              nom: (contact.nom || "").toString(),
+              prenom: (contact.prenom || "").toString(),
+              fonction: (contact.fonction || "").toString(),
+              enabled: true,
+              mainCouranteReadOnly: true,
+              notificationPreferences: preferences,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, {merge: true});
+
+        normalizedContacts.push(contact);
+      }
+
+      const activeHashes = new Set(
+          normalizedContacts
+              .map((contact) => (contact.accessTokenHash || "")
+                  .toString()
+                  .trim())
+              .filter(Boolean),
+      );
+
+      for (const oldContact of beforeContacts) {
+        const oldHash = (oldContact.accessTokenHash || "").toString().trim();
+        if (oldHash && !activeHashes.has(oldHash)) {
+          await admin.firestore()
+              .collection("institutionalMainCouranteAccess")
+              .doc(oldHash)
+              .set({
+                enabled: false,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              }, {merge: true});
+        }
+      }
+
+      if (territoryNeedsUpdate) {
+        await event.data.after.ref.set({
+          institutionnels: normalizedContacts,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {merge: true});
+      }
+
+      if (onboarding.length === 0) return;
+
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: SMTP_USER,
+          pass: process.env.GMAIL_APP_PASSWORD,
+        },
+      });
+
+      for (const item of onboarding) {
+        const contact = item.contact || {};
+        const email = (contact.email || "").toString().trim().toLowerCase();
+        if (!email) continue;
+
+        const accessUrl =
+          INSTITUTIONAL_MAIN_COURANTE_URL +
+          encodeURIComponent(item.rawToken);
+        const greeting = operationalNotificationGreeting(contact);
+
+        try {
+          const mailResult = await sendSphotMail(transporter, {
+            from: MAIL_FROM,
+            to: email,
+            subject: "SPHOT - Votre accès institutionnel à la MAIN COURANTE",
+            html:
+              "<p>" + escapeHtml(greeting) + "</p>" +
+              "<p>Votre structure vous a habilité comme contact " +
+              "institutionnel SPHOT.</p>" +
+              "<p>Cet accès vous permet de consulter la " +
+              "<strong>MAIN COURANTE</strong> de vos SPHOTS surveillés en " +
+              "lecture seule et de choisir les notifications que vous " +
+              "souhaitez recevoir : affalage du drapeau et intervention.</p>" +
+              "<div style=\"text-align:center;margin:28px 0;\">" +
+              "<a href=\"" + accessUrl + "\" style=\"display:inline-block;" +
+              "padding:14px 24px;border-radius:12px;background:#1e3a8a;" +
+              "color:#ffffff;text-decoration:none;font-weight:900;\">" +
+              "OUVRIR LA MAIN COURANTE SPHOT</a></div>" +
+              "<p>Ce lien est personnel. Ne le transférez pas.</p>" +
+              "<p>L'équipe SPHOT</p>",
+            text:
+              greeting + "\n\n" +
+              "Votre structure vous a habilité comme contact institutionnel " +
+              "SPHOT.\n\nCet accès vous permet de consulter la MAIN " +
+              "COURANTE de vos SPHOTS surveillés en lecture seule et de " +
+              "choisir les notifications que vous souhaitez recevoir : " +
+              "affalage du drapeau et intervention.\n\n" +
+              "Accès à la MAIN COURANTE :\n" +
+              accessUrl + "\n\n" +
+              "L'équipe SPHOT",
+          });
+
+          if (item.ledgerId) {
+            await admin.firestore()
+                .collection("institutionalMainCouranteMailLedger")
+                .doc(item.ledgerId)
+                .set({
+                  status: "sent",
+                  messageId: mailResult.messageId || null,
+                  sentAt: admin.firestore.FieldValue.serverTimestamp(),
+                  rawToken: admin.firestore.FieldValue.delete(),
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                }, {merge: true});
+          }
+        } catch (mailError) {
+          console.error(
+              "Erreur email habilitation institutionnelle:",
+              territoireId,
+              email,
+              mailError,
+          );
+
+          if (item.ledgerId) {
+            await admin.firestore()
+                .collection("institutionalMainCouranteMailLedger")
+                .doc(item.ledgerId)
+                .set({
+                  status: "failed",
+                  error: (mailError && mailError.message) ?
+                    mailError.message :
+                    String(mailError),
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                }, {merge: true});
+          }
+        }
+      }
+    },
+);
+
+exports.getInstitutionalMainCourante = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const token = (request.body.token || "").toString().trim();
+        if (!token) {
+          response.status(401).json({success: false, error: "missing_token"});
+          return;
+        }
+
+        const tokenHash = hashInstitutionalAccessToken(token);
+        const accessReference = admin.firestore()
+            .collection("institutionalMainCouranteAccess")
+            .doc(tokenHash);
+        const accessSnapshot = await accessReference.get();
+        const access = accessSnapshot.data() || {};
+
+        const expiresAt = access.expiresAt;
+        const expired = expiresAt &&
+            typeof expiresAt.toMillis === "function" &&
+            expiresAt.toMillis() <= Date.now();
+
+        if (!accessSnapshot.exists ||
+            access.enabled !== true ||
+            access.mainCouranteReadOnly !== true ||
+            expired) {
+          response.status(403).json({success: false, error: "access_denied"});
+          return;
+        }
+
+        const territoireId = (access.territoireId || "").toString().trim();
+        if (!territoireId) {
+          response.status(403).json({success: false, error: "access_denied"});
+          return;
+        }
+
+        const territoryReference = admin.firestore()
+            .collection("territoires")
+            .doc(territoireId);
+        const territorySnapshot = await territoryReference.get();
+        const territory = territorySnapshot.data() || {};
+
+        const spotsSnapshot = await territoryReference
+            .collection("spots")
+            .where("typeSphot", "==", "🚨 POSTE DE SECOURS 🚨")
+            .get();
+
+        const spots = spotsSnapshot.docs
+            .map((document) => {
+              const data = document.data() || {};
+              const label = [
+                (data.nomSecours || "").toString().trim(),
+                (data.nomSphot || "").toString().trim(),
+              ].filter(Boolean).join(" - ");
+              return {
+                id: document.id,
+                label: label || document.id,
+              };
+            })
+            .sort((a, b) => a.label.localeCompare(b.label, "fr"));
+
+        let spotId = (request.body.spotId || "").toString().trim();
+        if (!spotId && spots.length > 0) spotId = spots[0].id;
+
+        if (spotId && !spots.some((spot) => spot.id === spotId)) {
+          response.status(403).json({success: false, error: "spot_denied"});
+          return;
+        }
+
+        const statusOnly = request.body.statusOnly === true;
+        const allSpotsStatus = request.body.allSpots === true;
+        let operationalAlert = {};
+        let activeOperationalAlerts = [];
+        let entries = [];
+
+        if (spotId) {
+          const liveSpotSnapshot = await admin.firestore()
+              .collection("spots")
+              .doc(spotId)
+              .get();
+          const liveSpot = liveSpotSnapshot.data() || {};
+          const rawAlert = liveSpot.operationalAlert &&
+              typeof liveSpot.operationalAlert === "object" &&
+              !Array.isArray(liveSpot.operationalAlert) ?
+            liveSpot.operationalAlert :
+            {};
+
+          if (rawAlert && Object.keys(rawAlert).length > 0) {
+            operationalAlert = {
+              type: rawAlert.type || "",
+              active: rawAlert.active === true,
+              message: rawAlert.message || "",
+              flagColor: rawAlert.flagColor || "",
+              triggeredAt: rawAlert.triggeredAt &&
+                  typeof rawAlert.triggeredAt.toMillis === "function" ?
+                rawAlert.triggeredAt.toMillis() : null,
+              endedAt: rawAlert.endedAt &&
+                  typeof rawAlert.endedAt.toMillis === "function" ?
+                rawAlert.endedAt.toMillis() : null,
+            };
+          }
+
+          if (!statusOnly) {
+            let entriesQuery = territoryReference
+                .collection("spots")
+                .doc(spotId)
+                .collection("mainCourante");
+
+            const dayStartMillis = Number(request.body.dayStartMillis);
+            const dayEndMillis = Number(request.body.dayEndMillis);
+            if (Number.isFinite(dayStartMillis) &&
+                Number.isFinite(dayEndMillis) &&
+                dayEndMillis > dayStartMillis) {
+              entriesQuery = entriesQuery
+                  .where(
+                      "occurredAt",
+                      ">=",
+                      admin.firestore.Timestamp.fromMillis(dayStartMillis),
+                  )
+                  .where(
+                      "occurredAt",
+                      "<",
+                      admin.firestore.Timestamp.fromMillis(dayEndMillis),
+                  );
+            }
+
+            const entriesSnapshot = await entriesQuery
+                .orderBy("occurredAt", "desc")
+                .limit(500)
+                .get();
+
+            entries = entriesSnapshot.docs
+                .map((document) => {
+                  const data = document.data() || {};
+                  return {
+                    id: document.id,
+                    type: data.type || "Observation",
+                    description: data.description || "",
+                    actionTaken: data.actionTaken || "",
+                    visibility: data.visibility || "operational",
+                    interventionZones:
+                      sanitizeMainCouranteInterventionZones(
+                          data.interventionZones,
+                      ),
+                    presencePersonnel:
+                      sanitizeMainCourantePresencePersonnel(
+                          data.presencePersonnel,
+                      ),
+                    source: data.source || "",
+                    wasEdited: data.wasEdited === true,
+                    occurredAt: data.occurredAt &&
+                        typeof data.occurredAt.toMillis === "function" ?
+                      data.occurredAt.toMillis() : null,
+                  };
+                })
+                .filter((entry) => entry.visibility !== "restricted");
+          }
+        }
+
+        if (statusOnly && allSpotsStatus && spots.length > 0) {
+          const liveReferences = spots.map((spot) => {
+            return admin.firestore().collection("spots").doc(spot.id);
+          });
+          const liveSnapshots = await admin.firestore().getAll(
+              ...liveReferences,
+          );
+
+          activeOperationalAlerts = liveSnapshots
+              .map((snapshot, index) => {
+                const liveSpot = snapshot.data() || {};
+                const rawAlert = liveSpot.operationalAlert &&
+                    typeof liveSpot.operationalAlert === "object" &&
+                    !Array.isArray(liveSpot.operationalAlert) ?
+                  liveSpot.operationalAlert :
+                  {};
+                if (rawAlert.active !== true) return null;
+
+                return {
+                  spotId: spots[index].id,
+                  spotLabel: spots[index].label,
+                  type: rawAlert.type || "",
+                  active: true,
+                  message: rawAlert.message || "",
+                  flagColor: rawAlert.flagColor || "",
+                  triggeredAt: rawAlert.triggeredAt &&
+                      typeof rawAlert.triggeredAt.toMillis === "function" ?
+                    rawAlert.triggeredAt.toMillis() : null,
+                };
+              })
+              .filter((alert) => alert)
+              .sort((a, b) => {
+                return Number(b.triggeredAt || 0) - Number(a.triggeredAt || 0);
+              });
+        }
+
+        if (!statusOnly) {
+          await admin.firestore()
+              .collection("mainCouranteAccessLogs")
+              .add({
+                territoireId,
+                spotId,
+                viewerId: access.contactId || tokenHash,
+                viewerLogin: access.email || "",
+                viewerRole:
+                  (access.viewerType || "institutionnel").toString(),
+                viewerType:
+                  (access.viewerType || "institutionnel").toString(),
+                action: "view",
+                viewedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+        }
+
+        response.status(200).json({
+          success: true,
+          contact: {
+            civilite: access.civilite || "",
+            nom: access.nom || "",
+            prenom: access.prenom || "",
+            fonction: access.fonction || "",
+            email: access.email || "",
+          },
+          territory: {
+            id: territoireId,
+            organisation:
+              territory.organisation ||
+              territory.nomStructure ||
+              territory.ville ||
+              "",
+          },
+          spots,
+          selectedSpotId: spotId,
+          entries,
+          viewerType: (access.viewerType || "institutionnel").toString(),
+          operationalAlert,
+          activeOperationalAlerts,
+          notificationPreferences:
+            institutionalNotificationPreferences(access),
+        });
+      } catch (error) {
+        console.error("Erreur lecture institutionnelle main courante:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.updateInstitutionalMainCourantePreferences = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const token = (request.body.token || "").toString().trim();
+        if (!token) {
+          response.status(401).json({success: false, error: "missing_token"});
+          return;
+        }
+
+        const tokenHash = hashInstitutionalAccessToken(token);
+        const accessReference = admin.firestore()
+            .collection("institutionalMainCouranteAccess")
+            .doc(tokenHash);
+        const accessSnapshot = await accessReference.get();
+        const access = accessSnapshot.data() || {};
+
+        const expiresAt = access.expiresAt;
+        const expired = expiresAt &&
+            typeof expiresAt.toMillis === "function" &&
+            expiresAt.toMillis() <= Date.now();
+
+        if (!accessSnapshot.exists || access.enabled !== true || expired) {
+          response.status(403).json({success: false, error: "access_denied"});
+          return;
+        }
+
+        const preferences = {
+          flagLowered: request.body.flagLowered === true,
+          intervention: request.body.intervention === true,
+        };
+
+        const territoireId = (access.territoireId || "").toString().trim();
+        const contactId = (access.contactId || "").toString().trim();
+
+        await accessReference.set({
+          notificationPreferences: preferences,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {merge: true});
+
+        const viewerType = (access.viewerType || "institutionnel")
+            .toString()
+            .toLowerCase();
+
+        if (viewerType === "admin") {
+          const accountLogin = (access.accountLogin || access.email || "")
+              .toString()
+              .trim()
+              .toLowerCase();
+          if (accountLogin) {
+            await admin.firestore()
+                .collection("adminAccounts")
+                .doc(accountLogin)
+                .set({
+                  notificationPreferences: preferences,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                }, {merge: true});
+          }
+        } else if (territoireId && contactId) {
+          const territoryReference = admin.firestore()
+              .collection("territoires")
+              .doc(territoireId);
+
+          await admin.firestore().runTransaction(async (transaction) => {
+            const territorySnapshot =
+                await transaction.get(territoryReference);
+            const territoryData = territorySnapshot.data() || {};
+            const contacts = Array.isArray(territoryData.institutionnels) ?
+              territoryData.institutionnels.map((rawContact) => {
+                const contact = {...(rawContact || {})};
+                if ((contact.id || "").toString() === contactId) {
+                  contact.notificationPreferences = preferences;
+                }
+                return contact;
+              }) :
+              [];
+
+            transaction.set(territoryReference, {
+              institutionnels: contacts,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, {merge: true});
+          });
+        }
+
+        response.status(200).json({success: true, preferences});
+      } catch (error) {
+        console.error(
+            "Erreur mise à jour préférences institutionnelles:",
+            error,
+        );
+        response.status(500).json({success: false});
+      }
+    },
+);
+
 exports.updateSauveteurLiveState = onRequest(
     {
+      secrets: ["GMAIL_APP_PASSWORD"],
       cpu: 1,
       memory: "256MiB",
     },
@@ -5219,11 +6402,20 @@ exports.updateSauveteurLiveState = onRequest(
           return;
         }
 
+        let automaticNotificationMainCourante = null;
+
         if (sanitizedChanges.notificationPublique !== undefined) {
           const notification = sanitizedChanges.notificationPublique || {};
           const message = (notification.message || "")
               .toString()
               .trim();
+          const notificationSource = (notification.source || "")
+              .toString()
+              .trim();
+          const mainCouranteDescription =
+              (notification.mainCouranteDescription || "")
+                  .toString()
+                  .trim();
 
           if (!message) {
             delete sanitizedChanges.notificationPublique;
@@ -5239,6 +6431,14 @@ exports.updateSauveteurLiveState = onRequest(
                 role: context.userRole,
               },
             };
+
+            if (notificationSource === "recherche_personne" &&
+                mainCouranteDescription) {
+              automaticNotificationMainCourante = {
+                description: mainCouranteDescription.substring(0, 6000),
+                publicMessage: message.substring(0, 1500),
+              };
+            }
           }
         }
 
@@ -5258,6 +6458,9 @@ exports.updateSauveteurLiveState = onRequest(
         const auditReference = db.collection("sauveteurOperationalAudit").doc();
 
         const flagJournalLines = [];
+        let flagWasLowered = false;
+        let flagWasRaised = false;
+        let loweredFlagColor = "";
         const nextLiveFlag = sanitizedChanges.liveFlag;
 
         if (nextLiveFlag &&
@@ -5307,11 +6510,67 @@ exports.updateSauveteurLiveState = onRequest(
                 `Position du drapeau : ${oldPosition} → ${newPosition}`,
             );
           }
+
+          flagWasLowered =
+            oldPosition !== "Affalé" && newPosition === "Affalé";
+          flagWasRaised =
+            oldPosition === "Affalé" && newPosition === "Hissé";
+          if (flagWasLowered) loweredFlagColor = newColor;
+        }
+
+        let operationalAlertUpdate = null;
+        let operationalAlertMessage = "";
+
+        if (flagWasLowered || flagWasRaised) {
+          let spotLabel = spotId;
+          try {
+            const territorySpotSnapshot = await db
+                .collection("territoires")
+                .doc(context.territoireId)
+                .collection("spots")
+                .doc(spotId)
+                .get();
+            const territorySpot = territorySpotSnapshot.data() || {};
+            spotLabel = (
+              territorySpot.nomSecours ||
+              territorySpot.nomSphot ||
+              territorySpot.idSphot ||
+              spotId
+            ).toString().trim();
+          } catch (_) {
+            // Le numéro technique du poste reste exploitable en secours.
+          }
+
+          if (flagWasLowered) {
+            const loweringTime = formatFrenchOperationalTime(new Date());
+            operationalAlertMessage =
+              `Drapeau du poste de secours ${spotLabel} affalé à ` +
+              `${loweringTime}.`;
+            operationalAlertUpdate = {
+              type: "flag_lowered",
+              active: true,
+              message: operationalAlertMessage,
+              flagColor: loweredFlagColor,
+              triggeredAt: admin.firestore.FieldValue.serverTimestamp(),
+              endedAt: null,
+              source: "automatic_flag_event",
+            };
+          } else if (flagWasRaised) {
+            operationalAlertUpdate = {
+              type: "flag_lowered",
+              active: false,
+              message: `Drapeau du poste de secours ${spotLabel} hissé`,
+              endedAt: admin.firestore.FieldValue.serverTimestamp(),
+              source: "automatic_flag_event",
+            };
+          }
         }
 
         const batch = db.batch();
         batch.set(spotReference, {
           ...sanitizedChanges,
+          ...(operationalAlertUpdate ?
+            {operationalAlert: operationalAlertUpdate} : {}),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBySauveteurId: context.sauveteurId,
         }, {merge: true});
@@ -5351,7 +6610,49 @@ exports.updateSauveteurLiveState = onRequest(
           });
         }
 
+        if (automaticNotificationMainCourante) {
+          const mainCouranteReference = db
+              .collection("territoires")
+              .doc(context.territoireId)
+              .collection("spots")
+              .doc(spotId)
+              .collection("mainCourante")
+              .doc();
+
+          batch.set(mainCouranteReference, {
+            type: "Personne recherchée",
+            description: automaticNotificationMainCourante.description,
+            actionTaken:
+              "Notification publique publiée automatiquement depuis " +
+              "RECHERCHE DE PERSONNE",
+            visibility: "operational",
+            occurredAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdBy: {
+              sauveteurId: context.sauveteurId,
+              login: session.login,
+              role: context.userRole,
+            },
+            source: "automatic_person_search_publication",
+            publicNotificationMessage:
+              automaticNotificationMainCourante.publicMessage,
+            immutableOriginal: true,
+          });
+        }
+
         await batch.commit();
+
+        if (flagWasLowered) {
+          await sendInstitutionalOperationalNotification({
+            territoireId: context.territoireId,
+            spotId,
+            eventType: "flagLowered",
+            title: "Drapeau affalé",
+            description: operationalAlertMessage ||
+              "Drapeau du poste de secours affalé",
+            sphotMode: context.sphotMode,
+          });
+        }
 
         response.status(200).json({success: true});
       } catch (error) {
@@ -5467,8 +6768,72 @@ exports.getSauveteurMainCourante = onRequest(
     },
 );
 
+function sanitizeMainCourantePresencePersonnel(rawPersonnel) {
+  if (!Array.isArray(rawPersonnel)) return [];
+
+  const clean = (value, maxLength = 160) =>
+    (value || "").toString().trim().slice(0, maxLength);
+
+  return rawPersonnel
+      .map((raw) => {
+        const source = raw &&
+            typeof raw === "object" &&
+            !Array.isArray(raw) ?
+          raw :
+          {};
+
+        return {
+          name: clean(source.name, 140),
+          quality: clean(source.quality, 140),
+          hours: clean(source.hours, 180),
+        };
+      })
+      .filter((person) => person.name && person.hours);
+}
+
+/**
+ * Nettoie les catégories terrain d'une intervention.
+ * @param {Array<*>} rawZones Catégories reçues du client.
+ * @return {Array<string>} Catégories reconnues et dédupliquées.
+ */
+function sanitizeMainCouranteInterventionZones(rawZones) {
+  const allowed = new Set([
+    "Zone de bain surveillée",
+    "Hors zone de bain surveillée",
+    "Zone réglementée",
+    "Hors zone réglementée",
+  ]);
+
+  if (!Array.isArray(rawZones)) return [];
+
+  return [...new Set(
+      rawZones
+          .map((value) => (value || "").toString().trim())
+          .filter((value) => allowed.has(value)),
+  )];
+}
+
+/**
+ * Vérifie que l'intervention est qualifiée sur les deux axes terrain.
+ * @param {Array<string>} zones Catégories d'intervention normalisées.
+ * @return {boolean} Vrai si un choix cohérent existe pour chaque axe.
+ */
+function hasCompleteMainCouranteInterventionZones(zones) {
+  const bathingCount = [
+    "Zone de bain surveillée",
+    "Hors zone de bain surveillée",
+  ].filter((value) => zones.includes(value)).length;
+  const regulationCount = [
+    "Zone réglementée",
+    "Hors zone réglementée",
+  ].filter((value) => zones.includes(value)).length;
+
+  return bathingCount === 1 && regulationCount === 1;
+}
+
 exports.addSauveteurMainCouranteEntry = onRequest(
     {
+      secrets: ["GMAIL_APP_PASSWORD"],
       cpu: 1,
       memory: "256MiB",
     },
@@ -5539,6 +6904,11 @@ exports.addSauveteurMainCouranteEntry = onRequest(
           "restricted" :
           "operational";
 
+        const entryType =
+          (request.body.type || "Observation").toString().trim() ||
+          "Observation";
+        const normalizedType = entryType.toLowerCase();
+
         const entryReference = admin.firestore()
             .collection("territoires")
             .doc(context.territoireId)
@@ -5548,7 +6918,7 @@ exports.addSauveteurMainCouranteEntry = onRequest(
             .doc();
 
         await entryReference.set({
-          type: (request.body.type || "Observation").toString(),
+          type: entryType,
           description,
           actionTaken: (request.body.actionTaken || "").toString().trim(),
           visibility,
@@ -5561,6 +6931,17 @@ exports.addSauveteurMainCouranteEntry = onRequest(
           },
           immutableOriginal: true,
         });
+
+        if (normalizedType === "intervention") {
+          await sendInstitutionalOperationalNotification({
+            territoireId: context.territoireId,
+            spotId,
+            eventType: "intervention",
+            title: "Intervention",
+            description,
+            sphotMode: context.sphotMode,
+          });
+        }
 
         response.status(200).json({
           success: true,
@@ -6767,16 +8148,35 @@ L'équipe SPHOT`,
             {merge: true},
         );
 
+        const refreshedAccountSnapshot = await accountDoc.ref.get();
+        const refreshedAccountData = refreshedAccountSnapshot.data() || data;
+        let mainCouranteToken = "";
+
+        try {
+          mainCouranteToken = await createAdminMainCouranteSession(
+              accountDoc.ref,
+              refreshedAccountData,
+          );
+        } catch (mainCouranteError) {
+          console.error(
+              "Erreur création session MAIN COURANTE administrateur:",
+              mainCouranteError,
+          );
+        }
+
         response.status(200).json({
           success: true,
           adminId: accountDoc.id,
-          adminUid: (data.adminUid || "").toString(),
-          territoireId: (data.territoireId || "").toString(),
-          userRole: (data.role || "ADMIN").toString(),
-          mustChangePassword: data.mustChangePassword === true,
-          civilite: (data.civilite || "").toString(),
-          prenom: (data.prenom || "").toString(),
-          nom: (data.nom || "").toString(),
+          adminUid: (refreshedAccountData.adminUid || "").toString(),
+          territoireId:
+            (refreshedAccountData.territoireId || "").toString(),
+          userRole: (refreshedAccountData.role || "ADMIN").toString(),
+          mustChangePassword:
+            refreshedAccountData.mustChangePassword === true,
+          civilite: (refreshedAccountData.civilite || "").toString(),
+          prenom: (refreshedAccountData.prenom || "").toString(),
+          nom: (refreshedAccountData.nom || "").toString(),
+          mainCouranteToken,
         });
       } catch (error) {
         console.error("Erreur login admin:", error);

@@ -1,0 +1,1401 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+import '../../../pages/sauveteur/widgets/sauveteur_styled_dropdown.dart';
+import '../services/operational_alert_sound.dart';
+
+class InstitutionalMainCourantePage extends StatefulWidget {
+  const InstitutionalMainCourantePage({
+    super.key,
+    required this.token,
+    this.embedded = false,
+    this.onClose,
+  });
+
+  final String token;
+  final bool embedded;
+  final VoidCallback? onClose;
+
+  @override
+  State<InstitutionalMainCourantePage> createState() =>
+      _InstitutionalMainCourantePageState();
+}
+
+class _InstitutionalMainCourantePageState
+    extends State<InstitutionalMainCourantePage> {
+  static const _blue = Color(0xFF1E3A8A);
+  static const _red = Color(0xFFDC2626);
+  static const _purple = Color(0xFF8E24AA);
+
+  final ScrollController _dayScrollController = ScrollController();
+  Timer? _operationalStatusTimer;
+
+  bool _loading = true;
+  bool _savingPreferences = false;
+  String? _errorMessage;
+  String? _selectedSpotId;
+
+  late DateTime _selectedDay;
+
+  List<Map<String, dynamic>> _spots = [];
+  List<Map<String, dynamic>> _entries = [];
+  Map<String, dynamic> _contact = {};
+  Map<String, dynamic> _territory = {};
+  Map<String, dynamic> _operationalAlert = {};
+  String _viewerType = 'institutionnel';
+  int? _lastAlertTriggeredAt;
+  bool _soundEnabled = true;
+
+  bool _notifyFlagLowered = true;
+  bool _notifyIntervention = true;
+
+  static const _months = <String>[
+    'JANVIER',
+    'FÉVRIER',
+    'MARS',
+    'AVRIL',
+    'MAI',
+    'JUIN',
+    'JUILLET',
+    'AOÛT',
+    'SEPTEMBRE',
+    'OCTOBRE',
+    'NOVEMBRE',
+    'DÉCEMBRE',
+  ];
+
+  DateTime get _today {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  bool get _selectedMonthIsCurrentMonth {
+    final today = _today;
+    return _selectedDay.year == today.year &&
+        _selectedDay.month == today.month;
+  }
+
+  Future<void> _changeMonth(int delta) async {
+    final today = _today;
+    final currentMonth = DateTime(today.year, today.month);
+    final targetMonth = DateTime(
+      _selectedDay.year,
+      _selectedDay.month + delta,
+    );
+
+    if (targetMonth.isAfter(currentMonth)) return;
+
+    final daysInTargetMonth = DateTime(
+      targetMonth.year,
+      targetMonth.month + 1,
+      0,
+    ).day;
+
+    var targetDay = _selectedDay.day;
+    if (targetDay > daysInTargetMonth) {
+      targetDay = daysInTargetMonth;
+    }
+
+    if (targetMonth.year == today.year &&
+        targetMonth.month == today.month &&
+        targetDay > today.day) {
+      targetDay = today.day;
+    }
+
+    setState(() {
+      _selectedDay = DateTime(
+        targetMonth.year,
+        targetMonth.month,
+        targetDay,
+      );
+    });
+
+    _scrollSelectedDayIntoView();
+    await _load();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDay = _today;
+    _load();
+    _operationalStatusTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _refreshOperationalStatus(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _operationalStatusTimer?.cancel();
+    _dayScrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    if (widget.token.trim().isEmpty) {
+      setState(() {
+        _loading = false;
+        _errorMessage = 'Lien institutionnel incomplet ou expiré.';
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+          'getInstitutionalMainCourante',
+        ),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'token': widget.token,
+          'spotId': _selectedSpotId,
+          'dayStartMillis': DateTime(
+            _selectedDay.year,
+            _selectedDay.month,
+            _selectedDay.day,
+          ).millisecondsSinceEpoch,
+          'dayEndMillis': DateTime(
+            _selectedDay.year,
+            _selectedDay.month,
+            _selectedDay.day + 1,
+          ).millisecondsSinceEpoch,
+        }),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        setState(() {
+          _loading = false;
+          _errorMessage =
+              'Cet accès institutionnel n’est plus disponible.';
+        });
+        return;
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
+        setState(() {
+          _loading = false;
+          _errorMessage =
+              'Impossible de charger la MAIN COURANTE institutionnelle.';
+        });
+        return;
+      }
+
+      final spots = decoded['spots'] is List
+          ? (decoded['spots'] as List)
+              .whereType<Map>()
+              .map((value) => Map<String, dynamic>.from(value))
+              .toList()
+          : <Map<String, dynamic>>[];
+      final entries = decoded['entries'] is List
+          ? (decoded['entries'] as List)
+              .whereType<Map>()
+              .map((value) => Map<String, dynamic>.from(value))
+              .toList()
+          : <Map<String, dynamic>>[];
+      final preferences = decoded['notificationPreferences'] is Map
+          ? Map<String, dynamic>.from(
+              decoded['notificationPreferences'] as Map,
+            )
+          : <String, dynamic>{};
+      final operationalAlert = decoded['operationalAlert'] is Map
+          ? Map<String, dynamic>.from(
+              decoded['operationalAlert'] as Map,
+            )
+          : <String, dynamic>{};
+      final triggeredAt = operationalAlert['triggeredAt'] is num
+          ? (operationalAlert['triggeredAt'] as num).toInt()
+          : null;
+
+      setState(() {
+        _spots = spots;
+        _entries = entries;
+        _selectedSpotId =
+            (decoded['selectedSpotId'] ?? '').toString().trim().isEmpty
+                ? null
+                : decoded['selectedSpotId'].toString().trim();
+        _contact = decoded['contact'] is Map
+            ? Map<String, dynamic>.from(decoded['contact'] as Map)
+            : <String, dynamic>{};
+        _territory = decoded['territory'] is Map
+            ? Map<String, dynamic>.from(decoded['territory'] as Map)
+            : <String, dynamic>{};
+        _operationalAlert = operationalAlert;
+        _viewerType =
+            (decoded['viewerType'] ?? 'institutionnel').toString().toLowerCase();
+        if (_lastAlertTriggeredAt == null &&
+            operationalAlert['active'] == true &&
+            triggeredAt != null) {
+          _lastAlertTriggeredAt = triggeredAt;
+        }
+        _notifyFlagLowered = preferences['flagLowered'] != false;
+        _notifyIntervention = preferences['intervention'] != false;
+        _loading = false;
+      });
+
+      _scrollSelectedDayIntoView();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _errorMessage =
+            'Impossible de joindre le service MAIN COURANTE actuellement.';
+      });
+    }
+  }
+
+
+  Future<void> _refreshOperationalStatus() async {
+    if (!mounted || widget.token.trim().isEmpty || _selectedSpotId == null) {
+      return;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+          'getInstitutionalMainCourante',
+        ),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'token': widget.token,
+          'spotId': _selectedSpotId,
+          'statusOnly': true,
+          'allSpots': true,
+        }),
+      );
+
+      if (!mounted || response.statusCode < 200 || response.statusCode >= 300) {
+        return;
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
+        return;
+      }
+
+      final nextAlert = decoded['operationalAlert'] is Map
+          ? Map<String, dynamic>.from(
+              decoded['operationalAlert'] as Map,
+            )
+          : <String, dynamic>{};
+      final activeAlerts = decoded['activeOperationalAlerts'] is List
+          ? (decoded['activeOperationalAlerts'] as List)
+              .whereType<Map>()
+              .map((value) => Map<String, dynamic>.from(value))
+              .toList()
+          : <Map<String, dynamic>>[];
+      final alertForSound =
+          activeAlerts.isNotEmpty ? activeAlerts.first : nextAlert;
+      final triggeredAt = alertForSound['triggeredAt'] is num
+          ? (alertForSound['triggeredAt'] as num).toInt()
+          : null;
+      final isNewActiveAlert =
+          alertForSound['active'] == true &&
+          triggeredAt != null &&
+          triggeredAt != _lastAlertTriggeredAt;
+
+      if (triggeredAt != null && alertForSound['active'] == true) {
+        _lastAlertTriggeredAt = triggeredAt;
+      }
+
+      setState(() {
+        _operationalAlert = widget.embedded && activeAlerts.isNotEmpty
+            ? alertForSound
+            : nextAlert;
+      });
+
+      if (isNewActiveAlert && _soundEnabled && !widget.embedded) {
+        await playOperationalFogHorn();
+      }
+    } catch (_) {
+      // Le polling silencieux ne doit jamais interrompre la consultation.
+    }
+  }
+
+  Future<void> _savePreferences() async {
+    if (_savingPreferences) return;
+
+    setState(() => _savingPreferences = true);
+
+    try {
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+          'updateInstitutionalMainCourantePreferences',
+        ),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'token': widget.token,
+          'flagLowered': _notifyFlagLowered,
+          'intervention': _notifyIntervention,
+        }),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        setState(() {
+          _errorMessage =
+              'Les préférences n’ont pas pu être enregistrées.';
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage =
+            'Les préférences n’ont pas pu être enregistrées.';
+      });
+    } finally {
+      if (mounted) setState(() => _savingPreferences = false);
+    }
+  }
+
+  Future<void> _selectDay(DateTime day) async {
+    if (day.isAfter(_today)) return;
+
+    setState(() {
+      _selectedDay = DateTime(day.year, day.month, day.day);
+    });
+
+    _scrollSelectedDayIntoView();
+    await _load();
+  }
+
+  void _scrollSelectedDayIntoView() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_dayScrollController.hasClients) return;
+
+      final desiredOffset = ((_selectedDay.day - 3) * 48.0)
+          .clamp(
+            0.0,
+            _dayScrollController.position.maxScrollExtent,
+          )
+          .toDouble();
+
+      _dayScrollController.animateTo(
+        desiredOffset,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  String _formatDate(dynamic rawMillis) {
+    final millis = rawMillis is num ? rawMillis.toInt() : null;
+    if (millis == null) return 'Date non renseignée';
+
+    final date = DateTime.fromMillisecondsSinceEpoch(millis).toLocal();
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+
+    return '$day/$month/${date.year} — $hour:$minute';
+  }
+
+  Widget _dayTabs() {
+    final today = _today;
+    final selectedMonth = DateTime(
+      _selectedDay.year,
+      _selectedDay.month,
+    );
+    final daysInMonth = DateTime(
+      selectedMonth.year,
+      selectedMonth.month + 1,
+      0,
+    ).day;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(6, 5, 6, 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _blue, width: 1.3),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 30,
+            child: Row(
+              children: [
+              IconButton(
+                tooltip: 'Mois précédent',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 34,
+                  minHeight: 30,
+                ),
+                onPressed: () => _changeMonth(-1),
+                icon: const Icon(
+                  Icons.chevron_left_rounded,
+                  color: _blue,
+                  size: 24,
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  '${_months[selectedMonth.month - 1]} '
+                  '${selectedMonth.year}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: _blue,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Mois suivant',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 34,
+                  minHeight: 30,
+                ),
+                onPressed: _selectedMonthIsCurrentMonth
+                    ? null
+                    : () => _changeMonth(1),
+                icon: Icon(
+                  Icons.chevron_right_rounded,
+                  color: _selectedMonthIsCurrentMonth
+                      ? Colors.black26
+                      : _blue,
+                  size: 24,
+                ),
+              ),
+            ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 34,
+            child: ListView.builder(
+              controller: _dayScrollController,
+              scrollDirection: Axis.horizontal,
+              itemCount: daysInMonth,
+              itemBuilder: (context, index) {
+                final date = DateTime(
+                  selectedMonth.year,
+                  selectedMonth.month,
+                  index + 1,
+                );
+                final selected =
+                    _selectedDay.year == date.year &&
+                    _selectedDay.month == date.month &&
+                    _selectedDay.day == date.day;
+                final future = date.isAfter(today);
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 5),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: future ? null : () => _selectDay(date),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      width: 34,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? _purple
+                            : future
+                                ? Colors.black.withOpacity(0.04)
+                                : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: selected
+                              ? _purple
+                              : _blue.withOpacity(0.35),
+                        ),
+                      ),
+                      child: Text(
+                        '${index + 1}',
+                        style: TextStyle(
+                          color: selected
+                              ? Colors.white
+                              : future
+                                  ? Colors.black26
+                                  : _blue,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _isPresenceEntry(Map<String, dynamic> entry) {
+    final type = (entry['type'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    return type == 'présence' || type == 'presence';
+  }
+
+  bool _isMaterialVerificationEntry(
+    Map<String, dynamic> entry,
+  ) {
+    final type = (entry['type'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    return type == 'vérification matériel' ||
+        type == 'verification materiel' ||
+        type == 'vérifications' ||
+        type == 'verifications';
+  }
+
+  int _entryOccurredAtMillis(Map<String, dynamic> entry) {
+    final raw = entry['occurredAt'];
+    if (raw is num) return raw.toInt();
+    return int.tryParse((raw ?? '').toString()) ?? 0;
+  }
+
+  String _materialVerificationCategory(
+    Map<String, dynamic> entry,
+  ) {
+    final description =
+        (entry['description'] ?? '').toString().toLowerCase();
+
+    if (description.contains('catégorie : secours') ||
+        description.contains('categorie : secours') ||
+        description.contains('catégorie : oxy') ||
+        description.contains('categorie : oxy') ||
+        description.contains('dsa') ||
+        description.contains('bouteille principale')) {
+      return 'SECOURS';
+    }
+
+    if (description.contains('catégorie : phonie') ||
+        description.contains('categorie : phonie') ||
+        description.contains('communication') ||
+        description.contains('vhf')) {
+      return 'PHONIE';
+    }
+
+    if (description.contains('catégorie : matériel roulant') ||
+        description.contains('categorie : materiel roulant') ||
+        description.contains('véhicules / quads') ||
+        description.contains('vehicules / quads')) {
+      return 'MATÉRIEL ROULANT';
+    }
+
+    if (description.contains('catégorie : matériel flottant') ||
+        description.contains('categorie : materiel flottant') ||
+        description.contains('embarcations / jets') ||
+        description.contains('rescue tubes')) {
+      return 'MATÉRIEL FLOTTANT';
+    }
+
+    return 'VÉRIFICATION';
+  }
+
+  String _materialVerificationBody(
+    Map<String, dynamic> entry,
+  ) {
+    final description = (entry['description'] ?? '').toString();
+    final lines = description.split(RegExp(r'\r?\n')).toList();
+
+    if (lines.isNotEmpty) {
+      final first = lines.first.trim().toLowerCase();
+      if (first.startsWith('catégorie :') ||
+          first.startsWith('categorie :')) {
+        lines.removeAt(0);
+      }
+    }
+
+    return lines.join('\n').replaceAll(' • ', '\n').trim();
+  }
+
+  String _verificationTime(Map<String, dynamic> entry) {
+    final millis = _entryOccurredAtMillis(entry);
+    if (millis <= 0) return '--:--';
+
+    final date = DateTime.fromMillisecondsSinceEpoch(millis).toLocal();
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  List<List<Map<String, dynamic>>> _materialVerificationGroups() {
+    final entries = _entries
+        .where(_isMaterialVerificationEntry)
+        .toList()
+      ..sort(
+        (a, b) => _entryOccurredAtMillis(a).compareTo(
+          _entryOccurredAtMillis(b),
+        ),
+      );
+
+    final categoryOccurrences = <String, int>{};
+    final groups = <List<Map<String, dynamic>>>[];
+
+    for (final entry in entries) {
+      final category = _materialVerificationCategory(entry);
+      final occurrence = categoryOccurrences[category] ?? 0;
+      categoryOccurrences[category] = occurrence + 1;
+
+      while (groups.length <= occurrence) {
+        groups.add(<Map<String, dynamic>>[]);
+      }
+
+      groups[occurrence].add(entry);
+    }
+
+    for (final group in groups) {
+      group.sort(
+        (a, b) => _entryOccurredAtMillis(a).compareTo(
+          _entryOccurredAtMillis(b),
+        ),
+      );
+    }
+
+    return groups;
+  }
+
+  List<Map<String, dynamic>> _chronologicalNonVerificationEntries() {
+    final entries = _entries
+        .where((entry) => !_isMaterialVerificationEntry(entry))
+        .toList()
+      ..sort(
+        (a, b) => _entryOccurredAtMillis(a).compareTo(
+          _entryOccurredAtMillis(b),
+        ),
+      );
+    return entries;
+  }
+
+  Widget _verificationGroupCard(
+    List<Map<String, dynamic>> group,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _purple.withOpacity(0.42),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'VÉRIFICATIONS',
+            style: TextStyle(
+              color: _purple,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 9),
+          ...group.map((entry) {
+            final category = _materialVerificationCategory(entry);
+            final body = _materialVerificationBody(entry);
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 11),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _blue.withOpacity(0.22),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            category,
+                            style: const TextStyle(
+                              color: _blue,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          _verificationTime(entry),
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (body.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        body,
+                        style: const TextStyle(
+                          fontSize: 11.2,
+                          fontWeight: FontWeight.w700,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _factWidgets() {
+    final verificationGroups = _materialVerificationGroups();
+    final otherEntries = _chronologicalNonVerificationEntries();
+    final presenceEntries = otherEntries
+        .where(_isPresenceEntry)
+        .toList();
+    final chronologicalEntries = otherEntries
+        .where((entry) => !_isPresenceEntry(entry))
+        .toList();
+
+    return <Widget>[
+      ...presenceEntries.map(_entryCard),
+      ...verificationGroups.map(_verificationGroupCard),
+      ...chronologicalEntries.map(_entryCard),
+    ];
+  }
+
+  Widget _entryCard(Map<String, dynamic> entry) {
+    final source = (entry['source'] ?? '').toString();
+    final automatic = source.startsWith('automatic_');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  (entry['type'] ?? 'Observation')
+                      .toString()
+                      .toUpperCase(),
+                  style: const TextStyle(
+                    color: _purple,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              if (automatic)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    'AUTOMATIQUE',
+                    style: TextStyle(
+                      color: Color(0xFFB45309),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            _formatDate(entry['occurredAt']),
+            style: const TextStyle(
+              color: Colors.black54,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 9),
+          Text(
+            (entry['description'] ?? '').toString(),
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              height: 1.3,
+            ),
+          ),
+          if (entry['interventionZones'] is List &&
+              (entry['interventionZones'] as List).isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: (entry['interventionZones'] as List)
+                  .map(
+                    (value) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: _blue.withOpacity(0.30),
+                        ),
+                      ),
+                      child: Text(
+                        value.toString(),
+                        style: const TextStyle(
+                          color: _blue,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+          if ((entry['actionTaken'] ?? '').toString().trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Suite donnée : ${(entry['actionTaken'] ?? '').toString()}',
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+
+  Widget _operationalAlertBanner() {
+    if (_operationalAlert['active'] != true) {
+      return const SizedBox.shrink();
+    }
+
+    final message = (_operationalAlert['message'] ?? '')
+        .toString()
+        .trim();
+    final triggeredAt = _operationalAlert['triggeredAt'];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _red, width: 1.8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.crisis_alert_rounded, color: _red, size: 22),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'ÉVÉNEMENT OPÉRATIONNEL EN COURS',
+                  style: TextStyle(
+                    color: _red,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Text(
+            message.isEmpty ? 'Drapeau du poste de secours affalé' : message,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontWeight: FontWeight.w900,
+              fontSize: 13,
+            ),
+          ),
+          if (triggeredAt is num) ...[
+            const SizedBox(height: 3),
+            Text(
+              'Déclenché le ${_formatDate(triggeredAt)}',
+              style: const TextStyle(
+                color: Colors.black54,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          const SizedBox(height: 7),
+          const Text(
+            'Les informations complémentaires seront renseignées dans la '
+            'MAIN COURANTE dès que la situation opérationnelle le permettra.',
+            style: TextStyle(
+              color: Colors.black54,
+              fontSize: 10.5,
+              height: 1.3,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _preferencesCard() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.93),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _blue.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.notifications_active_outlined, color: _blue),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'MES NOTIFICATIONS',
+                  style: TextStyle(
+                    color: _blue,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Text(
+                'LECTURE SEULE',
+                style: TextStyle(
+                  color: Colors.black45,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          SwitchListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Affalage du drapeau'),
+            value: _notifyFlagLowered,
+            onChanged: (value) {
+              setState(() => _notifyFlagLowered = value);
+              _savePreferences();
+            },
+          ),
+          if (!widget.embedded)
+            SwitchListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Corne de brume sur cette page'),
+              subtitle: const Text(
+                'Le navigateur doit autoriser la lecture du son.',
+                style: TextStyle(fontSize: 10.5),
+              ),
+              value: _soundEnabled,
+              onChanged: (value) async {
+                setState(() => _soundEnabled = value);
+                if (value) {
+                  await playOperationalFogHorn();
+                }
+              },
+            ),
+          SwitchListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Intervention'),
+            value: _notifyIntervention,
+            onChanged: (value) {
+              setState(() => _notifyIntervention = value);
+              _savePreferences();
+            },
+          ),
+          if (_savingPreferences)
+            const LinearProgressIndicator(minHeight: 2),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildEmbeddedPanel() {
+    final alertActive = _operationalAlert['active'] == true;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: 500,
+      decoration: BoxDecoration(
+        color: alertActive
+            ? const Color(0xFFFFECEF)
+            : Colors.white.withOpacity(0.98),
+        border: Border(
+          left: BorderSide(
+            color: alertActive ? _red : _blue.withOpacity(0.45),
+            width: alertActive ? 2 : 1.5,
+          ),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 14, 12, 12),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.menu_book_rounded,
+                      color: _red,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'MAIN COURANTE',
+                        style: TextStyle(
+                          color: _blue,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Actualiser',
+                      onPressed: _loading ? null : _load,
+                      icon: const Icon(
+                        Icons.refresh_rounded,
+                        color: _blue,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Fermer',
+                      onPressed: widget.onClose,
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: _blue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(
+                height: 1,
+                color: alertActive
+                    ? _red.withOpacity(0.35)
+                    : _blue.withOpacity(0.18),
+              ),
+              if (_loading)
+                const Expanded(
+                  child: Center(
+                    child: CircularProgressIndicator(color: _blue),
+                  ),
+                )
+              else if (_errorMessage != null && _spots.isEmpty)
+                Expanded(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: _red,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _operationalAlertBanner(),
+                      if (alertActive) const SizedBox(height: 10),
+                      if (_spots.isNotEmpty)
+                        SauveteurStyledDropdown(
+                          labelText: 'Poste de secours',
+                          value: _selectedSpotId,
+                          options: _spots
+                              .map(
+                                (spot) => SauveteurDropdownOption(
+                                  value: (spot['id'] ?? '').toString(),
+                                  label: (spot['label'] ?? '').toString(),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) async {
+                            setState(() => _selectedSpotId = value);
+                            await _load();
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: alertActive
+                            ? Colors.white.withOpacity(0.72)
+                            : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: alertActive
+                              ? _red.withOpacity(0.32)
+                              : _blue.withOpacity(0.22),
+                        ),
+                      ),
+                      child: ListView(
+                        children: [
+                          if (_errorMessage != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                _errorMessage!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: _red,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          _preferencesCard(),
+                          const SizedBox(height: 10),
+                          if (_entries.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.all(20),
+                              child: Text(
+                                'Aucun fait enregistré pour cette journée.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            )
+                          else
+                            ..._factWidgets(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 94,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: _dayTabs(),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.embedded) {
+      return _buildEmbeddedPanel();
+    }
+
+    final identity = [
+      (_contact['civilite'] ?? '').toString().trim(),
+      (_contact['prenom'] ?? '').toString().trim(),
+      (_contact['nom'] ?? '').toString().trim(),
+    ].where((value) => value.isNotEmpty).join(' ');
+
+    return Scaffold(
+      backgroundColor: _operationalAlert['active'] == true
+          ? const Color(0xFFFFECEF)
+          : const Color(0xFFF3F6FB),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 98,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+            child: _dayTabs(),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage != null && _spots.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: _red,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Column(
+                      children: [
+                        Image.asset(
+                          'data/icons/title.png',
+                          height: 52,
+                          fit: BoxFit.contain,
+                        ),
+                        Text(
+                          _viewerType == 'admin'
+                              ? 'MAIN COURANTE — ACCÈS ADMIN'
+                              : 'MAIN COURANTE — ACCÈS INSTITUTIONNEL',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: _red,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        if (identity.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            identity,
+                            style: const TextStyle(
+                              color: _blue,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                        if ((_territory['organisation'] ?? '')
+                            .toString()
+                            .trim()
+                            .isNotEmpty)
+                          Text(
+                            (_territory['organisation'] ?? '').toString(),
+                            style: const TextStyle(
+                              color: Colors.black54,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        const SizedBox(height: 10),
+                        _operationalAlertBanner(),
+                        if (_operationalAlert['active'] == true)
+                          const SizedBox(height: 10),
+                        _preferencesCard(),
+                        const SizedBox(height: 10),
+                        if (_spots.isNotEmpty)
+                          SauveteurStyledDropdown(
+                            labelText: 'Poste de secours',
+                            value: _selectedSpotId,
+                            options: _spots
+                                .map(
+                                  (spot) => SauveteurDropdownOption(
+                                    value: (spot['id'] ?? '').toString(),
+                                    label: (spot['label'] ?? '').toString(),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) async {
+                              setState(() => _selectedSpotId = value);
+                              await _load();
+                            },
+                          ),
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.55),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: _blue, width: 1.5),
+                            ),
+                            child: ListView(
+                              children: [
+                                if (_errorMessage != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: Text(
+                                      _errorMessage!,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: _red,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                if (_entries.isEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.all(20),
+                                    child: Text(
+                                      'Aucun fait enregistré pour cette journée.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  ..._factWidgets(),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+      ),
+    );
+  }
+}

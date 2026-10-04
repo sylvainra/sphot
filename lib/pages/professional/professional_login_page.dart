@@ -197,6 +197,8 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
       final userRole = (decoded['userRole'] ?? 'ADMIN').toString();
       final prenom = (decoded['prenom'] ?? '').toString();
       final nom = (decoded['nom'] ?? '').toString();
+      final mainCouranteToken =
+          (decoded['mainCouranteToken'] ?? '').toString();
 
       if (!mounted) return;
 
@@ -241,6 +243,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
                   civilite: (decoded['civilite'] ?? '').toString(),
                   prenom: prenom,
                   nom: nom,
+                  mainCouranteToken: mainCouranteToken,
                 ),
               ),
             );
@@ -308,6 +311,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
               civilite: civilite,
               prenom: prenom,
               nom: nom,
+              mainCouranteToken: mainCouranteToken,
             ),
           ),
         );
@@ -319,6 +323,7 @@ class _ProfessionalLoginPageState extends State<ProfessionalLoginPage>
           builder: (_) => AdminDashboardPage(
             adminUid: adminUid,
             territoireId: territoireId,
+            mainCouranteToken: mainCouranteToken,
           ),
         ),
         (route) => false,

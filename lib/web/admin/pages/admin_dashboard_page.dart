@@ -5,6 +5,7 @@ import '../../../models/advertising_pricing_config.dart';
 import '../../../services/admin_logo_storage_service.dart';
 import '../../../services/sphot_media_storage_service.dart';
 import '../../../widgets/adaptive_asset_image.dart';
+import '../../../pages/sauveteur/widgets/sauveteur_styled_dropdown.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
@@ -19,6 +20,8 @@ import 'package:flutter/services.dart';
 import 'sphot_admin_summary_page.dart';
 import 'admin_subscription_panel.dart';
 import 'admin_statistics_panel.dart';
+import '../../institutional/pages/institutional_main_courante_page.dart';
+import '../../institutional/services/operational_alert_sound.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -68,11 +71,13 @@ class _SuperAdminTileStyle {
 class AdminDashboardPage extends StatefulWidget {
   final String adminUid;
   final String territoireId;
+  final String mainCouranteToken;
 
   const AdminDashboardPage({
     super.key,
     this.adminUid = '',
     this.territoireId = '',
+    this.mainCouranteToken = '',
   });
 
   @override
@@ -93,7 +98,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final MapController _mapController = MapController();
   Timer? _mapMovementTimer;
   Timer? _trialEndRefreshTimer;
+  Timer? _operationalAlertTimer;
   DateTime? _scheduledTrialEndDate;
+  int? _lastOperationalAlertAt;
   OverlayEntry? _sphotHoverOverlayEntry;
   Timer? _sphotHoverExitTimer;
 
@@ -110,6 +117,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _showSubscriptionPanel = false;
   bool _showBillingDocumentsPanel = false;
   bool _showStatisticsPanel = false;
+  bool _showMainCourantePanel = false;
+  bool _operationalAlertActive = false;
+  String _operationalAlertMessage = '';
   bool _trialSummaryDialogOpen = false;
   Future<Map<String, dynamic>>? _trialSummaryPanelFuture;
   bool _placingSphotOnMap = false;
@@ -1333,7 +1343,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: _sphotHoverColor,
-                      fontSize: 13,
+                      fontSize: 11,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -1846,51 +1856,38 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Future<void> _persistInstitutionalContacts(
     List<Map<String, dynamic>> contacts,
   ) async {
-    final territoireId = _resolvedTerritoireId.trim();
-    final uid = widget.adminUid.trim();
+    final token = widget.mainCouranteToken.trim();
 
-    if (territoireId.isEmpty) {
-      throw StateError('Territoire introuvable.');
+    if (token.isEmpty) {
+      throw StateError(
+        'Session administrateur expirée. Reconnectez-vous à SPHOT ADMIN.',
+      );
     }
 
-    final firestore = FirebaseFirestore.instance;
-    final now = FieldValue.serverTimestamp();
-
-    await firestore.collection('territoires').doc(territoireId).set(
-      {
-        'institutionnels': contacts,
-        'updatedAt': now,
-      },
-      SetOptions(merge: true),
+    final response = await http.post(
+      Uri.parse(
+        'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+        'saveAdminInstitutionalContacts',
+      ),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'mainCouranteToken': token,
+        'contacts': contacts,
+      }),
     );
 
-    if (uid.isNotEmpty) {
-      final requestReferences = await _adminRequestReferencesForUid(uid);
+    final decoded = response.body.trim().isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body);
 
-      for (final reference in requestReferences) {
-        await reference.set(
-          {
-            'institutionnels': contacts,
-            'territoire.institutionnels': contacts,
-            'updatedAt': now,
-          },
-          SetOptions(merge: true),
-        );
-      }
-
-      final adminReference = firestore.collection('admins').doc(uid);
-      final adminSnapshot = await adminReference.get();
-
-      if (adminSnapshot.exists) {
-        await adminReference.set(
-          {
-            'institutionnels': contacts,
-            'territoire.institutionnels': contacts,
-            'updatedAt': now,
-          },
-          SetOptions(merge: true),
-        );
-      }
+    if (response.statusCode < 200 ||
+        response.statusCode >= 300 ||
+        decoded is! Map<String, dynamic> ||
+        decoded['success'] != true) {
+      final error = decoded is Map<String, dynamic>
+          ? (decoded['error'] ?? 'save_failed').toString()
+          : 'save_failed';
+      throw StateError(error);
     }
 
     if (!mounted) return;
@@ -1951,6 +1948,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final emailController = TextEditingController(
       text: _cleanText(existing['email']),
     );
+    final rawPreferences = existing['notificationPreferences'] is Map
+        ? Map<String, dynamic>.from(
+            existing['notificationPreferences'] as Map,
+          )
+        : <String, dynamic>{};
+    bool notifyFlagLowered = rawPreferences['flagLowered'] != false;
+    bool notifyInterventions = rawPreferences['intervention'] != false;
+    String? validationMessage;
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -1973,23 +1978,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      DropdownButtonFormField<String>(
+                      SauveteurStyledDropdown(
+                        labelText: 'Civilité',
                         value: civilite,
-                        decoration: const InputDecoration(
-                          labelText: 'Civilité',
-                        ),
-                        items: const [
-                          DropdownMenuItem(
+                        options: const [
+                          SauveteurDropdownOption(
                             value: 'Monsieur',
-                            child: Text('Monsieur'),
+                            label: 'Monsieur',
                           ),
-                          DropdownMenuItem(
+                          SauveteurDropdownOption(
                             value: 'Madame',
-                            child: Text('Madame'),
+                            label: 'Madame',
                           ),
                         ],
                         onChanged: (value) {
-                          if (value == null) return;
                           setDialogState(() => civilite = value);
                         },
                       ),
@@ -1997,18 +1999,27 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       TextField(
                         controller: nomController,
                         textCapitalization: TextCapitalization.characters,
+                        inputFormatters: const [
+                          UpperCaseTextFormatter(),
+                        ],
                         decoration: const InputDecoration(labelText: 'Nom'),
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: prenomController,
-                        textCapitalization: TextCapitalization.words,
+                        textCapitalization: TextCapitalization.sentences,
+                        inputFormatters: const [
+                          FirstLetterUpperCaseTextFormatter(),
+                        ],
                         decoration: const InputDecoration(labelText: 'Prénom'),
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: fonctionController,
-                        textCapitalization: TextCapitalization.words,
+                        textCapitalization: TextCapitalization.sentences,
+                        inputFormatters: const [
+                          FirstLetterUpperCaseTextFormatter(),
+                        ],
                         decoration: const InputDecoration(labelText: 'Fonction'),
                       ),
                       const SizedBox(height: 10),
@@ -2031,11 +2042,76 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           labelText: 'Email de contact',
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: adminColor.withOpacity(0.045),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: adminColor.withOpacity(0.22),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'ACCÈS & NOTIFICATIONS MAIN COURANTE',
+                              style: TextStyle(
+                                color: adminColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Le contact disposera d’un accès personnel en lecture seule. '
+                              'Il pourra ensuite modifier lui-même ces préférences.',
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 11,
+                                height: 1.25,
+                              ),
+                            ),
+                            SwitchListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Alerte lors de l’affalage du drapeau'),
+                              value: notifyFlagLowered,
+                              onChanged: (value) {
+                                setDialogState(() => notifyFlagLowered = value);
+                              },
+                            ),
+                            SwitchListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Alerte lors d’une intervention'),
+                              value: notifyInterventions,
+                              onChanged: (value) {
+                                setDialogState(() => notifyInterventions = value);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
               actions: [
+                if (validationMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Text(
+                      validationMessage!,
+                      style: const TextStyle(
+                        color: redColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
                 TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(),
                   child: const Text('ANNULER'),
@@ -2053,11 +2129,36 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
                     ).hasMatch(email);
 
-                    if (nom.isEmpty ||
-                        prenom.isEmpty ||
-                        fonction.isEmpty ||
-                        !phoneValid ||
-                        !emailValid) {
+                    if (nom.isEmpty) {
+                      setDialogState(() {
+                        validationMessage = 'Renseignez le nom.';
+                      });
+                      return;
+                    }
+                    if (prenom.isEmpty) {
+                      setDialogState(() {
+                        validationMessage = 'Renseignez le prénom.';
+                      });
+                      return;
+                    }
+                    if (fonction.isEmpty) {
+                      setDialogState(() {
+                        validationMessage = 'Renseignez la fonction.';
+                      });
+                      return;
+                    }
+                    if (!phoneValid) {
+                      setDialogState(() {
+                        validationMessage =
+                            'Renseignez un numéro de téléphone valide.';
+                      });
+                      return;
+                    }
+                    if (!emailValid) {
+                      setDialogState(() {
+                        validationMessage =
+                            'Renseignez une adresse email valide.';
+                      });
                       return;
                     }
 
@@ -2067,10 +2168,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           : DateTime.now().microsecondsSinceEpoch.toString(),
                       'civilite': civilite,
                       'nom': nom.toUpperCase(),
-                      'prenom': _capitalizeWords(prenom),
-                      'fonction': _capitalizeWords(fonction),
+                      'prenom': prenom,
+                      'fonction': fonction,
                       'telephone': telephone,
                       'email': email,
+                      'mainCouranteReadOnly': true,
+                      'notificationPreferences': {
+                        'flagLowered': notifyFlagLowered,
+                        'intervention': notifyInterventions,
+                      },
+                      if (_cleanText(existing['accessTokenHash']).isNotEmpty)
+                        'accessTokenHash': _cleanText(
+                          existing['accessTokenHash'],
+                        ),
                     });
                   },
                   icon: const Icon(Icons.save_outlined),
@@ -2108,7 +2218,41 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       updated.add(result);
     }
 
-    await _persistInstitutionalContacts(updated);
+    final emailChanged = index == null ||
+        _cleanText(existing['email']).toLowerCase() !=
+            _cleanText(result['email']).toLowerCase();
+
+    try {
+      await _persistInstitutionalContacts(updated);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF15803D),
+          content: Text(
+            emailChanged
+                ? 'Contact enregistré. Son accès personnel à la MAIN COURANTE '
+                    'va être envoyé automatiquement par email.'
+                : 'Contact institutionnel enregistré.',
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: redColor,
+          content: Text(
+            'Impossible d’enregistrer ce contact institutionnel. '
+            'Reconnectez-vous puis réessayez.',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _deleteInstitutionalContact({
@@ -2169,7 +2313,31 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         .map((entry) => Map<String, dynamic>.from(entry.value))
         .toList();
 
-    await _persistInstitutionalContacts(updated);
+    try {
+      await _persistInstitutionalContacts(updated);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFF15803D),
+          content: Text(
+            'Contact institutionnel supprimé.',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: redColor,
+          content: Text(
+            'Impossible de supprimer ce contact institutionnel.',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildInstitutionalContactsAdminSection(
@@ -2313,6 +2481,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 _cleanText(contact['email']),
                                 style: const TextStyle(fontSize: 11.5),
                               ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _cleanText(contact['accessTokenHash']).isNotEmpty
+                                  ? 'ACCÈS MAIN COURANTE ACTIF'
+                                  : 'ENVOI DE L’ACCÈS EN COURS',
+                              style: TextStyle(
+                                color: _cleanText(
+                                  contact['accessTokenHash'],
+                                ).isNotEmpty
+                                    ? const Color(0xFF15803D)
+                                    : const Color(0xFFF59E0B),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -3129,25 +3312,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ),
                       const SizedBox(height: 18),
 
-                      DropdownButtonFormField<String>(
-                        initialValue: civilite,
-                        decoration: const InputDecoration(
-                          labelText: 'Civilité',
-                          prefixIcon: Icon(Icons.person_outline_rounded),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
+                      SauveteurStyledDropdown(
+                        labelText: 'Civilité',
+                        value: civilite,
+                        options: const [
+                          SauveteurDropdownOption(
                             value: 'Monsieur',
-                            child: Text('Monsieur'),
+                            label: 'Monsieur',
                           ),
-                          DropdownMenuItem(
+                          SauveteurDropdownOption(
                             value: 'Madame',
-                            child: Text('Madame'),
+                            label: 'Madame',
                           ),
                         ],
                         onChanged: (value) {
-                          if (value == null) return;
-
                           setDialogState(() {
                             civilite = value;
                           });
@@ -5390,6 +5568,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _trialSummaryDialogOpen = true;
       _showTrialSummaryPanel = false;
       _showSubscriptionPanel = false;
@@ -5425,6 +5604,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _trialSummaryPanelFuture = _loadTrialSummaryData();
       _showTrialSummaryPanel = true;
       _showSubscriptionPanel = false;
@@ -5560,6 +5740,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _openSubscriptionPanel() {
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _showSubscriptionPanel = true;
       _showBillingDocumentsPanel = false;
       _showTrialSummaryPanel = false;
@@ -5579,6 +5760,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _openBillingDocumentsPanel() {
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _showBillingDocumentsPanel = true;
       _showSubscriptionPanel = false;
       _showTrialSummaryPanel = false;
@@ -5610,6 +5792,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _openStatisticsPanel() {
     setState(() {
       _showStatisticsPanel = true;
+      _showMainCourantePanel = false;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
       _showTrialSummaryPanel = false;
@@ -5629,7 +5812,45 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _closeStatisticsPanel() {
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
     });
+  }
+
+  void _openMainCourante() {
+    final token = widget.mainCouranteToken.trim();
+    if (token.isEmpty) return;
+
+    setState(() {
+      _showStatisticsPanel = false;
+      _showMainCourantePanel = true;
+      _showSubscriptionPanel = false;
+      _showBillingDocumentsPanel = false;
+      _showTrialSummaryPanel = false;
+      _trialSummaryPanelFuture = null;
+      _showSauveteursManagementPanel = false;
+      _showSurveillancePeriodsPanel = false;
+      _showSauveteurEditorPanel = false;
+      _showSphotEditorPanel = false;
+      _placingSphotOnMap = false;
+      _selectedSpot = null;
+      _selectedAdmin = null;
+      _selectedAdvertiser = null;
+      _showLegalDocumentsPanel = false;
+    });
+  }
+
+  void _closeMainCourantePanel() {
+    setState(() {
+      _showMainCourantePanel = false;
+    });
+  }
+
+  Widget _buildMainCourantePanel() {
+    return InstitutionalMainCourantePage(
+      token: widget.mainCouranteToken,
+      embedded: true,
+      onClose: _closeMainCourantePanel,
+    );
   }
 
   Widget _buildCommercialPanelHeader({
@@ -5993,8 +6214,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required bool canRequestTrial,
   }) {
     return Container(
-      width: 360,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      width: 330,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.96),
         border: Border(
@@ -6038,7 +6259,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
             Expanded(
               child: LayoutBuilder(
@@ -6153,6 +6374,25 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             isActive: _showStatisticsPanel,
                             onTap: _openStatisticsPanel,
                           ),
+                          _summaryCard(
+                            title: 'MAIN COURANTE',
+                            value: '',
+                            color: widget.mainCouranteToken.trim().isNotEmpty
+                                ? adminColor
+                                : pendingColor,
+                            iconPath: 'data/icons/fire_red_icon.svg',
+                            stepNumber: 9,
+                            titleFontSize: 16,
+                            titleLetterSpacing: 0.5,
+                            showValue: false,
+                            grayscaleIcon:
+                                widget.mainCouranteToken.trim().isEmpty,
+                            isActive: _showMainCourantePanel,
+                            alertHighlight: _operationalAlertActive,
+                            onTap: widget.mainCouranteToken.trim().isNotEmpty
+                                ? _openMainCourante
+                                : null,
+                          ),
                         ],
                       ),
                     ),
@@ -6177,36 +6417,44 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     bool showValue = true,
     bool grayscaleIcon = false,
     bool isActive = false,
+    bool alertHighlight = false,
     VoidCallback? onTap,
   }) {
-    final effectiveColor = isActive ? redColor : color;
+    final effectiveColor = isActive || alertHighlight ? redColor : color;
     final displayedStepNumberColor = grayscaleIcon
         ? pendingColor
-        : isActive
+        : isActive || alertHighlight
         ? redColor
         : color;
 
     final icon = AdaptiveAssetImage(
       iconPath,
-      width: 44,
-      height: 56,
+      width: 34,
+      height: 42,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.high,
     );
 
     final card = Container(
-      height: 72,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: isActive ? redColor.withOpacity(0.04) : Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: effectiveColor, width: isActive ? 2 : 1.6),
+        color: alertHighlight
+            ? const Color(0xFFFFDDE3)
+            : isActive
+            ? redColor.withOpacity(0.04)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: effectiveColor,
+          width: isActive || alertHighlight ? 2 : 1.5,
+        ),
       ),
       child: Row(
         children: [
           SizedBox(
-            width: 48,
-            height: 56,
+            width: 38,
+            height: 44,
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -6242,14 +6490,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     '$stepNumber',
                     style: TextStyle(
                       color: displayedStepNumberColor,
-                      fontSize: 13,
+                      fontSize: 8,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 9),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -6682,6 +6930,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
@@ -7691,6 +7940,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _openNewSphotEditor() {
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
@@ -7720,6 +7970,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
@@ -7744,6 +7995,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     setState(() {
+      _showMainCourantePanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
@@ -7951,6 +8203,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
@@ -13386,6 +13639,75 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+
+  Future<void> _pollOperationalAlerts() async {
+    final token = widget.mainCouranteToken.trim();
+    if (!mounted || token.isEmpty) return;
+
+    try {
+      final response = await http.post(
+        Uri.parse(
+          'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+          'getInstitutionalMainCourante',
+        ),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'token': token,
+          'statusOnly': true,
+          'allSpots': true,
+        }),
+      );
+
+      if (!mounted || response.statusCode < 200 || response.statusCode >= 300) {
+        return;
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
+        return;
+      }
+
+      final alerts = decoded['activeOperationalAlerts'] is List
+          ? (decoded['activeOperationalAlerts'] as List)
+              .whereType<Map>()
+              .map((value) => Map<String, dynamic>.from(value))
+              .toList()
+          : <Map<String, dynamic>>[];
+
+      final hasActiveAlert = alerts.isNotEmpty;
+      final alert = hasActiveAlert ? alerts.first : <String, dynamic>{};
+      final message = hasActiveAlert
+          ? (alert['message'] ?? 'Drapeau affalé').toString()
+          : '';
+
+      if (_operationalAlertActive != hasActiveAlert ||
+          _operationalAlertMessage != message) {
+        setState(() {
+          _operationalAlertActive = hasActiveAlert;
+          _operationalAlertMessage = message;
+        });
+      }
+
+      if (!hasActiveAlert) {
+        _lastOperationalAlertAt = null;
+        return;
+      }
+
+      final triggeredAt = alert['triggeredAt'] is num
+          ? (alert['triggeredAt'] as num).toInt()
+          : null;
+
+      if (triggeredAt == null || triggeredAt == _lastOperationalAlertAt) {
+        return;
+      }
+
+      _lastOperationalAlertAt = triggeredAt;
+      await playOperationalFogHorn();
+    } catch (_) {
+      // Une perte réseau ne doit pas interrompre le dashboard Admin.
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -13401,12 +13723,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _loadAllLegalChaptersFromFirebase();
 
     _loadAdministratorTerritoryCenter();
+
+    if (widget.mainCouranteToken.trim().isNotEmpty) {
+      Future<void>.delayed(
+        const Duration(seconds: 2),
+        _pollOperationalAlerts,
+      );
+      _operationalAlertTimer = Timer.periodic(
+        const Duration(seconds: 5),
+        (_) => _pollOperationalAlerts(),
+      );
+    }
   }
 
   @override
   void dispose() {
     _mapMovementTimer?.cancel();
     _trialEndRefreshTimer?.cancel();
+    _operationalAlertTimer?.cancel();
 
     _sphotHoverExitTimer?.cancel();
     _removeSphotHoverLabel();
@@ -14020,6 +14354,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     setState(() {
       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
       _selectedSpot = type == 'spot' ? data : null;
       _selectedAdmin = type == 'admin' ? data : null;
       _selectedAdvertiser = type == 'advertiser' ? data : null;
@@ -14076,6 +14411,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           onTap: () {
             setState(() {
               _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
               _selectedSpot = null;
               _selectedAdmin = Map<String, dynamic>.from(data);
               _selectedAdvertiser = null;
@@ -14159,6 +14495,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         onTap: () {
           setState(() {
             _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
             _selectedSpot = null;
             _selectedAdmin = null;
             _selectedAdvertiser = data;
@@ -14444,6 +14781,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
                                     setState(() {
                                       _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
                                       _selectedSpot = null;
                                       _selectedAdmin = null;
                                       _selectedAdvertiser = null;
@@ -14654,6 +14992,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             territoireId: _resolvedTerritoireId,
                             onClose: _closeStatisticsPanel,
                           )
+                        else if (_showMainCourantePanel)
+                          _buildMainCourantePanel()
                         else if (_showTrialSummaryPanel)
                           _buildTrialSummaryPanel()
                         else if (_showSauveteursManagementPanel)
@@ -14704,6 +15044,44 @@ class DashboardSpotMarker extends StatelessWidget {
       errorBuilder: (_, __, ___) {
         return Icon(Icons.place, color: typeColor, size: 34);
       },
+    );
+  }
+}
+
+class UpperCaseTextFormatter extends TextInputFormatter {
+  const UpperCaseTextFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return newValue.copyWith(
+      text: newValue.text.toUpperCase(),
+      composing: TextRange.empty,
+    );
+  }
+}
+
+class FirstLetterUpperCaseTextFormatter extends TextInputFormatter {
+  const FirstLetterUpperCaseTextFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    if (text.isEmpty) {
+      return newValue;
+    }
+
+    final formatted =
+        text[0].toUpperCase() + text.substring(1).toLowerCase();
+
+    return newValue.copyWith(
+      text: formatted,
+      composing: TextRange.empty,
     );
   }
 }

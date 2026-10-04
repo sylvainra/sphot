@@ -485,6 +485,8 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
     final civilite = (decoded['civilite'] ?? '').toString();
     final prenom = (decoded['prenom'] ?? '').toString();
     final nom = (decoded['nom'] ?? '').toString();
+    final mainCouranteToken =
+        (decoded['mainCouranteToken'] ?? '').toString();
 
     if (!mounted) return;
 
@@ -499,6 +501,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
             civilite: civilite,
             prenom: prenom,
             nom: nom,
+            mainCouranteToken: mainCouranteToken,
           ),
         ),
       );
@@ -510,6 +513,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
         builder: (_) => AdminDashboardPage(
           adminUid: adminUid,
           territoireId: territoireId,
+          mainCouranteToken: mainCouranteToken,
         ),
       ),
       (route) => false,
