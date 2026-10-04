@@ -609,6 +609,46 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+  int? _sphotOrderNumber(Map<String, dynamic> data) {
+    final rawId = _cleanText(data['idSphot'] ?? data['_docId']);
+
+    final match = RegExp(r'\d+').firstMatch(rawId);
+    if (match == null) {
+      return null;
+    }
+
+    return int.tryParse(match.group(0)!);
+  }
+
+  int _compareSphotsNaturally(
+    Map<String, dynamic> first,
+    Map<String, dynamic> second,
+  ) {
+    final firstNumber = _sphotOrderNumber(first);
+    final secondNumber = _sphotOrderNumber(second);
+
+    if (firstNumber != null && secondNumber != null) {
+      final numericComparison = firstNumber.compareTo(secondNumber);
+      if (numericComparison != 0) {
+        return numericComparison;
+      }
+    }
+
+    final firstId = _cleanText(first['idSphot'] ?? first['_docId'])
+        .toUpperCase();
+    final secondId = _cleanText(second['idSphot'] ?? second['_docId'])
+        .toUpperCase();
+
+    final idComparison = firstId.compareTo(secondId);
+    if (idComparison != 0) {
+      return idComparison;
+    }
+
+    return _spotName(first)
+        .toUpperCase()
+        .compareTo(_spotName(second).toUpperCase());
+  }
+
   String _normalizeType(String value) {
     return value
         .toUpperCase()
@@ -4482,12 +4522,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       final firstSpot = Map<String, dynamic>.from(first['spot'] ?? {});
       final secondSpot = Map<String, dynamic>.from(second['spot'] ?? {});
 
-      return _spotName(firstSpot).compareTo(_spotName(secondSpot));
+      return _compareSphotsNaturally(firstSpot, secondSpot);
     });
 
-    otherSpots.sort((first, second) {
-      return _spotName(first).compareTo(_spotName(second));
-    });
+    otherSpots.sort(_compareSphotsNaturally);
 
     return {
       'territoireId': territoireId,
