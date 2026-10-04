@@ -14,6 +14,7 @@ class SauveteurPlanningPage extends StatefulWidget {
   final String sphotMode;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final String? initialSpotId;
   final bool canManageRestrictedOperationalData;
 
   const SauveteurPlanningPage({
@@ -24,6 +25,7 @@ class SauveteurPlanningPage extends StatefulWidget {
     required this.sphotMode,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    required this.initialSpotId,
     required this.canManageRestrictedOperationalData,
   });
 
@@ -225,8 +227,13 @@ String? selectedSpotId;
     );
 
   if (beachList.isNotEmpty) {
-    selectedBeach = beachList.first['label'];
-    selectedSpotId = beachList.first['id'];
+    final preferredId = widget.initialSpotId?.trim();
+    final initialBeach = beachList.firstWhere(
+      (spot) => spot['id'] == preferredId,
+      orElse: () => beachList.first,
+    );
+    selectedBeach = initialBeach['label'];
+    selectedSpotId = initialBeach['id'];
   } else {
     selectedBeach = null;
     selectedSpotId = null;

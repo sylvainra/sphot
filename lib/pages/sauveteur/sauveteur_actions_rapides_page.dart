@@ -18,6 +18,7 @@ class SauveteurActionsRapidesPage extends StatefulWidget {
   final String territoireId;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final String? initialSpotId;
 
   const SauveteurActionsRapidesPage({
     super.key,
@@ -26,6 +27,7 @@ class SauveteurActionsRapidesPage extends StatefulWidget {
     required this.territoireId,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    required this.initialSpotId,
   });
 
   bool get isSphotOn => sphotMode.toUpperCase() == 'ON';
@@ -151,7 +153,12 @@ class _SauveteurActionsRapidesPageState
     });
 
     if (postesSecoursCommune.isNotEmpty) {
-      await _selectSpot(postesSecoursCommune.first);
+      final preferredId = widget.initialSpotId?.trim();
+      final initialPoste = postesSecoursCommune.firstWhere(
+        (poste) => poste['spotId'] == preferredId,
+        orElse: () => postesSecoursCommune.first,
+      );
+      await _selectSpot(initialPoste);
     }
   }
 

@@ -12,6 +12,7 @@ class SauveteurMeteoTerrestrePage extends StatefulWidget {
   final String sphotMode;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final String? initialSpotId;
 
   const SauveteurMeteoTerrestrePage({
     super.key,
@@ -20,6 +21,7 @@ class SauveteurMeteoTerrestrePage extends StatefulWidget {
     required this.sphotMode,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    required this.initialSpotId,
   });
 
   @override
@@ -84,7 +86,15 @@ class _SauveteurMeteoTerrestrePageState extends State<SauveteurMeteoTerrestrePag
       _assignedSpots
         ..clear()
         ..addAll(spots);
-      _selectedSpotId = _assignedSpots.isEmpty ? null : _assignedSpots.first.id;
+      final preferredId = widget.initialSpotId?.trim();
+      _selectedSpotId = _assignedSpots.isEmpty
+          ? null
+          : _assignedSpots
+              .firstWhere(
+                (spot) => spot.id == preferredId,
+                orElse: () => _assignedSpots.first,
+              )
+              .id;
 
       if (_selectedSpotId != null) {
         await _loadSelectedSpotState();

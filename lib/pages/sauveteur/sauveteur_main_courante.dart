@@ -14,6 +14,7 @@ class SauveteurMainCourantePage extends StatefulWidget {
   final String sphotMode;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final String? initialSpotId;
   final bool canManageRestrictedOperationalData;
 
   const SauveteurMainCourantePage({
@@ -25,6 +26,7 @@ class SauveteurMainCourantePage extends StatefulWidget {
     required this.sphotMode,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    required this.initialSpotId,
     required this.canManageRestrictedOperationalData,
   });
 
@@ -131,7 +133,14 @@ class _SauveteurMainCourantePageState
       _spots
         ..clear()
         ..addAll(spots);
-      _selectedSpotId = _spots.isEmpty ? null : _spots.first['id'];
+      final preferredId = widget.initialSpotId?.trim();
+      final initialSpot = _spots.isEmpty
+          ? null
+          : _spots.firstWhere(
+              (spot) => spot['id'] == preferredId,
+              orElse: () => _spots.first,
+            );
+      _selectedSpotId = initialSpot?['id'];
       _institutionalContacts = institutionalContacts;
       _loading = false;
     });

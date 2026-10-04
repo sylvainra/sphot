@@ -4405,7 +4405,6 @@ async function resolveSauveteurOperationalContext(accountData, login) {
 
   const accountActive = accountData.accountStatus === "ACTIVE";
   const sphotOn = accountActive &&
-    diffusionAccessGranted &&
     assignedSpotIds.length > 0 &&
     assignmentPeriods.active;
 
@@ -4414,8 +4413,6 @@ async function resolveSauveteurOperationalContext(accountData, login) {
     modeReason = "account_inactive";
   } else if (assignedSpotIds.length === 0) {
     modeReason = "no_active_assignment";
-  } else if (!diffusionAccessGranted) {
-    modeReason = "administration_diffusion_off";
   } else if (!assignmentPeriods.active) {
     modeReason = assignmentPeriods.reason;
   }

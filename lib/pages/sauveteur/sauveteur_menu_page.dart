@@ -12,6 +12,9 @@ import 'sauveteur_recherche_personne_page.dart';
 import 'sauveteur_ephemeride_dicton_page.dart';
 import 'sauveteur_planning_page.dart';
 import 'sauveteur_main_courante.dart';
+import '../../services/sauveteur_live_publication_service.dart';
+import 'widgets/sauveteur_styled_dropdown.dart';
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurMenuPage extends StatefulWidget {
   final Color profileColor;
@@ -51,6 +54,9 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
 
   Timer? _modeRefreshTimer;
   bool _refreshingMode = false;
+  bool _loadingSpots = true;
+  final List<SauveteurAssignedSpot> _assignedSpots = [];
+  String? _selectedSpotId;
 
   bool get _isSphotOn => _sphotMode.toUpperCase() == 'ON';
 
@@ -99,6 +105,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
     _canManageRestrictedOperationalData =
         widget.canManageRestrictedOperationalData;
 
+    _loadAssignedSpots();
     _refreshMode();
     _modeRefreshTimer = Timer.periodic(
       const Duration(seconds: 30),
@@ -167,12 +174,67 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
         _canManageRestrictedOperationalData =
             decoded['canManageRestrictedOperationalData'] == true;
       });
+
+      await _loadAssignedSpots();
     } catch (_) {
       // Le dernier état connu reste affiché. Les écritures sensibles sont
       // de toute façon revérifiées côté Cloud Functions.
     } finally {
       _refreshingMode = false;
     }
+  }
+
+  Future<void> _loadAssignedSpots() async {
+    try {
+      final spots = await SauveteurLivePublicationService.loadAssignedSpots(
+        territoireId: widget.territoireId,
+        postesAffectes: _postesAffectes,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _assignedSpots
+          ..clear()
+          ..addAll(spots);
+
+        final currentStillAvailable = _selectedSpotId != null &&
+            _assignedSpots.any((spot) => spot.id == _selectedSpotId);
+
+        if (!currentStillAvailable) {
+          _selectedSpotId =
+              _assignedSpots.isEmpty ? null : _assignedSpots.first.id;
+        }
+
+        _loadingSpots = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _assignedSpots.clear();
+        _selectedSpotId = null;
+        _loadingSpots = false;
+      });
+    }
+  }
+
+  Widget _spotSelector() {
+    return SauveteurStyledDropdown(
+      labelText: 'Poste de secours',
+      value: _selectedSpotId,
+      enabled: !_loadingSpots,
+      options: _assignedSpots
+          .map(
+            (spot) => SauveteurDropdownOption(
+              value: spot.id,
+              label: spot.label,
+            ),
+          )
+          .toList(),
+      onChanged: (spotId) {
+        setState(() => _selectedSpotId = spotId);
+      },
+    );
   }
 
   Future<void> _showModeInfo() async {
@@ -222,7 +284,8 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
             fit: BoxFit.cover,
           ),
           SafeArea(
-            child: Padding(
+            child: SauveteurAdaptiveViewport(
+              child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 children: [
@@ -294,8 +357,9 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                     ),
                   ),
                   const SizedBox(height: 6),
-                  SizedBox(
-                    height: 430,
+                  _spotSelector(),
+                  const SizedBox(height: 6),
+                  Expanded(
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -324,6 +388,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                     sauveteurSessionToken:
                                         widget.sauveteurSessionToken,
                                     postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                   ),
                                 ),
                               );
@@ -354,6 +419,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -374,6 +440,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -394,6 +461,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -430,6 +498,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                           canManageRestrictedOperationalData:
                                               _canManageRestrictedOperationalData,
                                         ),
@@ -474,6 +543,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                     sauveteurSessionToken:
                                         widget.sauveteurSessionToken,
                                     postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                     canManageRestrictedOperationalData:
                                         _canManageRestrictedOperationalData,
                                   ),
@@ -516,6 +586,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
               ),
             ),
           ),
+        ),
         ],
       ),
     );
