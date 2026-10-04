@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/web_proconnect_auth_service.dart';
 import '../shared/web_colors.dart';
-import '../admin/web_admin_registration_page.dart';
-
-import '../super_admin/web_super_admin_app.dart';
+import '../admin/pages/admin_trial_request_page.dart';
 
 import '../../services/web_pending_auth_storage.dart';
 
@@ -105,7 +103,7 @@ void initState() {
       case WebAdminAccessStatus.registrationRequired:
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => WebAdminRegistrationPage(
+            builder: (_) => AdminTrialRequestPage(
               proConnectUid: 'test_uid_admin_001',
               proConnectEmail: 'admin@testville.fr',
               proConnectNom: 'DUPONT',
@@ -244,39 +242,6 @@ void initState() {
                       ),
                       const SizedBox(height: 12),
 
-SizedBox(
-  width: double.infinity,
-  height: 52,
-  child: OutlinedButton(
-    onPressed: _isLoading
-        ? null
-        : () {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (_) => const WebSuperAdminApp(),
-              ),
-            );
-          },
-    style: OutlinedButton.styleFrom(
-      side: const BorderSide(
-        color: WebColors.red,
-        width: 2,
-      ),
-      foregroundColor: WebColors.red,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(30),
-      ),
-    ),
-    child: const Text(
-      'TEST INSCRIPTION ADMIN',
-      style: TextStyle(
-        fontWeight: FontWeight.w900,
-      ),
-    ),
-  ),
-),
-
-const SizedBox(height: 12),
 
 TextButton(
                         onPressed: _isLoading
