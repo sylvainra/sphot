@@ -215,15 +215,163 @@ Future<void> _toggleFavoritesFilter() async {
     return LatLng(lat, lng);
   }
 
+  double _measureSelectedLabelHeight(
+    String text, {
+    required double fontSize,
+    required double maxWidth,
+    FontWeight fontWeight = FontWeight.w800,
+  }) {
+    final value = text.trim();
+    if (value.isEmpty) return 0;
+
+    final painter = TextPainter(
+      text: TextSpan(
+        text: value,
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          height: 1.15,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: maxWidth);
+
+    return painter.height;
+  }
+
+  ({double above, double below}) _selectedSpotVisualExtents(
+    SpotFlagState spot,
+    double screenWidth,
+  ) {
+    const lineSpacing = 3.0;
+
+    if (spot.isPosteSecours) {
+      final labelWidth = min(420.0, max(180.0, screenWidth - 24));
+      final nameHeight = _measureSelectedLabelHeight(
+        spot.mapDisplayName,
+        fontSize: 13,
+        maxWidth: labelWidth,
+        fontWeight: FontWeight.bold,
+      );
+      final cityHeight = _measureSelectedLabelHeight(
+        spot.ville.toUpperCase(),
+        fontSize: 12,
+        maxWidth: labelWidth,
+      );
+
+      final statusText = spot.hasValidFlag
+          ? spot.displayStatut.replaceAll('⚠️ ', '')
+          : 'BAIGNADE NON SURVEILLÉE';
+      final statusHeight = spot.hasValidFlag
+          ? max(
+              24.0,
+              _measureSelectedLabelHeight(
+                statusText,
+                fontSize: 13.2,
+                maxWidth: max(150.0, labelWidth - 34),
+                fontWeight: FontWeight.w900,
+              ),
+            )
+          : 49.0;
+
+      // Le mât animé remonte nettement au-dessus du point GPS.
+      const above = 98.0;
+      final below =
+          8.0 +
+          nameHeight +
+          (cityHeight > 0 ? lineSpacing + 3 + cityHeight : 0) +
+          lineSpacing +
+          34.0 +
+          lineSpacing +
+          statusHeight;
+
+      return (above: above, below: below);
+    }
+
+    final labelWidth = min(380.0, max(180.0, screenWidth - 24));
+    final nameHeight = _measureSelectedLabelHeight(
+      spot.mapDisplayName,
+      fontSize: 13,
+      maxWidth: labelWidth,
+      fontWeight: FontWeight.w700,
+    );
+    final cityHeight = _measureSelectedLabelHeight(
+      spot.ville.toUpperCase(),
+      fontSize: 12,
+      maxWidth: labelWidth,
+    );
+    final typeHeight = _measureSelectedLabelHeight(
+      spot.typeSphot,
+      fontSize: 14,
+      maxWidth: labelWidth,
+      fontWeight: FontWeight.w700,
+    );
+
+    // Le marker FIRE SVG est centré sur le point GPS ; les cinq lignes
+    // éventuelles sont toutes placées en dessous.
+    const above = 30.0;
+    final below =
+        24.0 +
+        nameHeight +
+        (cityHeight > 0 ? lineSpacing + 3 + cityHeight : 0) +
+        lineSpacing +
+        typeHeight +
+        lineSpacing +
+        24.0 +
+        lineSpacing +
+        24.0;
+
+    return (above: above, below: below);
+  }
+
+  double _selectedSpotSheetFraction(SpotFlagState spot) {
+    return spot.isPosteSecours ? 0.60 : 0.64;
+  }
+
+  double _selectedSpotTargetScreenY(
+    SpotFlagState spot,
+    Size screenSize,
+    double topSafeInset,
+  ) {
+    final sheetFraction = _selectedSpotSheetFraction(spot);
+    final sheetTop = screenSize.height * (1 - sheetFraction);
+
+    // Le logo SPHOT occupe le haut de l'écran. Une fois un SPHOT sélectionné,
+    // la recherche et les boutons de carte disparaissent : cette zone devient
+    // entièrement disponible pour le marker et ses libellés.
+    final availableTop = topSafeInset + 78.0 + 12.0;
+    final availableBottom = sheetTop - 12.0;
+    final extents = _selectedSpotVisualExtents(spot, screenSize.width);
+
+    final minAnchorY = availableTop + extents.above;
+    final maxAnchorY = availableBottom - extents.below;
+
+    if (minAnchorY <= maxAnchorY) {
+      return (minAnchorY + maxAnchorY) / 2;
+    }
+
+    // Très petits écrans : on centre l'ensemble visuel dans la zone
+    // disponible afin de répartir au mieux le manque de place.
+    final visualCenterOffset = (extents.below - extents.above) / 2;
+    return ((availableTop + availableBottom) / 2) - visualCenterOffset;
+  }
+
   LatLng _selectedSpotCameraCenter(
     SpotFlagState spot,
     double zoom,
-    double rotation,
-  ) {
+    double rotation, {
+    required Size screenSize,
+    required double topSafeInset,
+  }) {
     final spotPoint = _mercatorPixelPoint(spot, zoom);
+    final targetScreenY = _selectedSpotTargetScreenY(
+      spot,
+      screenSize,
+      topSafeInset,
+    );
     final desiredScreenOffset = Offset(
       0,
-      spot.isPosteSecours ? -216 : -255,
+      targetScreenY - (screenSize.height / 2),
     );
     final angle = rotation * pi / 180.0;
 
@@ -972,10 +1120,14 @@ SpotFlagState? _findBestSpotMatch(
     });
 
     const selectedSpotZoom = 17.2;
+    final screenSize = MediaQuery.sizeOf(context);
+    final topSafeInset = MediaQuery.of(context).padding.top;
     final selectedSpotCenter = _selectedSpotCameraCenter(
       spot,
       selectedSpotZoom,
       _currentRotation,
+      screenSize: screenSize,
+      topSafeInset: topSafeInset,
     );
 
     _mapController.move(
@@ -1005,8 +1157,7 @@ SpotFlagState? _findBestSpotMatch(
       isDismissible: true,
       enableDrag: false,
       builder: (sheetContext) {
-        final fixedChildSize =
-            spot.isPosteSecours ? 0.60 : 0.64;
+        final fixedChildSize = _selectedSpotSheetFraction(spot);
         final sheetHeight =
             MediaQuery.sizeOf(sheetContext).height * fixedChildSize;
 
@@ -2474,7 +2625,8 @@ onPositionChanged: (position, hasGesture) {
                   ),
                 ],
               ),
-              _buildLeftMapControls(allSpots),
+              if (_selectedPublicSpotId == null)
+                _buildLeftMapControls(allSpots),
 
 
 Positioned(
