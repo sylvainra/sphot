@@ -17,6 +17,22 @@ const TextStyle _publicSectionTitleStyle = TextStyle(
   letterSpacing: 0.5,
 );
 
+Future<void> _centerHorizontalItem(BuildContext itemContext) async {
+  await Future<void>.delayed(Duration.zero);
+
+  if (!itemContext.mounted) return;
+
+  final renderObject = itemContext.findRenderObject();
+  if (renderObject == null) return;
+
+  await Scrollable.ensureVisible(
+    itemContext,
+    alignment: 0.5,
+    duration: const Duration(milliseconds: 240),
+    curve: Curves.easeOutCubic,
+  );
+}
+
 class PublicSpotDetailPage extends StatelessWidget {
   final SpotFlagState spot;
 
@@ -289,6 +305,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
 
   static const List<(String, IconData)> _pages = [
     ('Live', Icons.sensors_rounded),
+    ('Signaux', Icons.warning_amber_rounded),
     ('Météo terrestre', Icons.wb_sunny_outlined),
     ('Météo marine', Icons.water_rounded),
     ('Dicton & Éphéméride', Icons.calendar_today_outlined),
@@ -773,30 +790,114 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     );
   }
 
+  Widget _buildSignalsPage(
+    BuildContext context,
+    SpotFlagState spot,
+    ScrollController controller,
+  ) {
+    final flagIsLowered =
+        spot.isPosteSecours && spot.flagPosition == FlagPosition.affale;
+    final showUnsupervisedWarning =
+        spot.isMissingFlagColorDuringSurveillance || flagIsLowered;
+    final rawStatus = flagIsLowered
+        ? '⚠️ BAIGNADE NON SURVEILLÉE TEMPORAIREMENT'
+        : spot.displayStatut;
+    final publicStatus = rawStatus.replaceFirst(
+      ' ⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
+      '\n⚠️ BAIGNADE À VOS RISQUES ET PÉRILS',
+    );
+    final dangerValues =
+        _PublicLiveDataSection._flattenValues(spot.dangers);
+    final notification = spot.notificationPublique is Map
+        ? Map<String, dynamic>.from(spot.notificationPublique as Map)
+        : <String, dynamic>{};
+    final notificationMessage =
+        (notification['message'] ?? '').toString().trim();
+    final notificationActive = notification['active'] != false;
+    final notificationPublishedAt =
+        _PublicLiveDataSection._formatTimestamp(
+      notification['publishedAt'],
+    );
+
+    return ListView(
+      controller: controller,
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
+      children: [
+        _MobilePublicCard(
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  if (spot.isPosteSecours) ...[
+                    SizedBox(
+                      width: 78,
+                      height: 98,
+                      child: Center(
+                        child: FlagMarker(spot: spot),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: _StatusCard(
+                      color: Color(spot.statutColor),
+                      text: publicStatus,
+                    ),
+                  ),
+                ],
+              ),
+              if (showUnsupervisedWarning) ...[
+                const SizedBox(height: 10),
+                const _UnsupervisedWarning(),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        _PublicDangerList(values: dangerValues),
+        if (notificationActive && notificationMessage.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _PublicNotificationCard(
+            message: notificationMessage,
+            publishedAt: notificationPublishedAt,
+          ),
+        ],
+        const SizedBox(height: 12),
+        _buildSpotActions(context, spot),
+      ],
+    );
+  }
+
   Widget _buildSelectedPage(
     BuildContext context,
     SpotFlagState spot,
   ) {
     switch (_selectedPage) {
       case 1:
-        return _buildTerrestrialPage(
+        return _buildSignalsPage(
           context,
           spot,
           widget.sheetScrollController,
         );
       case 2:
-        return _buildMarinePage(
+        return _buildTerrestrialPage(
           context,
           spot,
           widget.sheetScrollController,
         );
       case 3:
-        return _buildEphemeridePage(
+        return _buildMarinePage(
           context,
           spot,
           widget.sheetScrollController,
         );
       case 4:
+        return _buildEphemeridePage(
+          context,
+          spot,
+          widget.sheetScrollController,
+        );
+      case 5:
         return _buildInfoPage(
           context,
           spot,
@@ -874,10 +975,14 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                         final page = _pages[index];
                         final selected = _selectedPage == index;
 
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(99),
-                          onTap: () => _selectPage(index),
-                          child: AnimatedContainer(
+                        return Builder(
+                          builder: (itemContext) => InkWell(
+                            borderRadius: BorderRadius.circular(99),
+                            onTap: () async {
+                              _selectPage(index);
+                              await _centerHorizontalItem(itemContext);
+                            },
+                            child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 13,
@@ -917,6 +1022,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                               ],
                             ),
                           ),
+                        ),
                         );
                       },
                     ),
@@ -1211,6 +1317,14 @@ class _MobileSpotActionBar extends StatelessWidget {
     required this.onSave,
   });
 
+  Future<void> _centerThenRun(
+    BuildContext itemContext,
+    VoidCallback action,
+  ) async {
+    await _centerHorizontalItem(itemContext);
+    action();
+  }
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -1219,31 +1333,39 @@ class _MobileSpotActionBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
         children: [
-          _MobileSpotActionButton(
-            icon: Icons.directions_rounded,
-            label: 'ITINÉRAIRE',
-            onTap: onDirections,
+          Builder(
+            builder: (itemContext) => _MobileSpotActionButton(
+              icon: Icons.directions_rounded,
+              label: 'ITINÉRAIRE',
+              onTap: () => _centerThenRun(itemContext, onDirections),
+            ),
           ),
           const SizedBox(width: 8),
-          _MobileSpotActionButton(
-            icon: Icons.navigation_rounded,
-            label: 'DÉMARRER',
-            onTap: onStart,
+          Builder(
+            builder: (itemContext) => _MobileSpotActionButton(
+              icon: Icons.navigation_rounded,
+              label: 'DÉMARRER',
+              onTap: () => _centerThenRun(itemContext, onStart),
+            ),
           ),
           const SizedBox(width: 8),
-          _MobileSpotActionButton(
-            icon: Icons.share_rounded,
-            label: 'PARTAGER',
-            onTap: onShare,
+          Builder(
+            builder: (itemContext) => _MobileSpotActionButton(
+              icon: Icons.share_rounded,
+              label: 'PARTAGER',
+              onTap: () => _centerThenRun(itemContext, onShare),
+            ),
           ),
           const SizedBox(width: 8),
-          _MobileSpotActionButton(
-            icon: isSaved
-                ? Icons.bookmark_rounded
-                : Icons.bookmark_border_rounded,
-            label: isSaved ? 'ENREGISTRÉ' : 'ENREGISTRER',
-            selected: isSaved,
-            onTap: onSave,
+          Builder(
+            builder: (itemContext) => _MobileSpotActionButton(
+              icon: isSaved
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+              label: isSaved ? 'ENREGISTRÉ' : 'ENREGISTRER',
+              selected: isSaved,
+              onTap: () => _centerThenRun(itemContext, onSave),
+            ),
           ),
         ],
       ),
