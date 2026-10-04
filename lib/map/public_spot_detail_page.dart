@@ -1574,7 +1574,7 @@ class _BathingSignalSymbol extends StatelessWidget {
       case _BathingSignalVisual.purpleFlag:
         return const _SolidSignalFlag(color: Color(0xFFD946EF));
       case _BathingSignalVisual.orangeWindsock:
-        return const WindsockGlyph(
+        return WindsockGlyph(
           width: 54,
           height: 32,
         );
