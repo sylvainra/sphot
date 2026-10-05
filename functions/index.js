@@ -8695,44 +8695,12 @@ L'équipe SPHOT`,
           );
         }
 
-        const adminUid = cleanValue(
-            refreshedAccountData.adminUid,
-            "",
-        );
-        const territoireId = cleanValue(
-            refreshedAccountData.territoireId,
-            "",
-        );
-        const firebaseUid = cleanValue(
-            refreshedAccountData.firebaseUid,
-            "",
-        ) || adminUid || accountDoc.id;
-
-        const firebaseToken = await admin.auth().createCustomToken(
-            firebaseUid,
-            {
-              role: "ADMIN",
-              adminUid,
-              territoireId,
-            },
-        );
-
-        if (!cleanValue(refreshedAccountData.firebaseUid, "")) {
-          await accountDoc.ref.set(
-              {
-                firebaseUid,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-              },
-              {merge: true},
-          );
-        }
-
         response.status(200).json({
           success: true,
           adminId: accountDoc.id,
-          adminUid,
-          territoireId,
-          firebaseToken,
+          adminUid: (refreshedAccountData.adminUid || "").toString(),
+          territoireId:
+            (refreshedAccountData.territoireId || "").toString(),
           userRole: (refreshedAccountData.role || "ADMIN").toString(),
           mustChangePassword:
             refreshedAccountData.mustChangePassword === true,
