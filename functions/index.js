@@ -8151,19 +8151,49 @@ L'équipe SPHOT`,
           );
         }
 
+        const adminUid =
+          (refreshedAccountData.adminUid || "").toString().trim();
+
+        if (!adminUid) {
+          console.error(
+              "loginAdmin : adminUid absent pour le compte",
+              login,
+          );
+          response.status(500).json({
+            success: false,
+            error: "ADMIN_UID_MISSING",
+          });
+          return;
+        }
+
+        const territoireId =
+          (refreshedAccountData.territoireId || "").toString();
+
+        const userRole =
+          (refreshedAccountData.role || "ADMIN").toString();
+
+        const firebaseToken = await admin.auth().createCustomToken(
+            adminUid,
+            {
+              role: userRole,
+              adminUid: adminUid,
+              territoireId: territoireId,
+            },
+        );
+
         response.status(200).json({
           success: true,
           adminId: accountDoc.id,
-          adminUid: (refreshedAccountData.adminUid || "").toString(),
-          territoireId:
-            (refreshedAccountData.territoireId || "").toString(),
-          userRole: (refreshedAccountData.role || "ADMIN").toString(),
+          adminUid: adminUid,
+          territoireId: territoireId,
+          userRole: userRole,
           mustChangePassword:
             refreshedAccountData.mustChangePassword === true,
           civilite: (refreshedAccountData.civilite || "").toString(),
           prenom: (refreshedAccountData.prenom || "").toString(),
           nom: (refreshedAccountData.nom || "").toString(),
           mainCouranteToken,
+          firebaseToken: firebaseToken,
         });
       } catch (error) {
         console.error("Erreur login admin:", error);
