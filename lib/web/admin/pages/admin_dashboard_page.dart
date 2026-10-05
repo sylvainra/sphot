@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../models/advertising_pricing_config.dart';
@@ -8522,6 +8523,58 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  Future<void> _deleteSphotDocument({
+    required String territoireId,
+    required String documentId,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      throw StateError('Session Firebase Admin absente.');
+    }
+
+    final idToken = await user.getIdToken();
+
+    if (idToken == null || idToken.trim().isEmpty) {
+      throw StateError('Jeton Firebase Admin absent.');
+    }
+
+    final response = await http.post(
+      Uri.parse(
+        'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+        'deleteAdminSphot',
+      ),
+      headers: <String, String>{
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
+      body: jsonEncode({
+        'territoireId': territoireId,
+        'spotId': documentId,
+      }),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      String serverError = '';
+
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          serverError = _cleanText(decoded['error']);
+        }
+      } catch (_) {
+        // La réponse HTTP suffit pour le diagnostic.
+      }
+
+      throw StateError(
+        serverError.isEmpty
+            ? 'Suppression du SPHOT impossible '
+                '(HTTP ${response.statusCode}).'
+            : 'Suppression du SPHOT impossible : $serverError.',
+      );
+    }
+  }
+
   Future<void> _deleteSphotFromSummary(Map<String, dynamic> spot) async {
     final documentId = _cleanText(spot['_docId'] ?? spot['idSphot']);
 
@@ -8574,12 +8627,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     try {
-      await FirebaseFirestore.instance
-          .collection('territoires')
-          .doc(territoireId)
-          .collection('spots')
-          .doc(documentId)
-          .delete();
+      await _deleteSphotDocument(
+        territoireId: territoireId,
+        documentId: documentId,
+      );
 
       if (!mounted) {
         return;
@@ -8593,11 +8644,25 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _trialSummaryPanelFuture = _loadTrialSummaryData();
       });
 
-    } catch (error) {
+    } catch (error, stackTrace) {
+      debugPrint('Suppression SPHOT impossible : $error');
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) {
         return;
       }
 
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error
+                .toString()
+                .replaceFirst('Bad state: ', '')
+                .replaceFirst('Exception: ', ''),
+          ),
+          backgroundColor: redColor,
+        ),
+      );
     }
   }
 
@@ -8659,12 +8724,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     });
 
     try {
-      await FirebaseFirestore.instance
-          .collection('territoires')
-          .doc(territoireId)
-          .collection('spots')
-          .doc(documentId)
-          .delete();
+      await _deleteSphotDocument(
+        territoireId: territoireId,
+        documentId: documentId,
+      );
 
       if (!mounted) return;
 
@@ -8676,13 +8739,27 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _clearSphotEditor();
       });
 
-    } catch (error) {
+    } catch (error, stackTrace) {
+      debugPrint('Suppression SPHOT impossible : $error');
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
 
       setState(() {
         _isSavingSphot = false;
       });
 
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error
+                .toString()
+                .replaceFirst('Bad state: ', '')
+                .replaceFirst('Exception: ', ''),
+          ),
+          backgroundColor: redColor,
+        ),
+      );
     }
   }
 
