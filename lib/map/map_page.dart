@@ -308,9 +308,11 @@ Future<void> _toggleFavoritesFilter() async {
       fontWeight: FontWeight.w700,
     );
 
-    // Le marker FIRE SVG est centré sur le point GPS ; les cinq lignes
-    // éventuelles sont toutes placées en dessous.
-    const above = 30.0;
+    // Référence de placement : pointe haute réelle du marker FIRE.
+    // Le FIRE standard fait 48 px et le naturisme 52 px, tous deux centrés
+    // sur le point GPS. Leur pointe supérieure doit s'aligner sur la même
+    // référence visuelle que le haut du mât d'un poste de secours.
+    final above = spot.isNaturisme ? 26.0 : 24.0;
     final below =
         24.0 +
         nameHeight +
@@ -325,13 +327,18 @@ Future<void> _toggleFavoritesFilter() async {
     return (above: above, below: below);
   }
 
-  double _selectedSpotVisualTop(double topSafeInset) {
-    // Le header SPHOT occupe 58 px sous la zone système.
-    // On conserve une petite marge visuelle avant le marker / mât.
-    const appBarHeight = 58.0;
-    const headerGap = 8.0;
+  static const double _selectedSpotEdgeGap = 8.0;
+  static const double _selectedSpotHeaderVisualHeight = 63.0;
+  static const double _selectedSpotBottomExtentSafety = 10.0;
 
-    return topSafeInset + appBarHeight + headerGap;
+  double _selectedSpotVisualTop(double topSafeInset) {
+    // Le logo SPHOT mesure 68 px et déborde de 5 px vers le haut.
+    // Sa limite visuelle basse se situe donc à ~63 px sous le SafeArea.
+    // Le haut du mât ou la pointe du marker FIRE vient ensuite avec la
+    // même marge que celle conservée entre la dernière ligne et le volet.
+    return topSafeInset +
+        _selectedSpotHeaderVisualHeight +
+        _selectedSpotEdgeGap;
   }
 
   double _selectedSpotSheetHeight(
@@ -339,18 +346,25 @@ Future<void> _toggleFavoritesFilter() async {
     Size screenSize,
     double topSafeInset,
   ) {
-    const gapBelowSelectedSpot = 12.0;
-    const minimumSheetHeight = 320.0;
-
     final extents = _selectedSpotVisualExtents(spot, screenSize.width);
-    final visualBottom =
-        _selectedSpotVisualTop(topSafeInset) + extents.above + extents.below;
-    final desiredSheetTop = visualBottom + gapBelowSelectedSpot;
-    final maximumSheetTop =
-        max(0.0, screenSize.height - minimumSheetHeight);
-    final sheetTop = min(desiredSheetTop, maximumSheetTop);
 
-    return max(minimumSheetHeight, screenSize.height - sheetTop);
+    // La sécurité absorbe les ombres de texte et les petites différences
+    // de hauteur de rendu entre Android, iOS, téléphone et tablette.
+    final visualBottom =
+        _selectedSpotVisualTop(topSafeInset) +
+        extents.above +
+        extents.below +
+        _selectedSpotBottomExtentSafety;
+
+    // Le haut du volet ne doit jamais remonter au-dessus de la dernière
+    // ligne du SPHOT sélectionné. On garde exactement la même marge que
+    // sous le header.
+    final sheetTop = min(
+      screenSize.height,
+      visualBottom + _selectedSpotEdgeGap,
+    );
+
+    return max(0.0, screenSize.height - sheetTop);
   }
 
   double _selectedSpotTargetScreenY(
@@ -1165,12 +1179,13 @@ SpotFlagState? _findBestSpotMatch(
       isDismissible: true,
       enableDrag: false,
       builder: (sheetContext) {
-        final sheetScreenSize = MediaQuery.sizeOf(sheetContext);
-        final sheetTopSafeInset = MediaQuery.of(sheetContext).padding.top;
+        // Utilise les dimensions de l'écran de la carte, pas celles du
+        // contexte contraint du BottomSheet. Le marker et le volet partagent
+        // ainsi exactement le même repère sur téléphone et tablette.
         final sheetHeight = _selectedSpotSheetHeight(
           spot,
-          sheetScreenSize,
-          sheetTopSafeInset,
+          screenSize,
+          topSafeInset,
         );
 
         return SizedBox(
@@ -3203,9 +3218,7 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                           style: _mapLabelStyle(
                             fontSize: _labelSize(11),
                             fontWeight: FontWeight.w800,
-                            color: spot.normalizedType.contains('PLAGE')
-                                ? const Color(0xFFFF0000)
-                                : Colors.black,
+                            color: Colors.black,
                           ),
                         ),
                         if (spot.ville.trim().isNotEmpty) ...[
@@ -3388,7 +3401,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                             style: _mapLabelStyle(
                               fontSize: _labelSize(11),
                               fontWeight: FontWeight.bold,
-                              color: Colors.black,
+                              color: const Color(0xFFFF0000),
                             ),
                           ),
                           if (spot.ville.trim().isNotEmpty) ...[
@@ -3429,7 +3442,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                             style: _mapLabelStyle(
                               fontSize: _labelSize(11),
                               fontWeight: FontWeight.bold,
-                              color: Colors.black,
+                              color: const Color(0xFFFF0000),
                             ),
                           ),
                           if (spot.ville.trim().isNotEmpty) ...[
