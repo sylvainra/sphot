@@ -486,11 +486,18 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
     final userRole = (decoded['userRole'] ?? 'ADMIN').toString();
     final adminUid = (decoded['adminUid'] ?? '').toString();
     final territoireId = (decoded['territoireId'] ?? '').toString();
+    final firebaseToken = (decoded['firebaseToken'] ?? '').toString().trim();
     final civilite = (decoded['civilite'] ?? '').toString();
     final prenom = (decoded['prenom'] ?? '').toString();
     final nom = (decoded['nom'] ?? '').toString();
     final mainCouranteToken =
         (decoded['mainCouranteToken'] ?? '').toString();
+
+    if (firebaseToken.isEmpty) {
+      throw StateError('Session Firebase Admin absente.');
+    }
+
+    await FirebaseAuth.instance.signInWithCustomToken(firebaseToken);
 
     if (!mounted) return;
 
