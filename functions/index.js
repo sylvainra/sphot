@@ -8716,6 +8716,129 @@ L'équipe SPHOT`,
     },
 );
 
+/**
+ * Supprime définitivement un SPHOT du territoire de l'administrateur connecté.
+ *
+ * La suppression passe par l'Admin SDK afin d'éviter qu'un refus Firestore
+ * côté navigateur soit masqué par l'interface. Les sous-collections du SPHOT
+ * sont également supprimées.
+ */
+exports.deleteAdminSphot = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set(
+          "Access-Control-Allow-Headers",
+          "Content-Type, Authorization",
+      );
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      if (request.method !== "POST") {
+        response.status(405).json({success: false});
+        return;
+      }
+
+      try {
+        const authorization = cleanValue(
+            request.get("Authorization"),
+            "",
+        );
+
+        if (!authorization.startsWith("Bearer ")) {
+          response.status(401).json({
+            success: false,
+            error: "ADMIN_SESSION_MISSING",
+          });
+          return;
+        }
+
+        const idToken = authorization
+            .substring("Bearer ".length)
+            .trim();
+        const session = await admin.auth().verifyIdToken(idToken);
+        const role = cleanValue(session.role, "").toUpperCase();
+
+        const territoireId = cleanValue(
+            (request.body || {}).territoireId,
+            "",
+        );
+        const spotId = cleanValue(
+            (request.body || {}).spotId,
+            "",
+        );
+        const sessionTerritoireId = cleanValue(
+            session.territoireId,
+            "",
+        );
+
+        if (!territoireId || !spotId || spotId.includes("/")) {
+          response.status(400).json({
+            success: false,
+            error: "INVALID_SPOT",
+          });
+          return;
+        }
+
+        if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+          response.status(403).json({
+            success: false,
+            error: "ADMIN_ACCESS_REQUIRED",
+          });
+          return;
+        }
+
+        if (
+          role === "ADMIN" &&
+          (!sessionTerritoireId ||
+            sessionTerritoireId !== territoireId)
+        ) {
+          response.status(403).json({
+            success: false,
+            error: "TERRITORY_MISMATCH",
+          });
+          return;
+        }
+
+        const spotReference = admin.firestore()
+            .collection("territoires")
+            .doc(territoireId)
+            .collection("spots")
+            .doc(spotId);
+
+        const snapshot = await spotReference.get();
+
+        if (!snapshot.exists) {
+          response.status(200).json({
+            success: true,
+            alreadyDeleted: true,
+          });
+          return;
+        }
+
+        await admin.firestore().recursiveDelete(spotReference);
+
+        response.status(200).json({
+          success: true,
+          alreadyDeleted: false,
+        });
+      } catch (error) {
+        console.error("Erreur suppression SPHOT Admin:", error);
+        response.status(500).json({
+          success: false,
+          error: "DELETE_SPHOT_FAILED",
+        });
+      }
+    },
+);
+
 exports.upsertSauveteurAccount = onRequest(
     {
       cpu: 1,
