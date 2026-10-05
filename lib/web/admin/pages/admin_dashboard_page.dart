@@ -124,6 +124,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Future<Map<String, dynamic>>? _trialSummaryPanelFuture;
   bool _placingSphotOnMap = false;
   bool _isSavingSphot = false;
+  String? _sphotSaveErrorMessage;
   bool _isUpdatingAdminLogo = false;
 
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>? _cachedSpotsStream;
@@ -7973,6 +7974,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _sphotPhotoMimeType = '';
     _sphotPhotoFileSizeBytes = null;
     _sphotPhotoErrorMessage = null;
+    _sphotSaveErrorMessage = null;
   }
 
   void _openNewSphotEditor() {
@@ -8425,11 +8427,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     if (errorMessage != null) {
+      setState(() {
+        _sphotSaveErrorMessage = errorMessage;
+      });
       return;
     }
 
     setState(() {
       _isSavingSphot = true;
+      _sphotSaveErrorMessage = null;
     });
 
     try {
@@ -8550,13 +8556,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _selectedSpot = null;
         _clearSphotEditor();
       });
-    } catch (error) {
+    } catch (error, stackTrace) {
+      debugPrint('Enregistrement SPHOT impossible : $error');
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
+
+      final rawMessage = error
+          .toString()
+          .replaceFirst('Bad state: ', '')
+          .replaceFirst('Exception: ', '');
 
       setState(() {
         _isSavingSphot = false;
+        _sphotSaveErrorMessage = 'Enregistrement impossible : $rawMessage';
       });
-
     }
   }
 
@@ -11467,6 +11481,33 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 _buildSphotMediaEditor(),
 
                 const SizedBox(height: 26),
+
+                if (_sphotSaveErrorMessage != null) ...[
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: redColor.withOpacity(0.07),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: redColor.withOpacity(0.35),
+                      ),
+                    ),
+                    child: Text(
+                      _sphotSaveErrorMessage!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: redColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
 
                 SizedBox(
                   width: double.infinity,
