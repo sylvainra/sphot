@@ -1102,7 +1102,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
     return Marker(
       point: LatLng(lat, lng),
-      width: 180,
+      width: 240,
       height: 86,
       alignment: Alignment.center,
       child: DashboardSpotMarker(
@@ -7342,7 +7342,7 @@ class DashboardSpotMarker extends StatelessWidget {
         },
 
         child: SizedBox(
-          width: 180,
+          width: 240,
           height: 86,
           child: Stack(
             clipBehavior: Clip.none,
