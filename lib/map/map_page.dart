@@ -274,8 +274,9 @@ Future<void> _toggleFavoritesFilter() async {
             )
           : 49.0;
 
-      // Le mât animé remonte nettement au-dessus du point GPS.
-      const above = 98.0;
+      // Le haut réel du mât se situe environ 75 px au-dessus
+      // du point GPS du marker sélectionné.
+      const above = 75.0;
       final below =
           8.0 +
           nameHeight +
@@ -324,8 +325,32 @@ Future<void> _toggleFavoritesFilter() async {
     return (above: above, below: below);
   }
 
-  double _selectedSpotSheetFraction(SpotFlagState spot) {
-    return spot.isPosteSecours ? 0.60 : 0.64;
+  double _selectedSpotVisualTop(double topSafeInset) {
+    // Le header SPHOT occupe 58 px sous la zone système.
+    // On conserve une petite marge visuelle avant le marker / mât.
+    const appBarHeight = 58.0;
+    const headerGap = 8.0;
+
+    return topSafeInset + appBarHeight + headerGap;
+  }
+
+  double _selectedSpotSheetHeight(
+    SpotFlagState spot,
+    Size screenSize,
+    double topSafeInset,
+  ) {
+    const gapBelowSelectedSpot = 12.0;
+    const minimumSheetHeight = 320.0;
+
+    final extents = _selectedSpotVisualExtents(spot, screenSize.width);
+    final visualBottom =
+        _selectedSpotVisualTop(topSafeInset) + extents.above + extents.below;
+    final desiredSheetTop = visualBottom + gapBelowSelectedSpot;
+    final maximumSheetTop =
+        max(0.0, screenSize.height - minimumSheetHeight);
+    final sheetTop = min(desiredSheetTop, maximumSheetTop);
+
+    return max(minimumSheetHeight, screenSize.height - sheetTop);
   }
 
   double _selectedSpotTargetScreenY(
@@ -333,27 +358,10 @@ Future<void> _toggleFavoritesFilter() async {
     Size screenSize,
     double topSafeInset,
   ) {
-    final sheetFraction = _selectedSpotSheetFraction(spot);
-    final sheetTop = screenSize.height * (1 - sheetFraction);
-
-    // Le logo SPHOT occupe le haut de l'écran. Une fois un SPHOT sélectionné,
-    // la recherche et les boutons de carte disparaissent : cette zone devient
-    // entièrement disponible pour le marker et ses libellés.
-    final availableTop = topSafeInset + 78.0 + 12.0;
-    final availableBottom = sheetTop - 12.0;
     final extents = _selectedSpotVisualExtents(spot, screenSize.width);
 
-    final minAnchorY = availableTop + extents.above;
-    final maxAnchorY = availableBottom - extents.below;
-
-    if (minAnchorY <= maxAnchorY) {
-      return (minAnchorY + maxAnchorY) / 2;
-    }
-
-    // Très petits écrans : on centre l'ensemble visuel dans la zone
-    // disponible afin de répartir au mieux le manque de place.
-    final visualCenterOffset = (extents.below - extents.above) / 2;
-    return ((availableTop + availableBottom) / 2) - visualCenterOffset;
+    // Le haut du marker / du mât est aligné juste sous le header SPHOT.
+    return _selectedSpotVisualTop(topSafeInset) + extents.above;
   }
 
   LatLng _selectedSpotCameraCenter(
@@ -1157,9 +1165,13 @@ SpotFlagState? _findBestSpotMatch(
       isDismissible: true,
       enableDrag: false,
       builder: (sheetContext) {
-        final fixedChildSize = _selectedSpotSheetFraction(spot);
-        final sheetHeight =
-            MediaQuery.sizeOf(sheetContext).height * fixedChildSize;
+        final sheetScreenSize = MediaQuery.sizeOf(sheetContext);
+        final sheetTopSafeInset = MediaQuery.of(sheetContext).padding.top;
+        final sheetHeight = _selectedSpotSheetHeight(
+          spot,
+          sheetScreenSize,
+          sheetTopSafeInset,
+        );
 
         return SizedBox(
           width: double.infinity,
@@ -2480,8 +2492,13 @@ final spots = allSpots
     )
     .toList();
 
+final selectedSpotId = _selectedPublicSpotId;
+final visibleSpots = selectedSpotId == null
+    ? spots
+    : spots.where((spot) => spot.id == selectedSpotId).toList();
+
 debugPrint('SPHOTS CHARGÉS : ${allSpots.length}');
-debugPrint('SPHOTS AFFICHÉS : ${spots.length}');
+debugPrint('SPHOTS AFFICHÉS : ${visibleSpots.length}');
 
           return FutureBuilder<List<Map<String, dynamic>>>(
             future: _publicAdvertisingSpotsFuture,
@@ -2555,38 +2572,44 @@ onPositionChanged: (position, hasGesture) {
     debugPrint('ERREUR TILE MAP : $error');
   },
 ),
-                  Builder(
-                    builder: (context) {
-                      final zoom = MapCamera.of(context).zoom;
-                      final rotation = MapCamera.of(context).rotation;
+                  if (_selectedPublicSpotId == null)
+                    Builder(
+                      builder: (context) {
+                        final zoom = MapCamera.of(context).zoom;
+                        final rotation = MapCamera.of(context).rotation;
 
-                      return MarkerLayer(
-                        markers: _buildAdminMarkers(allSpots, zoom, rotation),
-                      );
-                    },
-                  ),
+                        return MarkerLayer(
+                          markers: _buildAdminMarkers(
+                            allSpots,
+                            zoom,
+                            rotation,
+                          ),
+                        );
+                      },
+                    ),
+                  if (_selectedPublicSpotId == null)
+                    Builder(
+                      builder: (context) {
+                        final zoom = MapCamera.of(context).zoom;
+                        final rotation = MapCamera.of(context).rotation;
+                        return MarkerLayer(
+                          markers: _buildPublicAdvertisingMarkers(
+                            publicAdvertisers,
+                            zoom,
+                            rotation,
+                          ),
+                        );
+                      },
+                    ),
                   Builder(
                     builder: (context) {
                       final zoom = MapCamera.of(context).zoom;
                       final rotation = MapCamera.of(context).rotation;
-                      return MarkerLayer(
-                        markers: _buildPublicAdvertisingMarkers(
-                          publicAdvertisers,
-                          zoom,
-                          rotation,
-                        ),
-                      );
-                    },
-                  ),
-                  Builder(
-                    builder: (context) {
-                      final zoom = MapCamera.of(context).zoom;
-                      final rotation = MapCamera.of(context).rotation;
-                      final otherSpots = spots
+                      final otherSpots = visibleSpots
                           .where((spot) => !spot.isPosteSecours)
                           .toList();
                       final automaticLabelIds =
-                          _automaticTouchLabelIds(spots, zoom);
+                          _automaticTouchLabelIds(visibleSpots, zoom);
                       final markers = _buildMarkers(
                         otherSpots,
                         automaticLabelIds,
@@ -2611,11 +2634,11 @@ onPositionChanged: (position, hasGesture) {
                       final rotation = MapCamera.of(context).rotation;
 
                       final automaticLabelIds =
-                          _automaticTouchLabelIds(spots, zoom);
+                          _automaticTouchLabelIds(visibleSpots, zoom);
 
                       return MarkerLayer(
                         markers: _buildSecoursMarkers(
-                          spots,
+                          visibleSpots,
                           automaticLabelIds,
                           zoom,
                           rotation,
@@ -3220,7 +3243,9 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                             style: _mapLabelStyle(
                               fontSize: _labelSize(11),
                               fontWeight: FontWeight.w700,
-                              color: Colors.black,
+                              color: spot.normalizedType.contains('PLAGE')
+                                  ? const Color(0xFFFF0000)
+                                  : Colors.black,
                             ),
                           ),
                           if (spot.ville.trim().isNotEmpty) ...[
