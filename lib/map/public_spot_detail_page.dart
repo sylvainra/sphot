@@ -776,10 +776,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             children: [
               Text(
                 spot.mapDisplayName,
-                style: TextStyle(
-                  color: spot.normalizedType.contains('PLAGE')
-                      ? const Color(0xFFFF0000)
-                      : const Color(0xFF172033),
+                style: const TextStyle(
+                  color: Color(0xFF172033),
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                   height: 1.2,
@@ -1274,8 +1272,10 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             children: [
               Text(
                 spot.mapDisplayName,
-                style: const TextStyle(
-                  color: Color(0xFF172033),
+                style: TextStyle(
+                  color: spot.isPosteSecours
+                      ? const Color(0xFFFF0000)
+                      : const Color(0xFF172033),
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                   height: 1.2,
