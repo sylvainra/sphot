@@ -3203,7 +3203,9 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                           style: _mapLabelStyle(
                             fontSize: _labelSize(11),
                             fontWeight: FontWeight.w800,
-                            color: Colors.black,
+                            color: spot.normalizedType.contains('PLAGE')
+                                ? const Color(0xFFFF0000)
+                                : Colors.black,
                           ),
                         ),
                         if (spot.ville.trim().isNotEmpty) ...[
