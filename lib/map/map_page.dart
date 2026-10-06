@@ -3261,6 +3261,16 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
   bool isHovering = false;
 
   double _lineSpacing() {
+    // Sur le site, les SPHOTs non surveillés n'ont pas la hauteur visuelle
+    // du bloc "POSTE DE SECOURS". On augmente donc uniquement leur
+    // interligne web pour retrouver la même respiration visuelle.
+    if (kIsWeb) {
+      if (widget.zoom >= 16) return 6.0;
+      if (widget.zoom >= 15) return 5.4;
+      if (widget.zoom >= 14) return 4.8;
+      return 4.4;
+    }
+
     if (widget.zoom >= 16) return 3.0;
     if (widget.zoom >= 15) return 2.6;
     if (widget.zoom >= 14) return 2.2;

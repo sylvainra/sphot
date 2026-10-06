@@ -125,7 +125,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Future<Map<String, dynamic>>? _trialSummaryPanelFuture;
   bool _placingSphotOnMap = false;
   bool _isSavingSphot = false;
-  String? _sphotSaveErrorMessage;
   bool _isUpdatingAdminLogo = false;
 
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>? _cachedSpotsStream;
@@ -337,6 +336,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Map<String, dynamic>? _administratorTerritoryMarkerData;
 
   bool _territoryCenterLoaded = false;
+  bool _mapReady = false;
+  bool _administratorInitialCenterApplied = false;
 
   int _selectedTileStyle = 0;
 
@@ -609,46 +610,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           data['title'] ??
           'SPHOT sans nom',
     );
-  }
-
-  int? _sphotOrderNumber(Map<String, dynamic> data) {
-    final rawId = _cleanText(data['idSphot'] ?? data['_docId']);
-
-    final match = RegExp(r'\d+').firstMatch(rawId);
-    if (match == null) {
-      return null;
-    }
-
-    return int.tryParse(match.group(0)!);
-  }
-
-  int _compareSphotsNaturally(
-    Map<String, dynamic> first,
-    Map<String, dynamic> second,
-  ) {
-    final firstNumber = _sphotOrderNumber(first);
-    final secondNumber = _sphotOrderNumber(second);
-
-    if (firstNumber != null && secondNumber != null) {
-      final numericComparison = firstNumber.compareTo(secondNumber);
-      if (numericComparison != 0) {
-        return numericComparison;
-      }
-    }
-
-    final firstId = _cleanText(first['idSphot'] ?? first['_docId'])
-        .toUpperCase();
-    final secondId = _cleanText(second['idSphot'] ?? second['_docId'])
-        .toUpperCase();
-
-    final idComparison = firstId.compareTo(secondId);
-    if (idComparison != 0) {
-      return idComparison;
-    }
-
-    return _spotName(first)
-        .toUpperCase()
-        .compareTo(_spotName(second).toUpperCase());
   }
 
   String _normalizeType(String value) {
@@ -4524,10 +4485,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       final firstSpot = Map<String, dynamic>.from(first['spot'] ?? {});
       final secondSpot = Map<String, dynamic>.from(second['spot'] ?? {});
 
-      return _compareSphotsNaturally(firstSpot, secondSpot);
+      return _spotName(firstSpot).compareTo(_spotName(secondSpot));
     });
 
-    otherSpots.sort(_compareSphotsNaturally);
+    otherSpots.sort((first, second) {
+      return _spotName(first).compareTo(_spotName(second));
+    });
 
     return {
       'territoireId': territoireId,
@@ -7975,7 +7938,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _sphotPhotoMimeType = '';
     _sphotPhotoFileSizeBytes = null;
     _sphotPhotoErrorMessage = null;
-    _sphotSaveErrorMessage = null;
   }
 
   void _openNewSphotEditor() {
@@ -8428,15 +8390,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     if (errorMessage != null) {
-      setState(() {
-        _sphotSaveErrorMessage = errorMessage;
-      });
       return;
     }
 
     setState(() {
       _isSavingSphot = true;
-      _sphotSaveErrorMessage = null;
     });
 
     try {
@@ -8557,21 +8515,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _selectedSpot = null;
         _clearSphotEditor();
       });
-    } catch (error, stackTrace) {
-      debugPrint('Enregistrement SPHOT impossible : $error');
-      debugPrintStack(stackTrace: stackTrace);
-
+    } catch (error) {
       if (!mounted) return;
-
-      final rawMessage = error
-          .toString()
-          .replaceFirst('Bad state: ', '')
-          .replaceFirst('Exception: ', '');
 
       setState(() {
         _isSavingSphot = false;
-        _sphotSaveErrorMessage = 'Enregistrement impossible : $rawMessage';
       });
+
     }
   }
 
@@ -8797,15 +8747,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       if (!mounted) return;
 
-      final rawMessage = error
-          .toString()
-          .replaceFirst('Bad state: ', '')
-          .replaceFirst('Exception: ', '');
-
       setState(() {
         _isSavingSphot = false;
-        _sphotSaveErrorMessage = rawMessage;
       });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error
+                .toString()
+                .replaceFirst('Bad state: ', '')
+                .replaceFirst('Exception: ', ''),
+          ),
+          backgroundColor: redColor,
+        ),
+      );
     }
   }
 
@@ -11553,33 +11509,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
                 const SizedBox(height: 26),
 
-                if (_sphotSaveErrorMessage != null) ...[
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: redColor.withOpacity(0.07),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: redColor.withOpacity(0.35),
-                      ),
-                    ),
-                    child: Text(
-                      _sphotSaveErrorMessage!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: redColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-
                 SizedBox(
                   width: double.infinity,
                   height: 46,
@@ -13655,6 +13584,30 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     Overlay.of(context).insert(_dropdownOverlay!);
   }
 
+  void _centerMapOnAdministratorIfReady() {
+    if (!_mapReady ||
+        !_territoryCenterLoaded ||
+        _administratorInitialCenterApplied) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !_mapReady ||
+          !_territoryCenterLoaded ||
+          _administratorInitialCenterApplied) {
+        return;
+      }
+
+      try {
+        _mapController.move(_territoryCenter, _territoryZoom);
+        _administratorInitialCenterApplied = true;
+      } catch (error) {
+        debugPrint('Centrage initial Admin en attente : $error');
+      }
+    });
+  }
+
   Future<void> _loadAdministratorTerritoryCenter() async {
     try {
       final uid = widget.adminUid.trim();
@@ -13782,6 +13735,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _territoryCenterLoaded = true;
         _administratorTerritoryMarkerData = markerData;
       });
+
+      _centerMapOnAdministratorIfReady();
     } catch (error, stackTrace) {
       debugPrint('Erreur chargement position Admin : $error');
 
@@ -14919,9 +14874,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 mapController: _mapController,
                                 options: MapOptions(
                                   initialCenter: _territoryCenter,
-                                  initialZoom: 14.0,
+                                  initialZoom: _territoryZoom,
                                   minZoom: 2,
                                   maxZoom: 18,
+                                  onMapReady: () {
+                                    _mapReady = true;
+                                    _centerMapOnAdministratorIfReady();
+                                  },
                                   onTap: (_, point) {
                                     if (_showSphotEditorPanel &&
                                         _placingSphotOnMap) {
