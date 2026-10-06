@@ -35,7 +35,7 @@ class PublicSpotDetailPage extends StatelessWidget {
           children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(22, 16, 10, 16),
+              padding: const EdgeInsets.fromLTRB(22, 14, 10, 14),
               color: headerColor,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,6 +64,41 @@ class PublicSpotDetailPage extends StatelessWidget {
                             ),
                           ),
                         ],
+                        if (typeLabel.isNotEmpty) ...[
+                          const SizedBox(height: 7),
+                          if (spot.isPosteSecours)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SvgPicture.asset(
+                                  'data/icons/flag_red_yellow_5x3.svg',
+                                  width: 18,
+                                  height: 20,
+                                  fit: BoxFit.contain,
+                                ),
+                                const SizedBox(width: 7),
+                                const Text(
+                                  'POSTE DE SECOURS',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.15,
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
+                            Text(
+                              typeLabel.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.15,
+                              ),
+                            ),
+                        ],
                       ],
                     ),
                   ),
@@ -79,23 +114,6 @@ class PublicSpotDetailPage extends StatelessWidget {
                 ],
               ),
             ),
-            if (typeLabel.isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
-                color: Colors.white,
-                child: Text(
-                  typeLabel.toUpperCase(),
-                  style: TextStyle(
-                    color: spot.isPosteSecours
-                        ? const Color(0xFFFF0000)
-                        : const Color(0xFF172033),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
