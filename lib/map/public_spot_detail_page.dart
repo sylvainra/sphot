@@ -22,36 +22,11 @@ class PublicSpotDetailPage extends StatelessWidget {
 
   const PublicSpotDetailPage({super.key, required this.spot});
 
-  Future<void> _openUrl(BuildContext context, String rawUrl) async {
-    var url = rawUrl.trim();
-    if (url.isEmpty) return;
-
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'https://$url';
-    }
-
-    final uri = Uri.tryParse(url);
-    final opened =
-        uri != null &&
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-
-    if (!opened && context.mounted) {
-    }
-  }
-
-  Future<void> _call(BuildContext context) async {
-    final phone = spot.phone.replaceAll(RegExp(r'[^0-9+]'), '');
-    if (phone.isEmpty) return;
-
-    final opened = await launchUrl(Uri(scheme: 'tel', path: phone));
-    if (!opened && context.mounted) {
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final headerColor = Color(spot.markerColor);
     final commune = spot.ville.trim();
+    final typeLabel = spot.typeSphot.trim();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FA),
@@ -60,203 +35,73 @@ class PublicSpotDetailPage extends StatelessWidget {
           children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(22, 16, 18, 18),
+              padding: const EdgeInsets.fromLTRB(22, 16, 10, 16),
               color: headerColor,
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    spot.mapDisplayName.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          spot.mapDisplayName.toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            height: 1.10,
+                          ),
+                        ),
+                        if (commune.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            commune.toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  if (commune.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      commune.toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  IconButton(
+                    tooltip: 'Fermer',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white,
+                      size: 28,
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Container(
+            if (typeLabel.isNotEmpty)
+              Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 2,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: const Color(0xFFDCE3EA),
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+                color: Colors.white,
+                child: Text(
+                  typeLabel.toUpperCase(),
+                  style: TextStyle(
+                    color: spot.isPosteSecours
+                        ? const Color(0xFFFF0000)
+                        : const Color(0xFF172033),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.2,
                   ),
-                ),
-                child: _PublicInfoLine(
-                  iconAssetPath: spot.isPosteSecours
-                      ? 'data/icons/fire_red_icon.svg'
-                      : spot.markerIconPath,
-                  iconVerticalOffset: -9,
-                  label: 'Type de SPHOT',
-                  value: spot.typeSphot,
-                  valueColor: const Color(0xFF1E3A8A),
-                  valueWidget: spot.isPosteSecours
-                      ? const _PublicRescueStationValue()
-                      : null,
                 ),
               ),
-            ),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 760),
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFDCE3EA)),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x16000000),
-                            blurRadius: 18,
-                            offset: Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _LiveOperationalSnapshot(
-                            initialSpot: spot,
-                          ),
-                          if (spot.publicMediaUrl.isNotEmpty) ...[
-                            const SizedBox(height: 14),
-                            const Divider(),
-                            const SizedBox(height: 8),
-                            _PublicWebcamSection(
-                              url: spot.publicMediaUrl,
-                              isPhoto: spot.publicMediaIsPhoto,
-                            ),
-                            const SizedBox(height: 14),
-                            const Divider(),
-                          ],
-                          if (spot.periode.isNotEmpty)
-                            _PublicInfoLine(
-                              icon: Icons.date_range_outlined,
-                              label: 'Période de surveillance',
-                              value: spot.periode,
-                            ),
-                          if (spot.heureDebut.isNotEmpty ||
-                              spot.heureFin.isNotEmpty)
-                            _PublicInfoLine(
-                              icon: Icons.schedule_outlined,
-                              label: 'Horaires',
-                              value: [
-                                spot.heureDebut,
-                                spot.heureFin,
-                              ].where((value) => value.isNotEmpty).join(' – '),
-                            ),
-                          if (spot.phone.isNotEmpty)
-                            _PublicInfoLine(
-                              icon: Icons.phone_outlined,
-                              label: 'Téléphone public',
-                              value: spot.phone,
-                              onTap: () => _call(context),
-                            ),
-                          if (spot.activite.isNotEmpty)
-                            _PublicInfoLine(
-                              icon: Icons.waves_outlined,
-                              label: 'Activités',
-                              value: spot.activite,
-                            ),
-                          if (spot.publicEquipment.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            _PublicChips(
-                              title: 'Équipements',
-                              values: spot.publicEquipment,
-                            ),
-                          ],
-                          if (spot.publicLabels.isNotEmpty) ...[
-                            const SizedBox(height: 14),
-                            _PublicChips(
-                              title: 'Labels',
-                              values: spot.publicLabels,
-                              showLabelIcons: true,
-                            ),
-                          ],
-                          if (spot.siteInternetVille.isNotEmpty ||
-                              spot.arretesMunicipaux.isNotEmpty) ...[
-                            const SizedBox(height: 20),
-                            const Divider(),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'LIENS PUBLICS',
-                              style: _publicSectionTitleStyle,
-                            ),
-                            const SizedBox(height: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (spot.siteInternetVille.isNotEmpty)
-                                  _PublicLinkButton(
-                                    icon: Icons.language,
-                                    label: 'Site internet du lieu',
-                                    onTap: () => _openUrl(
-                                      context,
-                                      spot.siteInternetVille,
-                                    ),
-                                  ),
-                                if (spot.siteInternetVille.isNotEmpty &&
-                                    spot.arretesMunicipaux.isNotEmpty)
-                                  const SizedBox(height: 8),
-                                if (spot.arretesMunicipaux.isNotEmpty)
-                                  _PublicLinkButton(
-                                    icon: Icons.gavel_outlined,
-                                    label: 'Réglementation de baignade',
-                                    onTap: () => _openUrl(
-                                      context,
-                                      spot.arretesMunicipaux,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                          const SizedBox(height: 24),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () => Navigator.of(context).pop(),
-                              icon: const Icon(Icons.map_outlined),
-                              label: const Text('RETOUR À LA CARTE'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1E3A8A),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 15,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                child: PublicSpotMobileSheet(
+                  spot: spot,
+                  desktopMode: true,
                 ),
               ),
             ),
@@ -270,10 +115,12 @@ class PublicSpotDetailPage extends StatelessWidget {
 
 class PublicSpotMobileSheet extends StatefulWidget {
   final SpotFlagState spot;
+  final bool desktopMode;
 
   const PublicSpotMobileSheet({
     super.key,
     required this.spot,
+    this.desktopMode = false,
   });
 
   @override
@@ -968,12 +815,14 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         return Material(
           color: Colors.transparent,
           child: Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFFF4F7FA),
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(24),
-              ),
-              boxShadow: [
+            decoration: BoxDecoration(
+              color: const Color(0xFFF4F7FA),
+              borderRadius: widget.desktopMode
+                  ? BorderRadius.circular(18)
+                  : const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+              boxShadow: const [
                 BoxShadow(
                   color: Color(0x26000000),
                   blurRadius: 22,
@@ -983,19 +832,22 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             ),
             child: Column(
               children: [
-                SizedBox(
-                  height: 26,
-                  child: Center(
-                    child: Container(
-                      width: 44,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFB9C2CC),
-                        borderRadius: BorderRadius.circular(99),
+                if (!widget.desktopMode)
+                  SizedBox(
+                    height: 26,
+                    child: Center(
+                      child: Container(
+                        width: 44,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFB9C2CC),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
                       ),
                     ),
-                  ),
-                ),
+                  )
+                else
+                  const SizedBox(height: 10),
                 if (currentSpot.isPosteSecours)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
