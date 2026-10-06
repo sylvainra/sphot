@@ -336,6 +336,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Map<String, dynamic>? _administratorTerritoryMarkerData;
 
   bool _territoryCenterLoaded = false;
+  bool _mapReady = false;
+  bool _administratorInitialCenterApplied = false;
 
   int _selectedTileStyle = 0;
 
@@ -13582,6 +13584,30 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     Overlay.of(context).insert(_dropdownOverlay!);
   }
 
+  void _centerMapOnAdministratorIfReady() {
+    if (!_mapReady ||
+        !_territoryCenterLoaded ||
+        _administratorInitialCenterApplied) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !_mapReady ||
+          !_territoryCenterLoaded ||
+          _administratorInitialCenterApplied) {
+        return;
+      }
+
+      try {
+        _mapController.move(_territoryCenter, _territoryZoom);
+        _administratorInitialCenterApplied = true;
+      } catch (error) {
+        debugPrint('Centrage initial Admin en attente : $error');
+      }
+    });
+  }
+
   Future<void> _loadAdministratorTerritoryCenter() async {
     try {
       final uid = widget.adminUid.trim();
@@ -13709,6 +13735,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _territoryCenterLoaded = true;
         _administratorTerritoryMarkerData = markerData;
       });
+
+      _centerMapOnAdministratorIfReady();
     } catch (error, stackTrace) {
       debugPrint('Erreur chargement position Admin : $error');
 
@@ -14846,9 +14874,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 mapController: _mapController,
                                 options: MapOptions(
                                   initialCenter: _territoryCenter,
-                                  initialZoom: 14.0,
+                                  initialZoom: _territoryZoom,
                                   minZoom: 2,
                                   maxZoom: 18,
+                                  onMapReady: () {
+                                    _mapReady = true;
+                                    _centerMapOnAdministratorIfReady();
+                                  },
                                   onTap: (_, point) {
                                     if (_showSphotEditorPanel &&
                                         _placingSphotOnMap) {
