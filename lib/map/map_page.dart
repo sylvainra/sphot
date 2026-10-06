@@ -2542,6 +2542,12 @@ Widget _buildBottomBar() {
 }
 
   PreferredSizeWidget _buildAppBar() {
+  final screenWidth = MediaQuery.sizeOf(context).width;
+  final isDesktopWebDetailOpen =
+      kIsWeb && screenWidth >= 900 && _selectedPublicSpotId != null;
+  final detailPanelWidth =
+      isDesktopWebDetailOpen ? min(500.0, screenWidth * 0.40) : 0.0;
+
   return PreferredSize(
     preferredSize: const Size.fromHeight(66),
     child: SafeArea(
@@ -2552,7 +2558,7 @@ Widget _buildBottomBar() {
           Positioned(
             top: 3,
             left: 0,
-            right: 0,
+            right: detailPanelWidth,
             child: Center(
               child: Image.asset(
                 'data/icons/title.png',
