@@ -1092,18 +1092,43 @@ SpotFlagState? _findBestSpotMatch(
     final screenWidth = MediaQuery.sizeOf(context).width;
 
     if (kIsWeb && screenWidth >= 900) {
-      showGeneralDialog<void>(
+      setState(() {
+        _selectedPublicSpotId = spot.id;
+      });
+
+      const selectedWebSpotZoom = 17.2;
+      final selectedWebSpotCenter = LatLng(spot.lat, spot.lng);
+
+      _mapController.move(
+        selectedWebSpotCenter,
+        selectedWebSpotZoom,
+      );
+
+      unawaited(
+        Future<void>.delayed(
+          const Duration(milliseconds: 220),
+          () {
+            if (!mounted || _selectedPublicSpotId != spot.id) return;
+            _mapController.move(
+              selectedWebSpotCenter,
+              selectedWebSpotZoom,
+            );
+          },
+        ),
+      );
+
+      await showGeneralDialog<void>(
         context: context,
         barrierDismissible: true,
         barrierLabel: 'Fermer la fiche publique',
-        barrierColor: Colors.black.withOpacity(0.12),
+        barrierColor: Colors.black.withOpacity(0.08),
         transitionDuration: const Duration(milliseconds: 320),
         pageBuilder: (_, __, ___) {
           return SafeArea(
             child: Align(
               alignment: Alignment.centerRight,
               child: SizedBox(
-                width: min(460, screenWidth * 0.38),
+                width: min(500, screenWidth * 0.40),
                 height: double.infinity,
                 child: ClipRRect(
                   borderRadius: const BorderRadius.only(
@@ -1134,6 +1159,18 @@ SpotFlagState? _findBestSpotMatch(
           );
         },
       );
+
+      await _loadFavoriteSpotIds();
+
+      if (mounted) {
+        setState(() {
+          if (_selectedPublicSpotId == spot.id) {
+            _selectedPublicSpotId = null;
+          }
+          _mapTileRefreshVersion++;
+        });
+      }
+
       return;
     }
 
