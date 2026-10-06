@@ -69,6 +69,8 @@ class _MapPageState extends State<MapPage> {
   int _mapTileRefreshVersion = 0;
   int _selectedBottomIndex = 1;
   String? _selectedPublicSpotId;
+  static const double _desktopSelectedAdBottom = 6.0;
+  static const double _desktopSelectedAdHeight = 142.0;
   Set<String> _favoriteSpotIds = <String>{};
   bool _showFavoritesOnly = false;
   bool _isMovingMap = false;
@@ -419,14 +421,16 @@ Future<void> _toggleFavoritesFilter() async {
     double rotation, {
     required Size screenSize,
     required double panelWidth,
+    required double bottomOverlayHeight,
   }) {
     final spotPoint = _mercatorPixelPoint(spot, zoom);
 
-    // Le panneau droit recouvre une partie de la carte. Le SPHOT doit être
-    // centré dans la zone de carte réellement visible à gauche du panneau.
+    // Le panneau droit retire de la largeur utile et la publicité agrandie
+    // retire de la hauteur utile. Le SPHOT est centré dans le rectangle
+    // réellement visible de la carte, au-dessus de la publicité.
     final desiredScreenOffset = Offset(
       -panelWidth / 2,
-      0,
+      -bottomOverlayHeight / 2,
     );
     final angle = rotation * pi / 180.0;
 
@@ -1128,15 +1132,18 @@ SpotFlagState? _findBestSpotMatch(
         _selectedPublicSpotId = spot.id;
       });
 
-      const selectedWebSpotZoom = 18.8;
+      const selectedWebSpotZoom = 19.0;
       final screenSize = MediaQuery.sizeOf(context);
       final panelWidth = min(500.0, screenSize.width * 0.40);
+      final bottomOverlayHeight =
+          _desktopSelectedAdHeight + _desktopSelectedAdBottom;
       final selectedWebSpotCenter = _webSelectedSpotCameraCenter(
         spot,
         selectedWebSpotZoom,
         _currentRotation,
         screenSize: screenSize,
         panelWidth: panelWidth,
+        bottomOverlayHeight: bottomOverlayHeight,
       );
 
       _mapController.move(
@@ -2288,8 +2295,10 @@ Widget _buildAdBanner() {
   // Quand le panneau droit est ouvert, l'espace publicitaire garde son bord
   // supérieur mais s'étend jusqu'en bas à la place du menu inférieur.
   // Sa largeur s'arrête avant le panneau afin de ne jamais passer dessous.
-  final bannerBottom = isDesktopWebDetailOpen ? 6.0 : 58.0;
-  final bannerHeight = isDesktopWebDetailOpen ? 142.0 : 90.0;
+  final bannerBottom =
+      isDesktopWebDetailOpen ? _desktopSelectedAdBottom : 58.0;
+  final bannerHeight =
+      isDesktopWebDetailOpen ? _desktopSelectedAdHeight : 90.0;
   final bannerRight = isDesktopWebDetailOpen ? detailPanelWidth + 8.0 : 8.0;
 
   return Positioned(
