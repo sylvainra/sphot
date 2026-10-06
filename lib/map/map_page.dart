@@ -413,6 +413,38 @@ Future<void> _toggleFavoritesFilter() async {
     return _latLngFromMercatorPixelPoint(centerPoint, zoom);
   }
 
+  LatLng _webSelectedSpotCameraCenter(
+    SpotFlagState spot,
+    double zoom,
+    double rotation, {
+    required Size screenSize,
+    required double panelWidth,
+  }) {
+    final spotPoint = _mercatorPixelPoint(spot, zoom);
+
+    // Le panneau droit recouvre une partie de la carte. Le SPHOT doit être
+    // centré dans la zone de carte réellement visible à gauche du panneau.
+    final desiredScreenOffset = Offset(
+      -panelWidth / 2,
+      0,
+    );
+    final angle = rotation * pi / 180.0;
+
+    final mapDx =
+        desiredScreenOffset.dx * cos(angle) +
+        desiredScreenOffset.dy * sin(angle);
+    final mapDy =
+        -desiredScreenOffset.dx * sin(angle) +
+        desiredScreenOffset.dy * cos(angle);
+
+    final centerPoint = Offset(
+      spotPoint.dx - mapDx,
+      spotPoint.dy - mapDy,
+    );
+
+    return _latLngFromMercatorPixelPoint(centerPoint, zoom);
+  }
+
   Set<String> _automaticTouchLabelIds(
     List<SpotFlagState> spots,
     double zoom,
@@ -1096,8 +1128,16 @@ SpotFlagState? _findBestSpotMatch(
         _selectedPublicSpotId = spot.id;
       });
 
-      const selectedWebSpotZoom = 17.2;
-      final selectedWebSpotCenter = LatLng(spot.lat, spot.lng);
+      const selectedWebSpotZoom = 18.3;
+      final screenSize = MediaQuery.sizeOf(context);
+      final panelWidth = min(500.0, screenSize.width * 0.40);
+      final selectedWebSpotCenter = _webSelectedSpotCameraCenter(
+        spot,
+        selectedWebSpotZoom,
+        _currentRotation,
+        screenSize: screenSize,
+        panelWidth: panelWidth,
+      );
 
       _mapController.move(
         selectedWebSpotCenter,
@@ -1128,7 +1168,7 @@ SpotFlagState? _findBestSpotMatch(
             child: Align(
               alignment: Alignment.centerRight,
               child: SizedBox(
-                width: min(500, screenWidth * 0.40),
+                width: panelWidth,
                 height: double.infinity,
                 child: ClipRRect(
                   borderRadius: const BorderRadius.only(
@@ -1823,7 +1863,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
     left: 8,
     right: 8,
     top: MediaQuery.of(context).padding.top +
-        (_useAutomaticTouchLabels ? 64 : 50),
+        (kIsWeb ? 66 : (_useAutomaticTouchLabels ? 64 : 50)),
     child: Row(
       children: [
         Expanded(
