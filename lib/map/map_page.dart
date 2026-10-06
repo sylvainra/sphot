@@ -1128,7 +1128,7 @@ SpotFlagState? _findBestSpotMatch(
         _selectedPublicSpotId = spot.id;
       });
 
-      const selectedWebSpotZoom = 18.3;
+      const selectedWebSpotZoom = 18.8;
       final screenSize = MediaQuery.sizeOf(context);
       final panelWidth = min(500.0, screenSize.width * 0.40);
       final selectedWebSpotCenter = _webSelectedSpotCameraCenter(
@@ -1863,7 +1863,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
     left: 8,
     right: 8,
     top: MediaQuery.of(context).padding.top +
-        (kIsWeb ? 66 : (_useAutomaticTouchLabels ? 64 : 50)),
+        (kIsWeb ? 78 : (_useAutomaticTouchLabels ? 64 : 50)),
     child: Row(
       children: [
         Expanded(
@@ -2279,16 +2279,29 @@ shadows: const [
 }
 
 Widget _buildAdBanner() {
+  final screenWidth = MediaQuery.sizeOf(context).width;
+  final isDesktopWebDetailOpen =
+      kIsWeb && screenWidth >= 900 && _selectedPublicSpotId != null;
+  final detailPanelWidth =
+      isDesktopWebDetailOpen ? min(500.0, screenWidth * 0.40) : 0.0;
+
+  // Quand le panneau droit est ouvert, l'espace publicitaire garde son bord
+  // supérieur mais s'étend jusqu'en bas à la place du menu inférieur.
+  // Sa largeur s'arrête avant le panneau afin de ne jamais passer dessous.
+  final bannerBottom = isDesktopWebDetailOpen ? 6.0 : 58.0;
+  final bannerHeight = isDesktopWebDetailOpen ? 142.0 : 90.0;
+  final bannerRight = isDesktopWebDetailOpen ? detailPanelWidth + 8.0 : 8.0;
+
   return Positioned(
     left: 8,
-    right: 8,
-    bottom: 58,
+    right: bannerRight,
+    bottom: bannerBottom,
     child: GestureDetector(
       onTap: () {
         unawaited(_openAdvertiserWebsite());
       },
       child: Container(
-        height: 90,
+        height: bannerHeight,
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.22),
           borderRadius: BorderRadius.circular(14),
@@ -2521,14 +2534,14 @@ Widget _buildBottomBar() {
 
   PreferredSizeWidget _buildAppBar() {
   return PreferredSize(
-    preferredSize: const Size.fromHeight(58),
+    preferredSize: const Size.fromHeight(66),
     child: SafeArea(
       bottom: false,
       child: Stack(
         alignment: Alignment.topCenter,
         children: [
           Positioned(
-            top: -5,
+            top: 3,
             left: 0,
             right: 0,
             child: Center(
@@ -2755,7 +2768,10 @@ Positioned(
 
 _buildVerticalFilterMenu(),
 _buildAdBanner(),
-_buildBottomBar(),
+if (!(kIsWeb &&
+    MediaQuery.sizeOf(context).width >= 900 &&
+    _selectedPublicSpotId != null))
+  _buildBottomBar(),
                 ],
               );
             },
