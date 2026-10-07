@@ -1210,8 +1210,9 @@ async function expireTrial(subscriptionDoc, now) {
       <p>Votre configuration, vos périodes et vos sauveteurs restent enregistrés.</p>
       <p>Vous pouvez réactiver les fonctions temps réel avec l’abonnement annuel SPHOT ADMIN
       au tarif de <strong>${currency(price)} HT par an et par poste de secours</strong>.</p>
-      <p>Montant prévisionnel actuel : <strong>${currency(annual)} HT / an</strong>
-      pour ${stations} poste(s) de secours.</p>
+      <p>Vous pourrez sélectionner les postes de secours que vous souhaitez couvrir.
+      À titre indicatif, si les ${stations} poste(s) actuellement recensé(s) étaient
+      tous sélectionnés, le montant serait de <strong>${currency(annual)} HT / an</strong>.</p>
       <p><a href="${SPHOT_LOGIN_URL}">Accéder à SPHOT ADMIN</a></p>
       <p>Cordialement,<br>L’équipe SPHOT</p>`;
     await sendLifecycleMail({
@@ -1241,8 +1242,9 @@ async function sendTrialReminder(subscriptionDoc) {
     <p>Afin d’éviter toute interruption des fonctions temps réel, vous pouvez dès maintenant
     préparer votre abonnement annuel SPHOT ADMIN.</p>
     <p>Tarif : <strong>${currency(price)} HT / an / poste de secours</strong>.<br>
-    Montant prévisionnel : <strong>${currency(annual)} HT / an</strong>
-    pour ${stations} poste(s).</p>
+    Vous pourrez sélectionner les postes à couvrir. À titre indicatif, si les
+    ${stations} poste(s) actuellement recensé(s) étaient tous sélectionnés,
+    le montant serait de <strong>${currency(annual)} HT / an</strong>.</p>
     <p><a href="${SPHOT_LOGIN_URL}">Accéder à SPHOT ADMIN</a></p>
     <p>Cordialement,<br>L’équipe SPHOT</p>`;
   const sent = await sendLifecycleMail({
