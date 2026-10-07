@@ -776,8 +776,10 @@ async function territoryRealtimeScope(db, territoireId) {
     granted: false,
     allSpots: false,
     allSpotsSince: null,
+    allSpotsUntil: undefined,
     spotIds: new Set(),
     spotSince: new Map(),
+    spotUntil: new Map(),
   };
 
   if (!territoireId) return emptyScope;
@@ -785,14 +787,24 @@ async function territoryRealtimeScope(db, territoireId) {
   const adminDocuments = await territoryAdminDocuments(db, territoireId);
   const spotIds = new Set();
   const spotSince = new Map();
+  const spotUntil = new Map();
   let granted = false;
   let allSpots = false;
   let allSpotsSince = null;
+  let allSpotsUntil;
 
   const keepEarliestDate = (current, candidate) => {
     if (!candidate) return current;
     if (!current) return candidate;
     return candidate.getTime() < current.getTime() ? candidate : current;
+  };
+
+  const keepLatestExpiry = (current, candidate) => {
+    // undefined = aucune valeur fusionnée ; null = droit sans échéance connue.
+    if (current === null || candidate === null) return null;
+    if (candidate === undefined) return current;
+    if (current === undefined) return candidate;
+    return candidate.getTime() > current.getTime() ? candidate : current;
   };
 
   for (const document of adminDocuments) {
@@ -824,12 +836,14 @@ async function territoryRealtimeScope(db, territoireId) {
         const trialSince =
           firestoreDate(subscription.trialStartDate) ||
           firestoreDate(subscription.trialActivatedAt);
+        const trialUntil = firestoreDate(subscription.trialEndDate);
 
         // L'essai de 8 jours couvre tous les SPHOTS surveillés du territoire,
         // y compris un poste créé pendant la période d'essai. La sélection
         // poste par poste n'intervient qu'au moment de l'abonnement payant.
         allSpots = true;
         allSpotsSince = keepEarliestDate(allSpotsSince, trialSince);
+        allSpotsUntil = keepLatestExpiry(allSpotsUntil, trialUntil);
         continue;
       }
 
@@ -837,6 +851,8 @@ async function territoryRealtimeScope(db, territoireId) {
       const subscriptionStart =
         firestoreDate(subscription.subscriptionStartDate) ||
         firestoreDate(subscription.subscriptionActivatedAt);
+      const subscriptionUntil =
+        firestoreDate(subscription.subscriptionEndDate);
       const previousTrialStart = firestoreDate(subscription.trialStartDate);
       const previousTrialEnd = firestoreDate(subscription.trialEndDate);
       const continuesActiveTrial = Boolean(
@@ -856,6 +872,10 @@ async function territoryRealtimeScope(db, territoireId) {
             allSpotsSince,
             subscriptionSince,
         );
+        allSpotsUntil = keepLatestExpiry(
+            allSpotsUntil,
+            subscriptionUntil,
+        );
       } else {
         selectedIds.forEach((id) => {
           // L'essai couvre tous les SPHOTS surveillés. Si l'abonnement
@@ -869,6 +889,13 @@ async function territoryRealtimeScope(db, territoireId) {
           spotSince.set(
               id,
               keepEarliestDate(spotSince.get(id) || null, enabledSince),
+          );
+          spotUntil.set(
+              id,
+              keepLatestExpiry(
+                  spotUntil.has(id) ? spotUntil.get(id) : undefined,
+                  subscriptionUntil,
+              ),
           );
         });
       }
@@ -886,8 +913,10 @@ async function territoryRealtimeScope(db, territoireId) {
     granted,
     allSpots,
     allSpotsSince,
+    allSpotsUntil,
     spotIds,
     spotSince,
+    spotUntil,
   };
 }
 
