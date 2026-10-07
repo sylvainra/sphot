@@ -4670,7 +4670,7 @@ async function resolveSauveteurOperationalContext(accountData, login) {
   } else if (assignedSpotIds.length === 0) {
     modeReason = "no_active_assignment";
   } else if (!diffusionAccessGranted) {
-    modeReason = "administration_diffusion_off";
+    modeReason = "realtime_not_enabled_for_assignment";
   } else if (!assignmentPeriods.active) {
     modeReason = assignmentPeriods.reason;
   }
