@@ -25,14 +25,33 @@ const SPHOT_SAUVETEUR_LOGIN_URL =
 setGlobalOptions({maxInstances: 10});
 
 /**
+ * Indique si un SPHOT correspond à un poste de secours / SPHOT surveillé.
+ *
+ * @param {Object} spot Données du SPHOT.
+ * @return {boolean} Vrai pour un SPHOT surveillé.
+ */
+function isSupervisedSpotData(spot) {
+  const data = spot || {};
+  const type = (data.typeSphot || "").toString().trim().toUpperCase();
+
+  return data.isPosteSecours === true || type.includes("POSTE DE SECOURS");
+}
+
+/**
  * Construit la projection strictement publique d'un SPHOT.
  *
  * @param {string} territoireId Identifiant du territoire.
  * @param {string} spotId Identifiant du SPHOT.
  * @param {Object} spot Données internes du SPHOT.
+ * @param {boolean} realtimeAvailable Disponibilité du service temps réel.
  * @return {Object} Données autorisées sur la carte publique.
  */
-function buildPublicSpot(territoireId, spotId, spot) {
+function buildPublicSpot(
+    territoireId,
+    spotId,
+    spot,
+    realtimeAvailable = true,
+) {
   const publicFields = [
     "idSphot",
     "nomSecours",
@@ -98,7 +117,65 @@ function buildPublicSpot(territoireId, spotId, spot) {
     result.adresseWebcam = webcamUrl;
   }
 
+  const supervised = isSupervisedSpotData(spot);
+
+  if (supervised) {
+    result.realtimeAvailable = realtimeAvailable === true;
+    result.realtimeStatus = realtimeAvailable === true ?
+      "available" :
+      "unavailable";
+
+    if (!realtimeAvailable) {
+      [
+        "liveFlag",
+        "statutBaignade",
+        "periode",
+        "heureDebut",
+        "heureFin",
+        "dangers",
+        "meteoTerrestre",
+        "meteoMarine",
+        "ephemeride",
+        "notificationPublique",
+      ].forEach((field) => {
+        delete result[field];
+      });
+    }
+  } else {
+    result.realtimeStatus = "not_applicable";
+  }
+
   result.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+  return result;
+}
+
+/**
+ * Construit un état public indiquant que le temps réel n'est pas disponible.
+ *
+ * @return {Object} Mise à jour Firestore à fusionner.
+ */
+function buildUnavailablePublicLiveState() {
+  const result = {
+    realtimeAvailable: false,
+    realtimeStatus: "unavailable",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  [
+    "liveFlag",
+    "statutBaignade",
+    "periode",
+    "heureDebut",
+    "heureFin",
+    "dangers",
+    "meteoTerrestre",
+    "meteoMarine",
+    "ephemeride",
+    "notificationPublique",
+  ].forEach((field) => {
+    result[field] = admin.firestore.FieldValue.delete();
+  });
+
   return result;
 }
 
@@ -273,6 +350,9 @@ async function reconcilePublicTerritory(territoireId, publish) {
   if (!territoireId) return;
 
   const db = admin.firestore();
+  const realtimeAvailable = publish ?
+    await territoryDiffusionAccessGranted(db, territoireId) :
+    false;
   const territoryReference = db.collection("territoires").doc(territoireId);
   const publicSnapshot = await db
       .collection("publicSpots")
@@ -421,6 +501,7 @@ async function reconcilePublicTerritory(territoireId, publish) {
                 ),
                 territoryData,
             ),
+            realtimeAvailable,
         ),
       });
     });
@@ -600,15 +681,48 @@ async function territoryDiffusionAccessGranted(db, territoireId) {
 }
 
 /**
- * Vérifie que le territoire dispose d'un administrateur approuvé
- * dont les droits de diffusion SPHOT sont actuellement ouverts.
+ * Vérifie que le territoire dispose d'un accès administrateur approuvé.
+ *
+ * La publication des SPHOTS est indépendante de l'essai et de l'abonnement.
+ * Ces derniers ne pilotent que la disponibilité des informations temps réel.
  *
  * @param {string} territoireId Identifiant du territoire.
  * @return {Promise<boolean>}
  */
 async function isTerritoryPublic(territoireId) {
+  if (!territoireId) return false;
+
   const db = admin.firestore();
-  return territoryDiffusionAccessGranted(db, territoireId);
+
+  const nestedRequests = await db.collection("adminRequests")
+      .where("territoire.territoireId", "==", territoireId)
+      .get();
+
+  if (nestedRequests.docs.some(
+      (document) => isApprovedAdminRequest(document.data() || {}),
+  )) {
+    return true;
+  }
+
+  const legacyRequests = await db.collection("adminRequests")
+      .where("territoireId", "==", territoireId)
+      .get();
+
+  if (legacyRequests.docs.some(
+      (document) => isApprovedAdminRequest(document.data() || {}),
+  )) {
+    return true;
+  }
+
+  const adminSnapshot = await db.collection("admins")
+      .where("territoireId", "==", territoireId)
+      .get();
+
+  return adminSnapshot.docs.some((document) => {
+    const data = document.data() || {};
+    return (data.accessStatus || "").toString().trim().toLowerCase() ===
+      "approved";
+  });
 }
 
 /**
@@ -3427,10 +3541,51 @@ exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
       const liveState = buildPublicLiveState(
           event.data.after.exists ? event.data.after.data() : {},
       );
+      const diffusionByTerritory = new Map();
       const batch = db.batch();
-      publicSnapshot.docs.forEach((document) => {
-        batch.set(document.ref, liveState, {merge: true});
-      });
+
+      for (const document of publicSnapshot.docs) {
+        const publicData = document.data() || {};
+        const territoireId = (publicData.territoireId || "")
+            .toString()
+            .trim();
+        const supervised = isSupervisedSpotData(publicData);
+
+        if (!supervised) {
+          batch.set(document.ref, liveState, {merge: true});
+          continue;
+        }
+
+        if (!diffusionByTerritory.has(territoireId)) {
+          diffusionByTerritory.set(
+              territoireId,
+              await territoryDiffusionAccessGranted(db, territoireId),
+          );
+        }
+
+        const realtimeAvailable =
+          diffusionByTerritory.get(territoireId) === true;
+
+        if (!realtimeAvailable) {
+          batch.set(
+              document.ref,
+              buildUnavailablePublicLiveState(),
+              {merge: true},
+          );
+          continue;
+        }
+
+        batch.set(
+            document.ref,
+            {
+              ...liveState,
+              realtimeAvailable: true,
+              realtimeStatus: "available",
+            },
+            {merge: true},
+        );
+      }
+
       await batch.commit();
     },
 );
