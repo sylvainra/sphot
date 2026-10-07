@@ -19,7 +19,7 @@ class _AdminAccessPageState extends State<AdminAccessPage> {
     if (_opening) return;
 
     if (kIsWeb) {
-      Navigator.of(context).pushReplacementNamed('/admin-request-form');
+      Navigator.of(context).pushReplacementNamed('/admin-legal');
       return;
     }
 
@@ -29,7 +29,7 @@ class _AdminAccessPageState extends State<AdminAccessPage> {
     });
 
     final opened = await launchUrl(
-      Uri.parse('https://sphot.app/#/admin-request-form'),
+      Uri.parse('https://sphot.app/#/admin-legal'),
       mode: LaunchMode.externalApplication,
     );
 
