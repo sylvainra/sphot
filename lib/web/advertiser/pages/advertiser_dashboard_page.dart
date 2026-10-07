@@ -61,9 +61,9 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
       'Positionnez votre entreprise et enregistrez votre visuel.',
     ),
     _AdvertiserSection(
-      'VALIDATIONS JURIDIQUES',
+      'RAPPEL JURIDIQUE',
       Icons.gavel_rounded,
-      'Consultez et acceptez les documents avant de transmettre la demande.',
+      'Relisez les règles acceptées avant votre saisie puis transmettez la demande.',
     ),
   ];
 
@@ -863,6 +863,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           return [
             AdvertiserLegalAcceptanceSection(
               readOnly: _applicationLocked,
+              reminderOnly: true,
               key: ValueKey<String>(
                 'advertiser-legal-${_requestId ?? 'unknown'}',
               ),
