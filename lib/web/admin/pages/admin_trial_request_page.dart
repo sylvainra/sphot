@@ -1185,6 +1185,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
     try {
       final territoryId = _territoryId();
+      final legalVersionId = _sphotVersion.trim().replaceAll('.', '_');
       final user = FirebaseAuth.instance.currentUser;
 
       final adminRequestsCollection = FirebaseFirestore.instance.collection(
@@ -1420,6 +1421,9 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           'legalAcceptance': {
             'accepted': true,
             'version': _sphotVersion,
+            'legalVersion': _sphotVersion,
+            'legalVersionId': legalVersionId,
+            'legalPackPath': 'legalPacks/versions/items/$legalVersionId',
             'publishedAt': _sphotPublishedAt,
             'acceptedAt': FieldValue.serverTimestamp(),
             'representativeDeclaration': _certifyRepresentative,
