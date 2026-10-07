@@ -5150,10 +5150,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       summary['monitoredSpots'] ?? const [],
     );
 
-    final otherSpots = List<Map<String, dynamic>>.from(
-      summary['otherSpots'] ?? const [],
-    );
-
     final firestore = FirebaseFirestore.instance;
     final requestReference = firestore.collection('adminRequests').doc(uid);
 
