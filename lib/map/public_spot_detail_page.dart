@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -151,6 +153,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   bool _isSaved = false;
   late final List<GlobalKey> _pageTabKeys;
   late final ScrollController _contentScrollController;
+  Timer? _realtimeExpiryRefreshTimer;
 
   static const List<(String, IconData)> _pages = [
     ('Live', Icons.sensors_rounded),
@@ -169,11 +172,18 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
       (_) => GlobalKey(),
     );
     _contentScrollController = ScrollController();
+    _realtimeExpiryRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) {
+        if (mounted) setState(() {});
+      },
+    );
     _loadSavedState();
   }
 
   @override
   void dispose() {
+    _realtimeExpiryRefreshTimer?.cancel();
     _contentScrollController.dispose();
     super.dispose();
   }
