@@ -11,6 +11,7 @@ import 'map/profil_login_page.dart';
 import 'web/advertiser/web_advertiser_app.dart';
 import 'web/advertiser/pages/advertiser_first_access_page.dart';
 import 'web/admin/pages/admin_access_page.dart';
+import 'web/admin/pages/admin_legal_acceptance_page.dart';
 import 'web/admin/pages/admin_trial_request_page.dart';
 import 'web/admin/pages/admin_dashboard_page.dart';
 import 'web/institutional/pages/institutional_main_courante_page.dart';
@@ -155,10 +156,20 @@ class SphotApp extends StatelessWidget {
       );
     }
 
-    if (uri.path == '/admin-request-form') {
+    if (uri.path == '/admin-legal') {
       return MaterialPageRoute(
         settings: settings,
-        builder: (_) => const AdminTrialRequestPage(),
+        builder: (_) => const AdminLegalAcceptancePage(),
+      );
+    }
+
+    if (uri.path == '/admin-request-form') {
+      final requestId = uri.queryParameters['requestId']?.trim() ?? '';
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => requestId.isEmpty
+            ? const AdminLegalAcceptancePage()
+            : AdminTrialRequestPage(draftRequestId: requestId),
       );
     }
 
