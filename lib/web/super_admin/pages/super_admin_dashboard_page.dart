@@ -5407,6 +5407,27 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     );
   }
 
+  void _startNewLegalChapter(String documentTitle, List<String> chapters) {
+    var highestOrder = 0;
+
+    for (final chapter in chapters) {
+      final match = RegExp(r'^(\d+)').firstMatch(chapter);
+      final value = match == null ? null : int.tryParse(match.group(1)!);
+      if (value != null && value > highestOrder) {
+        highestOrder = value;
+      }
+    }
+
+    final nextOrder = (highestOrder + 1).toString().padLeft(2, '0');
+
+    setState(() {
+      _selectedLegalDocument = documentTitle;
+      _selectedLegalChapter = '$nextOrder. Nouvel article';
+      _legalTitleController.text = 'Nouvel article';
+      _legalContentController.clear();
+    });
+  }
+
   Widget _legalDocumentTile({
     required String title,
     required String subtitle,
@@ -5443,48 +5464,79 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               fontWeight: FontWeight.w700,
             ),
           ),
-          children: chapters.map((chapter) {
-            final isSelected =
-                _selectedLegalDocument == title &&
-                _selectedLegalChapter == chapter;
+          children: [
+            if (chapters.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Aucun article enregistré.',
+                  style: TextStyle(
+                    color: adminColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ...chapters.map((chapter) {
+              final isSelected =
+                  _selectedLegalDocument == title &&
+                  _selectedLegalChapter == chapter;
 
-            return Column(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    if (isSelected) {
-                      setState(() {
-                        _selectedLegalDocument = null;
-                        _selectedLegalChapter = null;
-                        _legalTitleController.clear();
-                        _legalContentController.clear();
-                      });
-                    } else {
-                      _loadLegalChapter(title, chapter);
-                    }
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(color: adminColor.withOpacity(0.18)),
+              return Column(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      if (isSelected) {
+                        setState(() {
+                          _selectedLegalDocument = null;
+                          _selectedLegalChapter = null;
+                          _legalTitleController.clear();
+                          _legalContentController.clear();
+                        });
+                      } else {
+                        _loadLegalChapter(title, chapter);
+                      }
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(color: adminColor.withOpacity(0.18)),
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      chapter,
-                      style: const TextStyle(
-                        color: adminColor,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                      child: Text(
+                        chapter,
+                        style: const TextStyle(
+                          color: adminColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
+                  if (isSelected) _buildLegalChapterEditor(),
+                ],
+              );
+            }),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => _startNewLegalChapter(title, chapters),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('AJOUTER UN ARTICLE'),
+                style: TextButton.styleFrom(
+                  foregroundColor: redColor,
+                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
                 ),
-                if (isSelected) _buildLegalChapterEditor(),
-              ],
-            );
-          }).toList(),
+              ),
+            ),
+            if (_selectedLegalDocument == title &&
+                _selectedLegalChapter != null &&
+                !_documentChapters[title]!.contains(_selectedLegalChapter))
+              _buildLegalChapterEditor(),
+          ],
         ),
       ),
     );
@@ -5604,9 +5656,30 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
 
+      await FirebaseFirestore.instance
+          .collection('legalDocuments')
+          .doc(documentId)
+          .set({
+            'title': _selectedLegalDocument,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+
+      await _loadAllLegalChaptersFromFirebase();
+
       if (!mounted) return;
 
-      setState(() {});
+      final modifiedDocument =
+          _selectedLegalDocument == 'POLITIQUE DE CONFIDENTIALITÉ'
+              ? 'Politique de confidentialité'
+              : _selectedLegalDocument!;
+
+      setState(() {
+        _selectedLegalChapter = title;
+        _modifiedDocuments.add(modifiedDocument);
+        (_modifiedChapters[modifiedDocument] ??= <String>{}).add(title);
+        _legalVersionSaved = false;
+        _legalVersionButtonRed = false;
+      });
     } catch (e) {
       if (!mounted) return;
 
