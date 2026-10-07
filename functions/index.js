@@ -792,9 +792,21 @@ async function territoryRealtimeScope(db, territoireId) {
       }
 
       const selectedIds = subscriptionRealtimeSpotIds(subscription);
-      const subscriptionSince =
+      const subscriptionStart =
         firestoreDate(subscription.subscriptionStartDate) ||
         firestoreDate(subscription.subscriptionActivatedAt);
+      const previousTrialStart = firestoreDate(subscription.trialStartDate);
+      const previousTrialEnd = firestoreDate(subscription.trialEndDate);
+      const continuesActiveTrial = Boolean(
+          subscriptionStart &&
+          previousTrialStart &&
+          previousTrialEnd &&
+          subscriptionStart.getTime() <= previousTrialEnd.getTime(),
+      );
+      const subscriptionSince = continuesActiveTrial ?
+        previousTrialStart :
+        subscriptionStart;
+
       if (selectedIds.size === 0) {
         // Compatibilité avec les abonnements historiques créés avant la
         // sélection poste par poste.
