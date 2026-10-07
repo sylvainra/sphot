@@ -3737,9 +3737,10 @@ exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
           .get();
       if (publicSnapshot.empty) return;
 
-      const liveState = buildPublicLiveState(
-          event.data.after.exists ? event.data.after.data() : {},
-      );
+      const historicalSpot = event.data.after.exists ?
+        event.data.after.data() :
+        null;
+      const liveState = buildPublicLiveState(historicalSpot || {});
       const scopesByTerritory = new Map();
       const batch = db.batch();
 
@@ -3762,8 +3763,9 @@ exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
           );
         }
 
+        const realtimeScope = scopesByTerritory.get(territoireId);
         const realtimeAvailable = realtimeScopeGrantsSpot(
-            scopesByTerritory.get(territoireId),
+            realtimeScope,
             event.params.spotId,
         );
 
@@ -3771,6 +3773,24 @@ exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
           batch.set(
               document.ref,
               buildUnavailablePublicLiveState(),
+              {merge: true},
+          );
+          continue;
+        }
+
+        const enabledSince = realtimeScopeEnabledSince(
+            realtimeScope,
+            event.params.spotId,
+        );
+        const liveStateFresh = historicalLiveStateIsFresh(
+            historicalSpot,
+            enabledSince,
+        );
+
+        if (!liveStateFresh) {
+          batch.set(
+              document.ref,
+              buildSuppressedPublicLiveState("awaiting_update"),
               {merge: true},
           );
           continue;
