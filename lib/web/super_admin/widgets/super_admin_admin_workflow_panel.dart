@@ -963,7 +963,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                           '${trialRequest['trialDurationDays'] ?? 8} jours',
                         ),
                         _line(
-                          'Postes surveillés concernés',
+                          'Postes recensés à la demande',
                           '${trialRequest['numberOfRescueStations'] ?? 0}',
                         ),
                         _statusLine(
