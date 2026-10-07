@@ -25,10 +25,12 @@ class AdvertiserLegalAcceptanceSection extends StatefulWidget {
 class _AdvertiserLegalAcceptanceSectionState
     extends State<AdvertiserLegalAcceptanceSection> {
   final ExpansionTileController _cguController = ExpansionTileController();
+  final ExpansionTileController _cgvController = ExpansionTileController();
   final ExpansionTileController _privacyController = ExpansionTileController();
   final ExpansionTileController _rgpdController = ExpansionTileController();
 
   Map<String, dynamic>? _cguDocument;
+  Map<String, dynamic>? _cgvDocument;
   Map<String, dynamic>? _privacyDocument;
   Map<String, dynamic>? _rgpdDocument;
 
@@ -36,6 +38,7 @@ class _AdvertiserLegalAcceptanceSectionState
   bool _submitting = false;
   bool _applicationCompleted = false;
   bool _cguAccepted = false;
+  bool _cgvAccepted = false;
   bool _privacyAccepted = false;
   bool _rgpdAccepted = false;
   bool _representativeAccepted = false;
@@ -53,6 +56,7 @@ class _AdvertiserLegalAcceptanceSectionState
   bool get _canSubmit =>
       _applicationCompleted &&
       _cguAccepted &&
+      _cgvAccepted &&
       _privacyAccepted &&
       _rgpdAccepted &&
       _representativeAccepted &&
@@ -98,6 +102,7 @@ class _AdvertiserLegalAcceptanceSectionState
           .doc('metadata')
           .get();
       final cgu = await _loadLegalDocument('cgu');
+      final cgv = await _loadLegalDocument('cgv');
       final privacy = await _loadLegalDocument('privacyPolicy');
       final rgpd = await _loadLegalDocument('rgpdNotice');
 
@@ -129,10 +134,12 @@ class _AdvertiserLegalAcceptanceSectionState
         _version = activeVersion;
         _legalPackPath = (metadataData['packPath'] ?? '').toString();
         _cguDocument = cgu;
+        _cgvDocument = cgv;
         _privacyDocument = privacy;
         _rgpdDocument = rgpd;
         _applicationCompleted = request['applicationCompleted'] == true;
         _cguAccepted = restoreAcceptance && acceptedDocuments['cgu'] == true;
+        _cgvAccepted = restoreAcceptance && acceptedDocuments['cgv'] == true;
         _privacyAccepted =
             restoreAcceptance && acceptedDocuments['privacy'] == true;
         _rgpdAccepted = restoreAcceptance && acceptedDocuments['rgpd'] == true;
@@ -194,6 +201,7 @@ class _AdvertiserLegalAcceptanceSectionState
         'legalAcceptanceCompleted': true,
         'acceptedDocuments': <String, Object?>{
           'cgu': true,
+          'cgv': true,
           'privacy': true,
           'rgpd': true,
           'version': _version,
@@ -205,6 +213,7 @@ class _AdvertiserLegalAcceptanceSectionState
           'representativeDeclaration': true,
           'documents': <String, Object?>{
             'cgu': true,
+            'cgv': true,
             'privacy': true,
             'rgpd': true,
           },
@@ -226,6 +235,7 @@ class _AdvertiserLegalAcceptanceSectionState
 
       if (!mounted) return;
       _cguController.collapse();
+      _cgvController.collapse();
       _privacyController.collapse();
       _rgpdController.collapse();
       setState(() {
@@ -253,10 +263,11 @@ class _AdvertiserLegalAcceptanceSectionState
     required bool value,
     required String text,
     required ValueChanged<bool?> onChanged,
+    bool enabled = true,
   }) {
     return CheckboxListTile(
       value: value,
-      onChanged: _locked ? null : onChanged,
+      onChanged: _locked || !enabled ? null : onChanged,
       activeColor: WebColors.blue,
       checkColor: Colors.white,
       controlAffinity: ListTileControlAffinity.leading,
@@ -378,6 +389,7 @@ class _AdvertiserLegalAcceptanceSectionState
           _acceptanceLine(
             value: accepted,
             text: acceptanceText,
+            enabled: chapters.isNotEmpty,
             onChanged: onChanged,
           ),
         ],
@@ -416,6 +428,17 @@ class _AdvertiserLegalAcceptanceSectionState
           controller: _cguController,
           onChanged: (value) {
             setState(() => _cguAccepted = value ?? false);
+          },
+        ),
+        _legalDocument(
+          title: 'Conditions Générales de Vente',
+          document: _cgvDocument,
+          accepted: _cgvAccepted,
+          acceptanceText:
+              'J’ai lu et j’accepte les Conditions Générales de Vente de SPHOT.',
+          controller: _cgvController,
+          onChanged: (value) {
+            setState(() => _cgvAccepted = value ?? false);
           },
         ),
         _legalDocument(
