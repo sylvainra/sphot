@@ -64,7 +64,7 @@ class _AdminAccessPageState extends State<AdminAccessPage> {
             const SizedBox(height: 16),
             Text(
               kIsWeb
-                  ? "Professionnels, créez votre SPHOT ADMIN en quelques clics, après validation de votre demande préalable auprès de l’équipe SPHOT."
+                  ? "Professionnels, créez votre SPHOT ADMIN en quelques clics. Votre demande d’accès sera instruite par l’équipe SPHOT avant ouverture de votre espace professionnel."
                   : "Pour créer votre SPHOT ADMIN dans de meilleures conditions de confort et de lisibilité, vous allez être redirigé vers le site SPHOT afin de compléter votre demande d’adhésion.",
               textAlign: TextAlign.center,
               style: const TextStyle(
