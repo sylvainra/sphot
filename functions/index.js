@@ -1842,6 +1842,16 @@ function createAdminRequestPdf({
           "Données personnelles",
           acceptedDocuments.rgpd === true ? "Accepté" : "Non accepté",
         ],
+        [
+          "Responsabilité déclarative",
+          trialRequest.adminResponsibilityAccepted === true ?
+            "Acceptée" :
+            "Non acceptée",
+        ],
+        [
+          "Version juridique",
+          cleanValue(acceptedDocuments.version, "Non renseignée"),
+        ],
       ];
 
       const consentColumnWidth = contentWidth / 2;
@@ -1869,7 +1879,7 @@ function createAdminRequestPdf({
             );
       }
 
-      doc.y = consentY + 41;
+      doc.y = consentY + 52;
 
       const warningY = doc.y + 5;
       doc
@@ -1888,10 +1898,10 @@ function createAdminRequestPdf({
           .fillColor(dark)
           .text(
               "Le présent document atteste uniquement de la réception " +
-              "de votre demande. Il ne constitue ni une décision " +
-              "d'approbation, ni une autorisation d'accès au portail " +
-              "SPHOT. La période d'essai, l'abonnement et la facturation " +
-              "font l'objet d'étapes et de documents distincts.",
+              "de votre demande. Il ne valide, ne certifie ni n'homologue " +
+              "aucun SPHOT ni aucune information déclarée. L'accès au " +
+              "portail, l'essai, l'abonnement et la facturation font " +
+              "l'objet d'étapes et de documents distincts.",
               left + 13,
               warningY + 27,
               {
