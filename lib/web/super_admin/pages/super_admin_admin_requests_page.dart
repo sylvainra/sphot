@@ -54,6 +54,36 @@ class _SuperAdminAdminRequestsPageState
   final subscriptionPreview =
       Map<String, dynamic>.from(data['subscriptionPreview'] ?? {});
 
+  final legalAcceptance =
+      Map<String, dynamic>.from(data['legalAcceptance'] ?? {});
+  final legalDocuments = legalAcceptance['documents'] is Map
+      ? Map<String, dynamic>.from(legalAcceptance['documents'] as Map)
+      : <String, dynamic>{};
+  final legalVersion =
+      (legalAcceptance['legalVersion'] ?? legalAcceptance['version'] ?? '')
+          .toString()
+          .trim();
+
+  final legalComplete =
+      (legalAcceptance['accepted'] == true || legalVersion.isNotEmpty) &&
+      legalAcceptance['representativeDeclaration'] == true &&
+      legalAcceptance['adminResponsibilityDeclaration'] == true &&
+      legalDocuments['cgu'] == true &&
+      legalDocuments['privacy'] == true &&
+      legalDocuments['rgpd'] == true;
+
+  if (!legalComplete) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Approbation impossible : les acceptations juridiques Admin sont incomplètes.',
+        ),
+      ),
+    );
+    return;
+  }
+
   final uid = (data['uid'] ?? doc.id).toString();
 
   final email = (
