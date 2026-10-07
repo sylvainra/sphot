@@ -280,7 +280,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                           Flexible(
                             child: Text(
                               _isSphotOn
-                                  ? 'SPHOT ON — DIFFUSION ACTIVE'
+                                  ? 'SPHOT ON — TEMPS RÉEL ACTIF'
                                   : 'SPHOT OFF',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
