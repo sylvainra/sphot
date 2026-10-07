@@ -195,7 +195,7 @@ function buildSuppressedPublicLiveState(
       realtimeValidUntil !== undefined &&
       realtimeValidUntil !== null) {
     result.realtimeValidUntil = realtimeValidUntil;
-  } else if (!awaitingUpdate) {
+  } else {
     result.realtimeValidUntil = admin.firestore.FieldValue.delete();
   }
 
@@ -3991,9 +3991,10 @@ exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
               ...liveState,
               realtimeAvailable: true,
               realtimeStatus: "available",
-              ...(validUntil !== undefined && validUntil !== null ?
-                {realtimeValidUntil: validUntil} :
-                {}),
+              realtimeValidUntil:
+                validUntil !== undefined && validUntil !== null ?
+                  validUntil :
+                  admin.firestore.FieldValue.delete(),
             },
             {merge: true},
         );
