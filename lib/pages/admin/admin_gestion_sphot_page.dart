@@ -26,8 +26,9 @@ class AdminGestionSphotPage extends StatelessWidget {
     return title.isEmpty ? docId : title;
   }
 
-  bool _isValidated(Map<String, dynamic> data) {
-    return data['sphotValide'] == true;
+  bool _isPublished(Map<String, dynamic> data) {
+    final status = (data['publicationStatus'] ?? '').toString().toLowerCase();
+    return status == 'published' || data['sphotValide'] == true;
   }
 
   @override
@@ -145,7 +146,7 @@ class AdminGestionSphotPage extends StatelessWidget {
                           itemBuilder: (context, index) {
                             final doc = docs[index];
                             final data = doc.data() as Map<String, dynamic>;
-                            final validated = _isValidated(data);
+                            final published = _isPublished(data);
                             final title = _sphotTitle(data, doc.id);
                             final ville = (data['ville'] ?? '').toString();
                             final typeSphot =
@@ -175,10 +176,10 @@ class AdminGestionSphotPage extends StatelessWidget {
                                 child: Row(
                                   children: [
                                     Icon(
-  validated
+  published
       ? Icons.check_circle_rounded
       : Icons.circle_rounded,
-  color: validated
+  color: published
       ? const Color(0xFFDC2626)
       : const Color(0xFF1E3A8A),
   size: 28,
