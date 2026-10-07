@@ -3541,6 +3541,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final registryPrecheck = _advertiserMap(advertiser['registryPrecheck']);
     final foreignProof = _advertiserMap(advertiser['foreignProof']);
     final legalAcceptance = _advertiserMap(advertiser['legalAcceptance']);
+    final acceptedLegalDocuments =
+        _advertiserMap(legalAcceptance['documents']);
     final registrationMode = _cleanText(advertiser['registrationMode']);
     final foreignProofUrl = _cleanText(foreignProof['url']);
     final companyName = _cleanText(
@@ -3719,6 +3721,12 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 _cleanText(legalAcceptance['version']).isEmpty
                     ? 'Non acceptée'
                     : _cleanText(legalAcceptance['version']),
+              ),
+              _advertiserRequestInfoLine(
+                'CGV',
+                acceptedLegalDocuments['cgv'] == true
+                    ? 'Acceptées'
+                    : 'Non acceptées',
               ),
               _advertiserRequestInfoLine('Adresse', address),
               _advertiserWebsiteLine(websiteUrl),
