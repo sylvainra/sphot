@@ -740,9 +740,9 @@ function subscriptionRealtimeSpotIds(subscription) {
 /**
  * Retourne le périmètre opérationnel temps réel d'un territoire.
  *
- * Pendant l'essai, les SPHOTS surveillés inclus dans la demande sont
- * couverts. Pour un abonnement actif, seuls les postes explicitement
- * sélectionnés sont
+ * Pendant l'essai, tous les SPHOTS surveillés du territoire sont couverts :
+ * l'essai est lié au service SPHOT SURVEILLÉ, pas à une sélection payante.
+ * Pour un abonnement actif, seuls les postes explicitement sélectionnés sont
  * couverts. Un abonnement historique sans sélection explicite conserve la
  * couverture globale pour compatibilité.
  *
@@ -803,26 +803,12 @@ async function territoryRealtimeScope(db, territoireId) {
         const trialSince =
           firestoreDate(subscription.trialStartDate) ||
           firestoreDate(subscription.trialActivatedAt);
-        const trialIds = Array.isArray(subscription.trialRescueStationIds) ?
-          subscription.trialRescueStationIds
-              .map((value) => (value || "").toString().trim())
-              .filter((value) => value) :
-          [];
 
-        if (trialIds.length === 0) {
-          // Compatibilité avec les essais créés avant le gel de la liste
-          // des postes concernés.
-          allSpots = true;
-          allSpotsSince = keepEarliestDate(allSpotsSince, trialSince);
-        } else {
-          trialIds.forEach((id) => {
-            spotIds.add(id);
-            spotSince.set(
-                id,
-                keepEarliestDate(spotSince.get(id) || null, trialSince),
-            );
-          });
-        }
+        // L'essai de 8 jours couvre tous les SPHOTS surveillés du territoire,
+        // y compris un poste créé pendant la période d'essai. La sélection
+        // poste par poste n'intervient qu'au moment de l'abonnement payant.
+        allSpots = true;
+        allSpotsSince = keepEarliestDate(allSpotsSince, trialSince);
         continue;
       }
 
