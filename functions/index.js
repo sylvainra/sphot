@@ -43,7 +43,7 @@ function isSupervisedSpotData(spot) {
  * @param {string} territoireId Identifiant du territoire.
  * @param {string} spotId Identifiant du SPHOT.
  * @param {Object} spot Données internes du SPHOT.
- * @param {boolean} realtimeAvailable Disponibilité du service temps réel.
+ * @param {string} realtimeStatus État du service temps réel public.
  * @return {Object} Données autorisées sur la carte publique.
  */
 function buildPublicSpot(
@@ -186,10 +186,6 @@ function buildSuppressedPublicLiveState(realtimeStatus) {
 
 function buildUnavailablePublicLiveState() {
   return buildSuppressedPublicLiveState("unavailable");
-}
-
-function buildAwaitingPublicLiveState() {
-  return buildSuppressedPublicLiveState("awaiting_update");
 }
 
 /**
