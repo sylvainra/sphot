@@ -3,7 +3,7 @@ name: Validation PR SPHOT
 on:
   push:
     branches:
-      - chatgpt/admin-trial-strategy-2026-10-07
+      - chatgpt/admin-trial-strategy-from-validated-2026-10-07
   workflow_dispatch:
 
 jobs:
