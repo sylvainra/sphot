@@ -3850,8 +3850,9 @@ exports.syncPublicSpotsForAdmin = onDocumentWritten(
       }
 
       for (const territoireId of territoireIds) {
-        const publish = await isTerritoryPublic(territoireId);
-        await reconcilePublicTerritory(territoireId, publish);
+        // Une modification du profil Admin ne doit jamais retirer les SPHOTS
+        // de la carte. L'essai et l'abonnement ne pilotent que le temps réel.
+        await reconcilePublicTerritory(territoireId, true);
       }
     },
 );
@@ -3875,8 +3876,9 @@ exports.syncPublicSpotsForAdminRequest = onDocumentWritten(
       territoireIds.delete("");
 
       for (const territoireId of territoireIds) {
-        const publish = await isTerritoryPublic(territoireId);
-        await reconcilePublicTerritory(territoireId, publish);
+        // Le statut administratif/commercial ne pilote pas la présence des
+        // SPHOTS déjà créés sur la carte publique.
+        await reconcilePublicTerritory(territoireId, true);
       }
     },
 );
@@ -3900,8 +3902,8 @@ exports.syncPublicSpotsForAdminAccount = onDocumentWritten(
       territoireIds.delete("");
 
       for (const territoireId of territoireIds) {
-        const publish = await isTerritoryPublic(territoireId);
-        await reconcilePublicTerritory(territoireId, publish);
+        // Les changements du compte Admin ne doivent pas masquer le territoire.
+        await reconcilePublicTerritory(territoireId, true);
       }
     },
 );
@@ -3915,8 +3917,21 @@ exports.syncPublicSpotsForTerritory = onDocumentWritten(
     },
     async (event) => {
       const territoireId = event.params.territoireId;
-      const publish = await isTerritoryPublic(territoireId);
-      await reconcilePublicTerritory(territoireId, publish);
+
+      if (!event.data.after.exists) {
+        const publicSnapshot = await admin.firestore()
+            .collection("publicSpots")
+            .where("territoireId", "==", territoireId)
+            .get();
+        const batch = admin.firestore().batch();
+        publicSnapshot.docs.forEach((document) => batch.delete(document.ref));
+        if (!publicSnapshot.empty) await batch.commit();
+        return;
+      }
+
+      // Une modification du territoire (logo, ville, métadonnées...) ne doit
+      // jamais retirer ses SPHOTS de la carte publique.
+      await reconcilePublicTerritory(territoireId, true);
     },
 );
 
