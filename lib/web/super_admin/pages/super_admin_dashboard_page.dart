@@ -5970,6 +5970,43 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     }
   }
 
+  String _nextLegalVersion(String current) {
+    final normalized = current.trim();
+    if (normalized.isEmpty) return '1.0';
+
+    final parts = normalized.split('.');
+    final major = int.tryParse(parts.isNotEmpty ? parts[0] : '') ?? 1;
+    final minor = int.tryParse(parts.length > 1 ? parts[1] : '') ?? 0;
+
+    return '$major.${minor + 1}';
+  }
+
+  Future<void> _loadLegalVersionMetadata() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('legalDocuments')
+          .doc('metadata')
+          .get();
+      final data = snapshot.data() ?? const <String, dynamic>{};
+      final version = (data['version'] ?? data['legalVersion'] ?? '1.0')
+          .toString()
+          .trim();
+
+      if (!mounted) return;
+
+      setState(() {
+        _legalVersionController.text = version.isEmpty ? '1.0' : version;
+        _legalLastUpdatedText =
+            (data['updatedAtText'] ?? 'Non renseignée').toString();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _legalVersionController.text = '1.0';
+      });
+    }
+  }
+
   Future<void> _saveLegalVersionAndTurnButtonRed() async {
     setState(() {
       _legalVersionButtonRed = true;
@@ -5984,9 +6021,21 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     }
 
     final now = DateTime.now();
-
-    const version = '1.0';
-    const versionId = '1_0';
+    final firestore = FirebaseFirestore.instance;
+    final metadataSnapshot = await firestore
+        .collection('legalDocuments')
+        .doc('metadata')
+        .get();
+    final metadataData =
+        metadataSnapshot.data() ?? const <String, dynamic>{};
+    final currentVersion =
+        (metadataData['version'] ?? metadataData['legalVersion'] ?? '')
+            .toString()
+            .trim();
+    final version = currentVersion.isEmpty
+        ? '1.0'
+        : _nextLegalVersion(currentVersion);
+    final versionId = version.replaceAll('.', '_');
 
     if (_legalVersionController.text != version) {
       _legalVersionController.text = version;
@@ -6004,8 +6053,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final summary = _legalChangeLogController.text.trim();
 
     try {
-      final firestore = FirebaseFirestore.instance;
-
       Future<Map<String, dynamic>> loadDocumentSnapshot({
         required String label,
         required String documentId,
@@ -6230,6 +6277,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     _legalVersionController.addListener(_markLegalVersionModified);
     _legalPublicationDateController.addListener(_markLegalVersionModified);
     _legalChangeLogController.addListener(_markLegalVersionModified);
+    _loadLegalVersionMetadata();
     _loadAllLegalChaptersFromFirebase();
   }
 
