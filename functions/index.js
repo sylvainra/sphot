@@ -824,15 +824,6 @@ async function territoryRealtimeScope(db, territoireId) {
           previousTrialEnd &&
           subscriptionStart.getTime() <= previousTrialEnd.getTime(),
       );
-      const trialIds = new Set(
-          Array.isArray(subscription.trialRescueStationIds) ?
-            subscription.trialRescueStationIds
-                .map((value) => (value || "").toString().trim())
-                .filter((value) => value) :
-            [],
-      );
-      const legacyTrialCoveredAll = trialIds.size === 0;
-
       if (selectedIds.size === 0) {
         // Compatibilité avec les abonnements historiques créés avant la
         // sélection poste par poste.
@@ -846,9 +837,10 @@ async function territoryRealtimeScope(db, territoireId) {
         );
       } else {
         selectedIds.forEach((id) => {
-          const continuedForSpot = continuesActiveTrial &&
-            (legacyTrialCoveredAll || trialIds.has(id));
-          const enabledSince = continuedForSpot ?
+          // L'essai couvre tous les SPHOTS surveillés. Si l'abonnement
+          // prend le relais avant la fin de l'essai, l'état temps réel déjà
+          // publié reste continu pour tout poste sélectionné.
+          const enabledSince = continuesActiveTrial ?
             previousTrialStart :
             subscriptionStart;
 
