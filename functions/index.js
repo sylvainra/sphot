@@ -178,6 +178,8 @@ function buildPublicSpot(
 /**
  * Construit un état public indiquant que le temps réel n'est pas disponible.
  *
+ * @param {string} realtimeStatus État temps réel à publier.
+ * @param {Date|null|undefined} realtimeValidUntil Fin de validité éventuelle.
  * @return {Object} Mise à jour Firestore à fusionner.
  */
 function buildSuppressedPublicLiveState(
@@ -217,10 +219,20 @@ function buildSuppressedPublicLiveState(
   return result;
 }
 
+/**
+ * Construit l'état public d'un SPHOT surveillé sans temps réel disponible.
+ *
+ * @return {Object} Mise à jour Firestore à fusionner.
+ */
 function buildUnavailablePublicLiveState() {
   return buildSuppressedPublicLiveState("unavailable");
 }
 
+/**
+ * Construit l'état public d'un SPHOT non surveillé.
+ *
+ * @return {Object} Mise à jour Firestore à fusionner.
+ */
 function buildNonSupervisedPublicLiveState() {
   const result = {
     realtimeAvailable: false,
@@ -758,6 +770,12 @@ function subscriptionRealtimeSpotIds(subscription) {
   return ids;
 }
 
+/**
+ * Indique si un abonnement contient une sélection explicite de postes.
+ *
+ * @param {Object} subscription Données de l'abonnement.
+ * @return {boolean} Vrai lorsqu'une sélection explicite est présente.
+ */
 function subscriptionHasExplicitRealtimeSelection(subscription) {
   const data = subscription || {};
   return Array.isArray(data.selectedRescueStationIds) ||
@@ -930,6 +948,13 @@ async function territoryRealtimeScope(db, territoireId) {
   };
 }
 
+/**
+ * Vérifie si le périmètre temps réel couvre un SPHOT donné.
+ *
+ * @param {Object} scope Périmètre temps réel calculé.
+ * @param {string} spotId Identifiant du SPHOT.
+ * @return {boolean} Vrai si le SPHOT est couvert.
+ */
 function realtimeScopeGrantsSpot(scope, spotId) {
   if (!scope || scope.granted !== true) return false;
   if (scope.allSpots === true) return true;
@@ -938,6 +963,13 @@ function realtimeScopeGrantsSpot(scope, spotId) {
   return Boolean(id && scope.spotIds instanceof Set && scope.spotIds.has(id));
 }
 
+/**
+ * Retourne la date d'ouverture du temps réel pour un SPHOT.
+ *
+ * @param {Object} scope Périmètre temps réel calculé.
+ * @param {string} spotId Identifiant du SPHOT.
+ * @return {Date|null} Date d'ouverture ou null.
+ */
 function realtimeScopeEnabledSince(scope, spotId) {
   if (!realtimeScopeGrantsSpot(scope, spotId)) return null;
   if (scope.allSpots === true) return scope.allSpotsSince || null;
@@ -948,6 +980,13 @@ function realtimeScopeEnabledSince(scope, spotId) {
     null;
 }
 
+/**
+ * Retourne la date de fin du droit temps réel pour un SPHOT.
+ *
+ * @param {Object} scope Périmètre temps réel calculé.
+ * @param {string} spotId Identifiant du SPHOT.
+ * @return {Date|null|undefined} Date de fin, null ou undefined.
+ */
 function realtimeScopeValidUntil(scope, spotId) {
   if (!realtimeScopeGrantsSpot(scope, spotId)) return undefined;
 
@@ -972,6 +1011,13 @@ function realtimeScopeValidUntil(scope, spotId) {
   });
 }
 
+/**
+ * Vérifie qu'un état temps réel historique est postérieur à son activation.
+ *
+ * @param {Object|null} historical Ancien état opérationnel du SPHOT.
+ * @param {Date|null} enabledSince Date d'ouverture du temps réel.
+ * @return {boolean} Vrai si l'état historique reste valide.
+ */
 function historicalLiveStateIsFresh(historical, enabledSince) {
   if (!historical) return false;
   if (!enabledSince) return true;
@@ -988,18 +1034,13 @@ function historicalLiveStateIsFresh(historical, enabledSince) {
 }
 
 /**
- * Vérifie qu'un territoire possède actuellement au moins un droit de
- * diffusion opérationnelle en temps réel.
+ * Filtre une liste d'identifiants pour ne garder que les SPHOTS surveillés.
  *
  * @param {FirebaseFirestore.Firestore} db Instance Firestore.
  * @param {string} territoireId Identifiant du territoire.
- * @return {Promise<boolean>} Vrai si au moins un poste est couvert.
+ * @param {Array<string>} spotIds Identifiants de SPHOTS à contrôler.
+ * @return {Promise<Array<string>>} Identifiants des SPHOTS surveillés.
  */
-async function territoryDiffusionAccessGranted(db, territoireId) {
-  const scope = await territoryRealtimeScope(db, territoireId);
-  return scope.granted === true;
-}
-
 async function supervisedSpotIds(
     db,
     territoireId,
