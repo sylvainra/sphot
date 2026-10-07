@@ -75,10 +75,10 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
   String _trialStatusLabel(String raw) {
     switch (raw.toLowerCase()) {
       case 'pending':
-        return 'En attente de validation';
+        return 'En attente d’autorisation';
       case 'approved':
       case 'trial':
-        return 'Validée / en cours';
+        return 'Autorisée / en cours';
       case 'expired':
         return 'Terminée';
       case 'rejected':
@@ -198,15 +198,16 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
           context: context,
           builder: (dialogContext) => AlertDialog(
             title: const Text(
-              'VALIDER LA PÉRIODE D’ESSAI',
+              'AUTORISER L’ESSAI 8 JOURS',
               style: TextStyle(
                 color: _blue,
                 fontWeight: FontWeight.w900,
               ),
             ),
             content: const Text(
-              'Cette action démarre immédiatement la période d’essai gratuite '
-              'SPHOT ADMIN de 8 jours et ouvre les droits de diffusion.',
+              'Cette action démarre immédiatement l’essai de 8 jours et '
+              'active les fonctions temps réel uniquement pour les SPHOTS '
+              'surveillés inclus dans la demande.',
               style: TextStyle(
                 color: _blue,
                 fontWeight: FontWeight.w600,
@@ -224,7 +225,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                   backgroundColor: _red,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('VALIDER L’ESSAI'),
+                child: const Text('AUTORISER L’ESSAI 8 JOURS'),
               ),
             ],
           ),
@@ -252,11 +253,20 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
     final duration = (trialRequest['trialDurationDays'] is num)
         ? (trialRequest['trialDurationDays'] as num).toInt()
         : 8;
-    final numberOfStations = (trialRequest['numberOfRescueStations'] is num)
-        ? (trialRequest['numberOfRescueStations'] as num).toInt()
-        : (subscription['numberOfRescueStations'] is num)
-            ? (subscription['numberOfRescueStations'] as num).toInt()
-            : 0;
+    final trialRescueStationIds = trialRequest['rescueStationIds'] is Iterable
+        ? (trialRequest['rescueStationIds'] as Iterable)
+            .map(_text)
+            .where((value) => value.isNotEmpty)
+            .toSet()
+            .toList()
+        : <String>[];
+    final numberOfStations = trialRescueStationIds.isNotEmpty
+        ? trialRescueStationIds.length
+        : (trialRequest['numberOfRescueStations'] is num)
+            ? (trialRequest['numberOfRescueStations'] as num).toInt()
+            : (subscription['numberOfRescueStations'] is num)
+                ? (subscription['numberOfRescueStations'] as num).toInt()
+                : 0;
 
     final start = DateTime.now();
     final end = start.add(Duration(days: duration));
@@ -287,7 +297,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
         'lastEvent': <String, dynamic>{
           'type': 'trial_approved',
           'category': 'commercial',
-          'label': 'Période d’essai SPHOT ADMIN validée',
+          'label': 'Période d’essai SPHOT ADMIN autorisée',
           'createdAt': serverNow,
           'createdByRole': 'super_admin',
         },
@@ -352,7 +362,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
             ),
             content: Text(
               'Confirmer la commande ${_text(data['orderNumber'])}. '
-              'L’abonnement annuel sera activé et les droits de diffusion seront ouverts.',
+              'L’abonnement annuel sera activé et les fonctions temps réel seront ouvertes pour les postes souscrits.',
             ),
             actions: [
               TextButton(
@@ -671,7 +681,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
               documentCount: accessChildren.length,
             ),
             _documentRubric(
-              title: '2 — PÉRIODE D’ESSAI',
+              title: '2 — SPHOT SURVEILLÉ — ESSAI 8 JOURS',
               icon: Icons.hourglass_bottom_rounded,
               children: tilesFor('trial'),
               documentCount: grouped['trial']!.length,
@@ -944,11 +954,15 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     _section(
-                      title: 'PÉRIODE D’ESSAI',
+                      title: 'SPHOT SURVEILLÉ — ESSAI 8 JOURS',
                       children: [
                         _line(
                           'Durée',
                           '${trialRequest['trialDurationDays'] ?? 8} jours',
+                        ),
+                        _line(
+                          'Postes recensés à la demande',
+                          '${trialRequest['numberOfRescueStations'] ?? 0}',
                         ),
                         _statusLine(
                           'Statut',
@@ -964,7 +978,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                           ),
                         ),
                         _line(
-                          'Validée le',
+                          'Autorisée le',
                           _formatDateTime(trialTracking['approvedAt']),
                         ),
                         _line(
@@ -976,11 +990,11 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                           _formatDateTime(subscription['trialEndDate']),
                         ),
                         _line(
-                          'Diffusion',
+                          'Temps réel',
                           trialStatus.toLowerCase() == 'approved' ||
                                   _text(subscription['status']) == 'trial'
-                              ? 'Autorisée'
-                              : 'Non autorisée',
+                              ? 'Autorisé'
+                              : 'Non autorisé',
                         ),
                         if (registrationStatus.toLowerCase() == 'approved' &&
                             trialStatus.toLowerCase() == 'pending') ...[
@@ -995,7 +1009,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                               ),
                               icon: const Icon(Icons.play_circle_fill_rounded),
                               label: const Text(
-                                'VALIDER LA PÉRIODE D’ESSAI',
+                                'AUTORISER L’ESSAI 8 JOURS',
                                 style: TextStyle(fontWeight: FontWeight.w900),
                               ),
                               style: ElevatedButton.styleFrom(
