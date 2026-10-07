@@ -75,7 +75,8 @@ class _MapPageState extends State<MapPage> {
   bool _showFavoritesOnly = false;
   bool _isMovingMap = false;
   Timer? _mapMoveTimer;
-Timer? _searchTimer;
+  Timer? _searchTimer;
+  Timer? _realtimeExpiryRefreshTimer;
 
 bool _isFilterOpen = false;
 bool _isMapStyleOpen = false;
@@ -112,6 +113,12 @@ void initState() {
   _speech = stt.SpeechToText();
   _publicAdvertisingSpotsFuture =
       _firestoreService.getPublicAdvertisingSpots();
+  _realtimeExpiryRefreshTimer = Timer.periodic(
+    const Duration(seconds: 30),
+    (_) {
+      if (mounted) setState(() {});
+    },
+  );
   unawaited(_loadFavoriteSpotIds());
 }
 
@@ -2585,6 +2592,7 @@ Widget _buildBottomBar() {
 void dispose() {
   _mapMoveTimer?.cancel();
   _searchTimer?.cancel();
+  _realtimeExpiryRefreshTimer?.cancel();
   _searchController.dispose();
   _searchFocusNode.dispose();
   super.dispose();
