@@ -879,6 +879,39 @@ async function territoryDiffusionAccessGranted(db, territoireId) {
   return scope.granted === true;
 }
 
+async function supervisedSpotIds(
+    db,
+    territoireId,
+    spotIds,
+) {
+  if (!territoireId || !Array.isArray(spotIds) || spotIds.length === 0) {
+    return [];
+  }
+
+  const normalizedIds = [...new Set(
+      spotIds
+          .map((value) => (value || "").toString().trim())
+          .filter((value) => value),
+  )];
+
+  if (normalizedIds.length === 0) return [];
+
+  const references = normalizedIds.map((spotId) => {
+    return db.collection("territoires")
+        .doc(territoireId)
+        .collection("spots")
+        .doc(spotId);
+  });
+
+  const snapshots = await db.getAll(...references);
+  return snapshots
+      .filter((snapshot) => {
+        return snapshot.exists &&
+          isSupervisedSpotData(snapshot.data() || {});
+      })
+      .map((snapshot) => snapshot.id);
+}
+
 /**
  * Vérifie que le territoire dispose d'un accès administrateur approuvé.
  *
@@ -4754,8 +4787,13 @@ async function resolveSauveteurOperationalContext(accountData, login) {
   );
 
   const realtimeScope = await territoryRealtimeScope(db, territoireId);
-  const realtimeSpotIds = assignedSpotIds.filter(
+  const entitledSpotIds = assignedSpotIds.filter(
       (spotId) => realtimeScopeGrantsSpot(realtimeScope, spotId),
+  );
+  const realtimeSpotIds = await supervisedSpotIds(
+      db,
+      territoireId,
+      entitledSpotIds,
   );
   const diffusionAccessGranted = realtimeSpotIds.length > 0;
 
