@@ -641,16 +641,11 @@ async function territoryAdminDocuments(db, territoireId) {
 }
 
 /**
- * Vérifie qu'un territoire possède actuellement des droits de diffusion
- * opérationnelle en temps réel.
+ * Retourne les identifiants des postes explicitement couverts par un
+ * abonnement annuel.
  *
- * Lorsqu'un document subscriptions existe, son statut et ses dates font
- * autorité. Le booléen admins.diffusionAccessGranted n'est conservé que
- * comme compatibilité pour les anciens comptes sans abonnement enregistré.
- *
- * @param {FirebaseFirestore.Firestore} db Instance Firestore.
- * @param {string} territoireId Identifiant du territoire.
- * @return {Promise<boolean>}
+ * @param {Object} subscription Données de l'abonnement.
+ * @return {Set<string>} Identifiants de documents SPHOT.
  */
 function subscriptionRealtimeSpotIds(subscription) {
   const data = subscription || {};
@@ -767,6 +762,14 @@ function realtimeScopeGrantsSpot(scope, spotId) {
   return Boolean(id && scope.spotIds instanceof Set && scope.spotIds.has(id));
 }
 
+/**
+ * Vérifie qu'un territoire possède actuellement au moins un droit de
+ * diffusion opérationnelle en temps réel.
+ *
+ * @param {FirebaseFirestore.Firestore} db Instance Firestore.
+ * @param {string} territoireId Identifiant du territoire.
+ * @return {Promise<boolean>} Vrai si au moins un poste est couvert.
+ */
 async function territoryDiffusionAccessGranted(db, territoireId) {
   const scope = await territoryRealtimeScope(db, territoireId);
   return scope.granted === true;
