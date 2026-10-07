@@ -1161,8 +1161,9 @@ async function reconcilePublicSubscription(subscriptionId, subscription) {
 
   if (!territoireId) return;
 
-  const publish = await isTerritoryPublic(territoireId);
-  await reconcilePublicTerritory(territoireId, publish);
+  // L'abonnement ne pilote jamais la présence des SPHOTS sur la carte.
+  // Il ne sert qu'à recalculer le périmètre des informations temps réel.
+  await reconcilePublicTerritory(territoireId, true);
 }
 
 /**
@@ -3937,12 +3938,10 @@ exports.syncPublicSpotOnWrite = onDocumentWritten(
         return;
       }
 
-      const publish = await isTerritoryPublic(territoireId);
-      if (!publish) {
-        await publicReference.delete();
-        return;
-      }
-
+      // La présence sur la carte est indépendante de l'essai et de
+      // l'abonnement. Dès qu'un SPHOT existe dans le territoire, sa
+      // projection publique est créée ou mise à jour. Les droits commerciaux
+      // ne pilotent que les informations opérationnelles temps réel.
       await reconcilePublicTerritory(territoireId, true);
     },
 );
