@@ -1652,12 +1652,12 @@ exports.activateApprovedAdminOrder = onDocumentUpdated(
         currentOrderId: event.params.orderId,
         currentOrderNumber: after.orderNumber || null,
         numberOfRescueStations: Number(after.numberOfRescueStations || 0),
-        selectedRescueStationIds:
-          Array.isArray(after.selectedRescueStationIds) ?
-            after.selectedRescueStationIds : [],
-        selectedRescueStations:
-          Array.isArray(after.selectedRescueStations) ?
-            after.selectedRescueStations : [],
+        ...(Array.isArray(after.selectedRescueStationIds) ? {
+          selectedRescueStationIds: after.selectedRescueStationIds,
+        } : {}),
+        ...(Array.isArray(after.selectedRescueStations) ? {
+          selectedRescueStations: after.selectedRescueStations,
+        } : {}),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, {merge: true});
       batch.set(db.collection("admins").doc(uid), {
