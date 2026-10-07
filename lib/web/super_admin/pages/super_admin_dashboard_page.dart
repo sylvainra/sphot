@@ -3875,6 +3875,29 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       throw Exception('Identifiant de la demande introuvable.');
     }
 
+    final legalAcceptance =
+        Map<String, dynamic>.from(adminData['legalAcceptance'] ?? {});
+    final legalDocuments = legalAcceptance['documents'] is Map
+        ? Map<String, dynamic>.from(legalAcceptance['documents'] as Map)
+        : <String, dynamic>{};
+
+    final legalComplete =
+        (legalAcceptance['accepted'] == true ||
+            _cleanText(
+              legalAcceptance['legalVersion'] ?? legalAcceptance['version'],
+            ).isNotEmpty) &&
+        legalAcceptance['representativeDeclaration'] == true &&
+        legalAcceptance['adminResponsibilityDeclaration'] == true &&
+        legalDocuments['cgu'] == true &&
+        legalDocuments['privacy'] == true &&
+        legalDocuments['rgpd'] == true;
+
+    if (!legalComplete) {
+      throw Exception(
+        'Acceptations juridiques Admin incomplètes : la demande doit être corrigée avant approbation.',
+      );
+    }
+
     final profile = Map<String, dynamic>.from(adminData['profile'] ?? {});
 
     final proConnect = Map<String, dynamic>.from(adminData['proConnect'] ?? {});
@@ -4243,6 +4266,17 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
     final profile = Map<String, dynamic>.from(admin['profile'] ?? {});
 
+    final legalAcceptance =
+        Map<String, dynamic>.from(admin['legalAcceptance'] ?? {});
+    final legalDocuments = legalAcceptance['documents'] is Map
+        ? Map<String, dynamic>.from(legalAcceptance['documents'] as Map)
+        : <String, dynamic>{};
+    final legalVersion = _cleanText(
+      legalAcceptance['legalVersion'] ?? legalAcceptance['version'],
+    );
+    final adminResponsibilityAccepted =
+        legalAcceptance['adminResponsibilityDeclaration'] == true;
+
     final mairie = _cleanText(
       structure['nom'] ??
           admin['nomStructure'] ??
@@ -4451,6 +4485,40 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   _spotInfoLine(
                     'Ville',
                     ville.isEmpty ? 'Non renseignée' : ville,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _adminDetailSection(
+                title: 'ACCEPTATIONS JURIDIQUES',
+                children: [
+                  _spotInfoLine(
+                    'Version',
+                    legalVersion.isEmpty ? 'Non renseignée' : legalVersion,
+                  ),
+                  _spotInfoLine(
+                    'CGU',
+                    legalDocuments['cgu'] == true
+                        ? 'Acceptées'
+                        : 'Non acceptées',
+                  ),
+                  _spotInfoLine(
+                    'Confidentialité',
+                    legalDocuments['privacy'] == true
+                        ? 'Acceptée'
+                        : 'Non acceptée',
+                  ),
+                  _spotInfoLine(
+                    'RGPD',
+                    legalDocuments['rgpd'] == true
+                        ? 'Accepté'
+                        : 'Non accepté',
+                  ),
+                  _spotInfoLine(
+                    'Responsabilité des informations déclarées',
+                    adminResponsibilityAccepted
+                        ? 'Acceptée'
+                        : 'Non acceptée',
                   ),
                 ],
               ),
