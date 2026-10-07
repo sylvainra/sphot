@@ -685,11 +685,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     SpotFlagState spot,
     ScrollController controller,
   ) {
-    final hasCoreInfo =
-        spot.periode.trim().isNotEmpty ||
-        spot.heureDebut.trim().isNotEmpty ||
-        spot.heureFin.trim().isNotEmpty ||
-        spot.activite.trim().isNotEmpty;
+    final hasCoreInfo = spot.activite.trim().isNotEmpty;
 
     final warningTitle = spot.normalizedType.contains('PLAGE')
         ? 'PLAGE NON SURVEILLÉE'
@@ -748,22 +744,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           _MobilePublicCard(
             child: Column(
               children: [
-                if (spot.periode.isNotEmpty)
-                  _PublicInfoLine(
-                    icon: Icons.date_range_outlined,
-                    label: 'Période',
-                    value: spot.periode,
-                  ),
-                if (spot.heureDebut.isNotEmpty ||
-                    spot.heureFin.isNotEmpty)
-                  _PublicInfoLine(
-                    icon: Icons.schedule_outlined,
-                    label: 'Horaires',
-                    value: [
-                      spot.heureDebut,
-                      spot.heureFin,
-                    ].where((value) => value.isNotEmpty).join(' – '),
-                  ),
                 if (spot.activite.isNotEmpty)
                   _PublicInfoLine(
                     icon: Icons.waves_outlined,
@@ -1275,10 +1255,15 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     SpotFlagState spot,
     ScrollController controller,
   ) {
+    final showSurveillanceSchedule =
+        spot.isPosteSecours &&
+        spot.realtimeAvailable &&
+        !spot.isRealtimeAwaitingUpdate;
     final hasCoreInfo =
-        spot.periode.trim().isNotEmpty ||
-        spot.heureDebut.trim().isNotEmpty ||
-        spot.heureFin.trim().isNotEmpty ||
+        (showSurveillanceSchedule &&
+            (spot.periode.trim().isNotEmpty ||
+                spot.heureDebut.trim().isNotEmpty ||
+                spot.heureFin.trim().isNotEmpty)) ||
         spot.activite.trim().isNotEmpty;
 
     return ListView(
@@ -1333,14 +1318,15 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           _MobilePublicCard(
             child: Column(
               children: [
-                if (spot.periode.isNotEmpty)
+                if (showSurveillanceSchedule && spot.periode.isNotEmpty)
                   _PublicInfoLine(
                     icon: Icons.date_range_outlined,
                     label: 'Période de surveillance',
                     value: spot.periode,
                   ),
-                if (spot.heureDebut.isNotEmpty ||
-                    spot.heureFin.isNotEmpty)
+                if (showSurveillanceSchedule &&
+                    (spot.heureDebut.isNotEmpty ||
+                        spot.heureFin.isNotEmpty))
                   _PublicInfoLine(
                     icon: Icons.schedule_outlined,
                     label: 'Horaires',
