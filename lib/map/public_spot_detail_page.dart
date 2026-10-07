@@ -1037,13 +1037,55 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           ),
         ),
         const SizedBox(height: 10),
-        _PublicDangerList(values: dangerValues),
-        if (notificationActive && notificationMessage.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          _PublicNotificationCard(
-            message: notificationMessage,
-            publishedAt: notificationPublishedAt,
-          ),
+        if (!spot.realtimeAvailable)
+          const _MobilePublicCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      color: Color(0xFF64748B),
+                      size: 20,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Les informations opérationnelles de surveillance ne sont '
+                  'actuellement pas diffusées sur SPHOT. Consultez les '
+                  'informations et consignes affichées sur place.',
+                  style: TextStyle(
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else ...[
+          _PublicDangerList(values: dangerValues),
+          if (notificationActive && notificationMessage.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _PublicNotificationCard(
+              message: notificationMessage,
+              publishedAt: notificationPublishedAt,
+            ),
+          ],
         ],
         if (spot.phone.isNotEmpty) ...[
           const SizedBox(height: 10),
@@ -2001,6 +2043,55 @@ class _PublicLiveDataSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!spot.realtimeAvailable) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFDCE3EA)),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 18,
+                  color: Color(0xFF64748B),
+                ),
+                SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Les informations opérationnelles de surveillance ne sont '
+              'actuellement pas diffusées sur SPHOT. Consultez les '
+              'informations et consignes affichées sur place.',
+              style: TextStyle(
+                color: Color(0xFF475569),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final dangerValues = _flattenValues(spot.dangers);
     final terrestrialValues =
         _formatTerrestrialValues(spot.meteoTerrestre);
