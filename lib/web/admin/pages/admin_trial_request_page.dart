@@ -1912,7 +1912,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
               _menuButton(
                 section: _TrialRequestSection.essai,
                 icon: Icons.fact_check_outlined,
-                label: 'DEMANDE D’ACCÈS',
+                label: 'RÈGLES & DEMANDE D’ACCÈS',
                 completed: _saved || _canSubmitTrialRequest,
                 enabled:
                     !_saved &&
@@ -3416,7 +3416,10 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _pageHeader('DEMANDE D’ACCÈS', 'Demandez l’accès à votre SPHOT ADMIN.'),
+        _pageHeader(
+          'RÈGLES & DEMANDE D’ACCÈS',
+          'Prenez connaissance des règles applicables puis demandez l’accès à votre SPHOT ADMIN.',
+        ),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
