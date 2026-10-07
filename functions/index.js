@@ -146,7 +146,20 @@ function buildPublicSpot(
       });
     }
   } else {
+    result.realtimeAvailable = false;
     result.realtimeStatus = "not_applicable";
+
+    [
+      "liveFlag",
+      "statutBaignade",
+      "periode",
+      "heureDebut",
+      "heureFin",
+      "dangers",
+      "notificationPublique",
+    ].forEach((field) => {
+      delete result[field];
+    });
   }
 
   result.updatedAt = admin.firestore.FieldValue.serverTimestamp();
@@ -186,6 +199,28 @@ function buildSuppressedPublicLiveState(realtimeStatus) {
 
 function buildUnavailablePublicLiveState() {
   return buildSuppressedPublicLiveState("unavailable");
+}
+
+function buildNonSupervisedPublicLiveState() {
+  const result = {
+    realtimeAvailable: false,
+    realtimeStatus: "not_applicable",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  [
+    "liveFlag",
+    "statutBaignade",
+    "periode",
+    "heureDebut",
+    "heureFin",
+    "dangers",
+    "notificationPublique",
+  ].forEach((field) => {
+    result[field] = admin.firestore.FieldValue.delete();
+  });
+
+  return result;
 }
 
 /**
@@ -3842,7 +3877,11 @@ exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
         const supervised = isSupervisedSpotData(publicData);
 
         if (!supervised) {
-          batch.set(document.ref, liveState, {merge: true});
+          batch.set(
+              document.ref,
+              buildNonSupervisedPublicLiveState(),
+              {merge: true},
+          );
           continue;
         }
 
