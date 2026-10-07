@@ -1505,6 +1505,12 @@ exports.processAdminOrderCreated = onDocumentCreated(
         engagementNumber: order.engagementNumber || "",
         chorusServiceCode: order.chorusServiceCode || "",
         numberOfRescueStations: Number(order.numberOfRescueStations || 0),
+        selectedRescueStationIds:
+          Array.isArray(order.selectedRescueStationIds) ?
+            order.selectedRescueStationIds : [],
+        selectedRescueStations:
+          Array.isArray(order.selectedRescueStations) ?
+            order.selectedRescueStations : [],
         unitPriceExclTax: Number(order.unitPriceExclTax || DEFAULT_PRICE_PER_STATION_EXCL_TAX),
         subtotalExclTax: Number(order.totalExclTax || 0),
         vatRate: Number(order.vatRate || DEFAULT_VAT_RATE),
@@ -1645,6 +1651,13 @@ exports.activateApprovedAdminOrder = onDocumentUpdated(
         billingCycle: "annual",
         currentOrderId: event.params.orderId,
         currentOrderNumber: after.orderNumber || null,
+        numberOfRescueStations: Number(after.numberOfRescueStations || 0),
+        selectedRescueStationIds:
+          Array.isArray(after.selectedRescueStationIds) ?
+            after.selectedRescueStationIds : [],
+        selectedRescueStations:
+          Array.isArray(after.selectedRescueStations) ?
+            after.selectedRescueStations : [],
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, {merge: true});
       batch.set(db.collection("admins").doc(uid), {
