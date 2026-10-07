@@ -1463,7 +1463,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             'acceptedDocuments': {
               'version': _sphotVersion,
               'publishedAt': _sphotPublishedAt,
-              'acceptedAt': FieldValue.serverTimestamp(),
+              'acceptedAt': _legalAcceptedAt ?? FieldValue.serverTimestamp(),
               'cgu': true,
               'privacy': true,
               'rgpd': true,
@@ -1478,7 +1478,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             'legalVersionId': legalVersionId,
             'legalPackPath': 'legalPacks/versions/items/$legalVersionId',
             'publishedAt': _sphotPublishedAt,
-            'acceptedAt': FieldValue.serverTimestamp(),
+            'acceptedAt': _legalAcceptedAt ?? FieldValue.serverTimestamp(),
             'representativeDeclaration': _certifyRepresentative,
             'adminResponsibilityDeclaration':
                 _adminResponsibilityAccepted,
@@ -1983,7 +1983,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
               _menuButton(
                 section: _TrialRequestSection.essai,
                 icon: Icons.fact_check_outlined,
-                label: 'RÈGLES & DEMANDE D’ACCÈS',
+                label: 'RAPPEL & DEMANDE D’ACCÈS',
                 completed: _saved || _canSubmitTrialRequest,
                 enabled:
                     !_saved &&
@@ -3371,6 +3371,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     required String checkText,
     required ValueChanged<bool?> onChanged,
     required ExpansionTileController controller,
+    bool readOnly = false,
   }) {
     final chapters = List<Map<String, dynamic>>.from(
       document?['chapters'] ?? [],
@@ -3477,7 +3478,36 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
               ),
             ),
           ),
-          _checkLine(value: checked, text: checkText, onChanged: onChanged),
+          if (readOnly)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: Color(0xFF15803D),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      checked
+                          ? 'Accepté avant la saisie de la demande.'
+                          : 'Acceptation juridique non retrouvée.',
+                      style: TextStyle(
+                        color: checked
+                            ? const Color(0xFF15803D)
+                            : redColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            _checkLine(value: checked, text: checkText, onChanged: onChanged),
         ],
       ),
     );
@@ -3488,8 +3518,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _pageHeader(
-          'RÈGLES & DEMANDE D’ACCÈS',
-          'Prenez connaissance des règles applicables puis demandez l’accès à votre SPHOT ADMIN.',
+          'RAPPEL & DEMANDE D’ACCÈS',
+          'Retrouvez les règles acceptées avant votre saisie puis transmettez votre demande d’accès.',
         ),
         Container(
           width: double.infinity,
@@ -3532,31 +3562,56 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
         _trialFeature('Diffusez la couleur du drapeau et les dangers du jour'),
 
-        _checkLine(
-          value: _certifyRepresentative,
-          text: 'Je certifie être habilité à représenter cette structure.',
-          onChanged: (value) {
-            setState(() {
-              _certifyRepresentative = value ?? false;
-              _saved = false;
-            });
-          },
-        ),
-
-        _checkLine(
-          value: _adminResponsibilityAccepted,
-          text:
-              'Je reconnais que les informations renseignées dans SPHOT sont '
-              'fournies sous la responsabilité de mon organisme, qui doit en '
-              'assurer l’exactitude et la mise à jour. Je comprends que SPHOT '
-              'ne valide ni ne certifie leur véracité ni le caractère '
-              'surveillé d’un SPHOT.',
-          onChanged: (value) {
-            setState(() {
-              _adminResponsibilityAccepted = value ?? false;
-              _saved = false;
-            });
-          },
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: const Color(0xFF15803D),
+              width: 1.2,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(
+                    Icons.verified_user_rounded,
+                    color: Color(0xFF15803D),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Règles acceptées avant la saisie',
+                      style: TextStyle(
+                        color: Color(0xFF15803D),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Vous avez confirmé être habilité à représenter la structure '
+                'et reconnu la responsabilité de votre organisme concernant '
+                'l’exactitude et la mise à jour des informations déclarées. '
+                'SPHOT ne valide ni ne certifie leur véracité ni le caractère '
+                'surveillé d’un SPHOT.\n\nVersion juridique acceptée : '
+                '$_sphotVersion',
+                style: const TextStyle(
+                  color: adminColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
         ),
 
         if (_legalLoading)
@@ -3568,6 +3623,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             checked: _legalReadConfirmed,
             checkText: 'J’ai lu et j’accepte les CGU de SPHOT.',
             controller: _cguExpansionController,
+            readOnly: true,
             onChanged: (value) {
               setState(() {
                 _legalReadConfirmed = value ?? false;
@@ -3583,6 +3639,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             checkText:
                 'J’ai lu et j’accepte la Politique de confidentialité de SPHOT.',
             controller: _privacyExpansionController,
+            readOnly: true,
             onChanged: (value) {
               setState(() {
                 _privacyReadConfirmed = value ?? false;
@@ -3598,6 +3655,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             checkText:
                 'J’accepte le traitement des données conformément au RGPD.',
             controller: _rgpdExpansionController,
+            readOnly: true,
             onChanged: (value) {
               setState(() {
                 _rgpdAccepted = value ?? false;
