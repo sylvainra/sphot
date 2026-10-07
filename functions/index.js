@@ -803,24 +803,38 @@ async function territoryRealtimeScope(db, territoireId) {
           previousTrialEnd &&
           subscriptionStart.getTime() <= previousTrialEnd.getTime(),
       );
-      const subscriptionSince = continuesActiveTrial ?
-        previousTrialStart :
-        subscriptionStart;
+      const trialIds = new Set(
+          Array.isArray(subscription.trialRescueStationIds) ?
+            subscription.trialRescueStationIds
+                .map((value) => (value || "").toString().trim())
+                .filter((value) => value) :
+            [],
+      );
+      const legacyTrialCoveredAll = trialIds.size === 0;
 
       if (selectedIds.size === 0) {
         // Compatibilité avec les abonnements historiques créés avant la
         // sélection poste par poste.
         allSpots = true;
+        const subscriptionSince = continuesActiveTrial ?
+          previousTrialStart :
+          subscriptionStart;
         allSpotsSince = keepEarliestDate(
             allSpotsSince,
             subscriptionSince,
         );
       } else {
         selectedIds.forEach((id) => {
+          const continuedForSpot = continuesActiveTrial &&
+            (legacyTrialCoveredAll || trialIds.has(id));
+          const enabledSince = continuedForSpot ?
+            previousTrialStart :
+            subscriptionStart;
+
           spotIds.add(id);
           spotSince.set(
               id,
-              keepEarliestDate(spotSince.get(id) || null, subscriptionSince),
+              keepEarliestDate(spotSince.get(id) || null, enabledSince),
           );
         });
       }
