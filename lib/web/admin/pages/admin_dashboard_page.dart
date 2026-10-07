@@ -5150,9 +5150,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       summary['monitoredSpots'] ?? const [],
     );
 
-    final otherSpots = List<Map<String, dynamic>>.from(
-      summary['otherSpots'] ?? const [],
-    );
+    final trialRescueStationIds = monitoredSpots
+        .map((entry) => Map<String, dynamic>.from(entry['spot'] ?? const {}))
+        .map((spot) => _cleanText(spot['_docId']))
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList();
+
+    final trialRescueStations = monitoredSpots.map((entry) {
+      final spot = Map<String, dynamic>.from(entry['spot'] ?? const {});
+      return <String, dynamic>{
+        'spotDocumentId': _cleanText(spot['_docId']),
+        'idSphot': _cleanText(spot['idSphot']),
+        'name': _spotName(spot),
+      };
+    }).where((spot) => _cleanText(spot['spotDocumentId']).isNotEmpty).toList();
 
     final firestore = FirebaseFirestore.instance;
     final requestReference = firestore.collection('adminRequests').doc(uid);
@@ -5188,9 +5200,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           'trialRequest': {
             'status': 'pending',
             'trialDurationDays': 8,
+            'scope': 'supervised_spots_only',
             'territoireId': summary['territoireId'],
-            'numberOfRescueStations': monitoredSpots.length,
-            'numberOfOtherSpots': otherSpots.length,
+            'numberOfRescueStations': trialRescueStationIds.length,
+            'rescueStationIds': trialRescueStationIds,
+            'rescueStations': trialRescueStations,
             'numberOfSurveillancePeriods': summary['periodCount'] ?? 0,
             'numberOfLifeguards': summary['sauveteurCount'] ?? 0,
             'requestedAt': FieldValue.serverTimestamp(),
@@ -5311,7 +5325,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         Text(
                           isSidePanel
                               ? 'ESPACE SPHOT ADMIN'
-                              : 'ESSAI GRATUIT 8 JOURS',
+                              : 'SPHOT SURVEILLÉ - ESSAI 8 JOURS',
                           style: const TextStyle(
                             color: adminColor,
                             fontSize: 20,
@@ -5322,8 +5336,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         if (!isSidePanel) ...[
                           const SizedBox(height: 3),
                           const Text(
-                            'Vérifiez votre organisation avant '
-                            'd’envoyer la demande d’essai gratuit.',
+                            'Cette étape concerne uniquement vos SPHOTS '
+                            'surveillés et leurs fonctions en temps réel.',
                             style: TextStyle(
                               color: adminColor,
                               fontSize: 13,
@@ -5384,57 +5398,69 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           child: _buildTrialMonitoredSpotCard(entry),
                         ),
                       ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      'AUTRES SPHOTS',
-                      style: TextStyle(
-                        color: redColor,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    if (otherSpots.isEmpty)
-                      const Text(
-                        'Aucun autre SPHOT enregistré.',
-                        style: TextStyle(
-                          color: adminColor,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      )
-                    else if (isSidePanel)
-                      Column(
-                        children: otherSpots.map((spot) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: SizedBox(
-                              width: double.infinity,
-                              child: _buildTrialOtherSpotTile(
-                                spot,
-                                showActions: true,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      )
-                    else
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: otherSpots.map((spot) {
-                          return SizedBox(
-                            width: 300,
-                            child: _buildTrialOtherSpotTile(
-                              spot,
-                              showActions: true,
-                            ),
-                          );
-                        }).toList(),
-                      ),
                     if (isSidePanel) ...[
+                      const SizedBox(height: 18),
+                      const Text(
+                        'AUTRES SPHOTS',
+                        style: TextStyle(
+                          color: redColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (otherSpots.isEmpty)
+                        const Text(
+                          'Aucun autre SPHOT enregistré.',
+                          style: TextStyle(
+                            color: adminColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        )
+                      else
+                        Column(
+                          children: otherSpots.map((spot) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: _buildTrialOtherSpotTile(
+                                  spot,
+                                  showActions: true,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
                       const SizedBox(height: 22),
                       _buildSphotAdminSummaryAccess(),
+                    ],
+                    if (!isSidePanel) ...[
+                      const SizedBox(height: 18),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: adminColor.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: adminColor.withOpacity(0.25),
+                          ),
+                        ),
+                        child: const Text(
+                          'Les SPHOTS autres que surveillés ne sont pas '
+                          'concernés par cet essai. Leur publication sur la '
+                          'carte reste indépendante de l’essai et de '
+                          'l’abonnement.',
+                          style: TextStyle(
+                            color: adminColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
                     ],
                   ],
                 ),
@@ -5455,11 +5481,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         value: '${monitoredSpots.length}',
                         label: 'SPHOTS surveillés',
                       ),
-                      _trialCounter(
-                        icon: Icons.place_outlined,
-                        value: '${otherSpots.length}',
-                        label: 'autres SPHOTS',
-                      ),
+                      if (isSidePanel)
+                        _trialCounter(
+                          icon: Icons.place_outlined,
+                          value: '${otherSpots.length}',
+                          label: 'autres SPHOTS',
+                        ),
                       _trialCounter(
                         icon: Icons.date_range_outlined,
                         value: '${summary['periodCount'] ?? 0}',
@@ -5495,9 +5522,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         ),
                         const SizedBox(width: 10),
                         OutlinedButton.icon(
-                          onPressed: () {
-                            _submitTrialRequest(summary, onClose);
-                          },
+                          onPressed: monitoredSpots.isEmpty
+                              ? null
+                              : () {
+                                  _submitTrialRequest(summary, onClose);
+                                },
 
                           style: OutlinedButton.styleFrom(
                             foregroundColor: redColor,
@@ -5515,7 +5544,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           icon: const Icon(Icons.send_rounded),
 
                           label: const Text(
-                            'ENVOYER MA DEMANDE D’ESSAI GRATUIT 8 JOURS',
+                            'DEMANDER L’ESSAI 8 JOURS DES SPHOTS SURVEILLÉS',
                             style: TextStyle(
                               color: redColor,
                               fontWeight: FontWeight.w900,
@@ -6326,12 +6355,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             onTap: _openTrialSummaryPanel,
                           ),
                           _summaryCard(
-                            title: 'ESSAI GRATUIT 8 JOURS',
+                            title: 'SPHOT SURVEILLÉ - ESSAI 8 JOURS',
                             value: '',
                             color: canRequestTrial ? adminColor : pendingColor,
                             iconPath: 'data/icons/fire_red_icon.svg',
                             stepNumber: 5,
-                            titleFontSize: 17,
+                            titleFontSize: 13,
                             titleLetterSpacing: 0.8,
                             showValue: false,
                             grayscaleIcon: !canRequestTrial,
@@ -8493,13 +8522,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         'arretesMunicipaux': territoryData['arretesMunicipaux'] ?? '',
         'territoireId': territoireId,
         'source': 'admin',
-        'sphotValide': true,
-        'dateValidation': FieldValue.serverTimestamp(),
+        'publicationStatus': 'published',
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
       if (!wasEditing) {
         data['createdAt'] = FieldValue.serverTimestamp();
+        data['publishedAt'] = FieldValue.serverTimestamp();
       }
 
       await targetDocument.set(data, SetOptions(merge: true));

@@ -3,7 +3,7 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 /**
- * Relance la projection publique pour les administrateurs approuvés.
+ * Relance la projection publique pour les accès administrateurs approuvés.
  *
  * @return {Promise<void>}
  */
@@ -40,7 +40,7 @@ async function rebuildPublicSpots() {
   }
 
   console.log(
-      `${documents.length} validation(s) administrative(s) transmise(s) ` +
+      `${documents.length} accès administrateur(s) transmis ` +
       "à la projection publique.",
   );
 }

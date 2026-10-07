@@ -69,6 +69,7 @@ class _WebAdminRegistrationPageState extends State<WebAdminRegistrationPage> {
   bool _acceptedPrivacy = false;
   bool _acceptedRgpd = false;
   bool _acceptedRepresentative = false;
+  bool _acceptedAdminResponsibility = false;
 
   Map<String, dynamic>? _activeLegalPack;
   bool _isLoadingLegalPack = false;
@@ -504,6 +505,7 @@ bool get _legalValidationComplete {
       _acceptedPrivacy &&
       _acceptedRgpd &&
       _acceptedRepresentative &&
+      _acceptedAdminResponsibility &&
       _activeLegalPack != null;
 }
 
@@ -726,8 +728,8 @@ Widget _buildLegalValidationStep() {
   return Column(
     children: [
       _stepHeader(
-  '6. DEMANDE D’ESSAI GRATUIT',
-  'Finalisez votre demande d’accès à SPHOT',
+  '6. VALIDATIONS JURIDIQUES',
+  'Finalisez votre demande d’accès administrateur à SPHOT',
 ),
 
       Text(
@@ -808,6 +810,22 @@ Widget _buildLegalValidationStep() {
         onChanged: (value) {
           setState(() {
             _acceptedRepresentative = value;
+            _saved = false;
+          });
+        },
+      ),
+
+      _legalCheckTile(
+        title: 'RESPONSABILITÉ DES INFORMATIONS DÉCLARÉES',
+        subtitle:
+            'Je reconnais que les informations renseignées dans SPHOT sont '
+            'fournies sous la responsabilité de mon organisme, qui doit en '
+            'assurer l’exactitude et la mise à jour. SPHOT ne valide ni ne '
+            'certifie leur véracité ni le caractère surveillé d’un SPHOT.',
+        value: _acceptedAdminResponsibility,
+        onChanged: (value) {
+          setState(() {
+            _acceptedAdminResponsibility = value;
             _saved = false;
           });
         },
@@ -1303,6 +1321,7 @@ final legalVersionId = _versionId(legalVersion);
   'legalPackPath': 'legalPacks/versions/items/$legalVersionId',
   'acceptedAt': FieldValue.serverTimestamp(),
   'representativeDeclaration': true,
+  'adminResponsibilityDeclaration': true,
   'documents': {
     'cgu': true,
     'privacy': true,
@@ -1425,7 +1444,7 @@ final legalVersionId = _versionId(legalVersion);
                 children: [
                   Text(
                     isFinalStep
-                        ? (_saved ? 'DEMANDE ENVOYÉE' : 'DEMANDE D’ESSAI GRATUIT')
+                        ? (_saved ? 'DEMANDE ENVOYÉE' : 'ENVOYER MA DEMANDE D’ACCÈS')
                         : 'SUIVANT',
                     style: buttonTextStyle(
                       _saved

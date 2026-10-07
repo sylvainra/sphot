@@ -522,8 +522,8 @@ Future<void> _prefillTerritoryFromFirebase() async {
     'commerce': _value('commerce'),
     'territoireId': widget.territoireId,
     'source': 'admin',
-    'sphotValide': true,
-    'dateValidation': FieldValue.serverTimestamp(),
+    'publicationStatus': 'published',
+    'publishedAt': FieldValue.serverTimestamp(),
     'updatedAt': FieldValue.serverTimestamp(),
   };
 

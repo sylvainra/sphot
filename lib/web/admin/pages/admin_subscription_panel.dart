@@ -550,13 +550,14 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   Widget _saveButton({
     required String section,
     required VoidCallback onPressed,
+    bool enabled = true,
   }) {
     final isSaving = _savingSection == section;
 
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _savingSection == null ? onPressed : null,
+        onPressed: enabled && _savingSection == null ? onPressed : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: _blue,
           foregroundColor: Colors.white,
@@ -681,6 +682,13 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
 
   Widget _offerForm(Map<String, dynamic> data) {
   _initializeOfferSelection(data);
+  final subscriptionStatus = _text(data['status']).toLowerCase();
+  final commercialOrderStatus =
+      _text(data['commercialOrderStatus']).toLowerCase();
+  final offerLocked =
+      subscriptionStatus == 'active' ||
+      subscriptionStatus == 'order_pending' ||
+      commercialOrderStatus == 'submitted';
 
   return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
     stream: FirebaseFirestore.instance
@@ -834,15 +842,17 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        onChanged: (value) {
-                          setState(() {
-                            if (value == true) {
-                              _selectedRescueStationIds.add(document.id);
-                            } else {
-                              _selectedRescueStationIds.remove(document.id);
-                            }
-                          });
-                        },
+                        onChanged: offerLocked
+                            ? null
+                            : (value) {
+                                setState(() {
+                                  if (value == true) {
+                                    _selectedRescueStationIds.add(document.id);
+                                  } else {
+                                    _selectedRescueStationIds.remove(document.id);
+                                  }
+                                });
+                              },
                       ),
                     );
                   }),
@@ -925,18 +935,31 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'Abonnement annuel uniquement. La sélection prépare l’offre et le devis sans activer l’abonnement.',
-                  style: TextStyle(
+                Text(
+                  offerLocked
+                      ? 'La sélection des postes est figée pendant le traitement de la commande et durant l’abonnement actif.'
+                      : 'Abonnement annuel uniquement. La sélection prépare l’offre et le devis sans activer l’abonnement.',
+                  style: const TextStyle(
                     color: _grey,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     height: 1.35,
                   ),
                 ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Les SPHOTS surveillés non couverts par l’abonnement restent visibles sur la carte avec la mention « Informations en temps réel indisponibles ».',
+                  style: TextStyle(
+                    color: _blue,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    height: 1.35,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 _saveButton(
                   section: 'offer',
+                  enabled: !offerLocked,
                   onPressed: () {
                     _saveSection(
                       'offer',

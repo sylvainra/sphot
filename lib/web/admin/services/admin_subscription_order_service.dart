@@ -53,7 +53,24 @@ class AdminSubscriptionOrderService {
       return;
     }
 
-    final stations = _int(data['numberOfRescueStations']);
+    final hasExplicitRescueStationSelection =
+        data['selectedRescueStationIds'] is Iterable;
+    final selectedRescueStationIds = hasExplicitRescueStationSelection
+        ? (data['selectedRescueStationIds'] as Iterable)
+            .map(_text)
+            .where((value) => value.isNotEmpty)
+            .toSet()
+            .toList()
+        : <String>[];
+    final selectedRescueStations = data['selectedRescueStations'] is Iterable
+        ? (data['selectedRescueStations'] as Iterable)
+            .whereType<Map>()
+            .map((value) => Map<String, dynamic>.from(value))
+            .toList()
+        : <Map<String, dynamic>>[];
+    final stations = hasExplicitRescueStationSelection
+        ? selectedRescueStationIds.length
+        : _int(data['numberOfRescueStations']);
     final unitPrice = _number(data['pricePerStationExclTax']) > 0
         ? _number(data['pricePerStationExclTax'])
         : _defaultPricePerStationExclTax;
@@ -273,6 +290,13 @@ class AdminSubscriptionOrderService {
         : const <String, dynamic>{};
     final requestNumber = _text(requestData['requestNumber']);
     final subscriptionStatus = _text(data['status']).toLowerCase();
+    final keepCurrentRealtimeStatus = const <String>{
+      'active',
+      'trial',
+      'trial_active',
+      'trialing',
+      'in_trial',
+    }.contains(subscriptionStatus);
     final orderType = subscriptionStatus == 'active' ||
             subscriptionStatus == 'awaiting_renewal'
         ? 'renewal'
@@ -315,6 +339,8 @@ class AdminSubscriptionOrderService {
       'engagementNumber': engagementNumber,
       'chorusServiceCode': chorusServiceCode,
       'numberOfRescueStations': stations,
+      'selectedRescueStationIds': selectedRescueStationIds,
+      'selectedRescueStations': selectedRescueStations,
       'unitPriceExclTax': unitPrice,
       'totalExclTax': totalExclTax,
       'vatRate': vatRate,
@@ -334,10 +360,13 @@ class AdminSubscriptionOrderService {
       <String, dynamic>{
         'currentOrderId': orderReference.id,
         'commercialOrderStatus': 'submitted',
+        'selectedRescueStationIds': selectedRescueStationIds,
+        'selectedRescueStations': selectedRescueStations,
+        'numberOfRescueStations': stations,
         'paymentMethod': paymentMethod,
         'administrativeDataConfirmedAt': serverNow,
         'billingDataConfirmedAt': serverNow,
-        if (subscriptionStatus != 'active') 'status': 'order_pending',
+        if (!keepCurrentRealtimeStatus) 'status': 'order_pending',
         'updatedAt': serverNow,
       },
       SetOptions(merge: true),

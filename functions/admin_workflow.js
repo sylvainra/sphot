@@ -669,6 +669,7 @@ async function sendTrialReceipt(requestId) {
   const trial = data.trialRequest || {};
   const requestedAt = data.trialRequestedAt || trial.requestedAt || new Date();
   const duration = Number(trial.trialDurationDays || DEFAULT_TRIAL_DAYS);
+  const stations = Number(trial.numberOfRescueStations || 0);
   const docNumber = `${requestNumber}-ESS-AR-01`;
 
   try {
@@ -691,15 +692,20 @@ async function sendTrialReceipt(requestId) {
         {heading: "Demande"},
         {label: "Demande reçue le", value: formatFrenchDate(requestedAt)},
         {label: "Durée sollicitée", value: `${duration} jours`},
-        {label: "Statut", value: "En attente de validation"},
+        {label: "Périmètre", value: "SPHOTS surveillés uniquement"},
+        {
+          label: "Postes recensés à l’activation",
+          value: stations || "Non renseigné",
+        },
+        {label: "Statut", value: "En attente d’autorisation"},
         {heading: "Structure concernée"},
         {label: "Organisation", value: organisationDisplay(data)},
       ],
       notice:
-        "La période d’essai n’est pas active à ce stade. Aucun droit de " +
-        "diffusion n’est ouvert par le présent document. Vous recevrez " +
-        "une décision distincte lors de l’activation éventuelle de " +
-        "votre période d’essai.",
+        "La période d’essai n’est pas active à ce stade. Les fonctions " +
+        "opérationnelles en temps réel ne sont pas encore ouvertes par le " +
+        "présent document. Vous recevrez une décision distincte lors de " +
+        "l’activation éventuelle de votre période d’essai.",
     });
 
     const greeting = buildGreeting(data);
@@ -715,6 +721,8 @@ async function sendTrialReceipt(requestId) {
     période d’essai gratuite SPHOT ADMIN de ${duration} jours
   </strong>
   pour <strong>${escapeHtml(organisation)}</strong>.
+  Cette période concerne uniquement les SPHOTS surveillés inclus dans
+  la demande.
 </p>
 
 <p style="
@@ -736,10 +744,10 @@ async function sendTrialReceipt(requestId) {
   line-height:1.6;
 ">
   Votre demande est actuellement
-  <strong>en attente de validation par l’équipe SPHOT</strong>.
+  <strong>en attente d’autorisation par l’équipe SPHOT</strong>.
   <br><br>
   La période d’essai gratuite ne débutera
-  <strong>qu’après cette validation</strong>.
+  <strong>qu’après cette autorisation</strong>.
   Vous recevrez un nouvel email dès son activation.
 </div>
 
@@ -849,8 +857,9 @@ async function sendTrialApproval(requestId) {
   const start = subscription.trialStartDate || data.trialTracking?.approvedAt;
   const end = subscription.trialEndDate;
   const duration = Number(subscription.trialDurationDays || DEFAULT_TRIAL_DAYS);
+  const stations = Number(subscription.numberOfRescueStations || 0);
   const requestNumber = cleanValue(data.requestNumber, requestId);
-  const docNumber = `${requestNumber}-ESS-VAL-01`;
+  const docNumber = `${requestNumber}-ESS-AUT-01`;
 
   try {
     const pdf = await createRegistryPdf({
@@ -865,21 +874,26 @@ async function sendTrialApproval(requestId) {
       rubric: "Période d’essai",
       statusLabel: "ACTIVÉE",
       introduction:
-        "SPHOT confirme l’ouverture de votre période d’essai gratuite. " +
-        "Les droits associés à cette phase sont activés pour la durée " +
+        "SPHOT confirme l’autorisation d’ouverture de votre période " +
+        "d’essai gratuite. Les fonctions temps réel sont activées pour " +
+        "les SPHOTS surveillés de votre territoire pendant la durée " +
         "indiquée ci-dessous.",
       lines: [
         {heading: "Période d’essai"},
         {label: "Statut", value: "Période d’essai activée"},
         {label: "Durée", value: `${duration} jours`},
+        {label: "Périmètre", value: "SPHOTS surveillés uniquement"},
+        {label: "Postes concernés", value: stations || "Non renseigné"},
         {label: "Début", value: formatFrenchDate(start)},
         {label: "Fin", value: formatFrenchDate(end)},
-        {label: "Droits de diffusion", value: "Autorisés pendant l’essai"},
+        {label: "Service temps réel", value: "Activé pendant l’essai"},
         {heading: "Structure concernée"},
         {label: "Organisation", value: organisationDisplay(data)},
       ],
       notice:
-        "L’activation de la période d’essai ne constitue pas une " +
+        "L’activation de la période d’essai ne constitue ni une validation " +
+        "ni une certification par SPHOT de l’existence ou du caractère " +
+        "surveillé des lieux déclarés. Elle ne constitue pas non plus une " +
         "souscription payante. Toute activation d’un abonnement annuel " +
         "fera l’objet d’une démarche, d’une référence et d’un document " +
         "distincts.",
@@ -893,7 +907,7 @@ async function sendTrialApproval(requestId) {
 <p style="font-size:16px;line-height:1.6;">
   Votre demande de
   <strong>période d’essai gratuite SPHOT ADMIN</strong>
-  a été validée.
+  a été autorisée.
 </p>
 
 <div style="
@@ -910,7 +924,7 @@ async function sendTrialApproval(requestId) {
   et prendra fin le
   <strong>${escapeHtml(formatFrenchDate(end))}</strong>.
   <br><br>
-  <strong>Vos droits de diffusion SPHOT ADMIN sont désormais activés.</strong>
+  <strong>Les fonctions temps réel de vos SPHOTS surveillés sont désormais activées pendant la période d’essai.</strong>
 </div>
 
 <div style="
@@ -1189,12 +1203,16 @@ async function expireTrial(subscriptionDoc, now) {
       <p>${escapeHtml(buildGreeting(requestData))}</p>
       <p>Votre <strong>période d’essai gratuite SPHOT ADMIN</strong> est arrivée
       à son terme le <strong>${escapeHtml(formatFrenchDate(end))}</strong>.</p>
-      <p><strong>Vos droits de diffusion sont désormais suspendus.</strong>
-      Votre configuration, vos SPHOTS, vos périodes et vos sauveteurs restent enregistrés.</p>
-      <p>Vous pouvez poursuivre la diffusion avec l’abonnement annuel SPHOT ADMIN
+      <p><strong>Les fonctions opérationnelles en temps réel sont désormais désactivées.</strong>
+      Vos SPHOTS restent visibles sur la carte SPHOT. Pour les SPHOTS surveillés,
+      l’application affiche « Informations en temps réel indisponibles » tant
+      qu’aucun abonnement actif ne couvre le poste concerné.</p>
+      <p>Votre configuration, vos périodes et vos sauveteurs restent enregistrés.</p>
+      <p>Vous pouvez réactiver les fonctions temps réel avec l’abonnement annuel SPHOT ADMIN
       au tarif de <strong>${currency(price)} HT par an et par poste de secours</strong>.</p>
-      <p>Montant prévisionnel actuel : <strong>${currency(annual)} HT / an</strong>
-      pour ${stations} poste(s) de secours.</p>
+      <p>Vous pourrez sélectionner les postes de secours que vous souhaitez couvrir.
+      À titre indicatif, si les ${stations} poste(s) actuellement recensé(s) étaient
+      tous sélectionnés, le montant serait de <strong>${currency(annual)} HT / an</strong>.</p>
       <p><a href="${SPHOT_LOGIN_URL}">Accéder à SPHOT ADMIN</a></p>
       <p>Cordialement,<br>L’équipe SPHOT</p>`;
     await sendLifecycleMail({
@@ -1221,11 +1239,12 @@ async function sendTrialReminder(subscriptionDoc) {
     <p>${escapeHtml(buildGreeting(data))}</p>
     <p>Votre <strong>période d’essai gratuite SPHOT ADMIN</strong> prendra fin le
     <strong>${escapeHtml(formatFrenchDate(subscription.trialEndDate))}</strong>.</p>
-    <p>Afin d’éviter toute interruption de diffusion, vous pouvez dès maintenant
+    <p>Afin d’éviter toute interruption des fonctions temps réel, vous pouvez dès maintenant
     préparer votre abonnement annuel SPHOT ADMIN.</p>
     <p>Tarif : <strong>${currency(price)} HT / an / poste de secours</strong>.<br>
-    Montant prévisionnel : <strong>${currency(annual)} HT / an</strong>
-    pour ${stations} poste(s).</p>
+    Vous pourrez sélectionner les postes à couvrir. À titre indicatif, si les
+    ${stations} poste(s) actuellement recensé(s) étaient tous sélectionnés,
+    le montant serait de <strong>${currency(annual)} HT / an</strong>.</p>
     <p><a href="${SPHOT_LOGIN_URL}">Accéder à SPHOT ADMIN</a></p>
     <p>Cordialement,<br>L’équipe SPHOT</p>`;
   const sent = await sendLifecycleMail({
@@ -1304,7 +1323,10 @@ async function expireAnnualSubscription(subscriptionDoc) {
     const html = `
       <p>${escapeHtml(buildGreeting(requestData))}</p>
       <p>Votre abonnement annuel SPHOT ADMIN est arrivé à échéance.</p>
-      <p><strong>Vos droits de diffusion sont suspendus dans l’attente du renouvellement.</strong></p>
+      <p><strong>Les fonctions opérationnelles en temps réel sont suspendues dans l’attente du renouvellement.</strong></p>
+      <p>Vos SPHOTS restent visibles sur la carte SPHOT. Pour les SPHOTS surveillés,
+      l’application affiche « Informations en temps réel indisponibles » tant que
+      le poste concerné n’est pas couvert par un abonnement actif.</p>
       <p>Vos données et votre configuration restent conservées dans votre espace.</p>
       <p><a href="${SPHOT_LOGIN_URL}">RENOUVELER MON ABONNEMENT</a></p>
       <p>Cordialement,<br>L’équipe SPHOT</p>`;
@@ -1505,6 +1527,12 @@ exports.processAdminOrderCreated = onDocumentCreated(
         engagementNumber: order.engagementNumber || "",
         chorusServiceCode: order.chorusServiceCode || "",
         numberOfRescueStations: Number(order.numberOfRescueStations || 0),
+        selectedRescueStationIds:
+          Array.isArray(order.selectedRescueStationIds) ?
+            order.selectedRescueStationIds : [],
+        selectedRescueStations:
+          Array.isArray(order.selectedRescueStations) ?
+            order.selectedRescueStations : [],
         unitPriceExclTax: Number(order.unitPriceExclTax || DEFAULT_PRICE_PER_STATION_EXCL_TAX),
         subtotalExclTax: Number(order.totalExclTax || 0),
         vatRate: Number(order.vatRate || DEFAULT_VAT_RATE),
@@ -1645,6 +1673,14 @@ exports.activateApprovedAdminOrder = onDocumentUpdated(
         billingCycle: "annual",
         currentOrderId: event.params.orderId,
         currentOrderNumber: after.orderNumber || null,
+        commercialOrderStatus: cleanValue(after.status, "approved"),
+        numberOfRescueStations: Number(after.numberOfRescueStations || 0),
+        ...(Array.isArray(after.selectedRescueStationIds) ? {
+          selectedRescueStationIds: after.selectedRescueStationIds,
+        } : {}),
+        ...(Array.isArray(after.selectedRescueStations) ? {
+          selectedRescueStations: after.selectedRescueStations,
+        } : {}),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, {merge: true});
       batch.set(db.collection("admins").doc(uid), {

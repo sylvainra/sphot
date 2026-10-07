@@ -75,7 +75,8 @@ class _MapPageState extends State<MapPage> {
   bool _showFavoritesOnly = false;
   bool _isMovingMap = false;
   Timer? _mapMoveTimer;
-Timer? _searchTimer;
+  Timer? _searchTimer;
+  Timer? _realtimeExpiryRefreshTimer;
 
 bool _isFilterOpen = false;
 bool _isMapStyleOpen = false;
@@ -112,6 +113,12 @@ void initState() {
   _speech = stt.SpeechToText();
   _publicAdvertisingSpotsFuture =
       _firestoreService.getPublicAdvertisingSpots();
+  _realtimeExpiryRefreshTimer = Timer.periodic(
+    const Duration(seconds: 30),
+    (_) {
+      if (mounted) setState(() {});
+    },
+  );
   unawaited(_loadFavoriteSpotIds());
 }
 
@@ -261,10 +268,17 @@ Future<void> _toggleFavoritesFilter() async {
         maxWidth: labelWidth,
       );
 
-      final statusText = spot.hasValidFlag
+      final statusText = spot.isRealtimeAwaitingUpdate
+          ? 'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR'
+          : !spot.realtimeAvailable
+          ? 'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES'
+          : spot.hasValidFlag
           ? spot.displayStatut.replaceAll('⚠️ ', '')
           : 'BAIGNADE NON SURVEILLÉE';
-      final statusHeight = spot.hasValidFlag
+      final statusHeight =
+          spot.isRealtimeAwaitingUpdate ||
+          !spot.realtimeAvailable ||
+          spot.hasValidFlag
           ? max(
               24.0,
               _measureSelectedLabelHeight(
@@ -2578,6 +2592,7 @@ Widget _buildBottomBar() {
 void dispose() {
   _mapMoveTimer?.cancel();
   _searchTimer?.cancel();
+  _realtimeExpiryRefreshTimer?.cancel();
   _searchController.dispose();
   _searchFocusNode.dispose();
   super.dispose();
@@ -3627,6 +3642,56 @@ Widget _rescueStatusUnderMarker(
   SpotFlagState spot,
   double size,
 ) {
+  if (spot.isRealtimeAwaitingUpdate) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.sync_rounded,
+          size: size * 0.85,
+          color: const Color(0xFF64748B),
+        ),
+        const SizedBox(width: 3),
+        Flexible(
+          child: Text(
+            'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR',
+            textAlign: TextAlign.center,
+            style: _mapLabelStyle(
+              fontSize: size * 0.50,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFF64748B),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  if (!spot.realtimeAvailable) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.info_outline_rounded,
+          size: size * 0.85,
+          color: const Color(0xFF64748B),
+        ),
+        const SizedBox(width: 3),
+        Flexible(
+          child: Text(
+            'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES',
+            textAlign: TextAlign.center,
+            style: _mapLabelStyle(
+              fontSize: size * 0.50,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFF64748B),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   if (spot.hasValidFlag) {
     final statusColor = Color(spot.statutColor);
     final statusText = spot.displayStatut.replaceAll('⚠️ ', '');

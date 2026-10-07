@@ -131,18 +131,21 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   final Map<String, List<String>> _documentChapters = {
     'CGU': [],
+    'CGV': [],
     'Politique de confidentialité': [],
     'RGPD': [],
   };
 
   final Map<String, Map<String, String>> _legalChapterIdsByDocument = {
     'cgu': {},
+    'cgv': {},
     'privacyPolicy': {},
     'rgpdNotice': {},
   };
 
   final Map<String, Set<String>> _modifiedChapters = {
     'CGU': {},
+    'CGV': {},
     'Politique de confidentialité': {},
     'RGPD': {},
   };
@@ -2794,8 +2797,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
     final pays = _cleanText(spot['pays']);
 
-    final isValidated = spot['sphotValide'] == true;
-
     final isRescueStation = _normalizeType(
       _cleanText(spot['typeSphot']),
     ).contains('POSTE DE SECOURS');
@@ -2946,8 +2947,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _spotVerticalField(
-                      'Validation',
-                      isValidated ? 'Validé' : 'Non validé',
+                      'Information déclarée par',
+                      'L’organisme gestionnaire du SPHOT',
                     ),
                     _spotVerticalField(
                       'Admin',
@@ -3287,6 +3288,24 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
     if (requestId.isEmpty) return;
 
+    final currentStatus = _cleanText(advertiser['status']).toLowerCase();
+    final legalAcceptance = _advertiserMap(advertiser['legalAcceptance']);
+    final legalDocuments = _advertiserMap(legalAcceptance['documents']);
+    final isInitialApproval =
+        decision == 'approved' && currentStatus != 'approved';
+
+    if (isInitialApproval && legalDocuments['cgv'] != true) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Approbation impossible : les CGV doivent avoir été acceptées par l’annonceur.',
+          ),
+        ),
+      );
+      return;
+    }
+
     String reason = '';
     if (decision != 'approved') {
       final result = await _askAdvertiserReviewReason(
@@ -3540,6 +3559,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final registryPrecheck = _advertiserMap(advertiser['registryPrecheck']);
     final foreignProof = _advertiserMap(advertiser['foreignProof']);
     final legalAcceptance = _advertiserMap(advertiser['legalAcceptance']);
+    final acceptedLegalDocuments =
+        _advertiserMap(legalAcceptance['documents']);
     final registrationMode = _cleanText(advertiser['registrationMode']);
     final foreignProofUrl = _cleanText(foreignProof['url']);
     final companyName = _cleanText(
@@ -3719,6 +3740,12 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     ? 'Non acceptée'
                     : _cleanText(legalAcceptance['version']),
               ),
+              _advertiserRequestInfoLine(
+                'CGV',
+                acceptedLegalDocuments['cgv'] == true
+                    ? 'Acceptées'
+                    : 'Non acceptées',
+              ),
               _advertiserRequestInfoLine('Adresse', address),
               _advertiserWebsiteLine(websiteUrl),
               if (assetChangeStatus.isNotEmpty)
@@ -3846,6 +3873,29 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
     if (requestId.isEmpty) {
       throw Exception('Identifiant de la demande introuvable.');
+    }
+
+    final legalAcceptance =
+        Map<String, dynamic>.from(adminData['legalAcceptance'] ?? {});
+    final legalDocuments = legalAcceptance['documents'] is Map
+        ? Map<String, dynamic>.from(legalAcceptance['documents'] as Map)
+        : <String, dynamic>{};
+
+    final legalComplete =
+        (legalAcceptance['accepted'] == true ||
+            _cleanText(
+              legalAcceptance['legalVersion'] ?? legalAcceptance['version'],
+            ).isNotEmpty) &&
+        legalAcceptance['representativeDeclaration'] == true &&
+        legalAcceptance['adminResponsibilityDeclaration'] == true &&
+        legalDocuments['cgu'] == true &&
+        legalDocuments['privacy'] == true &&
+        legalDocuments['rgpd'] == true;
+
+    if (!legalComplete) {
+      throw Exception(
+        'Acceptations juridiques Admin incomplètes : la demande doit être corrigée avant approbation.',
+      );
     }
 
     final profile = Map<String, dynamic>.from(adminData['profile'] ?? {});
@@ -4216,6 +4266,17 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
     final profile = Map<String, dynamic>.from(admin['profile'] ?? {});
 
+    final legalAcceptance =
+        Map<String, dynamic>.from(admin['legalAcceptance'] ?? {});
+    final legalDocuments = legalAcceptance['documents'] is Map
+        ? Map<String, dynamic>.from(legalAcceptance['documents'] as Map)
+        : <String, dynamic>{};
+    final legalVersion = _cleanText(
+      legalAcceptance['legalVersion'] ?? legalAcceptance['version'],
+    );
+    final adminResponsibilityAccepted =
+        legalAcceptance['adminResponsibilityDeclaration'] == true;
+
     final mairie = _cleanText(
       structure['nom'] ??
           admin['nomStructure'] ??
@@ -4428,6 +4489,40 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ],
               ),
               const SizedBox(height: 10),
+              _adminDetailSection(
+                title: 'ACCEPTATIONS JURIDIQUES',
+                children: [
+                  _spotInfoLine(
+                    'Version',
+                    legalVersion.isEmpty ? 'Non renseignée' : legalVersion,
+                  ),
+                  _spotInfoLine(
+                    'CGU',
+                    legalDocuments['cgu'] == true
+                        ? 'Acceptées'
+                        : 'Non acceptées',
+                  ),
+                  _spotInfoLine(
+                    'Confidentialité',
+                    legalDocuments['privacy'] == true
+                        ? 'Acceptée'
+                        : 'Non acceptée',
+                  ),
+                  _spotInfoLine(
+                    'RGPD',
+                    legalDocuments['rgpd'] == true
+                        ? 'Accepté'
+                        : 'Non accepté',
+                  ),
+                  _spotInfoLine(
+                    'Responsabilité des informations déclarées',
+                    adminResponsibilityAccepted
+                        ? 'Acceptée'
+                        : 'Non acceptée',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               SuperAdminAdminWorkflowPanel(adminData: admin),
               const SizedBox(height: 18),
 
@@ -4560,6 +4655,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     switch (title) {
       case 'CGU':
         return 'cgu';
+      case 'CGV':
+        return 'cgv';
       case 'Politique de confidentialité':
       case 'POLITIQUE DE CONFIDENTIALITÉ':
         return 'privacyPolicy';
@@ -4598,6 +4695,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   Future<void> _loadAllLegalChaptersFromFirebase() async {
     final cgu = await _loadLegalChaptersFromFirebase('CGU');
+    final cgv = await _loadLegalChaptersFromFirebase('CGV');
     final privacy = await _loadLegalChaptersFromFirebase(
       'Politique de confidentialité',
     );
@@ -4607,6 +4705,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
     setState(() {
       _documentChapters['CGU'] = cgu;
+      _documentChapters['CGV'] = cgv;
       _documentChapters['Politique de confidentialité'] = privacy;
       _documentChapters['RGPD'] = rgpd;
     });
@@ -4657,6 +4756,14 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 title: 'CGU',
                 subtitle: 'Conditions Générales d’Utilisation',
                 chapters: _documentChapters['CGU'] ?? [],
+              ),
+
+              const SizedBox(height: 12),
+
+              _legalDocumentTile(
+                title: 'CGV',
+                subtitle: 'Conditions Générales de Vente',
+                chapters: _documentChapters['CGV'] ?? [],
               ),
 
               const SizedBox(height: 12),
@@ -5152,6 +5259,33 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             _modifiedChaptersBlock('CGU'),
 
             CheckboxListTile(
+              value: _modifiedDocuments.contains('CGV'),
+              onChanged: (value) {
+                setState(() {
+                  if (value == true) {
+                    _modifiedDocuments.add('CGV');
+                  } else {
+                    _modifiedDocuments.remove('CGV');
+                    _modifiedChapters['CGV']?.clear();
+                  }
+                });
+              },
+              title: const Text(
+                'CGV',
+                style: TextStyle(
+                  color: adminColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
+              activeColor: adminColor,
+              checkColor: Colors.white,
+              side: const BorderSide(color: adminColor, width: 1.6),
+            ),
+
+            _modifiedChaptersBlock('CGV'),
+
+            CheckboxListTile(
               value: _modifiedDocuments.contains(
                 'Politique de confidentialité',
               ),
@@ -5365,6 +5499,39 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     );
   }
 
+  String _legalDocumentListKey(String title) {
+    return title == 'POLITIQUE DE CONFIDENTIALITÉ'
+        ? 'Politique de confidentialité'
+        : title;
+  }
+
+  void _startNewLegalChapter(String documentTitle, List<String> chapters) {
+    var highestOrder = 0;
+    final documentId = _legalDocumentIdFromTitle(documentTitle);
+    final storedIds =
+        _legalChapterIdsByDocument[documentId]?.values ?? const <String>[];
+
+    for (final chapterId in storedIds) {
+      final value = int.tryParse(chapterId);
+      if (value != null && value > highestOrder) {
+        highestOrder = value;
+      }
+    }
+
+    if (highestOrder == 0) {
+      highestOrder = chapters.length;
+    }
+
+    final nextOrder = (highestOrder + 1).toString().padLeft(2, '0');
+
+    setState(() {
+      _selectedLegalDocument = documentTitle;
+      _selectedLegalChapter = '$nextOrder. Nouvel article';
+      _legalTitleController.text = 'Nouvel article';
+      _legalContentController.clear();
+    });
+  }
+
   Widget _legalDocumentTile({
     required String title,
     required String subtitle,
@@ -5401,48 +5568,81 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               fontWeight: FontWeight.w700,
             ),
           ),
-          children: chapters.map((chapter) {
-            final isSelected =
-                _selectedLegalDocument == title &&
-                _selectedLegalChapter == chapter;
+          children: [
+            if (chapters.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Aucun article enregistré.',
+                  style: TextStyle(
+                    color: adminColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ...chapters.map((chapter) {
+              final isSelected =
+                  _selectedLegalDocument == title &&
+                  _selectedLegalChapter == chapter;
 
-            return Column(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    if (isSelected) {
-                      setState(() {
-                        _selectedLegalDocument = null;
-                        _selectedLegalChapter = null;
-                        _legalTitleController.clear();
-                        _legalContentController.clear();
-                      });
-                    } else {
-                      _loadLegalChapter(title, chapter);
-                    }
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(color: adminColor.withOpacity(0.18)),
+              return Column(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      if (isSelected) {
+                        setState(() {
+                          _selectedLegalDocument = null;
+                          _selectedLegalChapter = null;
+                          _legalTitleController.clear();
+                          _legalContentController.clear();
+                        });
+                      } else {
+                        _loadLegalChapter(title, chapter);
+                      }
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(color: adminColor.withOpacity(0.18)),
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      chapter,
-                      style: const TextStyle(
-                        color: adminColor,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                      child: Text(
+                        chapter,
+                        style: const TextStyle(
+                          color: adminColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
+                  if (isSelected) _buildLegalChapterEditor(),
+                ],
+              );
+            }),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => _startNewLegalChapter(title, chapters),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('AJOUTER UN ARTICLE'),
+                style: TextButton.styleFrom(
+                  foregroundColor: redColor,
+                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
                 ),
-                if (isSelected) _buildLegalChapterEditor(),
-              ],
-            );
-          }).toList(),
+              ),
+            ),
+            if (_selectedLegalDocument == title &&
+                _selectedLegalChapter != null &&
+                !(_documentChapters[_legalDocumentListKey(title)] ??
+                        const <String>[])
+                    .contains(_selectedLegalChapter))
+              _buildLegalChapterEditor(),
+          ],
         ),
       ),
     );
@@ -5452,6 +5652,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     switch (title) {
       case 'CGU':
         return 'cgu';
+      case 'CGV':
+        return 'cgv';
       case 'POLITIQUE DE CONFIDENTIALITÉ':
         return 'privacyPolicy';
       case 'RGPD':
@@ -5560,9 +5762,30 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
 
+      await FirebaseFirestore.instance
+          .collection('legalDocuments')
+          .doc(documentId)
+          .set({
+            'title': _selectedLegalDocument,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+
+      await _loadAllLegalChaptersFromFirebase();
+
       if (!mounted) return;
 
-      setState(() {});
+      final modifiedDocument =
+          _selectedLegalDocument == 'POLITIQUE DE CONFIDENTIALITÉ'
+              ? 'Politique de confidentialité'
+              : _selectedLegalDocument!;
+
+      setState(() {
+        _selectedLegalChapter = title;
+        _modifiedDocuments.add(modifiedDocument);
+        (_modifiedChapters[modifiedDocument] ??= <String>{}).add(title);
+        _legalVersionSaved = false;
+        _legalVersionButtonRed = false;
+      });
     } catch (e) {
       if (!mounted) return;
 
@@ -5641,6 +5864,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
       const legalDocuments = <String, String>{
         'CGU': 'cgu',
+        'CGV': 'cgv',
         'Politique de confidentialité': 'privacyPolicy',
         'RGPD': 'rgpdNotice',
       };
@@ -5729,6 +5953,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         documentId: 'cgu',
       );
 
+      final cgvSnapshot = await loadDocumentSnapshot(
+        label: 'CGV',
+        documentId: 'cgv',
+      );
+
       final privacySnapshot = await loadDocumentSnapshot(
         label: 'Politique de confidentialité',
         documentId: 'privacyPolicy',
@@ -5748,7 +5977,24 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       const migrationSummary =
           'Harmonisation terminologique SPHOT ADMIN / SPHOT PUBLICITAIRE.';
 
-      final versionRef = firestore.collection('legalVersions').doc('1_0');
+      final metadataSnapshot = await firestore
+          .collection('legalDocuments')
+          .doc('metadata')
+          .get();
+      final metadataData =
+          metadataSnapshot.data() ?? const <String, dynamic>{};
+      final currentVersion =
+          (metadataData['version'] ?? metadataData['legalVersion'] ?? '')
+              .toString()
+              .trim();
+      final hasChanges = changedCount > 0;
+      final version = currentVersion.isEmpty
+          ? '1.0'
+          : hasChanges
+              ? _nextLegalVersion(currentVersion)
+              : currentVersion;
+      final versionId = version.replaceAll('.', '_');
+      final versionRef = firestore.collection('legalVersions').doc(versionId);
       final versionDoc = await versionRef.get();
       final versionData = versionDoc.data() ?? <String, dynamic>{};
       final previousSummary =
@@ -5759,8 +6005,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           : previousSummary.isEmpty
               ? migrationSummary
               : '$previousSummary • $migrationSummary';
-
-      final hasChanges = changedCount > 0;
 
       final documentsModified = hasChanges
           ? changedChapters.entries
@@ -5778,7 +6022,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             );
 
       await firestore.collection('legalDocuments').doc('metadata').set({
-        'version': '1.0',
+        'version': version,
         'summary': summary,
         'documentsModified': documentsModified,
         'chaptersModified': chaptersModified,
@@ -5787,13 +6031,14 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       }, SetOptions(merge: true));
 
       await versionRef.set({
-        'version': '1.0',
-        'versionId': '1_0',
+        'version': version,
+        'versionId': versionId,
         'summary': summary,
         'documentsModified': documentsModified,
         'chaptersModified': chaptersModified,
         'documents': {
           'cgu': cguSnapshot,
+          'cgv': cgvSnapshot,
           'privacyPolicy': privacySnapshot,
           'rgpdNotice': rgpdSnapshot,
         },
@@ -5803,15 +6048,17 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
       if (!mounted) return;
 
-      _legalVersionController.text = '1.0';
+      _legalVersionController.text = version;
       await _loadAllLegalChaptersFromFirebase();
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Terminologie SPHOT ADMIN / SPHOT PUBLICITAIRE appliquée. Version maintenue à 1.0.',
+            hasChanges
+                ? 'Terminologie appliquée. Nouvelle version juridique $version.'
+                : 'Aucune modification terminologique à versionner.',
           ),
         ),
       );
@@ -5832,6 +6079,43 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     }
   }
 
+  String _nextLegalVersion(String current) {
+    final normalized = current.trim();
+    if (normalized.isEmpty) return '1.0';
+
+    final parts = normalized.split('.');
+    final major = int.tryParse(parts.isNotEmpty ? parts[0] : '') ?? 1;
+    final minor = int.tryParse(parts.length > 1 ? parts[1] : '') ?? 0;
+
+    return '$major.${minor + 1}';
+  }
+
+  Future<void> _loadLegalVersionMetadata() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('legalDocuments')
+          .doc('metadata')
+          .get();
+      final data = snapshot.data() ?? const <String, dynamic>{};
+      final version = (data['version'] ?? data['legalVersion'] ?? '1.0')
+          .toString()
+          .trim();
+
+      if (!mounted) return;
+
+      setState(() {
+        _legalVersionController.text = version.isEmpty ? '1.0' : version;
+        _legalLastUpdatedText =
+            (data['updatedAtText'] ?? 'Non renseignée').toString();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _legalVersionController.text = '1.0';
+      });
+    }
+  }
+
   Future<void> _saveLegalVersionAndTurnButtonRed() async {
     setState(() {
       _legalVersionButtonRed = true;
@@ -5846,9 +6130,21 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     }
 
     final now = DateTime.now();
-
-    const version = '1.0';
-    const versionId = '1_0';
+    final firestore = FirebaseFirestore.instance;
+    final metadataSnapshot = await firestore
+        .collection('legalDocuments')
+        .doc('metadata')
+        .get();
+    final metadataData =
+        metadataSnapshot.data() ?? const <String, dynamic>{};
+    final currentVersion =
+        (metadataData['version'] ?? metadataData['legalVersion'] ?? '')
+            .toString()
+            .trim();
+    final version = currentVersion.isEmpty
+        ? '1.0'
+        : _nextLegalVersion(currentVersion);
+    final versionId = version.replaceAll('.', '_');
 
     if (_legalVersionController.text != version) {
       _legalVersionController.text = version;
@@ -5866,8 +6162,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final summary = _legalChangeLogController.text.trim();
 
     try {
-      final firestore = FirebaseFirestore.instance;
-
       Future<Map<String, dynamic>> loadDocumentSnapshot({
         required String label,
         required String documentId,
@@ -5903,6 +6197,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         documentId: 'cgu',
       );
 
+      final cgvSnapshot = await loadDocumentSnapshot(
+        label: 'CGV',
+        documentId: 'cgv',
+      );
+
       final privacySnapshot = await loadDocumentSnapshot(
         label: 'Politique de confidentialité',
         documentId: 'privacyPolicy',
@@ -5930,6 +6229,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         'chaptersModified': chaptersModified,
         'documents': {
           'cgu': cguSnapshot,
+          'cgv': cgvSnapshot,
           'privacyPolicy': privacySnapshot,
           'rgpdNotice': rgpdSnapshot,
         },
@@ -5964,6 +6264,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
         _modifiedDocuments.clear();
         _modifiedChapters['CGU'] = <String>{};
+        _modifiedChapters['CGV'] = <String>{};
         _modifiedChapters['Politique de confidentialité'] = <String>{};
         _modifiedChapters['RGPD'] = <String>{};
 
@@ -6085,6 +6386,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     _legalVersionController.addListener(_markLegalVersionModified);
     _legalPublicationDateController.addListener(_markLegalVersionModified);
     _legalChangeLogController.addListener(_markLegalVersionModified);
+    _loadLegalVersionMetadata();
     _loadAllLegalChaptersFromFirebase();
   }
 

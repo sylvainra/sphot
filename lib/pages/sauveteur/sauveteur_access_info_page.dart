@@ -197,9 +197,9 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                                 ),
                               _line(
                                 'Le passage SPHOT OFF / SPHOT ON dépend '
-                                'de vos affectations et des droits de diffusion '
-                                'ouverts par votre administration de tutelle '
-                                'SPHOT ADMIN.',
+                                'de vos affectations et de la disponibilité '
+                                'du service SPHOT en temps réel pour le poste '
+                                'concerné.',
                               ),
                             ],
                           ),
@@ -209,9 +209,9 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                             color: red,
                             children: [
                               _line(
-                                'Vous basculerez en SPHOT ON dès lors que '
-                                'votre administration SPHOT ADMIN bénéficiera '
-                                'des droits de diffusion sur SPHOT.\n'
+                                'Vous basculerez en SPHOT ON lorsque le service '
+                                'temps réel est actif pour votre poste et que '
+                                'votre affectation est en cours.\n'
                                 'Tous les sauveteurs SPHOT ON affectés au même '
                                 'poste peuvent agir professionnellement sur '
                                 'les paramètres opérationnels partagés : '
