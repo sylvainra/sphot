@@ -756,6 +756,20 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
               'Choisissez l’espace professionnel que vous souhaitez créer.',
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 12),
+            const Text(
+              'Pour faciliter la création de votre espace professionnel, '
+              'la demande se poursuit sur le site SPHOT, dans de meilleures '
+              'conditions de confort, de lisibilité et de saisie. '
+              'Vous retrouverez ensuite votre espace dans SPHOT.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: _blue,
+                fontSize: 13,
+                height: 1.35,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 22),
             Center(
               child: SizedBox(
