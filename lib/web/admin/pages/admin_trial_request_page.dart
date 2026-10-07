@@ -1218,13 +1218,15 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         _privacyDoc = privacy;
         _rgpdDoc = rgpd;
 
-        _sphotVersion = (
-          metadataData['legalVersion'] ??
-          metadataData['version'] ??
-          metadataData['activeVersion'] ??
-          '1.0'
-        ).toString();
-        _sphotPublishedAt = metadataData['publishedAt'];
+        if (_legalAcceptedAt == null) {
+          _sphotVersion = (
+            metadataData['legalVersion'] ??
+            metadataData['version'] ??
+            metadataData['activeVersion'] ??
+            '1.0'
+          ).toString();
+          _sphotPublishedAt = metadataData['publishedAt'];
+        }
         _sphotChangeLog = (metadataData['changeLog'] ?? '').toString();
 
         _legalLoading = false;
