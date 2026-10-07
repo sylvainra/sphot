@@ -75,10 +75,10 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
   String _trialStatusLabel(String raw) {
     switch (raw.toLowerCase()) {
       case 'pending':
-        return 'En attente de validation';
+        return 'En attente d’autorisation';
       case 'approved':
       case 'trial':
-        return 'Validée / en cours';
+        return 'Autorisée / en cours';
       case 'expired':
         return 'Terminée';
       case 'rejected':
@@ -198,7 +198,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
           context: context,
           builder: (dialogContext) => AlertDialog(
             title: const Text(
-              'VALIDER LA PÉRIODE D’ESSAI',
+              'AUTORISER LA PÉRIODE D’ESSAI',
               style: TextStyle(
                 color: _blue,
                 fontWeight: FontWeight.w900,
@@ -224,7 +224,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                   backgroundColor: _red,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('VALIDER L’ESSAI'),
+                child: const Text('AUTORISER L’ESSAI'),
               ),
             ],
           ),
@@ -287,7 +287,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
         'lastEvent': <String, dynamic>{
           'type': 'trial_approved',
           'category': 'commercial',
-          'label': 'Période d’essai SPHOT ADMIN validée',
+          'label': 'Période d’essai SPHOT ADMIN autorisée',
           'createdAt': serverNow,
           'createdByRole': 'super_admin',
         },
@@ -934,7 +934,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                           _formatDateTime(request['requestedAt']),
                         ),
                         _line(
-                          'Validée le',
+                          'Autorisée le',
                           _formatDateTime(
                             administrativeTracking['approvedAt'] ??
                                 request['approvedAt'],
@@ -995,7 +995,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                               ),
                               icon: const Icon(Icons.play_circle_fill_rounded),
                               label: const Text(
-                                'VALIDER LA PÉRIODE D’ESSAI',
+                                'AUTORISER LA PÉRIODE D’ESSAI',
                                 style: TextStyle(fontWeight: FontWeight.w900),
                               ),
                               style: ElevatedButton.styleFrom(
