@@ -938,6 +938,30 @@ function realtimeScopeEnabledSince(scope, spotId) {
     null;
 }
 
+function realtimeScopeValidUntil(scope, spotId) {
+  if (!realtimeScopeGrantsSpot(scope, spotId)) return undefined;
+
+  const id = (spotId || "").toString().trim();
+  const expiries = [];
+
+  if (scope.allSpots === true) {
+    expiries.push(scope.allSpotsUntil);
+  }
+
+  if (id && scope.spotUntil instanceof Map && scope.spotUntil.has(id)) {
+    expiries.push(scope.spotUntil.get(id));
+  }
+
+  if (expiries.some((value) => value === null)) return null;
+
+  const datedExpiries = expiries.filter((value) => value instanceof Date);
+  if (datedExpiries.length === 0) return undefined;
+
+  return datedExpiries.reduce((latest, candidate) => {
+    return candidate.getTime() > latest.getTime() ? candidate : latest;
+  });
+}
+
 function historicalLiveStateIsFresh(historical, enabledSince) {
   if (!historical) return false;
   if (!enabledSince) return true;
