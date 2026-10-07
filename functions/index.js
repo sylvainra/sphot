@@ -44,6 +44,7 @@ function isSupervisedSpotData(spot) {
  * @param {string} spotId Identifiant du SPHOT.
  * @param {Object} spot Données internes du SPHOT.
  * @param {string} realtimeStatus État du service temps réel public.
+ * @param {Date|null|undefined} realtimeValidUntil Fin du droit temps réel.
  * @return {Object} Données autorisées sur la carte publique.
  */
 function buildPublicSpot(
@@ -51,6 +52,7 @@ function buildPublicSpot(
     spotId,
     spot,
     realtimeStatus = "available",
+    realtimeValidUntil = undefined,
 ) {
   const publicFields = [
     "idSphot",
@@ -129,6 +131,12 @@ function buildPublicSpot(
     result.realtimeAvailable = normalizedRealtimeStatus !== "unavailable";
     result.realtimeStatus = normalizedRealtimeStatus;
 
+    if (normalizedRealtimeStatus !== "unavailable" &&
+        realtimeValidUntil !== undefined &&
+        realtimeValidUntil !== null) {
+      result.realtimeValidUntil = realtimeValidUntil;
+    }
+
     if (normalizedRealtimeStatus !== "available") {
       [
         "liveFlag",
@@ -148,6 +156,7 @@ function buildPublicSpot(
   } else {
     result.realtimeAvailable = false;
     result.realtimeStatus = "not_applicable";
+    delete result.realtimeValidUntil;
 
     [
       "liveFlag",
