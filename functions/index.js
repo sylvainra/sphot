@@ -709,8 +709,9 @@ function subscriptionRealtimeSpotIds(subscription) {
 /**
  * Retourne le périmètre opérationnel temps réel d'un territoire.
  *
- * Pendant l'essai, tous les SPHOTS surveillés du territoire sont couverts.
- * Pour un abonnement actif, seuls les postes explicitement sélectionnés sont
+ * Pendant l'essai, les SPHOTS surveillés inclus dans la demande sont
+ * couverts. Pour un abonnement actif, seuls les postes explicitement
+ * sélectionnés sont
  * couverts. Un abonnement historique sans sélection explicite conserve la
  * couverture globale pour compatibilité.
  *
@@ -768,11 +769,29 @@ async function territoryRealtimeScope(db, territoireId) {
       ]);
 
       if (trialStatuses.has(status)) {
-        allSpots = true;
         const trialSince =
           firestoreDate(subscription.trialStartDate) ||
           firestoreDate(subscription.trialActivatedAt);
-        allSpotsSince = keepEarliestDate(allSpotsSince, trialSince);
+        const trialIds = Array.isArray(subscription.trialRescueStationIds) ?
+          subscription.trialRescueStationIds
+              .map((value) => (value || "").toString().trim())
+              .filter((value) => value) :
+          [];
+
+        if (trialIds.length === 0) {
+          // Compatibilité avec les essais créés avant le gel de la liste
+          // des postes concernés.
+          allSpots = true;
+          allSpotsSince = keepEarliestDate(allSpotsSince, trialSince);
+        } else {
+          trialIds.forEach((id) => {
+            spotIds.add(id);
+            spotSince.set(
+                id,
+                keepEarliestDate(spotSince.get(id) || null, trialSince),
+            );
+          });
+        }
         continue;
       }
 
