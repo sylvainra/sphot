@@ -964,7 +964,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                           ),
                         ),
                         _line(
-                          'Validée le',
+                          'Autorisée le',
                           _formatDateTime(trialTracking['approvedAt']),
                         ),
                         _line(
