@@ -3964,6 +3964,10 @@ exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
             realtimeScope,
             event.params.spotId,
         );
+        const validUntil = realtimeScopeValidUntil(
+            realtimeScope,
+            event.params.spotId,
+        );
         const liveStateFresh = historicalLiveStateIsFresh(
             historicalSpot,
             enabledSince,
@@ -3972,7 +3976,10 @@ exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
         if (!liveStateFresh) {
           batch.set(
               document.ref,
-              buildSuppressedPublicLiveState("awaiting_update"),
+              buildSuppressedPublicLiveState(
+                  "awaiting_update",
+                  validUntil,
+              ),
               {merge: true},
           );
           continue;
@@ -3984,6 +3991,9 @@ exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
               ...liveState,
               realtimeAvailable: true,
               realtimeStatus: "available",
+              ...(validUntil !== undefined && validUntil !== null ?
+                {realtimeValidUntil: validUntil} :
+                {}),
             },
             {merge: true},
         );
