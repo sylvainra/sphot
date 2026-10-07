@@ -1657,6 +1657,7 @@ exports.activateApprovedAdminOrder = onDocumentUpdated(
         billingCycle: "annual",
         currentOrderId: event.params.orderId,
         currentOrderNumber: after.orderNumber || null,
+        commercialOrderStatus: cleanValue(after.status, "approved"),
         numberOfRescueStations: Number(after.numberOfRescueStations || 0),
         ...(Array.isArray(after.selectedRescueStationIds) ? {
           selectedRescueStationIds: after.selectedRescueStationIds,
