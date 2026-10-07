@@ -261,10 +261,12 @@ Future<void> _toggleFavoritesFilter() async {
         maxWidth: labelWidth,
       );
 
-      final statusText = spot.hasValidFlag
+      final statusText = !spot.realtimeAvailable
+          ? 'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES'
+          : spot.hasValidFlag
           ? spot.displayStatut.replaceAll('⚠️ ', '')
           : 'BAIGNADE NON SURVEILLÉE';
-      final statusHeight = spot.hasValidFlag
+      final statusHeight = !spot.realtimeAvailable || spot.hasValidFlag
           ? max(
               24.0,
               _measureSelectedLabelHeight(
@@ -3627,6 +3629,31 @@ Widget _rescueStatusUnderMarker(
   SpotFlagState spot,
   double size,
 ) {
+  if (!spot.realtimeAvailable) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.info_outline_rounded,
+          size: size * 0.85,
+          color: const Color(0xFF64748B),
+        ),
+        const SizedBox(width: 3),
+        Flexible(
+          child: Text(
+            'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES',
+            textAlign: TextAlign.center,
+            style: _mapLabelStyle(
+              fontSize: size * 0.50,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFF64748B),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   if (spot.hasValidFlag) {
     final statusColor = Color(spot.statutColor);
     final statusText = spot.displayStatut.replaceAll('⚠️ ', '');
