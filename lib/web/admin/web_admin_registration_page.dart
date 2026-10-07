@@ -1444,7 +1444,7 @@ final legalVersionId = _versionId(legalVersion);
                 children: [
                   Text(
                     isFinalStep
-                        ? (_saved ? 'DEMANDE ENVOYÉE' : 'DEMANDE D’ESSAI GRATUIT')
+                        ? (_saved ? 'DEMANDE ENVOYÉE' : 'ENVOYER MA DEMANDE D’ACCÈS')
                         : 'SUIVANT',
                     style: buttonTextStyle(
                       _saved
