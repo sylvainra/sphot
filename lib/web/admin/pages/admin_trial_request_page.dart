@@ -12,10 +12,12 @@ import '../../../services/admin_logo_storage_service.dart';
 
 class AdminTrialRequestPage extends StatefulWidget {
   final String? correctionRequestId;
+  final String? draftRequestId;
 
   const AdminTrialRequestPage({
     super.key,
     this.correctionRequestId,
+    this.draftRequestId,
   });
 
   @override
@@ -130,6 +132,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
   String _sphotVersion = '1.0';
   dynamic _sphotPublishedAt;
+  dynamic _legalAcceptedAt;
   String _sphotChangeLog = '';
 
   final List<String> civiliteChoices = const ['Monsieur', 'Madame'];
@@ -160,6 +163,11 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       _loadExistingRequest();
     } else {
       _controller('typeStructure').text = 'MAIRIE';
+      final draftRequestId = widget.draftRequestId?.trim() ?? '';
+      if (draftRequestId.isNotEmpty) {
+        _createdRequestId = draftRequestId;
+        _loadDraftLegalAcceptance(draftRequestId);
+      }
     }
 
     _loadLegalDocuments();
@@ -221,6 +229,69 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     }
 
     return _value(key) != (_correctionBaseline[key] ?? '');
+  }
+
+  Future<void> _loadDraftLegalAcceptance(String requestId) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('adminRequests')
+          .doc(requestId)
+          .get();
+
+      if (!snapshot.exists) {
+        throw Exception('Le dossier juridique préalable est introuvable.');
+      }
+
+      final data = snapshot.data() ?? <String, dynamic>{};
+      final legalAcceptance = Map<String, dynamic>.from(
+        data['legalAcceptance'] ?? {},
+      );
+      final trialRequest = Map<String, dynamic>.from(
+        data['trialRequest'] ?? {},
+      );
+      final acceptedDocuments = Map<String, dynamic>.from(
+        trialRequest['acceptedDocuments'] ?? {},
+      );
+      final documents = Map<String, dynamic>.from(
+        legalAcceptance['documents'] ?? {},
+      );
+
+      if (legalAcceptance['accepted'] != true ||
+          legalAcceptance['adminResponsibilityDeclaration'] != true ||
+          legalAcceptance['representativeDeclaration'] != true) {
+        throw Exception('Les règles SPHOT ADMIN doivent être acceptées.');
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _certifyRepresentative = true;
+        _adminResponsibilityAccepted = true;
+        _legalReadConfirmed =
+            documents['cgu'] == true || acceptedDocuments['cgu'] == true;
+        _privacyReadConfirmed =
+            documents['privacy'] == true ||
+            acceptedDocuments['privacy'] == true;
+        _rgpdAccepted =
+            documents['rgpd'] == true || acceptedDocuments['rgpd'] == true;
+        _sphotVersion =
+            (legalAcceptance['version'] ??
+                    acceptedDocuments['version'] ??
+                    _sphotVersion)
+                .toString();
+        _sphotPublishedAt =
+            legalAcceptance['publishedAt'] ?? acceptedDocuments['publishedAt'];
+        _legalAcceptedAt =
+            legalAcceptance['acceptedAt'] ?? acceptedDocuments['acceptedAt'];
+      });
+    } catch (error) {
+      debugPrint('Chargement acceptation juridique Admin impossible : $error');
+      if (!mounted) return;
+      setState(() {
+        _trialRequestMessage =
+            'Votre acceptation juridique préalable est introuvable ou '
+            'incomplète. Revenez au début de la demande.';
+      });
+    }
   }
 
   Future<void> _loadExistingRequest() async {
