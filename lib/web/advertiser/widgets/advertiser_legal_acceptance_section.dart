@@ -10,12 +10,16 @@ class AdvertiserLegalAcceptanceSection extends StatefulWidget {
     required this.requestStatus,
     this.onSubmitted,
     this.readOnly = false,
+    this.preApplication = false,
+    this.reminderOnly = false,
   });
 
   final String? requestId;
   final String requestStatus;
   final VoidCallback? onSubmitted;
   final bool readOnly;
+  final bool preApplication;
+  final bool reminderOnly;
 
   @override
   State<AdvertiserLegalAcceptanceSection> createState() =>
@@ -49,19 +53,26 @@ class _AdvertiserLegalAcceptanceSectionState
 
   bool get _locked {
     final status = widget.requestStatus.toLowerCase();
+    if (widget.preApplication) return widget.readOnly;
     return widget.readOnly ||
         (status != 'draft' && status != 'changes_requested');
   }
 
-  bool get _canSubmit =>
-      _applicationCompleted &&
+  bool get _allLegalAccepted =>
       _cguAccepted &&
       _cgvAccepted &&
       _privacyAccepted &&
       _rgpdAccepted &&
-      _representativeAccepted &&
-      !_locked &&
-      !_submitting;
+      _representativeAccepted;
+
+  bool get _canSubmit {
+    if (_locked || _submitting) return false;
+    if (widget.preApplication) return _allLegalAccepted;
+    if (widget.reminderOnly) {
+      return _applicationCompleted && _allLegalAccepted;
+    }
+    return _applicationCompleted && _allLegalAccepted;
+  }
 
   @override
   void initState() {
@@ -184,17 +195,85 @@ class _AdvertiserLegalAcceptanceSectionState
       final snapshot = await reference.get();
       final data = snapshot.data() ?? <String, dynamic>{};
 
+      if (widget.preApplication) {
+        await reference.set({
+          'status': 'draft',
+          'legalAcceptanceCompleted': true,
+          'legalPreAcceptanceCompleted': true,
+          'acceptedDocuments': <String, Object?>{
+            'cgu': true,
+            'cgv': true,
+            'privacy': true,
+            'rgpd': true,
+            'version': _version,
+            'acceptedAt': FieldValue.serverTimestamp(),
+          },
+          'legalAcceptance': <String, Object?>{
+            'version': _version,
+            'packPath': _legalPackPath,
+            'representativeDeclaration': true,
+            'documents': <String, Object?>{
+              'cgu': true,
+              'cgv': true,
+              'privacy': true,
+              'rgpd': true,
+            },
+            'acceptedAt': FieldValue.serverTimestamp(),
+          },
+          'createdAt': data['createdAt'] ?? FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        if (!mounted) return;
+        setState(() {
+          _submitting = false;
+          _success = 'Règles acceptées. Vous pouvez poursuivre votre demande.';
+        });
+        widget.onSubmitted?.call();
+        return;
+      }
+
       if (data['profileCompleted'] != true ||
           data['establishmentCompleted'] != true ||
           data['applicationCompleted'] != true) {
         throw const _LegalSubmissionException(
-          'Terminez les deux premières étapes avant la transmission.',
+          'Terminez les étapes de votre demande avant la transmission.',
         );
       }
 
       final recipient = (data['contactEmail'] ?? data['email'] ?? '')
           .toString()
           .trim();
+
+      if (widget.reminderOnly) {
+        await reference.set({
+          'status': 'pending',
+          'acknowledgementEmail': <String, Object?>{
+            'status': 'pending',
+            'recipient': recipient,
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+          'review': <String, Object?>{
+            'status': 'pending',
+            'reason': '',
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+          'submittedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        if (!mounted) return;
+        _cguController.collapse();
+        _cgvController.collapse();
+        _privacyController.collapse();
+        _rgpdController.collapse();
+        setState(() {
+          _submitting = false;
+          _success = 'Votre demande a été transmise à l’équipe SPHOT.';
+        });
+        widget.onSubmitted?.call();
+        return;
+      }
 
       await reference.set({
         'status': 'pending',
@@ -267,7 +346,7 @@ class _AdvertiserLegalAcceptanceSectionState
   }) {
     return CheckboxListTile(
       value: value,
-      onChanged: _locked || !enabled ? null : onChanged,
+      onChanged: _locked || widget.reminderOnly || !enabled ? null : onChanged,
       activeColor: WebColors.blue,
       checkColor: Colors.white,
       controlAffinity: ListTileControlAffinity.leading,
@@ -409,10 +488,16 @@ class _AdvertiserLegalAcceptanceSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Consultez puis acceptez les documents applicables avant de '
-          'transmettre votre demande de SPHOT PUBLICITAIRE.',
-          style: TextStyle(
+        Text(
+          widget.preApplication
+              ? 'Avant toute saisie, consultez et acceptez les règles '
+                  'applicables à SPHOT PUBLICITAIRE.'
+              : widget.reminderOnly
+                  ? 'Rappel des règles acceptées avant votre saisie. '
+                      'Vous pouvez les relire avant de transmettre votre demande.'
+                  : 'Consultez puis acceptez les documents applicables avant de '
+                      'transmettre votre demande de SPHOT PUBLICITAIRE.',
+          style: const TextStyle(
             color: WebColors.blue,
             fontSize: 15,
             fontWeight: FontWeight.w700,
@@ -471,11 +556,11 @@ class _AdvertiserLegalAcceptanceSectionState
           },
         ),
         const SizedBox(height: 8),
-        if (!_applicationCompleted && !_locked)
+        if (!widget.preApplication && !_applicationCompleted && !_locked)
           const Padding(
             padding: EdgeInsets.only(bottom: 12),
             child: Text(
-              'Terminez et enregistrez d’abord les deux premières étapes.',
+              'Terminez et enregistrez d’abord les étapes de votre demande.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: WebColors.red,
@@ -540,8 +625,10 @@ class _AdvertiserLegalAcceptanceSectionState
               _submitting
                   ? 'ENVOI EN COURS…'
                   : _locked
-                  ? 'DEMANDE TRANSMISE'
-                  : 'TRANSMETTRE LA DEMANDE',
+                      ? 'DEMANDE TRANSMISE'
+                      : widget.preApplication
+                          ? 'J’ACCEPTE — CONTINUER MA DEMANDE'
+                          : 'TRANSMETTRE LA DEMANDE',
               style: const TextStyle(fontWeight: FontWeight.w900),
             ),
           ),
