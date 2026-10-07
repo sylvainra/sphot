@@ -4454,8 +4454,8 @@ renseignées par les sauveteurs actuellement en SPHOT ON.
 
 <p>
   Lors d'une nouvelle affectation, SPHOT ON sera réactivé
-  automatiquement dès lors que les droits de diffusion de votre
-  administration de tutelle seront ouverts.
+  automatiquement dès lors que le service SPHOT en temps réel sera
+  actif pour le poste concerné.
 </p>
 
 <div style="text-align:center;margin:35px 0;">
@@ -4494,8 +4494,7 @@ des postes de secours et ne peuvent pas altérer les informations renseignées
 par les sauveteurs actuellement en SPHOT ON.
 
 Lors d'une nouvelle affectation, SPHOT ON sera réactivé automatiquement dès
-lors que les droits de diffusion de votre administration de tutelle
-seront ouverts.
+lors que le service SPHOT en temps réel sera actif pour le poste concerné.
 
 Se connecter à SPHOT SAUVETEUR :
 ${SPHOT_SAUVETEUR_LOGIN_URL}
