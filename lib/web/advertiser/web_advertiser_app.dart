@@ -260,7 +260,7 @@ class _StartPage extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             kIsWeb
-                ? "Professionnels, créez votre SPHOT PUBLICITAIRE en quelques clics, après validation de votre demande préalable auprès de l'équipe SPHOT."
+                ? "Professionnels, créez votre SPHOT PUBLICITAIRE en quelques clics. Votre dossier sera instruit par l’équipe SPHOT avant l’ouverture de votre espace publicitaire."
                 : "Pour créer votre SPHOT PUBLICITAIRE dans de meilleures conditions de confort et de lisibilité, vous allez être redirigé vers le site SPHOT afin de compléter votre demande.",
             textAlign: TextAlign.center,
             style: const TextStyle(
