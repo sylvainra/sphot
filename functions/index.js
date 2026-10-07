@@ -3983,7 +3983,7 @@ exports.sendTrialEndingReminderEmails = onSchedule(
 Votre période d'essai SPHOT pour ${organisation}
 arrive bientôt à échéance.
 
-Pour continuer à utiliser SPHOT sans interruption,
+Pour continuer à bénéficier des fonctions SPHOT en temps réel sans interruption,
 vous pouvez activer votre abonnement depuis votre espace administrateur.
 
 Cordialement,
@@ -4061,7 +4061,7 @@ exports.sendOverdueSubscriptionReminderEmails = onSchedule(
 Votre abonnement SPHOT pour ${organisation}
 nécessite une régularisation.
 
-Pour éviter toute interruption de service,
+Pour rétablir ou maintenir les fonctions SPHOT en temps réel,
 merci de régulariser votre abonnement depuis votre espace administrateur.
 
 Cordialement,
