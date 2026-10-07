@@ -728,8 +728,8 @@ Widget _buildLegalValidationStep() {
   return Column(
     children: [
       _stepHeader(
-  '6. DEMANDE D’ESSAI GRATUIT',
-  'Finalisez votre demande d’accès à SPHOT',
+  '6. VALIDATIONS JURIDIQUES',
+  'Finalisez votre demande d’accès administrateur à SPHOT',
 ),
 
       Text(
