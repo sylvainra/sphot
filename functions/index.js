@@ -738,16 +738,17 @@ function subscriptionRealtimeSpotIds(subscription) {
   const data = subscription || {};
   const ids = new Set();
 
-  const rawIds = Array.isArray(data.selectedRescueStationIds) ?
-    data.selectedRescueStationIds :
-    [];
+  if (Array.isArray(data.selectedRescueStationIds)) {
+    data.selectedRescueStationIds.forEach((value) => {
+      const id = (value || "").toString().trim();
+      if (id) ids.add(id);
+    });
 
-  rawIds.forEach((value) => {
-    const id = (value || "").toString().trim();
-    if (id) ids.add(id);
-  });
+    // Dès que la liste d'identifiants existe, elle est l'autorité, même vide.
+    return ids;
+  }
 
-  if (ids.size === 0 && Array.isArray(data.selectedRescueStations)) {
+  if (Array.isArray(data.selectedRescueStations)) {
     data.selectedRescueStations.forEach((entry) => {
       if (!entry || typeof entry !== "object") return;
       const id = (
@@ -761,6 +762,12 @@ function subscriptionRealtimeSpotIds(subscription) {
   }
 
   return ids;
+}
+
+function subscriptionHasExplicitRealtimeSelection(subscription) {
+  const data = subscription || {};
+  return Array.isArray(data.selectedRescueStationIds) ||
+    Array.isArray(data.selectedRescueStations);
 }
 
 /**
@@ -824,7 +831,6 @@ async function territoryRealtimeScope(db, territoireId) {
       const subscription = subscriptionSnapshot.data() || {};
       if (!subscriptionGrantsDiffusion(subscription)) continue;
 
-      granted = true;
       const status = (subscription.status || "")
           .toString()
           .trim()
@@ -846,6 +852,7 @@ async function territoryRealtimeScope(db, territoireId) {
         // L'essai de 8 jours couvre tous les SPHOTS surveillés du territoire,
         // y compris un poste créé pendant la période d'essai. La sélection
         // poste par poste n'intervient qu'au moment de l'abonnement payant.
+        granted = true;
         allSpots = true;
         allSpotsSince = keepEarliestDate(allSpotsSince, trialSince);
         allSpotsUntil = keepLatestExpiry(allSpotsUntil, trialUntil);
@@ -853,6 +860,8 @@ async function territoryRealtimeScope(db, territoireId) {
       }
 
       const selectedIds = subscriptionRealtimeSpotIds(subscription);
+      const hasExplicitSelection =
+        subscriptionHasExplicitRealtimeSelection(subscription);
       const subscriptionStart =
         firestoreDate(subscription.subscriptionStartDate) ||
         firestoreDate(subscription.subscriptionActivatedAt);
@@ -866,9 +875,10 @@ async function territoryRealtimeScope(db, territoireId) {
           previousTrialEnd &&
           subscriptionStart.getTime() <= previousTrialEnd.getTime(),
       );
-      if (selectedIds.size === 0) {
-        // Compatibilité avec les abonnements historiques créés avant la
-        // sélection poste par poste.
+      if (selectedIds.size === 0 && !hasExplicitSelection) {
+        // Compatibilité uniquement avec les abonnements historiques qui ne
+        // possèdent encore aucun champ de sélection poste par poste.
+        granted = true;
         allSpots = true;
         const subscriptionSince = continuesActiveTrial ?
           previousTrialStart :
@@ -881,7 +891,8 @@ async function territoryRealtimeScope(db, territoireId) {
             allSpotsUntil,
             subscriptionUntil,
         );
-      } else {
+      } else if (selectedIds.size > 0) {
+        granted = true;
         selectedIds.forEach((id) => {
           // L'essai couvre tous les SPHOTS surveillés. Si l'abonnement
           // prend le relais avant la fin de l'essai, l'état temps réel déjà
