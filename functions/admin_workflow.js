@@ -691,7 +691,7 @@ async function sendTrialReceipt(requestId) {
         {heading: "Demande"},
         {label: "Demande reçue le", value: formatFrenchDate(requestedAt)},
         {label: "Durée sollicitée", value: `${duration} jours`},
-        {label: "Statut", value: "En attente de validation"},
+        {label: "Statut", value: "En attente d’autorisation"},
         {heading: "Structure concernée"},
         {label: "Organisation", value: organisationDisplay(data)},
       ],
@@ -736,10 +736,10 @@ async function sendTrialReceipt(requestId) {
   line-height:1.6;
 ">
   Votre demande est actuellement
-  <strong>en attente de validation par l’équipe SPHOT</strong>.
+  <strong>en attente d’autorisation par l’équipe SPHOT</strong>.
   <br><br>
   La période d’essai gratuite ne débutera
-  <strong>qu’après cette validation</strong>.
+  <strong>qu’après cette autorisation</strong>.
   Vous recevrez un nouvel email dès son activation.
 </div>
 
