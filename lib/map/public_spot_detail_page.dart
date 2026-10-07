@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -151,6 +153,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   bool _isSaved = false;
   late final List<GlobalKey> _pageTabKeys;
   late final ScrollController _contentScrollController;
+  Timer? _realtimeExpiryRefreshTimer;
 
   static const List<(String, IconData)> _pages = [
     ('Live', Icons.sensors_rounded),
@@ -169,11 +172,18 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
       (_) => GlobalKey(),
     );
     _contentScrollController = ScrollController();
+    _realtimeExpiryRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) {
+        if (mounted) setState(() {});
+      },
+    );
     _loadSavedState();
   }
 
   @override
   void dispose() {
+    _realtimeExpiryRefreshTimer?.cancel();
     _contentScrollController.dispose();
     super.dispose();
   }
@@ -417,6 +427,66 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     required ScrollController controller,
     required List<(IconData, String, List<String>)> groups,
   }) {
+    if (spot.isPosteSecours &&
+        (spot.isRealtimeAwaitingUpdate || !spot.realtimeAvailable)) {
+      final awaiting = spot.isRealtimeAwaitingUpdate;
+
+      return ListView(
+        controller: controller,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: ClampingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
+        children: [
+          _MobilePublicCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      awaiting ? Icons.sync_rounded : Icons.info_outline_rounded,
+                      color: const Color(0xFF64748B),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        awaiting
+                            ? 'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR'
+                            : 'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  awaiting
+                      ? 'Le service temps réel est actif, mais aucune information opérationnelle actualisée n’a encore été transmise depuis son activation.'
+                      : 'Les informations opérationnelles ne sont actuellement pas diffusées sur SPHOT. Consultez les informations et consignes affichées sur place.',
+                  style: const TextStyle(
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildAdvertisingSpace(),
+          const SizedBox(height: 10),
+          _buildSpotActions(context, spot),
+        ],
+      );
+    }
+
     return ListView(
       controller: controller,
       physics: const AlwaysScrollableScrollPhysics(
@@ -615,11 +685,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     SpotFlagState spot,
     ScrollController controller,
   ) {
-    final hasCoreInfo =
-        spot.periode.trim().isNotEmpty ||
-        spot.heureDebut.trim().isNotEmpty ||
-        spot.heureFin.trim().isNotEmpty ||
-        spot.activite.trim().isNotEmpty;
+    final hasCoreInfo = spot.activite.trim().isNotEmpty;
 
     final warningTitle = spot.normalizedType.contains('PLAGE')
         ? 'PLAGE NON SURVEILLÉE'
@@ -678,22 +744,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           _MobilePublicCard(
             child: Column(
               children: [
-                if (spot.periode.isNotEmpty)
-                  _PublicInfoLine(
-                    icon: Icons.date_range_outlined,
-                    label: 'Période',
-                    value: spot.periode,
-                  ),
-                if (spot.heureDebut.isNotEmpty ||
-                    spot.heureFin.isNotEmpty)
-                  _PublicInfoLine(
-                    icon: Icons.schedule_outlined,
-                    label: 'Horaires',
-                    value: [
-                      spot.heureDebut,
-                      spot.heureFin,
-                    ].where((value) => value.isNotEmpty).join(' – '),
-                  ),
                 if (spot.activite.isNotEmpty)
                   _PublicInfoLine(
                     icon: Icons.waves_outlined,
@@ -1037,13 +1087,95 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           ),
         ),
         const SizedBox(height: 10),
-        _PublicDangerList(values: dangerValues),
-        if (notificationActive && notificationMessage.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          _PublicNotificationCard(
-            message: notificationMessage,
-            publishedAt: notificationPublishedAt,
-          ),
+        if (spot.isRealtimeAwaitingUpdate)
+          const _MobilePublicCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.sync_rounded,
+                      color: Color(0xFF64748B),
+                      size: 20,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Le service temps réel est actif, mais aucune information '
+                  'opérationnelle actualisée n’a encore été transmise depuis '
+                  'son activation. Consultez les consignes affichées sur place.',
+                  style: TextStyle(
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (!spot.realtimeAvailable)
+          const _MobilePublicCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      color: Color(0xFF64748B),
+                      size: 20,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Les informations opérationnelles de surveillance ne sont '
+                  'actuellement pas diffusées sur SPHOT. Consultez les '
+                  'informations et consignes affichées sur place.',
+                  style: TextStyle(
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else ...[
+          _PublicDangerList(values: dangerValues),
+          if (notificationActive && notificationMessage.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _PublicNotificationCard(
+              message: notificationMessage,
+              publishedAt: notificationPublishedAt,
+            ),
+          ],
         ],
         if (spot.phone.isNotEmpty) ...[
           const SizedBox(height: 10),
@@ -1123,10 +1255,15 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     SpotFlagState spot,
     ScrollController controller,
   ) {
+    final showSurveillanceSchedule =
+        spot.isPosteSecours &&
+        spot.realtimeAvailable &&
+        !spot.isRealtimeAwaitingUpdate;
     final hasCoreInfo =
-        spot.periode.trim().isNotEmpty ||
-        spot.heureDebut.trim().isNotEmpty ||
-        spot.heureFin.trim().isNotEmpty ||
+        (showSurveillanceSchedule &&
+            (spot.periode.trim().isNotEmpty ||
+                spot.heureDebut.trim().isNotEmpty ||
+                spot.heureFin.trim().isNotEmpty)) ||
         spot.activite.trim().isNotEmpty;
 
     return ListView(
@@ -1181,14 +1318,15 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           _MobilePublicCard(
             child: Column(
               children: [
-                if (spot.periode.isNotEmpty)
+                if (showSurveillanceSchedule && spot.periode.isNotEmpty)
                   _PublicInfoLine(
                     icon: Icons.date_range_outlined,
                     label: 'Période de surveillance',
                     value: spot.periode,
                   ),
-                if (spot.heureDebut.isNotEmpty ||
-                    spot.heureFin.isNotEmpty)
+                if (showSurveillanceSchedule &&
+                    (spot.heureDebut.isNotEmpty ||
+                        spot.heureFin.isNotEmpty))
                   _PublicInfoLine(
                     icon: Icons.schedule_outlined,
                     label: 'Horaires',
@@ -2001,6 +2139,104 @@ class _PublicLiveDataSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (spot.isRealtimeAwaitingUpdate) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFDCE3EA)),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.sync_rounded,
+                  size: 18,
+                  color: Color(0xFF64748B),
+                ),
+                SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Le service temps réel est actif, mais aucune information '
+              'opérationnelle actualisée n’a encore été transmise depuis '
+              'son activation. Consultez les consignes affichées sur place.',
+              style: TextStyle(
+                color: Color(0xFF475569),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!spot.realtimeAvailable) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFDCE3EA)),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 18,
+                  color: Color(0xFF64748B),
+                ),
+                SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Les informations opérationnelles de surveillance ne sont '
+              'actuellement pas diffusées sur SPHOT. Consultez les '
+              'informations et consignes affichées sur place.',
+              style: TextStyle(
+                color: Color(0xFF475569),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final dangerValues = _flattenValues(spot.dangers);
     final terrestrialValues =
         _formatTerrestrialValues(spot.meteoTerrestre);
