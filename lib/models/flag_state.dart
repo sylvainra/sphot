@@ -328,6 +328,10 @@ class SpotFlagState {
   }
 
   FlagColor get flagColor {
+    if (!realtimeAvailable || isRealtimeAwaitingUpdate) {
+      return FlagColor.none;
+    }
+
     switch (_readString(liveFlag?['flagColor']).toLowerCase()) {
       case 'green':
       case 'vert':
@@ -346,6 +350,10 @@ class SpotFlagState {
   }
 
   FlagPosition get flagPosition {
+    if (!realtimeAvailable || isRealtimeAwaitingUpdate) {
+      return FlagPosition.none;
+    }
+
     switch (_readString(liveFlag?['flagPosition']).toLowerCase()) {
       case 'hisse':
       case 'hissé':
