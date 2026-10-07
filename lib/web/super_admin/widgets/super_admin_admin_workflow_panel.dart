@@ -206,7 +206,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
             ),
             content: const Text(
               'Cette action démarre immédiatement la période d’essai gratuite '
-              'SPHOT ADMIN de 8 jours et ouvre les droits de diffusion.',
+              'SPHOT ADMIN de 8 jours et active les fonctions opérationnelles en temps réel des SPHOTS surveillés concernés.',
               style: TextStyle(
                 color: _blue,
                 fontWeight: FontWeight.w600,
@@ -363,7 +363,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
             ),
             content: Text(
               'Confirmer la commande ${_text(data['orderNumber'])}. '
-              'L’abonnement annuel sera activé et les droits de diffusion seront ouverts.',
+              'L’abonnement annuel sera activé et les fonctions temps réel seront ouvertes pour les postes souscrits.',
             ),
             actions: [
               TextButton(
@@ -987,7 +987,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                           _formatDateTime(subscription['trialEndDate']),
                         ),
                         _line(
-                          'Diffusion',
+                          'Temps réel',
                           trialStatus.toLowerCase() == 'approved' ||
                                   _text(subscription['status']) == 'trial'
                               ? 'Autorisée'
