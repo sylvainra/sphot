@@ -263,10 +263,11 @@ class _AdvertiserLegalAcceptanceSectionState
     required bool value,
     required String text,
     required ValueChanged<bool?> onChanged,
+    bool enabled = true,
   }) {
     return CheckboxListTile(
       value: value,
-      onChanged: _locked ? null : onChanged,
+      onChanged: _locked || !enabled ? null : onChanged,
       activeColor: WebColors.blue,
       checkColor: Colors.white,
       controlAffinity: ListTileControlAffinity.leading,
@@ -388,6 +389,7 @@ class _AdvertiserLegalAcceptanceSectionState
           _acceptanceLine(
             value: accepted,
             text: acceptanceText,
+            enabled: chapters.isNotEmpty,
             onChanged: onChanged,
           ),
         ],
