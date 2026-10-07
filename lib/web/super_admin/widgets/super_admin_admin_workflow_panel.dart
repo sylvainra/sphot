@@ -252,11 +252,20 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
     final duration = (trialRequest['trialDurationDays'] is num)
         ? (trialRequest['trialDurationDays'] as num).toInt()
         : 8;
-    final numberOfStations = (trialRequest['numberOfRescueStations'] is num)
-        ? (trialRequest['numberOfRescueStations'] as num).toInt()
-        : (subscription['numberOfRescueStations'] is num)
-            ? (subscription['numberOfRescueStations'] as num).toInt()
-            : 0;
+    final trialRescueStationIds = trialRequest['rescueStationIds'] is Iterable
+        ? (trialRequest['rescueStationIds'] as Iterable)
+            .map(_text)
+            .where((value) => value.isNotEmpty)
+            .toSet()
+            .toList()
+        : <String>[];
+    final numberOfStations = trialRescueStationIds.isNotEmpty
+        ? trialRescueStationIds.length
+        : (trialRequest['numberOfRescueStations'] is num)
+            ? (trialRequest['numberOfRescueStations'] as num).toInt()
+            : (subscription['numberOfRescueStations'] is num)
+                ? (subscription['numberOfRescueStations'] as num).toInt()
+                : 0;
 
     final start = DateTime.now();
     final end = start.add(Duration(days: duration));
@@ -305,6 +314,8 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
         'trialStartDate': Timestamp.fromDate(start),
         'trialEndDate': Timestamp.fromDate(end),
         'numberOfRescueStations': numberOfStations,
+        if (trialRescueStationIds.isNotEmpty)
+          'trialRescueStationIds': trialRescueStationIds,
         'pricePerStationExclTax': subscription['pricePerStationExclTax'] ??
             _pricePerStationExclTax,
         'billingCycle': 'annual',
