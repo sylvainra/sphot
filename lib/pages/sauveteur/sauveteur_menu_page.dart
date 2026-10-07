@@ -80,10 +80,14 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
       case 'account_inactive':
         return 'SPHOT OFF : votre compte n’est pas actuellement autorisé à '
             'agir sur les données opérationnelles réelles.';
+      case 'realtime_not_enabled_for_assignment':
+        return 'SPHOT OFF : le service d’informations en temps réel n’est '
+            'pas actuellement actif pour le ou les postes auxquels vous êtes '
+            'affecté. Vous pouvez consulter SPHOT, mais vos actions ne '
+            'modifient pas les données opérationnelles réelles.';
       default:
-        return 'SPHOT OFF : votre administration de tutelle n’a pas '
-            'actuellement ouvert les droits de diffusion. Vous pouvez tester '
-            'SPHOT SAUVETEUR, mais vos actions ne modifient pas le SPHOT réel.';
+        return 'SPHOT OFF : les fonctions opérationnelles en temps réel ne '
+            'sont pas actuellement disponibles pour votre affectation.';
     }
   }
 
