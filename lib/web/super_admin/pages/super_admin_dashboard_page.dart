@@ -5407,15 +5407,27 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     );
   }
 
+  String _legalDocumentListKey(String title) {
+    return title == 'POLITIQUE DE CONFIDENTIALITÉ'
+        ? 'Politique de confidentialité'
+        : title;
+  }
+
   void _startNewLegalChapter(String documentTitle, List<String> chapters) {
     var highestOrder = 0;
+    final documentId = _legalDocumentIdFromTitle(documentTitle);
+    final storedIds =
+        _legalChapterIdsByDocument[documentId]?.values ?? const <String>[];
 
-    for (final chapter in chapters) {
-      final match = RegExp(r'^(\d+)').firstMatch(chapter);
-      final value = match == null ? null : int.tryParse(match.group(1)!);
+    for (final chapterId in storedIds) {
+      final value = int.tryParse(chapterId);
       if (value != null && value > highestOrder) {
         highestOrder = value;
       }
+    }
+
+    if (highestOrder == 0) {
+      highestOrder = chapters.length;
     }
 
     final nextOrder = (highestOrder + 1).toString().padLeft(2, '0');
@@ -5534,7 +5546,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             ),
             if (_selectedLegalDocument == title &&
                 _selectedLegalChapter != null &&
-                !_documentChapters[title]!.contains(_selectedLegalChapter))
+                !(_documentChapters[_legalDocumentListKey(title)] ??
+                        const <String>[])
+                    .contains(_selectedLegalChapter))
               _buildLegalChapterEditor(),
           ],
         ),
