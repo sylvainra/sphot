@@ -693,7 +693,10 @@ async function sendTrialReceipt(requestId) {
         {label: "Demande reçue le", value: formatFrenchDate(requestedAt)},
         {label: "Durée sollicitée", value: `${duration} jours`},
         {label: "Périmètre", value: "SPHOTS surveillés uniquement"},
-        {label: "Postes concernés", value: stations || "Non renseigné"},
+        {
+          label: "Postes recensés à l’activation",
+          value: stations || "Non renseigné",
+        },
         {label: "Statut", value: "En attente d’autorisation"},
         {heading: "Structure concernée"},
         {label: "Organisation", value: organisationDisplay(data)},
@@ -873,7 +876,7 @@ async function sendTrialApproval(requestId) {
       introduction:
         "SPHOT confirme l’autorisation d’ouverture de votre période " +
         "d’essai gratuite. Les fonctions temps réel sont activées pour " +
-        "les SPHOTS surveillés inclus dans la demande, pendant la durée " +
+        "les SPHOTS surveillés de votre territoire pendant la durée " +
         "indiquée ci-dessous.",
       lines: [
         {heading: "Période d’essai"},
@@ -888,7 +891,9 @@ async function sendTrialApproval(requestId) {
         {label: "Organisation", value: organisationDisplay(data)},
       ],
       notice:
-        "L’activation de la période d’essai ne constitue pas une " +
+        "L’activation de la période d’essai ne constitue ni une validation " +
+        "ni une certification par SPHOT de l’existence ou du caractère " +
+        "surveillé des lieux déclarés. Elle ne constitue pas non plus une " +
         "souscription payante. Toute activation d’un abonnement annuel " +
         "fera l’objet d’une démarche, d’une référence et d’un document " +
         "distincts.",
@@ -919,7 +924,7 @@ async function sendTrialApproval(requestId) {
   et prendra fin le
   <strong>${escapeHtml(formatFrenchDate(end))}</strong>.
   <br><br>
-  <strong>Les fonctions temps réel des SPHOTS surveillés inclus dans votre essai sont désormais activées.</strong>
+  <strong>Les fonctions temps réel de vos SPHOTS surveillés sont désormais activées pendant la période d’essai.</strong>
 </div>
 
 <div style="
