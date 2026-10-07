@@ -261,12 +261,17 @@ Future<void> _toggleFavoritesFilter() async {
         maxWidth: labelWidth,
       );
 
-      final statusText = !spot.realtimeAvailable
+      final statusText = spot.isRealtimeAwaitingUpdate
+          ? 'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR'
+          : !spot.realtimeAvailable
           ? 'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES'
           : spot.hasValidFlag
           ? spot.displayStatut.replaceAll('⚠️ ', '')
           : 'BAIGNADE NON SURVEILLÉE';
-      final statusHeight = !spot.realtimeAvailable || spot.hasValidFlag
+      final statusHeight =
+          spot.isRealtimeAwaitingUpdate ||
+          !spot.realtimeAvailable ||
+          spot.hasValidFlag
           ? max(
               24.0,
               _measureSelectedLabelHeight(
@@ -3629,6 +3634,31 @@ Widget _rescueStatusUnderMarker(
   SpotFlagState spot,
   double size,
 ) {
+  if (spot.isRealtimeAwaitingUpdate) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.sync_rounded,
+          size: size * 0.85,
+          color: const Color(0xFF64748B),
+        ),
+        const SizedBox(width: 3),
+        Flexible(
+          child: Text(
+            'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR',
+            textAlign: TextAlign.center,
+            style: _mapLabelStyle(
+              fontSize: size * 0.50,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFF64748B),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   if (!spot.realtimeAvailable) {
     return Row(
       mainAxisSize: MainAxisSize.min,
