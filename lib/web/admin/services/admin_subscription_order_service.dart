@@ -54,6 +54,19 @@ class AdminSubscriptionOrderService {
     }
 
     final stations = _int(data['numberOfRescueStations']);
+    final selectedRescueStationIds = data['selectedRescueStationIds'] is Iterable
+        ? (data['selectedRescueStationIds'] as Iterable)
+            .map(_text)
+            .where((value) => value.isNotEmpty)
+            .toSet()
+            .toList()
+        : <String>[];
+    final selectedRescueStations = data['selectedRescueStations'] is Iterable
+        ? (data['selectedRescueStations'] as Iterable)
+            .whereType<Map>()
+            .map((value) => Map<String, dynamic>.from(value))
+            .toList()
+        : <Map<String, dynamic>>[];
     final unitPrice = _number(data['pricePerStationExclTax']) > 0
         ? _number(data['pricePerStationExclTax'])
         : _defaultPricePerStationExclTax;
@@ -315,6 +328,8 @@ class AdminSubscriptionOrderService {
       'engagementNumber': engagementNumber,
       'chorusServiceCode': chorusServiceCode,
       'numberOfRescueStations': stations,
+      'selectedRescueStationIds': selectedRescueStationIds,
+      'selectedRescueStations': selectedRescueStations,
       'unitPriceExclTax': unitPrice,
       'totalExclTax': totalExclTax,
       'vatRate': vatRate,
@@ -334,6 +349,9 @@ class AdminSubscriptionOrderService {
       <String, dynamic>{
         'currentOrderId': orderReference.id,
         'commercialOrderStatus': 'submitted',
+        'selectedRescueStationIds': selectedRescueStationIds,
+        'selectedRescueStations': selectedRescueStations,
+        'numberOfRescueStations': stations,
         'paymentMethod': paymentMethod,
         'administrativeDataConfirmedAt': serverNow,
         'billingDataConfirmedAt': serverNow,
