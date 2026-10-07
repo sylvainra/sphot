@@ -1,4 +1,3 @@
-const {sendSphotMail} = require("./sphot_email_design");
 const {setGlobalOptions} = require("firebase-functions");
 const {onRequest} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
@@ -10,8 +9,6 @@ const {
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 const {getDownloadURL} = require("firebase-admin/storage");
-const nodemailer = require("nodemailer");
-const PDFDocument = require("pdfkit");
 
 admin.initializeApp();
 
@@ -20,6 +17,47 @@ const MAIL_FROM = "\"SPHOT\" <no-reply@sphot.app>";
 const SPHOT_LOGIN_URL = "https://sphot.app";
 const SPHOT_SAUVETEUR_LOGIN_URL =
   `${SPHOT_LOGIN_URL}/#/sauveteur-login`;
+
+let cachedNodemailer;
+let cachedPDFDocument;
+let cachedSendSphotMail;
+
+/**
+ * Charge Nodemailer uniquement lorsqu'une fonction d'email en a besoin.
+ *
+ * @return {Object} Module Nodemailer.
+ */
+function getNodemailer() {
+  if (!cachedNodemailer) {
+    cachedNodemailer = require("nodemailer");
+  }
+  return cachedNodemailer;
+}
+
+/**
+ * Charge PDFKit uniquement lorsqu'une génération PDF est réellement exécutée.
+ *
+ * @return {Function} Constructeur PDFDocument.
+ */
+function getPDFDocument() {
+  if (!cachedPDFDocument) {
+    cachedPDFDocument = require("pdfkit");
+  }
+  return cachedPDFDocument;
+}
+
+/**
+ * Charge l'habillage email SPHOT à la première utilisation.
+ *
+ * @return {Function} Fonction d'envoi d'email SPHOT.
+ */
+function getSendSphotMail() {
+  if (!cachedSendSphotMail) {
+    ({sendSphotMail: cachedSendSphotMail} =
+      require("./sphot_email_design"));
+  }
+  return cachedSendSphotMail;
+}
 
 
 setGlobalOptions({maxInstances: 10});
@@ -1640,7 +1678,7 @@ function createAdminRequestPdf({
 }) {
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({
+      const doc = new (getPDFDocument())({
         size: "A4",
         margins: {
           top: 30,
@@ -2156,7 +2194,7 @@ async function sendAdminAccessAcknowledgementEmail(
   const greeting = buildAdminGreeting(data);
   const organisation = buildOrganisationDisplay(data);
 
-  const transporter = nodemailer.createTransport({
+  const transporter = getNodemailer().createTransport({
     service: "gmail",
     auth: {
       user: SMTP_USER,
@@ -2164,7 +2202,7 @@ async function sendAdminAccessAcknowledgementEmail(
     },
   });
 
-  return sendSphotMail(transporter, {
+  return getSendSphotMail()(transporter, {
     from: MAIL_FROM,
     to: recipientEmail,
     subject:
@@ -3006,7 +3044,7 @@ exports.sendAdminRequestApprovalEmail = onDocumentUpdated(
       const loginUrl =
           `${SPHOT_LOGIN_URL}/#/professional-login`;
 
-      const transporter = nodemailer.createTransport({
+      const transporter = getNodemailer().createTransport({
         service: "gmail",
         auth: {
           user: SMTP_USER,
@@ -3015,7 +3053,7 @@ exports.sendAdminRequestApprovalEmail = onDocumentUpdated(
       });
 
       try {
-        const mailResult = await sendSphotMail(transporter, {
+        const mailResult = await getSendSphotMail()(transporter, {
           from: MAIL_FROM,
           to: email,
           subject:
@@ -3474,7 +3512,7 @@ exports.sendAdminRequestRejectionEmail = onDocumentUpdated(
           `${SPHOT_LOGIN_URL}/#/admin-request-correction` +
           `?requestId=${encodeURIComponent(event.params.requestId)}`;
 
-      const transporter = nodemailer.createTransport({
+      const transporter = getNodemailer().createTransport({
         service: "gmail",
         auth: {
           user: SMTP_USER,
@@ -3483,7 +3521,7 @@ exports.sendAdminRequestRejectionEmail = onDocumentUpdated(
       });
 
       try {
-        const mailResult = await sendSphotMail(transporter, {
+        const mailResult = await getSendSphotMail()(transporter, {
           from: MAIL_FROM,
           to: email,
           subject:
@@ -3712,7 +3750,7 @@ exports.sendSubscriptionActivatedEmail = onDocumentUpdated(
       const organisation =
           after.billingOrganisation || "votre organisation";
 
-      const transporter = nodemailer.createTransport({
+      const transporter = getNodemailer().createTransport({
         service: "gmail",
         auth: {
           user: SMTP_USER,
@@ -3720,7 +3758,7 @@ exports.sendSubscriptionActivatedEmail = onDocumentUpdated(
         },
       });
 
-      await sendSphotMail(transporter, {
+      await getSendSphotMail()(transporter, {
         from: MAIL_FROM,
         to: email,
         subject: "Activation de votre abonnement SPHOT",
@@ -4126,7 +4164,7 @@ exports.sendTrialEndingReminderEmails = onSchedule(
           .where("trialEndDate", "<", endTimestamp)
           .get();
 
-      const transporter = nodemailer.createTransport({
+      const transporter = getNodemailer().createTransport({
         service: "gmail",
         auth: {
           user: SMTP_USER,
@@ -4152,7 +4190,7 @@ exports.sendTrialEndingReminderEmails = onSchedule(
         const organisation =
             data.billingOrganisation || "votre organisation";
 
-        await sendSphotMail(transporter, {
+        await getSendSphotMail()(transporter, {
           from: MAIL_FROM,
           to: email,
           subject: "Votre essai SPHOT arrive bientôt à échéance",
@@ -4204,7 +4242,7 @@ exports.sendOverdueSubscriptionReminderEmails = onSchedule(
           .where("status", "==", "overdue")
           .get();
 
-      const transporter = nodemailer.createTransport({
+      const transporter = getNodemailer().createTransport({
         service: "gmail",
         auth: {
           user: SMTP_USER,
@@ -4230,7 +4268,7 @@ exports.sendOverdueSubscriptionReminderEmails = onSchedule(
         const organisation =
             data.billingOrganisation || "votre organisation";
 
-        await sendSphotMail(transporter, {
+        await getSendSphotMail()(transporter, {
           from: MAIL_FROM,
           to: email,
           subject: "Votre abonnement SPHOT nécessite une régularisation",
@@ -4273,7 +4311,7 @@ exports.testEmailSphot = onRequest(
     },
     async (request, response) => {
       try {
-        const transporter = nodemailer.createTransport({
+        const transporter = getNodemailer().createTransport({
           service: "gmail",
           auth: {
             user: SMTP_USER,
@@ -4281,7 +4319,7 @@ exports.testEmailSphot = onRequest(
           },
         });
 
-        await sendSphotMail(transporter, {
+        await getSendSphotMail()(transporter, {
           from: MAIL_FROM,
           to: "rabreau.sylvain@gmail.com",
           subject: "Test email SPHOT",
@@ -4374,7 +4412,7 @@ exports.sendSauveteurCredentialsEmail = onRequest(
             escapeHtml(nom.toUpperCase() || "Sauveteur")
           }</span>`;
 
-        const transporter = nodemailer.createTransport({
+        const transporter = getNodemailer().createTransport({
           service: "gmail",
           auth: {
             user: SMTP_USER,
@@ -4382,7 +4420,7 @@ exports.sendSauveteurCredentialsEmail = onRequest(
           },
         });
 
-        await sendSphotMail(transporter, {
+        await getSendSphotMail()(transporter, {
           from: MAIL_FROM,
           to: email,
           subject: isReset ?
@@ -4591,7 +4629,7 @@ exports.notifySauveteurSphotOffAfterAssignment = onDocumentUpdated(
           .filter((value) => value)
           .join(" ") || "Sauveteur";
 
-      const mailTransporter = nodemailer.createTransport({
+      const mailTransporter = getNodemailer().createTransport({
         service: "gmail",
         auth: {
           user: SMTP_USER,
@@ -4599,7 +4637,7 @@ exports.notifySauveteurSphotOffAfterAssignment = onDocumentUpdated(
         },
       });
 
-      await sendSphotMail(mailTransporter, {
+      await getSendSphotMail()(mailTransporter, {
         from: MAIL_FROM,
         to: email,
         subject: "SPHOT SAUVETEUR — Passage en SPHOT OFF",
@@ -5944,7 +5982,7 @@ async function sendInstitutionalOperationalNotification(options) {
       // Le libellé technique suffit si la fiche SPHOT n'est pas disponible.
     }
 
-    const transporter = nodemailer.createTransport({
+    const transporter = getNodemailer().createTransport({
       service: "gmail",
       auth: {
         user: SMTP_USER,
@@ -5958,7 +5996,7 @@ async function sendInstitutionalOperationalNotification(options) {
       const greeting = operationalNotificationGreeting(contact);
 
       try {
-        await sendSphotMail(transporter, {
+        await getSendSphotMail()(transporter, {
           from: MAIL_FROM,
           to: email,
           subject: "SPHOT - " + title + " - " + spotLabel,
@@ -6409,7 +6447,7 @@ exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
 
       if (onboarding.length === 0) return;
 
-      const transporter = nodemailer.createTransport({
+      const transporter = getNodemailer().createTransport({
         service: "gmail",
         auth: {
           user: SMTP_USER,
@@ -6428,7 +6466,7 @@ exports.provisionInstitutionalMainCouranteAccess = onDocumentWritten(
         const greeting = operationalNotificationGreeting(contact);
 
         try {
-          const mailResult = await sendSphotMail(transporter, {
+          const mailResult = await getSendSphotMail()(transporter, {
             from: MAIL_FROM,
             to: email,
             subject: "SPHOT - Votre accès institutionnel à la MAIN COURANTE",
@@ -8425,7 +8463,7 @@ exports.requestAdminReplacement = onRequest(
         await batch.commit();
 
         const transporter =
-            nodemailer.createTransport({
+            getNodemailer().createTransport({
               service: "gmail",
               auth: {
                 user: SMTP_USER,
@@ -8438,7 +8476,7 @@ exports.requestAdminReplacement = onRequest(
             `${SPHOT_LOGIN_URL}/#/professional-login`;
 
         try {
-          await sendSphotMail(
+          await getSendSphotMail()(
               transporter,
               {
                 from: MAIL_FROM,
@@ -8617,7 +8655,7 @@ L'équipe SPHOT`,
          * le changement déjà préparé.
          */
         try {
-          await sendSphotMail(
+          await getSendSphotMail()(
               transporter,
               {
                 from: MAIL_FROM,
@@ -9053,7 +9091,7 @@ exports.loginAdmin = onRequest(
   replacementResult.previousEmail
             ) {
               try {
-                const transporter = nodemailer.createTransport({
+                const transporter = getNodemailer().createTransport({
                   service: "gmail",
                   auth: {
                     user: SMTP_USER,
@@ -9081,7 +9119,7 @@ exports.loginAdmin = onRequest(
                     "",
                 );
 
-                await sendSphotMail(transporter, {
+                await getSendSphotMail()(transporter, {
                   from: MAIL_FROM,
                   to: replacementResult.previousEmail,
                   replyTo: "contact@sphot.app",
@@ -9623,7 +9661,7 @@ exports.changeSauveteurPassword = onRequest(
 
         if (email && accountResult.sendEmail) {
           try {
-            const transporter = nodemailer.createTransport({
+            const transporter = getNodemailer().createTransport({
               service: "gmail",
               auth: {
                 user: SMTP_USER,
@@ -9631,7 +9669,7 @@ exports.changeSauveteurPassword = onRequest(
               },
             });
 
-            await sendSphotMail(transporter, {
+            await getSendSphotMail()(transporter, {
               from: MAIL_FROM,
               to: email,
               replyTo: "contact@sphot.app",
@@ -9832,7 +9870,7 @@ exports.changeAdminPassword = onRequest(
 
         if (email) {
           try {
-            const transporter = nodemailer.createTransport({
+            const transporter = getNodemailer().createTransport({
               service: "gmail",
               auth: {
                 user: SMTP_USER,
@@ -9840,7 +9878,7 @@ exports.changeAdminPassword = onRequest(
               },
             });
 
-            await sendSphotMail(transporter, {
+            await getSendSphotMail()(transporter, {
               from: MAIL_FROM,
               to: email,
               replyTo: "contact@sphot.app",
@@ -10463,7 +10501,7 @@ exports.sendAdvertiserRequestAcknowledgement = onDocumentUpdated(
       );
       if (!claimed) return;
 
-      const transporter = nodemailer.createTransport({
+      const transporter = getNodemailer().createTransport({
         service: "gmail",
         auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
       });
@@ -10477,7 +10515,7 @@ exports.sendAdvertiserRequestAcknowledgement = onDocumentUpdated(
         const applicantUrl = await advertiserRequestAccessUrl(
             requestReference, recipient,
         );
-        const mailResult = await sendSphotMail(transporter, {
+        const mailResult = await getSendSphotMail()(transporter, {
           from: MAIL_FROM,
           to: recipient,
           subject:
@@ -10705,7 +10743,7 @@ exports.sendAdvertiserRequestApprovalEmail = onDocumentUpdated(
 
       let loginUrl = `${SPHOT_LOGIN_URL}/#/professional-login` +
         "?audience=advertiser";
-      const transporter = nodemailer.createTransport({
+      const transporter = getNodemailer().createTransport({
         service: "gmail",
         auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
       });
@@ -10726,7 +10764,7 @@ exports.sendAdvertiserRequestApprovalEmail = onDocumentUpdated(
             `?login=${encodeURIComponent(login)}` +
             `&token=${encodeURIComponent(firstAccessToken)}`;
         }
-        const mailResult = await sendSphotMail(transporter, {
+        const mailResult = await getSendSphotMail()(transporter, {
           from: MAIL_FROM,
           to: recipient,
           subject: "SPHOT - Votre accès annonceur est approuvé",
@@ -10928,7 +10966,7 @@ exports.sendAdvertiserReviewEmail = onDocumentUpdated(
       );
       if (!claimed) return;
 
-      const transporter = nodemailer.createTransport({
+      const transporter = getNodemailer().createTransport({
         service: "gmail",
         auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
       });
@@ -10939,7 +10977,7 @@ exports.sendAdvertiserReviewEmail = onDocumentUpdated(
         const applicantUrl = isCorrection ?
           await advertiserRequestAccessUrl(requestReference, recipient) :
           SPHOT_LOGIN_URL;
-        const mailResult = await sendSphotMail(transporter, {
+        const mailResult = await getSendSphotMail()(transporter, {
           from: MAIL_FROM,
           to: recipient,
           subject: isCorrection ?
@@ -11405,7 +11443,7 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
       if (recipient && !reviewQueued) {
         recipients.push({kind: "advertiser", email: recipient});
       }
-      const transporter = nodemailer.createTransport({
+      const transporter = getNodemailer().createTransport({
         service: "gmail",
         auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
       });
@@ -11456,7 +11494,7 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
               "\n\nAccéder à votre espace : " + url +
               "\n\nL'équipe SPHOT";
           }
-          const result = await sendSphotMail(transporter, {
+          const result = await getSendSphotMail()(transporter, {
             from: MAIL_FROM,
             to: target.email,
             subject: "SPHOT - " + labels[status],
