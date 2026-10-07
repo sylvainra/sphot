@@ -946,6 +946,16 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                     height: 1.35,
                   ),
                 ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Les SPHOTS surveillés non couverts par l’abonnement restent visibles sur la carte avec la mention « Informations en temps réel indisponibles ».',
+                  style: TextStyle(
+                    color: _blue,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    height: 1.35,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 _saveButton(
                   section: 'offer',
