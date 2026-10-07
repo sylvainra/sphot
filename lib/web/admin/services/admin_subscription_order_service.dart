@@ -53,7 +53,9 @@ class AdminSubscriptionOrderService {
       return;
     }
 
-    final selectedRescueStationIds = data['selectedRescueStationIds'] is Iterable
+    final hasExplicitRescueStationSelection =
+        data['selectedRescueStationIds'] is Iterable;
+    final selectedRescueStationIds = hasExplicitRescueStationSelection
         ? (data['selectedRescueStationIds'] as Iterable)
             .map(_text)
             .where((value) => value.isNotEmpty)
@@ -66,7 +68,7 @@ class AdminSubscriptionOrderService {
             .map((value) => Map<String, dynamic>.from(value))
             .toList()
         : <Map<String, dynamic>>[];
-    final stations = selectedRescueStationIds.isNotEmpty
+    final stations = hasExplicitRescueStationSelection
         ? selectedRescueStationIds.length
         : _int(data['numberOfRescueStations']);
     final unitPrice = _number(data['pricePerStationExclTax']) > 0
