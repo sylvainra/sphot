@@ -1037,7 +1037,47 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           ),
         ),
         const SizedBox(height: 10),
-        if (!spot.realtimeAvailable)
+        if (spot.isRealtimeAwaitingUpdate)
+          const _MobilePublicCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.sync_rounded,
+                      color: Color(0xFF64748B),
+                      size: 20,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Le service temps réel est actif, mais aucune information '
+                  'opérationnelle actualisée n’a encore été transmise depuis '
+                  'son activation. Consultez les consignes affichées sur place.',
+                  style: TextStyle(
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (!spot.realtimeAvailable)
           const _MobilePublicCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2043,6 +2083,55 @@ class _PublicLiveDataSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (spot.isRealtimeAwaitingUpdate) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFDCE3EA)),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.sync_rounded,
+                  size: 18,
+                  color: Color(0xFF64748B),
+                ),
+                SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Le service temps réel est actif, mais aucune information '
+              'opérationnelle actualisée n’a encore été transmise depuis '
+              'son activation. Consultez les consignes affichées sur place.',
+              style: TextStyle(
+                color: Color(0xFF475569),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (!spot.realtimeAvailable) {
       return Container(
         width: double.infinity,
