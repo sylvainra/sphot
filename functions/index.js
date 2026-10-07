@@ -857,7 +857,9 @@ function historicalLiveStateIsFresh(historical, enabledSince) {
   if (!historical) return false;
   if (!enabledSince) return true;
 
-  const updatedAt = firestoreDate(historical.updatedAt);
+  const updatedAt =
+    firestoreDate(historical.liveUpdatedAt) ||
+    firestoreDate(historical.updatedAt);
   return Boolean(
       updatedAt &&
       updatedAt.getTime() >= enabledSince.getTime(),
@@ -6931,6 +6933,7 @@ exports.updateSauveteurLiveState = onRequest(
           ...sanitizedChanges,
           ...(operationalAlertUpdate ?
             {operationalAlert: operationalAlertUpdate} : {}),
+          liveUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBySauveteurId: context.sauveteurId,
         }, {merge: true});
