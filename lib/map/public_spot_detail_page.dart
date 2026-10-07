@@ -427,6 +427,66 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     required ScrollController controller,
     required List<(IconData, String, List<String>)> groups,
   }) {
+    if (spot.isPosteSecours &&
+        (spot.isRealtimeAwaitingUpdate || !spot.realtimeAvailable)) {
+      final awaiting = spot.isRealtimeAwaitingUpdate;
+
+      return ListView(
+        controller: controller,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: ClampingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
+        children: [
+          _MobilePublicCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      awaiting ? Icons.sync_rounded : Icons.info_outline_rounded,
+                      color: const Color(0xFF64748B),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        awaiting
+                            ? 'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR'
+                            : 'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  awaiting
+                      ? 'Le service temps réel est actif, mais aucune information opérationnelle actualisée n’a encore été transmise depuis son activation.'
+                      : 'Les informations opérationnelles ne sont actuellement pas diffusées sur SPHOT. Consultez les informations et consignes affichées sur place.',
+                  style: const TextStyle(
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildAdvertisingSpace(),
+          const SizedBox(height: 10),
+          _buildSpotActions(context, spot),
+        ],
+      );
+    }
+
     return ListView(
       controller: controller,
       physics: const AlwaysScrollableScrollPhysics(
