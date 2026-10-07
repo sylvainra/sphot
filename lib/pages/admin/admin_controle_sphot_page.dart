@@ -25,7 +25,7 @@ class _AdminControleSphotPageState extends State<AdminControleSphotPage> {
   static const Color pageColor = Color(0xFFDC2626);
 
   late Map<String, dynamic> data;
-  bool sphotValide = false;
+  bool sphotPublie = false;
 
   @override
 void initState() {
@@ -33,7 +33,10 @@ void initState() {
 
   data = Map<String, dynamic>.from(widget.data);
 
-  sphotValide = data['sphotValide'] == true;
+  final publicationStatus =
+      (data['publicationStatus'] ?? '').toString().toLowerCase();
+  sphotPublie =
+      publicationStatus == 'published' || data['sphotValide'] == true;
 }
 
   String _value(String key) {
@@ -108,38 +111,36 @@ void initState() {
 );
   }
 
-  Future<void> _validateSphot() async {
-  setState(() {
-    sphotValide = true;
-    data['sphotValide'] = true;
-  });
+  Future<void> _publishSphot() async {
+    setState(() {
+      sphotPublie = true;
+      data['publicationStatus'] = 'published';
+    });
 
-  Future.delayed(const Duration(seconds: 2), () {
+    await FirebaseFirestore.instance
+        .collection('territoires')
+        .doc(data['territoireId'])
+        .collection('spots')
+        .doc(widget.docId)
+        .set(
+      {
+        'publicationStatus': 'published',
+        'publishedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+
     if (!mounted) return;
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => AdminGestionSphotPage(
-  territoireId: data['territoireId']?.toString() ?? '',
-),
+          territoireId: data['territoireId']?.toString() ?? '',
+        ),
       ),
     );
-  });
-
-  FirebaseFirestore.instance
-    .collection('territoires')
-    .doc(data['territoireId'])
-    .collection('spots')
-    .doc(widget.docId)
-    .set(
-    {
-      'sphotValide': true,
-      'dateValidation': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    },
-    SetOptions(merge: true),
-  );
-}
+  }
 
   void _editSphot() {
   Navigator.of(context).pushReplacement(
@@ -164,7 +165,7 @@ void initState() {
   'ÉQUIPEMENTS',
   'ACCESSIBILITÉ',
   'ACTIVITÉS',
-  'VALIDATION',
+  'PUBLICATION',
 ];
 
     return Scaffold(
@@ -200,7 +201,7 @@ void initState() {
   ),
 ),
                   const Text(
-                    'CONTRÔLE DU SPHOT',
+                    'FICHE DU SPHOT',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
@@ -232,7 +233,7 @@ void initState() {
                               _title().toUpperCase(),
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: sphotValide ? pageColor : const Color(0xFFDC2626),
+                                color: sphotPublie ? pageColor : const Color(0xFFDC2626),
                                 fontSize: 16,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -337,16 +338,16 @@ SizedBox(
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton.icon(
-                      onPressed: sphotValide ? null : _validateSphot,
+                      onPressed: sphotPublie ? null : _publishSphot,
                       icon: Icon(
-                        sphotValide
+                        sphotPublie
                             ? Icons.check_circle_rounded
-                            : Icons.warning_rounded,
+                            : Icons.publish_rounded,
                       ),
                       label: Text(
-                        sphotValide
-                            ? 'SPHOT VALIDÉ'
-                            : 'VALIDER LE SPHOT',
+                        sphotPublie
+                            ? 'SPHOT PUBLIÉ'
+                            : 'PUBLIER LE SPHOT',
                         style: const TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 15,
