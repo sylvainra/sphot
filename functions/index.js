@@ -3900,62 +3900,11 @@ exports.assignCreditNoteNumberOnWrite = onDocumentWritten(
     },
 );
 
-exports.updateSubscriptionStatuses = onSchedule(
-    {
-      schedule: "0 1 * * *",
-      timeZone: "Europe/Paris",
-      region: "europe-west1",
-      cpu: 1,
-      memory: "256MiB",
-    },
-    async () => {
-      const db = admin.firestore();
-      const now = admin.firestore.Timestamp.now();
-
-      const trialSnapshot = await db
-          .collection("subscriptions")
-          .where("status", "==", "trial")
-          .where("trialEndDate", "<", now)
-          .get();
-
-      const activeSnapshot = await db
-          .collection("subscriptions")
-          .where("status", "==", "active")
-          .where("nextInvoiceDate", "<", now)
-          .get();
-
-      const batch = db.batch();
-
-      trialSnapshot.docs.forEach((doc) => {
-        batch.set(
-            doc.ref,
-            {
-              status: "overdue",
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            },
-            {merge: true},
-        );
-      });
-
-      activeSnapshot.docs.forEach((doc) => {
-        batch.set(
-            doc.ref,
-            {
-              status: "overdue",
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            },
-            {merge: true},
-        );
-      });
-
-      await batch.commit();
-
-      console.log(
-          "Statuts abonnements mis à jour:",
-          trialSnapshot.size + activeSnapshot.size,
-      );
-    },
-);
+// Le cycle essai / abonnement est piloté par processSubscriptionLifecycle
+// dans admin_workflow.js. L'ancien scheduler quotidien qui transformait
+// directement les statuts en "overdue" est volontairement supprimé afin
+// de ne pas court-circuiter les transitions awaiting_subscription et
+// awaiting_renewal, ni les emails et historiques associés.
 
 exports.sendTrialEndingReminderEmails = onSchedule(
     {
