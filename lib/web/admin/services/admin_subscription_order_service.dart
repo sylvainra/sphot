@@ -286,6 +286,13 @@ class AdminSubscriptionOrderService {
         : const <String, dynamic>{};
     final requestNumber = _text(requestData['requestNumber']);
     final subscriptionStatus = _text(data['status']).toLowerCase();
+    final keepCurrentRealtimeStatus = const <String>{
+      'active',
+      'trial',
+      'trial_active',
+      'trialing',
+      'in_trial',
+    }.contains(subscriptionStatus);
     final orderType = subscriptionStatus == 'active' ||
             subscriptionStatus == 'awaiting_renewal'
         ? 'renewal'
@@ -355,14 +362,7 @@ class AdminSubscriptionOrderService {
         'paymentMethod': paymentMethod,
         'administrativeDataConfirmedAt': serverNow,
         'billingDataConfirmedAt': serverNow,
-        if (!const {
-          'active',
-          'trial',
-          'trial_active',
-          'trialing',
-          'in_trial',
-        }.contains(subscriptionStatus))
-          'status': 'order_pending',
+        if (!keepCurrentRealtimeStatus) 'status': 'order_pending',
         'updatedAt': serverNow,
       },
       SetOptions(merge: true),
