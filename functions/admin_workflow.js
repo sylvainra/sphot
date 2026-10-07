@@ -669,6 +669,7 @@ async function sendTrialReceipt(requestId) {
   const trial = data.trialRequest || {};
   const requestedAt = data.trialRequestedAt || trial.requestedAt || new Date();
   const duration = Number(trial.trialDurationDays || DEFAULT_TRIAL_DAYS);
+  const stations = Number(trial.numberOfRescueStations || 0);
   const docNumber = `${requestNumber}-ESS-AR-01`;
 
   try {
@@ -691,6 +692,8 @@ async function sendTrialReceipt(requestId) {
         {heading: "Demande"},
         {label: "Demande reçue le", value: formatFrenchDate(requestedAt)},
         {label: "Durée sollicitée", value: `${duration} jours`},
+        {label: "Périmètre", value: "SPHOTS surveillés uniquement"},
+        {label: "Postes concernés", value: stations || "Non renseigné"},
         {label: "Statut", value: "En attente d’autorisation"},
         {heading: "Structure concernée"},
         {label: "Organisation", value: organisationDisplay(data)},
@@ -715,6 +718,8 @@ async function sendTrialReceipt(requestId) {
     période d’essai gratuite SPHOT ADMIN de ${duration} jours
   </strong>
   pour <strong>${escapeHtml(organisation)}</strong>.
+  Cette période concerne uniquement les SPHOTS surveillés inclus dans
+  la demande.
 </p>
 
 <p style="
@@ -849,8 +854,9 @@ async function sendTrialApproval(requestId) {
   const start = subscription.trialStartDate || data.trialTracking?.approvedAt;
   const end = subscription.trialEndDate;
   const duration = Number(subscription.trialDurationDays || DEFAULT_TRIAL_DAYS);
+  const stations = Number(subscription.numberOfRescueStations || 0);
   const requestNumber = cleanValue(data.requestNumber, requestId);
-  const docNumber = `${requestNumber}-ESS-VAL-01`;
+  const docNumber = `${requestNumber}-ESS-AUT-01`;
 
   try {
     const pdf = await createRegistryPdf({
@@ -865,13 +871,16 @@ async function sendTrialApproval(requestId) {
       rubric: "Période d’essai",
       statusLabel: "ACTIVÉE",
       introduction:
-        "SPHOT confirme l’ouverture de votre période d’essai gratuite. " +
-        "Les droits associés à cette phase sont activés pour la durée " +
+        "SPHOT confirme l’autorisation d’ouverture de votre période " +
+        "d’essai gratuite. Les fonctions temps réel sont activées pour " +
+        "les SPHOTS surveillés inclus dans la demande, pendant la durée " +
         "indiquée ci-dessous.",
       lines: [
         {heading: "Période d’essai"},
         {label: "Statut", value: "Période d’essai activée"},
         {label: "Durée", value: `${duration} jours`},
+        {label: "Périmètre", value: "SPHOTS surveillés uniquement"},
+        {label: "Postes concernés", value: stations || "Non renseigné"},
         {label: "Début", value: formatFrenchDate(start)},
         {label: "Fin", value: formatFrenchDate(end)},
         {label: "Service temps réel", value: "Activé pendant l’essai"},
