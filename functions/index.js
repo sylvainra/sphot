@@ -254,9 +254,6 @@ function buildPublicLiveState(spot) {
   const liveFields = [
     "liveFlag",
     "statutBaignade",
-    "periode",
-    "heureDebut",
-    "heureFin",
     "phone",
     "telephonePoste",
     "dangers",
@@ -296,9 +293,6 @@ function mergePublicSpotData(spot, historical) {
   const historicalLiveFields = [
     "liveFlag",
     "statutBaignade",
-    "periode",
-    "heureDebut",
-    "heureFin",
     "phone",
     "telephonePoste",
     "dangers",
