@@ -893,7 +893,7 @@ async function sendTrialApproval(requestId) {
 <p style="font-size:16px;line-height:1.6;">
   Votre demande de
   <strong>période d’essai gratuite SPHOT ADMIN</strong>
-  a été validée.
+  a été autorisée.
 </p>
 
 <div style="
