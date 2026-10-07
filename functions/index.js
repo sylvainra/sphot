@@ -1075,51 +1075,6 @@ async function supervisedSpotIds(
 }
 
 /**
- * Vérifie que le territoire dispose d'un accès administrateur approuvé.
- *
- * La publication des SPHOTS est indépendante de l'essai et de l'abonnement.
- * Ces derniers ne pilotent que la disponibilité des informations temps réel.
- *
- * @param {string} territoireId Identifiant du territoire.
- * @return {Promise<boolean>}
- */
-async function isTerritoryPublic(territoireId) {
-  if (!territoireId) return false;
-
-  const db = admin.firestore();
-
-  const nestedRequests = await db.collection("adminRequests")
-      .where("territoire.territoireId", "==", territoireId)
-      .get();
-
-  if (nestedRequests.docs.some(
-      (document) => isApprovedAdminRequest(document.data() || {}),
-  )) {
-    return true;
-  }
-
-  const legacyRequests = await db.collection("adminRequests")
-      .where("territoireId", "==", territoireId)
-      .get();
-
-  if (legacyRequests.docs.some(
-      (document) => isApprovedAdminRequest(document.data() || {}),
-  )) {
-    return true;
-  }
-
-  const adminSnapshot = await db.collection("admins")
-      .where("territoireId", "==", territoireId)
-      .get();
-
-  return adminSnapshot.docs.some((document) => {
-    const data = document.data() || {};
-    return (data.accessStatus || "").toString().trim().toLowerCase() ===
-      "approved";
-  });
-}
-
-/**
  * Applique le statut d'un abonnement à la projection publique associée.
  *
  * @param {string} subscriptionId Identifiant du document abonnement.
