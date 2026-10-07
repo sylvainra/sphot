@@ -350,9 +350,9 @@ async function reconcilePublicTerritory(territoireId, publish) {
   if (!territoireId) return;
 
   const db = admin.firestore();
-  const realtimeAvailable = publish ?
-    await territoryDiffusionAccessGranted(db, territoireId) :
-    false;
+  const realtimeScope = publish ?
+    await territoryRealtimeScope(db, territoireId) :
+    {granted: false, allSpots: false, spotIds: new Set()};
   const territoryReference = db.collection("territoires").doc(territoireId);
   const publicSnapshot = await db
       .collection("publicSpots")
@@ -488,20 +488,22 @@ async function reconcilePublicTerritory(territoireId, publish) {
     spotSnapshot.docs.forEach((document) => {
       const reference = db.collection("publicSpots")
           .doc(`${territoireId}__${document.id}`);
+      const mergedSpot = mergePublicTerritoryData(
+          mergePublicSpotData(
+              document.data(),
+              historicalSpots.get(document.id) || null,
+          ),
+          territoryData,
+      );
+
       writes.push({
         type: "set",
         reference,
         data: buildPublicSpot(
             territoireId,
             document.id,
-            mergePublicTerritoryData(
-                mergePublicSpotData(
-                    document.data(),
-                    historicalSpots.get(document.id) || null,
-                ),
-                territoryData,
-            ),
-            realtimeAvailable,
+            mergedSpot,
+            realtimeScopeGrantsSpot(realtimeScope, document.id),
         ),
       });
     });
@@ -650,14 +652,63 @@ async function territoryAdminDocuments(db, territoireId) {
  * @param {string} territoireId Identifiant du territoire.
  * @return {Promise<boolean>}
  */
-async function territoryDiffusionAccessGranted(db, territoireId) {
-  if (!territoireId) return false;
+function subscriptionRealtimeSpotIds(subscription) {
+  const data = subscription || {};
+  const ids = new Set();
+
+  const rawIds = Array.isArray(data.selectedRescueStationIds) ?
+    data.selectedRescueStationIds :
+    [];
+
+  rawIds.forEach((value) => {
+    const id = (value || "").toString().trim();
+    if (id) ids.add(id);
+  });
+
+  if (ids.size === 0 && Array.isArray(data.selectedRescueStations)) {
+    data.selectedRescueStations.forEach((entry) => {
+      if (!entry || typeof entry !== "object") return;
+      const id = (
+        entry.spotDocumentId ||
+        entry.spotId ||
+        entry.idSphot ||
+        ""
+      ).toString().trim();
+      if (id) ids.add(id);
+    });
+  }
+
+  return ids;
+}
+
+/**
+ * Retourne le périmètre opérationnel temps réel d'un territoire.
+ *
+ * Pendant l'essai, tous les SPHOTS surveillés du territoire sont couverts.
+ * Pour un abonnement actif, seuls les postes explicitement sélectionnés sont
+ * couverts. Un abonnement historique sans sélection explicite conserve la
+ * couverture globale pour compatibilité.
+ *
+ * @param {FirebaseFirestore.Firestore} db Instance Firestore.
+ * @param {string} territoireId Identifiant du territoire.
+ * @return {Promise<Object>} Périmètre temps réel.
+ */
+async function territoryRealtimeScope(db, territoireId) {
+  const emptyScope = {
+    granted: false,
+    allSpots: false,
+    spotIds: new Set(),
+  };
+
+  if (!territoireId) return emptyScope;
 
   const adminDocuments = await territoryAdminDocuments(db, territoireId);
+  const spotIds = new Set();
+  let granted = false;
+  let allSpots = false;
 
   for (const document of adminDocuments) {
     const data = document.data() || {};
-
     if (data.accessStatus !== "approved") continue;
 
     const subscriptionSnapshot = await db.collection("subscriptions")
@@ -665,23 +716,60 @@ async function territoryDiffusionAccessGranted(db, territoireId) {
         .get();
 
     if (subscriptionSnapshot.exists) {
-      if (subscriptionGrantsDiffusion(subscriptionSnapshot.data() || {})) {
-        return true;
+      const subscription = subscriptionSnapshot.data() || {};
+      if (!subscriptionGrantsDiffusion(subscription)) continue;
+
+      granted = true;
+      const status = (subscription.status || "")
+          .toString()
+          .trim()
+          .toLowerCase();
+
+      const trialStatuses = new Set([
+        "trial",
+        "trial_active",
+        "trialing",
+        "in_trial",
+      ]);
+
+      if (trialStatuses.has(status)) {
+        allSpots = true;
+        continue;
       }
 
-      // Lorsqu'un abonnement existe, son état fait autorité : un ancien
-      // booléen diffusionAccessGranted ne doit jamais maintenir le temps réel
-      // après la fin de l'essai ou de l'abonnement.
+      const selectedIds = subscriptionRealtimeSpotIds(subscription);
+      if (selectedIds.size === 0) {
+        // Compatibilité avec les abonnements historiques créés avant la
+        // sélection poste par poste.
+        allSpots = true;
+      } else {
+        selectedIds.forEach((id) => spotIds.add(id));
+      }
+
       continue;
     }
 
     // Compatibilité avec les anciens comptes sans document subscriptions.
     if (data.diffusionAccessGranted === true) {
-      return true;
+      granted = true;
+      allSpots = true;
     }
   }
 
-  return false;
+  return {granted, allSpots, spotIds};
+}
+
+function realtimeScopeGrantsSpot(scope, spotId) {
+  if (!scope || scope.granted !== true) return false;
+  if (scope.allSpots === true) return true;
+
+  const id = (spotId || "").toString().trim();
+  return Boolean(id && scope.spotIds instanceof Set && scope.spotIds.has(id));
+}
+
+async function territoryDiffusionAccessGranted(db, territoireId) {
+  const scope = await territoryRealtimeScope(db, territoireId);
+  return scope.granted === true;
 }
 
 /**
@@ -3545,7 +3633,7 @@ exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
       const liveState = buildPublicLiveState(
           event.data.after.exists ? event.data.after.data() : {},
       );
-      const diffusionByTerritory = new Map();
+      const scopesByTerritory = new Map();
       const batch = db.batch();
 
       for (const document of publicSnapshot.docs) {
@@ -3560,15 +3648,17 @@ exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
           continue;
         }
 
-        if (!diffusionByTerritory.has(territoireId)) {
-          diffusionByTerritory.set(
+        if (!scopesByTerritory.has(territoireId)) {
+          scopesByTerritory.set(
               territoireId,
-              await territoryDiffusionAccessGranted(db, territoireId),
+              await territoryRealtimeScope(db, territoireId),
           );
         }
 
-        const realtimeAvailable =
-          diffusionByTerritory.get(territoireId) === true;
+        const realtimeAvailable = realtimeScopeGrantsSpot(
+            scopesByTerritory.get(territoireId),
+            event.params.spotId,
+        );
 
         if (!realtimeAvailable) {
           batch.set(
@@ -4559,8 +4649,11 @@ async function resolveSauveteurOperationalContext(accountData, login) {
       assignedPeriodIds,
   );
 
-  const diffusionAccessGranted =
-    await territoryDiffusionAccessGranted(db, territoireId);
+  const realtimeScope = await territoryRealtimeScope(db, territoireId);
+  const realtimeSpotIds = assignedSpotIds.filter(
+      (spotId) => realtimeScopeGrantsSpot(realtimeScope, spotId),
+  );
+  const diffusionAccessGranted = realtimeSpotIds.length > 0;
 
   const accountActive = accountData.accountStatus === "ACTIVE";
   const sphotOn = accountActive &&
@@ -4588,6 +4681,7 @@ async function resolveSauveteurOperationalContext(accountData, login) {
     functions,
     userRole,
     assignedSpotIds,
+    realtimeSpotIds,
     assignedPeriodIds,
     activePeriodIds: assignmentPeriods.activePeriodIds,
     diffusionAccessGranted,
@@ -4970,7 +5064,8 @@ exports.loginSauveteur = onRequest(
           territoireId: context.territoireId,
           userRole: context.userRole,
           fonctions: context.functions,
-          postesAffectes: context.assignedSpotIds,
+          postesAffectes: context.realtimeSpotIds,
+          postesAffectesDeclares: context.assignedSpotIds,
           periodesSurveillance: context.assignedPeriodIds,
           activePeriodIds: context.activePeriodIds,
           diffusionAccessGranted: context.diffusionAccessGranted,
@@ -5034,7 +5129,8 @@ exports.getSauveteurSessionState = onRequest(
           territoireId: context.territoireId,
           userRole: context.userRole,
           fonctions: context.functions,
-          postesAffectes: context.assignedSpotIds,
+          postesAffectes: context.realtimeSpotIds,
+          postesAffectesDeclares: context.assignedSpotIds,
           periodesSurveillance: context.assignedPeriodIds,
           activePeriodIds: context.activePeriodIds,
           diffusionAccessGranted: context.diffusionAccessGranted,
@@ -5239,7 +5335,7 @@ exports.saveSauveteurPlanning = onRequest(
           return;
         }
 
-        if (!context.assignedSpotIds.includes(spotId)) {
+        if (!context.realtimeSpotIds.includes(spotId)) {
           response.status(403).json({
             success: false,
             error: "spot_not_assigned",
@@ -6530,7 +6626,7 @@ exports.updateSauveteurLiveState = onRequest(
           return;
         }
 
-        if (!context.assignedSpotIds.includes(spotId)) {
+        if (!context.realtimeSpotIds.includes(spotId)) {
           response.status(403).json({
             success: false,
             error: "spot_not_assigned",
@@ -6861,7 +6957,7 @@ exports.getSauveteurMainCourante = onRequest(
         const spotId = (request.body.spotId || "").toString().trim();
 
         if (context.sphotMode !== "ON" ||
-            !context.assignedSpotIds.includes(spotId)) {
+            !context.realtimeSpotIds.includes(spotId)) {
           response.status(403).json({
             success: false,
             error: "main_courante_not_available",
@@ -7018,7 +7114,7 @@ exports.addSauveteurMainCouranteEntry = onRequest(
         const spotId = (request.body.spotId || "").toString().trim();
 
         if (context.sphotMode !== "ON" ||
-            !context.assignedSpotIds.includes(spotId)) {
+            !context.realtimeSpotIds.includes(spotId)) {
           response.status(403).json({
             success: false,
             error: "sphot_off",
