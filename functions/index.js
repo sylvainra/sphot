@@ -180,13 +180,24 @@ function buildPublicSpot(
  *
  * @return {Object} Mise à jour Firestore à fusionner.
  */
-function buildSuppressedPublicLiveState(realtimeStatus) {
+function buildSuppressedPublicLiveState(
+    realtimeStatus,
+    realtimeValidUntil = undefined,
+) {
   const awaitingUpdate = realtimeStatus === "awaiting_update";
   const result = {
     realtimeAvailable: awaitingUpdate,
     realtimeStatus: awaitingUpdate ? "awaiting_update" : "unavailable",
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
+
+  if (awaitingUpdate &&
+      realtimeValidUntil !== undefined &&
+      realtimeValidUntil !== null) {
+    result.realtimeValidUntil = realtimeValidUntil;
+  } else if (!awaitingUpdate) {
+    result.realtimeValidUntil = admin.firestore.FieldValue.delete();
+  }
 
   [
     "liveFlag",
@@ -214,6 +225,7 @@ function buildNonSupervisedPublicLiveState() {
   const result = {
     realtimeAvailable: false,
     realtimeStatus: "not_applicable",
+    realtimeValidUntil: admin.firestore.FieldValue.delete(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
