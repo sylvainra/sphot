@@ -198,15 +198,16 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
           context: context,
           builder: (dialogContext) => AlertDialog(
             title: const Text(
-              'AUTORISER LA PÉRIODE D’ESSAI',
+              'AUTORISER L’ESSAI 8 JOURS',
               style: TextStyle(
                 color: _blue,
                 fontWeight: FontWeight.w900,
               ),
             ),
             content: const Text(
-              'Cette action démarre immédiatement la période d’essai gratuite '
-              'SPHOT ADMIN de 8 jours et active les fonctions opérationnelles en temps réel des SPHOTS surveillés concernés.',
+              'Cette action démarre immédiatement l’essai de 8 jours et '
+              'active les fonctions temps réel uniquement pour les SPHOTS '
+              'surveillés inclus dans la demande.',
               style: TextStyle(
                 color: _blue,
                 fontWeight: FontWeight.w600,
@@ -224,7 +225,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                   backgroundColor: _red,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('AUTORISER L’ESSAI'),
+                child: const Text('AUTORISER L’ESSAI 8 JOURS'),
               ),
             ],
           ),
@@ -682,7 +683,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
               documentCount: accessChildren.length,
             ),
             _documentRubric(
-              title: '2 — PÉRIODE D’ESSAI',
+              title: '2 — SPHOT SURVEILLÉ — ESSAI 8 JOURS',
               icon: Icons.hourglass_bottom_rounded,
               children: tilesFor('trial'),
               documentCount: grouped['trial']!.length,
@@ -955,7 +956,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     _section(
-                      title: 'PÉRIODE D’ESSAI',
+                      title: 'SPHOT SURVEILLÉ — ESSAI 8 JOURS',
                       children: [
                         _line(
                           'Durée',
@@ -1006,7 +1007,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                               ),
                               icon: const Icon(Icons.play_circle_fill_rounded),
                               label: const Text(
-                                'AUTORISER LA PÉRIODE D’ESSAI',
+                                'AUTORISER L’ESSAI 8 JOURS',
                                 style: TextStyle(fontWeight: FontWeight.w900),
                               ),
                               style: ElevatedButton.styleFrom(
