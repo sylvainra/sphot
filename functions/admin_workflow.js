@@ -1224,7 +1224,7 @@ async function sendTrialReminder(subscriptionDoc) {
     <p>${escapeHtml(buildGreeting(data))}</p>
     <p>Votre <strong>période d’essai gratuite SPHOT ADMIN</strong> prendra fin le
     <strong>${escapeHtml(formatFrenchDate(subscription.trialEndDate))}</strong>.</p>
-    <p>Afin d’éviter toute interruption de diffusion, vous pouvez dès maintenant
+    <p>Afin d’éviter toute interruption des fonctions temps réel, vous pouvez dès maintenant
     préparer votre abonnement annuel SPHOT ADMIN.</p>
     <p>Tarif : <strong>${currency(price)} HT / an / poste de secours</strong>.<br>
     Montant prévisionnel : <strong>${currency(annual)} HT / an</strong>
