@@ -857,12 +857,14 @@ function historicalLiveStateIsFresh(historical, enabledSince) {
   if (!historical) return false;
   if (!enabledSince) return true;
 
-  const updatedAt =
-    firestoreDate(historical.liveUpdatedAt) ||
-    firestoreDate(historical.updatedAt);
+  // Après une nouvelle activation, seule une publication opérationnelle
+  // explicite d'un sauveteur rend les données temps réel à nouveau valides.
+  // Un updatedAt générique peut provenir d'une modification sans rapport
+  // avec la surveillance et ne doit donc pas réactiver un ancien état.
+  const liveUpdatedAt = firestoreDate(historical.liveUpdatedAt);
   return Boolean(
-      updatedAt &&
-      updatedAt.getTime() >= enabledSince.getTime(),
+      liveUpdatedAt &&
+      liveUpdatedAt.getTime() >= enabledSince.getTime(),
   );
 }
 
