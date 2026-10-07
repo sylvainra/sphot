@@ -683,8 +683,12 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   Widget _offerForm(Map<String, dynamic> data) {
   _initializeOfferSelection(data);
   final subscriptionStatus = _text(data['status']).toLowerCase();
+  final commercialOrderStatus =
+      _text(data['commercialOrderStatus']).toLowerCase();
   final offerLocked =
-      subscriptionStatus == 'active' || subscriptionStatus == 'order_pending';
+      subscriptionStatus == 'active' ||
+      subscriptionStatus == 'order_pending' ||
+      commercialOrderStatus == 'submitted';
 
   return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
     stream: FirebaseFirestore.instance
