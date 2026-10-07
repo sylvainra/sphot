@@ -131,18 +131,21 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   final Map<String, List<String>> _documentChapters = {
     'CGU': [],
+    'CGV': [],
     'Politique de confidentialité': [],
     'RGPD': [],
   };
 
   final Map<String, Map<String, String>> _legalChapterIdsByDocument = {
     'cgu': {},
+    'cgv': {},
     'privacyPolicy': {},
     'rgpdNotice': {},
   };
 
   final Map<String, Set<String>> _modifiedChapters = {
     'CGU': {},
+    'CGV': {},
     'Politique de confidentialité': {},
     'RGPD': {},
   };
@@ -4560,6 +4563,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     switch (title) {
       case 'CGU':
         return 'cgu';
+      case 'CGV':
+        return 'cgv';
       case 'Politique de confidentialité':
       case 'POLITIQUE DE CONFIDENTIALITÉ':
         return 'privacyPolicy';
@@ -4598,6 +4603,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   Future<void> _loadAllLegalChaptersFromFirebase() async {
     final cgu = await _loadLegalChaptersFromFirebase('CGU');
+    final cgv = await _loadLegalChaptersFromFirebase('CGV');
     final privacy = await _loadLegalChaptersFromFirebase(
       'Politique de confidentialité',
     );
@@ -4607,6 +4613,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
     setState(() {
       _documentChapters['CGU'] = cgu;
+      _documentChapters['CGV'] = cgv;
       _documentChapters['Politique de confidentialité'] = privacy;
       _documentChapters['RGPD'] = rgpd;
     });
@@ -4657,6 +4664,14 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 title: 'CGU',
                 subtitle: 'Conditions Générales d’Utilisation',
                 chapters: _documentChapters['CGU'] ?? [],
+              ),
+
+              const SizedBox(height: 12),
+
+              _legalDocumentTile(
+                title: 'CGV',
+                subtitle: 'Conditions Générales de Vente',
+                chapters: _documentChapters['CGV'] ?? [],
               ),
 
               const SizedBox(height: 12),
@@ -5452,6 +5467,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     switch (title) {
       case 'CGU':
         return 'cgu';
+      case 'CGV':
+        return 'cgv';
       case 'POLITIQUE DE CONFIDENTIALITÉ':
         return 'privacyPolicy';
       case 'RGPD':
