@@ -1472,7 +1472,8 @@ const COMMERCIAL_DOCUMENTS = {
  * @param {Object} params.proConnect Identité transmise par ProConnect.
  * @param {Object} params.structure Informations concernant la structure.
  * @param {Object} params.territoire Informations concernant le territoire.
- * @param {Object} params.trialRequest Informations concernant l'essai.
+ * @param {Object} params.trialRequest Informations historiques d'acceptation.
+ * @param {Object} params.legalAcceptance Acceptation juridique enregistrée.
  * @return {Promise<Buffer>} Contenu du document PDF.
  */
 function createAdminRequestPdf({
@@ -1484,6 +1485,7 @@ function createAdminRequestPdf({
   structure,
   territoire,
   trialRequest,
+  legalAcceptance = {},
 }) {
   return new Promise((resolve, reject) => {
     try {
@@ -1821,36 +1823,51 @@ function createAdminRequestPdf({
       doc.moveDown(0.45);
       drawSectionTitle("Consentements enregistrés");
 
+      const legalDocuments = legalAcceptance.documents || {};
       const acceptedDocuments = trialRequest.acceptedDocuments || {};
+      const representativeAccepted =
+        trialRequest.certifyRepresentative === true ||
+        legalAcceptance.representativeDeclaration === true;
+      const responsibilityAccepted =
+        trialRequest.adminResponsibilityAccepted === true ||
+        legalAcceptance.adminResponsibilityDeclaration === true;
+      const legalVersion =
+        acceptedDocuments.version ||
+        legalAcceptance.version ||
+        legalAcceptance.legalVersion ||
+        "";
       const consentY = doc.y;
       const consentRows = [
         [
           "Habilitation",
-          trialRequest.certifyRepresentative === true ? "Oui" : "Non",
+          representativeAccepted ? "Oui" : "Non",
         ],
         [
           "CGU",
-          acceptedDocuments.cgu === true ? "Acceptées" : "Non acceptées",
+          acceptedDocuments.cgu === true || legalDocuments.cgu === true ?
+            "Acceptées" :
+            "Non acceptées",
         ],
         [
           "Confidentialité",
-          acceptedDocuments.privacy === true ?
+          acceptedDocuments.privacy === true ||
+            legalDocuments.privacy === true ?
             "Acceptée" :
             "Non acceptée",
         ],
         [
           "Données personnelles",
-          acceptedDocuments.rgpd === true ? "Accepté" : "Non accepté",
+          acceptedDocuments.rgpd === true || legalDocuments.rgpd === true ?
+            "Accepté" :
+            "Non accepté",
         ],
         [
           "Responsabilité déclarative",
-          trialRequest.adminResponsibilityAccepted === true ?
-            "Acceptée" :
-            "Non acceptée",
+          responsibilityAccepted ? "Acceptée" : "Non acceptée",
         ],
         [
           "Version juridique",
-          cleanValue(acceptedDocuments.version, "Non renseignée"),
+          cleanValue(legalVersion, "Non renseignée"),
         ],
       ];
 
@@ -2128,6 +2145,7 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
       const structure = data.structure || {};
       const territoire = data.territoire || {};
       const trialRequest = data.trialRequest || {};
+      const legalAcceptance = data.legalAcceptance || {};
       const subscriptionPreview = data.subscriptionPreview || {};
 
       const recipientEmail = cleanValue(
@@ -2223,6 +2241,7 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
           structure: structure,
           territoire: territoire,
           trialRequest: trialRequest,
+          legalAcceptance: legalAcceptance,
           subscriptionPreview: subscriptionPreview,
         });
 
