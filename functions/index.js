@@ -863,14 +863,10 @@ async function territoryRealtimeScope(db, territoireId) {
       continue;
     }
 
-    // Compatibilité avec les anciens comptes sans document subscriptions.
-    if (data.diffusionAccessGranted === true) {
-      granted = true;
-      allSpots = true;
-      // Ancien modèle sans date d'activation fiable : pas de filtre de
-      // fraîcheur afin de préserver les installations déjà en production.
-      allSpotsSince = null;
-    }
+    // Sans document subscriptions actif, aucun droit temps réel n'est
+    // accordé. Le booléen historique diffusionAccessGranted peut encore être
+    // conservé dans admins/{uid} pour l'interface, mais il n'est plus une
+    // autorité de diffusion : le contrôle commercial doit rester fail-closed.
   }
 
   return {
