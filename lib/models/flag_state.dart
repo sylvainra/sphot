@@ -38,8 +38,9 @@ class SpotFlagState {
   final dynamic meteoMarine;
   final dynamic ephemeride;
   final dynamic notificationPublique;
-  final bool realtimeAvailable;
+  final bool _realtimeAvailable;
   final String realtimeStatus;
+  final dynamic realtimeValidUntil;
   final dynamic updatedAt;
 
   SpotFlagState({
@@ -78,10 +79,11 @@ class SpotFlagState {
     this.meteoMarine,
     this.ephemeride,
     this.notificationPublique,
-    this.realtimeAvailable = true,
+    bool realtimeAvailable = true,
     this.realtimeStatus = 'available',
+    this.realtimeValidUntil,
     this.updatedAt,
-  });
+  }) : _realtimeAvailable = realtimeAvailable;
 
   factory SpotFlagState.fromFirestore(String id, Map<String, dynamic> data) {
   return SpotFlagState(
@@ -140,12 +142,39 @@ class SpotFlagState {
     realtimeStatus: _readString(data['realtimeStatus']).isNotEmpty
         ? _readString(data['realtimeStatus']).toLowerCase()
         : (data['realtimeAvailable'] == false ? 'unavailable' : 'available'),
+    realtimeValidUntil: data['realtimeValidUntil'],
     updatedAt: data['updatedAt'],
   );
 }
 
   bool get isPosteSecours {
     return typeSphot.toLowerCase().contains('poste de secours');
+  }
+
+  DateTime? get _realtimeValidUntilDate {
+    final value = realtimeValidUntil;
+    if (value == null) return null;
+    if (value is DateTime) return value;
+
+    try {
+      final converted = value.toDate();
+      if (converted is DateTime) return converted;
+    } catch (_) {}
+
+    if (value is String) {
+      return DateTime.tryParse(value);
+    }
+
+    return null;
+  }
+
+  bool get realtimeAvailable {
+    if (!_realtimeAvailable) return false;
+
+    final validUntil = _realtimeValidUntilDate;
+    if (validUntil == null) return true;
+
+    return !DateTime.now().isAfter(validUntil);
   }
 
   bool get isNaturisme {
@@ -330,6 +359,7 @@ class SpotFlagState {
   }
 
   bool get isRealtimeAwaitingUpdate =>
+      realtimeAvailable &&
       realtimeStatus.toLowerCase() == 'awaiting_update';
 
   bool get isMissingFlagColorDuringSurveillance {
