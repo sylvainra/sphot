@@ -421,8 +421,10 @@ async function reconcilePublicTerritory(territoireId, publish) {
       granted: false,
       allSpots: false,
       allSpotsSince: null,
+      allSpotsUntil: undefined,
       spotIds: new Set(),
       spotSince: new Map(),
+      spotUntil: new Map(),
     };
   const territoryReference = db.collection("territoires").doc(territoireId);
   const publicSnapshot = await db
@@ -563,6 +565,8 @@ async function reconcilePublicTerritory(territoireId, publish) {
         realtimeScopeGrantsSpot(realtimeScope, document.id);
       const enabledSince =
         realtimeScopeEnabledSince(realtimeScope, document.id);
+      const validUntil =
+        realtimeScopeValidUntil(realtimeScope, document.id);
       const historicalSpot = historicalSpots.get(document.id) || null;
       const liveStateFresh = realtimeGranted &&
         historicalLiveStateIsFresh(historicalSpot, enabledSince);
@@ -586,6 +590,7 @@ async function reconcilePublicTerritory(territoireId, publish) {
             document.id,
             mergedSpot,
             realtimeStatus,
+            validUntil,
         ),
       });
     });
