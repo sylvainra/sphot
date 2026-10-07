@@ -355,7 +355,14 @@ class AdminSubscriptionOrderService {
         'paymentMethod': paymentMethod,
         'administrativeDataConfirmedAt': serverNow,
         'billingDataConfirmedAt': serverNow,
-        if (subscriptionStatus != 'active') 'status': 'order_pending',
+        if (!const {
+          'active',
+          'trial',
+          'trial_active',
+          'trialing',
+          'in_trial',
+        }.contains(subscriptionStatus))
+          'status': 'order_pending',
         'updatedAt': serverNow,
       },
       SetOptions(merge: true),
