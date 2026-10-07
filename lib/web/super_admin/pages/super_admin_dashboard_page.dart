@@ -96,7 +96,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     {
       'title': 'Prix, taxes et évolution tarifaire',
       'content':
-          "Les prix sont exprimés en euros hors taxes, sauf indication contraire. La TVA et toute taxe légalement applicable sont ajoutées selon les règles en vigueur. Le prix applicable est celui présenté et accepté lors de la commande. Les tarifs futurs peuvent être modifiés par SPHOT sans effet rétroactif sur une commande déjà acceptée.",
+          "Les prix sont exprimés en euros hors taxes, sauf indication contraire. La TVA et toute taxe légalement applicable sont ajoutées selon les règles en vigueur. Le barème applicable est celui du configurateur SPHOT et, lorsqu’il existe, du devis ou bon de commande accepté. Le prix applicable est celui présenté et accepté lors de la commande. Sauf mention expresse, aucun escompte n’est accordé pour paiement anticipé et aucune remise n’est acquise en dehors de celles affichées ou convenues par écrit. Les tarifs futurs peuvent être modifiés par SPHOT sans effet rétroactif sur une commande déjà acceptée.",
     },
     {
       'title': 'Zone de diffusion et durée',
@@ -126,12 +126,12 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     {
       'title': 'Facturation et paiement',
       'content':
-          "La facturation est établie à partir des informations fournies par l’annonceur. Le délai, le moyen de paiement, les références de commande, d’engagement ou de service et les éventuelles modalités de facturation électronique sont ceux indiqués sur le devis, le bon de commande ou la facture. L’annonceur s’engage à fournir des informations de facturation exactes et à jour.",
+          "La facturation est établie à partir des informations fournies par l’annonceur. Sauf délai différent expressément convenu dans le devis ou le bon de commande et conforme aux limites légales, les factures sont payables à réception. Le moyen de paiement, les références de commande, d’engagement ou de service et les éventuelles modalités de facturation électronique sont ceux indiqués sur le devis, le bon de commande ou la facture. L’annonceur s’engage à fournir des informations de facturation exactes et à jour.",
     },
     {
       'title': 'Retard ou défaut de paiement',
       'content':
-          "En cas de retard de paiement entre professionnels, les pénalités et l’indemnité forfaitaire légale pour frais de recouvrement sont exigibles dans les conditions prévues par le Code de commerce et indiquées sur la facture. SPHOT peut en outre suspendre une campagne ou refuser une nouvelle commande tant que les sommes exigibles restent impayées.",
+          "En cas de retard de paiement, des pénalités sont exigibles dès le jour suivant la date de règlement figurant sur la facture, sans rappel préalable. Sauf taux différent valablement convenu dans les limites légales, leur taux correspond au taux appliqué par la Banque centrale européenne à son opération de refinancement la plus récente majoré de 10 points de pourcentage. Une indemnité forfaitaire de 40 euros pour frais de recouvrement est également due de plein droit par tout professionnel en retard de paiement ; une indemnisation complémentaire peut être demandée sur justification lorsque les frais de recouvrement réellement exposés sont supérieurs. SPHOT peut en outre suspendre une campagne ou refuser une nouvelle commande tant que les sommes exigibles restent impayées.",
     },
     {
       'title': 'Propriété intellectuelle et droit de diffusion',
