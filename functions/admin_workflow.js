@@ -696,10 +696,10 @@ async function sendTrialReceipt(requestId) {
         {label: "Organisation", value: organisationDisplay(data)},
       ],
       notice:
-        "La période d’essai n’est pas active à ce stade. Aucun droit de " +
-        "diffusion n’est ouvert par le présent document. Vous recevrez " +
-        "une décision distincte lors de l’activation éventuelle de " +
-        "votre période d’essai.",
+        "La période d’essai n’est pas active à ce stade. Les fonctions " +
+        "opérationnelles en temps réel ne sont pas encore ouvertes par le " +
+        "présent document. Vous recevrez une décision distincte lors de " +
+        "l’activation éventuelle de votre période d’essai.",
     });
 
     const greeting = buildGreeting(data);
@@ -874,7 +874,7 @@ async function sendTrialApproval(requestId) {
         {label: "Durée", value: `${duration} jours`},
         {label: "Début", value: formatFrenchDate(start)},
         {label: "Fin", value: formatFrenchDate(end)},
-        {label: "Droits de diffusion", value: "Autorisés pendant l’essai"},
+        {label: "Service temps réel", value: "Activé pendant l’essai"},
         {heading: "Structure concernée"},
         {label: "Organisation", value: organisationDisplay(data)},
       ],
@@ -910,7 +910,7 @@ async function sendTrialApproval(requestId) {
   et prendra fin le
   <strong>${escapeHtml(formatFrenchDate(end))}</strong>.
   <br><br>
-  <strong>Vos droits de diffusion SPHOT ADMIN sont désormais activés.</strong>
+  <strong>Les fonctions temps réel des SPHOTS surveillés inclus dans votre essai sont désormais activées.</strong>
 </div>
 
 <div style="
@@ -1189,9 +1189,12 @@ async function expireTrial(subscriptionDoc, now) {
       <p>${escapeHtml(buildGreeting(requestData))}</p>
       <p>Votre <strong>période d’essai gratuite SPHOT ADMIN</strong> est arrivée
       à son terme le <strong>${escapeHtml(formatFrenchDate(end))}</strong>.</p>
-      <p><strong>Vos droits de diffusion sont désormais suspendus.</strong>
-      Votre configuration, vos SPHOTS, vos périodes et vos sauveteurs restent enregistrés.</p>
-      <p>Vous pouvez poursuivre la diffusion avec l’abonnement annuel SPHOT ADMIN
+      <p><strong>Les fonctions opérationnelles en temps réel sont désormais désactivées.</strong>
+      Vos SPHOTS restent visibles sur la carte SPHOT. Pour les SPHOTS surveillés,
+      l’application affiche « Informations en temps réel indisponibles » tant
+      qu’aucun abonnement actif ne couvre le poste concerné.</p>
+      <p>Votre configuration, vos périodes et vos sauveteurs restent enregistrés.</p>
+      <p>Vous pouvez réactiver les fonctions temps réel avec l’abonnement annuel SPHOT ADMIN
       au tarif de <strong>${currency(price)} HT par an et par poste de secours</strong>.</p>
       <p>Montant prévisionnel actuel : <strong>${currency(annual)} HT / an</strong>
       pour ${stations} poste(s) de secours.</p>
@@ -1304,7 +1307,10 @@ async function expireAnnualSubscription(subscriptionDoc) {
     const html = `
       <p>${escapeHtml(buildGreeting(requestData))}</p>
       <p>Votre abonnement annuel SPHOT ADMIN est arrivé à échéance.</p>
-      <p><strong>Vos droits de diffusion sont suspendus dans l’attente du renouvellement.</strong></p>
+      <p><strong>Les fonctions opérationnelles en temps réel sont suspendues dans l’attente du renouvellement.</strong></p>
+      <p>Vos SPHOTS restent visibles sur la carte SPHOT. Pour les SPHOTS surveillés,
+      l’application affiche « Informations en temps réel indisponibles » tant que
+      le poste concerné n’est pas couvert par un abonnement actif.</p>
       <p>Vos données et votre configuration restent conservées dans votre espace.</p>
       <p><a href="${SPHOT_LOGIN_URL}">RENOUVELER MON ABONNEMENT</a></p>
       <p>Cordialement,<br>L’équipe SPHOT</p>`;
