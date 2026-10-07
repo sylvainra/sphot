@@ -92,7 +92,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   bool _saved = false;
   bool _isSaving = false;
   bool _certifyRepresentative = false;
-  bool _acceptTerms = false;
+  bool _adminResponsibilityAccepted = false;
   bool _showLegalDetails = false;
   bool _legalReadConfirmed = false;
   bool _privacyReadConfirmed = false;
@@ -298,6 +298,10 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         trialRequest['acceptedDocuments'] ?? {},
       );
 
+      final legalAcceptance = Map<String, dynamic>.from(
+        data['legalAcceptance'] ?? {},
+      );
+
       final administrativeTracking = Map<String, dynamic>.from(
         data['administrativeTracking'] ?? {},
       );
@@ -387,7 +391,9 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       _rgpdAccepted =
           trialRequest['rgpdAccepted'] == true ||
           acceptedDocuments['rgpd'] == true;
-      _acceptTerms = true;
+      _adminResponsibilityAccepted =
+          legalAcceptance['adminResponsibilityDeclaration'] == true ||
+          trialRequest['adminResponsibilityAccepted'] == true;
 
       _institutionalContacts
         ..clear()
@@ -532,6 +538,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     // Première demande d'accès.
     return _canOpenTrialRequest &&
         _certifyRepresentative &&
+        _adminResponsibilityAccepted &&
         _legalReadConfirmed &&
         _privacyReadConfirmed &&
         _rgpdAccepted;
@@ -1140,7 +1147,12 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         _privacyDoc = privacy;
         _rgpdDoc = rgpd;
 
-        _sphotVersion = (metadataData['version'] ?? '1.0').toString();
+        _sphotVersion = (
+          metadataData['legalVersion'] ??
+          metadataData['version'] ??
+          metadataData['activeVersion'] ??
+          '1.0'
+        ).toString();
         _sphotPublishedAt = metadataData['publishedAt'];
         _sphotChangeLog = (metadataData['changeLog'] ?? '').toString();
 
@@ -1165,6 +1177,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
     try {
       final territoryId = _territoryId();
+      final legalVersionId = _sphotVersion.trim().replaceAll('.', '_');
       final user = FirebaseAuth.instance.currentUser;
 
       final adminRequestsCollection = FirebaseFirestore.instance.collection(
@@ -1272,6 +1285,9 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
           'trialRequest.certifyRepresentative': _certifyRepresentative,
 
+          'trialRequest.adminResponsibilityAccepted':
+              _adminResponsibilityAccepted,
+
           'trialRequest.legalReadConfirmed': _legalReadConfirmed,
 
           'trialRequest.privacyReadConfirmed': _privacyReadConfirmed,
@@ -1369,6 +1385,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           'trialRequest': {
             'trialDurationDays': 8,
             'certifyRepresentative': _certifyRepresentative,
+            'adminResponsibilityAccepted': _adminResponsibilityAccepted,
             'legalReadConfirmed': _legalReadConfirmed,
             'privacyReadConfirmed': _privacyReadConfirmed,
             'rgpdAccepted': _rgpdAccepted,
@@ -1381,6 +1398,24 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
               'rgpd': true,
             },
             'commercialLabel': 'Demande d’accès SPHOT ADMIN',
+          },
+
+          'legalAcceptance': {
+            'accepted': true,
+            'version': _sphotVersion,
+            'legalVersion': _sphotVersion,
+            'legalVersionId': legalVersionId,
+            'legalPackPath': 'legalPacks/versions/items/$legalVersionId',
+            'publishedAt': _sphotPublishedAt,
+            'acceptedAt': FieldValue.serverTimestamp(),
+            'representativeDeclaration': _certifyRepresentative,
+            'adminResponsibilityDeclaration':
+                _adminResponsibilityAccepted,
+            'documents': {
+              'cgu': _legalReadConfirmed,
+              'privacy': _privacyReadConfirmed,
+              'rgpd': _rgpdAccepted,
+            },
           },
 
           'subscriptionPreview': {
@@ -3391,12 +3426,15 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             border: Border.all(color: adminColor.withOpacity(0.35), width: 1.3),
           ),
           child: const Text(
-            'Votre demande sera transmise à l’équipe SPHOT pour vérification '
-            'et validation.\n\n'
+            'Votre demande sera transmise à l’équipe SPHOT pour instruction '
+            'administrative.\n\n'
+            'SPHOT ne valide, ne certifie et n’homologue ni l’existence '
+            'd’un lieu, ni son caractère surveillé, ni l’exactitude des '
+            'informations que vous déclarez.\n\n'
             'Cette démarche ne déclenche ni période d’essai ni facturation.\n\n'
-            'Après validation, vous pourrez accéder à votre SPHOT ADMIN, '
-            'finaliser sa configuration puis demander votre période d’essai '
-            'gratuite de 8 jours.',
+            'Après autorisation de votre accès, vous pourrez accéder à votre '
+            'SPHOT ADMIN, finaliser sa configuration puis demander la période '
+            'd’essai de 8 jours réservée aux SPHOTS surveillés.',
             style: TextStyle(
               color: adminColor,
               fontSize: 14,
@@ -3426,6 +3464,22 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           onChanged: (value) {
             setState(() {
               _certifyRepresentative = value ?? false;
+              _saved = false;
+            });
+          },
+        ),
+
+        _checkLine(
+          value: _adminResponsibilityAccepted,
+          text:
+              'Je reconnais que les informations renseignées dans SPHOT sont '
+              'fournies sous la responsabilité de mon organisme, qui doit en '
+              'assurer l’exactitude et la mise à jour. Je comprends que SPHOT '
+              'ne valide ni ne certifie leur véracité ni le caractère '
+              'surveillé d’un SPHOT.',
+          onChanged: (value) {
+            setState(() {
+              _adminResponsibilityAccepted = value ?? false;
               _saved = false;
             });
           },
