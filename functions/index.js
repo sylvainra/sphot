@@ -50,7 +50,7 @@ function buildPublicSpot(
     territoireId,
     spotId,
     spot,
-    realtimeAvailable = true,
+    realtimeStatus = "available",
 ) {
   const publicFields = [
     "idSphot",
@@ -120,12 +120,16 @@ function buildPublicSpot(
   const supervised = isSupervisedSpotData(spot);
 
   if (supervised) {
-    result.realtimeAvailable = realtimeAvailable === true;
-    result.realtimeStatus = realtimeAvailable === true ?
-      "available" :
-      "unavailable";
+    const normalizedRealtimeStatus = [
+      "available",
+      "awaiting_update",
+      "unavailable",
+    ].includes(realtimeStatus) ? realtimeStatus : "unavailable";
 
-    if (!realtimeAvailable) {
+    result.realtimeAvailable = normalizedRealtimeStatus !== "unavailable";
+    result.realtimeStatus = normalizedRealtimeStatus;
+
+    if (normalizedRealtimeStatus !== "available") {
       [
         "liveFlag",
         "statutBaignade",
@@ -154,10 +158,11 @@ function buildPublicSpot(
  *
  * @return {Object} Mise à jour Firestore à fusionner.
  */
-function buildUnavailablePublicLiveState() {
+function buildSuppressedPublicLiveState(realtimeStatus) {
+  const awaitingUpdate = realtimeStatus === "awaiting_update";
   const result = {
-    realtimeAvailable: false,
-    realtimeStatus: "unavailable",
+    realtimeAvailable: awaitingUpdate,
+    realtimeStatus: awaitingUpdate ? "awaiting_update" : "unavailable",
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
@@ -177,6 +182,14 @@ function buildUnavailablePublicLiveState() {
   });
 
   return result;
+}
+
+function buildUnavailablePublicLiveState() {
+  return buildSuppressedPublicLiveState("unavailable");
+}
+
+function buildAwaitingPublicLiveState() {
+  return buildSuppressedPublicLiveState("awaiting_update");
 }
 
 /**
@@ -352,7 +365,13 @@ async function reconcilePublicTerritory(territoireId, publish) {
   const db = admin.firestore();
   const realtimeScope = publish ?
     await territoryRealtimeScope(db, territoireId) :
-    {granted: false, allSpots: false, spotIds: new Set()};
+    {
+      granted: false,
+      allSpots: false,
+      allSpotsSince: null,
+      spotIds: new Set(),
+      spotSince: new Map(),
+    };
   const territoryReference = db.collection("territoires").doc(territoireId);
   const publicSnapshot = await db
       .collection("publicSpots")
@@ -488,10 +507,21 @@ async function reconcilePublicTerritory(territoireId, publish) {
     spotSnapshot.docs.forEach((document) => {
       const reference = db.collection("publicSpots")
           .doc(`${territoireId}__${document.id}`);
+      const realtimeGranted =
+        realtimeScopeGrantsSpot(realtimeScope, document.id);
+      const enabledSince =
+        realtimeScopeEnabledSince(realtimeScope, document.id);
+      const historicalSpot = historicalSpots.get(document.id) || null;
+      const liveStateFresh = realtimeGranted &&
+        historicalLiveStateIsFresh(historicalSpot, enabledSince);
+      const realtimeStatus = !realtimeGranted ?
+        "unavailable" :
+        liveStateFresh ? "available" : "awaiting_update";
+
       const mergedSpot = mergePublicTerritoryData(
           mergePublicSpotData(
               document.data(),
-              historicalSpots.get(document.id) || null,
+              liveStateFresh ? historicalSpot : null,
           ),
           territoryData,
       );
@@ -503,7 +533,7 @@ async function reconcilePublicTerritory(territoireId, publish) {
             territoireId,
             document.id,
             mergedSpot,
-            realtimeScopeGrantsSpot(realtimeScope, document.id),
+            realtimeStatus,
         ),
       });
     });
@@ -692,15 +722,25 @@ async function territoryRealtimeScope(db, territoireId) {
   const emptyScope = {
     granted: false,
     allSpots: false,
+    allSpotsSince: null,
     spotIds: new Set(),
+    spotSince: new Map(),
   };
 
   if (!territoireId) return emptyScope;
 
   const adminDocuments = await territoryAdminDocuments(db, territoireId);
   const spotIds = new Set();
+  const spotSince = new Map();
   let granted = false;
   let allSpots = false;
+  let allSpotsSince = null;
+
+  const keepEarliestDate = (current, candidate) => {
+    if (!candidate) return current;
+    if (!current) return candidate;
+    return candidate.getTime() < current.getTime() ? candidate : current;
+  };
 
   for (const document of adminDocuments) {
     const data = document.data() || {};
@@ -729,16 +769,33 @@ async function territoryRealtimeScope(db, territoireId) {
 
       if (trialStatuses.has(status)) {
         allSpots = true;
+        const trialSince =
+          firestoreDate(subscription.trialStartDate) ||
+          firestoreDate(subscription.trialActivatedAt);
+        allSpotsSince = keepEarliestDate(allSpotsSince, trialSince);
         continue;
       }
 
       const selectedIds = subscriptionRealtimeSpotIds(subscription);
+      const subscriptionSince =
+        firestoreDate(subscription.subscriptionStartDate) ||
+        firestoreDate(subscription.subscriptionActivatedAt);
       if (selectedIds.size === 0) {
         // Compatibilité avec les abonnements historiques créés avant la
         // sélection poste par poste.
         allSpots = true;
+        allSpotsSince = keepEarliestDate(
+            allSpotsSince,
+            subscriptionSince,
+        );
       } else {
-        selectedIds.forEach((id) => spotIds.add(id));
+        selectedIds.forEach((id) => {
+          spotIds.add(id);
+          spotSince.set(
+              id,
+              keepEarliestDate(spotSince.get(id) || null, subscriptionSince),
+          );
+        });
       }
 
       continue;
@@ -748,10 +805,19 @@ async function territoryRealtimeScope(db, territoireId) {
     if (data.diffusionAccessGranted === true) {
       granted = true;
       allSpots = true;
+      // Ancien modèle sans date d'activation fiable : pas de filtre de
+      // fraîcheur afin de préserver les installations déjà en production.
+      allSpotsSince = null;
     }
   }
 
-  return {granted, allSpots, spotIds};
+  return {
+    granted,
+    allSpots,
+    allSpotsSince,
+    spotIds,
+    spotSince,
+  };
 }
 
 function realtimeScopeGrantsSpot(scope, spotId) {
@@ -760,6 +826,27 @@ function realtimeScopeGrantsSpot(scope, spotId) {
 
   const id = (spotId || "").toString().trim();
   return Boolean(id && scope.spotIds instanceof Set && scope.spotIds.has(id));
+}
+
+function realtimeScopeEnabledSince(scope, spotId) {
+  if (!realtimeScopeGrantsSpot(scope, spotId)) return null;
+  if (scope.allSpots === true) return scope.allSpotsSince || null;
+
+  const id = (spotId || "").toString().trim();
+  return scope.spotSince instanceof Map ?
+    scope.spotSince.get(id) || null :
+    null;
+}
+
+function historicalLiveStateIsFresh(historical, enabledSince) {
+  if (!historical) return false;
+  if (!enabledSince) return true;
+
+  const updatedAt = firestoreDate(historical.updatedAt);
+  return Boolean(
+      updatedAt &&
+      updatedAt.getTime() >= enabledSince.getTime(),
+  );
 }
 
 /**
