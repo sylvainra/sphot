@@ -639,10 +639,12 @@ async function territoryAdminDocuments(db, territoireId) {
 }
 
 /**
- * Vérifie qu'un territoire possède actuellement des droits de diffusion.
+ * Vérifie qu'un territoire possède actuellement des droits de diffusion
+ * opérationnelle en temps réel.
  *
- * Le booléen admins.diffusionAccessGranted reste prioritaire. En sécurité,
- * une période d'essai active ou un abonnement actif ouvre aussi les droits.
+ * Lorsqu'un document subscriptions existe, son statut et ses dates font
+ * autorité. Le booléen admins.diffusionAccessGranted n'est conservé que
+ * comme compatibilité pour les anciens comptes sans abonnement enregistré.
  *
  * @param {FirebaseFirestore.Firestore} db Instance Firestore.
  * @param {string} territoireId Identifiant du territoire.
