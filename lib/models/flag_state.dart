@@ -38,6 +38,7 @@ class SpotFlagState {
   final dynamic meteoMarine;
   final dynamic ephemeride;
   final dynamic notificationPublique;
+  final bool realtimeAvailable;
   final dynamic updatedAt;
 
   SpotFlagState({
@@ -76,6 +77,7 @@ class SpotFlagState {
     this.meteoMarine,
     this.ephemeride,
     this.notificationPublique,
+    this.realtimeAvailable = true,
     this.updatedAt,
   });
 
@@ -130,6 +132,9 @@ class SpotFlagState {
     meteoMarine: data['meteoMarine'],
     ephemeride: data['ephemeride'],
     notificationPublique: data['notificationPublique'],
+    realtimeAvailable: data['realtimeAvailable'] is bool
+        ? data['realtimeAvailable'] as bool
+        : true,
     updatedAt: data['updatedAt'],
   );
 }
@@ -321,6 +326,7 @@ class SpotFlagState {
 
   bool get isMissingFlagColorDuringSurveillance {
     return isPosteSecours &&
+        realtimeAvailable &&
         _isCurrentlyInSurveillanceWindow() &&
         flagPosition != FlagPosition.affale &&
         flagColor == FlagColor.none;
@@ -328,6 +334,7 @@ class SpotFlagState {
 
   bool get hasValidFlag {
     return isPosteSecours &&
+        realtimeAvailable &&
         _isCurrentlyInSurveillanceWindow() &&
         flagColor != FlagColor.none &&
         flagPosition == FlagPosition.hisse;
@@ -342,7 +349,9 @@ class SpotFlagState {
       parts.add('📞 $phone');
     }
 
-    if (heureDebut.trim().isNotEmpty && heureFin.trim().isNotEmpty) {
+    if (realtimeAvailable &&
+        heureDebut.trim().isNotEmpty &&
+        heureFin.trim().isNotEmpty) {
       parts.add('🕘 $heureDebut - $heureFin');
     }
 
@@ -350,6 +359,10 @@ class SpotFlagState {
   }
 
   String get displayStatut {
+    if (isPosteSecours && !realtimeAvailable) {
+      return 'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES';
+    }
+
     if (!isPosteSecours || !_isCurrentlyInSurveillanceWindow()) {
       return '⚠️ BAIGNADE NON SURVEILLÉE ⚠️ BAIGNADE À VOS RISQUES ET PÉRILS';
     }
@@ -378,6 +391,7 @@ class SpotFlagState {
 
   int get statutColor {
     if (!isPosteSecours) return 0xFFFF0000;
+    if (!realtimeAvailable) return 0xFF64748B;
     if (!_isCurrentlyInSurveillanceWindow()) return 0xFFFF0000;
     if (flagPosition == FlagPosition.affale) return 0xFFFF0000;
     if (flagColor == FlagColor.none) return 0xFFFF0000;
