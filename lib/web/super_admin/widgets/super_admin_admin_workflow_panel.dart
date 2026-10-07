@@ -315,8 +315,6 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
         'trialStartDate': Timestamp.fromDate(start),
         'trialEndDate': Timestamp.fromDate(end),
         'numberOfRescueStations': numberOfStations,
-        if (trialRescueStationIds.isNotEmpty)
-          'trialRescueStationIds': trialRescueStationIds,
         'pricePerStationExclTax': subscription['pricePerStationExclTax'] ??
             _pricePerStationExclTax,
         'billingCycle': 'annual',
