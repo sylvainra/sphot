@@ -39,6 +39,7 @@ class SpotFlagState {
   final dynamic ephemeride;
   final dynamic notificationPublique;
   final bool realtimeAvailable;
+  final String realtimeStatus;
   final dynamic updatedAt;
 
   SpotFlagState({
@@ -78,6 +79,7 @@ class SpotFlagState {
     this.ephemeride,
     this.notificationPublique,
     this.realtimeAvailable = true,
+    this.realtimeStatus = 'available',
     this.updatedAt,
   });
 
@@ -135,6 +137,9 @@ class SpotFlagState {
     realtimeAvailable: data['realtimeAvailable'] is bool
         ? data['realtimeAvailable'] as bool
         : true,
+    realtimeStatus: _readString(data['realtimeStatus']).isNotEmpty
+        ? _readString(data['realtimeStatus']).toLowerCase()
+        : (data['realtimeAvailable'] == false ? 'unavailable' : 'available'),
     updatedAt: data['updatedAt'],
   );
 }
@@ -324,9 +329,13 @@ class SpotFlagState {
     }
   }
 
+  bool get isRealtimeAwaitingUpdate =>
+      realtimeStatus.toLowerCase() == 'awaiting_update';
+
   bool get isMissingFlagColorDuringSurveillance {
     return isPosteSecours &&
         realtimeAvailable &&
+        !isRealtimeAwaitingUpdate &&
         _isCurrentlyInSurveillanceWindow() &&
         flagPosition != FlagPosition.affale &&
         flagColor == FlagColor.none;
@@ -359,6 +368,10 @@ class SpotFlagState {
   }
 
   String get displayStatut {
+    if (isPosteSecours && isRealtimeAwaitingUpdate) {
+      return 'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR';
+    }
+
     if (isPosteSecours && !realtimeAvailable) {
       return 'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES';
     }
@@ -391,7 +404,7 @@ class SpotFlagState {
 
   int get statutColor {
     if (!isPosteSecours) return 0xFFFF0000;
-    if (!realtimeAvailable) return 0xFF64748B;
+    if (!realtimeAvailable || isRealtimeAwaitingUpdate) return 0xFF64748B;
     if (!_isCurrentlyInSurveillanceWindow()) return 0xFFFF0000;
     if (flagPosition == FlagPosition.affale) return 0xFFFF0000;
     if (flagColor == FlagColor.none) return 0xFFFF0000;
