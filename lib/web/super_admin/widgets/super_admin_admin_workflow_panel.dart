@@ -962,6 +962,10 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                           'Durée',
                           '${trialRequest['trialDurationDays'] ?? 8} jours',
                         ),
+                        _line(
+                          'Postes surveillés concernés',
+                          '${trialRequest['numberOfRescueStations'] ?? 0}',
+                        ),
                         _statusLine(
                           'Statut',
                           trialStatus,
@@ -991,8 +995,8 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                           'Temps réel',
                           trialStatus.toLowerCase() == 'approved' ||
                                   _text(subscription['status']) == 'trial'
-                              ? 'Autorisée'
-                              : 'Non autorisée',
+                              ? 'Autorisé'
+                              : 'Non autorisé',
                         ),
                         if (registrationStatus.toLowerCase() == 'approved' &&
                             trialStatus.toLowerCase() == 'pending') ...[
