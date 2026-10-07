@@ -8522,13 +8522,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         'arretesMunicipaux': territoryData['arretesMunicipaux'] ?? '',
         'territoireId': territoireId,
         'source': 'admin',
-        'sphotValide': true,
-        'dateValidation': FieldValue.serverTimestamp(),
+        'publicationStatus': 'published',
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
       if (!wasEditing) {
         data['createdAt'] = FieldValue.serverTimestamp();
+        data['publishedAt'] = FieldValue.serverTimestamp();
       }
 
       await targetDocument.set(data, SetOptions(merge: true));
