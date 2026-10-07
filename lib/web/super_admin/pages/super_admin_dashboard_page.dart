@@ -5885,7 +5885,24 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       const migrationSummary =
           'Harmonisation terminologique SPHOT ADMIN / SPHOT PUBLICITAIRE.';
 
-      final versionRef = firestore.collection('legalVersions').doc('1_0');
+      final metadataSnapshot = await firestore
+          .collection('legalDocuments')
+          .doc('metadata')
+          .get();
+      final metadataData =
+          metadataSnapshot.data() ?? const <String, dynamic>{};
+      final currentVersion =
+          (metadataData['version'] ?? metadataData['legalVersion'] ?? '')
+              .toString()
+              .trim();
+      final hasChanges = changedCount > 0;
+      final version = currentVersion.isEmpty
+          ? '1.0'
+          : hasChanges
+              ? _nextLegalVersion(currentVersion)
+              : currentVersion;
+      final versionId = version.replaceAll('.', '_');
+      final versionRef = firestore.collection('legalVersions').doc(versionId);
       final versionDoc = await versionRef.get();
       final versionData = versionDoc.data() ?? <String, dynamic>{};
       final previousSummary =
@@ -5896,8 +5913,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           : previousSummary.isEmpty
               ? migrationSummary
               : '$previousSummary • $migrationSummary';
-
-      final hasChanges = changedCount > 0;
 
       final documentsModified = hasChanges
           ? changedChapters.entries
@@ -5915,7 +5930,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             );
 
       await firestore.collection('legalDocuments').doc('metadata').set({
-        'version': '1.0',
+        'version': version,
         'summary': summary,
         'documentsModified': documentsModified,
         'chaptersModified': chaptersModified,
@@ -5924,8 +5939,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       }, SetOptions(merge: true));
 
       await versionRef.set({
-        'version': '1.0',
-        'versionId': '1_0',
+        'version': version,
+        'versionId': versionId,
         'summary': summary,
         'documentsModified': documentsModified,
         'chaptersModified': chaptersModified,
@@ -5941,15 +5956,17 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
       if (!mounted) return;
 
-      _legalVersionController.text = '1.0';
+      _legalVersionController.text = version;
       await _loadAllLegalChaptersFromFirebase();
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Terminologie SPHOT ADMIN / SPHOT PUBLICITAIRE appliquée. Version maintenue à 1.0.',
+            hasChanges
+                ? 'Terminologie appliquée. Nouvelle version juridique $version.'
+                : 'Aucune modification terminologique à versionner.',
           ),
         ),
       );
