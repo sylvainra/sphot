@@ -5150,6 +5150,22 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       summary['monitoredSpots'] ?? const [],
     );
 
+    final trialRescueStationIds = monitoredSpots
+        .map((entry) => Map<String, dynamic>.from(entry['spot'] ?? const {}))
+        .map((spot) => _cleanText(spot['_docId']))
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList();
+
+    final trialRescueStations = monitoredSpots.map((entry) {
+      final spot = Map<String, dynamic>.from(entry['spot'] ?? const {});
+      return <String, dynamic>{
+        'spotDocumentId': _cleanText(spot['_docId']),
+        'idSphot': _cleanText(spot['idSphot']),
+        'name': _spotName(spot),
+      };
+    }).where((spot) => _cleanText(spot['spotDocumentId']).isNotEmpty).toList();
+
     final firestore = FirebaseFirestore.instance;
     final requestReference = firestore.collection('adminRequests').doc(uid);
 
@@ -5186,7 +5202,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             'trialDurationDays': 8,
             'scope': 'supervised_spots_only',
             'territoireId': summary['territoireId'],
-            'numberOfRescueStations': monitoredSpots.length,
+            'numberOfRescueStations': trialRescueStationIds.length,
+            'rescueStationIds': trialRescueStationIds,
+            'rescueStations': trialRescueStations,
             'numberOfSurveillancePeriods': summary['periodCount'] ?? 0,
             'numberOfLifeguards': summary['sauveteurCount'] ?? 0,
             'requestedAt': FieldValue.serverTimestamp(),
