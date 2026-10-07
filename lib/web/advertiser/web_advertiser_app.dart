@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../shared/web_colors.dart';
 import 'pages/advertiser_dashboard_page.dart';
+import 'widgets/advertiser_legal_acceptance_section.dart';
 
 const bool _advertiserDevBypassEnabled = bool.fromEnvironment(
   'SPHOT_ADVERTISER_DEV_BYPASS',
@@ -54,6 +55,7 @@ class WebAdvertiserAccessPage extends StatefulWidget {
 class _WebAdvertiserAccessPageState extends State<WebAdvertiserAccessPage> {
   bool _starting = false;
   bool _opened = false;
+  bool _legalGate = false;
   bool _modificationRequested = false;
   String? _requestId;
   User? _user;
@@ -141,7 +143,8 @@ class _WebAdvertiserAccessPageState extends State<WebAdvertiserAccessPage> {
       }
       if (!mounted) return;
       setState(() {
-        _opened = true;
+        _opened = _isCorrection;
+        _legalGate = !_isCorrection;
         _starting = false;
       });
     } on FirebaseAuthException catch (error) {
@@ -163,6 +166,33 @@ class _WebAdvertiserAccessPageState extends State<WebAdvertiserAccessPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_legalGate && !_opened) {
+      return SphotAccessPage(
+        title: 'RÈGLES SPHOT PUBLICITAIRE',
+        onBack: () async {
+          await FirebaseAuth.instance.signOut();
+          if (!mounted) return;
+          setState(() {
+            _legalGate = false;
+            _requestId = null;
+            _user = null;
+          });
+        },
+        child: AdvertiserLegalAcceptanceSection(
+          requestId: _requestId,
+          requestStatus: 'draft',
+          preApplication: true,
+          onSubmitted: () {
+            if (!mounted) return;
+            setState(() {
+              _legalGate = false;
+              _opened = true;
+            });
+          },
+        ),
+      );
+    }
+
     if (_opened) {
       return AdvertiserDashboardPage(
         user: _user,
@@ -171,7 +201,12 @@ class _WebAdvertiserAccessPageState extends State<WebAdvertiserAccessPage> {
         developmentBypass: _advertiserDevBypassEnabled && !_isCorrection,
         onSignOut: () async {
           await FirebaseAuth.instance.signOut();
-          if (mounted) setState(() => _opened = false);
+          if (mounted) {
+            setState(() {
+              _opened = false;
+              _legalGate = false;
+            });
+          }
         },
       );
     }
