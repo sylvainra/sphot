@@ -5167,6 +5167,33 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             _modifiedChaptersBlock('CGU'),
 
             CheckboxListTile(
+              value: _modifiedDocuments.contains('CGV'),
+              onChanged: (value) {
+                setState(() {
+                  if (value == true) {
+                    _modifiedDocuments.add('CGV');
+                  } else {
+                    _modifiedDocuments.remove('CGV');
+                    _modifiedChapters['CGV']?.clear();
+                  }
+                });
+              },
+              title: const Text(
+                'CGV',
+                style: TextStyle(
+                  color: adminColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
+              activeColor: adminColor,
+              checkColor: Colors.white,
+              side: const BorderSide(color: adminColor, width: 1.6),
+            ),
+
+            _modifiedChaptersBlock('CGV'),
+
+            CheckboxListTile(
               value: _modifiedDocuments.contains(
                 'Politique de confidentialité',
               ),
@@ -5658,6 +5685,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
       const legalDocuments = <String, String>{
         'CGU': 'cgu',
+        'CGV': 'cgv',
         'Politique de confidentialité': 'privacyPolicy',
         'RGPD': 'rgpdNotice',
       };
@@ -5746,6 +5774,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         documentId: 'cgu',
       );
 
+      final cgvSnapshot = await loadDocumentSnapshot(
+        label: 'CGV',
+        documentId: 'cgv',
+      );
+
       final privacySnapshot = await loadDocumentSnapshot(
         label: 'Politique de confidentialité',
         documentId: 'privacyPolicy',
@@ -5811,6 +5844,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         'chaptersModified': chaptersModified,
         'documents': {
           'cgu': cguSnapshot,
+          'cgv': cgvSnapshot,
           'privacyPolicy': privacySnapshot,
           'rgpdNotice': rgpdSnapshot,
         },
@@ -5920,6 +5954,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         documentId: 'cgu',
       );
 
+      final cgvSnapshot = await loadDocumentSnapshot(
+        label: 'CGV',
+        documentId: 'cgv',
+      );
+
       final privacySnapshot = await loadDocumentSnapshot(
         label: 'Politique de confidentialité',
         documentId: 'privacyPolicy',
@@ -5947,6 +5986,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         'chaptersModified': chaptersModified,
         'documents': {
           'cgu': cguSnapshot,
+          'cgv': cgvSnapshot,
           'privacyPolicy': privacySnapshot,
           'rgpdNotice': rgpdSnapshot,
         },
@@ -5981,6 +6021,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
         _modifiedDocuments.clear();
         _modifiedChapters['CGU'] = <String>{};
+        _modifiedChapters['CGV'] = <String>{};
         _modifiedChapters['Politique de confidentialité'] = <String>{};
         _modifiedChapters['RGPD'] = <String>{};
 
