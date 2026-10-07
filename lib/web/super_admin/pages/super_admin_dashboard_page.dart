@@ -77,6 +77,99 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   static const Color redColor = Color(0xFFDC2626);
 
+  static const List<Map<String, String>> _defaultCgvChapters = [
+    {
+      'title': 'Objet et champ d’application',
+      'content':
+          "Les présentes Conditions Générales de Vente s’appliquent aux prestations SPHOT PUBLICITAIRE souscrites par des professionnels. Elles encadrent la commande, la diffusion et la facturation des campagnes publicitaires proposées dans l’écosystème SPHOT. Toute condition particulière figurant sur un devis, un bon de commande ou une offre acceptée prévaut sur les présentes CGV en cas de contradiction.",
+    },
+    {
+      'title': 'Description des prestations',
+      'content':
+          "SPHOT PUBLICITAIRE permet à un annonceur de souscrire une visibilité sur les supports et emplacements proposés par SPHOT, notamment sur la carte, sur une fiche SPHOT Premium ou dans un pack de visibilité. Le périmètre géographique, la durée, les supports, les options et le prix applicables sont ceux récapitulés au moment de la commande.",
+    },
+    {
+      'title': 'Formation de la commande',
+      'content':
+          "La commande devient ferme lorsque l’annonceur valide le récapitulatif, le devis ou le bon de commande applicable et fournit les informations nécessaires à son traitement. SPHOT peut demander les éléments permettant de vérifier l’identité professionnelle de l’annonceur, ses coordonnées de facturation et son habilitation à engager l’entreprise.",
+    },
+    {
+      'title': 'Prix, taxes et évolution tarifaire',
+      'content':
+          "Les prix sont exprimés en euros hors taxes, sauf indication contraire. La TVA et toute taxe légalement applicable sont ajoutées selon les règles en vigueur. Le prix applicable est celui présenté et accepté lors de la commande. Les tarifs futurs peuvent être modifiés par SPHOT sans effet rétroactif sur une commande déjà acceptée.",
+    },
+    {
+      'title': 'Zone de diffusion et durée',
+      'content':
+          "La diffusion est réalisée selon la zone, le rayon, le périmètre national éventuel, les supports et la durée sélectionnés lors de la commande. La campagne commence et se termine aux dates prévues au dossier ou au bon de commande. Sauf mention expresse, aucune reconduction automatique n’est appliquée.",
+    },
+    {
+      'title': 'Contenus fournis par l’annonceur',
+      'content':
+          "L’annonceur garantit disposer de tous les droits, autorisations et licences nécessaires sur les textes, marques, logos, photographies, vidéos et autres contenus transmis. Il demeure seul responsable de leur exactitude, de leur licéité et de leur conformité aux règles de publicité, de propriété intellectuelle, de concurrence et de protection des consommateurs qui lui sont applicables.",
+    },
+    {
+      'title': 'Contrôle et refus d’un contenu',
+      'content':
+          "SPHOT peut refuser, demander la modification, suspendre ou retirer un contenu manifestement illicite, trompeur, portant atteinte aux droits d’un tiers, incompatible avec l’objet ou l’image du service, ou ne respectant pas les caractéristiques techniques demandées. Une telle mesure ne transfère pas à SPHOT la responsabilité éditoriale du contenu fourni par l’annonceur.",
+    },
+    {
+      'title': 'Diffusion, disponibilité et performances',
+      'content':
+          "SPHOT met en œuvre les moyens raisonnables pour diffuser la campagne conformément à la commande. Sauf engagement écrit spécifique, SPHOT ne garantit aucun volume minimal d’impressions, de clics, de fréquentation, de contacts ou de chiffre d’affaires. Des opérations de maintenance, incidents techniques ou contraintes de plateformes tierces peuvent affecter temporairement la diffusion.",
+    },
+    {
+      'title': 'Modification, report et annulation',
+      'content':
+          "Toute demande de modification, de report ou d’annulation doit être formulée par écrit. Ses conséquences financières sont celles prévues au devis ou au bon de commande. À défaut de disposition particulière, les prestations déjà exécutées, réservées ou engagées restent dues, sauf manquement imputable à SPHOT ou accord écrit contraire.",
+    },
+    {
+      'title': 'Facturation et paiement',
+      'content':
+          "La facturation est établie à partir des informations fournies par l’annonceur. Le délai, le moyen de paiement, les références de commande, d’engagement ou de service et les éventuelles modalités de facturation électronique sont ceux indiqués sur le devis, le bon de commande ou la facture. L’annonceur s’engage à fournir des informations de facturation exactes et à jour.",
+    },
+    {
+      'title': 'Retard ou défaut de paiement',
+      'content':
+          "En cas de retard de paiement entre professionnels, les pénalités et l’indemnité forfaitaire légale pour frais de recouvrement sont exigibles dans les conditions prévues par le Code de commerce et indiquées sur la facture. SPHOT peut en outre suspendre une campagne ou refuser une nouvelle commande tant que les sommes exigibles restent impayées.",
+    },
+    {
+      'title': 'Propriété intellectuelle et droit de diffusion',
+      'content':
+          "L’annonceur reste titulaire des droits sur ses contenus. Il accorde à SPHOT, pour la durée et le périmètre de la campagne, les droits strictement nécessaires à leur reproduction, adaptation technique, affichage et diffusion sur les supports concernés. Les marques, logiciels, interfaces et éléments propres à SPHOT restent la propriété de leurs titulaires.",
+    },
+    {
+      'title': 'Données personnelles',
+      'content':
+          "Les traitements de données personnelles liés à la création du dossier, à la gestion de la commande, à la facturation et aux échanges avec l’annonceur sont décrits dans la Politique de confidentialité et la notice RGPD SPHOT. Ces documents font partie du cadre contractuel applicable.",
+    },
+    {
+      'title': 'Responsabilité',
+      'content':
+          "Chaque partie répond des dommages directs résultant de ses manquements prouvés. SPHOT n’est pas responsable du contenu, des offres ou des produits de l’annonceur, ni des décisions prises par les utilisateurs à partir de ces contenus. Aucune stipulation des présentes CGV ne limite une responsabilité qui ne peut légalement être exclue ou limitée.",
+    },
+    {
+      'title': 'Force majeure et événements extérieurs',
+      'content':
+          "Aucune partie n’est responsable d’un retard ou d’une inexécution résultant d’un événement de force majeure au sens du droit français. Les parties se tiennent informées et recherchent, lorsque cela est possible, une solution de report, d’adaptation ou de reprise de la prestation.",
+    },
+    {
+      'title': 'Suspension et résiliation',
+      'content':
+          "En cas de manquement grave, d’utilisation illicite du service, d’atteinte aux droits d’un tiers, de risque de sécurité ou de défaut de paiement, SPHOT peut suspendre l’accès ou la diffusion après information de l’annonceur lorsque les circonstances le permettent. La résiliation et ses effets financiers sont appréciés au regard de la commande, des prestations déjà exécutées et du droit applicable.",
+    },
+    {
+      'title': 'Réclamations, droit applicable et litiges',
+      'content':
+          "Toute réclamation doit être adressée à SPHOT avec les éléments permettant d’identifier la commande concernée. Les parties recherchent prioritairement une solution amiable. Les présentes CGV sont soumises au droit français et tout litige relève des juridictions compétentes selon les règles légalement applicables.",
+    },
+    {
+      'title': 'Version applicable',
+      'content':
+          "La version des CGV opposable à une commande est celle acceptée et enregistrée lors de la démarche de l’annonceur. Les versions ultérieures sont sans effet rétroactif sur les commandes déjà formées, sauf accord des parties ou exigence légale contraire.",
+    },
+  ];
+
   static const String _rescueStationTypeAsset =
       'data/icons/flag_red_yellow_5x3.svg';
 
@@ -161,6 +254,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   bool _isSavingLegalChapter = false;
   bool _isLoadingLegalChapter = false;
   bool _isApplyingLegalTerminology = false;
+  bool _isInitializingCgv = false;
 
   int _visibleAdvertiserCount = 0;
 
@@ -4711,6 +4805,98 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     });
   }
 
+  Future<void> _initializeDefaultCgvChapters() async {
+    if (_isInitializingCgv) return;
+
+    setState(() => _isInitializingCgv = true);
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final existing = await firestore
+          .collection('legalDocuments')
+          .doc('cgv')
+          .collection('chapters')
+          .limit(1)
+          .get();
+
+      if (existing.docs.isNotEmpty) {
+        await _loadAllLegalChaptersFromFirebase();
+        return;
+      }
+
+      final batch = firestore.batch();
+      final chapterTitles = <String>[];
+
+      for (var index = 0; index < _defaultCgvChapters.length; index++) {
+        final chapter = _defaultCgvChapters[index];
+        final chapterId = (index + 1).toString().padLeft(2, '0');
+        final title = chapter['title'] ?? 'Article ${index + 1}';
+        final content = chapter['content'] ?? '';
+        chapterTitles.add(title);
+
+        final reference = firestore
+            .collection('legalDocuments')
+            .doc('cgv')
+            .collection('chapters')
+            .doc(chapterId);
+
+        batch.set(reference, {
+          'order': index + 1,
+          'title': title,
+          'content': content,
+          'isActive': true,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      batch.set(
+        firestore.collection('legalDocuments').doc('cgv'),
+        {
+          'title': 'Conditions Générales de Vente',
+          'scope': 'SPHOT PUBLICITAIRE',
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+
+      await batch.commit();
+      await _loadAllLegalChaptersFromFirebase();
+
+      if (!mounted) return;
+
+      setState(() {
+        _modifiedDocuments.add('CGV');
+        _modifiedChapters['CGV'] = chapterTitles.toSet();
+        _legalVersionSaved = false;
+        _legalVersionButtonRed = false;
+        if (_legalChangeLogController.text.trim().isEmpty) {
+          _legalChangeLogController.text =
+              'Ajout initial des Conditions Générales de Vente '
+              'SPHOT PUBLICITAIRE.';
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'CGV initialisées. Relisez ou modifiez les articles puis '
+            'enregistrez la nouvelle Version SPHOT.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Initialisation des CGV impossible : $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isInitializingCgv = false);
+      }
+    }
+  }
+
   Widget _buildLegalDocumentsPanel() {
     return Container(
       width: 420,
@@ -5570,15 +5756,43 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           ),
           children: [
             if (chapters.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8),
-                child: Text(
-                  'Aucun article enregistré.',
-                  style: TextStyle(
-                    color: adminColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Aucun article enregistré.',
+                      style: TextStyle(
+                        color: adminColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (title == 'CGV') ...[
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: _isInitializingCgv
+                            ? null
+                            : _initializeDefaultCgvChapters,
+                        icon: _isInitializingCgv
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.auto_fix_high_rounded),
+                        label: Text(
+                          _isInitializingCgv
+                              ? 'INITIALISATION…'
+                              : 'INITIALISER LES CGV SPHOT PUBLICITAIRE',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ...chapters.map((chapter) {
