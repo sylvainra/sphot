@@ -656,23 +656,25 @@ async function territoryDiffusionAccessGranted(db, territoireId) {
   for (const document of adminDocuments) {
     const data = document.data() || {};
 
-    /*
-     * Le Super Admin ouvre explicitement la diffusion au moment de la
-     * validation de l'essai. Ce booléen est donc l'autorité prioritaire,
-     * même pour les anciens documents admins dépourvus de accessStatus.
-     */
-    if (data.diffusionAccessGranted === true) {
-      return true;
-    }
-
     if (data.accessStatus !== "approved") continue;
 
     const subscriptionSnapshot = await db.collection("subscriptions")
         .doc(document.id)
         .get();
 
-    if (subscriptionSnapshot.exists &&
-        subscriptionGrantsDiffusion(subscriptionSnapshot.data() || {})) {
+    if (subscriptionSnapshot.exists) {
+      if (subscriptionGrantsDiffusion(subscriptionSnapshot.data() || {})) {
+        return true;
+      }
+
+      // Lorsqu'un abonnement existe, son état fait autorité : un ancien
+      // booléen diffusionAccessGranted ne doit jamais maintenir le temps réel
+      // après la fin de l'essai ou de l'abonnement.
+      continue;
+    }
+
+    // Compatibilité avec les anciens comptes sans document subscriptions.
+    if (data.diffusionAccessGranted === true) {
       return true;
     }
   }
