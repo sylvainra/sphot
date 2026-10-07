@@ -397,6 +397,7 @@ class SpotFlagState {
     }
 
     if (realtimeAvailable &&
+        !isRealtimeAwaitingUpdate &&
         heureDebut.trim().isNotEmpty &&
         heureFin.trim().isNotEmpty) {
       parts.add('🕘 $heureDebut - $heureFin');
