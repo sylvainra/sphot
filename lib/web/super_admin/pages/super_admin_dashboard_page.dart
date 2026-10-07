@@ -3288,6 +3288,24 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
     if (requestId.isEmpty) return;
 
+    final currentStatus = _cleanText(advertiser['status']).toLowerCase();
+    final legalAcceptance = _advertiserMap(advertiser['legalAcceptance']);
+    final legalDocuments = _advertiserMap(legalAcceptance['documents']);
+    final isInitialApproval =
+        decision == 'approved' && currentStatus != 'approved';
+
+    if (isInitialApproval && legalDocuments['cgv'] != true) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Approbation impossible : les CGV doivent avoir été acceptées par l’annonceur.',
+          ),
+        ),
+      );
+      return;
+    }
+
     String reason = '';
     if (decision != 'approved') {
       final result = await _askAdvertiserReviewReason(
