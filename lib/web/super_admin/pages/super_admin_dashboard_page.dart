@@ -2797,8 +2797,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
     final pays = _cleanText(spot['pays']);
 
-    final isValidated = spot['sphotValide'] == true;
-
     final isRescueStation = _normalizeType(
       _cleanText(spot['typeSphot']),
     ).contains('POSTE DE SECOURS');
@@ -2949,8 +2947,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _spotVerticalField(
-                      'Validation',
-                      isValidated ? 'Validé' : 'Non validé',
+                      'Information déclarée par',
+                      'L’organisme gestionnaire du SPHOT',
                     ),
                     _spotVerticalField(
                       'Admin',
