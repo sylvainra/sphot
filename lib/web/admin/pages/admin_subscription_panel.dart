@@ -550,13 +550,14 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   Widget _saveButton({
     required String section,
     required VoidCallback onPressed,
+    bool enabled = true,
   }) {
     final isSaving = _savingSection == section;
 
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _savingSection == null ? onPressed : null,
+        onPressed: enabled && _savingSection == null ? onPressed : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: _blue,
           foregroundColor: Colors.white,
@@ -681,6 +682,9 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
 
   Widget _offerForm(Map<String, dynamic> data) {
   _initializeOfferSelection(data);
+  final subscriptionStatus = _text(data['status']).toLowerCase();
+  final offerLocked =
+      subscriptionStatus == 'active' || subscriptionStatus == 'order_pending';
 
   return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
     stream: FirebaseFirestore.instance
@@ -834,15 +838,17 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        onChanged: (value) {
-                          setState(() {
-                            if (value == true) {
-                              _selectedRescueStationIds.add(document.id);
-                            } else {
-                              _selectedRescueStationIds.remove(document.id);
-                            }
-                          });
-                        },
+                        onChanged: offerLocked
+                            ? null
+                            : (value) {
+                                setState(() {
+                                  if (value == true) {
+                                    _selectedRescueStationIds.add(document.id);
+                                  } else {
+                                    _selectedRescueStationIds.remove(document.id);
+                                  }
+                                });
+                              },
                       ),
                     );
                   }),
@@ -925,9 +931,11 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'Abonnement annuel uniquement. La sélection prépare l’offre et le devis sans activer l’abonnement.',
-                  style: TextStyle(
+                Text(
+                  offerLocked
+                      ? 'La sélection des postes est figée pendant le traitement de la commande et durant l’abonnement actif.'
+                      : 'Abonnement annuel uniquement. La sélection prépare l’offre et le devis sans activer l’abonnement.',
+                  style: const TextStyle(
                     color: _grey,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -937,6 +945,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                 const SizedBox(height: 12),
                 _saveButton(
                   section: 'offer',
+                  enabled: !offerLocked,
                   onPressed: () {
                     _saveSection(
                       'offer',
