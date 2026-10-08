@@ -2015,7 +2015,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       padding: const EdgeInsets.only(top: 1, bottom: 8),
       child: SizedBox(
         width: double.infinity,
-        height: 52,
+        height: 64,
         child: ElevatedButton.icon(
           onPressed: canSend ? _saveRegistration : null,
           icon: _isSaving
