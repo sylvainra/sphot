@@ -2081,9 +2081,9 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     final stepNumber = section.index + 1;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 7),
+      padding: const EdgeInsets.only(bottom: 9),
       child: SizedBox(
-        height: 60,
+        height: 64,
         child: OutlinedButton(
           onPressed: isEnabled ? () => _selectSection(section) : null,
           style: OutlinedButton.styleFrom(
@@ -2102,8 +2102,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           child: Row(
             children: [
               SizedBox(
-                width: 42,
-                height: 48,
+                width: 44,
+                height: 50,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -2137,8 +2137,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                             ]),
                       child: AdaptiveAssetImage(
                         'data/icons/fire_red_icon.svg',
-                        width: 38,
-                        height: 48,
+                        width: 40,
+                        height: 50,
                         fit: BoxFit.contain,
                       ),
                     ),
