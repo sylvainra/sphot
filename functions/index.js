@@ -2295,7 +2295,7 @@ L'équipe SPHOT`,
   });
 }
 
-exports.generateAdminRequestAcknowledgement = onDocumentUpdated(
+exports.generateAdminRequestAcknowledgement = onDocumentWritten(
     {
       document: "adminRequests/{requestId}",
       region: "europe-west1",
@@ -2304,39 +2304,21 @@ exports.generateAdminRequestAcknowledgement = onDocumentUpdated(
       memory: "512MiB",
     },
     async (event) => {
-      const beforeSnapshot = event.data.before;
       const requestSnapshot = event.data.after;
 
-      if (!requestSnapshot) {
-        console.error("Document adminRequests introuvable.");
+      if (!requestSnapshot.exists) {
         return;
       }
 
-      const beforeData = beforeSnapshot.data() || {};
       const data = requestSnapshot.data() || {};
       const requestReference = requestSnapshot.ref;
       const requestId = event.params.requestId;
+      const requestStatus = cleanValue(data.status, "").toLowerCase();
 
-      const beforeStatus = cleanValue(beforeData.status, "").toLowerCase();
-      const afterStatus = cleanValue(data.status, "").toLowerCase();
-
-      // Le document est créé en brouillon lors de l'acceptation juridique.
-      // L'accusé de réception ne doit partir qu'au véritable envoi du dossier,
-      // lors du passage vers le statut pending.
-      if (afterStatus !== "pending" || beforeStatus === "pending") {
-        return;
-      }
-
-      const existingDocument = data.acknowledgementDocument || {};
-
-      if (
-        existingDocument.status === "generated" ||
-        existingDocument.status === "sent"
-      ) {
-        console.log(
-            "Accusé de réception déjà généré pour:",
-            requestId,
-        );
+      // Le dossier existe en brouillon dès l'acceptation juridique.
+      // Aucun accusé n'est généré tant que l'utilisateur n'a pas réellement
+      // envoyé sa demande.
+      if (requestStatus !== "pending") {
         return;
       }
 
@@ -2354,29 +2336,70 @@ exports.generateAdminRequestAcknowledgement = onDocumentUpdated(
       ).toLowerCase();
 
       if (!recipientEmail) {
-        await requestReference.set(
-            {
-              acknowledgementDocument: {
-                status: "failed",
-                error: "Adresse email du demandeur absente.",
-                updatedAt:
-                    admin.firestore.FieldValue.serverTimestamp(),
-              },
-              acknowledgementEmail: {
-                status: "failed",
-                error: "Adresse email du demandeur absente.",
-                updatedAt:
-                    admin.firestore.FieldValue.serverTimestamp(),
-              },
-            },
-            {merge: true},
-        );
-
         console.error(
-            "Adresse email absente pour la demande:",
+            "Adresse email absente pour la demande pending:",
             requestId,
         );
+        return;
+      }
 
+      // Réservation transactionnelle du traitement. Les écritures internes de
+      // cette Function retriggeront onDocumentWritten, mais seront ignorées
+      // grâce aux états generating/sending.
+      const claimed = await admin.firestore().runTransaction(
+          async (transaction) => {
+            const freshSnapshot = await transaction.get(requestReference);
+            if (!freshSnapshot.exists) return false;
+
+            const freshData = freshSnapshot.data() || {};
+            if (cleanValue(freshData.status, "").toLowerCase() !== "pending") {
+              return false;
+            }
+
+            const freshDocument = freshData.acknowledgementDocument || {};
+            const freshEmail = freshData.acknowledgementEmail || {};
+            const documentStatus =
+                cleanValue(freshDocument.status, "").toLowerCase();
+            const emailStatus =
+                cleanValue(freshEmail.status, "").toLowerCase();
+
+            if (
+              documentStatus === "generating" ||
+              documentStatus === "generated" ||
+              documentStatus === "sent" ||
+              emailStatus === "sending" ||
+              emailStatus === "sent"
+            ) {
+              return false;
+            }
+
+            transaction.set(
+                requestReference,
+                {
+                  acknowledgementDocument: {
+                    ...freshDocument,
+                    status: "generating",
+                    error: null,
+                    updatedAt:
+                        admin.firestore.FieldValue.serverTimestamp(),
+                  },
+                  acknowledgementEmail: {
+                    ...freshEmail,
+                    status: "sending",
+                    recipient: recipientEmail,
+                    error: null,
+                    updatedAt:
+                        admin.firestore.FieldValue.serverTimestamp(),
+                  },
+                },
+                {merge: true},
+            );
+
+            return true;
+          },
+      );
+
+      if (!claimed) {
         return;
       }
 
@@ -2410,20 +2433,20 @@ exports.generateAdminRequestAcknowledgement = onDocumentUpdated(
       await requestReference.set(
           {
             requestNumber: requestNumber,
-
             acknowledgementDocument: {
               status: "generating",
               documentType: "admin_request_acknowledgement",
               fileName: fileName,
               storagePath: storagePath,
               version: "1.0",
+              error: null,
               updatedAt:
                   admin.firestore.FieldValue.serverTimestamp(),
             },
-
             acknowledgementEmail: {
-              status: "pending",
+              status: "sending",
               recipient: recipientEmail,
+              error: null,
               updatedAt:
                   admin.firestore.FieldValue.serverTimestamp(),
             },
