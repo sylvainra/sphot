@@ -122,6 +122,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   final Set<String> _fieldsToCorrect = <String>{};
 
   final List<Map<String, dynamic>> _institutionalContacts = [];
+  bool _institutionnelsStepCompleted = false;
   int? _editingInstitutionalIndex;
   bool _institutionNotifyFlagLowered = true;
   bool _institutionNotifyIntervention = true;
@@ -566,7 +567,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         _value('emailResponsable').isNotEmpty;
   }
 
-  bool get _institutionnelsComplete => true;
+  bool get _institutionnelsComplete => _institutionnelsStepCompleted;
 
   bool get _territoireComplete {
     return _value('pays').isNotEmpty &&
@@ -1121,6 +1122,12 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     }
 
     setState(() {
+      if (!_isCorrectionMode &&
+          _selectedSection == _TrialRequestSection.institutionnels &&
+          section.index > _TrialRequestSection.institutionnels.index) {
+        _institutionnelsStepCompleted = true;
+      }
+
       _selectedSection = section;
       _trialRequestMessage = null;
     });
