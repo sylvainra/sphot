@@ -1985,15 +1985,73 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
               _menuButton(
                 section: _TrialRequestSection.essai,
                 icon: Icons.fact_check_outlined,
-                label: 'RAPPEL & DEMANDE D’ACCÈS',
+                label: 'RÈGLES',
                 completed: _saved || _canSubmitTrialRequest,
                 enabled:
                     !_saved &&
                     _correctionSectionEnabled(_TrialRequestSection.essai),
               ),
+              _leftSubmitRequestButton(),
               const Spacer(),
               _statusCard(),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _leftSubmitRequestButton() {
+    final canSend = _canSubmitTrialRequest && !_isSaving && !_saved;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 10),
+      child: SizedBox(
+        width: double.infinity,
+        height: 58,
+        child: ElevatedButton.icon(
+          onPressed: canSend ? _saveRegistration : null,
+          icon: _isSaving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.rocket_launch_rounded),
+          label: Text(
+            _isSaving
+                ? 'ENVOI EN COURS'
+                : (_saved
+                      ? (_isCorrectionMode
+                            ? 'DEMANDE D’ACCÈS RENVOYÉE'
+                            : 'DEMANDE D’ACCÈS ENVOYÉE')
+                      : (_isCorrectionMode
+                            ? 'RENVOYER MA DEMANDE D’ACCÈS'
+                            : 'ENVOYER MA DEMANDE D’ACCÈS')),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+              letterSpacing: 0.1,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: adminColor,
+            disabledBackgroundColor: Colors.grey.shade300,
+            disabledForegroundColor: Colors.grey.shade600,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: canSend ? adminColor : Colors.grey.shade400,
+                width: 1.4,
+              ),
+            ),
           ),
         ),
       ),
@@ -2818,7 +2876,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       children: [
         _pageHeader(
           'CONTACTS INSTITUTIONNELS',
-          'Vous pouvez renseigner les personnes institutionnelles de référence liées à la gestion de votre SPHOT, telles qu’un élu, la Police municipale, un service communal ou intercommunal, un office de tourisme ou tout autre interlocuteur institutionnel concerné. Cette étape est facultative.',
+          'Vous pouvez renseigner les personnels institutionnels de référence liés à la gestion de votre SPHOT tels qu’un élu, un service communal ou intercommunal, la Police Municipale, la Gendarmerie Nationale, les Sapeurs-Pompiers ou tout autre interlocuteur institutionnel concerné. Cette étape est facultative.',
         ),
         if (_institutionalContacts.isNotEmpty) ...[
           ..._institutionalContacts.asMap().entries.map(
@@ -3520,8 +3578,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _pageHeader(
-          'RAPPEL & DEMANDE D’ACCÈS',
-          'Retrouvez les règles acceptées avant votre saisie puis transmettez votre demande d’accès.',
+          'RÈGLES',
+          'Retrouvez les règles acceptées avant votre saisie.',
         ),
         Container(
           width: double.infinity,
@@ -3668,48 +3726,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         ],
         const SizedBox(height: 18),
 
-        SizedBox(
-          height: 56,
-          child: ElevatedButton.icon(
-            onPressed: _canSubmitTrialRequest && !_isSaving && !_saved
-                ? _saveRegistration
-                : null,
-            icon: _isSaving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.4,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.rocket_launch_rounded),
-            label: Text(
-              _isSaving
-                  ? 'ENVOI EN COURS'
-                  : (_saved
-                        ? (_isCorrectionMode
-                              ? 'DEMANDE D’ACCÈS RENVOYÉE'
-                              : 'DEMANDE D’ACCÈS ENVOYÉE')
-                        : (_isCorrectionMode
-                              ? 'RENVOYER MA DEMANDE D’ACCÈS'
-                              : 'ENVOYER MA DEMANDE D’ACCÈS')),
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.2,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: adminColor,
-              disabledBackgroundColor: Colors.grey.shade400,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-            ),
-          ),
-        ),
         if (_trialRequestMessage != null) ...[
           const SizedBox(height: 16),
           Container(
