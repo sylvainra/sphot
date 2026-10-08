@@ -2296,7 +2296,7 @@ L'équipe SPHOT`,
   });
 }
 
-exports.generateAdminRequestAcknowledgement = onDocumentCreated(
+exports.generateAdminRequestAcknowledgement = onDocumentUpdated(
     {
       document: "adminRequests/{requestId}",
       region: "europe-west1",
@@ -2305,16 +2305,28 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
       memory: "512MiB",
     },
     async (event) => {
-      const requestSnapshot = event.data;
+      const beforeSnapshot = event.data.before;
+      const requestSnapshot = event.data.after;
 
       if (!requestSnapshot) {
         console.error("Document adminRequests introuvable.");
         return;
       }
 
-      const requestReference = requestSnapshot.ref;
+      const beforeData = beforeSnapshot.data() || {};
       const data = requestSnapshot.data() || {};
+      const requestReference = requestSnapshot.ref;
       const requestId = event.params.requestId;
+
+      const beforeStatus = cleanValue(beforeData.status, "").toLowerCase();
+      const afterStatus = cleanValue(data.status, "").toLowerCase();
+
+      // Le document est créé en brouillon lors de l'acceptation juridique.
+      // L'accusé de réception ne doit partir qu'au véritable envoi du dossier,
+      // lors du passage vers le statut pending.
+      if (afterStatus !== "pending" || beforeStatus === "pending") {
+        return;
+      }
 
       const existingDocument = data.acknowledgementDocument || {};
 
@@ -2338,9 +2350,9 @@ exports.generateAdminRequestAcknowledgement = onDocumentCreated(
       const subscriptionPreview = data.subscriptionPreview || {};
 
       const recipientEmail = cleanValue(
-          profile.email || proConnect.email,
+          profile.email || data.email || proConnect.email,
           "",
-      );
+      ).toLowerCase();
 
       if (!recipientEmail) {
         await requestReference.set(
