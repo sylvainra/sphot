@@ -36,10 +36,10 @@
         "*.local"
       ],
       "predeploy": [
-  "npm --prefix functions run lint"
-]
+        "npm --prefix functions run lint"
+      ]
     }
-    ],
+  ],
   "hosting": {
     "public": "build/web",
     "ignore": [
@@ -49,25 +49,16 @@
     ],
     "headers": [
       {
-        "source": "/index.html",
+        "source": "**",
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
+            "value": "max-age=0, must-revalidate"
           }
         ]
       },
       {
-        "source": "/flutter_bootstrap.js",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          }
-        ]
-      },
-      {
-        "source": "/main.dart.js",
+        "source": "/flutter_service_worker.js",
         "headers": [
           {
             "key": "Cache-Control",
