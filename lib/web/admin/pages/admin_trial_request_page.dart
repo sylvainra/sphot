@@ -2876,7 +2876,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       children: [
         _pageHeader(
           'CONTACTS INSTITUTIONNELS',
-          'Vous pouvez renseigner les personnels institutionnels de référence liés à la gestion de votre SPHOT tels qu’un élu, un service communal ou intercommunal, la Police Municipale, la Gendarmerie Nationale, les Sapeurs-Pompiers ou tout autre interlocuteur institutionnel concerné. Cette étape est facultative.',
+          'Vous pouvez renseigner les personnels institutionnelles de référence liées à la gestion de votre SPHOT telles qu’un élu, un service communale ou intercommunal, La Police Municipale, la Gendarmerie Nationale, Les Sapeurs-Pompiers ou tout autre interlocuteur institutionnel concerné. Cette étape est facultative.',
         ),
         if (_institutionalContacts.isNotEmpty) ...[
           ..._institutionalContacts.asMap().entries.map(
