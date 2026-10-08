@@ -2047,15 +2047,21 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: adminColor,
-            disabledBackgroundColor: Colors.grey.shade300,
-            disabledForegroundColor: Colors.grey.shade600,
+            disabledBackgroundColor: _saved
+                ? redColor
+                : Colors.grey.shade300,
+            disabledForegroundColor: _saved
+                ? Colors.white
+                : Colors.grey.shade600,
             foregroundColor: Colors.white,
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 10),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(
-                color: canSend ? adminColor : Colors.grey.shade400,
+                color: _saved
+                    ? redColor
+                    : (canSend ? adminColor : Colors.grey.shade400),
                 width: 1.4,
               ),
             ),
