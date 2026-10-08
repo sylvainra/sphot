@@ -930,12 +930,13 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   }
 
   bool _correctionSectionEnabled(_TrialRequestSection section) {
-    if (!_isCorrectionMode) {
-      return section != _TrialRequestSection.essai || _canOpenTrialRequest;
+    // Les règles sont un rappel consultable à tout moment du parcours.
+    if (section == _TrialRequestSection.essai) {
+      return true;
     }
 
-    if (section == _TrialRequestSection.essai) {
-      return _allRequestedCorrectionsCompleted;
+    if (!_isCorrectionMode) {
+      return true;
     }
 
     return _sectionHasFieldsToCorrect(section);
@@ -1901,7 +1902,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                   height: 1.25,
                 ),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 16),
               _menuButton(
                 section: _TrialRequestSection.structure,
                 icon: Icons.account_balance_rounded,
@@ -1994,13 +1995,12 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                 icon: Icons.fact_check_outlined,
                 label: 'RÈGLES',
                 completed: _saved || _canSubmitTrialRequest,
-                enabled:
-                    !_saved &&
-                    _correctionSectionEnabled(_TrialRequestSection.essai),
+                enabled: _correctionSectionEnabled(
+                  _TrialRequestSection.essai,
+                ),
               ),
               _leftSubmitRequestButton(),
               const Spacer(),
-              _statusCard(),
             ],
           ),
         ),
@@ -2012,10 +2012,10 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     final canSend = _canSubmitTrialRequest && !_isSaving && !_saved;
 
     return Padding(
-      padding: const EdgeInsets.only(top: 2, bottom: 10),
+      padding: const EdgeInsets.only(top: 1, bottom: 8),
       child: SizedBox(
         width: double.infinity,
-        height: 58,
+        height: 52,
         child: ElevatedButton.icon(
           onPressed: canSend ? _saveRegistration : null,
           icon: _isSaving
@@ -2081,9 +2081,9 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     final stepNumber = section.index + 1;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 7),
       child: SizedBox(
-        height: 72,
+        height: 60,
         child: OutlinedButton(
           onPressed: isEnabled ? () => _selectSection(section) : null,
           style: OutlinedButton.styleFrom(
@@ -2102,8 +2102,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           child: Row(
             children: [
               SizedBox(
-                width: 48,
-                height: 56,
+                width: 42,
+                height: 48,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -2137,8 +2137,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                             ]),
                       child: AdaptiveAssetImage(
                         'data/icons/fire_red_icon.svg',
-                        width: 44,
-                        height: 56,
+                        width: 38,
+                        height: 48,
                         fit: BoxFit.contain,
                       ),
                     ),
@@ -2153,12 +2153,12 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 9),
               Expanded(
                 child: Text(
                   label,
                   style: const TextStyle(
-                    fontSize: 17,
+                    fontSize: 16,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.25,
                   ),
@@ -2173,77 +2173,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _statusCard() {
-    final correctionReady = _allRequestedCorrectionsCompleted;
-    final normalReady = _canOpenTrialRequest;
-
-    final bool ready = _isCorrectionMode ? correctionReady : normalReady;
-
-    final String text;
-
-    if (_saved) {
-      text = _isCorrectionMode
-          ? 'Corrections envoyées.\nVotre dossier est en attente de validation.'
-          : 'Demande envoyée.\nVotre dossier est en attente de validation.';
-    } else if (_isCorrectionMode) {
-      if (_fieldsToCorrect.isEmpty) {
-        text =
-            'Correction bloquée.\n'
-            'Aucun nom de champ n’a été reconnu dans le motif du refus.';
-      } else if (correctionReady) {
-        text =
-            'Corrections terminées.\n'
-            'Vous pouvez renvoyer votre demande d’accès.';
-      } else {
-        text =
-            'Modifiez tous les champs signalés\n'
-            'pour débloquer le renvoi.';
-      }
-    } else {
-      text = normalReady
-          ? 'Dossier complet.\n'
-                'Vous pouvez envoyer votre demande d’accès.'
-          : 'Complétez les étapes pour débloquer la demande d’accès.';
-    }
-
-    final Color statusColor = _saved
-        ? redColor
-        : ready
-        ? adminColor
-        : Colors.grey;
-
-    final IconData statusIcon = _saved
-        ? Icons.check_circle_rounded
-        : ready
-        ? Icons.lock_open_rounded
-        : Icons.lock_outline_rounded;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: statusColor, width: 1.4),
-      ),
-      child: Column(
-        children: [
-          Icon(statusIcon, color: statusColor, size: 26),
-          const SizedBox(height: 8),
-          Text(
-            text,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: statusColor,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              height: 1.25,
-            ),
-          ),
-        ],
       ),
     );
   }
