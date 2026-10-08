@@ -2035,9 +2035,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                       ? (_isCorrectionMode
                             ? 'DEMANDE D’ACCÈS RENVOYÉE'
                             : 'DEMANDE D’ACCÈS ENVOYÉE')
-                      : (_isCorrectionMode
-                            ? 'RENVOYER MA DEMANDE D’ACCÈS'
-                            : 'ENVOYER MA DEMANDE D’ACCÈS')),
+                      : 'ENVOYER MA DEMANDE D’ACCÈS'),
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontWeight: FontWeight.w900,
