@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../models/advertising_pricing_config.dart';
@@ -1783,7 +1784,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         logoMimeType.trim().toLowerCase() == 'image/svg+xml' ||
         AdminLogoStorageService.isSvgUrl(cleanUrl);
 
-    if (isSvg) {
+    // Sur Flutter Web, SvgPicture.network charge le SVG via une requête
+    // réseau qui peut rester bloquée avec les URL Firebase Storage. Le
+    // navigateur sait en revanche afficher nativement un SVG dans un <img>.
+    // On utilise donc Image.network en Web pour tous les logos distants.
+    if (isSvg && !kIsWeb) {
       return SvgPicture.network(
         cleanUrl,
         key: ValueKey<String>('admin-svg-logo-$cleanUrl'),
@@ -1803,7 +1808,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       height: size,
       fit: BoxFit.contain,
       gaplessPlayback: true,
-      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+      webHtmlElementStrategy: kIsWeb
+          ? WebHtmlElementStrategy.prefer
+          : WebHtmlElementStrategy.never,
       errorBuilder: (_, __, ___) => Icon(
         Icons.account_balance_rounded,
         color: adminColor,
