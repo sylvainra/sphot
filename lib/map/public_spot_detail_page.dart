@@ -226,15 +226,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     });
   }
 
-  Future<void> _openDirections(SpotFlagState spot) async {
-    final destination = '${spot.lat},${spot.lng}';
-    final uri = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=$destination',
-    );
-
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
-
   Future<void> _startNavigation(SpotFlagState spot) async {
     final destination = '${spot.lat},${spot.lng}';
     final uri = Uri.parse(
@@ -414,7 +405,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   ) {
     return _MobileSpotActionBar(
       isSaved: _isSaved,
-      onDirections: () => _openDirections(spot),
       onStart: () => _startNavigation(spot),
       onShare: () => _shareSpot(context, spot),
       onSave: () => _toggleSaved(spot),
@@ -1807,14 +1797,12 @@ class _ProhibitionSymbol extends StatelessWidget {
 
 class _MobileSpotActionBar extends StatefulWidget {
   final bool isSaved;
-  final VoidCallback onDirections;
   final VoidCallback onStart;
   final VoidCallback onShare;
   final VoidCallback onSave;
 
   const _MobileSpotActionBar({
     required this.isSaved,
-    required this.onDirections,
     required this.onStart,
     required this.onShare,
     required this.onSave,
@@ -1832,7 +1820,7 @@ class _MobileSpotActionBarState extends State<_MobileSpotActionBar> {
   void initState() {
     super.initState();
     _actionKeys = List<GlobalKey>.generate(
-      4,
+      3,
       (_) => GlobalKey(),
     );
   }
@@ -1872,11 +1860,11 @@ class _MobileSpotActionBarState extends State<_MobileSpotActionBar> {
           KeyedSubtree(
             key: _actionKeys[0],
             child: _MobileSpotActionButton(
-              icon: Icons.directions_rounded,
-              label: 'ITINÉRAIRE',
+              icon: Icons.navigation_rounded,
+              label: 'DÉMARRER',
               onTap: () => _activateAction(
                 0,
-                widget.onDirections,
+                widget.onStart,
               ),
             ),
           ),
@@ -1884,11 +1872,11 @@ class _MobileSpotActionBarState extends State<_MobileSpotActionBar> {
           KeyedSubtree(
             key: _actionKeys[1],
             child: _MobileSpotActionButton(
-              icon: Icons.navigation_rounded,
-              label: 'DÉMARRER',
+              icon: Icons.share_rounded,
+              label: 'PARTAGER',
               onTap: () => _activateAction(
                 1,
-                widget.onStart,
+                widget.onShare,
               ),
             ),
           ),
@@ -1896,25 +1884,13 @@ class _MobileSpotActionBarState extends State<_MobileSpotActionBar> {
           KeyedSubtree(
             key: _actionKeys[2],
             child: _MobileSpotActionButton(
-              icon: Icons.share_rounded,
-              label: 'PARTAGER',
-              onTap: () => _activateAction(
-                2,
-                widget.onShare,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          KeyedSubtree(
-            key: _actionKeys[3],
-            child: _MobileSpotActionButton(
               icon: widget.isSaved
                   ? Icons.bookmark_rounded
                   : Icons.bookmark_border_rounded,
               label: widget.isSaved ? 'ENREGISTRÉ' : 'ENREGISTRER',
               selected: widget.isSaved,
               onTap: () => _activateAction(
-                3,
+                2,
                 widget.onSave,
               ),
             ),
@@ -3455,8 +3431,20 @@ class _PublicChips extends StatelessWidget {
         ? (_labelDisplayNames[normalizedValue] ?? value)
         : value;
 
-    return Chip(
-      label: Row(
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 7,
+      ),
+      decoration: BoxDecoration(
+        gradient: _sphotWarmSoftGradient,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(
+          color: _sphotWarmBorder.withOpacity(0.55),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (iconPath != null) ...[
@@ -3473,7 +3461,7 @@ class _PublicChips extends StatelessWidget {
             child: Text(
               displayName,
               style: const TextStyle(
-                color: Colors.black87,
+                color: Color(0xFF3F4650),
                 fontSize: 10.5,
                 fontWeight: FontWeight.w700,
               ),
@@ -3481,9 +3469,6 @@ class _PublicChips extends StatelessWidget {
           ),
         ],
       ),
-      visualDensity: VisualDensity.compact,
-      backgroundColor: const Color(0xFFF2F6FB),
-      side: const BorderSide(color: Color(0xFFD7E0EC)),
     );
   }
 }
