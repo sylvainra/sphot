@@ -10164,12 +10164,19 @@ exports.getPublicAdminMarkers = onRequest(
             departement: cleanValue(territoire.departement, ""),
             latitude: latitude,
             longitude: longitude,
+            // Compatibilité avec les remplacements de logo enregistrés
+            // avant la correction du 09/10/2026 : set(..., merge:true)
+            // avait créé des champs littéraux "territoire.logoVille".
             logoVille: cleanValue(
-                territoire.logoVille || data.logoVille,
+                data["territoire.logoVille"] ||
+                data.logoVille ||
+                territoire.logoVille,
                 "",
             ),
             logoMimeType: cleanValue(
-                territoire.logoMimeType || data.logoMimeType,
+                data["territoire.logoMimeType"] ||
+                data.logoMimeType ||
+                territoire.logoMimeType,
                 "",
             ),
             siteInternetVille: cleanValue(
