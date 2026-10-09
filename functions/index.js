@@ -10093,6 +10093,106 @@ exports.deleteSauveteurAccount = onRequest(
 );
 
 /**
+ * Retourne uniquement les données publiques nécessaires aux marqueurs Admin.
+ *
+ * La visibilité d'un SPHOT ADMIN dépend exclusivement de l'approbation
+ * administrative par le Super Admin. Elle ne dépend ni d'une période d'essai
+ * ni d'un abonnement.
+ */
+exports.getPublicAdminMarkers = onRequest(
+    {
+      region: "europe-west1",
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      if (request.method !== "GET") {
+        response.status(405).json({success: false});
+        return;
+      }
+
+      try {
+        const snapshot = await admin.firestore()
+            .collection("adminRequests")
+            .limit(1000)
+            .get();
+
+        const markersByTerritory = new Map();
+
+        snapshot.docs.forEach((document) => {
+          const data = document.data() || {};
+          if (!isApprovedAdminRequest(data)) return;
+
+          const territoire = data.territoire || {};
+          const structure = data.structure || {};
+          const territoireId = cleanValue(
+              territoire.territoireId || data.territoireId,
+              "",
+          );
+          const ville = cleanValue(territoire.ville, "");
+          const latitude = Number(territoire.villeLat);
+          const longitude = Number(territoire.villeLng);
+
+          if (
+            !territoireId ||
+            !Number.isFinite(latitude) ||
+            !Number.isFinite(longitude) ||
+            (latitude === 0 && longitude === 0)
+          ) {
+            return;
+          }
+
+          markersByTerritory.set(territoireId, {
+            id: document.id,
+            territoireId: territoireId,
+            organisation: cleanValue(
+                structure.nom ||
+                structure.organisationDisplay ||
+                data.organisation ||
+                ville,
+                "SPHOT ADMIN",
+            ),
+            ville: ville,
+            departement: cleanValue(territoire.departement, ""),
+            latitude: latitude,
+            longitude: longitude,
+            logoVille: cleanValue(
+                territoire.logoVille || data.logoVille,
+                "",
+            ),
+            logoMimeType: cleanValue(
+                territoire.logoMimeType || data.logoMimeType,
+                "",
+            ),
+            siteInternetVille: cleanValue(
+                territoire.siteInternetVille ||
+                territoire.siteInternet ||
+                structure.siteInternet,
+                "",
+            ),
+          });
+        });
+
+        response.status(200).json({
+          success: true,
+          admins: [...markersByTerritory.values()],
+        });
+      } catch (error) {
+        console.error("Erreur chargement marqueurs Admin publics:", error);
+        response.status(500).json({success: false, admins: []});
+      }
+    },
+);
+
+/**
  * Retourne uniquement les données nécessaires aux marqueurs publicitaires.
  */
 exports.getPublicAdvertisingSpots = onRequest(
