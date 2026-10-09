@@ -12,8 +12,36 @@ import '../widgets/danger_pictogram.dart';
 import 'flag_marker.dart';
 import 'public_webcam_view.dart';
 
+const Color _sphotWarmRed = Color(0xFFE72B20);
+const Color _sphotWarmOrange = Color(0xFFF97316);
+const Color _sphotWarmYellow = Color(0xFFF6B51B);
+const Color _sphotWarmBorder = Color(0xFFF28A22);
+const Color _sphotWarmSurface = Color(0xFFFFFBF7);
+
+const LinearGradient _sphotWarmGradient = LinearGradient(
+  begin: Alignment.topCenter,
+  end: Alignment.bottomCenter,
+  colors: <Color>[
+    _sphotWarmRed,
+    _sphotWarmOrange,
+    _sphotWarmYellow,
+  ],
+  stops: <double>[0, 0.56, 1],
+);
+
+const LinearGradient _sphotWarmSoftGradient = LinearGradient(
+  begin: Alignment.topCenter,
+  end: Alignment.bottomCenter,
+  colors: <Color>[
+    Color(0x14E72B20),
+    Color(0x0DF97316),
+    Color(0x08F6B51B),
+  ],
+  stops: <double>[0, 0.58, 1],
+);
+
 const TextStyle _publicSectionTitleStyle = TextStyle(
-  color: Color(0xFF1E3A8A),
+  color: _sphotWarmRed,
   fontSize: 10,
   fontWeight: FontWeight.w900,
   letterSpacing: 0.5,
@@ -446,7 +474,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                   children: [
                     Icon(
                       awaiting ? Icons.sync_rounded : Icons.info_outline_rounded,
-                      color: const Color(0xFF64748B),
+                      color: _sphotWarmOrange,
                       size: 20,
                     ),
                     const SizedBox(width: 8),
@@ -456,7 +484,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                             ? 'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR'
                             : 'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES',
                         style: const TextStyle(
-                          color: Color(0xFF64748B),
+                          color: _sphotWarmRed,
                           fontWeight: FontWeight.w900,
                           fontSize: 13,
                         ),
@@ -719,7 +747,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                 Text(
                   spot.ville.toUpperCase(),
                   style: const TextStyle(
-                    color: Color(0xFF1E3A8A),
+                    color: _sphotWarmRed,
                     fontSize: 10,
                     fontWeight: FontWeight.w900,
                   ),
@@ -884,7 +912,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           color: Colors.transparent,
           child: Container(
             decoration: BoxDecoration(
-              color: const Color(0xFFF4F7FA),
+              color: _sphotWarmSurface,
               borderRadius: widget.desktopMode
                   ? BorderRadius.circular(18)
                   : const BorderRadius.vertical(
@@ -908,7 +936,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                         width: 44,
                         height: 5,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFB9C2CC),
+                          color: const Color(0xFFF2C79A),
                           borderRadius: BorderRadius.circular(99),
                         ),
                       ),
@@ -946,14 +974,15 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                                 vertical: 8,
                               ),
                               decoration: BoxDecoration(
-                                color: selected
-                                    ? const Color(0xFF1E3A8A)
-                                    : Colors.white,
+                                gradient: selected
+                                    ? _sphotWarmGradient
+                                    : _sphotWarmSoftGradient,
                                 borderRadius: BorderRadius.circular(99),
                                 border: Border.all(
                                   color: selected
-                                      ? const Color(0xFF1E3A8A)
-                                      : const Color(0xFFD5DEE7),
+                                      ? _sphotWarmRed
+                                      : _sphotWarmBorder,
+                                  width: selected ? 1.2 : 1.0,
                                 ),
                               ),
                               child: Row(
@@ -963,7 +992,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                                     size: 17,
                                     color: selected
                                         ? Colors.white
-                                        : const Color(0xFF1E3A8A),
+                                        : _sphotWarmRed,
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
@@ -971,7 +1000,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                                     style: TextStyle(
                                       color: selected
                                           ? Colors.white
-                                          : const Color(0xFF1E3A8A),
+                                          : _sphotWarmRed,
                                       fontSize: 10.5,
                                       fontWeight: FontWeight.w900,
                                     ),
@@ -1075,6 +1104,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                     child: _StatusCard(
                       color: statusColor,
                       text: publicStatus,
+                      useWarmTheme: spot.isRealtimeAwaitingUpdate,
                     ),
                   ),
                 ],
@@ -1104,7 +1134,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                       child: Text(
                         'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR',
                         style: TextStyle(
-                          color: Color(0xFF64748B),
+                          color: _sphotWarmRed,
                           fontWeight: FontWeight.w900,
                           fontSize: 13,
                         ),
@@ -1144,7 +1174,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                       child: Text(
                         'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES',
                         style: TextStyle(
-                          color: Color(0xFF64748B),
+                          color: _sphotWarmRed,
                           fontWeight: FontWeight.w900,
                           fontSize: 13,
                         ),
@@ -1226,7 +1256,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                   Icon(
                     Icons.flag_outlined,
                     size: 19,
-                    color: Color(0xFF1E3A8A),
+                    color: _sphotWarmRed,
                   ),
                   SizedBox(width: 8),
                   Expanded(
@@ -1293,7 +1323,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                 Text(
                   spot.ville.toUpperCase(),
                   style: const TextStyle(
-                    color: Color(0xFF1E3A8A),
+                    color: _sphotWarmRed,
                     fontSize: 10,
                     fontWeight: FontWeight.w900,
                   ),
@@ -1919,12 +1949,12 @@ class _MobileSpotActionButton extends StatelessWidget {
           vertical: 8,
         ),
         decoration: BoxDecoration(
-          color: selected
-              ? const Color(0xFF1E3A8A)
-              : Colors.white,
+          gradient: selected
+              ? _sphotWarmGradient
+              : _sphotWarmSoftGradient,
           borderRadius: BorderRadius.circular(99),
           border: Border.all(
-            color: const Color(0xFF1E3A8A),
+            color: selected ? _sphotWarmRed : _sphotWarmBorder,
           ),
         ),
         child: Row(
@@ -1934,7 +1964,7 @@ class _MobileSpotActionButton extends StatelessWidget {
               size: 17,
               color: selected
                   ? Colors.white
-                  : const Color(0xFF1E3A8A),
+                  : _sphotWarmRed,
             ),
             const SizedBox(width: 6),
             Text(
@@ -1943,7 +1973,7 @@ class _MobileSpotActionButton extends StatelessWidget {
               style: TextStyle(
                 color: selected
                     ? Colors.white
-                    : const Color(0xFF1E3A8A),
+                    : _sphotWarmRed,
                 fontSize: 10.5,
                 fontWeight: FontWeight.w900,
               ),
@@ -1966,11 +1996,10 @@ class _MobilePublicCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      padding: const EdgeInsets.all(1.15),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: _sphotWarmGradient,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFDCE3EA)),
         boxShadow: const [
           BoxShadow(
             color: Color(0x10000000),
@@ -1979,7 +2008,16 @@ class _MobilePublicCard extends StatelessWidget {
           ),
         ],
       ),
-      child: child,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        decoration: BoxDecoration(
+          gradient: _sphotWarmSoftGradient,
+          color: _sphotWarmSurface,
+          borderRadius: BorderRadius.circular(17),
+        ),
+        child: child,
+      ),
     );
   }
 }
@@ -2029,22 +2067,36 @@ class _MobileQuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 18),
-      label: Text(
-        label.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFF1E3A8A),
-        side: const BorderSide(color: Color(0xFF1E3A8A)),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: _sphotWarmSoftGradient,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: _sphotWarmBorder,
+              width: 1.2,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: _sphotWarmRed),
+              const SizedBox(width: 7),
+              Text(
+                label.toUpperCase(),
+                style: const TextStyle(
+                  color: _sphotWarmRed,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2113,6 +2165,7 @@ class _LiveOperationalSnapshot extends StatelessWidget {
                   child: _StatusCard(
                     color: statusColor,
                     text: publicStatus,
+                    useWarmTheme: currentSpot.isRealtimeAwaitingUpdate,
                   ),
                 ),
               ],
@@ -2144,9 +2197,10 @@ class _PublicLiveDataSection extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
+          gradient: _sphotWarmSoftGradient,
+          color: _sphotWarmSurface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFDCE3EA)),
+          border: Border.all(color: _sphotWarmBorder),
         ),
         child: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2193,9 +2247,10 @@ class _PublicLiveDataSection extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
+          gradient: _sphotWarmSoftGradient,
+          color: _sphotWarmSurface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFDCE3EA)),
+          border: Border.all(color: _sphotWarmBorder),
         ),
         child: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2268,7 +2323,7 @@ class _PublicLiveDataSection extends StatelessWidget {
               const Icon(
                 Icons.sensors_rounded,
                 size: 18,
-                color: Color(0xFF1E3A8A),
+                color: _sphotWarmRed,
               ),
               const SizedBox(width: 7),
               const Expanded(
@@ -3006,7 +3061,7 @@ class _LiveDataBlock extends StatelessWidget {
         Icon(
           icon,
           size: 17,
-          color: const Color(0xFF1E3A8A),
+          color: _sphotWarmRed,
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -3016,7 +3071,7 @@ class _LiveDataBlock extends StatelessWidget {
               Text(
                 title.toUpperCase(),
                 style: const TextStyle(
-                  color: Color(0xFF1E3A8A),
+                  color: _sphotWarmRed,
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
                 ),
@@ -3071,7 +3126,7 @@ class _PublicWebcamSection extends StatelessWidget {
                   ? Icons.photo_outlined
                   : Icons.videocam_outlined,
               size: 19,
-              color: const Color(0xFF1E3A8A),
+              color: _sphotWarmRed,
             ),
             const SizedBox(width: 7),
             Text(
@@ -3106,8 +3161,8 @@ class _PublicWebcamSection extends StatelessWidget {
             icon: const Icon(Icons.fullscreen_rounded),
             label: Text(fullscreenLabel),
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF1E3A8A),
-              side: const BorderSide(color: Color(0xFF1E3A8A)),
+              foregroundColor: _sphotWarmRed,
+              side: const BorderSide(color: _sphotWarmBorder),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -3122,24 +3177,36 @@ class _PublicWebcamSection extends StatelessWidget {
 class _StatusCard extends StatelessWidget {
   final Color color;
   final String text;
+  final bool useWarmTheme;
 
-  const _StatusCard({required this.color, required this.text});
+  const _StatusCard({
+    required this.color,
+    required this.text,
+    this.useWarmTheme = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = useWarmTheme ? _sphotWarmRed : color;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        gradient: useWarmTheme ? _sphotWarmSoftGradient : null,
+        color: useWarmTheme ? _sphotWarmSurface : color.withOpacity(0.10),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.65)),
+        border: Border.all(
+          color: useWarmTheme
+              ? _sphotWarmBorder
+              : color.withOpacity(0.65),
+        ),
       ),
       child: Text(
         text,
         textAlign: TextAlign.center,
         style: TextStyle(
-          color: color,
+          color: effectiveColor,
           fontSize: 14,
           height: 1.3,
           fontWeight: FontWeight.w900,
@@ -3248,7 +3315,7 @@ class _PublicInfoLine extends StatelessWidget {
                 ),
               )
             else
-              Icon(icon, size: 17, color: const Color(0xFF1E3A8A)),
+              Icon(icon, size: 17, color: _sphotWarmRed),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
@@ -3266,7 +3333,7 @@ class _PublicInfoLine extends StatelessWidget {
                           color: valueColor ??
                               (onTap == null
                                   ? Colors.black87
-                                  : const Color(0xFF1E3A8A)),
+                                  : _sphotWarmRed),
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
                           height: 1.25,
@@ -3312,7 +3379,7 @@ const SizedBox(width: 2),
             'POSTE DE SECOURS',
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: Color(0xFF1E3A8A),
+              color: _sphotWarmRed,
               fontSize: 14,
               fontWeight: FontWeight.w800,
             ),
@@ -3444,8 +3511,8 @@ class _PublicLinkButton extends StatelessWidget {
         ),
       ),
       style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFF1E3A8A),
-        side: const BorderSide(color: Color(0xFF1E3A8A)),
+        foregroundColor: _sphotWarmRed,
+        side: const BorderSide(color: _sphotWarmRed),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
