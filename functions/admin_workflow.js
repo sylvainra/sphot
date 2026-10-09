@@ -1,13 +1,66 @@
 "use strict";
 
-const {sendSphotMail} = require("./sphot_email_design");
-
-const {onDocumentCreated, onDocumentUpdated} = require("firebase-functions/v2/firestore");
+const {
+  onDocumentCreated,
+  onDocumentUpdated,
+} = require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
-const {getDownloadURL} = require("firebase-admin/storage");
-const nodemailer = require("nodemailer");
-const PDFDocument = require("pdfkit");
+
+let cachedNodemailer;
+let cachedPDFDocument;
+let cachedSendSphotMail;
+let cachedGetDownloadURL;
+
+/**
+ * Charge Nodemailer uniquement lorsqu'un email du workflow Admin est envoyé.
+ *
+ * @return {Object} Module Nodemailer.
+ */
+function getNodemailer() {
+  if (!cachedNodemailer) {
+    cachedNodemailer = require("nodemailer");
+  }
+  return cachedNodemailer;
+}
+
+/**
+ * Charge PDFKit uniquement lorsqu'un document Admin doit être généré.
+ *
+ * @return {Function} Constructeur PDFDocument.
+ */
+function getPDFDocument() {
+  if (!cachedPDFDocument) {
+    cachedPDFDocument = require("pdfkit");
+  }
+  return cachedPDFDocument;
+}
+
+/**
+ * Charge l'habillage email SPHOT uniquement au moment d'un envoi.
+ *
+ * @return {Function} Fonction d'envoi d'email SPHOT.
+ */
+function getSendSphotMail() {
+  if (!cachedSendSphotMail) {
+    ({sendSphotMail: cachedSendSphotMail} =
+      require("./sphot_email_design"));
+  }
+  return cachedSendSphotMail;
+}
+
+/**
+ * Charge le helper Storage uniquement lorsqu'une URL de PDF est nécessaire.
+ *
+ * @return {Function} Helper Firebase Storage getDownloadURL.
+ */
+function getStorageDownloadURL() {
+  if (!cachedGetDownloadURL) {
+    ({getDownloadURL: cachedGetDownloadURL} =
+      require("firebase-admin/storage"));
+  }
+  return cachedGetDownloadURL;
+}
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -96,7 +149,7 @@ function requestUid(data, requestId) {
 }
 
 function transporter() {
-  return nodemailer.createTransport({
+  return getNodemailer().createTransport({
     service: "gmail",
     auth: {
       user: SMTP_USER,
@@ -139,6 +192,7 @@ function simplePdfBuffer({
   notice = "",
 }) {
   return new Promise((resolve, reject) => {
+    const PDFDocument = getPDFDocument();
     const doc = new PDFDocument({
       size: "A4",
       margins: {top: 30, bottom: 30, left: 40, right: 40},
@@ -496,7 +550,7 @@ async function createRegistryPdf({
       },
     },
   });
-  const downloadUrl = await getDownloadURL(file);
+  const downloadUrl = await getStorageDownloadURL()(file);
 
   const payload = {
     requestId,
@@ -793,7 +847,7 @@ async function sendTrialReceipt(requestId) {
   <strong>L'équipe SPHOT</strong>
 </p>`;
 
-    const mailResult = await sendSphotMail(
+    const mailResult = await getSendSphotMail()(
         transporter(),
         {
           from: MAIL_FROM,
@@ -982,7 +1036,7 @@ async function sendTrialApproval(requestId) {
   <strong>L'équipe SPHOT</strong>
 </p>`;
 
-    const mailResult = await sendSphotMail(
+    const mailResult = await getSendSphotMail()(
         transporter(),
         {
           from: MAIL_FROM,
@@ -1113,7 +1167,7 @@ async function sendLifecycleMail({requestSnap, fieldName, subject, html}) {
   }, {merge: true});
 
   try {
-    const result = await sendSphotMail(
+    const result = await getSendSphotMail()(
         transporter(),
         {
           from: MAIL_FROM,
@@ -1561,7 +1615,7 @@ exports.processAdminOrderCreated = onDocumentCreated(
       const email = recipientEmail(requestData);
 
       if (email) {
-        await sendSphotMail(
+        await getSendSphotMail()(
             transporter(),
             {
               from: MAIL_FROM,
