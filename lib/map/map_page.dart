@@ -59,8 +59,8 @@ class _MapPageState extends State<MapPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final FirestoreService _firestoreService = FirestoreService();
   final MapController _mapController = MapController();
-  late final Future<List<Map<String, dynamic>>>
-      _publicAdvertisingSpotsFuture;
+  late final Future<List<List<Map<String, dynamic>>>>
+      _publicMapMarkersFuture;
 
   SpotFilter _selectedFilter = SpotFilter.all;
 
@@ -111,8 +111,10 @@ static const List<_MapTileStyle> _tileStyles = [
 void initState() {
   super.initState();
   _speech = stt.SpeechToText();
-  _publicAdvertisingSpotsFuture =
-      _firestoreService.getPublicAdvertisingSpots();
+  _publicMapMarkersFuture = Future.wait<List<Map<String, dynamic>>>([
+    _firestoreService.getPublicAdminMarkers(),
+    _firestoreService.getPublicAdvertisingSpots(),
+  ]);
   _realtimeExpiryRefreshTimer = Timer.periodic(
     const Duration(seconds: 30),
     (_) {
@@ -588,59 +590,63 @@ Future<void> _toggleFavoritesFilter() async {
   }
 
   Future<void> _openCityWebsite(
-    String rawUrl,
-    SpotFlagState spot,
-  ) async {
-  var url = rawUrl.trim();
+    String rawUrl, {
+    required String territoireId,
+    required String ville,
+  }) async {
+    var url = rawUrl.trim();
 
-  if (url.isEmpty) {
-    _showMapMessage('Site internet de la ville non renseigné.');
-    return;
+    if (url.isEmpty) {
+      _showMapMessage('Site internet de la ville non renseigné.');
+      return;
+    }
+
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://$url';
+    }
+
+    final uri = Uri.tryParse(url);
+
+    if (uri == null) {
+      _showMapMessage('Adresse du site internet invalide.');
+      return;
+    }
+
+    final cleanTerritoireId = territoireId.trim();
+    final cleanVille = ville.trim();
+
+    unawaited(
+      _firestoreService.recordPublicClick(
+        territoireId: cleanTerritoireId,
+        targetId: cleanTerritoireId.isNotEmpty
+            ? cleanTerritoireId
+            : cleanVille.toUpperCase(),
+        targetType: 'admin',
+        targetName: 'SPHOT ADMIN - ${cleanVille.toUpperCase()}',
+        source: kIsWeb ? 'web' : 'app',
+      ),
+    );
+
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: kIsWeb ? '_blank' : null,
+    );
+
+    if (!opened) {
+      _showMapMessage('Impossible d’ouvrir le site internet.');
+    }
   }
-
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    url = 'https://$url';
-  }
-
-  final uri = Uri.tryParse(url);
-
-  if (uri == null) {
-    _showMapMessage('Adresse du site internet invalide.');
-    return;
-  }
-
-  final territoireId = spot.territoireId.trim();
-  final ville = spot.ville.trim();
-  unawaited(
-    _firestoreService.recordPublicClick(
-      territoireId: territoireId,
-      targetId: territoireId.isNotEmpty ? territoireId : ville.toUpperCase(),
-      targetType: 'admin',
-      targetName: 'SPHOT ADMIN - ${ville.toUpperCase()}',
-      source: kIsWeb ? 'web' : 'app',
-    ),
-  );
-
-  final opened = await launchUrl(
-    uri,
-    mode: LaunchMode.externalApplication,
-    webOnlyWindowName: kIsWeb ? '_blank' : null,
-  );
-
-  if (!opened) {
-    _showMapMessage('Impossible d’ouvrir le site internet.');
-  }
-}
 
 List<Marker> _buildAdminMarkers(
   List<SpotFlagState> spots,
+  List<Map<String, dynamic>> approvedAdmins,
   double zoom,
   double rotation,
 ) {
   final markers = <Marker>[];
 
   if (zoom < 12) return markers;
-
 
   String cityKey(String value) {
     return value
@@ -672,44 +678,45 @@ List<Marker> _buildAdminMarkers(
     }
   }
 
-  final admins = <String, SpotFlagState>{};
+  final admins = <String, Map<String, dynamic>>{};
 
+  // Source prioritaire : demandes Admin approuvées par le Super Admin.
+  // Leur visibilité publique est indépendante de l'essai de 8 jours.
+  for (final admin in approvedAdmins) {
+    final territoireId =
+        (admin['territoireId'] ?? '').toString().trim();
+    final ville = (admin['ville'] ?? '').toString().trim();
+    final markerLat = _publicAdvertisingDouble(admin['latitude']);
+    final markerLng = _publicAdvertisingDouble(admin['longitude']);
+
+    if (ville.isEmpty ||
+        markerLat == 0 ||
+        markerLng == 0) {
+      continue;
+    }
+
+    final adminKey =
+        territoireId.isNotEmpty ? territoireId : cityKey(ville);
+
+    admins[adminKey] = <String, dynamic>{
+      'territoireId': territoireId,
+      'ville': ville,
+      'markerLat': markerLat,
+      'markerLng': markerLng,
+      'logoVille': (admin['logoVille'] ?? '').toString().trim(),
+      'logoMimeType': (admin['logoMimeType'] ?? '').toString().trim(),
+      'siteInternetVille':
+          (admin['siteInternetVille'] ?? '').toString().trim(),
+    };
+  }
+
+  // Compatibilité avec les territoires déjà projetés historiquement depuis
+  // leurs SPHOTS : on ne les utilise qu'en l'absence du nouvel endpoint Admin.
   for (final spot in spots) {
     final ville = spot.ville.trim();
     if (ville.isEmpty) continue;
 
-    final directCoordinatesValid =
-        spot.villeLat != 0 && spot.villeLng != 0;
-    final fallbackCoordinates =
-        cityCoordinates[cityKey(ville)];
-
-    if (!directCoordinatesValid && fallbackCoordinates == null) {
-      continue;
-    }
-
-    final adminKey = spot.territoireId.trim().isNotEmpty
-        ? spot.territoireId.trim()
-        : cityKey(ville);
-
-    final currentSpot = admins[adminKey];
-
-    if (currentSpot == null) {
-      admins[adminKey] = spot;
-      continue;
-    }
-
-    if (currentSpot.logoVille.trim().isEmpty &&
-        spot.logoVille.trim().isNotEmpty) {
-      admins[adminKey] = spot;
-    }
-  }
-
-  for (final spot in admins.values) {
-    final logoVille = spot.logoVille.trim();
-    final siteInternetVille = spot.siteInternetVille.trim();
-    final fallbackCoordinates =
-        cityCoordinates[cityKey(spot.ville)];
-
+    final fallbackCoordinates = cityCoordinates[cityKey(ville)];
     final markerLat = spot.villeLat != 0
         ? spot.villeLat
         : fallbackCoordinates?.latitude;
@@ -717,9 +724,52 @@ List<Marker> _buildAdminMarkers(
         ? spot.villeLng
         : fallbackCoordinates?.longitude;
 
-    if (markerLat == null || markerLng == null) {
+    if (markerLat == null || markerLng == null) continue;
+
+    final adminKey = spot.territoireId.trim().isNotEmpty
+        ? spot.territoireId.trim()
+        : cityKey(ville);
+
+    final current = admins[adminKey];
+    if (current != null) {
+      if ((current['logoVille'] ?? '').toString().trim().isEmpty &&
+          spot.logoVille.trim().isNotEmpty) {
+        current['logoVille'] = spot.logoVille.trim();
+      }
+      if ((current['siteInternetVille'] ?? '').toString().trim().isEmpty &&
+          spot.siteInternetVille.trim().isNotEmpty) {
+        current['siteInternetVille'] = spot.siteInternetVille.trim();
+      }
       continue;
     }
+
+    admins[adminKey] = <String, dynamic>{
+      'territoireId': spot.territoireId.trim(),
+      'ville': ville,
+      'markerLat': markerLat,
+      'markerLng': markerLng,
+      'logoVille': spot.logoVille.trim(),
+      'logoMimeType': '',
+      'siteInternetVille': spot.siteInternetVille.trim(),
+    };
+  }
+
+  for (final admin in admins.values) {
+    final territoireId =
+        (admin['territoireId'] ?? '').toString().trim();
+    final ville = (admin['ville'] ?? '').toString().trim();
+    final logoVille = (admin['logoVille'] ?? '').toString().trim();
+    final logoMimeType =
+        (admin['logoMimeType'] ?? '').toString().trim().toLowerCase();
+    final siteInternetVille =
+        (admin['siteInternetVille'] ?? '').toString().trim();
+    final markerLat = _publicAdvertisingDouble(admin['markerLat']);
+    final markerLng = _publicAdvertisingDouble(admin['markerLng']);
+
+    if (markerLat == 0 || markerLng == 0) continue;
+
+    final isSvg = logoMimeType == 'image/svg+xml' ||
+        logoVille.toLowerCase().contains('.svg');
 
     markers.add(
       Marker(
@@ -739,11 +789,15 @@ List<Marker> _buildAdminMarkers(
 
               Future<void>.delayed(
                 const Duration(milliseconds: 350),
-                () => _openCityWebsite(siteInternetVille, spot),
+                () => _openCityWebsite(
+                  siteInternetVille,
+                  territoireId: territoireId,
+                  ville: ville,
+                ),
               );
             },
             child: Tooltip(
-              message: spot.ville.toUpperCase(),
+              message: ville.toUpperCase(),
               preferBelow: true,
               verticalOffset: 40,
               decoration: BoxDecoration(
@@ -789,9 +843,7 @@ List<Marker> _buildAdminMarkers(
                                     size: 23,
                                   )
                                 : IgnorePointer(
-                                    child: logoVille
-                                            .toLowerCase()
-                                            .contains('.svg')
+                                    child: isSvg && !kIsWeb
                                         ? SvgPicture.network(
                                             logoVille,
                                             key: ValueKey<String>(
@@ -817,8 +869,9 @@ List<Marker> _buildAdminMarkers(
                                             height: 34,
                                             fit: BoxFit.contain,
                                             gaplessPlayback: true,
-                                            webHtmlElementStrategy:
-                                                WebHtmlElementStrategy.prefer,
+                                            webHtmlElementStrategy: kIsWeb
+                                                ? WebHtmlElementStrategy.prefer
+                                                : WebHtmlElementStrategy.never,
                                             errorBuilder: (_, __, ___) =>
                                                 const Icon(
                                               Icons.account_balance_rounded,
@@ -2635,11 +2688,17 @@ final visibleSpots = selectedSpotId == null
 debugPrint('SPHOTS CHARGÉS : ${allSpots.length}');
 debugPrint('SPHOTS AFFICHÉS : ${visibleSpots.length}');
 
-          return FutureBuilder<List<Map<String, dynamic>>>(
-            future: _publicAdvertisingSpotsFuture,
-            builder: (context, advertisingSnapshot) {
-              final publicAdvertisers =
-                  advertisingSnapshot.data ?? const <Map<String, dynamic>>[];
+          return FutureBuilder<List<List<Map<String, dynamic>>>>(
+            future: _publicMapMarkersFuture,
+            builder: (context, markerSnapshot) {
+              final markerData =
+                  markerSnapshot.data ?? const <List<Map<String, dynamic>>>[];
+              final publicAdmins = markerData.isNotEmpty
+                  ? markerData[0]
+                  : const <Map<String, dynamic>>[];
+              final publicAdvertisers = markerData.length > 1
+                  ? markerData[1]
+                  : const <Map<String, dynamic>>[];
               return Stack(
                 children: [
               FlutterMap(
@@ -2716,6 +2775,7 @@ onPositionChanged: (position, hasGesture) {
                         return MarkerLayer(
                           markers: _buildAdminMarkers(
                             allSpots,
+                            publicAdmins,
                             zoom,
                             rotation,
                           ),
