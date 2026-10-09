@@ -1896,7 +1896,7 @@ class _MobileSpotActionButton extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(
-          horizontal: 13,
+          horizontal: 6,
           vertical: 8,
         ),
         decoration: BoxDecoration(
@@ -1908,29 +1908,33 @@ class _MobileSpotActionButton extends StatelessWidget {
             color: selected ? _sphotWarmRed : _sphotWarmBorder,
           ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 17,
-              color: selected
-                  ? Colors.white
-                  : _sphotWarmRed,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              maxLines: 1,
-              style: TextStyle(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 15,
                 color: selected
                     ? Colors.white
                     : _sphotWarmRed,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w900,
               ),
-            ),
-          ],
+              const SizedBox(width: 4),
+              Text(
+                label,
+                maxLines: 1,
+                softWrap: false,
+                style: TextStyle(
+                  color: selected
+                      ? Colors.white
+                      : _sphotWarmRed,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
