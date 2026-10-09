@@ -1821,54 +1821,56 @@ class _MobileSpotActionBarState extends State<_MobileSpotActionBar> {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 48,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.fromLTRB(
-          0,
-          2,
-          MediaQuery.sizeOf(context).width * 0.55,
-          8,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: KeyedSubtree(
+                key: _actionKeys[0],
+                child: _MobileSpotActionButton(
+                  icon: Icons.navigation_rounded,
+                  label: 'DÉMARRER',
+                  onTap: () => _activateAction(
+                    0,
+                    widget.onStart,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: KeyedSubtree(
+                key: _actionKeys[1],
+                child: _MobileSpotActionButton(
+                  icon: Icons.share_rounded,
+                  label: 'PARTAGER',
+                  onTap: () => _activateAction(
+                    1,
+                    widget.onShare,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: KeyedSubtree(
+                key: _actionKeys[2],
+                child: _MobileSpotActionButton(
+                  icon: widget.isSaved
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
+                  label: widget.isSaved ? 'ENREGISTRÉ' : 'ENREGISTRER',
+                  selected: widget.isSaved,
+                  onTap: () => _activateAction(
+                    2,
+                    widget.onSave,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-        children: [
-          KeyedSubtree(
-            key: _actionKeys[0],
-            child: _MobileSpotActionButton(
-              icon: Icons.navigation_rounded,
-              label: 'DÉMARRER',
-              onTap: () => _activateAction(
-                0,
-                widget.onStart,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          KeyedSubtree(
-            key: _actionKeys[1],
-            child: _MobileSpotActionButton(
-              icon: Icons.share_rounded,
-              label: 'PARTAGER',
-              onTap: () => _activateAction(
-                1,
-                widget.onShare,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          KeyedSubtree(
-            key: _actionKeys[2],
-            child: _MobileSpotActionButton(
-              icon: widget.isSaved
-                  ? Icons.bookmark_rounded
-                  : Icons.bookmark_border_rounded,
-              label: widget.isSaved ? 'ENREGISTRÉ' : 'ENREGISTRER',
-              selected: widget.isSaved,
-              onTap: () => _activateAction(
-                2,
-                widget.onSave,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1907,6 +1909,7 @@ class _MobileSpotActionButton extends StatelessWidget {
           ),
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               icon,
