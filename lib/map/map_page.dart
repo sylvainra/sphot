@@ -1434,7 +1434,7 @@ void _searchAndMoveToSpot(
   _searchTimer?.cancel();
 
   _searchTimer = Timer(
-    const Duration(milliseconds: 650),
+    const Duration(milliseconds: 1000),
     () {
       if (!mounted) return;
 
@@ -1462,9 +1462,6 @@ void _searchAndMoveToSpot(
         debugPrint('VILLE TROUVÉE : ${spot.ville}');
         debugPrint('GPS VILLE : ${spot.villeLat}, ${spot.villeLng}');
 
-        _searchController.clear();
-        setState(() {});
-
         _mapController.move(
           LatLng(spot.villeLat, spot.villeLng),
           12.5,
@@ -1486,9 +1483,6 @@ void _searchAndMoveToSpot(
           'GPS DÉPARTEMENT : ${spot.departementLat}, ${spot.departementLng}',
         );
 
-        _searchController.clear();
-        setState(() {});
-
         _mapController.move(
           LatLng(spot.departementLat, spot.departementLng),
           9.5,
@@ -1505,9 +1499,6 @@ void _searchAndMoveToSpot(
 
       debugPrint('SPHOT TROUVÉ : ${spot.name}');
       debugPrint('GPS SPHOT : ${spot.lat}, ${spot.lng}');
-
-      _searchController.clear();
-      setState(() {});
 
       _mapController.move(
         LatLng(spot.lat, spot.lng),
