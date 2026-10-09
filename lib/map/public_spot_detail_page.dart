@@ -33,11 +33,11 @@ const LinearGradient _sphotWarmSoftGradient = LinearGradient(
   begin: Alignment.topCenter,
   end: Alignment.bottomCenter,
   colors: <Color>[
-    Color(0x14E72B20),
-    Color(0x0DF97316),
-    Color(0x08F6B51B),
+    Color(0xFFFFF1EE),
+    Color(0xFFFFF8F2),
+    Color(0xFFFFFBEA),
   ],
-  stops: <double>[0, 0.58, 1],
+  stops: <double>[0, 0.56, 1],
 );
 
 const TextStyle _publicSectionTitleStyle = TextStyle(
