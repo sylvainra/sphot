@@ -16,6 +16,31 @@ class FirestoreService {
     });
   }
 
+  Future<List<Map<String, dynamic>>> getPublicAdminMarkers() async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://europe-west1-sphot-ab80b.cloudfunctions.net/'
+              'getPublicAdminMarkers',
+            ),
+          )
+          .timeout(const Duration(seconds: 6));
+
+      if (response.statusCode != 200) return const [];
+
+      final payload = jsonDecode(response.body);
+      if (payload is! Map || payload['admins'] is! List) return const [];
+
+      return (payload['admins'] as List)
+          .whereType<Map>()
+          .map((admin) => Map<String, dynamic>.from(admin))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getPublicAdvertisingSpots() async {
     try {
       final response = await http
