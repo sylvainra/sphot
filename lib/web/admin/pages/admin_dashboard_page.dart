@@ -2751,27 +2751,27 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           'territoire.logoMimeType': uploadResult.mimeType,
           'territoire.logoFileSizeBytes': uploadResult.sizeBytes,
           'territoire.logoUploadedAt': now,
+          'logoVille': uploadResult.url,
+          'logoStoragePath': uploadResult.storagePath,
+          'logoFileName': uploadResult.fileName,
+          'logoMimeType': uploadResult.mimeType,
+          'logoFileSizeBytes': uploadResult.sizeBytes,
           'updatedAt': now,
         };
 
+        // update() interprète correctement les chemins "territoire.xxx".
+        // set(..., merge:true) les enregistrait auparavant comme des noms de
+        // champs littéraux, ce qui faisait réapparaître l'ancien logo après
+        // rechargement.
         for (final reference in requestReferences) {
-          await reference.set(
-            nestedLogoData,
-            SetOptions(merge: true),
-          );
+          await reference.update(nestedLogoData);
         }
 
         final adminReference = firestore.collection('admins').doc(uid);
         final adminSnapshot = await adminReference.get();
 
         if (adminSnapshot.exists) {
-          await adminReference.set(
-            {
-              ...nestedLogoData,
-              'logoVille': uploadResult.url,
-            },
-            SetOptions(merge: true),
-          );
+          await adminReference.update(nestedLogoData);
         }
       }
 
@@ -13732,6 +13732,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       final logoVille = _normalizeRemoteImageUrl(
         _firstCleanText([
+          administratorData['territoire.logoVille'],
+          administratorData['territoire.logoUrl'],
           territoire['logoVille'],
           territoire['logoUrl'],
           structure['logoVille'],
@@ -14525,6 +14527,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     final logoUrl = _normalizeRemoteImageUrl(
       _firstCleanText([
+        data['territoire.logoVille'],
+        data['territoire.logoUrl'],
         territoire['logoVille'],
         territoire['logoUrl'],
         structure['logoVille'],
@@ -14535,6 +14539,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
 
     final logoMimeType = _firstCleanText([
+      data['territoire.logoMimeType'],
       territoire['logoMimeType'],
       structure['logoMimeType'],
       data['logoMimeType'],
