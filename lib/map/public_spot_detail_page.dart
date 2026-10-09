@@ -1020,22 +1020,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     );
   }
 
-  String _formatFrenchPhoneForDisplay(String rawPhone) {
-    final digits = rawPhone.replaceAll(RegExp(r'[^0-9]'), '');
-
-    if (digits.length == 10 && digits.startsWith('0')) {
-      final groups = <String>[];
-
-      for (var index = 0; index < digits.length; index += 2) {
-        groups.add(digits.substring(index, index + 2));
-      }
-
-      return groups.join(' ');
-    }
-
-    return rawPhone.trim();
-  }
-
   Widget _buildActionsPage(
     BuildContext context,
     SpotFlagState spot,
@@ -1322,17 +1306,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             ],
           ),
         ),
-        if (spot.phone.trim().isNotEmpty) ...[
-          const SizedBox(height: 10),
-          _MobilePublicCard(
-            child: _PublicInfoLine(
-              icon: Icons.phone_in_talk_outlined,
-              label: 'Téléphone du poste de secours',
-              value: _formatFrenchPhoneForDisplay(spot.phone),
-              onTap: () => _call(spot),
-            ),
-          ),
-        ],
         if (hasCoreInfo) ...[
           const SizedBox(height: 10),
           _MobilePublicCard(
