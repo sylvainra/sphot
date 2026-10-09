@@ -717,35 +717,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
         _UnsupervisedWarning(title: warningTitle),
-        const SizedBox(height: 10),
-
-        _MobilePublicCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                spot.mapDisplayName,
-                style: const TextStyle(
-                  color: Color(0xFF172033),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  height: 1.2,
-                ),
-              ),
-              if (spot.ville.trim().isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  spot.ville.toUpperCase(),
-                  style: const TextStyle(
-                    color: _sphotWarmRed,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
 
         if (spot.publicMediaUrl.isNotEmpty) ...[
           const SizedBox(height: 10),
