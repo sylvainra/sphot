@@ -1126,7 +1126,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                   children: [
                     Icon(
                       Icons.sync_rounded,
-                      color: Color(0xFF64748B),
+                      color: _sphotWarmOrange,
                       size: 20,
                     ),
                     SizedBox(width: 8),
@@ -1166,7 +1166,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                   children: [
                     Icon(
                       Icons.info_outline_rounded,
-                      color: Color(0xFF64748B),
+                      color: _sphotWarmOrange,
                       size: 20,
                     ),
                     SizedBox(width: 8),
@@ -2210,14 +2210,14 @@ class _PublicLiveDataSection extends StatelessWidget {
                 Icon(
                   Icons.sync_rounded,
                   size: 18,
-                  color: Color(0xFF64748B),
+                  color: _sphotWarmOrange,
                 ),
                 SizedBox(width: 7),
                 Expanded(
                   child: Text(
                     'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR',
                     style: TextStyle(
-                      color: Color(0xFF64748B),
+                      color: _sphotWarmRed,
                       fontSize: 12,
                       fontWeight: FontWeight.w900,
                     ),
@@ -2260,14 +2260,14 @@ class _PublicLiveDataSection extends StatelessWidget {
                 Icon(
                   Icons.info_outline_rounded,
                   size: 18,
-                  color: Color(0xFF64748B),
+                  color: _sphotWarmOrange,
                 ),
                 SizedBox(width: 7),
                 Expanded(
                   child: Text(
                     'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES',
                     style: TextStyle(
-                      color: Color(0xFF64748B),
+                      color: _sphotWarmRed,
                       fontSize: 12,
                       fontWeight: FontWeight.w900,
                     ),
@@ -2311,9 +2311,10 @@ class _PublicLiveDataSection extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        gradient: _sphotWarmSoftGradient,
+        color: _sphotWarmSurface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFDCE3EA)),
+        border: Border.all(color: _sphotWarmBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
