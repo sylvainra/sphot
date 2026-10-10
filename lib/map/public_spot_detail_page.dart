@@ -1130,7 +1130,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                       width: 78,
                       height: 98,
                       child: Center(
-                        child: FlagMarker(spot: spot),
+                        child: FlagMarker(spot: spot, compactDetail: true),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -2009,7 +2009,7 @@ class _LiveOperationalSnapshot extends StatelessWidget {
                     width: 88,
                     height: 104,
                     child: Center(
-                      child: FlagMarker(spot: currentSpot),
+                      child: FlagMarker(spot: currentSpot, compactDetail: true),
                     ),
                   ),
                   const SizedBox(width: 10),
