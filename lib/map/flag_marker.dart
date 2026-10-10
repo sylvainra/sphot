@@ -8,9 +8,13 @@ import '../widgets/danger_pictogram.dart';
 class FlagMarker extends StatefulWidget {
   final SpotFlagState spot;
 
+  // L'aperçu sauveteur dispose d'un mât plus haut que les marqueurs de carte.
+  final bool sauveteurPreview;
+
   const FlagMarker({
     super.key,
     required this.spot,
+    this.sauveteurPreview = false,
   });
 
   @override
@@ -22,10 +26,10 @@ class _FlagMarkerState extends State<FlagMarker>
   late final AnimationController _controller;
 
   static const double markerWidth = 70;
-  static const double markerHeight = 95;
+  static const double _normalMarkerHeight = 95;
+  static const double _previewMarkerHeight = 145;
 
   static const double poleWidth = 4;
-  static const double poleHeight = 75;
   static const double poleLeft = (markerWidth - poleWidth) / 2;
 
   static const double flagLeft = poleLeft + poleWidth - 1;
@@ -33,7 +37,6 @@ class _FlagMarkerState extends State<FlagMarker>
   static const double flagHeight = 30;
 
   static const double flagTopHisse = 18;
-  static const double flagTopAffale = 54;
 
   @override
   void initState() {
@@ -66,12 +69,6 @@ class _FlagMarkerState extends State<FlagMarker>
     }
   }
 
-  double get flagTop {
-    return widget.spot.flagPosition == FlagPosition.affale
-        ? flagTopAffale
-        : flagTopHisse;
-  }
-
   @override
   Widget build(BuildContext context) {
     final purpleFlagActive = widget.spot.liveFlag?['purpleFlagActive'] == true;
@@ -82,20 +79,30 @@ class _FlagMarkerState extends State<FlagMarker>
 
     final isAffale = widget.spot.flagPosition == FlagPosition.affale;
 
-    // Si le drapeau principal est affalé et que le drapeau violet est activé,
-    // on remonte le drapeau principal pour laisser la place au violet dessous.
-    final mainFlagTop =
-        isAffale && purpleFlagActive ? flagTopAffale - 16 : flagTop;
+    // Le mât du sauveteur retrouve sa hauteur de présentation. Sur la carte,
+    // seul un ensemble de deux drapeaux affalés bénéficie de place supplémentaire.
+    final markerHeight = widget.sauveteurPreview
+        ? _previewMarkerHeight
+        : isAffale && purpleFlagActive
+            ? 125.0
+            : _normalMarkerHeight;
+    final poleHeight = markerHeight - 20;
 
-    // Le drapeau violet a exactement la même taille que les autres drapeaux
-    // et se place sous le drapeau principal.
-    final purpleFlagTop = mainFlagTop + 20;
+    // En position affalée, les drapeaux restent en bas du mât. Avec le violet,
+    // le drapeau principal remonte juste assez pour garder deux pavillons entiers.
+    final mainFlagTop = isAffale
+        ? markerHeight - (purpleFlagActive ? 66 : 41)
+        : flagTopHisse;
 
-    // On laisse plus d'espace avant la manche à air pour éviter qu'elle soit
-    // trop collée au drapeau.
-    final windsockTop = purpleFlagActive
-        ? purpleFlagTop + flagHeight + 8
-        : mainFlagTop + flagHeight + 10;
+    // Deux pavillons de même taille avec 32 px entre leurs points d'attache.
+    final purpleFlagTop = mainFlagTop + 32;
+
+    // La manche à air est horizontalement à côté du drapeau inférieur, et
+    // verticalement centrée sur sa moitié, sans le recouvrir.
+    const windsockHeight = 11.0;
+    final lowerFlagTop = purpleFlagActive ? purpleFlagTop : mainFlagTop;
+    final windsockTop = lowerFlagTop + (flagHeight - windsockHeight) / 2;
+    const windsockLeft = flagLeft + flagWidth + 6;
 
     return SizedBox(
       width: markerWidth,
@@ -155,7 +162,7 @@ class _FlagMarkerState extends State<FlagMarker>
             ),
           if (hasMainFlag && windsockActive)
             Positioned(
-              left: flagLeft,
+              left: windsockLeft,
               top: windsockTop,
               child: AnimatedBuilder(
                 animation: _controller,
