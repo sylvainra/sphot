@@ -100,12 +100,6 @@ static const List<_MapTileStyle> _tileStyles = [
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   maxZoom: 19,
   ),
-  _MapTileStyle(
-    name: 'Relief',
-    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-    subdomains: ['a', 'b', 'c'],
-    maxZoom: 17,
-  ),
 ];
 
 @override
@@ -1794,8 +1788,6 @@ Color _mapStyleColor(int index) {
       return const Color(0xFF2E7D32); // Plan
     case 1:
       return const Color(0xFF1E3A8A); // Satellite
-    case 2:
-      return const Color(0xFF8B5E3C); // Relief
     default:
       return Colors.black;
   }
@@ -1822,39 +1814,10 @@ Widget _mapStyleIcon(int index) {
     );
   }
 
-  /// STYLE RELIEF
-  return SizedBox(
-    width: 28,
-    height: 28,
-    child: Stack(
-      alignment: Alignment.center,
-      children: [
-        Transform.rotate(
-          angle: -0.18,
-          child: Icon(
-            Icons.map,
-            size: 24,
-            color: const Color(0xFF8B5E3C).withOpacity(
-              selected ? 1.0 : 0.6,
-            ), // marron relief
-          ),
-        ),
-
-        Transform.translate(
-          offset: const Offset(4, -2),
-          child: Transform.rotate(
-            angle: 0.12,
-            child: Icon(
-              Icons.map,
-              size: 20,
-              color: const Color(0xFF2E7D32).withOpacity(
-                selected ? 1.0 : 0.6,
-              ), // vert rivière
-            ),
-          ),
-        ),
-      ],
-    ),
+  return Icon(
+    Icons.satellite_alt,
+    size: 26,
+    color: _mapStyleColor(index).withOpacity(selected ? 1.0 : 0.6),
   );
 }
 
