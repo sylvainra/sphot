@@ -380,7 +380,10 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                       ),
                       child: Column(
                         children: [
-                          _MenuSquare(
+                          // Répartition proportionnelle : pas de grand vide entre les encarts.
+                          Expanded(
+                            flex: 3,
+                            child: _MenuSquare(
                             title: 'ACTIONS RAPIDES',
                             icon: Icons.warning_amber_rounded,
                             color: const Color(0xFFD50000),
@@ -400,24 +403,19 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                 ),
                               );
                             },
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Expanded(
+                            flex: 7,
                             child: LayoutBuilder(
                               builder: (context, constraints) {
                                 const tileSpacing = 6.0;
-                                final tileWidth = (constraints.maxWidth - tileSpacing * 2) / 3;
-                                // Les six tuiles centrales restent compactes,
-                                // même sur un écran de grande hauteur.
-                                const maxGridHeight = 170.0;
-                                final gridHeight = constraints.maxHeight < maxGridHeight
-                                    ? constraints.maxHeight
-                                    : maxGridHeight;
-                                final tileHeight = (gridHeight - tileSpacing) / 2;
-                                return Center(
-                                  child: SizedBox(
-                                    height: gridHeight,
-                                    child: GridView.count(
+                                final tileWidth =
+                                    (constraints.maxWidth - tileSpacing * 2) / 3;
+                                final tileHeight =
+                                    (constraints.maxHeight - tileSpacing) / 2;
+                                return GridView.count(
                                   physics: const NeverScrollableScrollPhysics(),
                                   crossAxisCount: 3,
                                   crossAxisSpacing: tileSpacing,
@@ -561,15 +559,16 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                   },
                                 ),
                                   ],
-                                    ),
-                                  ),
                                 );
                               },
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
+                          const SizedBox(height: 6),
+                          Expanded(
+                            flex: 3,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
                               Expanded(
                                 child: _MaterialVerificationSquare(
                                   title: 'SECOURS',
@@ -668,9 +667,12 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                 ),
                               ),
                             ],
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          _MenuSquare(
+                          const SizedBox(height: 6),
+                          Expanded(
+                            flex: 3,
+                            child: _MenuSquare(
                             title: 'MAIN COURANTE',
                             icon: Icons.menu_book_rounded,
                             color: const Color(0xFF8E24AA),
@@ -694,6 +696,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                 ),
                               );
                             },
+                            ),
                           ),
                         ],
                       ),
