@@ -259,7 +259,7 @@ Future<void> _toggleFavoritesFilter() async {
 
       final statusText = spot.hasValidFlag
           ? spot.displayStatut.replaceAll('⚠️ ', '')
-          : 'BAIGNADE NON SURVEILLÉE';
+          : _rescueWarningLines(spot).join(' ');
       final statusHeight = spot.hasValidFlag
           ? max(
               24.0,
@@ -270,7 +270,9 @@ Future<void> _toggleFavoritesFilter() async {
                 fontWeight: FontWeight.w900,
               ),
             )
-          : 49.0;
+          : _rescueWarningLines(spot).length == 1
+              ? 27.0
+              : 49.0;
 
       // Le haut réel du mât se situe environ 75 px au-dessus
       // du point GPS du marker sélectionné.
@@ -3582,6 +3584,42 @@ const SizedBox(width: 2),
   }
 }
 
+// Les messages affichés sous le marqueur correspondent exclusivement
+// aux informations publiques, aux droits temps réel et aux signaux sauveteur.
+// Aucune période de surveillance n'est supposée si elle n'est pas renseignée.
+List<String> _rescueWarningLines(SpotFlagState spot) {
+  if (spot.isRealtimeAwaitingUpdate) {
+    return const [
+      'SURVEILLANCE NON RENSEIGNÉE',
+      'COULEUR DE LA FLAMME NON RENSEIGNÉE',
+    ];
+  }
+
+  if (!spot.realtimeAvailable) {
+    return const ['INFORMATIONS EN TEMPS RÉEL INDISPONIBLES'];
+  }
+
+  if (spot.flagPosition == FlagPosition.affale) {
+    return const [
+      'BAIGNADE NON SURVEILLÉE TEMPORAIREMENT',
+      'BAIGNADE À VOS RISQUES ET PÉRILS',
+    ];
+  }
+
+  if (spot.flagPosition == FlagPosition.none ||
+      spot.flagColor == FlagColor.none) {
+    return const [
+      'SURVEILLANCE NON RENSEIGNÉE',
+      'COULEUR DE LA FLAMME NON RENSEIGNÉE',
+    ];
+  }
+
+  return const [
+    'BAIGNADE NON SURVEILLÉE',
+    'BAIGNADE À VOS RISQUES ET PÉRILS',
+  ];
+}
+
 Widget _rescueStatusUnderMarker(
   SpotFlagState spot,
   double size,
@@ -3616,18 +3654,14 @@ Widget _rescueStatusUnderMarker(
     );
   }
 
+  final warnings = _rescueWarningLines(spot);
   return Column(
     mainAxisSize: MainAxisSize.min,
     children: [
-      _warningLineUniform(
-        'BAIGNADE NON SURVEILLÉE',
-        size,
-      ),
-      const SizedBox(height: 1),
-      _warningLineUniform(
-        'BAIGNADE À VOS RISQUES ET PÉRILS',
-        size,
-      ),
+      for (var i = 0; i < warnings.length; i++) ...[
+        if (i > 0) const SizedBox(height: 1),
+        _warningLineUniform(warnings[i], size),
+      ],
     ],
   );
 }
