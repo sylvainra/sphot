@@ -10,7 +10,6 @@ import '../../map/flag_marker.dart';
 import '../../models/flag_state.dart';
 import '../../widgets/adaptive_asset_image.dart';
 import '../../widgets/danger_pictogram.dart';
-import 'widgets/sauveteur_styled_dropdown.dart';
 
 class SauveteurActionsRapidesPage extends StatefulWidget {
   final Color profileColor;
@@ -764,49 +763,6 @@ class _SauveteurActionsRapidesPageState
     padding: const EdgeInsets.fromLTRB(16, 0, 16, 50),
     child: Column(
       children: [
-                          _sectionCard(
-                            title: 'Choix du SPHOT de surveillance',
-                            leading: const AdaptiveAssetImage(
-                              'data/icons/fire_red_icon.svg',
-                              width: 24,
-                              height: 24,
-                            ),
-                            children: [
-                              const SizedBox(height: 5),
-                              SauveteurStyledDropdown(
-                                labelText: 'SPHOT surveillé',
-                                value: selectedSpotId,
-                                enabled: !_loadingSpots,
-                                options: postesSecoursCommune.map((poste) {
-                                  final secours =
-                                      (poste['nomSecours'] ?? '').trim();
-                                  final sphot =
-                                      (poste['nomSphot'] ?? '').trim();
-                                  final label = [
-                                    secours,
-                                    sphot,
-                                  ].where((value) => value.isNotEmpty).join(
-                                        ' - ',
-                                      );
-
-                                  return SauveteurDropdownOption(
-                                    value: poste['spotId'] ?? '',
-                                    label: label,
-                                  );
-                                }).where((option) {
-                                  return option.value.isNotEmpty;
-                                }).toList(),
-                                onChanged: (spotId) {
-                                  final poste =
-                                      postesSecoursCommune.firstWhere(
-                                    (item) => item['spotId'] == spotId,
-                                  );
-                                  unawaited(_selectSpot(poste));
-                                },
-                              ),
-                            ],
-                          ),
-
                           if (_loadingSpots)
                             const Padding(
                               padding: EdgeInsets.only(bottom: 6),
