@@ -24,6 +24,12 @@ const SPHOT_SAUVETEUR_LOGIN_URL =
 
 setGlobalOptions({maxInstances: 10});
 
+/**
+ * Détermine si un SPHOT est déclaré comme poste de secours surveillé.
+ *
+ * @param {Object} spot Données du SPHOT.
+ * @return {boolean} Vrai si le SPHOT est déclaré surveillé.
+ */
 function isSupervisedSpotData(spot) {
   const data = spot || {};
   const type = (data.typeSphot || "").toString().trim().toUpperCase();
@@ -37,6 +43,8 @@ function isSupervisedSpotData(spot) {
  * @param {string} territoireId Identifiant du territoire.
  * @param {string} spotId Identifiant du SPHOT.
  * @param {Object} spot Données internes du SPHOT.
+ * @param {string} realtimeStatus État du service temps réel public.
+ * @param {Date|null|undefined} realtimeValidUntil Fin du droit temps réel.
  * @return {Object} Données autorisées sur la carte publique.
  */
 function buildPublicSpot(
