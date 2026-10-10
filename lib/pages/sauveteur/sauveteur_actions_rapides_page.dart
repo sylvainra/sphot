@@ -627,12 +627,15 @@ class _SauveteurActionsRapidesPageState
                     ),
                   ),
                 ),
+                // Réserve au mât toute la hauteur utile de l'aperçu,
+                // indépendamment des marqueurs plus compacts de la carte.
                 Padding(
-                  padding: const EdgeInsets.only(top: 18, bottom: 18),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Transform.scale(
-                    scale: 1.08,
+                    scale: 1.02,
                     child: FlagMarker(
                       spot: _previewSpotState(),
+                      sauveteurPreview: true,
                     ),
                   ),
                 ),
