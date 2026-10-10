@@ -3486,7 +3486,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
       onExit: (_) => setState(() => isHovering = false),
       child: SizedBox(
         width: 70,
-        height: 95,
+        height: 132,
         child: Transform.rotate(
           angle: -widget.rotation * pi / 180,
           alignment: Alignment.center,
