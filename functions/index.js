@@ -11130,56 +11130,6 @@ function sanitizeMainCouranteVictim(rawVictim) {
 }
 
 /**
- * Nettoie les personnels présents et leurs horaires.
- * @param {Array<*>} rawPersonnel Personnels reçus du client.
- * @return {Array<Object>} Personnels présents normalisés.
- */
-function sanitizeMainCourantePresencePersonnel(rawPersonnel) {
-  if (!Array.isArray(rawPersonnel)) return [];
-
-  const clean = (value, maxLength = 160) =>
-    (value || "").toString().trim().slice(0, maxLength);
-
-  return rawPersonnel
-      .map((raw) => {
-        const source = raw &&
-            typeof raw === "object" &&
-            !Array.isArray(raw) ?
-          raw :
-          {};
-
-        return {
-          name: clean(source.name, 140),
-          quality: clean(source.quality, 140),
-          hours: clean(source.hours, 180),
-        };
-      })
-      .filter((person) => person.name && person.hours);
-}
-
-/**
- * Nettoie les catégories terrain d'une intervention.
- * @param {Array<*>} rawZones Catégories reçues du client.
- * @return {Array<string>} Catégories reconnues et dédupliquées.
- */
-function sanitizeMainCouranteInterventionZones(rawZones) {
-  const allowed = new Set([
-    "Zone de bain surveillée",
-    "Hors zone de bain surveillée",
-    "Zone réglementée",
-    "Hors zone réglementée",
-  ]);
-
-  if (!Array.isArray(rawZones)) return [];
-
-  return [...new Set(
-      rawZones
-          .map((value) => (value || "").toString().trim())
-          .filter((value) => allowed.has(value)),
-  )];
-}
-
-/**
  * Vérifie que l'intervention est qualifiée sur les deux axes terrain.
  * @param {Array<string>} zones Catégories d'intervention normalisées.
  * @return {boolean} Vrai si un choix cohérent existe pour chaque axe.
