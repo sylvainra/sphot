@@ -447,55 +447,71 @@ Future<void> _toggleFavoritesFilter() async {
     return _latLngFromMercatorPixelPoint(centerPoint, zoom);
   }
 
-  Set<String> _automaticTouchLabelIds(
+  // Étiquettes automatiques Web/mobile : icônes toujours visibles,
+  // priorité au SPHOT sélectionné puis aux postes de secours.
+  // On compare les zones de texte projetées, pas les seuls points.
+  Set<String> _automaticLabelIds(
     List<SpotFlagState> spots,
     double zoom,
   ) {
-    if (!_useAutomaticTouchLabels || zoom < 14.7) {
-      return const <String>{};
-    }
+    if (zoom < 16.0) return const <String>{};
 
     final candidates = spots
-        .where(
-          (spot) =>
-              spot.lat.isFinite &&
-              spot.lng.isFinite &&
-              spot.mapDisplayName.trim().isNotEmpty,
-        )
+        .where((spot) =>
+            spot.lat.isFinite &&
+            spot.lng.isFinite &&
+            spot.mapDisplayName.trim().isNotEmpty)
         .toList()
       ..sort((a, b) {
         if (a.id == _selectedPublicSpotId) return -1;
         if (b.id == _selectedPublicSpotId) return 1;
-
         if (a.isPosteSecours != b.isPosteSecours) {
           return a.isPosteSecours ? -1 : 1;
         }
-
         final latitudeCompare = a.lat.compareTo(b.lat);
         if (latitudeCompare != 0) return latitudeCompare;
-
         final longitudeCompare = a.lng.compareTo(b.lng);
         if (longitudeCompare != 0) return longitudeCompare;
-
         return a.id.compareTo(b.id);
       });
 
-    final minimumDistance = _automaticLabelMinimumDistance(zoom);
-    final acceptedPoints = <Offset>[];
+    final acceptedAreas = <Rect>[];
     final acceptedIds = <String>{};
+    final screenWidth = MediaQuery.sizeOf(context).width;
 
     for (final spot in candidates) {
       final point = _mercatorPixelPoint(spot, zoom);
+      final isRescue = spot.isPosteSecours;
       final selected = spot.id == _selectedPublicSpotId;
-
-      final overlaps = acceptedPoints.any(
-        (accepted) => (accepted - point).distance < minimumDistance,
+      final longestLabel = <String>[
+        spot.mapDisplayName,
+        spot.ville,
+        if (isRescue)
+          'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES'
+        else
+          'BAIGNADE À VOS RISQUES ET PÉRILS',
+      ].fold<int>(
+        0,
+        (maxLength, value) => max(maxLength, value.runes.length),
+      );
+      final width = min(
+        screenWidth - 20.0,
+        min(320.0, max(140.0, longestLabel * (zoom >= 17 ? 8.4 : 7.6))),
+      );
+      final height = isRescue ? 116.0 : 110.0;
+      final labelTopOffset = isRescue ? 4.0 : 20.0;
+      final area = Rect.fromLTWH(
+        point.dx - width / 2 - 8,
+        point.dy + labelTopOffset - 7,
+        width + 16,
+        height + 14,
       );
 
-      if (!selected && overlaps) continue;
-
+      if (!selected && acceptedAreas.any((other) => other.overlaps(area))) {
+        continue;
+      }
       acceptedIds.add(spot.id);
-      acceptedPoints.add(point);
+      acceptedAreas.add(area);
     }
 
     return acceptedIds;
@@ -1941,7 +1957,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
           iconPath: _getMarkerIconPath(spot),
           showTextAllowed: showText,
           forceShowText: _selectedPublicSpotId == spot.id,
-          autoShowName: autoShowName || zoom >= 16.0,
+          autoShowName: autoShowName,
           zoom: zoom,
           rotation: rotation,
           labelOpacity: _labelOpacity(zoom),
@@ -1976,7 +1992,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
                 spot: spot,
                 showTextAllowed: showText,
                 forceShowText: _selectedPublicSpotId == spot.id,
-                autoShowName: autoShowName || zoom >= 16.0,
+                autoShowName: autoShowName,
                 zoom: zoom,
                 rotation: rotation,
                 labelOpacity: _labelOpacity(zoom),
@@ -2690,7 +2706,7 @@ onPositionChanged: (position, hasGesture) {
                           .where((spot) => !spot.isPosteSecours)
                           .toList();
                       final automaticLabelIds =
-                          _automaticTouchLabelIds(visibleSpots, zoom);
+                          _automaticLabelIds(visibleSpots, zoom);
                       final markers = _buildMarkers(
                         otherSpots,
                         automaticLabelIds,
@@ -2715,7 +2731,7 @@ onPositionChanged: (position, hasGesture) {
                       final rotation = MapCamera.of(context).rotation;
 
                       final automaticLabelIds =
-                          _automaticTouchLabelIds(visibleSpots, zoom);
+                          _automaticLabelIds(visibleSpots, zoom);
 
                       return MarkerLayer(
                         markers: _buildSecoursMarkers(
@@ -3476,7 +3492,8 @@ class _HoverMarkerState extends State<_HoverMarker> {
             clipBehavior: Clip.none,
             children: [
               Transform.translate(
-                offset: const Offset(0, -47.5),
+                // Pied inchangé : l'allongement du mât se fait vers le haut.
+                offset: const Offset(0, -84.5),
                 child: FlagMarker(spot: spot),
               ),
               if (showAutomaticName)
@@ -3523,8 +3540,8 @@ class _HoverMarkerState extends State<_HoverMarker> {
                               children: [
                                 SvgPicture.asset(
                                   'data/icons/flag_red_yellow_5x3.svg',
-                                  width: 12,
-                                  height: 14,
+                                  width: 10,
+                                  height: 12,
                                   fit: BoxFit.contain,
                                 ),
                                 const SizedBox(width: 4),
@@ -3591,8 +3608,8 @@ class _HoverMarkerState extends State<_HoverMarker> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Transform.scale(
-  scaleX: 0.8,
-  scaleY: 1.4,
+  scaleX: 0.65,
+  scaleY: 1.25,
   alignment: Alignment.centerLeft,
   child: SizedBox(
     width: 18,
