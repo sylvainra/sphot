@@ -18,10 +18,11 @@ class FlagMarker extends StatefulWidget {
   // Le mât de la fiche Live reste compact, contrairement à celui de la carte.
   final bool compactDetail;
 
-  // Correctif propre à la fiche Live Web. Aucun effet sur l'application,
-  // la carte ou l'espace sauveteur.
+  // Configuration propre à la fiche LIVE Web. Cette valeur n'est vraie
+  // dans aucun autre constructeur spécialisé (carte, mobile, sauveteur).
   final bool desktopLive;
 
+  // Constructeur historique conservé pour la compatibilité.
   const FlagMarker({
     super.key,
     required this.spot,
@@ -30,6 +31,42 @@ class FlagMarker extends StatefulWidget {
     this.compactDetail = false,
     this.desktopLive = false,
   });
+
+  // Chaque surface sélectionne explicitement sa configuration.
+  // Les quatre réglages peuvent évoluer indépendamment sans modifier
+  // accidentellement le mât d'un autre écran.
+  const FlagMarker.map({
+    super.key,
+    required this.spot,
+  })  : sauveteurPreview = false,
+        sauveteurPreviewHeight = null,
+        compactDetail = false,
+        desktopLive = false;
+
+  const FlagMarker.publicLiveMobile({
+    super.key,
+    required this.spot,
+  })  : sauveteurPreview = false,
+        sauveteurPreviewHeight = null,
+        compactDetail = true,
+        desktopLive = false;
+
+  const FlagMarker.publicLiveWeb({
+    super.key,
+    required this.spot,
+  })  : sauveteurPreview = false,
+        sauveteurPreviewHeight = null,
+        compactDetail = true,
+        desktopLive = true;
+
+  const FlagMarker.actionsRapides({
+    super.key,
+    required this.spot,
+    required double height,
+  })  : sauveteurPreview = true,
+        sauveteurPreviewHeight = height,
+        compactDetail = false,
+        desktopLive = false;
 
   @override
   State<FlagMarker> createState() => _FlagMarkerState();
@@ -128,20 +165,21 @@ class _FlagMarkerState extends State<FlagMarker>
     final hasTripleSignal = hasMainFlag && purpleFlagActive && windsockActive;
     final loweredTripleGroupLift =
         isAffale && hasTripleSignal ? tripleSignalWindsockDrop : 0.0;
-    // Dans la fiche Live seulement, le mât a été allongé de 15 px
-    // vers le haut : remonter les signaux hissés d'autant.
-    // Le violet et la manche à air suivent automatiquement le drapeau
-    // principal ; les positions affalées et les marqueurs de carte
-    // restent strictement inchangés.
+    // Comportements indépendants par surface :
+    // - carte : positions existantes conservées ;
+    // - LIVE mobile : position compacte inchangée ;
+    // - LIVE Web : le drapeau hissé descend de 12 px afin de longer le mât ;
+    // - Actions rapides : aperçu hissé / affalé inchangé.
+    // La translation LIVE Web ne s'applique JAMAIS aux drapeaux affalés.
     const compactHissedLift = 15.0;
-    const desktopHissedLift = 15.0;
+    const webLiveHissedDrop = 12.0;
     final mainFlagTop = isAffale
         ? lowerFlagTop -
             ((purpleFlagActive || windsockActive) ? flagStep : 0) -
             loweredTripleGroupLift
         : flagTopHisse -
-            (widget.compactDetail ? compactHissedLift : 0) -
-            (widget.desktopLive ? desktopHissedLift : 0);
+            (widget.compactDetail ? compactHissedLift : 0) +
+            (widget.desktopLive ? webLiveHissedDrop : 0);
     final purpleFlagTop = mainFlagTop + flagStep;
 
     // Même en l'absence du violet, la manche à air se situe à la moitié
