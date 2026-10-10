@@ -699,34 +699,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         _UnsupervisedWarning(title: warningTitle),
         const SizedBox(height: 10),
 
-        _MobilePublicCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                spot.mapDisplayName,
-                style: const TextStyle(
-                  color: Color(0xFF172033),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  height: 1.2,
-                ),
-              ),
-              if (spot.ville.trim().isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  spot.ville.toUpperCase(),
-                  style: const TextStyle(
-                    color: _sphotWarmRed,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-
         if (spot.publicMediaUrl.isNotEmpty) ...[
           const SizedBox(height: 10),
           _MobilePublicCard(
@@ -888,12 +860,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 7, 6, 6),
+      padding: const EdgeInsets.fromLTRB(16, 5, 6, 4),
       decoration: const BoxDecoration(
         gradient: _sphotWarmSoftGradient,
-        border: Border(
-          bottom: BorderSide(color: _sphotWarmBorder),
-        ),
       ),
       child: Row(
         children: [
@@ -1112,22 +1081,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     );
   }
 
-  String _formatFrenchPhoneForDisplay(String rawPhone) {
-    final digits = rawPhone.replaceAll(RegExp(r'[^0-9]'), '');
-
-    if (digits.length == 10 && digits.startsWith('0')) {
-      final groups = <String>[];
-
-      for (var index = 0; index < digits.length; index += 2) {
-        groups.add(digits.substring(index, index + 2));
-      }
-
-      return groups.join(' ');
-    }
-
-    return rawPhone.trim();
-  }
-
   Widget _buildActionsPage(
     BuildContext context,
     SpotFlagState spot,
@@ -1210,7 +1163,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           const SizedBox(height: 10),
           _MobileQuickAction(
             icon: Icons.call_outlined,
-            label: 'Appeler',
+            label: 'CONTACTER LE POSTE DE SECOURS EN CAS D’URGENCE',
             onTap: () => _call(spot),
           ),
         ],
@@ -1297,46 +1250,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
       ),
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
-        _MobilePublicCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                spot.mapDisplayName,
-                style: TextStyle(
-                  color: spot.isPosteSecours
-                      ? const Color(0xFFFF0000)
-                      : const Color(0xFF172033),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  height: 1.2,
-                ),
-              ),
-              if (spot.ville.trim().isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  spot.ville.toUpperCase(),
-                  style: const TextStyle(
-                    color: _sphotWarmRed,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        if (spot.phone.trim().isNotEmpty) ...[
-          const SizedBox(height: 10),
-          _MobilePublicCard(
-            child: _PublicInfoLine(
-              icon: Icons.phone_in_talk_outlined,
-              label: 'Téléphone du poste de secours',
-              value: _formatFrenchPhoneForDisplay(spot.phone),
-              onTap: () => _call(spot),
-            ),
-          ),
-        ],
         if (hasCoreInfo) ...[
           const SizedBox(height: 10),
           _MobilePublicCard(
@@ -2013,18 +1926,26 @@ class _MobileQuickAction extends StatelessWidget {
               width: 1.2,
             ),
           ),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(
+            vertical: 12,
+            horizontal: 10,
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: 18, color: _sphotWarmRed),
               const SizedBox(width: 7),
-              Text(
-                label.toUpperCase(),
-                style: const TextStyle(
-                  color: _sphotWarmRed,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w900,
+              Flexible(
+                child: Text(
+                  label.toUpperCase(),
+                  textAlign: TextAlign.center,
+                  softWrap: true,
+                  maxLines: 2,
+                  style: const TextStyle(
+                    color: _sphotWarmRed,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ],
