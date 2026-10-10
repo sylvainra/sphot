@@ -3580,7 +3580,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                 // Mât de carte raccourci de 8 px, pied toujours ancré
                 // exactement au même point sur les cartes mobile et Web.
                 offset: const Offset(0, -76.5),
-                child: FlagMarker(spot: spot),
+                child: FlagMarker.map(spot: spot),
               ),
               if (showAutomaticName)
                 Positioned(
