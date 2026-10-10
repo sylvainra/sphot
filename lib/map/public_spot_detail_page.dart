@@ -65,6 +65,53 @@ Color _publicSpotTypeTextColor(SpotFlagState spot) {
   return Colors.black;
 }
 
+/// Messages de sécurité du bandeau, calculés à partir de l'état public
+/// issu des droits Admin et des publications sauveteur. Ne certifie jamais
+/// qu'un poste déclaré surveillé est effectivement surveillé.
+List<String> _publicSpotHeaderAlerts(SpotFlagState spot) {
+  if (!spot.isPosteSecours) {
+    return const [
+      'BAIGNADE NON SURVEILLÉE',
+      'BAIGNADE À VOS RISQUES ET PÉRILS',
+    ];
+  }
+
+  if (spot.isRealtimeAwaitingUpdate) {
+    return const [
+      'SURVEILLANCE NON RENSEIGNÉE',
+      'COULEUR DE LA FLAMME NON RENSEIGNÉE',
+    ];
+  }
+
+  if (!spot.realtimeAvailable) {
+    return const ['INFORMATIONS EN TEMPS RÉEL INDISPONIBLES'];
+  }
+
+  if (spot.flagPosition == FlagPosition.affale) {
+    return const [
+      'BAIGNADE NON SURVEILLÉE TEMPORAIREMENT',
+      'BAIGNADE À VOS RISQUES ET PÉRILS',
+    ];
+  }
+
+  if (spot.flagPosition == FlagPosition.none ||
+      spot.flagColor == FlagColor.none) {
+    return const [
+      'SURVEILLANCE NON RENSEIGNÉE',
+      'COULEUR DE LA FLAMME NON RENSEIGNÉE',
+    ];
+  }
+
+  if (spot.hasValidFlag) {
+    return [spot.displayStatut.replaceAll('⚠️ ', '')];
+  }
+
+  return const [
+    'BAIGNADE NON SURVEILLÉE',
+    'BAIGNADE À VOS RISQUES ET PÉRILS',
+  ];
+}
+
 class PublicSpotDetailPage extends StatelessWidget {
   final SpotFlagState spot;
 
@@ -148,6 +195,42 @@ class PublicSpotDetailPage extends StatelessWidget {
                               ),
                             ),
                         ],
+                        // Le bandeau desktop suit aussi le direct Firebase.
+                        StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                          stream: FirebaseFirestore.instance
+                              .collection('publicSpots')
+                              .doc(spot.id)
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            var currentSpot = spot;
+                            if (snapshot.hasData && snapshot.data!.exists) {
+                              final data = snapshot.data!.data();
+                              if (data != null) {
+                                currentSpot = SpotFlagState.fromFirestore(
+                                  snapshot.data!.id,
+                                  data,
+                                );
+                              }
+                            }
+                            final alerts = _publicSpotHeaderAlerts(currentSpot);
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                for (final alert in alerts) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '⚠️ $alert',
+                                    style: const TextStyle(
+                                      color: Color(0xFFFF0000),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -948,6 +1031,19 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+                ],
+                for (final alert in _publicSpotHeaderAlerts(spot)) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    '⚠️ $alert',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFFFF0000),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -2107,6 +2203,106 @@ class _PublicLiveDataSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (spot.isRealtimeAwaitingUpdate) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        decoration: BoxDecoration(
+          gradient: _sphotWarmSoftGradient,
+          color: _sphotWarmSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _sphotWarmBorder),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.sync_rounded,
+                  size: 18,
+                  color: _sphotWarmOrange,
+                ),
+                SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    'INFORMATIONS EN TEMPS RÉEL EN ATTENTE DE MISE À JOUR',
+                    style: TextStyle(
+                      color: _sphotWarmRed,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Le service temps réel est actif, mais aucune information '
+              'opérationnelle actualisée n’a encore été transmise depuis '
+              'son activation. Consultez les consignes affichées sur place.',
+              style: TextStyle(
+                color: Color(0xFF475569),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!spot.realtimeAvailable) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        decoration: BoxDecoration(
+          gradient: _sphotWarmSoftGradient,
+          color: _sphotWarmSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _sphotWarmBorder),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 18,
+                  color: _sphotWarmOrange,
+                ),
+                SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES',
+                    style: TextStyle(
+                      color: _sphotWarmRed,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Les informations opérationnelles de surveillance ne sont '
+              'actuellement pas diffusées sur SPHOT. Consultez les '
+              'informations et consignes affichées sur place.',
+              style: TextStyle(
+                color: Color(0xFF475569),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final dangerValues = _flattenValues(spot.dangers);
     final terrestrialValues =
         _formatTerrestrialValues(spot.meteoTerrestre);
