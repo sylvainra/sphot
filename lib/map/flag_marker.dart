@@ -91,7 +91,10 @@ class _FlagMarkerState extends State<FlagMarker>
         : widget.compactDetail
             ? 95.0
             : _normalMarkerHeight;
-    final poleHeight = markerHeight - 20;
+    // Dans la fiche Live, allonger seulement le trait vers le haut.
+    // La taille du widget et les positions validées des signaux ne changent pas.
+    final poleHeight =
+        widget.compactDetail ? markerHeight - 5 : markerHeight - 20;
 
     // Le dessin sinusoïdal remplit 18 px sur une zone de 30 px :
     // 6 px de marge en haut et en bas du CustomPaint.
