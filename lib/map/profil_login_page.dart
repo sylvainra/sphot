@@ -26,8 +26,7 @@ class ProfilLoginPage extends StatefulWidget {
   State<ProfilLoginPage> createState() => _ProfilLoginPageState();
 }
 
-class _ProfilLoginPageState extends State<ProfilLoginPage>
-    with WidgetsBindingObserver {
+class _ProfilLoginPageState extends State<ProfilLoginPage> {
   static const Color _blue = Color(0xFF1E3A8A);
   static const Color _red = Color(0xFFDC2626);
 
@@ -40,7 +39,6 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
   final FocusNode _identifierFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
 
-  bool _isEditing = false;
   bool _showPassword = false;
   bool _isResolvingIdentity = false;
   bool _isLoggingIn = false;
@@ -51,30 +49,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
   _LoginAudience? _selectedAudience;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void didChangeMetrics() {
-    super.didChangeMetrics();
-
-    final bottomInset =
-        WidgetsBinding.instance.platformDispatcher.views.first.viewInsets.bottom;
-
-    if (bottomInset == 0 && _isEditing) {
-      Future.delayed(const Duration(milliseconds: 80), () {
-        if (!mounted) return;
-        FocusScope.of(context).unfocus();
-        setState(() => _isEditing = false);
-      });
-    }
-  }
-
-  @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _identifierController.dispose();
     _passwordController.dispose();
     _identifierFocusNode.dispose();
@@ -82,16 +57,11 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
     super.dispose();
   }
 
-  void _activateEditingMode() {
-    if (_isEditing) return;
-    setState(() => _isEditing = true);
-  }
-
+  // Le clavier est géré par Flutter et Android : ne pas retirer le focus
+  // lorsque les métriques de l'émulateur changent pendant son ouverture.
+  // Un appui sur le fond reste le seul geste de fermeture explicite ici.
   void _closeKeyboard() {
     FocusScope.of(context).unfocus();
-    if (_isEditing) {
-      setState(() => _isEditing = false);
-    }
   }
 
   Future<void> _goBack() async {
@@ -971,7 +941,6 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
             AutofillHints.username,
             AutofillHints.email,
           ],
-          onTap: _activateEditingMode,
           onChanged: (_) {
             if (_errorMessage != null) {
               setState(() => _errorMessage = null);
@@ -1152,7 +1121,6 @@ class _ProfilLoginPageState extends State<ProfilLoginPage>
           autocorrect: false,
           enableSuggestions: false,
           autofillHints: const [AutofillHints.password],
-          onTap: _activateEditingMode,
           onChanged: (_) {
             if (_errorMessage != null) {
               setState(() => _errorMessage = null);
