@@ -3314,6 +3314,28 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                             ),
                           ),
                         ],
+                        if (widget.zoom >= 16.0) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            spot.typeSphot.toUpperCase(),
+                            textAlign: TextAlign.center,
+                            style: _mapLabelStyle(
+                              fontSize: _labelSize(10),
+                              fontWeight: FontWeight.w700,
+                              color: widget.typeTextColor,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          _warningLineUniform(
+                            'BAIGNADE NON SURVEILLÉE',
+                            _labelSize(17),
+                          ),
+                          const SizedBox(height: 1),
+                          _warningLineUniform(
+                            'BAIGNADE À VOS RISQUES ET PÉRILS',
+                            _labelSize(17),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -3492,6 +3514,34 @@ class _HoverMarkerState extends State<_HoverMarker> {
                                 fontWeight: FontWeight.w800,
                                 color: const Color(0xFF1E3A8A),
                               ),
+                            ),
+                          ],
+                          if (widget.zoom >= 16.0) ...[
+                            const SizedBox(height: 2),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SvgPicture.asset(
+                                  'data/icons/flag_red_yellow_5x3.svg',
+                                  width: 12,
+                                  height: 14,
+                                  fit: BoxFit.contain,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'POSTE DE SECOURS',
+                                  style: _mapLabelStyle(
+                                    fontSize: _labelSize(10),
+                                    fontWeight: FontWeight.w900,
+                                    color: const Color(0xFFFF0000),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            _rescueStatusUnderMarker(
+                              spot,
+                              _labelSize(17),
                             ),
                           ],
                         ],
