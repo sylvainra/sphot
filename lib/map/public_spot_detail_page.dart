@@ -138,8 +138,9 @@ class PublicSpotDetailPage extends StatelessWidget {
                               if (spot.isPosteSecours) ...[
                                 SvgPicture.asset(
                                   'data/icons/flag_red_yellow_5x3.svg',
-                                  width: 18,
-                                  height: 20,
+                                  // Même longueur visible que sur l'application.
+                                  width: 12,
+                                  height: 14,
                                   fit: BoxFit.contain,
                                 ),
                                 const SizedBox(width: 5),
@@ -697,8 +698,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 28),
       children: [
         _UnsupervisedWarning(title: warningTitle),
-        const SizedBox(height: 10),
 
+        // Chaque carte suivante possède déjà sa marge supérieure de 10 px.
+        // Ne pas cumuler deux marges avant la photo d'un SPHOT non surveillé.
         if (spot.publicMediaUrl.isNotEmpty) ...[
           const SizedBox(height: 10),
           _MobilePublicCard(
