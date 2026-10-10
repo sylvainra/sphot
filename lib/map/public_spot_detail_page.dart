@@ -65,53 +65,6 @@ Color _publicSpotTypeTextColor(SpotFlagState spot) {
   return Colors.black;
 }
 
-/// Messages de sécurité du bandeau, calculés à partir de l'état public
-/// issu des droits Admin et des publications sauveteur. Ne certifie jamais
-/// qu'un poste déclaré surveillé est effectivement surveillé.
-List<String> _publicSpotHeaderAlerts(SpotFlagState spot) {
-  if (!spot.isPosteSecours) {
-    return const [
-      'BAIGNADE NON SURVEILLÉE',
-      'BAIGNADE À VOS RISQUES ET PÉRILS',
-    ];
-  }
-
-  if (spot.isRealtimeAwaitingUpdate) {
-    return const [
-      'SURVEILLANCE NON RENSEIGNÉE',
-      'COULEUR DE LA FLAMME NON RENSEIGNÉE',
-    ];
-  }
-
-  if (!spot.realtimeAvailable) {
-    return const ['INFORMATIONS EN TEMPS RÉEL INDISPONIBLES'];
-  }
-
-  if (spot.flagPosition == FlagPosition.affale) {
-    return const [
-      'BAIGNADE NON SURVEILLÉE TEMPORAIREMENT',
-      'BAIGNADE À VOS RISQUES ET PÉRILS',
-    ];
-  }
-
-  if (spot.flagPosition == FlagPosition.none ||
-      spot.flagColor == FlagColor.none) {
-    return const [
-      'SURVEILLANCE NON RENSEIGNÉE',
-      'COULEUR DE LA FLAMME NON RENSEIGNÉE',
-    ];
-  }
-
-  if (spot.hasValidFlag) {
-    return [spot.displayStatut.replaceAll('⚠️ ', '')];
-  }
-
-  return const [
-    'BAIGNADE NON SURVEILLÉE',
-    'BAIGNADE À VOS RISQUES ET PÉRILS',
-  ];
-}
-
 class PublicSpotDetailPage extends StatelessWidget {
   final SpotFlagState spot;
 
@@ -149,88 +102,68 @@ class PublicSpotDetailPage extends StatelessWidget {
                             height: 1.10,
                           ),
                         ),
-                        if (commune.isNotEmpty) ...[
+                        // Bandeau compact : le nom, puis lieu et type
+                        // sur une seule ligne. Les états restent sur la carte.
+                        if (commune.isNotEmpty ||
+                            spot.isPosteSecours ||
+                            typeLabel.isNotEmpty) ...[
                           const SizedBox(height: 4),
-                          Text(
-                            commune.toUpperCase(),
-                            style: const TextStyle(
-                              color: Color(0xFF1E3A8A),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                        if (spot.isPosteSecours || typeLabel.isNotEmpty) ...[
-                          const SizedBox(height: 7),
-                          if (spot.isPosteSecours)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (commune.isNotEmpty)
+                                Flexible(
+                                  child: Text(
+                                    commune.toUpperCase(),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Color(0xFF1E3A8A),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              if (commune.isNotEmpty &&
+                                  (spot.isPosteSecours ||
+                                      typeLabel.isNotEmpty))
+                                const Text(
+                                  ' · ',
+                                  style: TextStyle(
+                                    color: Color(0xFF53657A),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              if (spot.isPosteSecours) ...[
                                 SvgPicture.asset(
                                   'data/icons/flag_red_yellow_5x3.svg',
                                   width: 18,
                                   height: 20,
                                   fit: BoxFit.contain,
                                 ),
-                                const SizedBox(width: 7),
-                                const Text(
-                                  'POSTE DE SECOURS',
-                                  style: const TextStyle(
-                                    color: Color(0xFFFF0000),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.15,
-                                  ),
-                                ),
+                                const SizedBox(width: 5),
                               ],
-                            )
-                          else
-                            Text(
-                              typeLabel.toUpperCase(),
-                              style: TextStyle(
-                                color: typeColor,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.15,
-                              ),
-                            ),
-                        ],
-                        // Le bandeau desktop suit aussi le direct Firebase.
-                        StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                          stream: FirebaseFirestore.instance
-                              .collection('publicSpots')
-                              .doc(spot.id)
-                              .snapshots(),
-                          builder: (context, snapshot) {
-                            var currentSpot = spot;
-                            if (snapshot.hasData && snapshot.data!.exists) {
-                              final data = snapshot.data!.data();
-                              if (data != null) {
-                                currentSpot = SpotFlagState.fromFirestore(
-                                  snapshot.data!.id,
-                                  data,
-                                );
-                              }
-                            }
-                            final alerts = _publicSpotHeaderAlerts(currentSpot);
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                for (final alert in alerts) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '⚠️ $alert',
-                                    style: const TextStyle(
-                                      color: Color(0xFFFF0000),
+                              if (spot.isPosteSecours ||
+                                  typeLabel.isNotEmpty)
+                                Flexible(
+                                  child: Text(
+                                    spot.isPosteSecours
+                                        ? 'POSTE DE SECOURS'
+                                        : typeLabel.toUpperCase(),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: typeColor,
                                       fontSize: 13,
                                       fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.15,
                                     ),
                                   ),
-                                ],
-                              ],
-                            );
-                          },
-                        ),
+                                ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -980,25 +913,34 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                     height: 1.12,
                   ),
                 ),
-                if (city.isNotEmpty) ...[
+                if (city.isNotEmpty || type.isNotEmpty) ...[
                   const SizedBox(height: 3),
-                  Text(
-                    city,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF1E3A8A),
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-                if (type.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  if (spot.isPosteSecours)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (city.isNotEmpty)
+                        Flexible(
+                          child: Text(
+                            city,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF1E3A8A),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      if (city.isNotEmpty && type.isNotEmpty)
+                        const Text(
+                          ' · ',
+                          style: TextStyle(
+                            color: Color(0xFF53657A),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      if (spot.isPosteSecours) ...[
                         SvgPicture.asset(
                           'data/icons/flag_red_yellow_5x3.svg',
                           width: 12,
@@ -1006,6 +948,8 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                           fit: BoxFit.contain,
                         ),
                         const SizedBox(width: 4),
+                      ],
+                      if (type.isNotEmpty)
                         Flexible(
                           child: Text(
                             type,
@@ -1018,31 +962,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                             ),
                           ),
                         ),
-                      ],
-                    )
-                  else
-                    Text(
-                      type,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: typeColor,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                ],
-                for (final alert in _publicSpotHeaderAlerts(spot)) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    '⚠️ $alert',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFFFF0000),
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    ],
                   ),
                 ],
               ],
