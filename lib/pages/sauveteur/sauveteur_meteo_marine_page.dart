@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:numberpicker/numberpicker.dart';
 
 import '../../services/sauveteur_live_publication_service.dart';
-import 'widgets/sauveteur_styled_dropdown.dart';
 import 'widgets/sauveteur_adaptive_viewport.dart';
 
 
@@ -166,22 +165,6 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
     });
   }
 
-  Future<void> _selectSpot(String? spotId) async {
-    if (spotId == null || spotId == _selectedSpotId) return;
-
-    setState(() {
-      _selectedSpotId = spotId;
-      _liveMessage = null;
-      _loadingLive = true;
-    });
-
-    try {
-      await _loadSelectedSpotState();
-    } finally {
-      if (mounted) setState(() => _loadingLive = false);
-    }
-  }
-
   Future<void> _publishWeather() async {
     if (!_isSphotOn || _selectedSpotId == null || _savingLive) return;
 
@@ -263,43 +246,21 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
       padding: const EdgeInsets.fromLTRB(0, 2, 0, 5),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: SauveteurStyledDropdown(
-                  labelText: 'SPHOT surveillé',
-                  value: _selectedSpotId,
-                  enabled: !_loadingLive,
-                  options: _assignedSpots
-                      .map(
-                        (spot) => SauveteurDropdownOption(
-                          value: spot.id,
-                          label: spot.label,
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (spotId) {
-                    _selectSpot(spotId);
-                  },
-                ),
+          SizedBox(
+            width: double.infinity,
+            height: 42,
+            child: ElevatedButton.icon(
+              onPressed: enabled && !_savingLive ? _publishWeather : null,
+              icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+              label: Text(
+                _savingLive ? '...' : 'PUBLIER',
+                style: const TextStyle(fontWeight: FontWeight.w900),
               ),
-              const SizedBox(width: 8),
-              SizedBox(
-                height: 42,
-                child: ElevatedButton.icon(
-                  onPressed: enabled && !_savingLive ? _publishWeather : null,
-                  icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-                  label: Text(
-                    _savingLive ? '...' : 'PUBLIER',
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0277BD),
-                    foregroundColor: Colors.white,
-                  ),
-                ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0277BD),
+                foregroundColor: Colors.white,
               ),
-            ],
+            ),
           ),
           if (!_isSphotOn)
             const Padding(
