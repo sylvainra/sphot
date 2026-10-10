@@ -810,6 +810,75 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     }
   }
 
+  // Identité toujours visible lorsque la carte est masquée par la fiche.
+  // Ce bandeau reste hors de la zone défilante de chaque rubrique.
+  Widget _buildMobileSpotHeader(SpotFlagState spot) {
+    final name = spot.mapDisplayName.trim();
+    final city = spot.ville.trim().toUpperCase();
+    final type = spot.isPosteSecours
+        ? 'POSTE DE SECOURS'
+        : spot.typeSphot.trim().toUpperCase();
+    final locationAndType = <String>[
+      if (city.isNotEmpty) city,
+      if (type.isNotEmpty) type,
+    ].join(' · ');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 7, 6, 6),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE1E6EC)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name.isEmpty ? 'SPHOT' : name.toUpperCase(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF172033),
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w800,
+                    height: 1.12,
+                  ),
+                ),
+                if (locationAndType.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    locationAndType,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF53657A),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Fermer la fiche',
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(
+              Icons.close_rounded,
+              size: 23,
+              color: Color(0xFF53657A),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -851,19 +920,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             child: Column(
               children: [
                 if (!widget.desktopMode)
-                  SizedBox(
-                    height: 26,
-                    child: Center(
-                      child: Container(
-                        width: 44,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFB9C2CC),
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                      ),
-                    ),
-                  )
+                  _buildMobileSpotHeader(currentSpot)
                 else
                   const SizedBox(height: 10),
                 if (currentSpot.isPosteSecours)
