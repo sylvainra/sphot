@@ -18,6 +18,7 @@ class SauveteurActionsRapidesPage extends StatefulWidget {
   final String territoireId;
   final String sauveteurSessionToken;
   final List<String> postesAffectes;
+  final String? initialSpotId;
 
   const SauveteurActionsRapidesPage({
     super.key,
@@ -26,6 +27,7 @@ class SauveteurActionsRapidesPage extends StatefulWidget {
     required this.territoireId,
     required this.sauveteurSessionToken,
     required this.postesAffectes,
+    this.initialSpotId,
   });
 
   bool get isSphotOn => sphotMode.toUpperCase() == 'ON';
@@ -153,7 +155,14 @@ class _SauveteurActionsRapidesPageState
     });
 
     if (postesSecoursCommune.isNotEmpty) {
-      await _selectSpot(postesSecoursCommune.first);
+      // Reprendre le poste choisi dans le menu sauveteur validé,
+      // sans modifier les signaux ni l'interface Actions rapides.
+      final requestedId = widget.initialSpotId;
+      final selectedPoste = postesSecoursCommune.firstWhere(
+        (poste) => poste['spotId'] == requestedId,
+        orElse: () => postesSecoursCommune.first,
+      );
+      await _selectSpot(selectedPoste);
     }
   }
 
