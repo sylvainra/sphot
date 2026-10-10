@@ -767,10 +767,11 @@ class _SauveteurActionsRapidesPageState
       builder: (context, pageConstraints) {
         // 8 bandeaux de hauteur unique : 7 rangées car les deux signaux
         // complémentaires sont côte à côte.
-        // 153 px = marges du statut (9), encart Actions rapides (85),
-        // écart entre encarts (8) et encart Signaux complémentaires (51).
-        // La flèche de retour a déjà 85 px réservés en bas.
-        const double espacesFixes = 153.0;
+        // Réserver aussi 28 px de marge de sécurité (4 px par rangée).
+        // Cela élimine le débordement de 14 px observé sur l'émulateur,
+        // tout en gardant les huit bandeaux strictement de même hauteur.
+        // La flèche de retour conserve sa réserve distincte de 85 px.
+        const double espacesFixes = 181.0;
         final double messagesHeight =
             (_loadingSpots ? 14.0 : 0.0) +
             (!_loadingSpots && postesSecoursCommune.isEmpty ? 38.0 : 0.0) +
