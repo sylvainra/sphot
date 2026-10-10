@@ -11,20 +11,62 @@ class FlagMarker extends StatefulWidget {
   // L'aperçu sauveteur dispose d'un mât plus haut que les marqueurs de carte.
   final bool sauveteurPreview;
 
+  // Hauteur personnalisée facultative réservée à l'aperçu Actions rapides.
+  // Null conserve toutes les dimensions existantes (carte, Live, autres pages).
+  final double? sauveteurPreviewHeight;
+
   // Le mât de la fiche Live reste compact, contrairement à celui de la carte.
   final bool compactDetail;
 
-  // Correctif propre à la fiche Live Web. Aucun effet sur l'application,
-  // la carte ou l'espace sauveteur.
+  // Configuration propre à la fiche LIVE Web. Cette valeur n'est vraie
+  // dans aucun autre constructeur spécialisé (carte, mobile, sauveteur).
   final bool desktopLive;
 
+  // Constructeur historique conservé pour la compatibilité.
   const FlagMarker({
     super.key,
     required this.spot,
     this.sauveteurPreview = false,
+    this.sauveteurPreviewHeight,
     this.compactDetail = false,
     this.desktopLive = false,
   });
+
+  // Chaque surface sélectionne explicitement sa configuration.
+  // Les quatre réglages peuvent évoluer indépendamment sans modifier
+  // accidentellement le mât d'un autre écran.
+  const FlagMarker.map({
+    super.key,
+    required this.spot,
+  })  : sauveteurPreview = false,
+        sauveteurPreviewHeight = null,
+        compactDetail = false,
+        desktopLive = false;
+
+  const FlagMarker.publicLiveMobile({
+    super.key,
+    required this.spot,
+  })  : sauveteurPreview = false,
+        sauveteurPreviewHeight = null,
+        compactDetail = true,
+        desktopLive = false;
+
+  const FlagMarker.publicLiveWeb({
+    super.key,
+    required this.spot,
+  })  : sauveteurPreview = false,
+        sauveteurPreviewHeight = null,
+        compactDetail = true,
+        desktopLive = true;
+
+  const FlagMarker.actionsRapides({
+    super.key,
+    required this.spot,
+    required double height,
+  })  : sauveteurPreview = true,
+        sauveteurPreviewHeight = height,
+        compactDetail = false,
+        desktopLive = false;
 
   @override
   State<FlagMarker> createState() => _FlagMarkerState();
@@ -36,7 +78,7 @@ class _FlagMarkerState extends State<FlagMarker>
 
   static const double markerWidth = 70;
   // Mât de carte allongé vers le haut ; le pied reste géoréférencé.
-  static const double _normalMarkerHeight = 132;
+  static const double _normalMarkerHeight = 124;
   static const double _previewMarkerHeight = 115;
 
   static const double poleWidth = 4;
@@ -92,7 +134,7 @@ class _FlagMarkerState extends State<FlagMarker>
     // La hauteur du mât reste fixe : activer un signal ne rallonge jamais
     // un marqueur de carte. L'aperçu sauveteur conserve son grand mât.
     final markerHeight = widget.sauveteurPreview
-        ? _previewMarkerHeight
+        ? (widget.sauveteurPreviewHeight ?? _previewMarkerHeight)
         : widget.compactDetail
             ? 95.0
             : _normalMarkerHeight;
@@ -115,18 +157,29 @@ class _FlagMarkerState extends State<FlagMarker>
     // Les signaux affalés restent près du pied du mât, avec assez
     // d'espace pour le pavillon violet ou la manche à air sous le premier.
     final lowerFlagTop = markerHeight - 27.0;
-    // Dans la fiche Live seulement, le mât a été allongé de 15 px
-    // vers le haut : remonter les signaux hissés d'autant.
-    // Le violet et la manche à air suivent automatiquement le drapeau
-    // principal ; les positions affalées et les marqueurs de carte
-    // restent strictement inchangés.
+    // La manche à air descend d'un pavillon quand les trois signaux sont
+    // simultanément présents : principal, violet et manche à air.
+    // Affalé, tout le groupe remonte d'autant : le dernier signal conserve
+    // sa place près du pied du mât.
+    const tripleSignalWindsockDrop = flagHeight;
+    final hasTripleSignal = hasMainFlag && purpleFlagActive && windsockActive;
+    final loweredTripleGroupLift =
+        isAffale && hasTripleSignal ? tripleSignalWindsockDrop : 0.0;
+    // Chaque contexte utilise son profil dédié.
+    // Le drapeau de carte commence 4 px sous le sommet du mât :
+    // (flagTopHisse = 18) + (marge peinte = 6) - (haut mât = 20).
+    // Même écart de 4 px dans la fiche LIVE Web, sans toucher à la carte :
+    // (18 - compactHissedLift = 15 + 6) - (haut mât compact = 5) = 4.
+    // Les autres profils, combinaisons et drapeaux affalés restent inchangés.
     const compactHissedLift = 15.0;
-    const desktopHissedLift = 15.0;
+    const webLiveHissedOffset = 0.0;
     final mainFlagTop = isAffale
-        ? lowerFlagTop - ((purpleFlagActive || windsockActive) ? flagStep : 0)
+        ? lowerFlagTop -
+            ((purpleFlagActive || windsockActive) ? flagStep : 0) -
+            loweredTripleGroupLift
         : flagTopHisse -
-            (widget.compactDetail ? compactHissedLift : 0) -
-            (widget.desktopLive ? desktopHissedLift : 0);
+            (widget.compactDetail ? compactHissedLift : 0) +
+            (widget.desktopLive ? webLiveHissedOffset : 0);
     final purpleFlagTop = mainFlagTop + flagStep;
 
     // Même en l'absence du violet, la manche à air se situe à la moitié
@@ -134,7 +187,8 @@ class _FlagMarkerState extends State<FlagMarker>
     // directement au mât (pas à l'extrémité du drapeau principal).
     const windsockHeight = 11.0;
     final windsockTop =
-        purpleFlagTop + flagHeight / 2 - windsockHeight / 2;
+        purpleFlagTop + flagHeight / 2 - windsockHeight / 2 +
+            (hasTripleSignal ? tripleSignalWindsockDrop : 0.0);
     const windsockLeft = flagLeft;
 
     return SizedBox(

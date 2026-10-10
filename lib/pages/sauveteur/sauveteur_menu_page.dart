@@ -291,7 +291,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
           ),
           SafeArea(
             child: SauveteurAdaptiveViewport(
-              minContentHeight: 0,
+              minContentHeight: 740,
               child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
@@ -380,7 +380,10 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                       ),
                       child: Column(
                         children: [
-                          _MenuSquare(
+                          // Répartition proportionnelle : pas de grand vide entre les encarts.
+                          Expanded(
+                            flex: 3,
+                            child: _MenuSquare(
                             title: 'ACTIONS RAPIDES',
                             icon: Icons.warning_amber_rounded,
                             color: const Color(0xFFD50000),
@@ -400,14 +403,18 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                 ),
                               );
                             },
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Expanded(
+                            flex: 7,
                             child: LayoutBuilder(
                               builder: (context, constraints) {
                                 const tileSpacing = 6.0;
-                                final tileWidth = (constraints.maxWidth - tileSpacing * 2) / 3;
-                                final tileHeight = (constraints.maxHeight - tileSpacing) / 2;
+                                final tileWidth =
+                                    (constraints.maxWidth - tileSpacing * 2) / 3;
+                                final tileHeight =
+                                    (constraints.maxHeight - tileSpacing) / 2;
                                 return GridView.count(
                                   physics: const NeverScrollableScrollPhysics(),
                                   crossAxisCount: 3,
@@ -416,6 +423,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                   childAspectRatio: tileWidth / tileHeight,
                                   children: [
                                 _MenuSquare(
+                                  compact: true,
                                   title: 'MÉTÉO TERRESTRE',
                                   icon: Icons.wb_sunny_rounded,
                                   color: const Color(0xFF8D6E63),
@@ -438,6 +446,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                   },
                                 ),
                                 _MenuSquare(
+                                  compact: true,
                                   title: 'MÉTÉO MARINE',
                                   icon: Icons.waves_rounded,
                                   color: const Color(0xFF1E88E5),
@@ -459,6 +468,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                   },
                                 ),
                                 _MenuSquare(
+                                  compact: true,
                                   title: 'ÉPHÉMÉRIDE\nDICTON',
                                   icon: Icons.auto_awesome_rounded,
                                   color: const Color(0xFFF9A825),
@@ -480,6 +490,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                   },
                                 ),
                                 _MenuSquare(
+                                  compact: true,
                                   title: 'RECHERCHE DE PERSONNE',
                                   icon: Icons.person_search_rounded,
                                   color: const Color(0xFF00897B),
@@ -501,6 +512,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                   },
                                 ),
                                 _MenuSquare(
+                                  compact: true,
                                   title: 'EMPLOI DU TEMPS',
                                   icon: Icons.calendar_month_rounded,
                                   color: const Color(0xFF43A047),
@@ -525,6 +537,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                   },
                                 ),
                                 _MenuSquare(
+                                  compact: true,
                                   title: 'STATS',
                                   icon: Icons.bar_chart_rounded,
                                   color: const Color(0xFF546E7A),
@@ -550,9 +563,12 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                               },
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
+                          const SizedBox(height: 6),
+                          Expanded(
+                            flex: 3,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
                               Expanded(
                                 child: _MaterialVerificationSquare(
                                   title: 'SECOURS',
@@ -651,9 +667,12 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                 ),
                               ),
                             ],
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          _MenuSquare(
+                          const SizedBox(height: 6),
+                          Expanded(
+                            flex: 3,
+                            child: _MenuSquare(
                             title: 'MAIN COURANTE',
                             icon: Icons.menu_book_rounded,
                             color: const Color(0xFF8E24AA),
@@ -677,6 +696,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                 ),
                               );
                             },
+                            ),
                           ),
                         ],
                       ),
@@ -783,6 +803,7 @@ class _MenuSquare extends StatelessWidget {
   final VoidCallback onTap;
   final Color? iconColor;
   final double? height;
+  final bool compact;
 
   const _MenuSquare({
     required this.title,
@@ -791,6 +812,7 @@ class _MenuSquare extends StatelessWidget {
     required this.onTap,
     this.iconColor,
     this.height,
+    this.compact = false,
   });
 
   @override
@@ -811,7 +833,7 @@ class _MenuSquare extends StatelessWidget {
         ),
 
         child: Padding(
-          padding: const EdgeInsets.all(6),
+          padding: EdgeInsets.all(compact ? 4 : 6),
 
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -819,10 +841,10 @@ class _MenuSquare extends StatelessWidget {
               Icon(
                 icon,
                 color: iconColor ?? color,
-                size: 29,
+                size: compact ? 24 : 29,
               ),
 
-              const SizedBox(height: 4),
+              SizedBox(height: compact ? 2 : 4),
 
               Text(
                 title,
@@ -831,7 +853,7 @@ class _MenuSquare extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: color,
-                  fontSize: 9.5,
+                  fontSize: compact ? 9 : 9.5,
                   fontWeight: FontWeight.w900,
                   height: 1.0,
                 ),

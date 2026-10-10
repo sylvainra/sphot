@@ -10,6 +10,7 @@ import '../../map/flag_marker.dart';
 import '../../models/flag_state.dart';
 import '../../widgets/adaptive_asset_image.dart';
 import '../../widgets/danger_pictogram.dart';
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurActionsRapidesPage extends StatefulWidget {
   final Color profileColor;
@@ -586,10 +587,9 @@ class _SauveteurActionsRapidesPageState
   }
 
   Widget _buildFlagMastControl() {
-    const height = 174.0;
-
+    // Le mât conserve sa hauteur propre à Actions rapides et suit
+    // uniquement la hauteur des trois commandes de couleur.
     return Container(
-      height: height,
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.45),
         borderRadius: BorderRadius.circular(18),
@@ -635,20 +635,17 @@ class _SauveteurActionsRapidesPageState
                     ),
                   ),
                 ),
-                // Réserve au mât toute la hauteur utile de l'aperçu,
-                // indépendamment des marqueurs plus compacts de la carte.
-                // Mât relevé dans son cadre : le pied ne touche plus
-                // l'indication AFFALÉ, sans modifier l'action tactile.
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                // Le tracé du mât commence 20 px sous son widget ;
+                // ce décalage de -10 le centre exactement entre les
+                // libellés HISSÉ / AFFALÉ. Dimensions propres à cette page.
+                Center(
                   child: Transform.translate(
                     offset: const Offset(0, -10),
-                    child: Transform.scale(
-                      scale: 1.02,
-                      child: FlagMarker(
-                        spot: _previewSpotState(),
-                        sauveteurPreview: true,
-                      ),
+                    child: FlagMarker.actionsRapides(
+                      spot: _previewSpotState(),
+                      height: (constraints.maxHeight - 75.0)
+                          .clamp(129.0, 140.0)
+                          .toDouble(),
                     ),
                   ),
                 ),
@@ -693,7 +690,9 @@ class _SauveteurActionsRapidesPageState
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
+      body: SauveteurAdaptiveViewport(
+        minContentHeight: 760,
+        child: Stack(
         fit: StackFit.expand,
         children: [
           Image.asset(
@@ -760,9 +759,28 @@ class _SauveteurActionsRapidesPageState
 
                 Expanded(
   child: Padding(
-    padding: const EdgeInsets.fromLTRB(16, 0, 16, 50),
-    child: Column(
-      children: [
+    // Garde la flèche de retour complètement dégagée du dernier encart.
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 85),
+    child: LayoutBuilder(
+      builder: (context, pageConstraints) {
+        // 8 bandeaux de hauteur unique : 7 rangées car les deux signaux
+        // complémentaires sont côte à côte.
+        // Réserver aussi 28 px de marge de sécurité (4 px par rangée).
+        // Cela élimine le débordement de 14 px observé sur l'émulateur,
+        // tout en gardant les huit bandeaux strictement de même hauteur.
+        // La flèche de retour conserve sa réserve distincte de 85 px.
+        const double espacesFixes = 181.0;
+        final double messagesHeight =
+            (_loadingSpots ? 14.0 : 0.0) +
+            (!_loadingSpots && postesSecoursCommune.isEmpty ? 38.0 : 0.0) +
+            (_liveStatusMessage != null ? 26.0 : 0.0);
+        final double bandeauHeight =
+            ((pageConstraints.maxHeight - espacesFixes - messagesHeight) / 7)
+                .clamp(48.0, 120.0)
+                .toDouble();
+
+        return Column(
+          children: [
                           if (_loadingSpots)
                             const Padding(
                               padding: EdgeInsets.only(bottom: 6),
@@ -800,13 +818,14 @@ class _SauveteurActionsRapidesPageState
                           if (!isTemporaryClosed)
                             Container(
                               width: double.infinity,
-                              height: 58,
+                              alignment: Alignment.center,
+                              height: bandeauHeight,
                               margin: const EdgeInsets.only(
                                 top: 3,
                                 bottom: 6,
                               ),
                               padding: const EdgeInsets.symmetric(
-                                vertical: 16,
+                                vertical: 8,
                                 horizontal: 14,
                               ),
                               decoration: BoxDecoration(
@@ -840,15 +859,18 @@ class _SauveteurActionsRapidesPageState
                               ),
                             ),
 
-                          if (isTemporaryClosed) _dangerBanner(),
+                          if (isTemporaryClosed)
+                            _dangerBanner(height: bandeauHeight),
 
                           _sectionCard(
                             title: 'Actions rapides',
                             icon: Icons.flash_on,
                             children: [
                               const SizedBox(height: 8),
+                              // Le cadre du mât occupe trois hauteurs de
+                              // bouton + les deux écarts verticaux de 7 px.
                               SizedBox(
-                                height: 174,
+                                height: bandeauHeight * 3 + 14,
                                 child: Row(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
@@ -901,6 +923,7 @@ class _SauveteurActionsRapidesPageState
                               ),
                               const SizedBox(height: 10),
                               _ActionButton(
+                                height: bandeauHeight,
                                 icon: Icons.warning_amber_rounded,
                                 label: selectedDangers.isEmpty
                                     ? 'Déclarer un danger'
@@ -915,6 +938,7 @@ class _SauveteurActionsRapidesPageState
                               ),
                               const SizedBox(height: 10),
                               _ActionButton(
+                                height: bandeauHeight,
                                 icon: Icons.campaign_rounded,
                                 label: 'Ajouter une notification',
                                 color: Colors.red,
@@ -938,7 +962,7 @@ class _SauveteurActionsRapidesPageState
                               ),
                             ],
                           ),
-
+                          const SizedBox(height: 8),
                           _sectionCard(
                             title: 'Signaux complémentaires',
                             icon: Icons.flag_rounded,
@@ -948,6 +972,7 @@ class _SauveteurActionsRapidesPageState
                                 children: [
                                   Expanded(
                                     child: _SupplementarySignalButton(
+                                      height: bandeauHeight,
                                       label: 'Drapeau violet',
                                       icon: Icons.flag_rounded,
                                       activeColor: const Color(0xFFD946EF),
@@ -958,6 +983,7 @@ class _SauveteurActionsRapidesPageState
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: _SupplementarySignalButton(
+                                      height: bandeauHeight,
                                       label: 'Manche à air',
                                       icon: Icons.air_rounded,
                                       activeColor: const Color(0xFFFF9800),
@@ -969,8 +995,10 @@ class _SauveteurActionsRapidesPageState
                               ),
                             ],
                           ),
-                        ],
-                      ),
+          ],
+        );
+      },
+    ),
                   ),
                 ),
               ],
@@ -1001,6 +1029,7 @@ class _SauveteurActionsRapidesPageState
             child: _bottomNavBar(),
           ),
         ],
+      ),
       ),
     );
   }
@@ -1182,10 +1211,10 @@ class _SauveteurActionsRapidesPageState
   );
 }
 
-  Widget _dangerBanner() {
+  Widget _dangerBanner({double height = 58}) {
     return Container(
       width: double.infinity,
-      height: 58,
+      height: height,
       margin: const EdgeInsets.only(top: 3, bottom: 6),
       padding: const EdgeInsets.symmetric(
         vertical: 6,
@@ -1452,6 +1481,7 @@ class _FlagColorButton extends StatelessWidget {
 }
 
 class _SupplementarySignalButton extends StatelessWidget {
+  final double height;
   final String label;
   final IconData icon;
   final Color activeColor;
@@ -1459,6 +1489,7 @@ class _SupplementarySignalButton extends StatelessWidget {
   final VoidCallback onTap;
 
   const _SupplementarySignalButton({
+    this.height = 54,
     required this.label,
     required this.icon,
     required this.activeColor,
@@ -1474,7 +1505,7 @@ class _SupplementarySignalButton extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        height: 54,
+        height: height,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: selected
@@ -1910,12 +1941,14 @@ class _ActionButton extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
+  final double height;
 
   const _ActionButton({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
+    this.height = 68,
   });
 
   @override
@@ -1925,7 +1958,7 @@ class _ActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 52,
+        height: height,
         width: double.infinity,
         decoration: BoxDecoration(
   color: color,

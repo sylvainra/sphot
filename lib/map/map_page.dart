@@ -3577,9 +3577,10 @@ class _HoverMarkerState extends State<_HoverMarker> {
             clipBehavior: Clip.none,
             children: [
               Transform.translate(
-                // Pied inchangé : l'allongement du mât se fait vers le haut.
-                offset: const Offset(0, -84.5),
-                child: FlagMarker(spot: spot),
+                // Mât de carte raccourci de 8 px, pied toujours ancré
+                // exactement au même point sur les cartes mobile et Web.
+                offset: const Offset(0, -76.5),
+                child: FlagMarker.map(spot: spot),
               ),
               if (showAutomaticName)
                 Positioned(

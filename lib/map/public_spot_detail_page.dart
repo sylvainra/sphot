@@ -1132,11 +1132,12 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                       width: 78,
                       height: 98,
                       child: Center(
-                        child: FlagMarker(
-                          spot: spot,
-                          compactDetail: true,
-                          desktopLive: widget.desktopMode,
-                        ),
+                        // La fiche LIVE Web et la fiche mobile sont isolées.
+                        // Seule la version Web abaisse son pavillon hissé ;
+                        // les signaux affalés et les autres écrans ne changent pas.
+                        child: widget.desktopMode
+                            ? FlagMarker.publicLiveWeb(spot: spot)
+                            : FlagMarker.publicLiveMobile(spot: spot),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -2015,7 +2016,7 @@ class _LiveOperationalSnapshot extends StatelessWidget {
                     width: 88,
                     height: 104,
                     child: Center(
-                      child: FlagMarker(spot: currentSpot, compactDetail: true),
+                      child: FlagMarker.publicLiveMobile(spot: currentSpot),
                     ),
                   ),
                   const SizedBox(width: 10),
