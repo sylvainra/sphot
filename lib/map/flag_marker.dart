@@ -168,18 +168,21 @@ class _FlagMarkerState extends State<FlagMarker>
     // Comportements indépendants par surface :
     // - carte : positions existantes conservées ;
     // - LIVE mobile : position compacte inchangée ;
-    // - LIVE Web : le drapeau hissé descend de 12 px afin de longer le mât ;
+    // - LIVE Web : aligner le bord supérieur peint du drapeau hissé
+    //   sur le sommet du mât. Le mât compact commence à y=5, tandis
+    //   que la peinture du drapeau laisse 6 px en haut du CustomPaint :
+    //   flagTopHisse (18) - compactHissedLift (15) - 4 + 6 = 5.
     // - Actions rapides : aperçu hissé / affalé inchangé.
-    // La translation LIVE Web ne s'applique JAMAIS aux drapeaux affalés.
+    // Cet ajustement n'agit JAMAIS sur les drapeaux affalés.
     const compactHissedLift = 15.0;
-    const webLiveHissedDrop = 12.0;
+    const webLiveHissedOffset = -4.0;
     final mainFlagTop = isAffale
         ? lowerFlagTop -
             ((purpleFlagActive || windsockActive) ? flagStep : 0) -
             loweredTripleGroupLift
         : flagTopHisse -
             (widget.compactDetail ? compactHissedLift : 0) +
-            (widget.desktopLive ? webLiveHissedDrop : 0);
+            (widget.desktopLive ? webLiveHissedOffset : 0);
     final purpleFlagTop = mainFlagTop + flagStep;
 
     // Même en l'absence du violet, la manche à air se situe à la moitié
