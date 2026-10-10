@@ -565,6 +565,7 @@ Future<void> _toggleFavoritesFilter() async {
           child: _PublicAdvertisingMarker(
             name: name.isEmpty ? 'SPHOT PUBLICITAIRE' : name,
             showTextAllowed: showText,
+            alwaysShowName: zoom >= 16.0,
             rotation: rotation,
             labelOpacity: _labelOpacity(zoom),
           ),
@@ -1980,7 +1981,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
           iconPath: _getMarkerIconPath(spot),
           showTextAllowed: showText,
           forceShowText: _selectedPublicSpotId == spot.id,
-          autoShowName: autoShowName,
+          autoShowName: autoShowName || zoom >= 16.0,
           zoom: zoom,
           rotation: rotation,
           labelOpacity: _labelOpacity(zoom),
@@ -2015,7 +2016,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
                 spot: spot,
                 showTextAllowed: showText,
                 forceShowText: _selectedPublicSpotId == spot.id,
-                autoShowName: autoShowName,
+                autoShowName: autoShowName || zoom >= 16.0,
                 zoom: zoom,
                 rotation: rotation,
                 labelOpacity: _labelOpacity(zoom),
@@ -3157,12 +3158,14 @@ class _PublicAdvertisingMarker extends StatefulWidget {
   const _PublicAdvertisingMarker({
     required this.name,
     required this.showTextAllowed,
+    required this.alwaysShowName,
     required this.rotation,
     required this.labelOpacity,
   });
 
   final String name;
   final bool showTextAllowed;
+  final bool alwaysShowName;
   final double rotation;
   final double labelOpacity;
 
@@ -3180,7 +3183,7 @@ class _PublicAdvertisingMarkerState extends State<_PublicAdvertisingMarker> {
         Theme.of(context).platform == TargetPlatform.android ||
             Theme.of(context).platform == TargetPlatform.iOS;
     final showText =
-        widget.showTextAllowed && (isTouchDevice || _isHovering);
+        widget.showTextAllowed && (widget.alwaysShowName || isTouchDevice || _isHovering);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -3216,7 +3219,7 @@ class _PublicAdvertisingMarkerState extends State<_PublicAdvertisingMarker> {
                         style: _mapLabelStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
-                          color: const Color(0xFF2E7D32),
+                          color: Colors.black,
                         ),
                       ),
                     ),
@@ -3295,8 +3298,7 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
 
     final showFullText = widget.forceShowText ||
         (widget.showTextAllowed && !isTouchDevice && isHovering);
-    final showAutomaticName =
-        !showFullText && isTouchDevice && widget.autoShowName;
+    final showAutomaticName = !showFullText && widget.autoShowName;
 
     return MouseRegion(
       onEnter: (_) => setState(() => isHovering = true),
@@ -3477,8 +3479,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
 
     final showFullText = widget.forceShowText ||
         (widget.showTextAllowed && !isTouchDevice && isHovering);
-    final showAutomaticName =
-        !showFullText && isTouchDevice && widget.autoShowName;
+    final showAutomaticName = !showFullText && widget.autoShowName;
 
     return MouseRegion(
       onEnter: (_) => setState(() => isHovering = true),
