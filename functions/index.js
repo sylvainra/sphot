@@ -10959,7 +10959,7 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
 Object.assign(exports, require("./admin_workflow"));
 
 // Fonctions sauveteur du chantier validé le 7 octobre 2026.
-// Conservent la protection de session, les rôles et les postes sous droits temps réel.
+// Conservent la protection de session, les rôles et les droits par poste.
 exports.getSauveteurStats = onRequest(
     {
       cpu: 1,
