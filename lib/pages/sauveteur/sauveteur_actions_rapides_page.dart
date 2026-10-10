@@ -629,13 +629,18 @@ class _SauveteurActionsRapidesPageState
                 ),
                 // Réserve au mât toute la hauteur utile de l'aperçu,
                 // indépendamment des marqueurs plus compacts de la carte.
+                // Mât relevé dans son cadre : le pied ne touche plus
+                // l'indication AFFALÉ, sans modifier l'action tactile.
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Transform.scale(
-                    scale: 1.02,
-                    child: FlagMarker(
-                      spot: _previewSpotState(),
-                      sauveteurPreview: true,
+                  child: Transform.translate(
+                    offset: const Offset(0, -10),
+                    child: Transform.scale(
+                      scale: 1.02,
+                      child: FlagMarker(
+                        spot: _previewSpotState(),
+                        sauveteurPreview: true,
+                      ),
                     ),
                   ),
                 ),
