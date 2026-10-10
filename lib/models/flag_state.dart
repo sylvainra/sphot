@@ -136,12 +136,15 @@ class SpotFlagState {
     meteoMarine: data['meteoMarine'],
     ephemeride: data['ephemeride'],
     notificationPublique: data['notificationPublique'],
+    // Sans métadonnées de droits dans une ancienne projection publique,
+    // ne jamais considérer implicitement les anciens signaux comme actuels.
+    // Les statuts exacts sont fournis par la synchronisation Cloud Functions.
     realtimeAvailable: data['realtimeAvailable'] is bool
         ? data['realtimeAvailable'] as bool
-        : true,
+        : false,
     realtimeStatus: _readString(data['realtimeStatus']).isNotEmpty
         ? _readString(data['realtimeStatus']).toLowerCase()
-        : (data['realtimeAvailable'] == false ? 'unavailable' : 'available'),
+        : (data['realtimeAvailable'] == true ? 'available' : 'unavailable'),
     realtimeValidUntil: data['realtimeValidUntil'],
     updatedAt: data['updatedAt'],
   );
