@@ -1135,7 +1135,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                         child: FlagMarker(
                           spot: spot,
                           compactDetail: true,
-                          desktopLive: widget.desktopMode,
+                          // Un seul décalage vertical est nécessaire :
+                          // le mode compact aligne déjà le pavillon hissé
+                          // avec le sommet du mât sur le Web comme sur mobile.
                         ),
                       ),
                     ),
