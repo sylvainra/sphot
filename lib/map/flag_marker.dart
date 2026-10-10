@@ -110,9 +110,15 @@ class _FlagMarkerState extends State<FlagMarker>
     // Les signaux affalés restent près du pied du mât, avec assez
     // d'espace pour le pavillon violet ou la manche à air sous le premier.
     final lowerFlagTop = markerHeight - 27.0;
+    // Dans la fiche Live seulement, le mât a été allongé de 15 px
+    // vers le haut : remonter les signaux hissés d'autant.
+    // Le violet et la manche à air suivent automatiquement le drapeau
+    // principal ; les positions affalées et les marqueurs de carte
+    // restent strictement inchangés.
+    const compactHissedLift = 15.0;
     final mainFlagTop = isAffale
         ? lowerFlagTop - ((purpleFlagActive || windsockActive) ? flagStep : 0)
-        : flagTopHisse;
+        : flagTopHisse - (widget.compactDetail ? compactHissedLift : 0);
     final purpleFlagTop = mainFlagTop + flagStep;
 
     // Même en l'absence du violet, la manche à air se situe à la moitié
