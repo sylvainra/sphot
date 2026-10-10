@@ -1,5 +1,7 @@
 import 'dart:math';
+
 import 'package:flutter/material.dart';
+
 import '../models/flag_state.dart';
 import '../widgets/danger_pictogram.dart';
 
@@ -74,13 +76,26 @@ class _FlagMarkerState extends State<FlagMarker>
   Widget build(BuildContext context) {
     final purpleFlagActive = widget.spot.liveFlag?['purpleFlagActive'] == true;
     final windsockActive = widget.spot.liveFlag?['windsockActive'] == true;
+
     final hasMainFlag = widget.spot.flagColor != FlagColor.none &&
         widget.spot.flagPosition != FlagPosition.none;
 
-    // Les signaux complémentaires suivent le drapeau principal.
-    // En position affalée, ils restent EN DESSOUS de celui-ci, quelle que
-    // soit sa couleur, au lieu de remonter vers le haut du mât.
-    final supplementaryTop = flagTop + 24;
+    final isAffale = widget.spot.flagPosition == FlagPosition.affale;
+
+    // Si le drapeau principal est affalé et que le drapeau violet est activé,
+    // on remonte le drapeau principal pour laisser la place au violet dessous.
+    final mainFlagTop =
+        isAffale && purpleFlagActive ? flagTopAffale - 16 : flagTop;
+
+    // Le drapeau violet a exactement la même taille que les autres drapeaux
+    // et se place sous le drapeau principal.
+    final purpleFlagTop = mainFlagTop + 20;
+
+    // On laisse plus d'espace avant la manche à air pour éviter qu'elle soit
+    // trop collée au drapeau.
+    final windsockTop = purpleFlagActive
+        ? purpleFlagTop + flagHeight + 8
+        : mainFlagTop + flagHeight + 10;
 
     return SizedBox(
       width: markerWidth,
@@ -107,7 +122,7 @@ class _FlagMarkerState extends State<FlagMarker>
           if (hasMainFlag)
             Positioned(
               left: flagLeft,
-              top: flagTop,
+              top: mainFlagTop,
               child: AnimatedBuilder(
                 animation: _controller,
                 builder: (context, child) {
@@ -124,12 +139,12 @@ class _FlagMarkerState extends State<FlagMarker>
           if (hasMainFlag && purpleFlagActive)
             Positioned(
               left: flagLeft,
-              top: supplementaryTop,
+              top: purpleFlagTop,
               child: AnimatedBuilder(
                 animation: _controller,
                 builder: (context, child) {
                   return CustomPaint(
-                    size: const Size(22, 18),
+                    size: const Size(flagWidth, flagHeight),
                     painter: WavingFlagPainter(
                       color: const Color(0xFFD946EF),
                       phase: _controller.value * 2 * pi,
@@ -141,14 +156,17 @@ class _FlagMarkerState extends State<FlagMarker>
           if (hasMainFlag && windsockActive)
             Positioned(
               left: flagLeft,
-              top: supplementaryTop + (purpleFlagActive ? 13 : 0),
+              top: windsockTop,
               child: AnimatedBuilder(
                 animation: _controller,
                 builder: (context, child) {
                   return Transform.rotate(
                     alignment: Alignment.centerLeft,
                     angle: sin(_controller.value * 2 * pi) * 0.04,
-                    child: const WindsockGlyph(width: 23, height: 11),
+                    child: const WindsockGlyph(
+                      width: 23,
+                      height: 11,
+                    ),
                   );
                 },
               ),
@@ -192,7 +210,7 @@ class WavingFlagPainter extends CustomPainter {
       final x = size.width * t;
 
       final amplitude = 0.8 + 3.0 * t;
-      final wave = sin( t * pi * 2.1 - phase) * amplitude;
+      final wave = sin(t * pi * 2.1 - phase) * amplitude;
 
       topPoints.add(Offset(x, verticalMargin + wave));
       bottomPoints.add(Offset(x, size.height - verticalMargin + wave));
@@ -219,6 +237,3 @@ class WavingFlagPainter extends CustomPainter {
     return oldDelegate.phase != phase || oldDelegate.color != color;
   }
 }
-
-
-
