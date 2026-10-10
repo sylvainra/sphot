@@ -461,6 +461,9 @@ class SpotFlagState {
     if (!isPosteSecours) return 0xFFFF0000;
     if (!realtimeAvailable || isRealtimeAwaitingUpdate) return 0xFF64748B;
     if (flagPosition == FlagPosition.affale) return 0xFFFF0000;
+    // Sans position hissée confirmée, ne jamais afficher la couleur
+    // "surveillée" d'un pavillon qui pourrait être une ancienne valeur.
+    if (flagPosition != FlagPosition.hisse) return 0xFFFF0000;
     if (flagColor == FlagColor.none) return 0xFFFF0000;
 
     switch (flagColor) {
