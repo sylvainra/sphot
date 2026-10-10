@@ -1276,7 +1276,9 @@ SpotFlagState? _findBestSpotMatch(
       backgroundColor: Colors.transparent,
       barrierColor: Colors.transparent,
       isDismissible: true,
-      enableDrag: false,
+      // Fermer également par glissement vertical vers le bas depuis
+      // l'en-tête, tout en conservant le défilement des onglets.
+      enableDrag: true,
       builder: (sheetContext) {
         // Le volet mobile occupe toute la hauteur utile de l'écran,
         // après déduction des zones système par useSafeArea.
