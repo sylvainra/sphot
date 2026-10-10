@@ -373,19 +373,25 @@ class SpotFlagState {
       realtimeAvailable &&
       realtimeStatus.toLowerCase() == 'awaiting_update';
 
+  // Une absence de couleur sur un drapeau effectivement hissé n'indique
+  // pas une baignade non surveillée : la couleur reste à renseigner.
+  // Ni les horaires du poste ni la période affichée ne déterminent l'état
+  // opérationnel transmis par un sauveteur SPHOT ON.
   bool get isMissingFlagColorDuringSurveillance {
     return isPosteSecours &&
         realtimeAvailable &&
         !isRealtimeAwaitingUpdate &&
-        _isCurrentlyInSurveillanceWindow() &&
-        flagPosition != FlagPosition.affale &&
+        flagPosition == FlagPosition.hisse &&
         flagColor == FlagColor.none;
   }
 
+  // Source de vérité : droits temps réel et dernier signal publié.
+  // Les périodes d'affectation sont contrôlées par les droits sauveteur,
+  // et ne doivent pas invalider a posteriori un drapeau déjà transmis.
   bool get hasValidFlag {
     return isPosteSecours &&
         realtimeAvailable &&
-        _isCurrentlyInSurveillanceWindow() &&
+        !isRealtimeAwaitingUpdate &&
         flagColor != FlagColor.none &&
         flagPosition == FlagPosition.hisse;
   }
@@ -418,12 +424,19 @@ class SpotFlagState {
       return 'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES';
     }
 
-    if (!isPosteSecours || !_isCurrentlyInSurveillanceWindow()) {
+    if (!isPosteSecours) {
       return '⚠️ BAIGNADE NON SURVEILLÉE ⚠️ BAIGNADE À VOS RISQUES ET PÉRILS';
     }
 
+    // L'affalage transmis fait foi, même en dehors des horaires indiqués.
     if (flagPosition == FlagPosition.affale) {
       return '⚠️ BAIGNADE NON SURVEILLÉE TEMPORAIREMENT ⚠️ BAIGNADE À VOS RISQUES ET PÉRILS';
+    }
+
+    // Aucun signal de position reçu : ne jamais déduire que la baignade
+    // est surveillée, ni qu'un sauveteur a effectivement affalé le drapeau.
+    if (flagPosition != FlagPosition.hisse) {
+      return '⚠️ SURVEILLANCE NON RENSEIGNÉE';
     }
 
     if (flagColor == FlagColor.none) {
@@ -447,7 +460,6 @@ class SpotFlagState {
   int get statutColor {
     if (!isPosteSecours) return 0xFFFF0000;
     if (!realtimeAvailable || isRealtimeAwaitingUpdate) return 0xFF64748B;
-    if (!_isCurrentlyInSurveillanceWindow()) return 0xFFFF0000;
     if (flagPosition == FlagPosition.affale) return 0xFFFF0000;
     if (flagColor == FlagColor.none) return 0xFFFF0000;
 
@@ -463,82 +475,6 @@ class SpotFlagState {
       case FlagColor.none:
         return 0xFFFF0000;
     }
-  }
-
-  bool _isCurrentlyInSurveillanceWindow() {
-    final now = DateTime.now();
-
-    if (periode.trim().isNotEmpty) {
-      final parts = periode.split('-');
-
-      if (parts.length >= 2) {
-        final start = _parseFrenchDate(parts[0].trim());
-        final end = _parseFrenchDate(parts[1].trim());
-
-        if (start != null && end != null) {
-          final startDay = DateTime(start.year, start.month, start.day);
-          final endDay = DateTime(end.year, end.month, end.day, 23, 59, 59);
-
-          if (now.isBefore(startDay) || now.isAfter(endDay)) {
-            return false;
-          }
-        }
-      }
-    }
-
-    if (heureDebut.trim().isNotEmpty && heureFin.trim().isNotEmpty) {
-      final startTime = _parseHour(heureDebut);
-      final endTime = _parseHour(heureFin);
-
-      if (startTime != null && endTime != null) {
-        final start = DateTime(
-          now.year,
-          now.month,
-          now.day,
-          startTime.$1,
-          startTime.$2,
-        );
-
-        final end = DateTime(
-          now.year,
-          now.month,
-          now.day,
-          endTime.$1,
-          endTime.$2,
-        );
-
-        if (now.isBefore(start) || now.isAfter(end)) {
-          return false;
-        }
-      }
-    }
-
-    return true;
-  }
-
-  static DateTime? _parseFrenchDate(String value) {
-    final parts = value.split('/');
-    if (parts.length != 3) return null;
-
-    final day = int.tryParse(parts[0]);
-    final month = int.tryParse(parts[1]);
-    final year = int.tryParse(parts[2]);
-
-    if (day == null || month == null || year == null) return null;
-
-    return DateTime(year, month, day);
-  }
-
-  static (int, int)? _parseHour(String value) {
-    final clean = value.trim().toLowerCase().replaceAll('h', ':');
-    final parts = clean.split(':');
-
-    final hour = int.tryParse(parts[0]);
-    final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
-
-    if (hour == null) return null;
-
-    return (hour, minute);
   }
 
   static String _readString(dynamic value) {
