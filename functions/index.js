@@ -10958,3 +10958,537 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
 
 Object.assign(exports, require("./admin_workflow"));
 
+// Fonctions sauveteur du chantier validé le 7 octobre 2026.
+// Conservent la protection de session, les rôles et les postes sous droits temps réel.
+exports.getSauveteurStats = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const session = await resolveSauveteurSession(
+            request.body.sauveteurSessionToken,
+        );
+
+        if (!session) {
+          response.status(401).json({
+            success: false,
+            error: "invalid_session",
+          });
+          return;
+        }
+
+        if (!session.legalAcceptanceCurrent) {
+          response.status(403).json({
+            success: false,
+            error: "legal_acceptance_required",
+          });
+          return;
+        }
+
+        const {context} = session;
+        const spotId = (request.body.spotId || "").toString().trim();
+
+        if (!context.realtimeSpotIds.includes(spotId)) {
+          response.status(403).json({
+            success: false,
+            error: "spot_not_assigned",
+          });
+          return;
+        }
+
+        let entriesQuery = admin.firestore()
+            .collection("territoires")
+            .doc(context.territoireId)
+            .collection("spots")
+            .doc(spotId)
+            .collection("mainCourante");
+
+        const dayStartMillis = Number(request.body.dayStartMillis);
+        const dayEndMillis = Number(request.body.dayEndMillis);
+        if (Number.isFinite(dayStartMillis) &&
+            Number.isFinite(dayEndMillis) &&
+            dayEndMillis > dayStartMillis) {
+          entriesQuery = entriesQuery
+              .where(
+                  "occurredAt",
+                  ">=",
+                  admin.firestore.Timestamp.fromMillis(dayStartMillis),
+              )
+              .where(
+                  "occurredAt",
+                  "<",
+                  admin.firestore.Timestamp.fromMillis(dayEndMillis),
+              );
+        }
+
+        const snapshot = await entriesQuery
+            .orderBy("occurredAt", "desc")
+            .limit(500)
+            .get();
+
+        const canSeeRestricted =
+          context.canManageRestrictedOperationalData;
+
+        const entries = snapshot.docs
+            .map((document) => {
+              const data = document.data() || {};
+              return {id: document.id, ...data};
+            })
+            .filter((entry) => {
+              return entry.visibility !== "restricted" || canSeeRestricted;
+            })
+            .map((entry) => ({
+              id: entry.id,
+              type: entry.type || "Observation",
+              description: entry.description || "",
+              actionTaken: entry.actionTaken || "",
+              visibility: entry.visibility || "operational",
+              victim: entry.victim && typeof entry.victim === "object" ?
+                entry.victim : null,
+              interventionZones:
+                sanitizeMainCouranteInterventionZones(
+                    entry.interventionZones,
+                ),
+              presencePersonnel:
+                sanitizeMainCourantePresencePersonnel(
+                    entry.presencePersonnel,
+                ),
+              source: entry.source || "",
+              wasEdited: entry.wasEdited === true,
+              occurredAt: entry.occurredAt &&
+                  typeof entry.occurredAt.toMillis === "function" ?
+                entry.occurredAt.toMillis() : null,
+              createdBy: entry.createdBy || {},
+            }));
+
+        await admin.firestore()
+            .collection("mainCouranteAccessLogs")
+            .add({
+              territoireId: context.territoireId,
+              spotId,
+              viewerId: context.sauveteurId,
+              viewerLogin: session.login,
+              viewerRole: context.userRole,
+              viewerType: "sauveteur",
+              action: "stats_view",
+              viewedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+        response.status(200).json({
+          success: true,
+          entries,
+        });
+      } catch (error) {
+        console.error("Erreur lecture statistiques sauveteur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+
+/**
+ * Nettoie et limite les données d'identification d'une victime.
+ * @param {Object} rawVictim Données victime reçues du client.
+ * @return {?Object} Données victime nettoyées, ou null si elles sont vides.
+ */
+function sanitizeMainCouranteVictim(rawVictim) {
+  if (!rawVictim || typeof rawVictim !== "object") return null;
+
+  const clean = (value, maxLength = 160) =>
+    (value || "").toString().trim().slice(0, maxLength);
+
+  const rawNom = clean(rawVictim.nom, 100);
+  const rawPrenom = clean(rawVictim.prenom, 100).toLowerCase();
+  const prenom = rawPrenom ?
+    rawPrenom.charAt(0).toUpperCase() + rawPrenom.slice(1) :
+    "";
+
+  const victim = {
+    sexe: clean(rawVictim.sexe, 40),
+    nom: rawNom.toUpperCase(),
+    prenom,
+    age: clean(rawVictim.age, 20),
+    dateNaissance: clean(rawVictim.dateNaissance, 20),
+    lieuHabitation: clean(rawVictim.lieuHabitation, 180),
+    telephone: clean(rawVictim.telephone, 40),
+    qualification: clean(rawVictim.qualification, 60),
+  };
+
+  const hasValue = Object.values(victim).some((value) => value.length > 0);
+  return hasValue ? victim : null;
+}
+
+/**
+ * Nettoie les personnels présents et leurs horaires.
+ * @param {Array<*>} rawPersonnel Personnels reçus du client.
+ * @return {Array<Object>} Personnels présents normalisés.
+ */
+function sanitizeMainCourantePresencePersonnel(rawPersonnel) {
+  if (!Array.isArray(rawPersonnel)) return [];
+
+  const clean = (value, maxLength = 160) =>
+    (value || "").toString().trim().slice(0, maxLength);
+
+  return rawPersonnel
+      .map((raw) => {
+        const source = raw &&
+            typeof raw === "object" &&
+            !Array.isArray(raw) ?
+          raw :
+          {};
+
+        return {
+          name: clean(source.name, 140),
+          quality: clean(source.quality, 140),
+          hours: clean(source.hours, 180),
+        };
+      })
+      .filter((person) => person.name && person.hours);
+}
+
+/**
+ * Nettoie les catégories terrain d'une intervention.
+ * @param {Array<*>} rawZones Catégories reçues du client.
+ * @return {Array<string>} Catégories reconnues et dédupliquées.
+ */
+function sanitizeMainCouranteInterventionZones(rawZones) {
+  const allowed = new Set([
+    "Zone de bain surveillée",
+    "Hors zone de bain surveillée",
+    "Zone réglementée",
+    "Hors zone réglementée",
+  ]);
+
+  if (!Array.isArray(rawZones)) return [];
+
+  return [...new Set(
+      rawZones
+          .map((value) => (value || "").toString().trim())
+          .filter((value) => allowed.has(value)),
+  )];
+}
+
+/**
+ * Vérifie que l'intervention est qualifiée sur les deux axes terrain.
+ * @param {Array<string>} zones Catégories d'intervention normalisées.
+ * @return {boolean} Vrai si un choix cohérent existe pour chaque axe.
+ */
+function hasCompleteMainCouranteInterventionZones(zones) {
+  const bathingCount = [
+    "Zone de bain surveillée",
+    "Hors zone de bain surveillée",
+  ].filter((value) => zones.includes(value)).length;
+  const regulationCount = [
+    "Zone réglementée",
+    "Hors zone réglementée",
+  ].filter((value) => zones.includes(value)).length;
+
+  return bathingCount === 1 && regulationCount === 1;
+}
+
+exports.updateSauveteurMainCouranteEntry = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const session = await resolveSauveteurSession(
+            request.body.sauveteurSessionToken,
+        );
+
+        if (!session) {
+          response.status(401).json({
+            success: false,
+            error: "invalid_session",
+          });
+          return;
+        }
+
+        if (!session.legalAcceptanceCurrent) {
+          response.status(403).json({
+            success: false,
+            error: "legal_acceptance_required",
+          });
+          return;
+        }
+
+        const {context} = session;
+        const spotId = (request.body.spotId || "").toString().trim();
+        const entryId = (request.body.entryId || "").toString().trim();
+
+        if (context.sphotMode !== "ON" ||
+            !context.realtimeSpotIds.includes(spotId)) {
+          response.status(403).json({
+            success: false,
+            error: "main_courante_not_available",
+          });
+          return;
+        }
+
+        if (!context.canManageRestrictedOperationalData) {
+          response.status(403).json({
+            success: false,
+            error: "insufficient_role",
+          });
+          return;
+        }
+
+        if (!entryId) {
+          response.status(400).json({
+            success: false,
+            error: "entry_id_required",
+          });
+          return;
+        }
+
+        const description = (request.body.description || "")
+            .toString()
+            .trim();
+
+        if (!description) {
+          response.status(400).json({
+            success: false,
+            error: "description_required",
+          });
+          return;
+        }
+
+        const entryReference = admin.firestore()
+            .collection("territoires")
+            .doc(context.territoireId)
+            .collection("spots")
+            .doc(spotId)
+            .collection("mainCourante")
+            .doc(entryId);
+
+        const entrySnapshot = await entryReference.get();
+        if (!entrySnapshot.exists) {
+          response.status(404).json({
+            success: false,
+            error: "entry_not_found",
+          });
+          return;
+        }
+
+        const visibility = request.body.visibility === "restricted" ?
+          "restricted" :
+          "operational";
+        const nextType =
+          (request.body.type || "Observation").toString().trim() ||
+          "Observation";
+        const normalizedNextType = nextType.toLowerCase();
+        const supportsVictim =
+          normalizedNextType === "intervention" ||
+          normalizedNextType === "secours";
+        const victim = supportsVictim ?
+          sanitizeMainCouranteVictim(request.body.victim) :
+          null;
+        const interventionZones =
+          normalizedNextType === "intervention" ?
+            sanitizeMainCouranteInterventionZones(
+                request.body.interventionZones,
+            ) :
+            [];
+        const presencePersonnel =
+          normalizedNextType === "présence" ||
+          normalizedNextType === "presence" ?
+            sanitizeMainCourantePresencePersonnel(
+                request.body.presencePersonnel,
+            ) :
+            [];
+
+        if (normalizedNextType === "intervention" &&
+            !hasCompleteMainCouranteInterventionZones(interventionZones)) {
+          response.status(400).json({
+            success: false,
+            error: "intervention_zones_required",
+          });
+          return;
+        }
+
+        const nextData = {
+          type: nextType,
+          description,
+          actionTaken: (request.body.actionTaken || "").toString().trim(),
+          visibility,
+          victim: victim || admin.firestore.FieldValue.delete(),
+          interventionZones: interventionZones.length > 0 ?
+            interventionZones :
+            admin.firestore.FieldValue.delete(),
+          presencePersonnel: presencePersonnel.length > 0 ?
+            presencePersonnel :
+            admin.firestore.FieldValue.delete(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedBy: {
+            sauveteurId: context.sauveteurId,
+            login: session.login,
+            role: context.userRole,
+          },
+          wasEdited: true,
+        };
+
+        const auditReference = admin.firestore()
+            .collection("mainCouranteAuditLogs")
+            .doc();
+        const batch = admin.firestore().batch();
+
+        batch.set(auditReference, {
+          action: "update",
+          territoireId: context.territoireId,
+          spotId,
+          entryId,
+          previousEntry: entrySnapshot.data() || {},
+          nextEntry: nextData,
+          actor: {
+            sauveteurId: context.sauveteurId,
+            login: session.login,
+            role: context.userRole,
+          },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        batch.set(entryReference, nextData, {merge: true});
+
+        await batch.commit();
+
+        response.status(200).json({success: true});
+      } catch (error) {
+        console.error("Erreur modification main courante:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+exports.deleteSauveteurMainCouranteEntry = onRequest(
+    {
+      cpu: 1,
+      memory: "256MiB",
+    },
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+
+      try {
+        const session = await resolveSauveteurSession(
+            request.body.sauveteurSessionToken,
+        );
+
+        if (!session) {
+          response.status(401).json({
+            success: false,
+            error: "invalid_session",
+          });
+          return;
+        }
+
+        if (!session.legalAcceptanceCurrent) {
+          response.status(403).json({
+            success: false,
+            error: "legal_acceptance_required",
+          });
+          return;
+        }
+
+        const {context} = session;
+        const spotId = (request.body.spotId || "").toString().trim();
+        const entryId = (request.body.entryId || "").toString().trim();
+
+        if (context.sphotMode !== "ON" ||
+            !context.realtimeSpotIds.includes(spotId)) {
+          response.status(403).json({
+            success: false,
+            error: "main_courante_not_available",
+          });
+          return;
+        }
+
+        if (!context.canManageRestrictedOperationalData) {
+          response.status(403).json({
+            success: false,
+            error: "insufficient_role",
+          });
+          return;
+        }
+
+        if (!entryId) {
+          response.status(400).json({
+            success: false,
+            error: "entry_id_required",
+          });
+          return;
+        }
+
+        const entryReference = admin.firestore()
+            .collection("territoires")
+            .doc(context.territoireId)
+            .collection("spots")
+            .doc(spotId)
+            .collection("mainCourante")
+            .doc(entryId);
+
+        const entrySnapshot = await entryReference.get();
+        if (!entrySnapshot.exists) {
+          response.status(404).json({
+            success: false,
+            error: "entry_not_found",
+          });
+          return;
+        }
+
+        const auditReference = admin.firestore()
+            .collection("mainCouranteAuditLogs")
+            .doc();
+        const batch = admin.firestore().batch();
+
+        batch.set(auditReference, {
+          action: "delete",
+          territoireId: context.territoireId,
+          spotId,
+          entryId,
+          deletedEntry: entrySnapshot.data() || {},
+          actor: {
+            sauveteurId: context.sauveteurId,
+            login: session.login,
+            role: context.userRole,
+          },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        batch.delete(entryReference);
+
+        await batch.commit();
+
+        response.status(200).json({success: true});
+      } catch (error) {
+        console.error("Erreur suppression main courante:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
+
+/** Valide et consomme un passage unique vers le dashboard Super Admin. */
