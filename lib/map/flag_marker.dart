@@ -165,17 +165,14 @@ class _FlagMarkerState extends State<FlagMarker>
     final hasTripleSignal = hasMainFlag && purpleFlagActive && windsockActive;
     final loweredTripleGroupLift =
         isAffale && hasTripleSignal ? tripleSignalWindsockDrop : 0.0;
-    // Comportements indépendants par surface :
-    // - carte : positions existantes conservées ;
-    // - LIVE mobile : position compacte inchangée ;
-    // - LIVE Web : aligner le bord supérieur peint du drapeau hissé
-    //   sur le sommet du mât. Le mât compact commence à y=5, tandis
-    //   que la peinture du drapeau laisse 6 px en haut du CustomPaint :
-    //   flagTopHisse (18) - compactHissedLift (15) - 4 + 6 = 5.
-    // - Actions rapides : aperçu hissé / affalé inchangé.
-    // Cet ajustement n'agit JAMAIS sur les drapeaux affalés.
+    // Chaque contexte utilise son profil dédié.
+    // Le drapeau de carte commence 4 px sous le sommet du mât :
+    // (flagTopHisse = 18) + (marge peinte = 6) - (haut mât = 20).
+    // Même écart de 4 px dans la fiche LIVE Web, sans toucher à la carte :
+    // (18 - compactHissedLift = 15 + 6) - (haut mât compact = 5) = 4.
+    // Les autres profils, combinaisons et drapeaux affalés restent inchangés.
     const compactHissedLift = 15.0;
-    const webLiveHissedOffset = -4.0;
+    const webLiveHissedOffset = 0.0;
     final mainFlagTop = isAffale
         ? lowerFlagTop -
             ((purpleFlagActive || windsockActive) ? flagStep : 0) -
