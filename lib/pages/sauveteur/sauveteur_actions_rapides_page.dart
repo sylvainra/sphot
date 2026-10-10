@@ -819,6 +819,7 @@ class _SauveteurActionsRapidesPageState
                           if (!isTemporaryClosed)
                             Container(
                               width: double.infinity,
+                              alignment: Alignment.center,
                               height: bandeauHeight,
                               margin: const EdgeInsets.only(
                                 top: 3,
