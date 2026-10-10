@@ -1026,57 +1026,44 @@ function historicalLiveStateIsFresh(historical, enabledSince) {
 }
 
 /**
- * Vérifie qu'un territoire possède actuellement des droits de diffusion.
- *
- * Le booléen admins.diffusionAccessGranted reste prioritaire. En sécurité,
- * une période d'essai active ou un abonnement actif ouvre aussi les droits.
+ * Filtre une liste d'identifiants pour ne garder que les SPHOTS surveillés.
  *
  * @param {FirebaseFirestore.Firestore} db Instance Firestore.
  * @param {string} territoireId Identifiant du territoire.
- * @return {Promise<boolean>}
+ * @param {Array<string>} spotIds Identifiants de SPHOTS à contrôler.
+ * @return {Promise<Array<string>>} Identifiants des SPHOTS surveillés.
  */
-async function territoryDiffusionAccessGranted(db, territoireId) {
-  if (!territoireId) return false;
-
-  const adminDocuments = await territoryAdminDocuments(db, territoireId);
-
-  for (const document of adminDocuments) {
-    const data = document.data() || {};
-
-    /*
-     * Le Super Admin ouvre explicitement la diffusion au moment de la
-     * validation de l'essai. Ce booléen est donc l'autorité prioritaire,
-     * même pour les anciens documents admins dépourvus de accessStatus.
-     */
-    if (data.diffusionAccessGranted === true) {
-      return true;
-    }
-
-    if (data.accessStatus !== "approved") continue;
-
-    const subscriptionSnapshot = await db.collection("subscriptions")
-        .doc(document.id)
-        .get();
-
-    if (subscriptionSnapshot.exists &&
-        subscriptionGrantsDiffusion(subscriptionSnapshot.data() || {})) {
-      return true;
-    }
+async function supervisedSpotIds(
+    db,
+    territoireId,
+    spotIds,
+) {
+  if (!territoireId || !Array.isArray(spotIds) || spotIds.length === 0) {
+    return [];
   }
 
-  return false;
-}
+  const normalizedIds = [...new Set(
+      spotIds
+          .map((value) => (value || "").toString().trim())
+          .filter((value) => value),
+  )];
 
-/**
- * Vérifie que le territoire dispose d'un administrateur approuvé
- * dont les droits de diffusion SPHOT sont actuellement ouverts.
- *
- * @param {string} territoireId Identifiant du territoire.
- * @return {Promise<boolean>}
- */
-async function isTerritoryPublic(territoireId) {
-  const db = admin.firestore();
-  return territoryDiffusionAccessGranted(db, territoireId);
+  if (normalizedIds.length === 0) return [];
+
+  const references = normalizedIds.map((spotId) => {
+    return db.collection("territoires")
+        .doc(territoireId)
+        .collection("spots")
+        .doc(spotId);
+  });
+
+  const snapshots = await db.getAll(...references);
+  return snapshots
+      .filter((snapshot) => {
+        return snapshot.exists &&
+          isSupervisedSpotData(snapshot.data() || {});
+      })
+      .map((snapshot) => snapshot.id);
 }
 
 /**
@@ -4959,8 +4946,17 @@ async function resolveSauveteurOperationalContext(accountData, login) {
       assignedPeriodIds,
   );
 
-  const diffusionAccessGranted =
-    await territoryDiffusionAccessGranted(db, territoireId);
+  // Même autorité que la projection publique : postes surveillés sous droit.
+  const realtimeScope = await territoryRealtimeScope(db, territoireId);
+  const entitledSpotIds = assignedSpotIds.filter(
+      (spotId) => realtimeScopeGrantsSpot(realtimeScope, spotId),
+  );
+  const realtimeSpotIds = await supervisedSpotIds(
+      db,
+      territoireId,
+      entitledSpotIds,
+  );
+  const diffusionAccessGranted = realtimeSpotIds.length > 0;
 
   const accountActive = accountData.accountStatus === "ACTIVE";
   const sphotOn = accountActive &&
@@ -4974,7 +4970,7 @@ async function resolveSauveteurOperationalContext(accountData, login) {
   } else if (assignedSpotIds.length === 0) {
     modeReason = "no_active_assignment";
   } else if (!diffusionAccessGranted) {
-    modeReason = "administration_diffusion_off";
+    modeReason = "realtime_not_enabled_for_assignment";
   } else if (!assignmentPeriods.active) {
     modeReason = assignmentPeriods.reason;
   }
@@ -4988,6 +4984,7 @@ async function resolveSauveteurOperationalContext(accountData, login) {
     functions,
     userRole,
     assignedSpotIds,
+    realtimeSpotIds,
     assignedPeriodIds,
     activePeriodIds: assignmentPeriods.activePeriodIds,
     diffusionAccessGranted,
@@ -5639,7 +5636,7 @@ exports.saveSauveteurPlanning = onRequest(
           return;
         }
 
-        if (!context.assignedSpotIds.includes(spotId)) {
+        if (!context.realtimeSpotIds.includes(spotId)) {
           response.status(403).json({
             success: false,
             error: "spot_not_assigned",
@@ -6930,7 +6927,7 @@ exports.updateSauveteurLiveState = onRequest(
           return;
         }
 
-        if (!context.assignedSpotIds.includes(spotId)) {
+        if (!context.realtimeSpotIds.includes(spotId)) {
           response.status(403).json({
             success: false,
             error: "spot_not_assigned",
@@ -7264,7 +7261,7 @@ exports.getSauveteurMainCourante = onRequest(
         const spotId = (request.body.spotId || "").toString().trim();
 
         if (context.sphotMode !== "ON" ||
-            !context.assignedSpotIds.includes(spotId)) {
+            !context.realtimeSpotIds.includes(spotId)) {
           response.status(403).json({
             success: false,
             error: "main_courante_not_available",
@@ -7421,7 +7418,7 @@ exports.addSauveteurMainCouranteEntry = onRequest(
         const spotId = (request.body.spotId || "").toString().trim();
 
         if (context.sphotMode !== "ON" ||
-            !context.assignedSpotIds.includes(spotId)) {
+            !context.realtimeSpotIds.includes(spotId)) {
           response.status(403).json({
             success: false,
             error: "sphot_off",
