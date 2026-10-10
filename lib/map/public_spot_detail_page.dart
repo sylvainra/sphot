@@ -113,7 +113,7 @@ class PublicSpotDetailPage extends StatelessWidget {
                             ),
                           ),
                         ],
-                        if (typeLabel.isNotEmpty) ...[
+                        if (spot.isPosteSecours || typeLabel.isNotEmpty) ...[
                           const SizedBox(height: 7),
                           if (spot.isPosteSecours)
                             Row(
@@ -897,34 +897,25 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                     height: 1.12,
                   ),
                 ),
-                if (city.isNotEmpty || type.isNotEmpty) ...[
+                if (city.isNotEmpty) ...[
                   const SizedBox(height: 3),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (city.isNotEmpty)
-                        Flexible(
-                          child: Text(
-                            city,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF1E3A8A),
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      if (city.isNotEmpty && type.isNotEmpty)
-                        const Text(
-                          ' · ',
-                          style: TextStyle(
-                            color: Color(0xFF53657A),
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      if (spot.isPosteSecours) ...[
+                  Text(
+                    city,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF1E3A8A),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+                if (type.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  if (spot.isPosteSecours)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         SvgPicture.asset(
                           'data/icons/flag_red_yellow_5x3.svg',
                           width: 12,
@@ -932,8 +923,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                           fit: BoxFit.contain,
                         ),
                         const SizedBox(width: 4),
-                      ],
-                      if (type.isNotEmpty)
                         Flexible(
                           child: Text(
                             type,
@@ -946,8 +935,19 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                             ),
                           ),
                         ),
-                    ],
-                  ),
+                      ],
+                    )
+                  else
+                    Text(
+                      type,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: typeColor,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                 ],
               ],
             ),
