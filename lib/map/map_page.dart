@@ -65,7 +65,9 @@ class _MapPageState extends State<MapPage> {
   SpotFilter _selectedFilter = SpotFilter.all;
 
   double _currentRotation = 0;
-  int _selectedTileStyle = 0;
+  // Fond satellite dès l'ouverture sur Web et mobile ; l'utilisateur peut
+  // toujours choisir Plan ou Relief via le sélecteur de cartes.
+  int _selectedTileStyle = 1;
   int _mapTileRefreshVersion = 0;
   int _selectedBottomIndex = 1;
   String? _selectedPublicSpotId;
