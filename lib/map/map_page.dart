@@ -496,9 +496,14 @@ Future<void> _toggleFavoritesFilter() async {
       );
       final width = min(
         screenWidth - 20.0,
-        min(320.0, max(140.0, longestLabel * (zoom >= 17 ? 8.4 : 7.6))),
+        min(
+          selected ? 420.0 : 320.0,
+          max(140.0, longestLabel * (zoom >= 17 ? 8.4 : 7.6)),
+        ),
       );
-      final height = isRescue ? 116.0 : 110.0;
+      // Réserve aussi la hauteur des lignes d'état, susceptibles
+      // de se répartir sur plusieurs lignes sur un écran étroit.
+      final height = selected ? 180.0 : (isRescue ? 154.0 : 142.0);
       final labelTopOffset = isRescue ? 4.0 : 20.0;
       final area = Rect.fromLTWH(
         point.dx - width / 2 - 8,
