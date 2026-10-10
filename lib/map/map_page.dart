@@ -447,9 +447,11 @@ Future<void> _toggleFavoritesFilter() async {
     return _latLngFromMercatorPixelPoint(centerPoint, zoom);
   }
 
-  // Étiquettes automatiques Web/mobile : icônes toujours visibles,
-  // priorité au SPHOT sélectionné puis aux postes de secours.
-  // On compare les zones de texte projetées, pas les seuls points.
+  // Affichage automatique commun au Web et au mobile : les marqueurs
+  // restent toujours présents, seules les étiquettes sont arbitrées.
+  // Priorité au SPHOT sélectionné, puis aux postes de secours.
+  // La zone réservée est mesurée d'après les lignes réellement affichées,
+  // plutôt qu'un rectangle fixe exagérément large et haut.
   Set<String> _automaticLabelIds(
     List<SpotFlagState> spots,
     double zoom,
@@ -478,38 +480,114 @@ Future<void> _toggleFavoritesFilter() async {
     final acceptedAreas = <Rect>[];
     final acceptedIds = <String>{};
     final screenWidth = MediaQuery.sizeOf(context).width;
+    final textScaler = MediaQuery.textScalerOf(context);
 
     for (final spot in candidates) {
       final point = _mercatorPixelPoint(spot, zoom);
       final isRescue = spot.isPosteSecours;
       final selected = spot.id == _selectedPublicSpotId;
-      final longestLabel = <String>[
-        spot.mapDisplayName,
-        spot.ville,
-        if (isRescue)
-          'INFORMATIONS EN TEMPS RÉEL INDISPONIBLES'
-        else
+      final maxLabelWidth = min(
+        screenWidth - 24.0,
+        selected ? (isRescue ? 420.0 : 380.0) : (isRescue ? 320.0 : 300.0),
+      );
+
+      double actualWidth = 0;
+      double actualHeight = 0;
+      bool hasLine = false;
+
+      void addLine(
+        String value,
+        double fontSize, {
+        double leadingIconWidth = 0,
+        double leadingIconHeight = 0,
+      }) {
+        if (value.trim().isEmpty) return;
+        final painter = TextPainter(
+          text: TextSpan(
+            text: value,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+          textScaler: textScaler,
+          textWidthBasis: TextWidthBasis.longestLine,
+        )..layout(maxWidth: max(50.0, maxLabelWidth - leadingIconWidth));
+
+        if (hasLine) actualHeight += 2.0;
+        actualWidth = max(
+          actualWidth,
+          painter.width + leadingIconWidth,
+        );
+        actualHeight += max(painter.height, leadingIconHeight);
+        hasLine = true;
+        painter.dispose();
+      }
+
+      // Les tailles sont celles utilisées par les widgets de marqueurs,
+      // y compris les pictogrammes devant les lignes de baignade.
+      addLine(spot.mapDisplayName, 13.0);
+      addLine(spot.ville.toUpperCase(), 12.0);
+
+      if (isRescue) {
+        addLine(
+          'POSTE DE SECOURS',
+          selected ? 14.0 : 12.0,
+          leadingIconWidth: 16.0,
+          leadingIconHeight: 14.0,
+        );
+        final iconSize = selected ? 24.0 : 19.0;
+        if (spot.hasValidFlag) {
+          addLine(
+            spot.displayStatut.replaceAll('⚠️ ', ''),
+            iconSize * 0.55,
+            leadingIconWidth: spot.flagColor == FlagColor.green
+                ? 0.0
+                : iconSize + 2,
+            leadingIconHeight: spot.flagColor == FlagColor.green
+                ? 0.0
+                : iconSize,
+          );
+        } else {
+          for (final line in _rescueWarningLines(spot)) {
+            addLine(
+              line,
+              iconSize * 0.55,
+              leadingIconWidth: iconSize + 2,
+              leadingIconHeight: iconSize,
+            );
+          }
+        }
+      } else {
+        addLine(spot.typeSphot.toUpperCase(), selected ? 14.0 : 12.0);
+        final iconSize = selected ? 24.0 : 19.0;
+        addLine(
+          'BAIGNADE NON SURVEILLÉE',
+          iconSize * 0.55,
+          leadingIconWidth: iconSize + 2,
+          leadingIconHeight: iconSize,
+        );
+        addLine(
           'BAIGNADE À VOS RISQUES ET PÉRILS',
-      ].fold<int>(
-        0,
-        (maxLength, value) => max(maxLength, value.runes.length),
-      );
-      final width = min(
-        screenWidth - 20.0,
-        min(
-          selected ? 420.0 : 320.0,
-          max(140.0, longestLabel * (zoom >= 17 ? 8.4 : 7.6)),
-        ),
-      );
-      // Réserve aussi la hauteur des lignes d'état, susceptibles
-      // de se répartir sur plusieurs lignes sur un écran étroit.
-      final height = selected ? 180.0 : (isRescue ? 154.0 : 142.0);
-      final labelTopOffset = isRescue ? 4.0 : 20.0;
+          iconSize * 0.55,
+          leadingIconWidth: iconSize + 2,
+          leadingIconHeight: iconSize,
+        );
+      }
+
+      // Coordonnées des étiquettes : la carte centre le marqueur sur
+      // la position du SPHOT. Les labels commencent sous le pictogramme.
+      final labelTopOffset = isRescue
+          ? (selected ? 6.5 : 4.5)
+          : (selected ? 22.0 : 20.0);
+      const horizontalMargin = 6.0;
+      const verticalMargin = 4.0;
       final area = Rect.fromLTWH(
-        point.dx - width / 2 - 8,
-        point.dy + labelTopOffset - 7,
-        width + 16,
-        height + 14,
+        point.dx - actualWidth / 2 - horizontalMargin,
+        point.dy + labelTopOffset - verticalMargin,
+        actualWidth + horizontalMargin * 2,
+        actualHeight + verticalMargin * 2,
       );
 
       if (!selected && acceptedAreas.any((other) => other.overlaps(area))) {
@@ -3615,7 +3693,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Transform.scale(
-  scaleX: 0.65,
+  scaleX: 0.8,
   scaleY: 1.25,
   alignment: Alignment.centerLeft,
   child: SizedBox(
