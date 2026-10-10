@@ -14,11 +14,16 @@ class FlagMarker extends StatefulWidget {
   // Le mât de la fiche Live reste compact, contrairement à celui de la carte.
   final bool compactDetail;
 
+  // Correctif propre à la fiche Live Web. Aucun effet sur l'application,
+  // la carte ou l'espace sauveteur.
+  final bool desktopLive;
+
   const FlagMarker({
     super.key,
     required this.spot,
     this.sauveteurPreview = false,
     this.compactDetail = false,
+    this.desktopLive = false,
   });
 
   @override
@@ -116,9 +121,12 @@ class _FlagMarkerState extends State<FlagMarker>
     // principal ; les positions affalées et les marqueurs de carte
     // restent strictement inchangés.
     const compactHissedLift = 15.0;
+    const desktopHissedLift = 15.0;
     final mainFlagTop = isAffale
         ? lowerFlagTop - ((purpleFlagActive || windsockActive) ? flagStep : 0)
-        : flagTopHisse - (widget.compactDetail ? compactHissedLift : 0);
+        : flagTopHisse -
+            (widget.compactDetail ? compactHissedLift : 0) -
+            (widget.desktopLive ? desktopHissedLift : 0);
     final purpleFlagTop = mainFlagTop + flagStep;
 
     // Même en l'absence du violet, la manche à air se situe à la moitié
