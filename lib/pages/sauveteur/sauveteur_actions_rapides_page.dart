@@ -10,6 +10,7 @@ import '../../map/flag_marker.dart';
 import '../../models/flag_state.dart';
 import '../../widgets/adaptive_asset_image.dart';
 import '../../widgets/danger_pictogram.dart';
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurActionsRapidesPage extends StatefulWidget {
   final Color profileColor;
@@ -586,10 +587,8 @@ class _SauveteurActionsRapidesPageState
   }
 
   Widget _buildFlagMastControl() {
-    const height = 174.0;
-
+    // La hauteur du mât suit la place disponible sur l'écran.
     return Container(
-      height: height,
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.45),
         borderRadius: BorderRadius.circular(18),
@@ -693,7 +692,9 @@ class _SauveteurActionsRapidesPageState
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
+      body: SauveteurAdaptiveViewport(
+        minContentHeight: 760,
+        child: Stack(
         fit: StackFit.expand,
         children: [
           Image.asset(
@@ -842,13 +843,13 @@ class _SauveteurActionsRapidesPageState
 
                           if (isTemporaryClosed) _dangerBanner(),
 
-                          _sectionCard(
+                          Expanded(
+                            child: _sectionCard(
                             title: 'Actions rapides',
                             icon: Icons.flash_on,
                             children: [
                               const SizedBox(height: 8),
-                              SizedBox(
-                                height: 174,
+                              Expanded(
                                 child: Row(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
@@ -938,7 +939,8 @@ class _SauveteurActionsRapidesPageState
                               ),
                             ],
                           ),
-
+                          ),
+                          const SizedBox(height: 8),
                           _sectionCard(
                             title: 'Signaux complémentaires',
                             icon: Icons.flag_rounded,
@@ -1001,6 +1003,7 @@ class _SauveteurActionsRapidesPageState
             child: _bottomNavBar(),
           ),
         ],
+      ),
       ),
     );
   }
