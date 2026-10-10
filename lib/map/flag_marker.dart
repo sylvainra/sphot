@@ -11,10 +11,14 @@ class FlagMarker extends StatefulWidget {
   // L'aperçu sauveteur dispose d'un mât plus haut que les marqueurs de carte.
   final bool sauveteurPreview;
 
+  // Le mât de la fiche Live reste compact, contrairement à celui de la carte.
+  final bool compactDetail;
+
   const FlagMarker({
     super.key,
     required this.spot,
     this.sauveteurPreview = false,
+    this.compactDetail = false,
   });
 
   @override
@@ -82,8 +86,11 @@ class _FlagMarkerState extends State<FlagMarker>
 
     // La hauteur du mât reste fixe : activer un signal ne rallonge jamais
     // un marqueur de carte. L'aperçu sauveteur conserve son grand mât.
-    final markerHeight =
-        widget.sauveteurPreview ? _previewMarkerHeight : _normalMarkerHeight;
+    final markerHeight = widget.sauveteurPreview
+        ? _previewMarkerHeight
+        : widget.compactDetail
+            ? 95.0
+            : _normalMarkerHeight;
     final poleHeight = markerHeight - 20;
 
     // Le dessin sinusoïdal remplit 18 px sur une zone de 30 px :
