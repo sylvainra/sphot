@@ -634,21 +634,19 @@ class _SauveteurActionsRapidesPageState
                     ),
                   ),
                 ),
-                // Réserve au mât toute la hauteur utile de l'aperçu,
-                // indépendamment des marqueurs plus compacts de la carte.
-                // Mât relevé dans son cadre : le pied ne touche plus
-                // l'indication AFFALÉ, sans modifier l'action tactile.
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Transform.translate(
-                    offset: const Offset(0, -10),
-                    child: Transform.scale(
-                      scale: 1.02,
-                      child: FlagMarker(
-                        spot: _previewSpotState(),
-                        sauveteurPreview: true,
-                      ),
-                    ),
+                // Hauteur augmentée uniquement pour cet écran. Le composant
+                // conserve sa largeur, la taille des pavillons et leurs
+                // positions validées (hissé/affalé + violet/manche à air).
+                // L'espace de 34 px en haut et en bas évite que les signaux
+                // touchent les libellés HISSÉ / AFFALÉ.
+                Center(
+                  child: FlagMarker(
+                    spot: _previewSpotState(),
+                    sauveteurPreview: true,
+                    sauveteurPreviewHeight:
+                        (constraints.maxHeight - 68.0)
+                            .clamp(115.0, 220.0)
+                            .toDouble(),
                   ),
                 ),
                 const Positioned(
@@ -761,7 +759,8 @@ class _SauveteurActionsRapidesPageState
 
                 Expanded(
   child: Padding(
-    padding: const EdgeInsets.fromLTRB(16, 0, 16, 50),
+    // Réserve une zone nette à la flèche de retour, sans chevauchement.
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 85),
     child: Column(
       children: [
                           if (_loadingSpots)
