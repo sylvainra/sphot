@@ -79,30 +79,31 @@ class _FlagMarkerState extends State<FlagMarker>
 
     final isAffale = widget.spot.flagPosition == FlagPosition.affale;
 
-    // Le mât du sauveteur retrouve sa hauteur de présentation. Sur la carte,
-    // seul un ensemble de deux drapeaux affalés bénéficie de place supplémentaire.
-    final markerHeight = widget.sauveteurPreview
-        ? _previewMarkerHeight
-        : isAffale && purpleFlagActive
-            ? 125.0
-            : _normalMarkerHeight;
+    // La hauteur du mât reste fixe : activer un signal ne rallonge jamais
+    // un marqueur de carte. L'aperçu sauveteur conserve son grand mât.
+    final markerHeight =
+        widget.sauveteurPreview ? _previewMarkerHeight : _normalMarkerHeight;
     final poleHeight = markerHeight - 20;
 
-    // En position affalée, les drapeaux restent en bas du mât. Avec le violet,
-    // le drapeau principal remonte juste assez pour garder deux pavillons entiers.
+    // Position affalée historique du drapeau principal, en bas du mât.
+    final originalLowerTop = markerHeight - 41;
+    const halfFlagHeight = flagHeight / 2;
+
+    // Sans violet : position principale inchangée, même si la manche à air
+    // est sélectionnée. Avec violet : il prend la place basse historique et
+    // le drapeau principal remonte de la moitié d'une hauteur de pavillon.
     final mainFlagTop = isAffale
-        ? markerHeight - (purpleFlagActive ? 66 : 41)
+        ? originalLowerTop - (purpleFlagActive ? halfFlagHeight : 0)
         : flagTopHisse;
+    final purpleFlagTop =
+        isAffale ? originalLowerTop : flagTopHisse + halfFlagHeight;
 
-    // Deux pavillons de même taille avec 32 px entre leurs points d'attache.
-    final purpleFlagTop = mainFlagTop + 32;
-
-    // La manche à air est horizontalement à côté du drapeau inférieur, et
-    // verticalement centrée sur sa moitié, sans le recouvrir.
+    // La manche à air est liée au MÂT, pas à l'extrémité du drapeau.
+    // Son point d'attache est à mi-hauteur du pavillon inférieur.
     const windsockHeight = 11.0;
     final lowerFlagTop = purpleFlagActive ? purpleFlagTop : mainFlagTop;
-    final windsockTop = lowerFlagTop + (flagHeight - windsockHeight) / 2;
-    const windsockLeft = flagLeft + flagWidth + 6;
+    final windsockTop = lowerFlagTop + halfFlagHeight - windsockHeight / 2;
+    const windsockLeft = flagLeft;
 
     return SizedBox(
       width: markerWidth,
