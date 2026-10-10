@@ -641,13 +641,11 @@ class _SauveteurActionsRapidesPageState
                 Center(
                   child: Transform.translate(
                     offset: const Offset(0, -10),
-                    child: FlagMarker(
+                    child: FlagMarker.actionsRapides(
                       spot: _previewSpotState(),
-                      sauveteurPreview: true,
-                      sauveteurPreviewHeight:
-                          (constraints.maxHeight - 75.0)
-                              .clamp(129.0, 140.0)
-                              .toDouble(),
+                      height: (constraints.maxHeight - 75.0)
+                          .clamp(129.0, 140.0)
+                          .toDouble(),
                     ),
                   ),
                 ),
