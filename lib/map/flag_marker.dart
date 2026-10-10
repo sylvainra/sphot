@@ -26,7 +26,8 @@ class _FlagMarkerState extends State<FlagMarker>
   late final AnimationController _controller;
 
   static const double markerWidth = 70;
-  static const double _normalMarkerHeight = 95;
+  // Mât de carte allongé vers le haut ; le pied reste géoréférencé.
+  static const double _normalMarkerHeight = 132;
   static const double _previewMarkerHeight = 115;
 
   static const double poleWidth = 4;
@@ -96,7 +97,9 @@ class _FlagMarkerState extends State<FlagMarker>
     // Affalé, un seul pavillon se place plus bas sur le mât.
     // Si un signal complémentaire est présent, le pavillon principal
     // remonte pour libérer la place basse, sans modifier le mât.
-    final lowerFlagTop = markerHeight - 35.0;
+    // Les signaux affalés restent près du pied du mât, avec assez
+    // d'espace pour le pavillon violet ou la manche à air sous le premier.
+    final lowerFlagTop = markerHeight - 27.0;
     final mainFlagTop = isAffale
         ? lowerFlagTop - ((purpleFlagActive || windsockActive) ? flagStep : 0)
         : flagTopHisse;
