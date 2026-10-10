@@ -635,19 +635,20 @@ class _SauveteurActionsRapidesPageState
                     ),
                   ),
                 ),
-                // Hauteur augmentée uniquement pour cet écran. Le composant
-                // conserve sa largeur, la taille des pavillons et leurs
-                // positions validées (hissé/affalé + violet/manche à air).
-                // L'espace de 34 px en haut et en bas évite que les signaux
-                // touchent les libellés HISSÉ / AFFALÉ.
+                // Le tracé du mât commence 20 px sous son widget ;
+                // ce décalage de -10 le centre exactement entre les
+                // libellés HISSÉ / AFFALÉ. Dimensions propres à cette page.
                 Center(
-                  child: FlagMarker(
-                    spot: _previewSpotState(),
-                    sauveteurPreview: true,
-                    sauveteurPreviewHeight:
-                        (constraints.maxHeight - 68.0)
-                            .clamp(115.0, 220.0)
-                            .toDouble(),
+                  child: Transform.translate(
+                    offset: const Offset(0, -10),
+                    child: FlagMarker(
+                      spot: _previewSpotState(),
+                      sauveteurPreview: true,
+                      sauveteurPreviewHeight:
+                          (constraints.maxHeight - 75.0)
+                              .clamp(129.0, 140.0)
+                              .toDouble(),
+                    ),
                   ),
                 ),
                 const Positioned(
@@ -843,16 +844,28 @@ class _SauveteurActionsRapidesPageState
 
                           if (isTemporaryClosed) _dangerBanner(),
 
-                          _sectionCard(
+                          Expanded(
+                            child: _sectionCard(
                             title: 'Actions rapides',
                             icon: Icons.flash_on,
                             children: [
                               const SizedBox(height: 8),
-                              // Trois commandes de couleur compactes.
-                              // Le mât suit ce bloc : les commandes de
-                              // publication conservent plus de place.
-                              SizedBox(
-                                height: 190,
+                              // Cinq boutons de même hauteur, répartis
+                              // sur toute la hauteur utile de la page.
+                              Expanded(
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    const gapCouleurs = 7.0;
+                                    const gapActions = 10.0;
+                                    final hauteurTouche =
+                                        (constraints.maxHeight -
+                                            2 * gapCouleurs -
+                                            2 * gapActions) / 5;
+                                    return Column(
+                                      children: [
+                                        SizedBox(
+                                          height: hauteurTouche * 3 +
+                                              2 * gapCouleurs,
                                 child: Row(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
@@ -905,6 +918,7 @@ class _SauveteurActionsRapidesPageState
                               ),
                               const SizedBox(height: 10),
                               _ActionButton(
+                                height: hauteurTouche,
                                 icon: Icons.warning_amber_rounded,
                                 label: selectedDangers.isEmpty
                                     ? 'Déclarer un danger'
@@ -919,6 +933,7 @@ class _SauveteurActionsRapidesPageState
                               ),
                               const SizedBox(height: 10),
                               _ActionButton(
+                                height: hauteurTouche,
                                 icon: Icons.campaign_rounded,
                                 label: 'Ajouter une notification',
                                 color: Colors.red,
@@ -940,7 +955,13 @@ class _SauveteurActionsRapidesPageState
                                   );
                                 },
                               ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ),
                             ],
+                          ),
                           ),
                           const SizedBox(height: 8),
                           _sectionCard(
@@ -1915,12 +1936,14 @@ class _ActionButton extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
+  final double height;
 
   const _ActionButton({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
+    this.height = 68,
   });
 
   @override
@@ -1930,7 +1953,7 @@ class _ActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 68,
+        height: height,
         width: double.infinity,
         decoration: BoxDecoration(
   color: color,
