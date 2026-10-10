@@ -122,14 +122,10 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
           ..addAll(spots);
 
         final preferredId = widget.initialSpotId?.trim();
-        final selected = _spots.isEmpty
-            ? null
-            : _spots.firstWhere(
-                (spot) => spot['id'] == preferredId,
-                orElse: () => _spots.first,
-              );
-
-        _selectedSpotId = selected?['id'];
+        // Ne bascule jamais vers un autre SPHOT sans choix depuis l'accueil.
+        _selectedSpotId = _spots.any((spot) => spot['id'] == preferredId)
+            ? preferredId
+            : null;
       });
 
       await _loadStats();
@@ -337,53 +333,6 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
     final day = date.day.toString().padLeft(2, '0');
     final month = date.month.toString().padLeft(2, '0');
     return '$day/$month/${date.year}';
-  }
-
-  Widget _spotSelector() {
-    if (_spots.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      width: double.infinity,
-      height: 42,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.55),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.black, width: 1.4),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedSpotId,
-          isExpanded: true,
-          icon: const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: _statsColor,
-          ),
-          items: _spots
-              .map(
-                (spot) => DropdownMenuItem<String>(
-                  value: spot['id'],
-                  child: Text(
-                    spot['label'] ?? '',
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: (value) async {
-            if (value == null) return;
-            setState(() => _selectedSpotId = value);
-            await _loadStats();
-          },
-        ),
-      ),
-    );
   }
 
   Widget _monthNavigation() {
@@ -818,8 +767,7 @@ class _SauveteurStatsPageState extends State<SauveteurStatsPage> {
                         ),
                         child: Column(
                           children: [
-                            _spotSelector(),
-                            const SizedBox(height: 8),
+                            // Le SPHOT est choisi uniquement dans le menu Sauveteur.
                             _monthNavigation(),
                             const SizedBox(height: 8),
                             Expanded(
