@@ -27,7 +27,7 @@ class _FlagMarkerState extends State<FlagMarker>
 
   static const double markerWidth = 70;
   static const double _normalMarkerHeight = 95;
-  static const double _previewMarkerHeight = 145;
+  static const double _previewMarkerHeight = 115;
 
   static const double poleWidth = 4;
   static const double poleLeft = (markerWidth - poleWidth) / 2;
@@ -85,24 +85,29 @@ class _FlagMarkerState extends State<FlagMarker>
         widget.sauveteurPreview ? _previewMarkerHeight : _normalMarkerHeight;
     final poleHeight = markerHeight - 20;
 
-    // Position affalée historique du drapeau principal, en bas du mât.
-    final originalLowerTop = markerHeight - 41;
-    const halfFlagHeight = flagHeight / 2;
+    // Le dessin sinusoïdal remplit 18 px sur une zone de 30 px :
+    // 6 px de marge en haut et en bas du CustomPaint.
+    // L'espace visible demandé entre les deux pavillons vaut un tiers
+    // de leur hauteur réellement peinte, soit 6 px.
+    const paintedFlagHeight = flagHeight - 12.0;
+    const flagGap = paintedFlagHeight / 3;
+    const flagStep = paintedFlagHeight + flagGap;
 
-    // Sans violet : position principale inchangée, même si la manche à air
-    // est sélectionnée. Avec violet : il prend la place basse historique et
-    // le drapeau principal remonte de la moitié d'une hauteur de pavillon.
+    // Affalé, un seul pavillon se place plus bas sur le mât.
+    // Si un signal complémentaire est présent, le pavillon principal
+    // remonte pour libérer la place basse, sans modifier le mât.
+    final lowerFlagTop = markerHeight - 35.0;
     final mainFlagTop = isAffale
-        ? originalLowerTop - (purpleFlagActive ? halfFlagHeight : 0)
+        ? lowerFlagTop - ((purpleFlagActive || windsockActive) ? flagStep : 0)
         : flagTopHisse;
-    final purpleFlagTop =
-        isAffale ? originalLowerTop : flagTopHisse + halfFlagHeight;
+    final purpleFlagTop = mainFlagTop + flagStep;
 
-    // La manche à air est liée au MÂT, pas à l'extrémité du drapeau.
-    // Son point d'attache est à mi-hauteur du pavillon inférieur.
+    // Même en l'absence du violet, la manche à air se situe à la moitié
+    // de l'emplacement où ce pavillon serait placé. Elle est attachée
+    // directement au mât (pas à l'extrémité du drapeau principal).
     const windsockHeight = 11.0;
-    final lowerFlagTop = purpleFlagActive ? purpleFlagTop : mainFlagTop;
-    final windsockTop = lowerFlagTop + halfFlagHeight - windsockHeight / 2;
+    final windsockTop =
+        purpleFlagTop + flagHeight / 2 - windsockHeight / 2;
     const windsockLeft = flagLeft;
 
     return SizedBox(
