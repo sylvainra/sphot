@@ -24,6 +24,13 @@ const SPHOT_SAUVETEUR_LOGIN_URL =
 
 setGlobalOptions({maxInstances: 10});
 
+function isSupervisedSpotData(spot) {
+  const data = spot || {};
+  const type = (data.typeSphot || "").toString().trim().toUpperCase();
+
+  return data.isPosteSecours === true || type.includes("POSTE DE SECOURS");
+}
+
 /**
  * Construit la projection strictement publique d'un SPHOT.
  *
@@ -32,7 +39,13 @@ setGlobalOptions({maxInstances: 10});
  * @param {Object} spot Données internes du SPHOT.
  * @return {Object} Données autorisées sur la carte publique.
  */
-function buildPublicSpot(territoireId, spotId, spot) {
+function buildPublicSpot(
+    territoireId,
+    spotId,
+    spot,
+    realtimeStatus = "available",
+    realtimeValidUntil = undefined,
+) {
   const publicFields = [
     "idSphot",
     "nomSecours",
@@ -98,7 +111,140 @@ function buildPublicSpot(territoireId, spotId, spot) {
     result.adresseWebcam = webcamUrl;
   }
 
+  const supervised = isSupervisedSpotData(spot);
+
+  if (supervised) {
+    const normalizedRealtimeStatus = [
+      "available",
+      "awaiting_update",
+      "unavailable",
+    ].includes(realtimeStatus) ? realtimeStatus : "unavailable";
+
+    result.realtimeAvailable = normalizedRealtimeStatus !== "unavailable";
+    result.realtimeStatus = normalizedRealtimeStatus;
+
+    if (normalizedRealtimeStatus !== "unavailable" &&
+        realtimeValidUntil !== undefined &&
+        realtimeValidUntil !== null) {
+      result.realtimeValidUntil = realtimeValidUntil;
+    }
+
+    if (normalizedRealtimeStatus !== "available") {
+      [
+        "liveFlag",
+        "statutBaignade",
+        "periode",
+        "heureDebut",
+        "heureFin",
+        "dangers",
+        "meteoTerrestre",
+        "meteoMarine",
+        "ephemeride",
+        "notificationPublique",
+      ].forEach((field) => {
+        delete result[field];
+      });
+    }
+  } else {
+    result.realtimeAvailable = false;
+    result.realtimeStatus = "not_applicable";
+    delete result.realtimeValidUntil;
+
+    [
+      "liveFlag",
+      "statutBaignade",
+      "periode",
+      "heureDebut",
+      "heureFin",
+      "dangers",
+      "notificationPublique",
+    ].forEach((field) => {
+      delete result[field];
+    });
+  }
+
   result.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+  return result;
+}
+
+/**
+ * Construit un état public indiquant que le temps réel n'est pas disponible.
+ *
+ * @param {string} realtimeStatus État temps réel à publier.
+ * @param {Date|null|undefined} realtimeValidUntil Fin de validité éventuelle.
+ * @return {Object} Mise à jour Firestore à fusionner.
+ */
+function buildSuppressedPublicLiveState(
+    realtimeStatus,
+    realtimeValidUntil = undefined,
+) {
+  const awaitingUpdate = realtimeStatus === "awaiting_update";
+  const result = {
+    realtimeAvailable: awaitingUpdate,
+    realtimeStatus: awaitingUpdate ? "awaiting_update" : "unavailable",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (awaitingUpdate &&
+      realtimeValidUntil !== undefined &&
+      realtimeValidUntil !== null) {
+    result.realtimeValidUntil = realtimeValidUntil;
+  } else {
+    result.realtimeValidUntil = admin.firestore.FieldValue.delete();
+  }
+
+  [
+    "liveFlag",
+    "statutBaignade",
+    "periode",
+    "heureDebut",
+    "heureFin",
+    "dangers",
+    "meteoTerrestre",
+    "meteoMarine",
+    "ephemeride",
+    "notificationPublique",
+  ].forEach((field) => {
+    result[field] = admin.firestore.FieldValue.delete();
+  });
+
+  return result;
+}
+
+/**
+ * Construit l'état public d'un SPHOT surveillé sans temps réel disponible.
+ *
+ * @return {Object} Mise à jour Firestore à fusionner.
+ */
+function buildUnavailablePublicLiveState() {
+  return buildSuppressedPublicLiveState("unavailable");
+}
+
+/**
+ * Construit l'état public d'un SPHOT non surveillé.
+ *
+ * @return {Object} Mise à jour Firestore à fusionner.
+ */
+function buildNonSupervisedPublicLiveState() {
+  const result = {
+    realtimeAvailable: false,
+    realtimeStatus: "not_applicable",
+    realtimeValidUntil: admin.firestore.FieldValue.delete(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  [
+    "liveFlag",
+    "statutBaignade",
+    "periode",
+    "heureDebut",
+    "heureFin",
+    "dangers",
+    "notificationPublique",
+  ].forEach((field) => {
+    result[field] = admin.firestore.FieldValue.delete();
+  });
+
   return result;
 }
 
@@ -112,9 +258,6 @@ function buildPublicLiveState(spot) {
   const liveFields = [
     "liveFlag",
     "statutBaignade",
-    "periode",
-    "heureDebut",
-    "heureFin",
     "phone",
     "telephonePoste",
     "dangers",
@@ -154,9 +297,6 @@ function mergePublicSpotData(spot, historical) {
   const historicalLiveFields = [
     "liveFlag",
     "statutBaignade",
-    "periode",
-    "heureDebut",
-    "heureFin",
     "phone",
     "telephonePoste",
     "dangers",
@@ -273,6 +413,17 @@ async function reconcilePublicTerritory(territoireId, publish) {
   if (!territoireId) return;
 
   const db = admin.firestore();
+  const realtimeScope = publish ?
+    await territoryRealtimeScope(db, territoireId) :
+    {
+      granted: false,
+      allSpots: false,
+      allSpotsSince: null,
+      allSpotsUntil: undefined,
+      spotIds: new Set(),
+      spotSince: new Map(),
+      spotUntil: new Map(),
+    };
   const territoryReference = db.collection("territoires").doc(territoireId);
   const publicSnapshot = await db
       .collection("publicSpots")
@@ -408,19 +559,36 @@ async function reconcilePublicTerritory(territoireId, publish) {
     spotSnapshot.docs.forEach((document) => {
       const reference = db.collection("publicSpots")
           .doc(`${territoireId}__${document.id}`);
+      const realtimeGranted =
+        realtimeScopeGrantsSpot(realtimeScope, document.id);
+      const enabledSince =
+        realtimeScopeEnabledSince(realtimeScope, document.id);
+      const validUntil =
+        realtimeScopeValidUntil(realtimeScope, document.id);
+      const historicalSpot = historicalSpots.get(document.id) || null;
+      const liveStateFresh = realtimeGranted &&
+        historicalLiveStateIsFresh(historicalSpot, enabledSince);
+      const realtimeStatus = !realtimeGranted ?
+        "unavailable" :
+        liveStateFresh ? "available" : "awaiting_update";
+
+      const mergedSpot = mergePublicTerritoryData(
+          mergePublicSpotData(
+              document.data(),
+              liveStateFresh ? historicalSpot : null,
+          ),
+          territoryData,
+      );
+
       writes.push({
         type: "set",
         reference,
         data: buildPublicSpot(
             territoireId,
             document.id,
-            mergePublicTerritoryData(
-                mergePublicSpotData(
-                    document.data(),
-                    historicalSpots.get(document.id) || null,
-                ),
-                territoryData,
-            ),
+            mergedSpot,
+            realtimeStatus,
+            validUntil,
         ),
       });
     });
@@ -558,6 +726,306 @@ async function territoryAdminDocuments(db, territoireId) {
 }
 
 /**
+ * Retourne les identifiants des postes explicitement couverts par un
+ * abonnement annuel.
+ *
+ * @param {Object} subscription Données de l'abonnement.
+ * @return {Set<string>} Identifiants de documents SPHOT.
+ */
+function subscriptionRealtimeSpotIds(subscription) {
+  const data = subscription || {};
+  const ids = new Set();
+
+  if (Array.isArray(data.selectedRescueStationIds)) {
+    data.selectedRescueStationIds.forEach((value) => {
+      const id = (value || "").toString().trim();
+      if (id) ids.add(id);
+    });
+
+    // Dès que la liste d'identifiants existe, elle est l'autorité, même vide.
+    return ids;
+  }
+
+  if (Array.isArray(data.selectedRescueStations)) {
+    data.selectedRescueStations.forEach((entry) => {
+      if (!entry || typeof entry !== "object") return;
+      const id = (
+        entry.spotDocumentId ||
+        entry.spotId ||
+        entry.idSphot ||
+        ""
+      ).toString().trim();
+      if (id) ids.add(id);
+    });
+  }
+
+  return ids;
+}
+
+/**
+ * Indique si un abonnement contient une sélection explicite de postes.
+ *
+ * @param {Object} subscription Données de l'abonnement.
+ * @return {boolean} Vrai lorsqu'une sélection explicite est présente.
+ */
+function subscriptionHasExplicitRealtimeSelection(subscription) {
+  const data = subscription || {};
+  return Array.isArray(data.selectedRescueStationIds) ||
+    Array.isArray(data.selectedRescueStations);
+}
+
+/**
+ * Retourne le périmètre opérationnel temps réel d'un territoire.
+ *
+ * Pendant l'essai, tous les SPHOTS surveillés du territoire sont couverts :
+ * l'essai est lié au service SPHOT SURVEILLÉ, pas à une sélection payante.
+ * Pour un abonnement actif, seuls les postes explicitement sélectionnés sont
+ * couverts. Un abonnement historique sans sélection explicite conserve la
+ * couverture globale pour compatibilité.
+ *
+ * @param {FirebaseFirestore.Firestore} db Instance Firestore.
+ * @param {string} territoireId Identifiant du territoire.
+ * @return {Promise<Object>} Périmètre temps réel.
+ */
+async function territoryRealtimeScope(db, territoireId) {
+  const emptyScope = {
+    granted: false,
+    allSpots: false,
+    allSpotsSince: null,
+    allSpotsUntil: undefined,
+    spotIds: new Set(),
+    spotSince: new Map(),
+    spotUntil: new Map(),
+  };
+
+  if (!territoireId) return emptyScope;
+
+  const adminDocuments = await territoryAdminDocuments(db, territoireId);
+  const spotIds = new Set();
+  const spotSince = new Map();
+  const spotUntil = new Map();
+  let granted = false;
+  let allSpots = false;
+  let allSpotsSince = null;
+  let allSpotsUntil;
+
+  const keepEarliestDate = (current, candidate) => {
+    if (!candidate) return current;
+    if (!current) return candidate;
+    return candidate.getTime() < current.getTime() ? candidate : current;
+  };
+
+  const keepLatestExpiry = (current, candidate) => {
+    // undefined = aucune valeur fusionnée ; null = droit sans échéance connue.
+    if (current === null || candidate === null) return null;
+    if (candidate === undefined) return current;
+    if (current === undefined) return candidate;
+    return candidate.getTime() > current.getTime() ? candidate : current;
+  };
+
+  for (const document of adminDocuments) {
+    const data = document.data() || {};
+    if (data.accessStatus !== "approved") continue;
+
+    const subscriptionSnapshot = await db.collection("subscriptions")
+        .doc(document.id)
+        .get();
+
+    if (subscriptionSnapshot.exists) {
+      const subscription = subscriptionSnapshot.data() || {};
+      if (!subscriptionGrantsDiffusion(subscription)) continue;
+
+      const status = (subscription.status || "")
+          .toString()
+          .trim()
+          .toLowerCase();
+
+      const trialStatuses = new Set([
+        "trial",
+        "trial_active",
+        "trialing",
+        "in_trial",
+      ]);
+
+      if (trialStatuses.has(status)) {
+        const trialSince =
+          firestoreDate(subscription.trialStartDate) ||
+          firestoreDate(subscription.trialActivatedAt);
+        const trialUntil = firestoreDate(subscription.trialEndDate);
+
+        // L'essai de 8 jours couvre tous les SPHOTS surveillés du territoire,
+        // y compris un poste créé pendant la période d'essai. La sélection
+        // poste par poste n'intervient qu'au moment de l'abonnement payant.
+        granted = true;
+        allSpots = true;
+        allSpotsSince = keepEarliestDate(allSpotsSince, trialSince);
+        allSpotsUntil = keepLatestExpiry(allSpotsUntil, trialUntil);
+        continue;
+      }
+
+      const selectedIds = subscriptionRealtimeSpotIds(subscription);
+      const hasExplicitSelection =
+        subscriptionHasExplicitRealtimeSelection(subscription);
+      const subscriptionStart =
+        firestoreDate(subscription.subscriptionStartDate) ||
+        firestoreDate(subscription.subscriptionActivatedAt);
+      const subscriptionUntil =
+        firestoreDate(subscription.subscriptionEndDate);
+      const previousTrialStart = firestoreDate(subscription.trialStartDate);
+      const previousTrialEnd = firestoreDate(subscription.trialEndDate);
+      const continuesActiveTrial = Boolean(
+          subscriptionStart &&
+          previousTrialStart &&
+          previousTrialEnd &&
+          subscriptionStart.getTime() <= previousTrialEnd.getTime(),
+      );
+      if (selectedIds.size === 0 && !hasExplicitSelection) {
+        // Compatibilité uniquement avec les abonnements historiques qui ne
+        // possèdent encore aucun champ de sélection poste par poste.
+        granted = true;
+        allSpots = true;
+        const subscriptionSince = continuesActiveTrial ?
+          previousTrialStart :
+          subscriptionStart;
+        allSpotsSince = keepEarliestDate(
+            allSpotsSince,
+            subscriptionSince,
+        );
+        allSpotsUntil = keepLatestExpiry(
+            allSpotsUntil,
+            subscriptionUntil,
+        );
+      } else if (selectedIds.size > 0) {
+        granted = true;
+        selectedIds.forEach((id) => {
+          // L'essai couvre tous les SPHOTS surveillés. Si l'abonnement
+          // prend le relais avant la fin de l'essai, l'état temps réel déjà
+          // publié reste continu pour tout poste sélectionné.
+          const enabledSince = continuesActiveTrial ?
+            previousTrialStart :
+            subscriptionStart;
+
+          spotIds.add(id);
+          spotSince.set(
+              id,
+              keepEarliestDate(spotSince.get(id) || null, enabledSince),
+          );
+          spotUntil.set(
+              id,
+              keepLatestExpiry(
+                  spotUntil.has(id) ? spotUntil.get(id) : undefined,
+                  subscriptionUntil,
+              ),
+          );
+        });
+      }
+
+      continue;
+    }
+
+    // Sans document subscriptions actif, aucun droit temps réel n'est
+    // accordé. Le booléen historique diffusionAccessGranted peut encore être
+    // conservé dans admins/{uid} pour l'interface, mais il n'est plus une
+    // autorité de diffusion : le contrôle commercial doit rester fail-closed.
+  }
+
+  return {
+    granted,
+    allSpots,
+    allSpotsSince,
+    allSpotsUntil,
+    spotIds,
+    spotSince,
+    spotUntil,
+  };
+}
+
+/**
+ * Vérifie si le périmètre temps réel couvre un SPHOT donné.
+ *
+ * @param {Object} scope Périmètre temps réel calculé.
+ * @param {string} spotId Identifiant du SPHOT.
+ * @return {boolean} Vrai si le SPHOT est couvert.
+ */
+function realtimeScopeGrantsSpot(scope, spotId) {
+  if (!scope || scope.granted !== true) return false;
+  if (scope.allSpots === true) return true;
+
+  const id = (spotId || "").toString().trim();
+  return Boolean(id && scope.spotIds instanceof Set && scope.spotIds.has(id));
+}
+
+/**
+ * Retourne la date d'ouverture du temps réel pour un SPHOT.
+ *
+ * @param {Object} scope Périmètre temps réel calculé.
+ * @param {string} spotId Identifiant du SPHOT.
+ * @return {Date|null} Date d'ouverture ou null.
+ */
+function realtimeScopeEnabledSince(scope, spotId) {
+  if (!realtimeScopeGrantsSpot(scope, spotId)) return null;
+  if (scope.allSpots === true) return scope.allSpotsSince || null;
+
+  const id = (spotId || "").toString().trim();
+  return scope.spotSince instanceof Map ?
+    scope.spotSince.get(id) || null :
+    null;
+}
+
+/**
+ * Retourne la date de fin du droit temps réel pour un SPHOT.
+ *
+ * @param {Object} scope Périmètre temps réel calculé.
+ * @param {string} spotId Identifiant du SPHOT.
+ * @return {Date|null|undefined} Date de fin, null ou undefined.
+ */
+function realtimeScopeValidUntil(scope, spotId) {
+  if (!realtimeScopeGrantsSpot(scope, spotId)) return undefined;
+
+  const id = (spotId || "").toString().trim();
+  const expiries = [];
+
+  if (scope.allSpots === true) {
+    expiries.push(scope.allSpotsUntil);
+  }
+
+  if (id && scope.spotUntil instanceof Map && scope.spotUntil.has(id)) {
+    expiries.push(scope.spotUntil.get(id));
+  }
+
+  if (expiries.some((value) => value === null)) return null;
+
+  const datedExpiries = expiries.filter((value) => value instanceof Date);
+  if (datedExpiries.length === 0) return undefined;
+
+  return datedExpiries.reduce((latest, candidate) => {
+    return candidate.getTime() > latest.getTime() ? candidate : latest;
+  });
+}
+
+/**
+ * Vérifie qu'un état temps réel historique est postérieur à son activation.
+ *
+ * @param {Object|null} historical Ancien état opérationnel du SPHOT.
+ * @param {Date|null} enabledSince Date d'ouverture du temps réel.
+ * @return {boolean} Vrai si l'état historique reste valide.
+ */
+function historicalLiveStateIsFresh(historical, enabledSince) {
+  if (!historical) return false;
+  if (!enabledSince) return true;
+
+  // Après une nouvelle activation, seule une publication opérationnelle
+  // explicite d'un sauveteur rend les données temps réel à nouveau valides.
+  // Un updatedAt générique peut provenir d'une modification sans rapport
+  // avec la surveillance et ne doit donc pas réactiver un ancien état.
+  const liveUpdatedAt = firestoreDate(historical.liveUpdatedAt);
+  return Boolean(
+      liveUpdatedAt &&
+      liveUpdatedAt.getTime() >= enabledSince.getTime(),
+  );
+}
+
+/**
  * Vérifie qu'un territoire possède actuellement des droits de diffusion.
  *
  * Le booléen admins.diffusionAccessGranted reste prioritaire. En sécurité,
@@ -653,8 +1121,8 @@ async function reconcilePublicSubscription(subscriptionId, subscription) {
 
   if (!territoireId) return;
 
-  const publish = await isTerritoryPublic(territoireId);
-  await reconcilePublicTerritory(territoireId, publish);
+  // L'abonnement conditionne le temps réel et non la présence sur la carte.
+  await reconcilePublicTerritory(territoireId, true);
 }
 
 /**
@@ -3312,8 +3780,9 @@ exports.syncPublicSpotsForAdmin = onDocumentWritten(
       }
 
       for (const territoireId of territoireIds) {
-        const publish = await isTerritoryPublic(territoireId);
-        await reconcilePublicTerritory(territoireId, publish);
+        // Une modification du profil Admin ne doit jamais retirer les SPHOTS
+        // de la carte. L'essai et l'abonnement ne pilotent que le temps réel.
+        await reconcilePublicTerritory(territoireId, true);
       }
     },
 );
@@ -3337,8 +3806,9 @@ exports.syncPublicSpotsForAdminRequest = onDocumentWritten(
       territoireIds.delete("");
 
       for (const territoireId of territoireIds) {
-        const publish = await isTerritoryPublic(territoireId);
-        await reconcilePublicTerritory(territoireId, publish);
+        // Le statut administratif/commercial ne pilote pas la présence des
+        // SPHOTS déjà créés sur la carte publique.
+        await reconcilePublicTerritory(territoireId, true);
       }
     },
 );
@@ -3362,8 +3832,8 @@ exports.syncPublicSpotsForAdminAccount = onDocumentWritten(
       territoireIds.delete("");
 
       for (const territoireId of territoireIds) {
-        const publish = await isTerritoryPublic(territoireId);
-        await reconcilePublicTerritory(territoireId, publish);
+        // Les changements du compte Admin ne doivent pas masquer le territoire.
+        await reconcilePublicTerritory(territoireId, true);
       }
     },
 );
@@ -3377,8 +3847,21 @@ exports.syncPublicSpotsForTerritory = onDocumentWritten(
     },
     async (event) => {
       const territoireId = event.params.territoireId;
-      const publish = await isTerritoryPublic(territoireId);
-      await reconcilePublicTerritory(territoireId, publish);
+
+      if (!event.data.after.exists) {
+        const publicSnapshot = await admin.firestore()
+            .collection("publicSpots")
+            .where("territoireId", "==", territoireId)
+            .get();
+        const batch = admin.firestore().batch();
+        publicSnapshot.docs.forEach((document) => batch.delete(document.ref));
+        if (!publicSnapshot.empty) await batch.commit();
+        return;
+      }
+
+      // Une modification du territoire (logo, ville, métadonnées...) ne doit
+      // jamais retirer ses SPHOTS de la carte publique.
+      await reconcilePublicTerritory(territoireId, true);
     },
 );
 
@@ -3400,12 +3883,10 @@ exports.syncPublicSpotOnWrite = onDocumentWritten(
         return;
       }
 
-      const publish = await isTerritoryPublic(territoireId);
-      if (!publish) {
-        await publicReference.delete();
-        return;
-      }
-
+      // La présence sur la carte est indépendante de l'essai et de
+      // l'abonnement. Dès qu'un SPHOT existe dans le territoire, sa
+      // projection publique est créée ou mise à jour. Les droits commerciaux
+      // ne pilotent que les informations opérationnelles temps réel.
       await reconcilePublicTerritory(territoireId, true);
     },
 );
@@ -3424,13 +3905,91 @@ exports.syncPublicSpotLiveStateOnWrite = onDocumentWritten(
           .get();
       if (publicSnapshot.empty) return;
 
-      const liveState = buildPublicLiveState(
-          event.data.after.exists ? event.data.after.data() : {},
-      );
+      const historicalSpot = event.data.after.exists ?
+        event.data.after.data() :
+        null;
+      const liveState = buildPublicLiveState(historicalSpot || {});
+      const scopesByTerritory = new Map();
       const batch = db.batch();
-      publicSnapshot.docs.forEach((document) => {
-        batch.set(document.ref, liveState, {merge: true});
-      });
+
+      for (const document of publicSnapshot.docs) {
+        const publicData = document.data() || {};
+        const territoireId = (publicData.territoireId || "")
+            .toString()
+            .trim();
+        const supervised = isSupervisedSpotData(publicData);
+
+        if (!supervised) {
+          batch.set(
+              document.ref,
+              buildNonSupervisedPublicLiveState(),
+              {merge: true},
+          );
+          continue;
+        }
+
+        if (!scopesByTerritory.has(territoireId)) {
+          scopesByTerritory.set(
+              territoireId,
+              await territoryRealtimeScope(db, territoireId),
+          );
+        }
+
+        const realtimeScope = scopesByTerritory.get(territoireId);
+        const realtimeAvailable = realtimeScopeGrantsSpot(
+            realtimeScope,
+            event.params.spotId,
+        );
+
+        if (!realtimeAvailable) {
+          batch.set(
+              document.ref,
+              buildUnavailablePublicLiveState(),
+              {merge: true},
+          );
+          continue;
+        }
+
+        const enabledSince = realtimeScopeEnabledSince(
+            realtimeScope,
+            event.params.spotId,
+        );
+        const validUntil = realtimeScopeValidUntil(
+            realtimeScope,
+            event.params.spotId,
+        );
+        const liveStateFresh = historicalLiveStateIsFresh(
+            historicalSpot,
+            enabledSince,
+        );
+
+        if (!liveStateFresh) {
+          batch.set(
+              document.ref,
+              buildSuppressedPublicLiveState(
+                  "awaiting_update",
+                  validUntil,
+              ),
+              {merge: true},
+          );
+          continue;
+        }
+
+        batch.set(
+            document.ref,
+            {
+              ...liveState,
+              realtimeAvailable: true,
+              realtimeStatus: "available",
+              realtimeValidUntil:
+                validUntil !== undefined && validUntil !== null ?
+                  validUntil :
+                  admin.firestore.FieldValue.delete(),
+            },
+            {merge: true},
+        );
+      }
+
       await batch.commit();
     },
 );
@@ -6572,6 +7131,9 @@ exports.updateSauveteurLiveState = onRequest(
           ...(operationalAlertUpdate ?
             {operationalAlert: operationalAlertUpdate} : {}),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          // Seules les nouvelles publications sauveteur débloquent l'état
+          // awaiting_update après activation du droit temps réel.
+          liveUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBySauveteurId: context.sauveteurId,
         }, {merge: true});
         batch.set(auditReference, {
