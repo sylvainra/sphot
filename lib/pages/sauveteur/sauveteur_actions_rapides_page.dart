@@ -587,7 +587,8 @@ class _SauveteurActionsRapidesPageState
   }
 
   Widget _buildFlagMastControl() {
-    // La hauteur du mât suit la place disponible sur l'écran.
+    // Le mât conserve sa hauteur propre à Actions rapides et suit
+    // uniquement la hauteur des trois commandes de couleur.
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.45),
@@ -691,7 +692,7 @@ class _SauveteurActionsRapidesPageState
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SauveteurAdaptiveViewport(
-        minContentHeight: 760,
+        minContentHeight: 820,
         child: Stack(
         fit: StackFit.expand,
         children: [
@@ -759,7 +760,7 @@ class _SauveteurActionsRapidesPageState
 
                 Expanded(
   child: Padding(
-    // Réserve une zone nette à la flèche de retour, sans chevauchement.
+    // Garde la flèche de retour complètement dégagée du dernier encart.
     padding: const EdgeInsets.fromLTRB(16, 0, 16, 85),
     child: Column(
       children: [
@@ -842,13 +843,16 @@ class _SauveteurActionsRapidesPageState
 
                           if (isTemporaryClosed) _dangerBanner(),
 
-                          Expanded(
-                            child: _sectionCard(
+                          _sectionCard(
                             title: 'Actions rapides',
                             icon: Icons.flash_on,
                             children: [
                               const SizedBox(height: 8),
-                              Expanded(
+                              // Trois commandes de couleur compactes.
+                              // Le mât suit ce bloc : les commandes de
+                              // publication conservent plus de place.
+                              SizedBox(
+                                height: 190,
                                 child: Row(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
@@ -937,7 +941,6 @@ class _SauveteurActionsRapidesPageState
                                 },
                               ),
                             ],
-                          ),
                           ),
                           const SizedBox(height: 8),
                           _sectionCard(
@@ -1927,7 +1930,7 @@ class _ActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 52,
+        height: 68,
         width: double.infinity,
         decoration: BoxDecoration(
   color: color,
