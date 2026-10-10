@@ -45,6 +45,26 @@ const TextStyle _publicSectionTitleStyle = TextStyle(
   letterSpacing: 0.5,
 );
 
+// Même référentiel de couleurs que les types de SPHOTS sur la carte.
+Color _publicSpotTypeTextColor(SpotFlagState spot) {
+  final type = spot.normalizedType;
+  if (spot.isPosteSecours) return const Color(0xFFFF0000);
+  if (spot.isNaturisme) return const Color(0xFFD87A5C);
+  if (type.contains('ACCES PLAGE')) return const Color(0xFFFFD000);
+  if (type.contains('LAC') ||
+      type.contains("PLAN D'EAU") ||
+      type.contains('BARRAGE')) {
+    return const Color(0xFF1E3A8A);
+  }
+  if (type.contains('FLEUVE') || type.contains('RIVIERE')) {
+    return const Color(0xFF2E7D32);
+  }
+  if (type.contains('LAGON') || type.contains('PISCINE NATURELLE')) {
+    return const Color(0xFF00ACC1);
+  }
+  return Colors.black;
+}
+
 class PublicSpotDetailPage extends StatelessWidget {
   final SpotFlagState spot;
 
@@ -52,7 +72,8 @@ class PublicSpotDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final headerColor = Color(spot.markerColor);
+    final nameColor = spot.isPosteSecours ? const Color(0xFFFF0000) : Colors.black;
+    final typeColor = _publicSpotTypeTextColor(spot);
     final commune = spot.ville.trim();
     final typeLabel = spot.typeSphot.trim();
 
@@ -64,7 +85,7 @@ class PublicSpotDetailPage extends StatelessWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(22, 14, 10, 14),
-              color: headerColor,
+              color: _sphotWarmSurface,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -74,8 +95,8 @@ class PublicSpotDetailPage extends StatelessWidget {
                       children: [
                         Text(
                           spot.mapDisplayName.toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: nameColor,
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                             height: 1.10,
@@ -86,7 +107,7 @@ class PublicSpotDetailPage extends StatelessWidget {
                           Text(
                             commune.toUpperCase(),
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: Color(0xFF1E3A8A),
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
                             ),
@@ -107,8 +128,8 @@ class PublicSpotDetailPage extends StatelessWidget {
                                 const SizedBox(width: 7),
                                 const Text(
                                   'POSTE DE SECOURS',
-                                  style: TextStyle(
-                                    color: Colors.white,
+                                  style: const TextStyle(
+                                    color: Color(0xFFFF0000),
                                     fontSize: 13,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 0.15,
@@ -119,8 +140,8 @@ class PublicSpotDetailPage extends StatelessWidget {
                           else
                             Text(
                               typeLabel.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: typeColor,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: 0.15,
@@ -135,7 +156,7 @@ class PublicSpotDetailPage extends StatelessWidget {
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(
                       Icons.close_rounded,
-                      color: Colors.white,
+                      color: Color(0xFF53657A),
                       size: 28,
                     ),
                   ),
@@ -404,6 +425,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   ) {
     return _MobileSpotActionBar(
       isSaved: _isSaved,
+      onDirections: () => _openDirections(spot),
       onShare: () => _shareSpot(context, spot),
       onSave: () => _toggleSaved(spot),
     );
@@ -844,10 +866,9 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     final type = spot.isPosteSecours
         ? 'POSTE DE SECOURS'
         : spot.typeSphot.trim().toUpperCase();
-    final locationAndType = <String>[
-      if (city.isNotEmpty) city,
-      if (type.isNotEmpty) type,
-    ].join(' · ');
+    final nameColor =
+        spot.isPosteSecours ? const Color(0xFFFF0000) : Colors.black;
+    final typeColor = _publicSpotTypeTextColor(spot);
 
     return Container(
       width: double.infinity,
@@ -869,24 +890,63 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                   name.isEmpty ? 'SPHOT' : name.toUpperCase(),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF172033),
+                  style: TextStyle(
+                    color: nameColor,
                     fontSize: 15.5,
                     fontWeight: FontWeight.w800,
                     height: 1.12,
                   ),
                 ),
-                if (locationAndType.isNotEmpty) ...[
+                if (city.isNotEmpty || type.isNotEmpty) ...[
                   const SizedBox(height: 3),
-                  Text(
-                    locationAndType,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF53657A),
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (city.isNotEmpty)
+                        Flexible(
+                          child: Text(
+                            city,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF1E3A8A),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      if (city.isNotEmpty && type.isNotEmpty)
+                        const Text(
+                          ' · ',
+                          style: TextStyle(
+                            color: Color(0xFF53657A),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      if (spot.isPosteSecours) ...[
+                        SvgPicture.asset(
+                          'data/icons/flag_red_yellow_5x3.svg',
+                          width: 12,
+                          height: 14,
+                          fit: BoxFit.contain,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      if (type.isNotEmpty)
+                        Flexible(
+                          child: Text(
+                            type,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: typeColor,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ],
@@ -1724,23 +1784,34 @@ class _ProhibitionSymbol extends StatelessWidget {
 
 class _MobileSpotActionBar extends StatelessWidget {
   final bool isSaved;
+  final VoidCallback onDirections;
   final VoidCallback onShare;
   final VoidCallback onSave;
 
   const _MobileSpotActionBar({
     required this.isSaved,
+    required this.onDirections,
     required this.onShare,
     required this.onSave,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Les trois actions tiennent sur la largeur, sans défilement horizontal.
     return SizedBox(
       height: 48,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
         child: Row(
           children: [
+            Expanded(
+              child: _MobileSpotActionButton(
+                icon: Icons.directions_rounded,
+                label: 'ITINÉRAIRE',
+                onTap: onDirections,
+              ),
+            ),
+            const SizedBox(width: 8),
             Expanded(
               child: _MobileSpotActionButton(
                 icon: Icons.share_rounded,
