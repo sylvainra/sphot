@@ -3,30 +3,22 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 /**
- * Relance la projection publique pour les administrateurs approuvés.
+ * Reconstruit les projections publiques de TOUS les territoires existants.
+ *
+ * Ce script ne change ni les droits Admin, ni les abonnements, ni les
+ * informations sauveteur. Il écrit seulement une date technique dans chaque
+ * territoire pour relancer syncPublicSpotsForTerritory sur le serveur.
+ * La présence sur la carte est indépendante des droits temps réel.
  *
  * @return {Promise<void>}
  */
 async function rebuildPublicSpots() {
   const db = admin.firestore();
-  const [admins, requests] = await Promise.all([
-    db.collection("admins")
-        .where("accessStatus", "==", "approved")
-        .get(),
-    db.collection("adminRequests").get(),
-  ]);
-  const approvedRequests = requests.docs.filter((document) => {
-    const data = document.data();
-    const tracking = data.administrativeTracking || {};
-    return data.status === "approved" ||
-      tracking.status === "approved" ||
-      data.accessPhase === "configuration_access";
-  });
-  const documents = [...admins.docs, ...approvedRequests];
+  const territories = await db.collection("territoires").get();
 
-  for (let index = 0; index < documents.length; index += 450) {
+  for (let index = 0; index < territories.docs.length; index += 450) {
     const batch = db.batch();
-    documents.slice(index, index + 450).forEach((document) => {
+    territories.docs.slice(index, index + 450).forEach((document) => {
       batch.set(
           document.ref,
           {
@@ -40,8 +32,8 @@ async function rebuildPublicSpots() {
   }
 
   console.log(
-      `${documents.length} validation(s) administrative(s) transmise(s) ` +
-      "à la projection publique.",
+      `${territories.docs.length} territoire(s) transmis à la projection ` +
+      "publique. Les droits et l'état temps réel sont recalculés par SPHOT.",
   );
 }
 
