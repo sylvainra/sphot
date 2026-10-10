@@ -1132,7 +1132,11 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                       width: 78,
                       height: 98,
                       child: Center(
-                        child: FlagMarker(spot: spot, compactDetail: true),
+                        child: FlagMarker(
+                          spot: spot,
+                          compactDetail: true,
+                          desktopLive: widget.desktopMode,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
