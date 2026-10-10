@@ -1258,24 +1258,17 @@ SpotFlagState? _findBestSpotMatch(
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      useSafeArea: false,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.transparent,
       isDismissible: true,
       enableDrag: false,
       builder: (sheetContext) {
-        // Utilise les dimensions de l'écran de la carte, pas celles du
-        // contexte contraint du BottomSheet. Le marker et le volet partagent
-        // ainsi exactement le même repère sur téléphone et tablette.
-        final sheetHeight = _selectedSpotSheetHeight(
-          spot,
-          screenSize,
-          topSafeInset,
-        );
-
+        // Le volet mobile occupe toute la hauteur utile de l'écran,
+        // après déduction des zones système par useSafeArea.
         return SizedBox(
           width: double.infinity,
-          height: sheetHeight,
+          height: MediaQuery.sizeOf(sheetContext).height,
           child: PublicSpotMobileSheet(
             spot: spot,
           ),
