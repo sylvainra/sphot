@@ -41,7 +41,7 @@ class _FlagMarkerState extends State<FlagMarker>
 
   static const double markerWidth = 70;
   // Mât de carte allongé vers le haut ; le pied reste géoréférencé.
-  static const double _normalMarkerHeight = 132;
+  static const double _normalMarkerHeight = 124;
   static const double _previewMarkerHeight = 115;
 
   static const double poleWidth = 4;
@@ -120,6 +120,14 @@ class _FlagMarkerState extends State<FlagMarker>
     // Les signaux affalés restent près du pied du mât, avec assez
     // d'espace pour le pavillon violet ou la manche à air sous le premier.
     final lowerFlagTop = markerHeight - 27.0;
+    // La manche à air descend d'un pavillon quand les trois signaux sont
+    // simultanément présents : principal, violet et manche à air.
+    // Affalé, tout le groupe remonte d'autant : le dernier signal conserve
+    // sa place près du pied du mât.
+    const tripleSignalWindsockDrop = flagHeight;
+    final hasTripleSignal = hasMainFlag && purpleFlagActive && windsockActive;
+    final loweredTripleGroupLift =
+        isAffale && hasTripleSignal ? tripleSignalWindsockDrop : 0.0;
     // Dans la fiche Live seulement, le mât a été allongé de 15 px
     // vers le haut : remonter les signaux hissés d'autant.
     // Le violet et la manche à air suivent automatiquement le drapeau
@@ -128,7 +136,9 @@ class _FlagMarkerState extends State<FlagMarker>
     const compactHissedLift = 15.0;
     const desktopHissedLift = 15.0;
     final mainFlagTop = isAffale
-        ? lowerFlagTop - ((purpleFlagActive || windsockActive) ? flagStep : 0)
+        ? lowerFlagTop -
+            ((purpleFlagActive || windsockActive) ? flagStep : 0) -
+            loweredTripleGroupLift
         : flagTopHisse -
             (widget.compactDetail ? compactHissedLift : 0) -
             (widget.desktopLive ? desktopHissedLift : 0);
@@ -139,7 +149,8 @@ class _FlagMarkerState extends State<FlagMarker>
     // directement au mât (pas à l'extrémité du drapeau principal).
     const windsockHeight = 11.0;
     final windsockTop =
-        purpleFlagTop + flagHeight / 2 - windsockHeight / 2;
+        purpleFlagTop + flagHeight / 2 - windsockHeight / 2 +
+            (hasTripleSignal ? tripleSignalWindsockDrop : 0.0);
     const windsockLeft = flagLeft;
 
     return SizedBox(
