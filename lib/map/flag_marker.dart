@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/flag_state.dart';
+import '../widgets/danger_pictogram.dart';
 
 class FlagMarker extends StatefulWidget {
   final SpotFlagState spot;
@@ -71,6 +72,16 @@ class _FlagMarkerState extends State<FlagMarker>
 
   @override
   Widget build(BuildContext context) {
+    final purpleFlagActive = widget.spot.liveFlag?['purpleFlagActive'] == true;
+    final windsockActive = widget.spot.liveFlag?['windsockActive'] == true;
+    final hasMainFlag = widget.spot.flagColor != FlagColor.none &&
+        widget.spot.flagPosition != FlagPosition.none;
+
+    // Les signaux complémentaires suivent le drapeau principal.
+    // En position affalée, ils restent EN DESSOUS de celui-ci, quelle que
+    // soit sa couleur, au lieu de remonter vers le haut du mât.
+    final supplementaryTop = flagTop + 24;
+
     return SizedBox(
       width: markerWidth,
       height: markerHeight,
@@ -93,8 +104,7 @@ class _FlagMarkerState extends State<FlagMarker>
               ),
             ),
           ),
-          if (widget.spot.flagColor != FlagColor.none &&
-              widget.spot.flagPosition != FlagPosition.none)
+          if (hasMainFlag)
             Positioned(
               left: flagLeft,
               top: flagTop,
@@ -107,6 +117,38 @@ class _FlagMarkerState extends State<FlagMarker>
                       color: getFlagColor(),
                       phase: _controller.value * 2 * pi,
                     ),
+                  );
+                },
+              ),
+            ),
+          if (hasMainFlag && purpleFlagActive)
+            Positioned(
+              left: flagLeft,
+              top: supplementaryTop,
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  return CustomPaint(
+                    size: const Size(22, 18),
+                    painter: WavingFlagPainter(
+                      color: const Color(0xFFD946EF),
+                      phase: _controller.value * 2 * pi,
+                    ),
+                  );
+                },
+              ),
+            ),
+          if (hasMainFlag && windsockActive)
+            Positioned(
+              left: flagLeft,
+              top: supplementaryTop + (purpleFlagActive ? 13 : 0),
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  return Transform.rotate(
+                    alignment: Alignment.centerLeft,
+                    angle: sin(_controller.value * 2 * pi) * 0.04,
+                    child: const WindsockGlyph(width: 23, height: 11),
                   );
                 },
               ),
