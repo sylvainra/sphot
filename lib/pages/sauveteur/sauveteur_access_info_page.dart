@@ -170,53 +170,31 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                         children: [
                           _section(
                             title: _isSphotOn
-                                ? 'SPHOT ON'
-                                : 'SPHOT OFF',
-                            icon: _isSphotOn
-                                ? Icons.toggle_on_rounded
-                                : Icons.toggle_off_rounded,
-                            color: _isSphotOn ? green : red,
+                                ? 'SPHOT ON — VOTRE SITUATION ACTUELLE'
+                                : 'SPHOT ON',
+                            icon: Icons.toggle_on_rounded,
+                            color: green,
                             children: [
-                              if (_isSphotOn)
-                                _line(
-                                  'Vous êtes actuellement autorisé à agir, '
-                                  'dans le cadre de vos fonctions '
-                                  'professionnelles, sur les données '
-                                  'opérationnelles réelles des SPHOTS '
-                                  'auxquels vous êtes affecté.',
-                                  strong: true,
-                                )
-                              else
-                                _line(
-                                  'Vous pouvez découvrir et tester '
-                                  'SPHOT SAUVETEUR. Vos actions de test '
-                                  'ne modifient jamais l’état opérationnel '
-                                  'réel ni les informations renseignées '
-                                  'par les sauveteurs en SPHOT ON.',
-                                  strong: true,
-                                ),
                               _line(
-                                'Le passage SPHOT OFF / SPHOT ON dépend '
-                                'de vos affectations et des droits de diffusion '
-                                'ouverts par votre administration de tutelle '
-                                'SPHOT ADMIN.',
+                                _isSphotOn
+                                    ? 'Vous êtes actuellement en SPHOT ON et '
+                                        'autorisé à agir, dans le cadre de vos '
+                                        'fonctions professionnelles, sur les '
+                                        'données opérationnelles réelles des '
+                                        'SPHOTS auxquels vous êtes affecté.'
+                                    : 'Vous êtes en SPHOT ON lorsqu’une '
+                                        'affectation valide est en cours et '
+                                        'que le service SPHOT en temps réel '
+                                        'est actif pour le poste concerné.',
+                                strong: true,
                               ),
-                            ],
-                          ),
-                          _section(
-                            title: 'SPHOT ON',
-                            icon: Icons.health_and_safety_rounded,
-                            color: red,
-                            children: [
                               _line(
-                                'Vous basculerez en SPHOT ON dès lors que '
-                                'votre administration SPHOT ADMIN bénéficiera '
-                                'des droits de diffusion sur SPHOT.\n'
-                                'Tous les sauveteurs SPHOT ON affectés au même '
-                                'poste peuvent agir professionnellement sur '
-                                'les paramètres opérationnels partagés : '
-                                'drapeau, statut de baignade, dangers, météo, '
-                                'éphéméride et autres renseignements métier.',
+                                'En SPHOT ON, vous pouvez renseigner et mettre '
+                                'à jour les paramètres opérationnels partagés '
+                                'du poste : drapeau, statut de baignade, '
+                                'dangers, météo, éphéméride et autres '
+                                'informations métier accessibles selon vos '
+                                'fonctions.',
                               ),
                               _line(
                                 'Si plusieurs sauveteurs sont SPHOT ON sur '
@@ -225,9 +203,52 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                                 'professionnelle validée devient visible par '
                                 'les autres sauveteurs autorisés.',
                               ),
+                            ],
+                          ),
+                          _section(
+                            title: !_isSphotOn
+                                ? 'SPHOT OFF — VOTRE SITUATION ACTUELLE'
+                                : 'SPHOT OFF',
+                            icon: Icons.toggle_off_rounded,
+                            color: red,
+                            children: [
                               _line(
-                                'Un sauveteur SPHOT OFF ne peut jamais '
-                                'altérer ces données réelles.',
+                                !_isSphotOn
+                                    ? 'Vous êtes actuellement en SPHOT OFF. '
+                                        'Votre compte SPHOT SAUVETEUR reste '
+                                        'accessible, mais vous ne pouvez pas '
+                                        'modifier les données opérationnelles '
+                                        'réelles d’un poste.'
+                                    : 'Vous passerez en SPHOT OFF dès que votre '
+                                        'affectation ne permet plus une action '
+                                        'réelle ou que le service SPHOT en '
+                                        'temps réel n’est plus actif pour le '
+                                        'poste concerné.',
+                                strong: true,
+                              ),
+                              _line(
+                                'En SPHOT OFF, vous pouvez toujours consulter '
+                                'les informations auxquelles votre compte vous '
+                                'donne accès et utiliser les fonctions de '
+                                'consultation ou de découverte prévues par '
+                                'l’application.',
+                              ),
+                              _line(
+                                'Toute saisie ou action effectuée en SPHOT OFF '
+                                'reste sans effet sur le drapeau, le statut de '
+                                'baignade, les dangers, la météo et les autres '
+                                'informations temps réel diffusées au public.',
+                              ),
+                              _line(
+                                'Le retour en SPHOT ON est automatique dès '
+                                'qu’une affectation valide est en cours et que '
+                                'le service SPHOT en temps réel est actif pour '
+                                'le poste concerné.',
+                              ),
+                              _line(
+                                'Un sauveteur SPHOT OFF ne peut jamais altérer '
+                                'les données réelles renseignées par les '
+                                'sauveteurs SPHOT ON.',
                                 strong: true,
                               ),
                             ],
