@@ -11,7 +11,13 @@ import 'sauveteur_meteo_marine_page.dart';
 import 'sauveteur_recherche_personne_page.dart';
 import 'sauveteur_ephemeride_dicton_page.dart';
 import 'sauveteur_planning_page.dart';
+import 'sauveteur_stats_page.dart';
 import 'sauveteur_main_courante.dart';
+import 'sauveteur_materiel_verification_page.dart';
+import 'sauveteur_materiel_category_verification_page.dart';
+import '../../services/sauveteur_live_publication_service.dart';
+import 'widgets/sauveteur_styled_dropdown.dart';
+import 'widgets/sauveteur_adaptive_viewport.dart';
 
 class SauveteurMenuPage extends StatefulWidget {
   final Color profileColor;
@@ -51,6 +57,9 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
 
   Timer? _modeRefreshTimer;
   bool _refreshingMode = false;
+  bool _loadingSpots = true;
+  final List<SauveteurAssignedSpot> _assignedSpots = [];
+  String? _selectedSpotId;
 
   bool get _isSphotOn => _sphotMode.toUpperCase() == 'ON';
 
@@ -80,10 +89,14 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
       case 'account_inactive':
         return 'SPHOT OFF : votre compte n’est pas actuellement autorisé à '
             'agir sur les données opérationnelles réelles.';
+      case 'realtime_not_enabled_for_assignment':
+        return 'SPHOT OFF : le service d’informations en temps réel n’est '
+            'pas actuellement actif pour le ou les postes auxquels vous êtes '
+            'affecté. Vous pouvez consulter SPHOT, mais vos actions ne '
+            'modifient pas les données opérationnelles réelles.';
       default:
-        return 'SPHOT OFF : votre administration de tutelle n’a pas '
-            'actuellement ouvert les droits de diffusion. Vous pouvez tester '
-            'SPHOT SAUVETEUR, mais vos actions ne modifient pas le SPHOT réel.';
+        return 'SPHOT OFF : les fonctions opérationnelles en temps réel ne '
+            'sont pas actuellement disponibles pour votre affectation.';
     }
   }
 
@@ -99,6 +112,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
     _canManageRestrictedOperationalData =
         widget.canManageRestrictedOperationalData;
 
+    _loadAssignedSpots();
     _refreshMode();
     _modeRefreshTimer = Timer.periodic(
       const Duration(seconds: 30),
@@ -167,12 +181,67 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
         _canManageRestrictedOperationalData =
             decoded['canManageRestrictedOperationalData'] == true;
       });
+
+      await _loadAssignedSpots();
     } catch (_) {
       // Le dernier état connu reste affiché. Les écritures sensibles sont
       // de toute façon revérifiées côté Cloud Functions.
     } finally {
       _refreshingMode = false;
     }
+  }
+
+  Future<void> _loadAssignedSpots() async {
+    try {
+      final spots = await SauveteurLivePublicationService.loadAssignedSpots(
+        territoireId: widget.territoireId,
+        postesAffectes: _postesAffectes,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _assignedSpots
+          ..clear()
+          ..addAll(spots);
+
+        final currentStillAvailable = _selectedSpotId != null &&
+            _assignedSpots.any((spot) => spot.id == _selectedSpotId);
+
+        if (!currentStillAvailable) {
+          _selectedSpotId =
+              _assignedSpots.isEmpty ? null : _assignedSpots.first.id;
+        }
+
+        _loadingSpots = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _assignedSpots.clear();
+        _selectedSpotId = null;
+        _loadingSpots = false;
+      });
+    }
+  }
+
+  Widget _spotSelector() {
+    return SauveteurStyledDropdown(
+      labelText: 'Poste de secours',
+      value: _selectedSpotId,
+      enabled: !_loadingSpots,
+      options: _assignedSpots
+          .map(
+            (spot) => SauveteurDropdownOption(
+              value: spot.id,
+              label: spot.label,
+            ),
+          )
+          .toList(),
+      onChanged: (spotId) {
+        setState(() => _selectedSpotId = spotId);
+      },
+    );
   }
 
   Future<void> _showModeInfo() async {
@@ -222,7 +291,8 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
             fit: BoxFit.cover,
           ),
           SafeArea(
-            child: Padding(
+            child: SauveteurAdaptiveViewport(
+              child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 children: [
@@ -276,7 +346,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                           Flexible(
                             child: Text(
                               _isSphotOn
-                                  ? 'SPHOT ON — DIFFUSION ACTIVE'
+                                  ? 'SPHOT ON — TEMPS RÉEL ACTIF'
                                   : 'SPHOT OFF',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -294,8 +364,9 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                     ),
                   ),
                   const SizedBox(height: 6),
-                  SizedBox(
-                    height: 430,
+                  _spotSelector(),
+                  const SizedBox(height: 6),
+                  Expanded(
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -324,6 +395,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                     sauveteurSessionToken:
                                         widget.sauveteurSessionToken,
                                     postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                   ),
                                 ),
                               );
@@ -354,6 +426,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -374,6 +447,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -394,6 +468,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -409,6 +484,12 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                         builder: (_) =>
                                             SauveteurRecherchePersonnePage(
                                           profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sphotMode: _sphotMode,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -430,6 +511,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                           sauveteurSessionToken:
                                               widget.sauveteurSessionToken,
                                           postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                           canManageRestrictedOperationalData:
                                               _canManageRestrictedOperationalData,
                                         ),
@@ -444,10 +526,15 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                   onTap: () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (_) =>
-                                            SauveteurEspaceReservePage(
-                                          title: 'STATS',
-                                          profileColor: profileColor,
+                                        builder: (_) => SauveteurStatsPage(
+                                          profileColor:
+                                              const Color(0xFF546E7A),
+                                          territoireId: widget.territoireId,
+                                          sphotMode: _sphotMode,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
                                         ),
                                       ),
                                     );
@@ -455,6 +542,108 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                 ),
                               ],
                             ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _MaterialVerificationSquare(
+                                  title: 'SECOURS',
+                                  icon: Icons.monitor_heart_outlined,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            SauveteurMaterielVerificationPage(
+                                          profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
+                                          sphotMode: _sphotMode,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _MaterialVerificationSquare(
+                                  title: 'PHONIE',
+                                  icon: Icons.wifi_tethering_rounded,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            SauveteurMaterielCategoryVerificationPage(
+                                          category:
+                                              SauveteurMaterielCategory.phonie,
+                                          profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
+                                          sphotMode: _sphotMode,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _MaterialVerificationSquare(
+                                  title: 'MATÉRIEL\nROULANT',
+                                  icon: Icons.directions_car_filled_rounded,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            SauveteurMaterielCategoryVerificationPage(
+                                          category:
+                                              SauveteurMaterielCategory.roulant,
+                                          profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
+                                          sphotMode: _sphotMode,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _MaterialVerificationSquare(
+                                  title: 'MATÉRIEL\nFLOTTANT',
+                                  icon: Icons.directions_boat_filled_rounded,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            SauveteurMaterielCategoryVerificationPage(
+                                          category:
+                                              SauveteurMaterielCategory.flottant,
+                                          profileColor: profileColor,
+                                          territoireId: widget.territoireId,
+                                          sauveteurSessionToken:
+                                              widget.sauveteurSessionToken,
+                                          postesAffectes: _postesAffectes,
+                                          initialSpotId: _selectedSpotId,
+                                          sphotMode: _sphotMode,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 4),
                           _MenuSquare(
@@ -474,6 +663,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                     sauveteurSessionToken:
                                         widget.sauveteurSessionToken,
                                     postesAffectes: _postesAffectes,
+                                    initialSpotId: _selectedSpotId,
                                     canManageRestrictedOperationalData:
                                         _canManageRestrictedOperationalData,
                                   ),
@@ -516,7 +706,64 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
               ),
             ),
           ),
+        ),
         ],
+      ),
+    );
+  }
+}
+
+class _MaterialVerificationSquare extends StatelessWidget {
+  const _MaterialVerificationSquare({
+    required this.title,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  static const Color _color = Color(0xFF1E3A8A);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 78,
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: _color,
+            width: 2,
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: _color,
+              size: 27,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: _color,
+                fontSize: 8.5,
+                fontWeight: FontWeight.w900,
+                height: 1.0,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
