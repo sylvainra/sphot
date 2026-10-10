@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'sauveteur_actions_rapides_page.dart';
-import 'sauveteur_espace_reserve_page.dart';
 import 'sauveteur_meteo_terrestre_page.dart';
 import 'sauveteur_meteo_marine_page.dart';
 import 'sauveteur_recherche_personne_page.dart';
@@ -292,6 +291,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
           ),
           SafeArea(
             child: SauveteurAdaptiveViewport(
+              minContentHeight: 0,
               child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
@@ -346,7 +346,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                           Flexible(
                             child: Text(
                               _isSphotOn
-                                  ? 'SPHOT ON — TEMPS RÉEL ACTIF'
+                                  ? 'SPHOT ON - DIFFUSION EN DIRECT LIVE'
                                   : 'SPHOT OFF',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -369,7 +369,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                   Expanded(
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(24),
@@ -384,7 +384,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                             title: 'ACTIONS RAPIDES',
                             icon: Icons.warning_amber_rounded,
                             color: const Color(0xFFD50000),
-                            height: 82,
+                            height: 72,
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -401,15 +401,20 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                               );
                             },
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 6),
                           Expanded(
-                            child: GridView.count(
-                              physics: const NeverScrollableScrollPhysics(),
-                              crossAxisCount: 3,
-                              crossAxisSpacing: 10,
-                              mainAxisSpacing: 10,
-                              childAspectRatio: 0.74,
-                              children: [
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                const tileSpacing = 6.0;
+                                final tileWidth = (constraints.maxWidth - tileSpacing * 2) / 3;
+                                final tileHeight = (constraints.maxHeight - tileSpacing) / 2;
+                                return GridView.count(
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  crossAxisCount: 3,
+                                  crossAxisSpacing: tileSpacing,
+                                  mainAxisSpacing: tileSpacing,
+                                  childAspectRatio: tileWidth / tileHeight,
+                                  children: [
                                 _MenuSquare(
                                   title: 'MÉTÉO TERRESTRE',
                                   icon: Icons.wb_sunny_rounded,
@@ -540,7 +545,9 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                                     );
                                   },
                                 ),
-                              ],
+                                  ],
+                                );
+                              },
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -650,7 +657,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
                             title: 'MAIN COURANTE',
                             icon: Icons.menu_book_rounded,
                             color: const Color(0xFF8E24AA),
-                            height: 82,
+                            height: 70,
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -731,7 +738,7 @@ class _MaterialVerificationSquare extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 78,
+        height: 70,
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(18),
@@ -747,9 +754,9 @@ class _MaterialVerificationSquare extends StatelessWidget {
             Icon(
               icon,
               color: _color,
-              size: 27,
+              size: 24,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               title,
               textAlign: TextAlign.center,
@@ -804,7 +811,7 @@ class _MenuSquare extends StatelessWidget {
         ),
 
         child: Padding(
-          padding: const EdgeInsets.all(9),
+          padding: const EdgeInsets.all(6),
 
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -812,10 +819,10 @@ class _MenuSquare extends StatelessWidget {
               Icon(
                 icon,
                 color: iconColor ?? color,
-                size: 34,
+                size: 29,
               ),
 
-              const SizedBox(height: 7),
+              const SizedBox(height: 4),
 
               Text(
                 title,
@@ -824,7 +831,7 @@ class _MenuSquare extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: color,
-                  fontSize: 10,
+                  fontSize: 9.5,
                   fontWeight: FontWeight.w900,
                   height: 1.0,
                 ),
