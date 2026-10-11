@@ -3176,7 +3176,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     );
   }
 
-  Widget _villePanel() {
+    Widget _villePanel() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -3184,6 +3184,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           'LIEU',
           'Positionnez le lieu du SPHOT ADMIN sur la carte centrale.',
         ),
+
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -3192,8 +3193,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             border: Border.all(color: adminColor, width: 1.4),
           ),
           child: const Text(
-            'Cliquez sur la carte pour positionner le lieu du SPHOT ADMIN.\n\n'
-            'Astuce : les coordonnées GPS seront enregistrées automatiquement.',
+            'Cliquez sur la carte pour positionner le lieu du SPHOT ADMIN.',
             style: TextStyle(
               color: adminColor,
               fontSize: 12,
@@ -3202,72 +3202,29 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 48,
-          child: OutlinedButton.icon(
-            onPressed: _hasCityPosition ? _centerOnCity : null,
-            icon: const Icon(Icons.center_focus_strong_rounded),
-            label: const Text(
-              'CENTRER SUR LE LIEU',
-              style: TextStyle(fontWeight: FontWeight.w900),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: adminColor,
-              disabledForegroundColor: Colors.grey,
-              side: BorderSide(
-                color: _hasCityPosition ? adminColor : Colors.grey,
-                width: 1.6,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ),
-        ),
+
         const SizedBox(height: 14),
-        Row(
-          children: [
-            Expanded(
-              child: _textField(
-                'villeLat',
-                'Latitude',
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                  signed: true,
-                ),
-                readOnly: !_isFieldEditable('villeLat'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _textField(
-                'villeLng',
-                'Longitude',
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                  signed: true,
-                ),
-                readOnly: !_isFieldEditable('villeLng'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
+
         _buildAdminLogoPicker(),
+
         const SizedBox(height: 14),
+
         _textField(
           'siteInternetVille',
           'https://www.votre-site.fr',
           readOnly: !_isFieldEditable('siteInternetVille'),
         ),
+
         const SizedBox(height: 11),
+
         _textField(
           'arretesMunicipaux',
           'https://réglements-de-baignade',
           readOnly: !_isFieldEditable('arretesMunicipaux'),
         ),
+
         const SizedBox(height: 22),
+
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -3275,7 +3232,10 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
             const SizedBox(width: 20),
 
-            _nextButton(_TrialRequestSection.essai, enabled: _villeComplete),
+            _nextButton(
+              _TrialRequestSection.essai,
+              enabled: _villeComplete,
+            ),
           ],
         ),
       ],
