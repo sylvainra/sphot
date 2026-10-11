@@ -2285,7 +2285,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
               countText,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: const Color(0xFFB91C1C),
+                color: const Color(0xFFFF0000),
                 fontWeight: FontWeight.w900,
                 fontSize: countText.length >= 4
                     ? 10
