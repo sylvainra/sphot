@@ -986,70 +986,80 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
     );
   }
 
+  String get _connectionTitle {
+    if (_step == 1) {
+      if (_hasAdmin && !_hasAdvertiser) {
+        return 'CONNEXION SPHOT ADMIN';
+      }
+      if (_hasAdvertiser && !_hasAdmin) {
+        return 'CONNEXION SPHOT PUBLICITAIRE';
+      }
+    }
+
+    // Accueil, sauveteur ou identifiant ayant les deux accès professionnels.
+    return 'CONNEXION SPHOT';
+  }
+
   Widget _buildAudienceChoice() {
-    final choices = <Widget>[];
-
-    if (_hasAdmin) {
-      choices.add(
-        RadioListTile<_LoginAudience>(
-          value: _LoginAudience.admin,
-          groupValue: _selectedAudience,
-          onChanged: _isLoggingIn
-              ? null
-              : (value) => setState(() => _selectedAudience = value),
-          activeColor: _red,
-          contentPadding: EdgeInsets.zero,
-          title: const Text(
-            'SPHOT ADMIN',
-            style: TextStyle(
-              color: _blue,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_hasAdvertiser) {
-      choices.add(
-        RadioListTile<_LoginAudience>(
-          value: _LoginAudience.advertiser,
-          groupValue: _selectedAudience,
-          onChanged: _isLoggingIn
-              ? null
-              : (value) => setState(() => _selectedAudience = value),
-          activeColor: _red,
-          contentPadding: EdgeInsets.zero,
-          title: const Text(
-            'SPHOT PUBLICITAIRE',
-            style: TextStyle(
-              color: _blue,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (choices.isEmpty) {
+    // Un seul accès professionnel : son intitulé est déjà dans le titre.
+    // Un double accès : laisser l'utilisateur choisir, sans bouton radio.
+    if (!_hasAdmin || !_hasAdvertiser) {
       return const SizedBox.shrink();
+    }
+
+    Widget buildChoice(_LoginAudience audience, String label) {
+      final isSelected = _selectedAudience == audience;
+
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: _isLoggingIn
+                ? null
+                : () => setState(() => _selectedAudience = audience),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _blue,
+              backgroundColor: isSelected
+                  ? _blue.withOpacity(0.10)
+                  : Colors.white.withOpacity(0.10),
+              side: BorderSide(
+                color: isSelected ? _red : _blue,
+                width: isSelected ? 2.2 : 1.6,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 14,
+              ),
+            ),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: _blue,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ),
+      );
     }
 
     return Column(
       children: [
         const SizedBox(height: 8),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Espace de connexion',
-            style: TextStyle(
-              color: _blue,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+        buildChoice(
+          _LoginAudience.admin,
+          'CONNEXION SPHOT ADMIN',
         ),
-        ...choices,
+        buildChoice(
+          _LoginAudience.advertiser,
+          'CONNEXION SPHOT PUBLICITAIRE',
+        ),
       ],
     );
   }
@@ -1165,7 +1175,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
   @override
   Widget build(BuildContext context) {
     return SphotAccessPage(
-      title: 'CONNEXION SPHOT',
+      title: _connectionTitle,
       onBackgroundTap: _closeKeyboard,
       onBack: _goBack,
       child: AnimatedSwitcher(
