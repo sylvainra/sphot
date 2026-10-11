@@ -342,7 +342,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                   Expanded(
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                       decoration: BoxDecoration(
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(24),
@@ -352,28 +352,25 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                         ),
                       ),
 
-                      child: SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        clipBehavior: Clip.none,
-                        child: Column(
-                            children: [
+                      child: Column(
+                          children: [
                               const Text(
                                 'PRÉVISIONS',
                                 style: TextStyle(
                                   color: Color(0xFF0277BD),
-                                  fontSize: 28,
+                                  fontSize: 24,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 0.8,
                                 ),
                               ),
 
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 4),
 
                               Row(
                                 children: [
                                   Expanded(
                                     child: SizedBox(
-                                      height: 92,
+                                      height: 82,
 
                                       child: _WaterTemperatureCard(
                                         minValue: waterMin,
@@ -398,7 +395,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
 
                                   Expanded(
                                     child: SizedBox(
-                                      height: 92,
+                                      height: 82,
 
                                       child: _SeaStateCard(
                                         value: seaStateIndex,
@@ -414,7 +411,7 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                                 ],
                               ),
 
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 4),
 
                               _TidesFullWidthCard(
                                   borderColor: tideColor,
@@ -498,10 +495,9 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                                   },
                                 ),
 
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 4),
 
-                              SizedBox(
-                                height: 276,
+                              Expanded(
                                 child: _SwellFullWidthCard(
                                   borderColor: swellColor,
 
@@ -566,15 +562,14 @@ class _SauveteurMeteoMarinePageState extends State<SauveteurMeteoMarinePage> {
                                     },
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 4),
                               _livePublicationBar(),
                             ],
                           ),
-                        ),
                     ),
                   ),
 
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Transform.translate(
                     offset: const Offset(0, 0),
 
@@ -641,7 +636,7 @@ class _WaterTemperatureCard extends StatelessWidget {
           width: 2,
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -899,7 +894,7 @@ class _TidesFullWidthCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 150,
+      height: 132,
       padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
       decoration: BoxDecoration(
         color: Colors.transparent,
@@ -912,7 +907,7 @@ class _TidesFullWidthCard extends StatelessWidget {
       child: Column(
         children: [
           SizedBox(
-            height: 38,
+            height: 36,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -976,7 +971,7 @@ class _TidesFullWidthCard extends StatelessWidget {
               onMinute2Changed: onHighMinute2Changed,
               onCoefChanged: onHighCoefChanged,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             _TideLine(
                 isHigh: false,
                 hour1: lowHour1,
@@ -1322,10 +1317,10 @@ class _SwellFullWidthCard extends StatelessWidget {
           ),
 
           Positioned(
-            top: 34,
+            top: 26,
             left: 0,
             right: 0,
-            height: 136,
+            height: 124,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -1353,7 +1348,7 @@ class _SwellFullWidthCard extends StatelessWidget {
           ),
 
           Positioned(
-            top: 176,
+            top: 156,
             left: 0,
             right: 0,
             child: Row(
