@@ -22,6 +22,10 @@ class FlagMarker extends StatefulWidget {
   // dans aucun autre constructeur spécialisé (carte, mobile, sauveteur).
   final bool desktopLive;
 
+  // Seul le constructeur .map utilise un mât de hauteur variable.
+  // Toutes les autres surfaces conservent strictement leur mât actuel.
+  final bool mapMarker;
+
   // Constructeur historique conservé pour la compatibilité.
   const FlagMarker({
     super.key,
@@ -30,10 +34,10 @@ class FlagMarker extends StatefulWidget {
     this.sauveteurPreviewHeight,
     this.compactDetail = false,
     this.desktopLive = false,
-  });
+  }) : mapMarker = false;
 
   // Chaque surface sélectionne explicitement sa configuration.
-  // Les quatre réglages peuvent évoluer indépendamment sans modifier
+  // Les réglages peuvent évoluer indépendamment sans modifier
   // accidentellement le mât d'un autre écran.
   const FlagMarker.map({
     super.key,
@@ -41,7 +45,8 @@ class FlagMarker extends StatefulWidget {
   })  : sauveteurPreview = false,
         sauveteurPreviewHeight = null,
         compactDetail = false,
-        desktopLive = false;
+        desktopLive = false,
+        mapMarker = true;
 
   const FlagMarker.publicLiveMobile({
     super.key,
@@ -49,7 +54,8 @@ class FlagMarker extends StatefulWidget {
   })  : sauveteurPreview = false,
         sauveteurPreviewHeight = null,
         compactDetail = true,
-        desktopLive = false;
+        desktopLive = false,
+        mapMarker = false;
 
   const FlagMarker.publicLiveWeb({
     super.key,
@@ -57,7 +63,8 @@ class FlagMarker extends StatefulWidget {
   })  : sauveteurPreview = false,
         sauveteurPreviewHeight = null,
         compactDetail = true,
-        desktopLive = true;
+        desktopLive = true,
+        mapMarker = false;
 
   const FlagMarker.actionsRapides({
     super.key,
@@ -66,7 +73,8 @@ class FlagMarker extends StatefulWidget {
   })  : sauveteurPreview = true,
         sauveteurPreviewHeight = height,
         compactDetail = false,
-        desktopLive = false;
+        desktopLive = false,
+        mapMarker = false;
 
   @override
   State<FlagMarker> createState() => _FlagMarkerState();
@@ -77,9 +85,25 @@ class _FlagMarkerState extends State<FlagMarker>
   late final AnimationController _controller;
 
   static const double markerWidth = 70;
-  // Mât de carte allongé vers le haut ; le pied reste géoréférencé.
+  // Conteneur fixe pour maintenir le pied du mât au même endroit sur la carte.
   static const double _normalMarkerHeight = 124;
   static const double _previewMarkerHeight = 115;
+
+  // Hauteurs réservées aux cartes Web et mobile (pixels Flutter).
+  // Les valeurs maintiennent nominalement DEUX espacements de 6 px
+  // entre le dernier signal hissé et le premier signal affalé.
+  // La manche à air n'occupe pas exactement la place du pavillon violet :
+  // sa combinaison avec le drapeau principal demande une autre hauteur.
+  // Le pied des mâts et la position des signaux affalés restent inchangés.
+  // Avec UN drapeau : trois hauteurs de drapeau REELLEMENT PEINT
+  // (3 x 18 px), separees par deux espaces visibles (2 x 6 px) : 66 px.
+  // Ce n'est pas la taille du CustomPaint (30 px), qui inclut 6 px
+  // de marge interne en haut et en bas. Rien ne change pour 0, 2 ou 3.
+  static const double _mapPoleHeightNoSignal = 55.0;
+  static const double _mapPoleHeightMainPurple = 103.0;
+  static const double _mapPoleHeightMainWindsock = 99.5;
+  static const double _mapPoleHeightThree = 159.5;
+  static const double _mapPoleHeightOneSignal = 66.0;
 
   static const double poleWidth = 4;
   static const double poleLeft = (markerWidth - poleWidth) / 2;
@@ -131,17 +155,49 @@ class _FlagMarkerState extends State<FlagMarker>
 
     final isAffale = widget.spot.flagPosition == FlagPosition.affale;
 
-    // La hauteur du mât reste fixe : activer un signal ne rallonge jamais
-    // un marqueur de carte. L'aperçu sauveteur conserve son grand mât.
+    // Le nombre de signaux correspond exactement aux signaux affichés :
+    // drapeau principal (même affalé), drapeau violet et manche à air.
+    // Les deux signaux complémentaires sont dessinés uniquement si le
+    // drapeau principal existe, comme dans le fonctionnement initial.
+    final visibleSignalCount = hasMainFlag
+        ? 1 + (purpleFlagActive ? 1 : 0) + (windsockActive ? 1 : 0)
+        : 0;
+
+    // Sur carte uniquement : un seul drapeau = trois hauteurs visibles
+    // de drapeau (18 px) + deux espacements visibles (6 px).
+    // Les hauteurs à 2 et 3 signaux sont inchangées.
+    // Le widget reste fixe (ancrage géographique) ; le mât et le signal
+    // hissé peuvent dépasser en haut du Stack (clip.none).
+    final mapPoleHeight = visibleSignalCount >= 3
+        ? _mapPoleHeightThree
+        : visibleSignalCount == 2
+            ? (windsockActive
+                ? _mapPoleHeightMainWindsock
+                : _mapPoleHeightMainPurple)
+            : visibleSignalCount == 1
+                ? _mapPoleHeightOneSignal
+                : _mapPoleHeightNoSignal;
+
     final markerHeight = widget.sauveteurPreview
         ? (widget.sauveteurPreviewHeight ?? _previewMarkerHeight)
         : widget.compactDetail
             ? 95.0
             : _normalMarkerHeight;
-    // Dans la fiche Live, allonger seulement le trait vers le haut.
-    // La taille du widget et les positions validées des signaux ne changent pas.
-    final poleHeight =
-        widget.compactDetail ? markerHeight - 5 : markerHeight - 20;
+
+    // Le mât reste attaché par son pied (bottom: 0). Les vues LIVE et
+    // Actions rapides conservent exactement leur calcul de hauteur.
+    final poleHeight = widget.mapMarker
+        ? mapPoleHeight
+        : widget.compactDetail
+            ? markerHeight - 5
+            : markerHeight - 20;
+
+    // Le groupe hissé suit le sommet du mât de carte : son premier
+    // pavillon peint commence à 4 px du sommet. Le groupe affalé
+    // conserve sa position historique près du pied, sur tous les profils.
+    final mapHissedOffset = widget.mapMarker
+        ? (_normalMarkerHeight - 20) - mapPoleHeight
+        : 0.0;
 
     // Le dessin sinusoïdal remplit 18 px sur une zone de 30 px :
     // 6 px de marge en haut et en bas du CustomPaint.
@@ -179,7 +235,8 @@ class _FlagMarkerState extends State<FlagMarker>
             loweredTripleGroupLift
         : flagTopHisse -
             (widget.compactDetail ? compactHissedLift : 0) +
-            (widget.desktopLive ? webLiveHissedOffset : 0);
+            (widget.desktopLive ? webLiveHissedOffset : 0) +
+            mapHissedOffset;
     final purpleFlagTop = mainFlagTop + flagStep;
 
     // Même en l'absence du violet, la manche à air se situe à la moitié
