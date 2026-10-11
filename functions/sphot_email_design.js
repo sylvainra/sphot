@@ -1270,6 +1270,7 @@ function textToEmailHtml(text) {
 /**
  * Habille un contenu avec le modèle commun de réception Admin.
  * @param {string} body Contenu HTML métier.
+ * @param {string} brandUrl Lien du logo, selon le profil destinataire.
  * @return {string} Email complet.
  */
 function renderSphotEmail(body, brandUrl = MAP_URL) {
