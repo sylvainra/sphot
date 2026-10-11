@@ -61,15 +61,18 @@ Future<void> main() async {
    */
   final fragment = Uri.base.fragment.trim();
 
-  // Si le lien Android ouvre le navigateur (application non installée),
-  // afficher une page explicative plutôt que la connexion sauveteur Web.
-  final initialRoute = fragment.isEmpty
-      ? (kIsWeb && Uri.base.path == '/sauveteur-login'
-          ? '/sauveteur-login'
-          : '/')
-      : fragment.startsWith('/')
-      ? fragment
-      : '/$fragment';
+  // Le navigateur Web utilise le fragment d'URL (/#/route).
+  // Android transmet les App Links au moteur Flutter : il faut conserver
+  // la route initiale reçue de la plateforme pour les démarrages à froid.
+  final platformInitialRoute =
+      WidgetsBinding.instance.platformDispatcher.defaultRouteName;
+  final initialRoute = kIsWeb
+      ? (fragment.isEmpty
+          ? (Uri.base.path == '/sauveteur-login'
+              ? '/sauveteur-login'
+              : '/')
+          : (fragment.startsWith('/') ? fragment : '/$fragment'))
+      : (platformInitialRoute.isNotEmpty ? platformInitialRoute : '/');
 
   runApp(SphotApp(initialRoute: initialRoute));
 }
