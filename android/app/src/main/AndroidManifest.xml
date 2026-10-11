@@ -32,6 +32,22 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
 
+            <!-- Connexion sauveteur par lien HTTPS dans les emails SPHOT.
+                 Requiert la publication de /.well-known/assetlinks.json
+                 avec l'empreinte SHA-256 de l'application Android. -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="true" />
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="sphot.app"
+                    android:path="/sauveteur-login" />
+            </intent-filter>
+
             <intent-filter android:label="proconnect">
     <action android:name="android.intent.action.VIEW" />
 

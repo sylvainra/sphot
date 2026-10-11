@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -8,6 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'map/map_page.dart';
 import 'map/profil_login_page.dart';
+import 'web/shared/sphot_access_page.dart';
 import 'web/advertiser/web_advertiser_app.dart';
 import 'web/advertiser/pages/advertiser_first_access_page.dart';
 import 'web/admin/pages/admin_access_page.dart';
@@ -59,11 +61,18 @@ Future<void> main() async {
    */
   final fragment = Uri.base.fragment.trim();
 
-  final initialRoute = fragment.isEmpty
-      ? '/'
-      : fragment.startsWith('/')
-      ? fragment
-      : '/$fragment';
+  // Le navigateur Web utilise le fragment d'URL (/#/route).
+  // Android transmet les App Links au moteur Flutter : il faut conserver
+  // la route initiale reçue de la plateforme pour les démarrages à froid.
+  final platformInitialRoute =
+      WidgetsBinding.instance.platformDispatcher.defaultRouteName;
+  final initialRoute = kIsWeb
+      ? (fragment.isEmpty
+          ? (Uri.base.path == '/sauveteur-login'
+              ? '/sauveteur-login'
+              : '/')
+          : (fragment.startsWith('/') ? fragment : '/$fragment'))
+      : (platformInitialRoute.isNotEmpty ? platformInitialRoute : '/');
 
   runApp(SphotApp(initialRoute: initialRoute));
 }
@@ -132,7 +141,16 @@ class SphotApp extends StatelessWidget {
       );
     }
 
-    if (uri.path == '/login' || uri.path == '/sauveteur-login') {
+    if (uri.path == '/sauveteur-login') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => kIsWeb
+            ? const _SauveteurMobileAccessPage()
+            : const ProfilLoginPage(),
+      );
+    }
+
+    if (uri.path == '/login') {
       return MaterialPageRoute(
         settings: settings,
         builder: (_) => const ProfilLoginPage(),
@@ -215,6 +233,43 @@ class SphotApp extends StatelessWidget {
         _generateRoute(RouteSettings(name: initialRouteName)),
       ],
       onGenerateRoute: _generateRoute,
+    );
+  }
+}
+
+// Page de repli : le domaine HTTPS est réservé aux liens de l'application.
+class _SauveteurMobileAccessPage extends StatelessWidget {
+  const _SauveteurMobileAccessPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return SphotAccessPage(
+      title: 'SPHOT SAUVETEUR',
+      onBack: () => Navigator.of(context)
+          .pushNamedAndRemoveUntil('/map', (route) => false),
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.smartphone_rounded, color: Color(0xFF1E3A8A), size: 45),
+          SizedBox(height: 16),
+          Text(
+            'La connexion SPHOT SAUVETEUR se fait dans l’application mobile SPHOT.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF1E3A8A),
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
+            ),
+          ),
+          SizedBox(height: 12),
+          Text(
+            'Installez ou ouvrez l’application SPHOT sur votre téléphone '
+            'pour accéder à votre espace sauveteur.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.sylvainra.sphot",
+      "sha256_cert_fingerprints": [
+        "B0:5A:1A:19:38:71:D7:5A:84:E5:4B:FF:DE:C7:C7:04:26:2B:E8:AD:6B:17:F2:F7:4D:4D:47:D3:1A:93:19:33"
+      ]
+    }
+  }
+]

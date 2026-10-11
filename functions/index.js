@@ -18,8 +18,9 @@ admin.initializeApp();
 const SMTP_USER = "admin@sphot.app";
 const MAIL_FROM = "\"SPHOT\" <no-reply@sphot.app>";
 const SPHOT_LOGIN_URL = "https://sphot.app";
+// Lien Android App Links : ouvre SPHOT si l'association du domaine est valide.
 const SPHOT_SAUVETEUR_LOGIN_URL =
-  `${SPHOT_LOGIN_URL}/#/sauveteur-login`;
+  `${SPHOT_LOGIN_URL}/sauveteur-login`;
 
 
 setGlobalOptions({maxInstances: 10});
@@ -4409,6 +4410,7 @@ exports.sendSauveteurCredentialsEmail = onRequest(
           subject: isReset ?
     "Vos nouveaux accès SPHOT" :
     "Vos accès SPHOT",
+          sphotBrandUrl: SPHOT_SAUVETEUR_LOGIN_URL,
           html: `
 <p style="font-weight:400 !important;">
   ${destinataireHtml} bonjour,
@@ -4624,6 +4626,7 @@ exports.notifySauveteurSphotOffAfterAssignment = onDocumentUpdated(
         from: MAIL_FROM,
         to: email,
         subject: "SPHOT SAUVETEUR — Passage en SPHOT OFF",
+        sphotBrandUrl: SPHOT_SAUVETEUR_LOGIN_URL,
         html: `
 <p>${escapeHtml(destinataire)} bonjour,</p>
 
@@ -9112,6 +9115,7 @@ exports.changeSauveteurPassword = onRequest(
               to: email,
               replyTo: "contact@sphot.app",
               subject: "Mise à jour de votre compte SPHOT",
+              sphotBrandUrl: SPHOT_SAUVETEUR_LOGIN_URL,
               html: `
 <p style="font-weight:400 !important;">
         ${destinataireHtml} bonjour,

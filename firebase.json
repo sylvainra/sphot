@@ -42,12 +42,26 @@
     ],
   "hosting": {
     "public": "build/web",
+    "appAssociation": "NONE",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
     ],
     "headers": [
+      {
+        "source": "/.well-known/assetlinks.json",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=300"
+          }
+        ]
+      },
       {
         "source": "/index.html",
         "headers": [
@@ -77,6 +91,10 @@
       }
     ],
     "rewrites": [
+      {
+        "source": "/.well-known/assetlinks.json",
+        "destination": "/assetlinks.json"
+      },
       {
         "source": "**",
         "destination": "/index.html"
