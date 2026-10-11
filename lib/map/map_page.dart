@@ -2285,7 +2285,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
               countText,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.black87,
+                color: const Color(0xFFB91C1C),
                 fontWeight: FontWeight.w900,
                 fontSize: countText.length >= 4
                     ? 10
@@ -2950,31 +2950,55 @@ onPositionChanged: (position, hasGesture) {
                         );
                       },
                     ),
-                  if (_selectedPublicSpotId == null)
-                    Builder(
-                      builder: (context) {
-                        final zoom = MapCamera.of(context).zoom;
-                        final rotation = MapCamera.of(context).rotation;
-                        return MarkerLayer(
-                          markers: _buildPublicAdvertisingMarkers(
-                            publicAdvertisers,
-                            zoom,
-                            rotation,
-                          ),
-                        );
-                      },
-                    ),
-                  // Une seule couche regroupe tous les types de SPHOTS,
-                  // y compris les postes de secours. Aucun double comptage.
+                  // Monde / régions : tous les SPHOTS sont regroupés.
+                  // Dès le zoom 12, les mâts surveillés sont indépendants
+                  // et dessinés AU-DESSUS des fire icons des autres SPHOTS.
                   Builder(
                     builder: (context) {
                       final zoom = MapCamera.of(context).zoom;
                       final rotation = MapCamera.of(context).rotation;
                       final automaticLabelIds =
                           _automaticLabelIds(visibleSpots, zoom);
-                      final markers = visibleSpots
+
+                      final eligibleSpots = visibleSpots
                           .where((spot) =>
                               spot.lat.isFinite && spot.lng.isFinite)
+                          .toList();
+
+                      final rescueSpots = zoom >= 12.0
+                          ? eligibleSpots
+                              .where((spot) => spot.isPosteSecours)
+                              .toList()
+                          : <SpotFlagState>[];
+
+                      final toCluster = eligibleSpots.where((spot) {
+                        // A faible zoom, même les mâts entrent dans les
+                        // groupes : aucun grand drapeau ne couvre la carte.
+                        if (zoom < 12.0) return true;
+                        if (spot.isPosteSecours) return false;
+
+                        // A zoom >= 16, tous les lieux redeviennent visibles.
+                        if (zoom >= 16.0 || rescueSpots.isEmpty) {
+                          return true;
+                        }
+
+                        // Tant qu'ils chevaucheraient visuellement un mât,
+                        // les fire icons voisins attendent. Ils apparaissent
+                        // naturellement quand la distance en pixels grandit
+                        // à mesure que l'utilisateur zoome.
+                        final point = _mercatorPixelPoint(spot, zoom);
+                        for (final rescue in rescueSpots) {
+                          final rescuePoint =
+                              _mercatorPixelPoint(rescue, zoom);
+                          if ((point.dx - rescuePoint.dx).abs() < 90.0 &&
+                              (point.dy - rescuePoint.dy).abs() < 110.0) {
+                            return false;
+                          }
+                        }
+                        return true;
+                      }).toList();
+
+                      final markers = toCluster
                           .map((spot) => _buildProgressiveSpotMarker(
                                 spot,
                                 zoom,
@@ -2989,8 +3013,6 @@ onPositionChanged: (position, hasGesture) {
                           size: const Size(54, 54),
                           alignment: Alignment.center,
                           maxZoom: 19.0,
-                          // Monde, régions, littoral, puis uniquement
-                          // les vrais chevauchements en zoom détaillé.
                           maxClusterRadius: zoom < 7.0
                               ? 92
                               : zoom < 12.0
@@ -2998,8 +3020,6 @@ onPositionChanged: (position, hasGesture) {
                                   : zoom < 16.0
                                       ? 42
                                       : 2,
-                          // Au zoom détaillé, afficher chaque mât et
-                          // chaque SPHOT sans les masquer sous un cluster.
                           disableClusteringAtZoom: 16,
                           zoomToBoundsOnClick: true,
                           centerMarkerOnClick: false,
@@ -3008,6 +3028,28 @@ onPositionChanged: (position, hasGesture) {
                           markerChildBehavior: true,
                           builder: _buildCluster,
                         ),
+                      );
+                    },
+                  ),
+
+                  // Dessinés en dernier, les mâts restent prioritaires sur
+                  // TOUS les autres marqueurs, à partir de leur zoom actuel.
+                  Builder(
+                    builder: (context) {
+                      final zoom = MapCamera.of(context).zoom;
+                      final rotation = MapCamera.of(context).rotation;
+                      final automaticLabelIds =
+                          _automaticLabelIds(visibleSpots, zoom);
+
+                      return MarkerLayer(
+                        markers: zoom < 12.0
+                            ? const <Marker>[]
+                            : _buildSecoursMarkers(
+                                visibleSpots,
+                                automaticLabelIds,
+                                zoom,
+                                rotation,
+                              ),
                       );
                     },
                   ),
