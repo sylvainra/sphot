@@ -2666,7 +2666,7 @@ Widget _buildBottomBar() {
     _isSearchPanelOpen ? const Color(0xFFFF7F00) : Colors.black87,
     const Color(0xFFFFD000),
     const Color(0xFF1E3A8A),
-    Colors.black87,
+    const Color(0xFFFF0000),
   ];
 
   return Positioned(
