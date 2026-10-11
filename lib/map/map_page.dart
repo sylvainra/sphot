@@ -48,6 +48,13 @@ class _MapTileStyle {
   });
 }
 
+class _SphotSingleWorldCrs extends Epsg3857 {
+  const _SphotSingleWorldCrs();
+
+  @override
+  bool get replicatesWorldLongitude => false;
+}
+
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
 
@@ -2692,8 +2699,28 @@ debugPrint('SPHOTS AFFICHÉS : ${visibleSpots.length}');
               FlutterMap(
                 mapController: _mapController,
                 options: MapOptions(
+  crs: const _SphotSingleWorldCrs(),
+
   initialCenter: const LatLng(46.4006176, -1.5064563),
   initialZoom: 13,
+
+  // Le monde ne doit pas devenir plus petit que
+  // la plus grande dimension de l'écran.
+  minZoom: max(
+    1.0,
+    log(
+      max(
+        MediaQuery.sizeOf(context).width,
+        MediaQuery.sizeOf(context).height,
+      ) / 256.0,
+    ) / ln2,
+  ),
+
+  // Empêche de dépasser le zoom des tuiles disponibles.
+  maxZoom: 19.0,
+
+  // Évite les débordements verticaux au dézoom.
+  cameraConstraint: const CameraConstraint.containLatitude(),
   interactionOptions: const InteractionOptions(
   flags: InteractiveFlag.all,
 ),
