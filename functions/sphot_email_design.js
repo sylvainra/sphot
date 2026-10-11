@@ -1272,7 +1272,7 @@ function textToEmailHtml(text) {
  * @param {string} body Contenu HTML métier.
  * @return {string} Email complet.
  */
-function renderSphotEmail(body) {
+function renderSphotEmail(body, brandUrl = MAP_URL) {
   return `<!doctype html>
 <html lang="fr">
 <head><meta charset="utf-8"><meta name="viewport"
@@ -1285,7 +1285,7 @@ style="background:#eef3f8;font-family:Arial,Helvetica,sans-serif;">
 style="max-width:620px;background:#ffffff;border:1px solid #d9e2ec;
 border-radius:18px;box-shadow:0 4px 12px rgba(0,0,0,.08);">
 <tr><td align="center" style="padding:30px 30px 18px;">
-  <a href="${MAP_URL}" style="text-decoration:none;">
+  <a href="${brandUrl}" style="text-decoration:none;">
     <img src="cid:${LOGO_CID}" alt="SPHOT" width="260"
     style="display:block;width:260px;max-width:100%;height:auto;border:0;">
   </a>
@@ -1294,7 +1294,7 @@ border-radius:18px;box-shadow:0 4px 12px rgba(0,0,0,.08);">
 ${body}
 </td></tr>
 <tr><td align="center" style="padding:26px 34px 34px;">
-  <a href="${MAP_URL}" style="text-decoration:none;">
+  <a href="${brandUrl}" style="text-decoration:none;">
       <img src="cid:${FIRE_PNG_CID}" alt="SPHOT" width="42" height="65"
       style="display:block;width:42px;height:65px;border:0;">
   </a>
@@ -1310,13 +1310,18 @@ ${body}
  * @return {Object} Message habillé et images intégrées.
  */
 function buildSphotMessage(options) {
-  const body = typeof options.html === "string" ?
-    options.html : textToEmailHtml(options.text || "");
+  // Seuls les emails sauveteurs utilisent l'accès mobile.
+  // Les emails Admin et Publicitaire conservent leurs liens Web.
+  const {sphotBrandUrl, ...mailOptions} = options;
+  const brandUrl = sphotBrandUrl === "https://sphot.app/sauveteur-login" ?
+    sphotBrandUrl : MAP_URL;
+  const body = typeof mailOptions.html === "string" ?
+    mailOptions.html : textToEmailHtml(mailOptions.text || "");
   return {
-    ...options,
-    html: renderSphotEmail(body),
+    ...mailOptions,
+    html: renderSphotEmail(body, brandUrl),
     attachments: [
-      ...(options.attachments || []),
+      ...(mailOptions.attachments || []),
       {
         filename: "sphot_title.png",
         cid: LOGO_CID,
