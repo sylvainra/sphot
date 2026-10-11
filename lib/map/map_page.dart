@@ -88,6 +88,7 @@ Timer? _searchTimer;
 
 bool _isFilterOpen = false;
 bool _isMapStyleOpen = false;
+bool _isSearchPanelOpen = false;
 
 final TextEditingController _searchController = TextEditingController();
 final FocusNode _searchFocusNode = FocusNode();
@@ -1407,12 +1408,38 @@ SpotFlagState? _findBestSpotMatch(
     setState(() => _currentRotation = 0);
   }
 
+  // La recherche reste volontairement invisible sur la carte tant que
+  // l'utilisateur n'a pas appuyé sur la loupe du menu inférieur.
+  void _closeSearchPanel() {
+    _isSearchPanelOpen = false;
+    _searchTimer?.cancel();
+    _searchController.clear();
+    _searchFocusNode.unfocus();
+    if (_isListening) {
+      _isListening = false;
+      unawaited(_speech.stop());
+    }
+  }
+
+  void _toggleSearchPanel() {
+    setState(() {
+      if (_isSearchPanelOpen) {
+        _closeSearchPanel();
+      } else {
+        _isSearchPanelOpen = true;
+        _isFilterOpen = false;
+        _isMapStyleOpen = false;
+      }
+    });
+  }
+
   void _toggleMapStyleBar() {
   setState(() {
     _isMapStyleOpen = !_isMapStyleOpen;
 
     if (_isMapStyleOpen) {
       _isFilterOpen = false;
+      _closeSearchPanel();
       _searchController.clear();
       _searchFocusNode.unfocus();
     }
@@ -1633,6 +1660,7 @@ void _toggleFilterBar() {
 
     if (_isFilterOpen) {
       _isMapStyleOpen = false;
+      _closeSearchPanel();
       _searchController.clear();
       _searchFocusNode.unfocus();
     }
@@ -2614,17 +2642,31 @@ const SizedBox(height: 6),
 }
 
 Widget _buildBottomBar() {
-  final items = [
-    {'icon': Icons.tune, 'label': 'FILTRES'},
-    {'icon': Icons.layers_outlined, 'label': 'CARTES'},
-    {
-      'icon': _favoriteSpotIds.isNotEmpty
-          ? Icons.star
-          : Icons.star_border,
-      'label': 'FAVORIS',
-    },
-    {'icon': Icons.info_outline, 'label': 'INFOS'},
-    {'icon': Icons.add, 'label': 'LOGIN'},
+  // Six zones de clic de largeur égale : compatible avec un mobile étroit,
+  // sans texte sous les icônes ni fond opaque / translucide.
+  final icons = <IconData>[
+    Icons.tune,
+    Icons.layers_outlined,
+    _isSearchPanelOpen ? Icons.close_rounded : Icons.search_rounded,
+    _favoriteSpotIds.isNotEmpty ? Icons.star : Icons.star_border,
+    Icons.info_outline,
+    Icons.person_outline_rounded,
+  ];
+  final labels = <String>[
+    'Filtres',
+    'Cartes',
+    _isSearchPanelOpen ? 'Fermer la recherche' : 'Rechercher un SPHOT',
+    'Favoris',
+    'Informations',
+    'Profil / Connexion',
+  ];
+  final colors = <Color>[
+    Colors.black87,
+    const Color(0xFF8B5E3C),
+    _isSearchPanelOpen ? const Color(0xFFFF7F00) : Colors.black87,
+    const Color(0xFFFFD000),
+    const Color(0xFF1E3A8A),
+    Colors.black87,
   ];
 
   return Positioned(
@@ -2632,7 +2674,7 @@ Widget _buildBottomBar() {
     right: 8,
     bottom: 6,
     child: Container(
-      height: 48,
+      height: 52,
       decoration: BoxDecoration(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
@@ -2642,119 +2684,59 @@ Widget _buildBottomBar() {
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: List.generate(items.length, (index) {
-          return InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: () {
-              setState(() {
-                _selectedBottomIndex = index;
-              });
+        children: List.generate(icons.length, (index) {
+          return Expanded(
+            child: Tooltip(
+              message: labels[index],
+              child: Semantics(
+                label: labels[index],
+                button: true,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () {
+                    setState(() {
+                      _selectedBottomIndex = index;
+                      if (index != 2 && _isSearchPanelOpen) {
+                        _closeSearchPanel();
+                      }
+                    });
 
-              if (index == 0) {
-                _toggleFilterBar();
-              } else if (index == 1) {
-                _toggleMapStyleBar();
-              } else if (index == 2) {
-                unawaited(_toggleFavoritesFilter());
-              } else if (index == 3) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const AppInfoPage(),
-                  ),
-                );
-              } else if (index == 4) {
-                unawaited(_openLoginPage());
-              }
-            },
-            child: Container(
-              width: 58,
-              height: 50,
-              decoration: BoxDecoration(
-                color: index == 2 && _showFavoritesOnly
-                    ? const Color(0x22FFD000)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 22,
-                    height: 22,
+                    if (index == 0) {
+                      _toggleFilterBar();
+                    } else if (index == 1) {
+                      _toggleMapStyleBar();
+                    } else if (index == 2) {
+                      _toggleSearchPanel();
+                    } else if (index == 3) {
+                      unawaited(_toggleFavoritesFilter());
+                    } else if (index == 4) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const AppInfoPage(),
+                        ),
+                      );
+                    } else if (index == 5) {
+                      unawaited(_openLoginPage());
+                    }
+                  },
+                  child: SizedBox(
+                    height: 48,
+                    width: double.infinity,
                     child: Center(
-                      child: index == 4
-                          ? Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Container(
-                                  width: 5,
-                                  height: 22,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFF0000),
-                                    borderRadius: BorderRadius.circular(1.5),
-                                  ),
-                                ),
-                                Container(
-                                  width: 22,
-                                  height: 5,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFF0000),
-                                    borderRadius: BorderRadius.circular(1.5),
-                                  ),
-                                ),
-                              ],
-                            )
-                          : index == 1
-                              ? const Icon(
-                                  Icons.layers_outlined,
-                                  size: 24,
-                                  color: Color(0xFF8B5E3C),
-                                )
-                              : Icon(
-                                  items[index]['icon'] as IconData,
-                                  size: 24,
-                                  color: index == 2
-                                      ? const Color(0xFFFFD000)
-                                      : index == 3
-                                          ? const Color(0xFF1E3A8A)
-                                          : Colors.black87,
-                                ),
+                      child: Icon(
+                        icons[index],
+                        size: 26,
+                        color: colors[index],
+                        shadows: const [
+                          Shadow(
+                            color: Colors.white,
+                            blurRadius: 3,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-
-                  const SizedBox(height: 2),
-
-                  index == 4
-    ? const Text(
-        'LOGIN',
-        maxLines: 1,
-        overflow: TextOverflow.visible,
-        style: TextStyle(
-          fontSize: 10.4,
-          fontWeight: FontWeight.w900,
-          letterSpacing: -0.2,
-          color: Color(0xFFFF0000),
-        ),
-      )
-    : Text(
-        items[index]['label'] as String,
-        maxLines: 1,
-        overflow: TextOverflow.visible,
-        style: TextStyle(
-          fontSize: 10.4,
-          fontWeight: FontWeight.w900,
-          letterSpacing: -0.2,
-          color: index == 1
-              ? const Color(0xFF2E7D32)
-              : index == 2
-                  ? const Color(0xFFFFD000)
-                  : index == 3
-                      ? const Color(0xFF1E3A8A)
-                      : Colors.black87,
-        ),
-      ),
-                ],
+                ),
               ),
             ),
           );
@@ -2880,12 +2862,13 @@ debugPrint('SPHOTS AFFICHÉS : ${visibleSpots.length}');
 ),
 
 onTap: (_, __) {
-  if (_isFilterOpen || _isMapStyleOpen) {
+  if (_isFilterOpen || _isMapStyleOpen || _isSearchPanelOpen) {
     _searchFocusNode.unfocus();
 
     setState(() {
       _isFilterOpen = false;
       _isMapStyleOpen = false;
+      if (_isSearchPanelOpen) _closeSearchPanel();
     });
   }
 },
@@ -2901,12 +2884,13 @@ onPositionChanged: (position, hasGesture) {
   }
 
   if (hasGesture) {
-    if (_isFilterOpen || _isMapStyleOpen) {
+    if (_isFilterOpen || _isMapStyleOpen || _isSearchPanelOpen) {
       _searchFocusNode.unfocus();
 
       setState(() {
         _isFilterOpen = false;
         _isMapStyleOpen = false;
+        if (_isSearchPanelOpen) _closeSearchPanel();
       });
     }
 
@@ -3055,7 +3039,7 @@ onPositionChanged: (position, hasGesture) {
                   ),
                 ],
               ),
-              if (_selectedPublicSpotId == null)
+              if (_selectedPublicSpotId == null && _isSearchPanelOpen)
                 _buildLeftMapControls(allSpots),
 
 
