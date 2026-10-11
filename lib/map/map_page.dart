@@ -2147,6 +2147,117 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
         .toList();
   }
 
+
+  // Représentation progressive de tous les SPHOTS sur les cartes publiques.
+  // Les marqueurs détaillés et leurs mâts restent inchangés dès le zoom 16.
+  Marker _buildProgressiveSpotMarker(
+    SpotFlagState spot,
+    double zoom,
+    double rotation,
+    Set<String> automaticLabelIds,
+  ) {
+    if (zoom >= 16.0) {
+      return spot.isPosteSecours
+          ? _buildSecoursMarker(
+              spot,
+              _showTextForZoom(zoom),
+              automaticLabelIds.contains(spot.id),
+              zoom,
+              rotation,
+            )
+          : _buildOtherSpotMarker(
+              spot,
+              _showTextForZoom(zoom),
+              automaticLabelIds.contains(spot.id),
+              zoom,
+              rotation,
+            );
+    }
+
+    // A l'échelle mondiale ou régionale, même un SPHOT isolé est
+    // représenté par une pastille sobre (1), jamais par un grand mât.
+    if (zoom < 12.0) {
+      return Marker(
+        point: LatLng(spot.lat, spot.lng),
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _mapController.move(
+            LatLng(spot.lat, spot.lng),
+            zoom < 7.0 ? 7.0 : 12.0,
+          ),
+          child: Tooltip(
+            message: spot.mapDisplayName,
+            child: Transform.rotate(
+              angle: -rotation * pi / 180,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E3A8A),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFFF28C28),
+                    width: 2,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Text(
+                    '1',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Du zoom 12 au zoom 15 : pictogrammes compacts.
+    // Pour les postes de secours, plus aucun mât à cette échelle.
+    final iconPath = spot.isPosteSecours
+        ? 'data/icons/fire_red_icon.svg'
+        : _getMarkerIconPath(spot);
+    final iconSize = spot.isPosteSecours ? 42.0 : 38.0;
+
+    return Marker(
+      point: LatLng(spot.lat, spot.lng),
+      width: 44,
+      height: 44,
+      alignment: Alignment.center,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => unawaited(_openPublicSpotDetail(spot)),
+        child: Tooltip(
+          message: spot.mapDisplayName,
+          child: Transform.rotate(
+            angle: -rotation * pi / 180,
+            child: AdaptiveAssetImage(
+              iconPath,
+              width: iconSize,
+              height: iconSize,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDrawer() {
   return Drawer(
     backgroundColor: Colors.transparent,
@@ -2311,48 +2422,46 @@ String _clusterIconPath(Color color) {
 }
 
   Widget _buildCluster(BuildContext context, List<Marker> markers) {
-  final clusterColor = _clusterBorderColor(markers);
-  final iconPath = _clusterIconPath(clusterColor);
-  final count = markers.length.toString();
-  final rotation = MapCamera.of(context).rotation;
+    final count = markers.length;
+    final rotation = MapCamera.of(context).rotation;
+    final diameter = count >= 100 ? 52.0 : count >= 10 ? 46.0 : 40.0;
 
-  return Transform.rotate(
-    angle: -rotation * pi / 180,
-    child: SizedBox(
-      width: 54,
-      height: 54,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          AdaptiveAssetImage(
-
-            iconPath,
-            width: 54,
-            height: 54,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
+    return Transform.rotate(
+      angle: -rotation * pi / 180,
+      child: Center(
+        child: Container(
+          width: diameter,
+          height: diameter,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E3A8A),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFFF28C28),
+              width: 2.2,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 5,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
-          Text(
-            count,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: count.length >= 3 ? 13 : 16,
-              fontWeight: FontWeight.w900,
-              color: Colors.black87,
-shadows: const [
-  Shadow(
-    color: Colors.white70,
-    offset: Offset(0.5, 0.5),
-    blurRadius: 1,
-  ),
-],
+          child: Center(
+            child: Text(
+              count.toString(),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: count >= 100 ? 13 : count >= 10 ? 15 : 16,
+              ),
             ),
           ),
-        ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
+
 
 Widget _buildAdBanner() {
   final screenWidth = MediaQuery.sizeOf(context).width;
@@ -2810,47 +2919,49 @@ onPositionChanged: (position, hasGesture) {
                         );
                       },
                     ),
+                  // Une seule couche regroupe tous les types de SPHOTS,
+                  // y compris les postes de secours. Aucun double comptage.
                   Builder(
                     builder: (context) {
                       final zoom = MapCamera.of(context).zoom;
                       final rotation = MapCamera.of(context).rotation;
-                      final otherSpots = visibleSpots
-                          .where((spot) => !spot.isPosteSecours)
-                          .toList();
                       final automaticLabelIds =
                           _automaticLabelIds(visibleSpots, zoom);
-                      final markers = _buildMarkers(
-                        otherSpots,
-                        automaticLabelIds,
-                        zoom,
-                        rotation,
-                      );
+                      final markers = visibleSpots
+                          .where((spot) =>
+                              spot.lat.isFinite && spot.lng.isFinite)
+                          .map((spot) => _buildProgressiveSpotMarker(
+                                spot,
+                                zoom,
+                                rotation,
+                                automaticLabelIds,
+                              ))
+                          .toList();
 
                       return MarkerClusterLayerWidget(
                         options: MarkerClusterLayerOptions(
                           markers: markers,
                           size: const Size(54, 54),
-                          maxClusterRadius: 45,
-                          disableClusteringAtZoom: 16,
+                          alignment: Alignment.center,
+                          maxZoom: 19.0,
+                          // Monde, régions, littoral, puis uniquement
+                          // les vrais chevauchements en zoom détaillé.
+                          maxClusterRadius: zoom < 7.0
+                              ? 92
+                              : zoom < 12.0
+                                  ? 64
+                                  : zoom < 16.0
+                                      ? 42
+                                      : 2,
+                          // Jusqu'au zoom maximal, les points exactement
+                          // superposés restent accessibles par déploiement.
+                          disableClusteringAtZoom: 20,
+                          zoomToBoundsOnClick: true,
+                          centerMarkerOnClick: false,
+                          spiderfyCluster: true,
+                          showPolygon: false,
+                          markerChildBehavior: true,
                           builder: _buildCluster,
-                        ),
-                      );
-                    },
-                  ),
-                  Builder(
-                    builder: (context) {
-                      final zoom = MapCamera.of(context).zoom;
-                      final rotation = MapCamera.of(context).rotation;
-
-                      final automaticLabelIds =
-                          _automaticLabelIds(visibleSpots, zoom);
-
-                      return MarkerLayer(
-                        markers: _buildSecoursMarkers(
-                          visibleSpots,
-                          automaticLabelIds,
-                          zoom,
-                          rotation,
                         ),
                       );
                     },
