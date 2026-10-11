@@ -2147,6 +2147,165 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
         .toList();
   }
 
+
+  // Conserve l'identité du SPHOT dans chaque marqueur pour calculer
+  // la couleur du fire icon MAJORITAIRE dans les regroupements.
+  Marker _tagSpotMarker(SpotFlagState spot, Marker marker) {
+    return Marker(
+      point: marker.point,
+      width: marker.width,
+      height: marker.height,
+      alignment: marker.alignment,
+      child: _SphotClusterMember(
+        spot: spot,
+        child: marker.child,
+      ),
+    );
+  }
+
+  // Affichage progressif commun aux cartes Web et Android.
+  // Les mâts validés sont toujours utilisés pour un poste de secours
+  // isolé dès le niveau local (zoom >= 12).
+  // A partir de 16, tous les marqueurs reprennent le rendu historique.
+  Marker _buildProgressiveSpotMarker(
+    SpotFlagState spot,
+    double zoom,
+    double rotation,
+    Set<String> automaticLabelIds,
+  ) {
+    if (spot.isPosteSecours && zoom >= 12.0) {
+      return _tagSpotMarker(
+        spot,
+        _buildSecoursMarker(
+          spot,
+          _showTextForZoom(zoom),
+          automaticLabelIds.contains(spot.id),
+          zoom,
+          rotation,
+        ),
+      );
+    }
+
+    if (zoom >= 16.0) {
+      return _tagSpotMarker(
+        spot,
+        _buildOtherSpotMarker(
+          spot,
+          _showTextForZoom(zoom),
+          automaticLabelIds.contains(spot.id),
+          zoom,
+          rotation,
+        ),
+      );
+    }
+
+    if (zoom < 12.0) {
+      // Une occurrence isolée sur la carte mondiale est également un
+      // fire icon de sa propre catégorie (avec le chiffre 1).
+      return _tagSpotMarker(
+        spot,
+        Marker(
+          point: LatLng(spot.lat, spot.lng),
+          width: 46,
+          height: 54,
+          alignment: Alignment.center,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _mapController.move(
+              LatLng(spot.lat, spot.lng),
+              zoom < 7.0 ? 7.0 : 12.0,
+            ),
+            child: Tooltip(
+              message: spot.mapDisplayName,
+              child: _buildFireCountIcon(
+                iconPath: spot.markerIconPath,
+                count: 1,
+                rotation: rotation,
+                size: 46.0,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Zoom 12 à 15 : autres SPHOTS compacts, postes de secours avec
+    // leurs mâts hissés / affalés de référence.
+    return _tagSpotMarker(
+      spot,
+      Marker(
+        point: LatLng(spot.lat, spot.lng),
+        width: 44,
+        height: 44,
+        alignment: Alignment.center,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => unawaited(_openPublicSpotDetail(spot)),
+          child: Tooltip(
+            message: spot.mapDisplayName,
+            child: Transform.rotate(
+              angle: -rotation * pi / 180,
+              child: AdaptiveAssetImage(
+                _getMarkerIconPath(spot),
+                width: 38,
+                height: 38,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // L'icône de regroupement reste de la charte SPHOT, quelle que soit
+  // la taille du groupe ; le chiffre est placé dans le centre du pictogramme.
+  Widget _buildFireCountIcon({
+    required String iconPath,
+    required int count,
+    required double rotation,
+    required double size,
+  }) {
+    final countText = count.toString();
+    return Transform.rotate(
+      angle: -rotation * pi / 180,
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            AdaptiveAssetImage(
+              iconPath,
+              width: size,
+              height: size,
+              fit: BoxFit.contain,
+            ),
+            Text(
+              countText,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: const Color(0xFFFF0000),
+                fontWeight: FontWeight.w900,
+                fontSize: countText.length >= 4
+                    ? 10
+                    : countText.length == 3
+                        ? 12
+                        : 15,
+                shadows: const [
+                  Shadow(
+                    color: Colors.white,
+                    blurRadius: 2,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDrawer() {
   return Drawer(
     backgroundColor: Colors.transparent,
@@ -2311,48 +2470,43 @@ String _clusterIconPath(Color color) {
 }
 
   Widget _buildCluster(BuildContext context, List<Marker> markers) {
-  final clusterColor = _clusterBorderColor(markers);
-  final iconPath = _clusterIconPath(clusterColor);
-  final count = markers.length.toString();
-  final rotation = MapCamera.of(context).rotation;
+    // Chaque marqueur porte le SPHOT qui lui correspond, même lorsqu'il
+    // s'agit d'un poste de secours. On compte les catégories réelles.
+    final frequencies = <String, int>{};
+    for (final marker in markers) {
+      final tagged = marker.child;
+      if (tagged is! _SphotClusterMember) continue;
+      final path = tagged.spot.markerIconPath;
+      frequencies.update(
+        path,
+        (value) => value + 1,
+        ifAbsent: () => 1,
+      );
+    }
 
-  return Transform.rotate(
-    angle: -rotation * pi / 180,
-    child: SizedBox(
-      width: 54,
-      height: 54,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          AdaptiveAssetImage(
+    // Priorité à la catégorie la plus représentée. En cas d'égalité,
+    // ordre alphabétique stable : le rendu ne dépend pas de Firestore.
+    final ordered = frequencies.entries.toList()
+      ..sort((a, b) {
+        final byCount = b.value.compareTo(a.value);
+        return byCount != 0 ? byCount : a.key.compareTo(b.key);
+      });
+    final majorityIcon = ordered.isEmpty
+        ? 'data/icons/fire_orange1_icon.svg'
+        : ordered.first.key;
 
-            iconPath,
-            width: 54,
-            height: 54,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-          ),
-          Text(
-            count,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: count.length >= 3 ? 13 : 16,
-              fontWeight: FontWeight.w900,
-              color: Colors.black87,
-shadows: const [
-  Shadow(
-    color: Colors.white70,
-    offset: Offset(0.5, 0.5),
-    blurRadius: 1,
-  ),
-],
-            ),
-          ),
-        ],
+    final count = markers.length;
+    final rotation = MapCamera.of(context).rotation;
+
+    return Center(
+      child: _buildFireCountIcon(
+        iconPath: majorityIcon,
+        count: count,
+        rotation: rotation,
+        size: 54.0,
       ),
-    ),
-  );
-}
+    );
+  }
 
 Widget _buildAdBanner() {
   final screenWidth = MediaQuery.sizeOf(context).width;
@@ -2796,62 +2950,106 @@ onPositionChanged: (position, hasGesture) {
                         );
                       },
                     ),
-                  if (_selectedPublicSpotId == null)
-                    Builder(
-                      builder: (context) {
-                        final zoom = MapCamera.of(context).zoom;
-                        final rotation = MapCamera.of(context).rotation;
-                        return MarkerLayer(
-                          markers: _buildPublicAdvertisingMarkers(
-                            publicAdvertisers,
-                            zoom,
-                            rotation,
-                          ),
-                        );
-                      },
-                    ),
+                  // Monde / régions : tous les SPHOTS sont regroupés.
+                  // Dès le zoom 12, les mâts surveillés sont indépendants
+                  // et dessinés AU-DESSUS des fire icons des autres SPHOTS.
                   Builder(
                     builder: (context) {
                       final zoom = MapCamera.of(context).zoom;
                       final rotation = MapCamera.of(context).rotation;
-                      final otherSpots = visibleSpots
-                          .where((spot) => !spot.isPosteSecours)
-                          .toList();
                       final automaticLabelIds =
                           _automaticLabelIds(visibleSpots, zoom);
-                      final markers = _buildMarkers(
-                        otherSpots,
-                        automaticLabelIds,
-                        zoom,
-                        rotation,
-                      );
+
+                      final eligibleSpots = visibleSpots
+                          .where((spot) =>
+                              spot.lat.isFinite && spot.lng.isFinite)
+                          .toList();
+
+                      final rescueSpots = zoom >= 12.0
+                          ? eligibleSpots
+                              .where((spot) => spot.isPosteSecours)
+                              .toList()
+                          : <SpotFlagState>[];
+
+                      final toCluster = eligibleSpots.where((spot) {
+                        // A faible zoom, même les mâts entrent dans les
+                        // groupes : aucun grand drapeau ne couvre la carte.
+                        if (zoom < 12.0) return true;
+                        if (spot.isPosteSecours) return false;
+
+                        // A zoom >= 16, tous les lieux redeviennent visibles.
+                        if (zoom >= 16.0 || rescueSpots.isEmpty) {
+                          return true;
+                        }
+
+                        // Tant qu'ils chevaucheraient visuellement un mât,
+                        // les fire icons voisins attendent. Ils apparaissent
+                        // naturellement quand la distance en pixels grandit
+                        // à mesure que l'utilisateur zoome.
+                        final point = _mercatorPixelPoint(spot, zoom);
+                        for (final rescue in rescueSpots) {
+                          final rescuePoint =
+                              _mercatorPixelPoint(rescue, zoom);
+                          if ((point.dx - rescuePoint.dx).abs() < 90.0 &&
+                              (point.dy - rescuePoint.dy).abs() < 110.0) {
+                            return false;
+                          }
+                        }
+                        return true;
+                      }).toList();
+
+                      final markers = toCluster
+                          .map((spot) => _buildProgressiveSpotMarker(
+                                spot,
+                                zoom,
+                                rotation,
+                                automaticLabelIds,
+                              ))
+                          .toList();
 
                       return MarkerClusterLayerWidget(
                         options: MarkerClusterLayerOptions(
                           markers: markers,
                           size: const Size(54, 54),
-                          maxClusterRadius: 45,
+                          alignment: Alignment.center,
+                          maxZoom: 19.0,
+                          maxClusterRadius: zoom < 7.0
+                              ? 92
+                              : zoom < 12.0
+                                  ? 64
+                                  : zoom < 16.0
+                                      ? 42
+                                      : 2,
                           disableClusteringAtZoom: 16,
+                          zoomToBoundsOnClick: true,
+                          centerMarkerOnClick: false,
+                          spiderfyCluster: true,
+                          showPolygon: false,
+                          markerChildBehavior: true,
                           builder: _buildCluster,
                         ),
                       );
                     },
                   ),
+
+                  // Dessinés en dernier, les mâts restent prioritaires sur
+                  // TOUS les autres marqueurs, à partir de leur zoom actuel.
                   Builder(
                     builder: (context) {
                       final zoom = MapCamera.of(context).zoom;
                       final rotation = MapCamera.of(context).rotation;
-
                       final automaticLabelIds =
                           _automaticLabelIds(visibleSpots, zoom);
 
                       return MarkerLayer(
-                        markers: _buildSecoursMarkers(
-                          visibleSpots,
-                          automaticLabelIds,
-                          zoom,
-                          rotation,
-                        ),
+                        markers: zoom < 12.0
+                            ? const <Marker>[]
+                            : _buildSecoursMarkers(
+                                visibleSpots,
+                                automaticLabelIds,
+                                zoom,
+                                rotation,
+                              ),
                       );
                     },
                   ),
@@ -2884,6 +3082,21 @@ if (!(kIsWeb &&
       ),
     );
   }
+}
+
+// Métadonnées invisibles permettant au clustering de déterminer la catégorie
+// majoritaire, sans changer l'affichage ni le comportement des marqueurs.
+class _SphotClusterMember extends StatelessWidget {
+  final SpotFlagState spot;
+  final Widget child;
+
+  const _SphotClusterMember({
+    required this.spot,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) => child;
 }
 
 class _ColoredSphotsText extends StatelessWidget {
