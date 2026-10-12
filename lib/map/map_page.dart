@@ -250,7 +250,7 @@ Future<void> _toggleFavoritesFilter() async {
     SpotFlagState spot,
     double screenWidth,
   ) {
-    const lineSpacing = 3.0;
+    const lineSpacing = _mapInfoLineGap;
 
     if (spot.isPosteSecours) {
       final labelWidth = min(420.0, max(180.0, screenWidth - 24));
@@ -497,7 +497,7 @@ Future<void> _toggleFavoritesFilter() async {
       final selected = spot.id == _selectedPublicSpotId;
       final maxLabelWidth = min(
         screenWidth - 24.0,
-        selected ? (isRescue ? 420.0 : 380.0) : (isRescue ? 320.0 : 300.0),
+        isRescue ? 420.0 : 380.0,
       );
 
       double actualWidth = 0;
@@ -524,12 +524,13 @@ Future<void> _toggleFavoritesFilter() async {
           textWidthBasis: TextWidthBasis.longestLine,
         )..layout(maxWidth: max(50.0, maxLabelWidth - leadingIconWidth));
 
-        if (hasLine) actualHeight += 2.0;
+        if (hasLine) actualHeight += _mapInfoLineGap;
         actualWidth = max(
           actualWidth,
           painter.width + leadingIconWidth,
         );
-        actualHeight += max(painter.height, leadingIconHeight);
+        actualHeight +=
+            max(_mapWarningIconSize, max(painter.height, leadingIconHeight));
         hasLine = true;
         painter.dispose();
       }
@@ -542,11 +543,11 @@ Future<void> _toggleFavoritesFilter() async {
       if (isRescue) {
         addLine(
           'POSTE DE SECOURS',
-          selected ? 14.0 : 12.0,
+          _mapTypeFontSize,
           leadingIconWidth: 16.0,
           leadingIconHeight: 14.0,
         );
-        final iconSize = selected ? 24.0 : 19.0;
+        const iconSize = _mapWarningIconSize;
         if (spot.hasValidFlag) {
           addLine(
             spot.displayStatut.replaceAll('⚠️ ', ''),
@@ -569,8 +570,8 @@ Future<void> _toggleFavoritesFilter() async {
           }
         }
       } else {
-        addLine(spot.typeSphot.toUpperCase(), selected ? 14.0 : 12.0);
-        final iconSize = selected ? 24.0 : 19.0;
+        addLine(spot.typeSphot.toUpperCase(), _mapTypeFontSize);
+        const iconSize = _mapWarningIconSize;
         addLine(
           'BAIGNADE NON SURVEILLÉE',
           iconSize * 0.55,
@@ -3557,6 +3558,16 @@ const double _mapCityFontSize = 12.0;
 const double _mapTypeFontSize = 12.0;
 const double _mapWarningIconSize = 22.0;
 
+// Une même hauteur minimale pour les lignes de texte et les alertes évite
+// les décalages optiques entre les lignes avec ou sans pictogramme.
+// Les textes longs conservent la liberté de se répartir sur plusieurs lignes.
+Widget _mapUniformInfoLine(Widget child) {
+  return ConstrainedBox(
+    constraints: const BoxConstraints(minHeight: _mapWarningIconSize),
+    child: Center(child: child),
+  );
+}
+
 class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
   bool isHovering = false;
 
@@ -3604,7 +3615,7 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
+                        _mapUniformInfoLine(Text(
                           spot.mapDisplayName,
                           textAlign: TextAlign.center,
                           softWrap: true,
@@ -3613,10 +3624,10 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                             fontWeight: FontWeight.w800,
                             color: Colors.black,
                           ),
-                        ),
+                        )),
                         if (spot.ville.trim().isNotEmpty) ...[
                           const SizedBox(height: _mapInfoLineGap),
-                          Text(
+                          _mapUniformInfoLine(Text(
                             spot.ville.toUpperCase(),
                             textAlign: TextAlign.center,
                             softWrap: true,
@@ -3625,11 +3636,11 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                               fontWeight: FontWeight.w800,
                               color: const Color(0xFF1E3A8A),
                             ),
-                          ),
+                          )),
                         ],
                         if (widget.zoom >= 16.0) ...[
                           const SizedBox(height: _mapInfoLineGap),
-                          Text(
+                          _mapUniformInfoLine(Text(
                             spot.typeSphot.toUpperCase(),
                             textAlign: TextAlign.center,
                             style: _mapLabelStyle(
@@ -3639,17 +3650,17 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                               useBlackOutline:
                                   spot.normalizedType.contains('ACCES PLAGE'),
                             ),
-                          ),
+                          )),
                           const SizedBox(height: _mapInfoLineGap),
-                          _warningLineUniform(
+                          _mapUniformInfoLine(_warningLineUniform(
                             'BAIGNADE NON SURVEILLÉE',
                             _mapWarningIconSize,
-                          ),
+                          )),
                           const SizedBox(height: _mapInfoLineGap),
-                          _warningLineUniform(
+                          _mapUniformInfoLine(_warningLineUniform(
                             'BAIGNADE À VOS RISQUES ET PÉRILS',
                             _mapWarningIconSize,
-                          ),
+                          )),
                         ],
                       ],
                     ),
@@ -3670,7 +3681,7 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
+                          _mapUniformInfoLine(Text(
                             spot.mapDisplayName,
                             textAlign: TextAlign.center,
                             style: _mapLabelStyle(
@@ -3678,10 +3689,10 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                               fontWeight: FontWeight.w800,
                               color: Colors.black,
                             ),
-                          ),
+                          )),
                           if (spot.ville.trim().isNotEmpty) ...[
                             const SizedBox(height: _mapInfoLineGap),
-                            Text(
+                            _mapUniformInfoLine(Text(
                               spot.ville.toUpperCase(),
                               textAlign: TextAlign.center,
                               style: _mapLabelStyle(
@@ -3689,10 +3700,10 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                                 fontWeight: FontWeight.w800,
                                 color: const Color(0xFF1E3A8A),
                               ),
-                            ),
+                            )),
                           ],
                           const SizedBox(height: _mapInfoLineGap),
-                          Text(
+                          _mapUniformInfoLine(Text(
                             spot.typeSphot.toUpperCase(),
                             textAlign: TextAlign.center,
                             style: _mapLabelStyle(
@@ -3702,17 +3713,17 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                               useBlackOutline:
                                   spot.normalizedType.contains('ACCES PLAGE'),
                             ),
-                          ),
+                          )),
                           const SizedBox(height: _mapInfoLineGap),
-                          _warningLineUniform(
+                          _mapUniformInfoLine(_warningLineUniform(
                             'BAIGNADE NON SURVEILLÉE',
                             _mapWarningIconSize,
-                          ),
+                          )),
                           const SizedBox(height: _mapInfoLineGap),
-                          _warningLineUniform(
+                          _mapUniformInfoLine(_warningLineUniform(
                             'BAIGNADE À VOS RISQUES ET PÉRILS',
                             _mapWarningIconSize,
-                          ),
+                          )),
                         ],
                       ),
                     ),
@@ -3796,7 +3807,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
+                          _mapUniformInfoLine(Text(
                             spot.mapDisplayName,
                             textAlign: TextAlign.center,
                             softWrap: true,
@@ -3805,10 +3816,10 @@ class _HoverMarkerState extends State<_HoverMarker> {
                               fontWeight: FontWeight.bold,
                               color: const Color(0xFFFF0000),
                             ),
-                          ),
+                          )),
                           if (spot.ville.trim().isNotEmpty) ...[
                             const SizedBox(height: _mapInfoLineGap),
-                            Text(
+                            _mapUniformInfoLine(Text(
                               spot.ville.toUpperCase(),
                               textAlign: TextAlign.center,
                               softWrap: true,
@@ -3817,7 +3828,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                                 fontWeight: FontWeight.w800,
                                 color: const Color(0xFF1E3A8A),
                               ),
-                            ),
+                            )),
                           ],
                           if (widget.zoom >= 16.0) ...[
                             const SizedBox(height: _mapInfoLineGap),
@@ -3831,21 +3842,21 @@ class _HoverMarkerState extends State<_HoverMarker> {
                                   fit: BoxFit.contain,
                                 ),
                                 const SizedBox(width: 4),
-                                Text(
+                                _mapUniformInfoLine(Text(
                                   'POSTE DE SECOURS',
                                   style: _mapLabelStyle(
                                     fontSize: _mapTypeFontSize,
                                     fontWeight: FontWeight.w900,
                                     color: const Color(0xFFFF0000),
                                   ),
-                                ),
+                                )),
                               ],
                             ),
                             const SizedBox(height: _mapInfoLineGap),
-                            _rescueStatusUnderMarker(
+                            _mapUniformInfoLine(_rescueStatusUnderMarker(
                               spot,
                               _mapWarningIconSize,
-                            ),
+                            )),
                           ],
                         ],
                       ),
@@ -3866,7 +3877,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
+                          _mapUniformInfoLine(Text(
                             spot.mapDisplayName,
                             textAlign: TextAlign.center,
                             style: _mapLabelStyle(
@@ -3874,10 +3885,10 @@ class _HoverMarkerState extends State<_HoverMarker> {
                               fontWeight: FontWeight.bold,
                               color: const Color(0xFFFF0000),
                             ),
-                          ),
+                          )),
                           if (spot.ville.trim().isNotEmpty) ...[
                             const SizedBox(height: _mapInfoLineGap),
-                            Text(
+                            _mapUniformInfoLine(Text(
                               spot.ville.toUpperCase(),
                               textAlign: TextAlign.center,
                               style: _mapLabelStyle(
@@ -3885,7 +3896,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                                 fontWeight: FontWeight.w800,
                                 color: const Color(0xFF1E3A8A),
                               ),
-                            ),
+                            )),
                           ],
 
                           const SizedBox(height: _mapInfoLineGap),
@@ -3900,23 +3911,23 @@ class _HoverMarkerState extends State<_HoverMarker> {
                                 fit: BoxFit.contain,
                               ),
                               const SizedBox(width: 4),
-                              Text(
+                              _mapUniformInfoLine(Text(
                                 'POSTE DE SECOURS',
                                 style: _mapLabelStyle(
                                   fontSize: _mapTypeFontSize,
                                   fontWeight: FontWeight.w900,
                                   color: const Color(0xFFFF0000),
                                 ),
-                              ),
+                              )),
                             ],
                           ),
 
                           const SizedBox(height: _mapInfoLineGap),
 
-                          _rescueStatusUnderMarker(
+                          _mapUniformInfoLine(_rescueStatusUnderMarker(
                             spot,
                             _mapWarningIconSize,
-                          ),
+                          )),
                         ],
                       ),
                     ),
