@@ -92,7 +92,7 @@ class _FlagMarkerState extends State<FlagMarker>
   // Hauteurs réservées aux cartes Web et mobile (pixels Flutter).
   // Le pied des mâts reste ancré quel que soit le nombre de signaux.
   // La combinaison drapeau principal + violet + manche à air utilise
-  // un mât raccourci de 18 px (hauteur réellement peinte d'un drapeau).
+  // un mât raccourci au total de 36 px (deux fois 18 px).
   // Avec UN drapeau : trois hauteurs de drapeau REELLEMENT PEINT
   // (3 x 18 px), separees par deux espaces visibles (2 x 6 px) : 66 px.
   // Ce n'est pas la taille du CustomPaint (30 px), qui inclut 6 px
@@ -100,7 +100,7 @@ class _FlagMarkerState extends State<FlagMarker>
   static const double _mapPoleHeightNoSignal = 55.0;
   static const double _mapPoleHeightMainPurple = 103.0;
   static const double _mapPoleHeightMainWindsock = 99.5;
-  static const double _mapPoleHeightThree = 141.5;
+  static const double _mapPoleHeightThree = 123.5;
   static const double _mapPoleHeightOneSignal = 66.0;
 
   static const double poleWidth = 4;
@@ -163,7 +163,7 @@ class _FlagMarkerState extends State<FlagMarker>
 
     // Sur carte uniquement : un seul drapeau = trois hauteurs visibles
     // de drapeau (18 px) + deux espacements visibles (6 px).
-    // Seule la hauteur du mât à 3 signaux a été réduite de 18 px.
+    // Seule la hauteur du mât à 3 signaux est raccourcie (123,5 px).
     // Le widget reste fixe (ancrage géographique) ; le mât et le signal
     // hissé peuvent dépasser en haut du Stack (clip.none).
     final mapPoleHeight = visibleSignalCount >= 3
@@ -238,12 +238,17 @@ class _FlagMarkerState extends State<FlagMarker>
     final purpleFlagTop = mainFlagTop + flagStep;
 
     // La manche à air reste attachée directement au mât.
-    // Sur les cartes Web et mobile uniquement : taille 30 x 15 px,
-    // centre remonté de 6 px (un espacement entre deux drapeaux).
-    // Les fiches LIVE et les vues sauveteur conservent 23 x 11 px
-    // et leur position historique.
-    final windsockHeight = widget.mapMarker ? 15.0 : 11.0;
-    final windsockRise = widget.mapMarker ? flagGap : 0.0;
+    // Cartes Web et mobile : taille 30 x 15 px, centre remonté de 6 px.
+    // Actions rapides uniquement : taille 26 x 13 px, centre remonté
+    // de 6 px, quel que soit le nombre de drapeaux et leur position.
+    // Tous les autres profils conservent 23 x 11 px et la position initiale.
+    final windsockHeight = widget.mapMarker
+        ? 15.0
+        : widget.sauveteurPreview
+            ? 13.0
+            : 11.0;
+    final windsockRise =
+        (widget.mapMarker || widget.sauveteurPreview) ? flagGap : 0.0;
     final windsockTop =
         purpleFlagTop + flagHeight / 2 - windsockHeight / 2 +
             (hasTripleSignal ? tripleSignalWindsockDrop : 0.0) -
@@ -317,7 +322,11 @@ class _FlagMarkerState extends State<FlagMarker>
                     alignment: Alignment.centerLeft,
                     angle: sin(_controller.value * 2 * pi) * 0.04,
                     child: WindsockGlyph(
-                      width: widget.mapMarker ? 30.0 : 23.0,
+                      width: widget.mapMarker
+                          ? 30.0
+                          : widget.sauveteurPreview
+                              ? 26.0
+                              : 23.0,
                       height: windsockHeight,
                     ),
                   );
