@@ -4009,10 +4009,47 @@ Widget _rescueStatusUnderMarker(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (spot.flagColor != FlagColor.green) ...[
-          Icon(
-            Icons.warning_amber_rounded,
-            size: size,
-            color: statusColor,
+          // Même halo blanc que les autres avertissements de la carte.
+          Stack(
+            children: [
+              Transform.translate(
+                offset: const Offset(1, 0),
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  size: size,
+                  color: Colors.white,
+                ),
+              ),
+              Transform.translate(
+                offset: const Offset(-1, 0),
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  size: size,
+                  color: Colors.white,
+                ),
+              ),
+              Transform.translate(
+                offset: const Offset(0, 1),
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  size: size,
+                  color: Colors.white,
+                ),
+              ),
+              Transform.translate(
+                offset: const Offset(0, -1),
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  size: size,
+                  color: Colors.white,
+                ),
+              ),
+              Icon(
+                Icons.warning_amber_rounded,
+                size: size,
+                color: statusColor,
+              ),
+            ],
           ),
           const SizedBox(width: 2),
         ],
