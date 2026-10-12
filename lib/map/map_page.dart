@@ -78,6 +78,12 @@ class _MapPageState extends State<MapPage> {
   int _mapTileRefreshVersion = 0;
   int _selectedBottomIndex = 1;
   String? _selectedPublicSpotId;
+  // Le volet public natif est affiché dans la Stack de la carte, sans
+  // barrière modale : les zones dégagées restent manipulables.
+  SpotFlagState? _mobileDetailSpot;
+  final ValueNotifier<double> _mobileDetailHeightFraction =
+      ValueNotifier<double>(1.0);
+  static const double _mobileDetailMinHeightFraction = 0.20;
   String? _hoveredRescueSpotId;
   static const double _desktopSelectedAdBottom = 6.0;
   static const double _desktopSelectedAdHeight = 142.0;
@@ -1331,7 +1337,12 @@ SpotFlagState? _findBestSpotMatch(
 
     setState(() {
       _selectedPublicSpotId = spot.id;
+      if (!kIsWeb) _mobileDetailSpot = spot;
     });
+    if (!kIsWeb) {
+      // Chaque nouveau SPHOT ouvre initialement son volet en totalité.
+      _mobileDetailHeightFraction.value = 1.0;
+    }
 
     const selectedSpotZoom = 17.2;
     final screenSize = MediaQuery.sizeOf(context);
@@ -1361,6 +1372,12 @@ SpotFlagState? _findBestSpotMatch(
         },
       ),
     );
+
+    // Sur Android/iOS, l'affichage du volet est assuré par la Stack de
+    // la carte. showModalBottomSheet resterait bloquant pour les gestes
+    // sur la carte lorsque le volet est partiellement replié.
+    // Le comportement existant du Web étroit reste inchangé.
+    if (!kIsWeb) return;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -1403,6 +1420,60 @@ SpotFlagState? _findBestSpotMatch(
         );
       });
     }
+  }
+
+  void _closeMobileSpotDetail() {
+    final closingSpot = _mobileDetailSpot;
+    if (closingSpot == null) return;
+
+    setState(() {
+      _mobileDetailSpot = null;
+      if (_selectedPublicSpotId == closingSpot.id) {
+        _selectedPublicSpotId = null;
+      }
+      _mapTileRefreshVersion++;
+    });
+    unawaited(_loadFavoriteSpotIds());
+  }
+
+  Widget _buildMobileSpotPanel() {
+    final spot = _mobileDetailSpot;
+    if (spot == null) return const SizedBox.shrink();
+
+    final padding = MediaQuery.paddingOf(context);
+    final size = MediaQuery.sizeOf(context);
+    final availableHeight = max(
+      1.0,
+      size.height - padding.top - padding.bottom,
+    );
+
+    // Seule la surface réellement occupée par le volet capte les gestes.
+    // Le reste de la Stack laisse la carte recevoir déplacements et zooms.
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: padding.bottom,
+      child: ValueListenableBuilder<double>(
+        valueListenable: _mobileDetailHeightFraction,
+        child: PublicSpotMobileSheet(
+          key: ValueKey('mobile_detail_${spot.id}'),
+          spot: spot,
+          onClose: _closeMobileSpotDetail,
+          onResize: (verticalDelta) {
+            final nextFraction = (_mobileDetailHeightFraction.value -
+                    verticalDelta / availableHeight)
+                .clamp(_mobileDetailMinHeightFraction, 1.0)
+                .toDouble();
+            _mobileDetailHeightFraction.value = nextFraction;
+          },
+        ),
+        builder: (context, fraction, child) => SizedBox(
+          width: double.infinity,
+          height: availableHeight * fraction,
+          child: child,
+        ),
+      ),
+    );
   }
 
   void _resetNorth() {
@@ -2788,6 +2859,7 @@ void dispose() {
   _searchTimer?.cancel();
   _searchController.dispose();
   _searchFocusNode.dispose();
+  _mobileDetailHeightFraction.dispose();
   super.dispose();
 }
 
@@ -2821,7 +2893,9 @@ final spots = allSpots
     .toList();
 
 final selectedSpotId = _selectedPublicSpotId;
-final visibleSpots = selectedSpotId == null
+// En mobile, conserver les autres marqueurs pour permettre de choisir un
+// nouveau SPHOT directement sur la portion de carte restée visible.
+final visibleSpots = selectedSpotId == null || _mobileDetailSpot != null
     ? spots
     : spots.where((spot) => spot.id == selectedSpotId).toList();
 
@@ -3061,6 +3135,8 @@ if (!(kIsWeb &&
     MediaQuery.sizeOf(context).width >= 900 &&
     _selectedPublicSpotId != null))
   _buildBottomBar(),
+if (!kIsWeb && _mobileDetailSpot != null)
+  _buildMobileSpotPanel(),
                 ],
               );
             },
