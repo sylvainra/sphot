@@ -982,13 +982,15 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         return Material(
           color: Colors.transparent,
           child: Container(
+            // Arrondi uniforme du volet mobile, y compris avec du contenu
+            // défilant : conserver l'ombre extérieure du Container.
+            clipBehavior:
+                widget.desktopMode ? Clip.none : Clip.antiAlias,
             decoration: BoxDecoration(
               color: _sphotWarmSurface,
               borderRadius: widget.desktopMode
                   ? BorderRadius.circular(18)
-                  : const BorderRadius.vertical(
-                      top: Radius.circular(24),
-                    ),
+                  : BorderRadius.circular(24),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x26000000),
