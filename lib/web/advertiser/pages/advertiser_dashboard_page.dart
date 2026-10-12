@@ -445,7 +445,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
       color: Colors.white,
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
           child: Column(
             children: [
               const Text(
@@ -457,7 +457,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               const Text(
                 'Configurez votre demande de SPHOT PUBLICITAIRE en suivant les étapes ci-dessous.',
                 textAlign: TextAlign.center,
@@ -467,18 +467,45 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
+              // Toutes les étapes restent visibles, sans défilement du menu.
               Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.only(top: 10),
-                  itemCount: _sections.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) => _SidebarButton(
-                    number: index + 1,
-                    label: _sections[index].label,
-                    selected: index == _selectedIndex,
-                    onTap: () => _selectSection(index),
-                  ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final count = _sections.length;
+                    if (count == 0) return const SizedBox.shrink();
+
+                    const desiredButtonHeight = 68.0;
+                    const desiredSpacing = 10.0;
+                    const maxSpacing = 12.0;
+
+                    final buttonHeight = ((constraints.maxHeight -
+                                desiredSpacing * (count - 1)) /
+                            count)
+                        .clamp(0.0, desiredButtonHeight)
+                        .toDouble();
+                    final spacing = count > 1
+                        ? ((constraints.maxHeight - buttonHeight * count) /
+                                (count - 1))
+                            .clamp(0.0, maxSpacing)
+                            .toDouble()
+                        : 0.0;
+
+                    return Column(
+                      children: [
+                        for (var index = 0; index < count; index++) ...[
+                          if (index > 0) SizedBox(height: spacing),
+                          _SidebarButton(
+                            number: index + 1,
+                            label: _sections[index].label,
+                            selected: index == _selectedIndex,
+                            height: buttonHeight,
+                            onTap: () => _selectSection(index),
+                          ),
+                        ],
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -1001,59 +1028,61 @@ class _SidebarButton extends StatelessWidget {
     required this.number,
     required this.label,
     required this.selected,
+    required this.height,
     required this.onTap,
   });
 
   final int number;
   final String label;
   final bool selected;
+  final double height;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final color = selected ? WebColors.red : WebColors.blue;
-
-    final icon = AdaptiveAssetImage(
-      'data/icons/fire_red_icon.svg',
-      width: 44,
-      height: 56,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-    );
+    final iconHeight = (height - 8).clamp(0.0, 52.0).toDouble();
+    final fontSize = height >= 58 ? 16.0 : 14.0;
 
     return SizedBox(
-      height: 72,
+      height: height,
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
           foregroundColor: color,
           side: BorderSide(color: color, width: 2),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
         ),
         child: Row(
           children: [
             SizedBox(
-              width: 48,
-              height: 56,
+              width: 46,
+              height: iconHeight,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  icon,
+                  AdaptiveAssetImage(
+                    'data/icons/fire_red_icon.svg',
+                    width: iconHeight * 44 / 56,
+                    height: iconHeight,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                  ),
                   Text(
                     '$number',
                     style: TextStyle(
-                      color: selected ? WebColors.red : WebColors.blue,
-                      fontSize: 13,
+                      color: color,
+                      fontSize: height >= 50 ? 13 : 11,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 label,
@@ -1061,7 +1090,7 @@ class _SidebarButton extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: color,
-                  fontSize: 16,
+                  fontSize: fontSize,
                   fontWeight: FontWeight.w900,
                 ),
               ),
