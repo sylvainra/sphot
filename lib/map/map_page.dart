@@ -78,6 +78,7 @@ class _MapPageState extends State<MapPage> {
   int _mapTileRefreshVersion = 0;
   int _selectedBottomIndex = 1;
   String? _selectedPublicSpotId;
+  String? _hoveredRescueSpotId;
   static const double _desktopSelectedAdBottom = 6.0;
   static const double _desktopSelectedAdHeight = 142.0;
   Set<String> _favoriteSpotIds = <String>{};
@@ -2062,12 +2063,13 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
     bool showText,
     bool autoShowName,
     double zoom,
-    double rotation,
-  ) {
+    double rotation, {
+    bool compactIcon = false,
+  }) {
     return Marker(
       point: LatLng(spot.lat, spot.lng),
-      width: 56,
-      height: 56,
+      width: compactIcon ? 44 : 56,
+      height: compactIcon ? 44 : 56,
       alignment: Alignment.center,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -2082,6 +2084,7 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
           rotation: rotation,
           labelOpacity: _labelOpacity(zoom),
           typeTextColor: _typeColor(spot),
+          compactIcon: compactIcon,
         ),
       ),
     );
@@ -2097,28 +2100,43 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
     return Marker(
       point: LatLng(spot.lat, spot.lng),
       width: 120,
-      height: 170,
+      height: 260,
       alignment: Alignment.center,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => unawaited(_openPublicSpotDetail(spot)),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              top: 37.5,
-              left: 25,
-              child: _HoverMarker(
-                spot: spot,
-                showTextAllowed: showText,
-                forceShowText: _selectedPublicSpotId == spot.id,
-                autoShowName: autoShowName,
-                zoom: zoom,
-                rotation: rotation,
-                labelOpacity: _labelOpacity(zoom),
+      // Zone cliquable prolongée vers le sommet des drapeaux. Le marqueur
+      // centré gagne 90 px ; le contenu descend de 45 px dans la boîte pour
+      // conserver exactement sa position géographique et visuelle.
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) {
+          if (!showText || _hoveredRescueSpotId == spot.id) return;
+          setState(() => _hoveredRescueSpotId = spot.id);
+        },
+        onExit: (_) {
+          if (_hoveredRescueSpotId != spot.id) return;
+          setState(() => _hoveredRescueSpotId = null);
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => unawaited(_openPublicSpotDetail(spot)),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                top: 82.5,
+                left: 25,
+                child: _HoverMarker(
+                  spot: spot,
+                  showTextAllowed: showText,
+                  forceShowText: _selectedPublicSpotId == spot.id ||
+                      (_hoveredRescueSpotId == spot.id && showText),
+                  autoShowName: autoShowName,
+                  zoom: zoom,
+                  rotation: rotation,
+                  labelOpacity: _labelOpacity(zoom),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -2243,45 +2261,29 @@ Widget _buildLeftMapControls(List<SpotFlagState> spots) {
               LatLng(spot.lat, spot.lng),
               zoom < 7.0 ? 7.0 : 12.0,
             ),
-            child: Tooltip(
-              message: spot.mapDisplayName,
-              child: _buildFireCountIcon(
-                iconPath: spot.markerIconPath,
-                count: 1,
-                rotation: rotation,
-                size: 46.0,
-              ),
+            child: _buildFireCountIcon(
+              iconPath: spot.markerIconPath,
+              count: 1,
+              rotation: rotation,
+              size: 46.0,
             ),
           ),
         ),
       );
     }
 
-    // Zoom 12 à 15 : autres SPHOTS compacts, postes de secours avec
-    // leurs mâts hissés / affalés de référence.
+    // Zoom 12 à 15 : icône compacte, sans infobulle grise.
+    // Les caractéristiques habituelles peuvent apparaître au survol dès
+    // le seuil de zoom autorisé, sans modifier la taille des lignes.
     return _tagSpotMarker(
       spot,
-      Marker(
-        point: LatLng(spot.lat, spot.lng),
-        width: 44,
-        height: 44,
-        alignment: Alignment.center,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => unawaited(_openPublicSpotDetail(spot)),
-          child: Tooltip(
-            message: spot.mapDisplayName,
-            child: Transform.rotate(
-              angle: -rotation * pi / 180,
-              child: AdaptiveAssetImage(
-                _getMarkerIconPath(spot),
-                width: 38,
-                height: 38,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-        ),
+      _buildOtherSpotMarker(
+        spot,
+        _showTextForZoom(zoom),
+        automaticLabelIds.contains(spot.id),
+        zoom,
+        rotation,
+        compactIcon: true,
       ),
     );
   }
@@ -3528,6 +3530,7 @@ class _OtherSpotMarker extends StatefulWidget {
   final double rotation;
   final double labelOpacity;
   final Color typeTextColor;
+  final bool compactIcon;
 
   const _OtherSpotMarker({
     required this.spot,
@@ -3539,6 +3542,7 @@ class _OtherSpotMarker extends StatefulWidget {
     required this.rotation,
     required this.labelOpacity,
     required this.typeTextColor,
+    this.compactIcon = false,
   });
 
   @override
@@ -3572,8 +3576,8 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
       onEnter: (_) => setState(() => isHovering = true),
       onExit: (_) => setState(() => isHovering = false),
       child: SizedBox(
-        width: 56,
-        height: 56,
+        width: widget.compactIcon ? 44 : 56,
+        height: widget.compactIcon ? 44 : 56,
         child: Transform.rotate(
           angle: -widget.rotation * pi / 180,
           alignment: Alignment.center,
@@ -3583,15 +3587,16 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
             children: [
               AdaptiveAssetImage(
                 widget.iconPath,
-                width: spot.isNaturisme ? 52 : 48,
-                height: spot.isNaturisme ? 52 : 48,
+                width: widget.compactIcon ? 38 : (spot.isNaturisme ? 52 : 48),
+                height: widget.compactIcon ? 38 : (spot.isNaturisme ? 52 : 48),
                 fit: BoxFit.contain,
               ),
               if (showAutomaticName)
                 Positioned(
-                  top: 48,
+                  top: widget.compactIcon ? 42 : 48,
                   left:
-                      (56 - min(380.0, MediaQuery.sizeOf(context).width - 24)) /
+                      ((widget.compactIcon ? 44 : 56) -
+                           min(380.0, MediaQuery.sizeOf(context).width - 24)) /
                       2,
                   child: SizedBox(
                     width:
@@ -3652,9 +3657,10 @@ class _OtherSpotMarkerState extends State<_OtherSpotMarker> {
                 ),
               if (showFullText)
                 Positioned(
-                  top: 48,
+                  top: widget.compactIcon ? 42 : 48,
                   left:
-                      (56 - min(380.0, MediaQuery.sizeOf(context).width - 24)) /
+                      ((widget.compactIcon ? 44 : 56) -
+                           min(380.0, MediaQuery.sizeOf(context).width - 24)) /
                       2,
                   child: Opacity(
                     opacity: widget.labelOpacity,
@@ -3820,7 +3826,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                               children: [
                                 SvgPicture.asset(
                                   'data/icons/flag_red_yellow_5x3.svg',
-                                  width: 14,
+                                  width: 11,
                                   height: 16,
                                   fit: BoxFit.contain,
                                 ),
@@ -3889,7 +3895,7 @@ class _HoverMarkerState extends State<_HoverMarker> {
                             children: [
                               SvgPicture.asset(
                                 'data/icons/flag_red_yellow_5x3.svg',
-                                width: 14,
+                                width: 11,
                                 height: 16,
                                 fit: BoxFit.contain,
                               ),
