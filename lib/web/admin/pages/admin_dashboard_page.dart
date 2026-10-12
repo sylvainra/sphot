@@ -190,6 +190,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final Set<String> _sauveteurPeriodesSurveillance = <String>{};
 
   bool _isSavingSauveteur = false;
+  bool _isSubmittingSauveteur = false;
   bool _sauveteurAccessGenerated = false;
   bool _sauveteurPasswordRegenerated = false;
   bool _sauveteurHasUnsavedChanges = false;
@@ -7094,6 +7095,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _sauveteurPostes.clear();
     _sauveteurPeriodesSurveillance.clear();
     _isSavingSauveteur = false;
+    _isSubmittingSauveteur = false;
     _sauveteurAccessGenerated = false;
     _sauveteurPasswordRegenerated = false;
     _sauveteurHasUnsavedChanges = false;
@@ -7275,9 +7277,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
-  Future<void> _generateSauveteurAccess() async {
+  Future<bool> _generateSauveteurAccess() async {
     if (!_validateSauveteurContact()) {
-      return;
+      return false;
     }
 
     final nom = _sauveteurNomController.text.trim();
@@ -7324,7 +7326,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       );
 
       if (!mounted) {
-        return;
+        return false;
       }
 
       setState(() {
@@ -7334,19 +7336,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _sauveteurAccessGenerated = true;
         _sauveteurEmailSent = false;
       });
+      return true;
     } catch (error) {
       if (!mounted) {
-        return;
+        return false;
       }
 
       setState(() {
         _isSavingSauveteur = false;
       });
       _showSauveteurError('Génération impossible : $error');
+      return false;
     }
   }
 
-  Future<void> _regenerateSauveteurPassword() async {
+  Future<bool> _regenerateSauveteurPassword() async {
     final sauveteurId = _editingSauveteurDocId?.trim() ?? '';
     final login = _sauveteurGeneratedLogin.trim();
 
@@ -7354,7 +7358,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _showSauveteurError(
         'Impossible de retrouver l’identifiant du sauveteur.',
       );
-      return;
+      return false;
     }
 
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -7389,7 +7393,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       );
 
       if (!mounted) {
-        return;
+        return false;
       }
 
       setState(() {
@@ -7400,21 +7404,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _sauveteurEmailSent = false;
       });
 
-      try {
-        await _sendSauveteurCredentialsEmail(isReset: true);
-      } catch (emailError) {
-        if (!mounted) {
-          return;
-        }
-
-        _showSauveteurError(
-          'Le mot de passe a bien été régénéré, mais '
-          'l’email n’a pas pu être envoyé : $emailError',
-        );
-      }
+      // L'email part seulement après la sauvegarde complète.
+      return true;
     } catch (error) {
       if (!mounted) {
-        return;
+        return false;
       }
 
       setState(() {
@@ -7422,6 +7416,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       });
 
       _showSauveteurError('Régénération du mot de passe impossible : $error');
+      return false;
     }
   }
 
@@ -7505,7 +7500,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     });
   }
 
-  bool _validateSauveteurBeforeSave() {
+  bool _validateSauveteurBeforeSave({bool requireGeneratedAccess = true}) {
     if (!_validateSauveteurContact()) {
       return false;
     }
@@ -7527,7 +7522,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       return false;
     }
 
-    if (_editingSauveteurDocId == null) {
+    if (requireGeneratedAccess && _editingSauveteurDocId == null) {
       if (!_sauveteurAccessGenerated) {
         _showSauveteurError('Générez l’accès avant d’enregistrer.');
         return false;
@@ -7535,6 +7530,27 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     return true;
+  }
+
+  Future<void> _submitSauveteur() async {
+    if (_isSubmittingSauveteur || _isSavingSauveteur) return;
+    // Ne modifier aucun identifiant tant que la fiche n'est pas valide.
+    if (!_validateSauveteurBeforeSave(requireGeneratedAccess: false)) return;
+
+    setState(() => _isSubmittingSauveteur = true);
+    try {
+      if (_editingSauveteurDocId == null) {
+        if (!_sauveteurAccessGenerated) {
+          final generated = await _generateSauveteurAccess();
+          if (!generated || !mounted) return;
+        }
+      }
+
+      if (!mounted) return;
+      await _saveSauveteur();
+    } finally {
+      if (mounted) setState(() => _isSubmittingSauveteur = false);
+    }
   }
 
   Future<void> _saveSauveteur() async {
@@ -7636,27 +7652,29 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             }, SetOptions(merge: true));
       }
 
-      /*
- * Lors d’une création, le mail est envoyé uniquement après
- * l’enregistrement du sauveteur et de toutes ses affectations.
- */
-      if (!isEditing) {
+      // Ne réinitialiser le mot de passe qu'après la sauvegarde de la
+      // fiche et des affectations. Un échec de la sauvegarde ne doit
+      // jamais déconnecter prématurément le sauveteur.
+      if (isEditing && !_sauveteurPasswordRegenerated) {
+        final regenerated = await _regenerateSauveteurPassword();
+        if (!regenerated || !mounted) return;
+      }
+
+      // Envoi unique après la sauvegarde et les affectations.
+      // En cas d'échec, le prochain clic ne régénère pas les accès.
+      if (!isEditing || _sauveteurPasswordRegenerated) {
         try {
-          await _sendSauveteurCredentialsEmail();
+          await _sendSauveteurCredentialsEmail(isReset: isEditing);
         } catch (error) {
-          if (!mounted) {
-            return;
-          }
-
-          setState(() {
-            _isSavingSauveteur = false;
-          });
-
+          if (!mounted) return;
+          setState(() => _isSavingSauveteur = false);
           _showSauveteurError(
-            'Le sauveteur a bien été créé, mais l’envoi '
-            'de l’email a échoué : $error',
+            isEditing
+                ? 'Les modifications et le nouveau mot de passe sont enregistrés, '
+                  'mais l’envoi de l’email a échoué : $error'
+                : 'Le sauveteur a bien été créé, mais l’envoi '
+                  'de l’email a échoué : $error',
           );
-
           return;
         }
       }
@@ -10799,10 +10817,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Widget _buildSauveteurEditorPanel() {
-    final contactOk =
-        _sauveteurTelephoneController.text.trim().isNotEmpty &&
-        _sauveteurEmailController.text.trim().contains('@');
-
     return Container(
       width: 430,
       decoration: BoxDecoration(
@@ -11011,132 +11025,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             }),
                           ],
                         ),
-                        const SizedBox(height: 18),
-                        _sauveteurSectionTitle(7, 'ACCÈS SAUVETEUR'),
-                        const SizedBox(height: 9),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 46,
-                          child: OutlinedButton(
-                            onPressed:
-                                _isSavingSauveteur ||
-                                    (_editingSauveteurDocId != null &&
-                                        _sauveteurPasswordRegenerated)
-                                ? null
-                                : _editingSauveteurDocId != null
-                                ? _regenerateSauveteurPassword
-                                : _generateSauveteurAccess,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor:
-                                  (_editingSauveteurDocId != null
-                                      ? _sauveteurPasswordRegenerated
-                                      : _sauveteurAccessGenerated)
-                                  ? Colors.white
-                                  : redColor,
-                              backgroundColor:
-                                  (_editingSauveteurDocId != null
-                                      ? _sauveteurPasswordRegenerated
-                                      : _sauveteurAccessGenerated)
-                                  ? redColor
-                                  : Colors.transparent,
-                              side: const BorderSide(
-                                color: redColor,
-                                width: 1.8,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            child: Text(
-                              _editingSauveteurDocId != null
-                                  ? _sauveteurPasswordRegenerated
-                                        ? 'MOT DE PASSE RÉGÉNÉRÉ'
-                                        : 'RÉGÉNÉRER LE MOT DE PASSE'
-                                  : _sauveteurAccessGenerated
-                                  ? 'ACCÈS GÉNÉRÉ'
-                                  : 'GÉNÉRER L’ACCÈS',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: adminColor.withOpacity(0.55),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Identifiant : '
-                                '${_sauveteurGeneratedLogin.isEmpty ? 'non généré' : _sauveteurGeneratedLogin}',
-                                style: const TextStyle(
-                                  color: adminColor,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Mot de passe : '
-                                '${_sauveteurGeneratedPassword.isEmpty ? 'non généré' : _sauveteurGeneratedPassword}',
-                                style: const TextStyle(
-                                  color: adminColor,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (_editingSauveteurDocId != null &&
-                            _sauveteurPasswordRegenerated) ...[
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 42,
-                            child: OutlinedButton.icon(
-                              onPressed: _sauveteurEmailSent
-                                  ? null
-                                  : () => _sendSauveteurCredentialsEmail(
-                                      isReset: true,
-                                    ),
-                              icon: Icon(
-                                _sauveteurEmailSent
-                                    ? Icons.mark_email_read_rounded
-                                    : Icons.email_outlined,
-                              ),
-                              label: Text(
-                                _sauveteurEmailSent
-                                    ? 'NOUVEAU MOT DE PASSE ENVOYÉ'
-                                    : 'ENVOYER LE NOUVEAU MOT DE PASSE',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: _sauveteurEmailSent
-                                    ? Colors.white
-                                    : redColor,
-                                backgroundColor: _sauveteurEmailSent
-                                    ? redColor
-                                    : Colors.transparent,
-                                side: const BorderSide(
-                                  color: redColor,
-                                  width: 1.8,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -11146,8 +11034,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton.icon(
-                    onPressed: _isSavingSauveteur ? null : _saveSauveteur,
-                    icon: _isSavingSauveteur
+                    onPressed: _isSubmittingSauveteur ? null : _submitSauveteur,
+                    icon: _isSubmittingSauveteur
                         ? const SizedBox(
                             width: 18,
                             height: 18,
@@ -11155,7 +11043,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           )
                         : const Icon(Icons.save_rounded),
                     label: Text(
-                      _isSavingSauveteur
+                      _isSubmittingSauveteur
                           ? _editingSauveteurDocId == null
                                 ? 'CRÉATION ET ENVOI...'
                                 : 'ENREGISTREMENT...'
@@ -11311,30 +11199,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _sphotEditorField(
-                        controller: _sphotLatController,
-                        label: 'Latitude',
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _sphotEditorField(
-                        controller: _sphotLngController,
-                        label: 'Longitude',
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
                 const SizedBox(height: 14),
                 _sphotSectionTitle(2, 'IDENTIFICATION'),
