@@ -84,6 +84,17 @@ class _MapPageState extends State<MapPage> {
   final ValueNotifier<double> _mobileDetailHeightFraction =
       ValueNotifier<double>(1.0);
   static const double _mobileDetailMinHeightFraction = 0.20;
+  // Le menu inférieur mesure 52 px et se trouve à 6 px du bas.
+  // Le volet laisse 6 px supplémentaires au-dessus de son contour.
+  static const double _mobileBottomMenuHeight = 52.0;
+  static const double _mobileBottomMenuBottom = 6.0;
+  static const double _mobileDetailMenuGap = 6.0;
+  static const double _mobileDetailBottomOffset =
+      _mobileBottomMenuHeight +
+      _mobileBottomMenuBottom +
+      _mobileDetailMenuGap;
+  static const double _mapHeaderLogoHeight = 68.0;
+  static const double _mapHeaderLogoTop = 3.0;
   String? _hoveredRescueSpotId;
   static const double _desktopSelectedAdBottom = 6.0;
   static const double _desktopSelectedAdHeight = 142.0;
@@ -1444,7 +1455,7 @@ SpotFlagState? _findBestSpotMatch(
     final size = MediaQuery.sizeOf(context);
     final availableHeight = max(
       1.0,
-      size.height - padding.top - padding.bottom,
+      size.height - padding.top - _mobileDetailBottomOffset,
     );
 
     // Seule la surface réellement occupée par le volet capte les gestes.
@@ -1452,7 +1463,7 @@ SpotFlagState? _findBestSpotMatch(
     return Positioned(
       left: 0,
       right: 0,
-      bottom: padding.bottom,
+      bottom: _mobileDetailBottomOffset,
       child: ValueListenableBuilder<double>(
         valueListenable: _mobileDetailHeightFraction,
         child: PublicSpotMobileSheet(
@@ -1474,6 +1485,27 @@ SpotFlagState? _findBestSpotMatch(
         ),
       ),
     );
+  }
+
+  // L'en-tête SPHOT appartient à la carte et se dessine au-dessus du volet.
+  // On le masque uniquement lorsque la position réelle du volet le recouvre.
+  bool _mobileDetailOverlapsMapHeader(double fraction) {
+    if (kIsWeb || _mobileDetailSpot == null) return false;
+
+    final media = MediaQuery.of(context);
+    final availableHeight = max(
+      1.0,
+      media.size.height -
+          media.padding.top -
+          _mobileDetailBottomOffset,
+    );
+    final sheetTop = media.size.height -
+        _mobileDetailBottomOffset -
+        availableHeight * fraction;
+    final logoBottom =
+        media.padding.top + _mapHeaderLogoTop + _mapHeaderLogoHeight;
+
+    return sheetTop < logoBottom;
   }
 
   void _resetNorth() {
@@ -2746,9 +2778,9 @@ Widget _buildBottomBar() {
   return Positioned(
     left: 8,
     right: 8,
-    bottom: 6,
+    bottom: _mobileBottomMenuBottom,
     child: Container(
-      height: 52,
+      height: _mobileBottomMenuHeight,
       decoration: BoxDecoration(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
@@ -2835,15 +2867,24 @@ Widget _buildBottomBar() {
         alignment: Alignment.topCenter,
         children: [
           Positioned(
-            top: 3,
+            top: _mapHeaderLogoTop,
             left: 0,
             right: detailPanelWidth,
-            child: Center(
-              child: Image.asset(
-                'data/icons/title.png',
-                height: 68,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.high,
+            child: ValueListenableBuilder<double>(
+              valueListenable: _mobileDetailHeightFraction,
+              builder: (context, fraction, child) {
+                if (_mobileDetailOverlapsMapHeader(fraction)) {
+                  return const SizedBox.shrink();
+                }
+                return child!;
+              },
+              child: Center(
+                child: Image.asset(
+                  'data/icons/title.png',
+                  height: _mapHeaderLogoHeight,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                ),
               ),
             ),
           ),
@@ -3130,7 +3171,10 @@ Positioned(
 ),
 
 _buildVerticalFilterMenu(),
-_buildAdBanner(),
+// La publicité figure déjà dans la fiche : ne rien laisser dépasser
+// dans l'espace de 6 px réservé entre le volet et le menu inférieur.
+if (kIsWeb || _mobileDetailSpot == null)
+  _buildAdBanner(),
 if (!(kIsWeb &&
     MediaQuery.sizeOf(context).width >= 900 &&
     _selectedPublicSpotId != null))
