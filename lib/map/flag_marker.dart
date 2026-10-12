@@ -90,19 +90,17 @@ class _FlagMarkerState extends State<FlagMarker>
   static const double _previewMarkerHeight = 115;
 
   // Hauteurs réservées aux cartes Web et mobile (pixels Flutter).
-  // Les valeurs maintiennent nominalement DEUX espacements de 6 px
-  // entre le dernier signal hissé et le premier signal affalé.
-  // La manche à air n'occupe pas exactement la place du pavillon violet :
-  // sa combinaison avec le drapeau principal demande une autre hauteur.
-  // Le pied des mâts et la position des signaux affalés restent inchangés.
+  // Le pied des mâts reste ancré quel que soit le nombre de signaux.
+  // La combinaison drapeau principal + violet + manche à air utilise
+  // un mât raccourci de 18 px (hauteur réellement peinte d'un drapeau).
   // Avec UN drapeau : trois hauteurs de drapeau REELLEMENT PEINT
   // (3 x 18 px), separees par deux espaces visibles (2 x 6 px) : 66 px.
   // Ce n'est pas la taille du CustomPaint (30 px), qui inclut 6 px
-  // de marge interne en haut et en bas. Rien ne change pour 0, 2 ou 3.
+  // de marge interne en haut et en bas.
   static const double _mapPoleHeightNoSignal = 55.0;
   static const double _mapPoleHeightMainPurple = 103.0;
   static const double _mapPoleHeightMainWindsock = 99.5;
-  static const double _mapPoleHeightThree = 159.5;
+  static const double _mapPoleHeightThree = 141.5;
   static const double _mapPoleHeightOneSignal = 66.0;
 
   static const double poleWidth = 4;
@@ -165,7 +163,7 @@ class _FlagMarkerState extends State<FlagMarker>
 
     // Sur carte uniquement : un seul drapeau = trois hauteurs visibles
     // de drapeau (18 px) + deux espacements visibles (6 px).
-    // Les hauteurs à 2 et 3 signaux sont inchangées.
+    // Seule la hauteur du mât à 3 signaux a été réduite de 18 px.
     // Le widget reste fixe (ancrage géographique) ; le mât et le signal
     // hissé peuvent dépasser en haut du Stack (clip.none).
     final mapPoleHeight = visibleSignalCount >= 3
@@ -239,13 +237,17 @@ class _FlagMarkerState extends State<FlagMarker>
             mapHissedOffset;
     final purpleFlagTop = mainFlagTop + flagStep;
 
-    // Même en l'absence du violet, la manche à air se situe à la moitié
-    // de l'emplacement où ce pavillon serait placé. Elle est attachée
-    // directement au mât (pas à l'extrémité du drapeau principal).
-    const windsockHeight = 11.0;
+    // La manche à air reste attachée directement au mât.
+    // Sur les cartes Web et mobile uniquement : taille 30 x 15 px,
+    // centre remonté de 6 px (un espacement entre deux drapeaux).
+    // Les fiches LIVE et les vues sauveteur conservent 23 x 11 px
+    // et leur position historique.
+    final windsockHeight = widget.mapMarker ? 15.0 : 11.0;
+    final windsockRise = widget.mapMarker ? flagGap : 0.0;
     final windsockTop =
         purpleFlagTop + flagHeight / 2 - windsockHeight / 2 +
-            (hasTripleSignal ? tripleSignalWindsockDrop : 0.0);
+            (hasTripleSignal ? tripleSignalWindsockDrop : 0.0) -
+            windsockRise;
     const windsockLeft = flagLeft;
 
     return SizedBox(
@@ -314,9 +316,9 @@ class _FlagMarkerState extends State<FlagMarker>
                   return Transform.rotate(
                     alignment: Alignment.centerLeft,
                     angle: sin(_controller.value * 2 * pi) * 0.04,
-                    child: const WindsockGlyph(
-                      width: 23,
-                      height: 11,
+                    child: WindsockGlyph(
+                      width: widget.mapMarker ? 30.0 : 23.0,
+                      height: windsockHeight,
                     ),
                   );
                 },
