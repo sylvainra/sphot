@@ -200,11 +200,17 @@ class PublicSpotDetailPage extends StatelessWidget {
 class PublicSpotMobileSheet extends StatefulWidget {
   final SpotFlagState spot;
   final bool desktopMode;
+  // Utilisés uniquement pour le panneau mobile non modal.
+  // En Web, la fermeture continue à utiliser Navigator.pop().
+  final VoidCallback? onClose;
+  final ValueChanged<double>? onResize;
 
   const PublicSpotMobileSheet({
     super.key,
     required this.spot,
     this.desktopMode = false,
+    this.onClose,
+    this.onResize,
   });
 
   @override
@@ -941,7 +947,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           ),
           IconButton(
             tooltip: 'Fermer la fiche',
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: widget.onClose ?? () => Navigator.of(context).pop(),
             icon: const Icon(
               Icons.close_rounded,
               size: 23,
@@ -993,6 +999,28 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             ),
             child: Column(
               children: [
+                // Poignée dédiée : son geste ajuste la hauteur du panneau,
+                // sans intercepter le défilement des ListView des onglets.
+                if (!widget.desktopMode && widget.onResize != null)
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onVerticalDragUpdate: (details) =>
+                        widget.onResize?.call(details.delta.dy),
+                    child: SizedBox(
+                      height: 24,
+                      width: double.infinity,
+                      child: Center(
+                        child: Container(
+                          width: 44,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF9EA6B0),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 if (!widget.desktopMode)
                   _buildMobileSpotHeader(currentSpot)
                 else
