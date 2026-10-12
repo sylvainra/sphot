@@ -86,6 +86,7 @@ class _MapPageState extends State<MapPage> {
   static const double _mobileDetailMinHeightFraction = 0.20;
   // Le menu inférieur mesure 52 px et se trouve à 6 px du bas.
   // Le volet laisse 6 px supplémentaires au-dessus de son contour.
+  static const double _mobileBottomMenuSideInset = 8.0;
   static const double _mobileBottomMenuHeight = 52.0;
   static const double _mobileBottomMenuBottom = 6.0;
   static const double _mobileDetailMenuGap = 6.0;
@@ -1011,7 +1012,9 @@ List<Marker> _buildAdminMarkers(
       case SpotFilter.secours:
         return spot.isPosteSecours;
       case SpotFilter.plage:
-        return type.contains('ACCES PLAGE');
+        // Inclure les libellés actuels « Plage » et historiques
+        // « Accès plage », comme le fait déjà le marqueur de plage.
+        return type.contains('PLAGE');
       case SpotFilter.eauBleue:
         return type.contains('LAC') ||
             type.contains("PLAN D'EAU") ||
@@ -1461,8 +1464,8 @@ SpotFlagState? _findBestSpotMatch(
     // Seule la surface réellement occupée par le volet capte les gestes.
     // Le reste de la Stack laisse la carte recevoir déplacements et zooms.
     return Positioned(
-      left: 0,
-      right: 0,
+      left: _mobileBottomMenuSideInset,
+      right: _mobileBottomMenuSideInset,
       bottom: _mobileDetailBottomOffset,
       child: ValueListenableBuilder<double>(
         valueListenable: _mobileDetailHeightFraction,
@@ -2776,8 +2779,8 @@ Widget _buildBottomBar() {
   ];
 
   return Positioned(
-    left: 8,
-    right: 8,
+    left: _mobileBottomMenuSideInset,
+    right: _mobileBottomMenuSideInset,
     bottom: _mobileBottomMenuBottom,
     child: Container(
       height: _mobileBottomMenuHeight,
