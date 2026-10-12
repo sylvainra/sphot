@@ -3552,7 +3552,7 @@ class _OtherSpotMarker extends StatefulWidget {
 
 // Style des étiquettes commun à tous les SPHOT, sur carte Web et mobile.
 // Le survol peut révéler des lignes, jamais grossir ni espacer le texte.
-const double _mapInfoLineGap = 6.0;
+const double _mapInfoLineGap = 3.0;
 const double _mapNameFontSize = 13.0;
 const double _mapCityFontSize = 12.0;
 const double _mapTypeFontSize = 12.0;
@@ -3837,9 +3837,10 @@ class _HoverMarkerState extends State<_HoverMarker> {
                               children: [
                                 SvgPicture.asset(
                                   'data/icons/flag_red_yellow_5x3.svg',
-                                  width: 11,
+                                  // Réduire la longueur, sans diminuer la hauteur.
+                                  width: 20,
                                   height: 16,
-                                  fit: BoxFit.contain,
+                                  fit: BoxFit.fill,
                                 ),
                                 const SizedBox(width: 4),
                                 _mapUniformInfoLine(Text(
@@ -3906,9 +3907,10 @@ class _HoverMarkerState extends State<_HoverMarker> {
                             children: [
                               SvgPicture.asset(
                                 'data/icons/flag_red_yellow_5x3.svg',
-                                width: 11,
+                                // Même dimensions sur la fiche complète au survol.
+                                width: 20,
                                 height: 16,
-                                fit: BoxFit.contain,
+                                fit: BoxFit.fill,
                               ),
                               const SizedBox(width: 4),
                               _mapUniformInfoLine(Text(
