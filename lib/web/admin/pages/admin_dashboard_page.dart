@@ -7544,9 +7544,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           final generated = await _generateSauveteurAccess();
           if (!generated || !mounted) return;
         }
-      } else if (!_sauveteurPasswordRegenerated) {
-        final regenerated = await _regenerateSauveteurPassword();
-        if (!regenerated || !mounted) return;
       }
 
       if (!mounted) return;
@@ -7653,6 +7650,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               'territoireId': _resolvedTerritoireId,
               'updatedAt': FieldValue.serverTimestamp(),
             }, SetOptions(merge: true));
+      }
+
+      // Ne réinitialiser le mot de passe qu'après la sauvegarde de la
+      // fiche et des affectations. Un échec de la sauvegarde ne doit
+      // jamais déconnecter prématurément le sauveteur.
+      if (isEditing && !_sauveteurPasswordRegenerated) {
+        final regenerated = await _regenerateSauveteurPassword();
+        if (!regenerated || !mounted) return;
       }
 
       // Envoi unique après la sauvegarde et les affectations.
