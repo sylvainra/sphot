@@ -20,6 +20,7 @@ import '../../../map/map_page.dart';
 import 'package:flutter/services.dart';
 import 'sphot_admin_summary_page.dart';
 import 'admin_subscription_panel.dart';
+import 'admin_payment_panel.dart';
 import 'admin_statistics_panel.dart';
 import '../../institutional/pages/institutional_main_courante_page.dart';
 import '../../institutional/services/operational_alert_sound.dart';
@@ -117,6 +118,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _showSurveillancePeriodsPanel = false;
   bool _showTrialSummaryPanel = false;
   bool _showSubscriptionPanel = false;
+  bool _showAdminPaymentPanel = false;
   bool _showBillingDocumentsPanel = false;
   bool _showStatisticsPanel = false;
   bool _showMainCourantePanel = false;
@@ -4820,6 +4822,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           _showTrialSummaryPanel = true;
                           _showSubscriptionPanel = false;
                           _showBillingDocumentsPanel = false;
+                          _showAdminPaymentPanel = false;
                           _trialSummaryPanelFuture = _loadTrialSummaryData();
                         });
                       },
@@ -5578,6 +5581,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _showTrialSummaryPanel = false;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
       _showSauveteursManagementPanel = false;
       _showSurveillancePeriodsPanel = false;
       _showSauveteurEditorPanel = false;
@@ -5614,6 +5618,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _showTrialSummaryPanel = true;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
 
       _showSauveteursManagementPanel = false;
       _showSurveillancePeriodsPanel = false;
@@ -5748,6 +5753,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _showMainCourantePanel = false;
       _showSubscriptionPanel = true;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSauveteursManagementPanel = false;
@@ -5762,11 +5768,37 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     });
   }
 
+  void _openAdminPaymentPanel() {
+    setState(() {
+      _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
+      _showSubscriptionPanel = false;
+      _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = true;
+      _showTrialSummaryPanel = false;
+      _trialSummaryPanelFuture = null;
+      _showSauveteursManagementPanel = false;
+      _showSurveillancePeriodsPanel = false;
+      _showSauveteurEditorPanel = false;
+      _showSphotEditorPanel = false;
+      _placingSphotOnMap = false;
+      _selectedSpot = null;
+      _selectedAdmin = null;
+      _selectedAdvertiser = null;
+      _showLegalDocumentsPanel = false;
+    });
+  }
+
+  void _closeAdminPaymentPanel() {
+    setState(() => _showAdminPaymentPanel = false);
+  }
+
   void _openBillingDocumentsPanel() {
     setState(() {
       _showStatisticsPanel = false;
       _showMainCourantePanel = false;
       _showBillingDocumentsPanel = true;
+      _showAdminPaymentPanel = false;
       _showSubscriptionPanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
@@ -5791,6 +5823,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _closeBillingDocumentsPanel() {
     setState(() {
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
     });
   }
 
@@ -5800,6 +5833,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _showMainCourantePanel = false;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSauveteursManagementPanel = false;
@@ -5830,6 +5864,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _showMainCourantePanel = true;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSauveteursManagementPanel = false;
@@ -6503,11 +6538,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             onTap: _openSubscriptionPanel,
                           ),
                           _summaryCard(
-                            title: 'DOCUMENTS & FACTURES',
+                            title: 'PAIEMENT',
                             value: '',
                             color: adminColor,
                             iconPath: 'data/icons/fire_red_icon.svg',
                             stepNumber: 7,
+                            titleFontSize: 16,
+                            titleLetterSpacing: 0.5,
+                            showValue: false,
+                            isActive: _showAdminPaymentPanel,
+                            onTap: _openAdminPaymentPanel,
+                          ),
+                          _summaryCard(
+                            title: 'DOCUMENTS & FACTURES',
+                            value: '',
+                            color: adminColor,
+                            iconPath: 'data/icons/fire_red_icon.svg',
+                            stepNumber: 8,
                             titleFontSize: 16,
                             titleLetterSpacing: 0.5,
                             showValue: false,
@@ -6519,7 +6566,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             value: '',
                             color: adminColor,
                             iconPath: 'data/icons/fire_red_icon.svg',
-                            stepNumber: 8,
+                            stepNumber: 9,
                             titleFontSize: 16,
                             titleLetterSpacing: 0.5,
                             showValue: false,
@@ -6533,7 +6580,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 ? adminColor
                                 : pendingColor,
                             iconPath: 'data/icons/fire_red_icon.svg',
-                            stepNumber: 9,
+                            stepNumber: 10,
                             titleFontSize: 16,
                             titleLetterSpacing: 0.5,
                             showValue: false,
@@ -7087,6 +7134,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
 
       _showSurveillancePeriodsPanel = true;
       _showSauveteurEditorPanel = false;
@@ -8114,6 +8162,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
 
       _clearSphotEditor();
       _showSauveteurEditorPanel = false;
@@ -8144,6 +8193,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
 
       _clearSauveteurEditor();
       _showSauveteurEditorPanel = true;
@@ -8169,6 +8219,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
 
       _clearSauveteurEditor();
       _showSauveteursManagementPanel = true;
@@ -8206,6 +8257,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
 
       _clearSauveteurEditor();
 
@@ -8377,6 +8429,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
 
       _editingSphotDocId = _cleanText(data['_docId']);
 
@@ -8809,6 +8862,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _showTrialSummaryPanel = true;
         _showSubscriptionPanel = false;
         _showBillingDocumentsPanel = false;
+        _showAdminPaymentPanel = false;
         _trialSummaryPanelFuture = _loadTrialSummaryData();
       });
 
@@ -15066,6 +15120,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                   !_showSauveteursManagementPanel &&
                                   !_showTrialSummaryPanel &&
                                   !_showSubscriptionPanel &&
+                                  !_showAdminPaymentPanel &&
                                   !_showBillingDocumentsPanel &&
                                   !_showStatisticsPanel &&
                                   !_showMainCourantePanel &&
@@ -15122,6 +15177,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             adminUid: widget.adminUid,
                             onClose: _closeSubscriptionPanel,
                           )
+                        else if (_showAdminPaymentPanel)
+                          AdminPaymentPanel(onClose: _closeAdminPaymentPanel)
                         else if (_showBillingDocumentsPanel)
                           _buildBillingDocumentsPanel()
                         else if (_showStatisticsPanel)
