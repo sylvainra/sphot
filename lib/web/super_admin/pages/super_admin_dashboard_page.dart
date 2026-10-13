@@ -7190,11 +7190,37 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                                 left: 0,
                                 right: 0,
                                 child: Center(
-                                  child: Image.asset(
-                                    'data/icons/title.png',
+                                  // Le titre est un asset unique (sans variantes
+                                  // de résolution). ExactAssetImage évite la
+                                  // recherche dans AssetManifest.bin.json, dont
+                                  // l'absence temporaire sur Flutter Web debug
+                                  // faisait disparaître le header de la carte.
+                                  child: Image(
+                                    image: const ExactAssetImage(
+                                      'data/icons/title.png',
+                                      scale: 1.0,
+                                    ),
                                     height: 68,
                                     fit: BoxFit.contain,
                                     filterQuality: FilterQuality.high,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      // Conserve un titre lisible sans laisser
+                                      // apparaître l'erreur Flutter sur la carte.
+                                      return const SizedBox(
+                                        height: 68,
+                                        child: Center(
+                                          child: Text(
+                                            'SPHOT',
+                                            style: TextStyle(
+                                              color: Color(0xFFEA580C),
+                                              fontSize: 44,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 7,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ),
                               ),
