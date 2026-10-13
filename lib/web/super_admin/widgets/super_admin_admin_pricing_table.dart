@@ -241,6 +241,39 @@ class _SuperAdminAdminPricingTableState
         revision: _revision, effectiveAt: effectiveAt));
   }
 
+  Future<void> _restoreHistoricalVersion(
+    int sourceVersion,
+    int expectedRevision,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('REPRENDRE ADMIN-V$sourceVersion'),
+        content: Text(
+          'Les quatre tarifs de la version ADMIN-V$sourceVersion seront '
+          'copiés à l’identique dans un nouveau brouillon.\n\n'
+          'La grille publiée et toutes les archives resteront inchangées. '
+          'Vous pourrez contrôler et modifier le nouveau brouillon avant '
+          'de l’enregistrer ou de le publier.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('ANNULER'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('CRÉER LE BROUILLON'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _persist(() => _service.restoreVersion(
+      'ADMIN', revision: expectedRevision, sourceVersion: sourceVersion,
+    ));
+  }
+
   Future<void> _history() async {
     CommercialPricingState data;
     try {
@@ -251,6 +284,8 @@ class _SuperAdminAdminPricingTableState
       return;
     }
     if (!mounted) return;
+    final canRestore = !_busy && !_editing &&
+        data.draft == null && data.scheduled == null;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -260,6 +295,15 @@ class _SuperAdminAdminPricingTableState
           height: 430,
           child: ListView(
             children: [
+              if (!canRestore)
+                const Padding(
+                  padding: EdgeInsets.all(10),
+                  child: Text(
+                    'Pour reprendre une version historique, terminez ou '
+                    'annulez d’abord le brouillon ou la programmation en cours.',
+                    style: TextStyle(fontSize: 12, color: _red),
+                  ),
+                ),
               if (data.draft != null)
                 Card(
                   child: Padding(
@@ -315,6 +359,24 @@ class _SuperAdminAdminPricingTableState
                               style: const TextStyle(
                                 fontSize: 12, color: Color(0xFF475569),
                               ),
+                            ),
+                          ),
+                        if (version['status'] == 'archived' ||
+                            version['status'] == 'published')
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: OutlinedButton.icon(
+                              onPressed: canRestore
+                                  ? () {
+                                      Navigator.pop(dialogContext);
+                                      _restoreHistoricalVersion(
+                                        (version['version'] as num).toInt(),
+                                        data.revision,
+                                      );
+                                    }
+                                  : null,
+                              icon: const Icon(Icons.restore_outlined, size: 17),
+                              label: const Text('REPRENDRE CETTE VERSION'),
                             ),
                           ),
                       ],
