@@ -116,6 +116,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   bool _showLegalDocumentsPanel = false;
   bool _showPricingPanel = false;
+  int _selectedPricingTab = 0;
 
   String? _selectedLegalDocument;
   String? _selectedLegalChapter;
@@ -7030,7 +7031,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _buildRightPanel(visibleSpots: validSpots.length),
-                        Expanded(
+                        if (!_showPricingPanel || _selectedPricingTab == 0)
+                          Expanded(
                           child: Stack(
                             children: [
                               FlutterMap(
@@ -7222,11 +7224,20 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         ),
 
                         if (_showPricingPanel)
-                          SuperAdminPricingPanel(
-                            onClose: () {
-                              setState(() => _showPricingPanel = false);
-                            },
-                          )
+                          if (_selectedPricingTab == 1)
+                            Expanded(
+                              child: SuperAdminPricingPanel(
+                                selectedTab: _selectedPricingTab,
+                                onTabChanged: (tab) => setState(() => _selectedPricingTab = tab),
+                                onClose: () => setState(() => _showPricingPanel = false),
+                              ),
+                            )
+                          else
+                            SuperAdminPricingPanel(
+                              selectedTab: _selectedPricingTab,
+                              onTabChanged: (tab) => setState(() => _selectedPricingTab = tab),
+                              onClose: () => setState(() => _showPricingPanel = false),
+                            )
                         else if (_showLegalDocumentsPanel)
                           _buildLegalDocumentsPanel()
                         else if (_selectedSpot != null)
