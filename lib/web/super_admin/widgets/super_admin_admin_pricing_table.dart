@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import '../services/commercial_pricing_service.dart';
 
 /// Ecran ADMIN de test : aucun changement Firestore, abonnement ou facture.
 class SuperAdminAdminPricingTable extends StatefulWidget {
-  const SuperAdminAdminPricingTable({super.key});
+  const SuperAdminAdminPricingTable({super.key, required this.sessionToken});
+
+  final String sessionToken;
 
   @override
   State<SuperAdminAdminPricingTable> createState() =>
@@ -26,7 +29,11 @@ class _SuperAdminAdminPricingTableState
 
   late final List<TextEditingController> _controllers;
   List<int> _published = List<int>.from(_original);
-  final List<List<int>> _archives = [];
+  List<Map<String, dynamic>> _remoteHistory = [];
+  late final CommercialPricingService _service;
+  int _revision = 0;
+  bool _busy = true;
+  String? _loadError;
   int _publishedVersion = 1;
   int _stationCount = 10;
   bool _editing = false;
@@ -40,6 +47,61 @@ class _SuperAdminAdminPricingTableState
     _controllers = _published
         .map((value) => TextEditingController(text: value.toString()))
         .toList();
+    _service = CommercialPricingService(widget.sessionToken);
+    _loadRemote();
+  }
+
+
+  void _applyRemote(CommercialPricingState data) {
+    final prices = (data.publishedPrices as List<dynamic>)
+        .map((e) => (e as num).toInt()).toList();
+    final draft = data.draft;
+    final working = draft == null ? prices :
+        (draft['prices'] as List<dynamic>).map((e) => (e as num).toInt()).toList();
+    setState(() {
+      _published = prices;
+      _publishedVersion = data.publishedVersion;
+      _revision = data.revision;
+      _remoteHistory = data.history;
+      _editing = draft != null;
+      _draftSaved = draft != null;
+      _scheduled = data.scheduled != null;
+      _scheduledDate = data.scheduled?['effectiveAt'] is String
+          ? DateTime.tryParse(data.scheduled!['effectiveAt'] as String) : null;
+      for (var i = 0; i < 4; i++) {
+        _controllers[i].text = working[i].toString();
+      }
+      _busy = false;
+      _loadError = null;
+    });
+  }
+
+  Future<void> _loadRemote() async {
+    try {
+      final data = await _service.load('ADMIN');
+      if (mounted) _applyRemote(data);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _loadError = e.toString();
+      });
+    }
+  }
+
+  Future<void> _persist(
+    Future<CommercialPricingState> Function() operation,
+  ) async {
+    setState(() => _busy = true);
+    try {
+      final data = await operation();
+      if (mounted) _applyRemote(data);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _message(e.toString());
+      await _loadRemote();
+    }
   }
 
   List<int>? _values() {
