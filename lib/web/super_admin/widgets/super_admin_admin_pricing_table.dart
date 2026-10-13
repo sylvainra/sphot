@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/commercial_pricing_service.dart';
 
-/// Ecran ADMIN de test : aucun changement Firestore, abonnement ou facture.
+/// Grille ADMIN: les prix versionnes sont stockes dans un catalogue Firestore isole.
 class SuperAdminAdminPricingTable extends StatefulWidget {
   const SuperAdminAdminPricingTable({super.key, required this.sessionToken});
 
@@ -589,7 +589,7 @@ class _SuperAdminAdminPricingTableState
                 ],
                 if (_scheduled)
                   _button(
-                    'ANNULER LA PROGRAMMATION (TEST)',
+                    'ANNULER LA PROGRAMMATION',
                     Icons.event_busy,
                     _busy ? null : () => _persist(() => _service.cancelSchedule(
                       'ADMIN', revision: _revision,
@@ -599,7 +599,7 @@ class _SuperAdminAdminPricingTableState
             ),
             if (_scheduledDate != null)
               Text(
-                'Programmée (test) : ${_scheduledDate!.day}/'
+                'Programmée : ${_scheduledDate!.day}/'
                 '${_scheduledDate!.month}/${_scheduledDate!.year}',
                 style: const TextStyle(color: _blue),
               ),
