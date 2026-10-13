@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../models/advertising_pricing_config.dart';
 import '../../../services/admin_logo_storage_service.dart';
 import '../../../services/sphot_media_storage_service.dart';
@@ -112,7 +113,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Color _sphotHoverColor = adminColor;
 
   bool _showSphotEditorPanel = false;
-  bool _showAdminWelcomePromotion = true;
+  bool _showAdminWelcomePromotion = false;
+  bool _welcomePromotionStateLoaded = false;
+  bool _welcomePromotionSeenLocally = false;
   bool _showSauveteurEditorPanel = false;
   bool _showSauveteursManagementPanel = false;
   bool _showSurveillancePeriodsPanel = false;
@@ -6294,7 +6297,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               tooltip: 'Fermer le message et afficher la carte',
                               icon: const Icon(Icons.close_rounded, color: adminColor),
                               onPressed: () {
-                                setState(() => _showAdminWelcomePromotion = false);
+                                _dismissAdminWelcomePromotion();
                               },
                             ),
                           ],
@@ -13879,6 +13882,55 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  // Le message commercial concerne la toute premiere utilisation de
+  // l'espace ADMIN. La fermeture est memorisee par profil, y compris
+  // apres une nouvelle connexion, et synchronisee dans adminRequests.
+  String get _welcomePromotionStorageKey =>
+      'sphot_admin_welcome_promotion_seen_${widget.adminUid.trim()}';
+
+  Future<void> _loadAdminWelcomePromotionState() async {
+    bool seen = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      seen = prefs.getBool(_welcomePromotionStorageKey) ?? false;
+    } catch (_) {
+      // Firestore conserve egalement une trace de la premiere fermeture.
+    }
+    if (!mounted) return;
+    setState(() {
+      _welcomePromotionSeenLocally = seen;
+      _welcomePromotionStateLoaded = true;
+      _showAdminWelcomePromotion = !seen;
+    });
+  }
+
+  Future<void> _dismissAdminWelcomePromotion() async {
+    if (!_showAdminWelcomePromotion) return;
+    setState(() {
+      _showAdminWelcomePromotion = false;
+      _welcomePromotionSeenLocally = true;
+    });
+    final uid = widget.adminUid.trim();
+    if (uid.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_welcomePromotionStorageKey, true);
+    } catch (_) {
+      // Les restrictions de stockage navigateur ne doivent pas bloquer l'UI.
+    }
+    try {
+      await FirebaseFirestore.instance
+          .collection('adminRequests')
+          .doc(uid)
+          .set({
+            'welcomePromotionSeenAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+    } catch (_) {
+      // Sur un navigateur qui refuse cette ecriture, la preference locale
+      // empeche toujours une nouvelle ouverture sur le meme profil/browser.
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -13894,6 +13946,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _loadAllLegalChaptersFromFirebase();
 
     _loadAdministratorTerritoryCenter();
+    _loadAdminWelcomePromotionState();
 
     if (widget.mainCouranteToken.trim().isNotEmpty) {
       Future<void>.delayed(
@@ -15126,6 +15179,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               _buildMapStyleButton(),
 
                               if (_showAdminWelcomePromotion &&
+                                  _welcomePromotionStateLoaded &&
+                                  !_welcomePromotionSeenLocally &&
+                                  docs.isEmpty &&
+                                  !hasAlreadyRequestedTrial &&
+                                  currentAdminRequest != null &&
+                                  currentAdminRequest['welcomePromotionSeenAt'] == null &&
                                   !_showSphotEditorPanel &&
                                   !_showSurveillancePeriodsPanel &&
                                   !_showSauveteurEditorPanel &&
@@ -15193,6 +15252,22 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           AdminPaymentPanel(
                             adminUid: widget.adminUid,
                             organisationName: paymentOrganisationName,
+                            rescueStationNames: {
+                              for (final doc in docs)
+                                if (doc.data()['isPosteSecours'] == true ||
+                                    (doc.data()['typeSphot'] ?? '')
+                                        .toString()
+                                        .toUpperCase()
+                                        .contains('POSTE DE SECOURS'))
+                                  doc.id: _firstCleanText([
+                                    doc.data()['nomSphot'],
+                                    doc.data()['nomSecours'],
+                                    doc.data()['name'],
+                                    doc.data()['nom'],
+                                    doc.data()['title'],
+                                    doc.id,
+                                  ]),
+                            },
                             // Memes SPHOTS que ceux de la carte de l'Admin :
                             // ne pas utiliser le compteur historique de
                             // subscriptions/{uid} pour cette estimation.
