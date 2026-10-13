@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import '../services/commercial_pricing_service.dart';
 
 /// Preview of the new advertiser tariff editor.
 /// All changes (including SAVE and PUBLISH) are session-only in this test.
 class SuperAdminAdvertiserPricingTable extends StatefulWidget {
-  const SuperAdminAdvertiserPricingTable({super.key});
+  const SuperAdminAdvertiserPricingTable({super.key, required this.sessionToken});
+
+  final String sessionToken;
 
   @override
   State<SuperAdminAdvertiserPricingTable> createState() =>
@@ -64,6 +67,11 @@ class _SuperAdminAdvertiserPricingTableState
   bool _draftSaved = false;
   DateTime? _scheduledFor;
   bool _simulatedScheduled = false;
+  late final CommercialPricingService _service;
+  int _revision = 0;
+  bool _busy = true;
+  String? _loadError;
+  List<Map<String, dynamic>> _remoteHistory = [];
 
   String _key(int level, int offer, int duration) =>
       '$level:$offer:$duration';
@@ -81,7 +89,74 @@ class _SuperAdminAdvertiserPricingTableState
         }
       }
     }
+    _service = CommercialPricingService(widget.sessionToken);
+    _loadRemote();
   }
+
+
+  void _applyRemote(CommercialPricingState data) {
+    final published = Map<String, dynamic>.from(data.publishedPrices as Map)
+        .map((key, value) => MapEntry(key, (value as num).toInt()));
+    final draft = data.draft;
+    final working = draft == null ? published :
+        Map<String, dynamic>.from(draft['prices'] as Map)
+            .map((key, value) => MapEntry(key, (value as num).toInt()));
+    setState(() {
+      _published = published;
+      _publishedVersion = data.publishedVersion;
+      _revision = data.revision;
+      _remoteHistory = data.history;
+      _editing = draft != null;
+      _draftSaved = draft != null;
+      _simulatedScheduled = data.scheduled != null;
+      _scheduledFor = data.scheduled?['effectiveAt'] is String
+          ? DateTime.tryParse(data.scheduled!['effectiveAt'] as String) : null;
+      _publishedPersonalised
+        ..clear()
+        ..addAll(data.publishedPersonalised);
+      _personalised
+        ..clear()
+        ..addAll(draft == null ?
+            data.publishedPersonalised :
+            (draft['personalised'] as List<dynamic>? ?? [])
+                .map((v) => v.toString()));
+      for (final entry in working.entries) {
+        _fields[entry.key]!.text = entry.value.toString();
+      }
+      _pivotInput.text = _fields[_key(0, 0, 0)]!.text;
+      _busy = false;
+      _loadError = null;
+    });
+  }
+
+  Future<void> _loadRemote() async {
+    try {
+      final data = await _service.load('ADVERTISER');
+      if (mounted) _applyRemote(data);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _loadError = e.toString();
+      });
+    }
+  }
+
+  Future<void> _persist(
+    Future<CommercialPricingState> Function() operation,
+  ) async {
+    setState(() => _busy = true);
+    try {
+      final data = await operation();
+      if (mounted) _applyRemote(data);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _notice(e.toString());
+      await _loadRemote();
+    }
+  }
+
 
   int? _amount(String key) {
     return int.tryParse(_fields[key]!.text.trim().replaceAll(' ', ''));
