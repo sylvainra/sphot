@@ -25,7 +25,9 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
     required String description,
   }) {
     final selected = _method == value;
-    return InkWell(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
       onTap: () => setState(() => _method = value),
       borderRadius: BorderRadius.circular(12),
       child: Container(
@@ -73,6 +75,7 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
