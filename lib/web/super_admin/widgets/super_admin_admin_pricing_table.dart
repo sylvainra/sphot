@@ -252,9 +252,9 @@ class _SuperAdminAdminPricingTableState
         content: Text(
           'Les quatre tarifs de la version ADMIN-V$sourceVersion seront '
           'copiés à l’identique dans un nouveau brouillon.\n\n'
-          'La grille publiée et toutes les archives resteront inchangées. '
-          'Vous pourrez contrôler et modifier le nouveau brouillon avant '
-          'de l’enregistrer ou de le publier.',
+          'Le nouveau brouillon sera immédiatement enregistré dans Firestore. '
+          'La grille publiée et les archives resteront inchangées. '
+          'Vous pourrez le contrôler et le modifier avant publication.',
         ),
         actions: [
           TextButton(
