@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/commercial_pricing_service.dart';
+import 'commercial_pricing_history_format.dart';
 
 /// Catalogue annonceur Firestore, isole des tarifs encore utilises en production.
 /// Les devis, commandes et paiements ne sont pas modifies par cet ecran.
@@ -72,7 +73,6 @@ class _SuperAdminAdvertiserPricingTableState
   int _revision = 0;
   bool _busy = true;
   String? _loadError;
-  List<Map<String, dynamic>> _remoteHistory = [];
 
   String _key(int level, int offer, int duration) =>
       '$level:$offer:$duration';
@@ -109,7 +109,6 @@ class _SuperAdminAdvertiserPricingTableState
           (data.scheduled?['version'] as num?)?.toInt() ??
           data.latestVersion + 1;
       _revision = data.revision;
-      _remoteHistory = data.history;
       _editing = draft != null;
       _draftSaved = draft != null;
       _simulatedScheduled = data.scheduled != null;
@@ -587,11 +586,9 @@ class _SuperAdminAdvertiserPricingTableState
   }
 
   Future<void> _showHistory() async {
-    List<Map<String, dynamic>> records;
+    CommercialPricingState data;
     try {
-      final data = await _service.load('ADVERTISER');
-      if (!mounted) return;
-      records = data.history;
+      data = await _service.load('ADVERTISER');
     } catch (e) {
       if (!mounted) return;
       _notice(e.toString());
@@ -600,53 +597,104 @@ class _SuperAdminAdvertiserPricingTableState
     if (!mounted) return;
     await showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('HISTORIQUE DES GRILLES ANNONCEUR'),
         content: SizedBox(
-          width: 750,
-          height: 450,
-          child: records.isEmpty
-              ? const Center(child: Text(
-                  'La grille initiale sera historisée au premier enregistrement.'))
-              : ListView(
-                  children: [
-                    for (final version in records)
-                      ExpansionTile(
-                        title: Text('FR-V${version["version"]} · ${version["status"]}'),
-                        subtitle: const Text('90 tarifs archivés, lecture seule'),
-                        children: [
-                          for (var l = 0; l < _levels.length; l++) ...[
-                            Padding(
-                              padding: const EdgeInsets.only(top: 10, bottom: 4),
-                              child: Text(_levels[l],
-                                  style: const TextStyle(
-                                    color: _blue, fontWeight: FontWeight.w900)),
-                            ),
-                            for (var o = 0; o < _offers.length; o++)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
-                                child: Text(
-                                  '${_offers[o]} : ${List<String>.generate(
-                                    _durations.length, (d) {
-                                      final key = _key(l, o, d);
-                                      final raw = (version["prices"] as Map)[key];
-                                      final amount = (raw as num).toInt();
-                                      return "${_durations[d]} : $amount €";
-                                    }).join("  ·  ")}',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
-                          ],
-                          const SizedBox(height: 10),
-                        ],
-                      ),
-                  ],
+          width: 810,
+          height: 475,
+          child: ListView(
+            children: [
+              if (data.draft != null)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'FR-V${data.draft!["version"]} · BROUILLON ENREGISTRÉ',
+                          style: const TextStyle(
+                            color: _blue, fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        for (final event in
+                            CommercialPricingHistoryFormat.draftEvents(data.draft!))
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: SelectableText(event),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
+              if (data.history.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('Aucune version historisée pour le moment.'),
+                ),
+              for (final version in data.history)
+                Card(
+                  child: ExpansionTile(
+                    title: Text(
+                      'FR-V${version["version"]} · '
+                      '${CommercialPricingHistoryFormat.status(version["status"])}',
+                      style: const TextStyle(
+                        color: _blue, fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 3),
+                        for (final event in
+                            CommercialPricingHistoryFormat.events(version))
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: SelectableText(
+                              event,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        const Text('Afficher les 90 tarifs de cette version',
+                          style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                    children: [
+                      for (var l = 0; l < _levels.length; l++) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10, bottom: 4),
+                          child: Text(_levels[l],
+                              style: const TextStyle(
+                                color: _blue, fontWeight: FontWeight.w900)),
+                        ),
+                        for (var o = 0; o < _offers.length; o++)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            child: Text(
+                              '${_offers[o]} : ${List<String>.generate(
+                                _durations.length, (d) {
+                                  final key = _key(l, o, d);
+                                  final amount = (version["prices"] as Map)[key];
+                                  return "${_durations[d]} : $amount €";
+                                }).join("  ·  ")}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                      ],
+                      const SizedBox(height: 10),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx),
-              child: const Text('FERMER')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('FERMER'),
+          ),
         ],
       ),
     );
