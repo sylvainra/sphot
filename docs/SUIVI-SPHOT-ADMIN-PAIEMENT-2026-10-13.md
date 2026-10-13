@@ -47,3 +47,9 @@
 - Vérifier la première connexion sur nouvel Admin et ancien profil, puis une reconnexion, y compris sur un second navigateur (Firestore doit empêcher la réapparition).
 - Tester rendu, suppression effective du soulignement jaune, noms des postes, tranches et total. Ne pas annoncer de compilation validée avant de l'avoir exécutée.
 - Préserver les autres étapes et workflows validés.
+
+## Retours du test visuel du 13 octobre (21 h 37)
+
+- **Validé par l'utilisateur** : largeur du volet PAIEMENT et taille du marker Fire SVG, numéros et noms des SPHOTS, présentation comptable et total rouge visibles sur capture. Ne plus toucher à ces éléments sans nouvelle demande.
+- **Corrigé** : suppression de « Grille tarifaire utilisée » et de sa référence isolée ; intitulé dynamique **« TARIFICATION SUIVANT GRILLE TARIFAIRE ${quote.pricingReference} »** dans `lib/web/admin/pages/admin_payment_panel.dart`, commit `04e0236fc4198f0b6fbe5f76b3ddee654ec8713f`.
+- **À décider ensuite (CGV)** : intégrer la consultation et l'acceptation explicite des CGV dans `ABONNEMENT`, idéalement juste avant « VALIDER LA COMMANDE D’ABONNEMENT », en réutilisant les versions publiées de `legalDocuments`, en historisant l'acceptation par version, UID et horodatage Firestore. La grille de tarification n'est pas une acceptation des CGV. **Ne pas coder ni activer la validation juridique sur une CGV non publiée sans accord sur le point du parcours.**
