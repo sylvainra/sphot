@@ -78,6 +78,20 @@ function defaultState(type) {
     draft: null, scheduled: null, seeded: true,
   };
 }
+function timeIso(value) {
+  return value && typeof value.toDate === "function" ?
+    value.toDate().toISOString() : null;
+}
+
+function serializeDraft(draft) {
+  if (!draft) return null;
+  return {
+    ...draft,
+    createdAt: timeIso(draft.createdAt),
+    updatedAt: timeIso(draft.updatedAt),
+  };
+}
+
 function externalState(data, type) {
   const state = data || defaultState(type);
   return {
@@ -87,10 +101,11 @@ function externalState(data, type) {
     revision: state.revision,
     publishedPrices: state.publishedPrices,
     publishedPersonalised: state.publishedPersonalised || [],
-    draft: state.draft || null,
+    draft: serializeDraft(state.draft),
     scheduled: state.scheduled ? {
       ...state.scheduled,
-      effectiveAt: state.scheduled.effectiveAt.toDate().toISOString(),
+      effectiveAt: timeIso(state.scheduled.effectiveAt),
+      scheduledAt: timeIso(state.scheduled.scheduledAt),
     } : null,
     seeded: !data,
   };
@@ -133,7 +148,17 @@ async function load(admin, type) {
       return {
         version: d.version,
         status: d.status,
-        effectiveAt: d.effectiveAt ? d.effectiveAt.toDate().toISOString() : null,
+        // All instants are recorded in UTC and formatted in local time by Flutter.
+        effectiveAt: timeIso(d.effectiveAt),
+        createdAt: timeIso(d.createdAt),
+        scheduledAt: timeIso(d.scheduledAt),
+        publishedAt: timeIso(d.publishedAt),
+        archivedAt: timeIso(d.archivedAt),
+        cancelledAt: timeIso(d.cancelledAt),
+        createdBy: d.createdBy || null,
+        publishedBy: d.publishedBy || null,
+        archivedBy: d.archivedBy || null,
+        cancelledBy: d.cancelledBy || null,
         prices: d.prices,
       };
     }),
@@ -163,15 +188,22 @@ async function saveDraft(admin, type, body, login) {
       tx.create(publishedRef, {
         version: 1, status: "published",
         prices: seed(type), personalised: [],
+        // Reference snapshot: do not call this the original publication date.
         effectiveAt: admin.firestore.Timestamp.now(), createdBy: "seed",
+        createdAt: admin.firestore.Timestamp.now(),
       });
     }
     const draftVersion = current.draft ?
       current.draft.version : current.latestVersion + 1;
+    const now = admin.firestore.Timestamp.now();
     const draft = {
       version: draftVersion, prices: validated.prices,
       personalised: validated.personalised,
-      updatedAt: admin.firestore.Timestamp.now(),
+      createdAt: current.draft && current.draft.createdAt ?
+        current.draft.createdAt : now,
+      createdBy: current.draft && current.draft.createdBy ?
+        current.draft.createdBy : login,
+      updatedAt: now,
       updatedBy: login,
     };
     tx.set(root, {
@@ -244,14 +276,21 @@ async function publish(admin, type, body, login) {
       prices: draft.prices, personalised: draft.personalised,
       effectiveAt: admin.firestore.Timestamp.fromDate(effectiveDate),
       createdAt: now, createdBy: login,
+      ...(scheduling ? {scheduledAt: now} :
+        {publishedAt: now, publishedBy: login}),
     });
     if (!scheduling && previous.exists) {
-      tx.update(previousRef, {status: "archived"});
+      tx.update(previousRef, {
+        status: "archived",
+        archivedAt: now,
+        archivedBy: login,
+      });
     }
     tx.update(root, {
       ...(scheduling ? {
         scheduled: {version: draft.version, prices: draft.prices,
           personalised: draft.personalised,
+          scheduledAt: now,
           effectiveAt: admin.firestore.Timestamp.fromDate(effectiveDate)},
       } : {
         publishedVersion: draft.version,
@@ -266,7 +305,7 @@ async function publish(admin, type, body, login) {
   return load(admin, type);
 }
 
-async function cancelSchedule(admin, type, body) {
+async function cancelSchedule(admin, type, body, login) {
   const db = admin.firestore();
   const root = db.collection(MARKETS).doc(marketId(type));
   await db.runTransaction(async (tx) => {
@@ -284,7 +323,11 @@ async function cancelSchedule(admin, type, body) {
     }
     const futureRef = root.collection("versions").doc(versionId(scheduled.version));
     const future = await tx.get(futureRef);
-    if (future.exists) tx.update(futureRef, {status: "cancelled"});
+    if (future.exists) tx.update(futureRef, {
+      status: "cancelled",
+      cancelledAt: admin.firestore.Timestamp.now(),
+      cancelledBy: login,
+    });
     tx.update(root, {
       scheduled: null,
       draft: {version: current.latestVersion + 1,
@@ -357,7 +400,7 @@ function endpoint({admin, crypto, onRequest}) {
             case "schedule":
               result = await publish(admin, type, body, login); break;
             case "cancelSchedule":
-              result = await cancelSchedule(admin, type, body); break;
+              result = await cancelSchedule(admin, type, body, login); break;
             default: throw err(400, "Action inconnue.");
           }
           response.status(200).json({success: true, data: result});
@@ -393,8 +436,17 @@ function scheduler({admin, onSchedule}) {
             ]);
             if (!scheduledVersion.exists ||
                 scheduledVersion.data().status !== "scheduled") return;
-            if (previous.exists) tx.update(previousRef, {status: "archived"});
-            tx.update(nextRef, {status: "published"});
+            const now = admin.firestore.Timestamp.now();
+            if (previous.exists) tx.update(previousRef, {
+              status: "archived",
+              archivedAt: now,
+              archivedBy: "scheduled-activation",
+            });
+            tx.update(nextRef, {
+              status: "published",
+              publishedAt: now,
+              publishedBy: "scheduled-activation",
+            });
             tx.update(market.ref, {
               publishedVersion: next.version,
               publishedPrices: next.prices,
