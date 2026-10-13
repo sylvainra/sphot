@@ -2,11 +2,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../../models/advertising_pricing_config.dart';
+import 'super_admin_advertiser_pricing_table.dart';
 
 class SuperAdminPricingPanel extends StatefulWidget {
-  const SuperAdminPricingPanel({super.key, required this.onClose});
+  const SuperAdminPricingPanel({
+    super.key,
+    required this.onClose,
+    required this.selectedTab,
+    required this.onTabChanged,
+  });
 
   final VoidCallback onClose;
+  final int selectedTab;
+  final ValueChanged<int> onTabChanged;
 
   @override
   State<SuperAdminPricingPanel> createState() => _SuperAdminPricingPanelState();
@@ -16,12 +24,10 @@ class _SuperAdminPricingPanelState extends State<SuperAdminPricingPanel> {
   static const _blue = Color(0xFF1E3A8A);
   static const _red = Color(0xFFDC2626);
 
-  int _selectedTab = 0;
-
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 560,
+      width: widget.selectedTab == 0 ? 560 : null,
       decoration: BoxDecoration(
         color: const Color(0xFFF5F7FA),
         border: Border(
@@ -69,10 +75,10 @@ class _SuperAdminPricingPanelState extends State<SuperAdminPricingPanel> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: IndexedStack(
-                  index: _selectedTab,
+                  index: widget.selectedTab,
                   children: const [
                     _AdminPricingEditor(),
-                    _AdvertiserPricingEditor(),
+                    SuperAdminAdvertiserPricingTable(),
                   ],
                 ),
               ),
@@ -84,9 +90,9 @@ class _SuperAdminPricingPanelState extends State<SuperAdminPricingPanel> {
   }
 
   Widget _tabButton(String label, int index) {
-    final selected = _selectedTab == index;
+    final selected = widget.selectedTab == index;
     return OutlinedButton(
-      onPressed: () => setState(() => _selectedTab = index),
+      onPressed: () => widget.onTabChanged(index),
       style: OutlinedButton.styleFrom(
         backgroundColor: selected ? _red.withOpacity(0.08) : Colors.white,
         foregroundColor: selected ? _red : _blue,
