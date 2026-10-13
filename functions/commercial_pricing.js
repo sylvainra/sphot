@@ -159,6 +159,7 @@ async function load(admin, type) {
         publishedBy: d.publishedBy || null,
         archivedBy: d.archivedBy || null,
         cancelledBy: d.cancelledBy || null,
+        restoredFromVersion: d.restoredFromVersion || null,
         prices: d.prices,
       };
     }),
@@ -205,6 +206,8 @@ async function saveDraft(admin, type, body, login) {
         current.draft.createdBy : login,
       updatedAt: now,
       updatedBy: login,
+      ...(current.draft && current.draft.restoredFromVersion ?
+        {restoredFromVersion: current.draft.restoredFromVersion} : {}),
     };
     tx.set(root, {
       country: "FR", currency: "EUR", type,
@@ -214,6 +217,63 @@ async function saveDraft(admin, type, body, login) {
       publishedPersonalised: current.publishedPersonalised || [],
       draft, scheduled: null,
       revision: expected + 1,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+  return load(admin, type);
+}
+
+/**
+ * Creates a NEW, saved draft from a historical immutable pricing version.
+ * This never modifies the source version or the currently published prices.
+ * An existing draft/schedule must be explicitly handled first.
+ */
+async function restoreVersion(admin, type, body, login) {
+  const sourceVersion = body.sourceVersion;
+  const expectedRevision = body.revision;
+  if (!Number.isSafeInteger(sourceVersion) || sourceVersion < 1 ||
+      !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    throw err(400, "Version source ou révision invalide.");
+  }
+  const db = admin.firestore();
+  const root = db.collection(MARKETS).doc(marketId(type));
+  await db.runTransaction(async (tx) => {
+    const sourceRef = root.collection("versions").doc(versionId(sourceVersion));
+    const [rootSnap, sourceSnap] = await Promise.all([
+      tx.get(root), tx.get(sourceRef),
+    ]);
+    if (!rootSnap.exists || rootSnap.data().revision !== expectedRevision) {
+      throw err(409, "La grille a changé. Fermez et rouvrez l'historique.");
+    }
+    const current = rootSnap.data();
+    if (current.draft) {
+      throw err(409, "Un brouillon existe déjà : publiez-le ou annulez-le.");
+    }
+    if (current.scheduled) {
+      throw err(409, "Annulez la programmation avant une reprise historique.");
+    }
+    if (!sourceSnap.exists) {
+      throw err(404, "Cette version historique n'existe pas.");
+    }
+    const source = sourceSnap.data();
+    if (source.version !== sourceVersion ||
+        !["published", "archived"].includes(source.status)) {
+      throw err(409, "Seules les versions publiées ou archivées sont reprises.");
+    }
+    const snapshot = validate(type, source.prices, source.personalised || []);
+    const now = admin.firestore.Timestamp.now();
+    tx.update(root, {
+      draft: {
+        version: current.latestVersion + 1,
+        prices: snapshot.prices,
+        personalised: snapshot.personalised,
+        restoredFromVersion: sourceVersion,
+        createdAt: now,
+        createdBy: login,
+        updatedAt: now,
+        updatedBy: login,
+      },
+      revision: current.revision + 1,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
   });
@@ -276,6 +336,8 @@ async function publish(admin, type, body, login) {
       prices: draft.prices, personalised: draft.personalised,
       effectiveAt: admin.firestore.Timestamp.fromDate(effectiveDate),
       createdAt: now, createdBy: login,
+      ...(draft.restoredFromVersion ?
+        {restoredFromVersion: draft.restoredFromVersion} : {}),
       ...(scheduling ? {scheduledAt: now} :
         {publishedAt: now, publishedBy: login}),
     });
@@ -398,6 +460,8 @@ function endpoint({admin, crypto, onRequest}) {
               result = await saveDraft(admin, type, body, login); break;
             case "discard":
               result = await discardDraft(admin, type, body); break;
+            case "restoreVersion":
+              result = await restoreVersion(admin, type, body, login); break;
             case "publish":
             case "schedule":
               result = await publish(admin, type, body, login); break;
