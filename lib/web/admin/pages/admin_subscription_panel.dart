@@ -24,7 +24,28 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   static const Color _grey = Color(0xFF6B7280);
   static const Color _green = Color(0xFF16A34A);
   static const Color _orange = Color(0xFFF59E0B);
-  static const double _fallbackAnnualPricePerStationExclTax = 500.0;
+  static const List<double> _defaultTierPrices = <double>[499, 399, 299, 199];
+
+  double _tierPrice(Map<String, dynamic>? pricing, int tier) {
+    const names = <String>[
+      'firstStationAnnualPriceExclTax',
+      'stations2To4AnnualPriceExclTax',
+      'stations5To9AnnualPriceExclTax',
+      'stations10PlusAnnualPriceExclTax',
+    ];
+    final configured = _number(pricing?[names[tier]]);
+    return configured > 0 ? configured : _defaultTierPrices[tier];
+  }
+
+  String _euros(double value) => '${value.toStringAsFixed(2).replaceAll('.', ',')} €';
+
+  double _progressiveAnnualTotal(int count, List<double> prices) {
+    if (count <= 0) return 0;
+    return prices[0] +
+        (count > 1 ? (count.clamp(1, 4) - 1) * prices[1] : 0) +
+        (count > 4 ? (count.clamp(4, 9) - 4) * prices[2] : 0) +
+        (count > 9 ? (count - 9) * prices[3] : 0);
+  }
 
   final Map<String, String> _draft = <String, String>{};
   final Set<String> _expandedSections = <String>{};
@@ -690,13 +711,13 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     builder: (context, pricingSnapshot) {
       final pricingData = pricingSnapshot.data?.data();
 
-      final configuredPrice = _number(
-        pricingData?['annualPricePerRescueStationExclTax'],
+      final tierPrices = List<double>.generate(
+        4,
+        (index) => _tierPrice(pricingData, index),
       );
-
-      final annualPricePerStationExclTax = configuredPrice > 0
-          ? configuredPrice
-          : _fallbackAnnualPricePerStationExclTax;
+      final pricingGridName = _text(pricingData?['name']).isNotEmpty
+          ? _text(pricingData?['name'])
+          : 'Grille SPHOT ADMIN';
 
       return FutureBuilder<String>(
       future: _territoireIdFuture,
@@ -758,7 +779,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                 .toSet();
             final selectedCount = activeSelectedIds.length;
             final annualTotalExclTax =
-                selectedCount * annualPricePerStationExclTax;
+                _progressiveAnnualTotal(selectedCount, tierPrices);
 
             final selectedStations = rescueStations
                 .where((document) => activeSelectedIds.contains(document.id))
@@ -857,70 +878,43 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        "$selectedCount poste${selectedCount > 1 ? 's' : ''} sélectionné${selectedCount > 1 ? 's' : ''}",
-                        style: const TextStyle(
-                          color: _blue,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-  'Tarif unique : ${annualPricePerStationExclTax.toStringAsFixed(2).replaceAll('.', ',')} € HT par poste et par an',
-  style: const TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        'TOTAL ANNUEL HT : ${annualTotalExclTax.toStringAsFixed(2).replaceAll('.', ',')} €',
-                        style: const TextStyle(
-                          color: _red,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
+                      const Text('PAIEMENT',
+                        style: TextStyle(color: _blue, fontSize: 14, fontWeight: FontWeight.w900)),
                       const SizedBox(height: 12),
-                      const Divider(height: 1),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'PÉRIODE D\'ABONNEMENT',
-                        style: TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
+                      const Text('Postes de Secours sollicités',
+                        style: TextStyle(color: _blue, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 5),
+                      if (selectedStations.isEmpty)
+                        const Text('Aucun poste sélectionné', style: TextStyle(color: _grey))
+                      else
+                        ...selectedStations.map((station) => Padding(
+                          padding: const EdgeInsets.only(bottom: 3),
+                          child: Text(_text(station['name']),
+                            style: const TextStyle(color: _blue, fontSize: 12)),
+                        )),
+                      const SizedBox(height: 12),
+                      const Text('Grille tarifaire utilisée',
+                        style: TextStyle(color: _blue, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 4),
+                      Text(pricingGridName, style: const TextStyle(color: _blue)),
+                      const SizedBox(height: 14),
+                      const Text('TARIFICATION',
+                        style: TextStyle(color: _blue, fontWeight: FontWeight.w900)),
                       const SizedBox(height: 6),
-                      const Text(
-                        'Début : date réelle d\'activation',
-                        style: TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                      if (selectedCount > 0)
+                        Text('1er Poste de Secours : ${_euros(tierPrices[0])}'),
+                      if (selectedCount > 1)
+                        Text('De 2 à 4 Postes de Secours : ${selectedCount.clamp(1, 4) - 1} × ${_euros(tierPrices[1])}'),
+                      if (selectedCount > 4)
+                        Text('De 5 à 9 Postes de Secours : ${selectedCount.clamp(4, 9) - 4} × ${_euros(tierPrices[2])}'),
+                      if (selectedCount > 9)
+                        Text('À partir du 10e Poste de Secours : ${selectedCount - 9} × ${_euros(tierPrices[3])}'),
+                      const SizedBox(height: 10),
+                      Text('Total annuel HT : ${_euros(annualTotalExclTax)}',
+                        style: const TextStyle(color: _red, fontSize: 13, fontWeight: FontWeight.w900)),
                       const SizedBox(height: 3),
-                      const Text(
-                        'Fin : 31 décembre de l\'année d\'activation',
-                        style: TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      const Text(
-                        'Renouvellement : du 1er janvier au 31 décembre',
-                        style: TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),                      
+                      const Text('Avant TVA et fiscalité...',
+                        style: TextStyle(color: _grey, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -945,8 +939,9 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                             activeSelectedIds.toList(),
                         'selectedRescueStations': selectedStations,
                         'numberOfRescueStations': selectedCount,
-                        'pricePerStationExclTax':
-                            annualPricePerStationExclTax,
+                        'pricePerStationExclTax': tierPrices[0],
+                        'pricingGridName': pricingGridName,
+                        'pricingTierAnnualPricesExclTax': tierPrices,
                         'annualAmountExclTax': annualTotalExclTax,
                         'billingCycle': 'annual',
                         'subscriptionPeriodRule': 'calendar_year',
