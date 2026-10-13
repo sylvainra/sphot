@@ -32,6 +32,10 @@ class CommercialPricingHistoryFormat {
   static List<String> events(Map<String, dynamic> version) {
     final lines = <String>[];
     final isInitialReference = version['createdBy'] == 'seed';
+    final restoredFrom = version['restoredFromVersion'];
+    if (restoredFrom is num) {
+      lines.add('Reprise exacte des tarifs de la version V${restoredFrom.toInt()}');
+    }
     final createdAt = version['createdAt'];
     final effectiveAt = version['effectiveAt'];
     final publishedAt = version['publishedAt'];
@@ -80,6 +84,10 @@ class CommercialPricingHistoryFormat {
 
   static List<String> draftEvents(Map<String, dynamic> draft) {
     final events = <String>[];
+    final restoredFrom = draft['restoredFromVersion'];
+    if (restoredFrom is num) {
+      events.add('Brouillon repris intégralement de V${restoredFrom.toInt()}');
+    }
     if (draft['createdAt'] != null) {
       events.add('Brouillon créé le ${time(draft['createdAt'])}');
     }
