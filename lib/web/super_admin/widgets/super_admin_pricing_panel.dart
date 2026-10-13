@@ -8,13 +8,13 @@ class SuperAdminPricingPanel extends StatefulWidget {
   const SuperAdminPricingPanel({
     super.key,
     required this.onClose,
-    required this.selectedTab,
-    required this.onTabChanged,
+    this.selectedTab = 0,
+    this.onTabChanged,
   });
 
   final VoidCallback onClose;
   final int selectedTab;
-  final ValueChanged<int> onTabChanged;
+  final ValueChanged<int>? onTabChanged;
 
   @override
   State<SuperAdminPricingPanel> createState() => _SuperAdminPricingPanelState();
@@ -23,11 +23,14 @@ class SuperAdminPricingPanel extends StatefulWidget {
 class _SuperAdminPricingPanelState extends State<SuperAdminPricingPanel> {
   static const _blue = Color(0xFF1E3A8A);
   static const _red = Color(0xFFDC2626);
+  int _localTab = 0;
+
+  int get _tab => widget.onTabChanged == null ? _localTab : widget.selectedTab;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: widget.selectedTab == 0 ? 560 : null,
+      width: widget.onTabChanged == null || _tab == 0 ? 560 : null,
       decoration: BoxDecoration(
         color: const Color(0xFFF5F7FA),
         border: Border(
@@ -75,7 +78,7 @@ class _SuperAdminPricingPanelState extends State<SuperAdminPricingPanel> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: IndexedStack(
-                  index: widget.selectedTab,
+                  index: _tab,
                   children: const [
                     _AdminPricingEditor(),
                     SuperAdminAdvertiserPricingTable(),
@@ -90,9 +93,15 @@ class _SuperAdminPricingPanelState extends State<SuperAdminPricingPanel> {
   }
 
   Widget _tabButton(String label, int index) {
-    final selected = widget.selectedTab == index;
+    final selected = _tab == index;
     return OutlinedButton(
-      onPressed: () => widget.onTabChanged(index),
+      onPressed: () {
+        if (widget.onTabChanged != null) {
+          widget.onTabChanged!(index);
+        } else {
+          setState(() => _localTab = index);
+        }
+      },
       style: OutlinedButton.styleFrom(
         backgroundColor: selected ? _red.withOpacity(0.08) : Colors.white,
         foregroundColor: selected ? _red : _blue,
