@@ -259,20 +259,40 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
                         padding: const EdgeInsets.only(bottom: 9),
                         child: _tierLine(line),
                       ),
-                  const Divider(height: 23),
-                  Text(
-                    'TOTAL ANNUEL HT : ${_money(quote.amountExclTax)}',
-                    style: const TextStyle(
-                      color: _blue, fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      decoration: TextDecoration.none,
-                    ),
+                  const Divider(height: 23, color: _border),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'TOTAL ANNUEL HT',
+                          style: TextStyle(
+                            color: Color(0xFFDC2626),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        _money(quote.amountExclTax),
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          color: Color(0xFFDC2626),
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 8),
                   const Text(
-                    'Avant TVA et fiscalité...',
+                    'Avant TVA et fiscalité applicable. Aucun devis contractuel '
+                    'ni montant à payer confirmé.',
                     style: TextStyle(
-                      color: _muted, fontSize: 11,
+                      color: _muted,
+                      fontSize: 11,
+                      height: 1.35,
                       decoration: TextDecoration.none,
                     ),
                   ),
@@ -294,19 +314,55 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
       4 => 'À partir du 10e Poste de Secours',
       _ => 'Tranche',
     };
-    final count = line['count'] as num;
+    final count = (line['count'] as num).toInt();
     final unit = line['unitExclTax'] as num;
-    // Tarifs exclusivement issus de la grille commerciale publiée.
-    final detail = tier == 1
-        ? '$label : ${_money(unit)}'
-        : '$label : ${count.toInt()} × ${_money(unit)}';
+    final amount = line['amountExclTax'] as num;
 
-    return Text(
-      detail,
-      style: const TextStyle(
-        color: Color(0xFF334155),
-        fontSize: 12, height: 1.35,
-        decoration: TextDecoration.none,
+    // Conserver les montants calculés par la grille commerciale publiée.
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Color(0xFF334155),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+                if (tier != 1) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    '$count × ${_money(unit)}',
+                    style: const TextStyle(
+                      color: _muted,
+                      fontSize: 11,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            _money(amount),
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              color: _blue,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              decoration: TextDecoration.none,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -362,46 +418,58 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 540,
-      decoration: const BoxDecoration(
-        color: _canvas,
-        border: Border(left: BorderSide(color: _border)),
+      width: 430,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.98),
+        border: Border(
+          left: BorderSide(color: _blue.withOpacity(0.45), width: 1.5),
+        ),
       ),
       child: DefaultTextStyle.merge(
         style: const TextStyle(decoration: TextDecoration.none),
         child: SafeArea(
           child: Column(
             children: [
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.fromLTRB(18, 12, 10, 12),
+              Padding(
+                padding: const EdgeInsets.all(20),
                 child: Row(
                   children: [
-                    const AdaptiveAssetImage(
-                      'data/icons/fire_red_icon.svg',
-                      width: 30, height: 34, fit: BoxFit.contain,
+                    const SizedBox(width: 6),
+                    Transform.translate(
+                      offset: const Offset(-12, 0),
+                      child: Transform.scale(
+                        scale: 1.5,
+                        alignment: Alignment.center,
+                        child: AdaptiveAssetImage(
+                          'data/icons/fire_red_icon.svg',
+                          width: 30,
+                          height: 30,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 10),
                     const Expanded(
                       child: Text(
                         'PAIEMENT',
                         style: TextStyle(
-                          color: _blue, fontSize: 20,
+                          color: _blue,
+                          fontSize: 20,
                           fontWeight: FontWeight.w900,
-                          letterSpacing: 1.1,
+                          letterSpacing: 1.2,
                           decoration: TextDecoration.none,
                         ),
                       ),
                     ),
                     IconButton(
+                      tooltip: 'Fermer',
                       onPressed: widget.onClose,
-                      icon: const Icon(Icons.close_rounded, color: _blue),
-                      tooltip: 'Fermer le volet paiement',
+                      icon: const Icon(Icons.close_rounded),
                     ),
                   ],
                 ),
               ),
-              const Divider(height: 1, color: _border),
+              Divider(height: 1, color: _blue.withOpacity(0.20)),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
