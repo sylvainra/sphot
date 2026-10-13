@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/commercial_pricing_service.dart';
+import 'commercial_pricing_history_format.dart';
 
 /// Grille ADMIN: les prix versionnes sont stockes dans un catalogue Firestore isole.
 class SuperAdminAdminPricingTable extends StatefulWidget {
@@ -29,7 +30,6 @@ class _SuperAdminAdminPricingTableState
 
   late final List<TextEditingController> _controllers;
   List<int> _published = List<int>.from(_original);
-  List<Map<String, dynamic>> _remoteHistory = [];
   late final CommercialPricingService _service;
   int _revision = 0;
   bool _busy = true;
@@ -66,7 +66,6 @@ class _SuperAdminAdminPricingTableState
           (data.scheduled?['version'] as num?)?.toInt() ??
           data.latestVersion + 1;
       _revision = data.revision;
-      _remoteHistory = data.history;
       _editing = draft != null;
       _draftSaved = draft != null;
       _scheduled = data.scheduled != null;
@@ -242,40 +241,94 @@ class _SuperAdminAdminPricingTableState
         revision: _revision, effectiveAt: effectiveAt));
   }
 
-  void _noticeHistoryError(String error) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
-  }
-
   Future<void> _history() async {
+    CommercialPricingState data;
     try {
-      final data = await _service.load('ADMIN');
-      if (!mounted) return;
-      _remoteHistory = data.history;
+      data = await _service.load('ADMIN');
     } catch (e) {
       if (!mounted) return;
-      _noticeHistoryError(e.toString());
+      _message(e.toString());
       return;
     }
-    final lines = _remoteHistory.map((row) {
-      final values = (row['prices'] as List<dynamic>)
-          .map((v) => _money((v as num).toInt())).join(' / ');
-      return 'ADMIN-V${row["version"]} · ${row["status"]} · $values';
-    }).join('\n');
+    if (!mounted) return;
     await showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('HISTORIQUE TARIFAIRE ADMIN'),
-        content: SingleChildScrollView(
-          child: SelectableText(
-            'Versions sauvegardées dans Firestore\n'
-            '${_editing ? "BROUILLON ENREGISTRÉ\n" : ""}'
-            '${_scheduled ? "PUBLICATION PROGRAMMÉE\n" : ""}\n'
-            '$lines',
+        content: SizedBox(
+          width: 690,
+          height: 430,
+          child: ListView(
+            children: [
+              if (data.draft != null)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ADMIN-V${data.draft!["version"]} · BROUILLON ENREGISTRÉ',
+                          style: const TextStyle(
+                            color: _blue, fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        for (final event in
+                            CommercialPricingHistoryFormat.draftEvents(data.draft!))
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 3),
+                            child: SelectableText(event),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              for (final version in data.history)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ADMIN-V${version["version"]} · '
+                          '${CommercialPricingHistoryFormat.status(version["status"])}',
+                          style: const TextStyle(
+                            color: _blue, fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        SelectableText(
+                          (version['prices'] as List<dynamic>)
+                              .map((amount) => _money((amount as num).toInt()))
+                              .join(' / '),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 8),
+                        for (final event in
+                            CommercialPricingHistoryFormat.events(version))
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: SelectableText(
+                              event,
+                              style: const TextStyle(
+                                fontSize: 12, color: Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx),
-              child: const Text('FERMER')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('FERMER'),
+          ),
         ],
       ),
     );
