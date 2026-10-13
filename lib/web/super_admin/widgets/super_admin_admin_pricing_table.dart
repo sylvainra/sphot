@@ -70,7 +70,9 @@ class _SuperAdminAdminPricingTableState
       _draftSaved = draft != null;
       _scheduled = data.scheduled != null;
       _scheduledDate = data.scheduled?['effectiveAt'] is String
-          ? DateTime.tryParse(data.scheduled!['effectiveAt'] as String) : null;
+          ? DateTime.tryParse(data.scheduled!['effectiveAt'] as String)
+              ?.toLocal()
+          : null;
       for (var i = 0; i < 4; i++) {
         _controllers[i].text = working[i].toString();
       }
