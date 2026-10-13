@@ -56,6 +56,7 @@ class _SuperAdminAdvertiserPricingTableState
 
   final Map<String, TextEditingController> _fields = {};
   final Set<String> _personalised = {};
+  final Set<String> _publishedPersonalised = {};
   final TextEditingController _pivotInput = TextEditingController(text: '49');
   Map<String, int> _published = {};
   int _publishedVersion = 1;
@@ -120,6 +121,9 @@ class _SuperAdminAdvertiserPricingTableState
         _fields[entry.key]!.text = entry.value.toString();
       }
       _pivotInput.text = _published[_key(0, 0, 0)].toString();
+      _personalised
+        ..clear()
+        ..addAll(_publishedPersonalised);
     });
   }
 
@@ -148,7 +152,7 @@ class _SuperAdminAdvertiserPricingTableState
       } else if (_personalised.contains(entry.key)) {
         next[entry.key] = entry.value;
       } else {
-        next[entry.key] = (entry.value * factor).round().clamp(1, 99999999);
+        next[entry.key] = (entry.value * factor).round().clamp(1, 99999999).toInt();
       }
     }
     final affected = 90 - _personalised.length;
@@ -283,6 +287,9 @@ class _SuperAdminAdvertiserPricingTableState
     } else {
       setState(() {
         _published = Map<String, int>.from(prices);
+        _publishedPersonalised
+          ..clear()
+          ..addAll(_personalised);
         _publishedVersion++;
         _editing = false;
         _draftSaved = false;
