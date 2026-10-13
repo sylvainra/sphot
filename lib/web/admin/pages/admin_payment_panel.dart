@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../widgets/adaptive_asset_image.dart';
 
 import '../../../services/published_commercial_quote_service.dart';
 import '../services/admin_station_pricing_preview.dart';
@@ -13,11 +14,11 @@ class AdminPaymentPanel extends StatefulWidget {
     required this.adminUid,
     required this.availableRescueStationIds,
     required this.onClose,
-    this.organisationName = '',
+    this.rescueStationNames = const <String, String>{},
   });
 
   final String adminUid;
-  final String organisationName;
+  final Map<String, String> rescueStationNames;
   final List<String> availableRescueStationIds;
   final VoidCallback onClose;
 
@@ -57,8 +58,11 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
     }
   }
 
-  String _money(num amount) =>
-      '${NumberFormat.decimalPattern('fr_FR').format(amount)} €';
+  String _money(num amount) => NumberFormat.currency(
+        locale: 'fr_FR',
+        symbol: '€',
+        decimalDigits: 2,
+      ).format(amount);
 
   Widget _card({required Widget child}) {
     return Container(
@@ -90,27 +94,6 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
         ),
       ],
     );
-  }
-
-  String _subscriptionStatus(dynamic raw) {
-    switch (raw?.toString().trim().toLowerCase()) {
-      case 'trial':
-        return 'Essai enregistré dans le dossier';
-      case 'active':
-        return 'Abonnement actif (statut enregistré)';
-      case 'awaiting_subscription':
-        return 'Abonnement à souscrire';
-      case 'order_pending':
-        return 'Commande en attente';
-      case 'awaiting_renewal':
-        return 'Renouvellement attendu';
-      case 'overdue':
-        return 'Paiement en retard';
-      case 'cancelled':
-        return 'Abonnement résilié';
-      default:
-        return '';
-    }
   }
 
   Widget _notice(String message) => _card(
@@ -205,8 +188,19 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
 
             final rawLines = quote.details['lines'];
             final lines = rawLines is List ? rawLines : const [];
-            final status = _subscriptionStatus(data['status']);
             final saved = preview.hasSavedSelection;
+            final rawSelected = data['selectedRescueStationIds'];
+            final selectedIds = rawSelected is Iterable
+                ? rawSelected.whereType<String>().toSet()
+                : <String>{};
+            final stationNames = widget.availableRescueStationIds
+                .where((id) => !saved || selectedIds.contains(id))
+                .map((id) {
+                  final name = widget.rescueStationNames[id]?.trim() ?? '';
+                  return name.isEmpty ? id : name;
+                })
+                .toList()
+              ..sort((first, second) => first.compareTo(second));
 
             return _card(
               child: Column(
@@ -246,51 +240,43 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
                     ],
                   ),
                   const SizedBox(height: 13),
-                  _detail(
-                    'Postes de secours retenus',
-                    '$stations poste${stations > 1 ? 's' : ''}',
-                    emphasized: true,
+                  const Text(
+                    'POSTES DE SECOURS SOLLICITÉS',
+                    style: TextStyle(
+                      color: _blue, fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                  const SizedBox(height: 5),
-                  _detail('Grille publiée', quote.pricingReference),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 7),
+                  for (final name in stationNames)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: Text(
+                        '• $name',
+                        style: const TextStyle(
+                          color: Color(0xFF334155), fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'GRILLE TARIFAIRE UTILISÉE',
+                    style: TextStyle(
+                      color: _blue, fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   Text(
-                    saved
-                        ? 'Sélection enregistrée : $stations sur '
-                          '${preview.availableCount} poste(s) référencé(s).'
-                        : 'Aucune offre enregistrée : calcul indicatif sur '
-                          'les ${preview.availableCount} poste(s) '
-                          'référencé(s) du territoire.',
+                    quote.pricingReference,
                     style: const TextStyle(
-                      color: _muted,
-                      fontSize: 12,
-                      height: 1.35,
+                      color: Color(0xFF334155), fontSize: 12,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  if (preview.hasLegacyCountMismatch) ...[
-                    const SizedBox(height: 5),
-                    Text(
-                      'Ancien compteur : ${preview.legacyCount} — '
-                      'non utilisé pour cette simulation.',
-                      style: const TextStyle(
-                        color: _red,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                  if (status.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      'Dossier : $status',
-                      style: const TextStyle(
-                        color: _muted,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
                   const Divider(height: 27),
                   const Text(
-                    'DÉTAIL DE LA TARIFICATION DÉGRESSIVE',
+                    'TARIFICATION',
                     style: TextStyle(
                       color: _blue,
                       fontSize: 12,
@@ -309,33 +295,27 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
                         child: _tierLine(line),
                       ),
                   const Divider(height: 23),
-                  const Text(
-                    'TOTAL ANNUEL INDICATIF HT',
-                    style: TextStyle(
-                      color: _muted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _money(quote.amountExclTax),
-                    style: const TextStyle(
-                      color: _blue,
-                      fontSize: 31,
-                      fontWeight: FontWeight.w900,
-                      height: 1.15,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Avant TVA et fiscalité applicable. '
-                    'Aucun devis contractuel ni montant à payer confirmé.',
-                    style: TextStyle(
-                      color: _muted,
-                      fontSize: 11,
-                      height: 1.35,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'TOTAL ANNUEL HT',
+                          style: TextStyle(
+                            color: _blue, fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        _money(quote.amountExclTax),
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          color: _blue, fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -346,43 +326,13 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
     );
   }
 
-  Widget _detail(
-    String label,
-    String value, {
-    bool emphasized = false,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(color: _muted, fontSize: 12),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              color: _blue,
-              fontSize: 12,
-              fontWeight: emphasized ? FontWeight.w800 : FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _tierLine(Map<dynamic, dynamic> line) {
     final tier = line['tier'];
     final label = switch (tier) {
-      1 => '1er poste',
-      2 => 'Du 2e au 4e',
-      3 => 'Du 5e au 9e',
-      4 => 'À partir du 10e',
+      1 => '1er Poste de Secours',
+      2 => 'De 2 à 4 Postes de Secours',
+      3 => 'De 5 à 9 Postes de Secours',
+      4 => 'À partir du 10e Poste de Secours',
       _ => 'Tranche',
     };
     final count = line['count'] as num;
@@ -394,7 +344,7 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
       children: [
         Expanded(
           child: Text(
-            '$label · $count × ${_money(unit)}',
+            tier == 1 ? '$label :' : '$label : $count × ${_money(unit)}',
             style: const TextStyle(
               color: Color(0xFF334155),
               fontSize: 12,
@@ -466,59 +416,46 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final organisationName = widget.organisationName.trim();
-
     return Container(
       width: 540,
       decoration: const BoxDecoration(
         color: _canvas,
         border: Border(left: BorderSide(color: _border)),
       ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(18, 12, 10, 12),
-              child: Row(
-                children: [
-                  const Icon(Icons.credit_card_outlined, color: _blue, size: 25),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'PAIEMENT SPHOT ADMIN',
-                          style: TextStyle(
-                            color: _blue,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          organisationName.isEmpty
-                              ? 'Abonnement annuel · France · EUR'
-                              : '$organisationName · France · EUR',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: _muted,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
+      child: DefaultTextStyle.merge(
+        style: const TextStyle(decoration: TextDecoration.none),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(18, 12, 10, 12),
+                child: Row(
+                  children: [
+                    const AdaptiveAssetImage(
+                      'data/icons/fire_red_icon.svg',
+                      width: 30, height: 34, fit: BoxFit.contain,
                     ),
-                  ),
-                  IconButton(
-                    onPressed: widget.onClose,
-                    icon: const Icon(Icons.close_rounded, color: _blue),
-                    tooltip: 'Fermer le volet paiement',
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'PAIEMENT',
+                        style: TextStyle(
+                          color: _blue, fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.1,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: widget.onClose,
+                      icon: const Icon(Icons.close_rounded, color: _blue),
+                      tooltip: 'Fermer le volet paiement',
+                    ),
+                  ],
+                ),
               ),
-            ),
             const Divider(height: 1, color: _border),
             Expanded(
               child: SingleChildScrollView(
@@ -567,6 +504,7 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
