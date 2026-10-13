@@ -279,6 +279,9 @@ async function cancelSchedule(admin, type, body) {
       throw err(409, "Version modifiée dans une autre session.");
     }
     const scheduled = current.scheduled;
+    if (scheduled.effectiveAt.toMillis() <= Date.now()) {
+      throw err(409, "La date de publication est déjà atteinte.");
+    }
     const futureRef = root.collection("versions").doc(versionId(scheduled.version));
     const future = await tx.get(futureRef);
     if (future.exists) tx.update(futureRef, {status: "cancelled"});
