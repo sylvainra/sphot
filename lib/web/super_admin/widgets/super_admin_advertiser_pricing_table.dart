@@ -1,0 +1,653 @@
+import 'package:flutter/material.dart';
+
+/// Preview of the new advertiser tariff editor.
+/// All changes (including SAVE and PUBLISH) are session-only in this test.
+class SuperAdminAdvertiserPricingTable extends StatefulWidget {
+  const SuperAdminAdvertiserPricingTable({super.key});
+
+  @override
+  State<SuperAdminAdvertiserPricingTable> createState() =>
+      _SuperAdminAdvertiserPricingTableState();
+}
+
+class _SuperAdminAdvertiserPricingTableState
+    extends State<SuperAdminAdvertiserPricingTable> {
+  static const _blue = Color(0xFF1E3A8A);
+  static const _red = Color(0xFFDC2626);
+  static const _grey = Color(0xFFF5F7FA);
+  static const _durations = <String>[
+    '1 SEMAINE', '2 SEMAINES', '1 MOIS', '2 MOIS', '6 MOIS', '1 AN',
+  ];
+  static const _levels = <String>[
+    'COMMUNE', 'INTERCOMMUNALITÉ', 'DÉPARTEMENT', 'RÉGION', 'NATIONAL',
+  ];
+  static const _offers = <String>[
+    'CARTE SPHOT', 'FICHES SPHOT', 'PACK VISIBILITÉ TOTALE',
+  ];
+
+  // Five administrative levels x three offers x six durations.
+  static const _seed = <List<List<int>>>[
+    [
+      [49, 95, 149, 249, 599, 999],
+      [99, 189, 299, 499, 1199, 1999],
+      [129, 239, 379, 629, 1519, 2539],
+    ],
+    [
+      [89, 159, 249, 419, 999, 1669],
+      [159, 289, 449, 759, 1799, 3009],
+      [199, 369, 569, 969, 2279, 3809],
+    ],
+    [
+      [139, 259, 399, 679, 1599, 2669],
+      [259, 489, 749, 1269, 2999, 5019],
+      [329, 619, 949, 1609, 3799, 6359],
+    ],
+    [
+      [209, 379, 590, 999, 2359, 3949],
+      [379, 709, 1090, 1859, 4359, 7299],
+      [489, 899, 1390, 2369, 5559, 9309],
+    ],
+    [
+      [250, 490, 790, 1390, 2900, 4900],
+      [450, 890, 1490, 2600, 5400, 8900],
+      [590, 1150, 1990, 3500, 7400, 11900],
+    ],
+  ];
+
+  final Map<String, TextEditingController> _fields = {};
+  final Set<String> _personalised = {};
+  final TextEditingController _pivotInput = TextEditingController(text: '49');
+  Map<String, int> _published = {};
+  int _publishedVersion = 1;
+  bool _editing = false;
+  bool _draftSaved = false;
+  DateTime? _scheduledFor;
+  bool _simulatedScheduled = false;
+
+  String _key(int level, int offer, int duration) =>
+      '$level:$offer:$duration';
+
+  @override
+  void initState() {
+    super.initState();
+    for (var level = 0; level < _levels.length; level++) {
+      for (var offer = 0; offer < _offers.length; offer++) {
+        for (var duration = 0; duration < _durations.length; duration++) {
+          final key = _key(level, offer, duration);
+          final price = _seed[level][offer][duration];
+          _fields[key] = TextEditingController(text: price.toString());
+          _published[key] = price;
+        }
+      }
+    }
+  }
+
+  int? _amount(String key) {
+    return int.tryParse(_fields[key]!.text.trim().replaceAll(' ', ''));
+  }
+
+  Map<String, int>? _validPrices() {
+    final result = <String, int>{};
+    for (final key in _fields.keys) {
+      final number = _amount(key);
+      if (number == null || number <= 0) return null;
+      result[key] = number;
+    }
+    return result;
+  }
+
+  void _notice(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  void _startDraft() {
+    setState(() {
+      _editing = true;
+      _draftSaved = false;
+      _simulatedScheduled = false;
+      _scheduledFor = null;
+      _pivotInput.text = _fields[_key(0, 0, 0)]!.text;
+    });
+  }
+
+  void _discardDraft() {
+    setState(() {
+      _editing = false;
+      _draftSaved = false;
+      for (final entry in _published.entries) {
+        _fields[entry.key]!.text = entry.value.toString();
+      }
+      _pivotInput.text = _published[_key(0, 0, 0)].toString();
+    });
+  }
+
+  Future<void> _recalculate() async {
+    if (!_editing) return;
+    final prices = _validPrices();
+    if (prices == null) {
+      _notice('Corrigez les montants invalides avant le recalcul.');
+      return;
+    }
+    final nextPivot = int.tryParse(_pivotInput.text.trim());
+    final originalPivot = prices[_key(0, 0, 0)]!;
+    if (nextPivot == null || nextPivot <= 0) {
+      _notice('Le tarif pivot doit être un entier supérieur à zéro.');
+      return;
+    }
+    if (originalPivot == nextPivot) {
+      _notice('Le tarif pivot est inchangé.');
+      return;
+    }
+    final factor = nextPivot / originalPivot;
+    final next = <String, int>{};
+    for (final entry in prices.entries) {
+      if (entry.key == _key(0, 0, 0)) {
+        next[entry.key] = nextPivot;
+      } else if (_personalised.contains(entry.key)) {
+        next[entry.key] = entry.value;
+      } else {
+        next[entry.key] = (entry.value * factor).round().clamp(1, 99999999);
+      }
+    }
+    final affected = 90 - _personalised.length;
+    final apply = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('CONFIRMER LE RECALCUL'),
+        content: Text(
+          'Pivot : $originalPivot € → $nextPivot €\n'
+          'Variation : ${((factor - 1) * 100).toStringAsFixed(2)} %\n'
+          '$affected tarifs recalculés, '
+          '${_personalised.length} tarifs personnalisés protégés.\n\n'
+          'Seul le brouillon de test sera modifié.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('ANNULER'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('RECALCULER'),
+          ),
+        ],
+      ),
+    );
+    if (apply != true || !mounted) return;
+    setState(() {
+      for (final entry in next.entries) {
+        _fields[entry.key]!.text = entry.value.toString();
+      }
+      _draftSaved = false;
+    });
+    _notice('Recalcul appliqué au brouillon de test.');
+  }
+
+  void _resetCell(int level, int offer, int duration) {
+    final key = _key(level, offer, duration);
+    final currentPivot = _amount(_key(0, 0, 0)) ?? 49;
+    final calculated =
+        (_seed[level][offer][duration] * currentPivot / 49).round();
+    setState(() {
+      _fields[key]!.text = calculated.toString();
+      _personalised.remove(key);
+      _draftSaved = false;
+    });
+  }
+
+  void _saveDraft() {
+    if (_validPrices() == null) {
+      _notice('Les 90 prix doivent être renseignés et supérieurs à zéro.');
+      return;
+    }
+    setState(() => _draftSaved = true);
+    _notice('Brouillon enregistré pour cet essai (sans Firebase).');
+  }
+
+  List<String> _warnings(Map<String, int> prices) {
+    final result = <String>[];
+    for (var l = 0; l < _levels.length; l++) {
+      for (var o = 0; o < _offers.length; o++) {
+        for (var d = 1; d < _durations.length; d++) {
+          if (prices[_key(l, o, d)]! < prices[_key(l, o, d - 1)]!) {
+            result.add('Prix décroissant : ${_levels[l]}, ${_offers[o]}.');
+          }
+        }
+      }
+      for (var d = 0; d < _durations.length; d++) {
+        if (prices[_key(l, 2, d)]! >
+            prices[_key(l, 0, d)]! + prices[_key(l, 1, d)]!) {
+          result.add('Pack plus cher que Carte + Fiches : ${_levels[l]}.');
+        }
+      }
+    }
+    return result;
+  }
+
+  Future<void> _publish() async {
+    if (!_editing || !_draftSaved) return;
+    final prices = _validPrices();
+    if (prices == null) {
+      _notice('Impossible de publier une grille incomplète.');
+      return;
+    }
+    final warnings = _warnings(prices);
+    final changed = prices.keys.where((k) => prices[k] != _published[k]).length;
+    final action = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('PUBLIER LA GRILLE ANNONCEUR'),
+        content: SingleChildScrollView(
+          child: Text(
+            'FRANCE · EUR · FR-V${_publishedVersion + 1}\n'
+            '90 tarifs complets · $changed montants modifiés\n'
+            '${warnings.isEmpty ? "Aucune incohérence détectée." : "Avertissements :\n${warnings.take(4).join("\n")}"}\n\n'
+            'MODE TEST : cette publication ne modifie pas Firebase.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('ANNULER'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop('schedule'),
+            child: const Text('PROGRAMMER'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop('now'),
+            child: const Text('PUBLIER MAINTENANT'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'schedule') {
+      final now = DateTime.now();
+      final date = await showDatePicker(
+        context: context,
+        initialDate: now.add(const Duration(days: 1)),
+        firstDate: now.add(const Duration(days: 1)),
+        lastDate: now.add(const Duration(days: 3650)),
+        helpText: 'DATE DE PUBLICATION (SIMULATION)',
+      );
+      if (date == null || !mounted) return;
+      setState(() {
+        _scheduledFor = date;
+        _simulatedScheduled = true;
+        _editing = false;
+      });
+      _notice('Publication programmée (simulation locale uniquement).');
+    } else {
+      setState(() {
+        _published = Map<String, int>.from(prices);
+        _publishedVersion++;
+        _editing = false;
+        _draftSaved = false;
+        _scheduledFor = null;
+        _simulatedScheduled = false;
+      });
+      _notice('Version publiée en simulation locale — aucun changement Firebase.');
+    }
+  }
+
+  Widget _topButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback? onPressed,
+    bool primary = false,
+  }) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: primary ? Colors.white : _blue,
+        backgroundColor: primary ? _blue : Colors.white,
+        side: BorderSide(color: primary ? _blue : const Color(0xFFB9C6D9)),
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 16),
+      ),
+    );
+  }
+
+  Widget _priceCell(int level, int offer, int duration) {
+    final key = _key(level, offer, duration);
+    final isPivot = level == 0 && offer == 0 && duration == 0;
+    final personal = _personalised.contains(key);
+    final price = _amount(key);
+    if (!_editing || isPivot) {
+      return Container(
+        height: 49,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            if (isPivot) const Icon(Icons.push_pin_outlined, size: 14, color: _red),
+            if (personal && !isPivot)
+              const Icon(Icons.lock_outline, size: 13, color: _red),
+            Text(
+              price == null ? '—' : '$price €',
+              style: TextStyle(
+                fontSize: 13,
+                color: isPivot ? _red : _blue,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      child: TextField(
+        controller: _fields[key],
+        keyboardType: TextInputType.number,
+        textAlign: TextAlign.right,
+        style: const TextStyle(fontSize: 13, color: _blue, fontWeight: FontWeight.w700),
+        onChanged: (_) => setState(() {
+          _personalised.add(key);
+          _draftSaved = false;
+        }),
+        decoration: InputDecoration(
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 7, vertical: 12),
+          filled: personal,
+          fillColor: const Color(0xFFFFF0F0),
+          suffixIcon: personal
+              ? IconButton(
+                  tooltip: 'Réinitialiser au tarif calculé',
+                  icon: const Icon(Icons.undo, size: 16, color: _red),
+                  onPressed: () => _resetCell(level, offer, duration),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minHeight: 28, minWidth: 28),
+                )
+              : null,
+          border: const OutlineInputBorder(),
+        ),
+      ),
+    );
+  }
+
+  Widget _tableHeading() {
+    return Container(
+      color: const Color(0xFFE6ECF6),
+      height: 48,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 193,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('OFFRE / TERRITOIRE', style: _headerStyle),
+              ),
+            ),
+          ),
+          for (final duration in _durations)
+            SizedBox(
+              width: 121,
+              child: Center(child: Text(duration, style: _headerStyle)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  static const _headerStyle = TextStyle(
+    color: _blue, fontSize: 11, fontWeight: FontWeight.w900,
+  );
+
+  List<Widget> _tableRows() {
+    final rows = <Widget>[];
+    for (var l = 0; l < _levels.length; l++) {
+      rows.add(Container(
+        height: 34,
+        color: const Color(0xFFE9EFF8),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Text(_levels[l],
+            style: const TextStyle(color: _blue, fontWeight: FontWeight.w900)),
+      ));
+      for (var o = 0; o < _offers.length; o++) {
+        rows.add(Container(
+          color: o.isEven ? Colors.white : const Color(0xFFF7F9FC),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 193,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(_offers[o],
+                      style: const TextStyle(
+                          color: _blue, fontSize: 12, fontWeight: FontWeight.w700)),
+                ),
+              ),
+              for (var d = 0; d < _durations.length; d++)
+                SizedBox(width: 121, child: _priceCell(l, o, d)),
+            ],
+          ),
+        ));
+        rows.add(const Divider(height: 1, thickness: 0.5));
+      }
+    }
+    return rows;
+  }
+
+  Future<void> _showHistory() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('HISTORIQUE DES VERSIONS'),
+        content: Text(
+          'FR-V$_publishedVersion — PUBLIÉE (simulation)\n'
+          '${_editing ? "FR-V${_publishedVersion + 1} — BROUILLON\n" : ""}'
+          '${_simulatedScheduled ? "FR-V${_publishedVersion + 1} — PROGRAMMÉE\n" : ""}'
+          '\nLes versions du test sont conservées uniquement en mémoire. '
+          'Le stockage et le véritable historique Firestore seront ajoutés '
+          'après validation de l’ergonomie.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('FERMER'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _editing
+        ? (_draftSaved ? 'BROUILLON ENREGISTRÉ' : 'BROUILLON NON ENREGISTRÉ')
+        : _simulatedScheduled
+            ? 'PROGRAMMÉE (TEST)'
+            : 'PUBLIÉE (TEST)';
+    return Container(
+      color: _grey,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E7),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFEDC974)),
+              ),
+              child: const Text(
+                'MODE TEST — 90 tarifs français validés. '
+                'Enregistrer et publier sont simulés dans cette session : '
+                'aucune écriture Firebase.',
+                style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF775B13)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text('FRANCE · EUR (€)',
+                    style: TextStyle(color: _blue, fontSize: 17,
+                        fontWeight: FontWeight.w900)),
+                Chip(label: Text('FR-V${_editing || _simulatedScheduled ? _publishedVersion + 1 : _publishedVersion}')),
+                Chip(label: Text(status)),
+                _topButton(
+                  label: 'HISTORIQUE',
+                  icon: Icons.history,
+                  onPressed: _showHistory,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: const Color(0xFFCCD5E4)),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                spacing: 12,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 260,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('TARIF PIVOT',
+                            style: TextStyle(color: _blue, fontWeight: FontWeight.w900)),
+                        const SizedBox(height: 3),
+                        const Text('Commune · Carte SPHOT · 1 semaine',
+                            style: TextStyle(fontSize: 12, color: Colors.black54)),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    width: 125,
+                    child: TextField(
+                      controller: _pivotInput,
+                      enabled: _editing,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(), labelText: 'EUR HT',
+                        isDense: true,
+                      ),
+                      onSubmitted: (_) {},
+                    ),
+                  ),
+                  _topButton(
+                    label: 'RECALCULER LES TARIFS',
+                    icon: Icons.calculate_outlined,
+                    onPressed: _editing ? _recalculate : null,
+                    primary: _editing,
+                  ),
+                  Text('${_personalised.length} prix personnalisés',
+                      style: const TextStyle(color: _blue, fontSize: 12)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text('TABLEAU COMPLET DES 90 TARIFS HT',
+                style: TextStyle(color: _blue, fontSize: 15, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: constraints.maxWidth > 919 ? constraints.maxWidth : 919,
+                      child: Column(
+                        children: [
+                          _tableHeading(),
+                          Expanded(
+                            child: ListView(children: _tableRows()),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              alignment: WrapAlignment.end,
+              children: [
+                if (!_editing && !_simulatedScheduled)
+                  _topButton(
+                    label: 'CRÉER UNE NOUVELLE VERSION',
+                    icon: Icons.copy,
+                    onPressed: _startDraft,
+                    primary: true,
+                  ),
+                if (_editing) ...[
+                  _topButton(
+                    label: 'ANNULER LE BROUILLON',
+                    icon: Icons.undo,
+                    onPressed: _discardDraft,
+                  ),
+                  _topButton(
+                    label: 'ENREGISTRER',
+                    icon: Icons.save_outlined,
+                    onPressed: _saveDraft,
+                  ),
+                  _topButton(
+                    label: 'PUBLIER',
+                    icon: Icons.send_outlined,
+                    onPressed: _draftSaved ? _publish : null,
+                    primary: true,
+                  ),
+                ],
+                if (_simulatedScheduled)
+                  _topButton(
+                    label: 'ANNULER LA PROGRAMMATION (TEST)',
+                    icon: Icons.event_busy,
+                    onPressed: () => setState(() {
+                      _simulatedScheduled = false;
+                      _scheduledFor = null;
+                      _editing = true;
+                      _draftSaved = true;
+                    }),
+                  ),
+              ],
+            ),
+            if (_simulatedScheduled && _scheduledFor != null)
+              Text(
+                'Date programmée (simulation) : ${_scheduledFor!.day}/${_scheduledFor!.month}/${_scheduledFor!.year}',
+                style: const TextStyle(color: _blue),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pivotInput.dispose();
+    for (final controller in _fields.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+}
