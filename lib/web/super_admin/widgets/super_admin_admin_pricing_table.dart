@@ -564,7 +564,7 @@ class _SuperAdminAdminPricingTableState
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: _blue.withOpacity(0.28),
+                              color: _blue.withValues(alpha: 0.28),
                             ),
                           ),
                           child: const Column(
