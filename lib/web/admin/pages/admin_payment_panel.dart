@@ -205,42 +205,8 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'VOTRE OFFRE ANNUELLE',
-                          style: TextStyle(
-                            color: _blue,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0F3F8),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          saved ? 'OFFRE ENREGISTRÉE' : 'SIMULATION',
-                          style: const TextStyle(
-                            color: _muted,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 13),
                   const Text(
-                    'POSTES DE SECOURS SOLLICITÉS',
+                    'Postes de Secours sollicités',
                     style: TextStyle(
                       color: _blue, fontSize: 12,
                       fontWeight: FontWeight.w800,
@@ -251,7 +217,7 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 5),
                       child: Text(
-                        '• $name',
+                        name,
                         style: const TextStyle(
                           color: Color(0xFF334155), fontSize: 12,
                         ),
@@ -259,7 +225,7 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
                     ),
                   const SizedBox(height: 12),
                   const Text(
-                    'GRILLE TARIFAIRE UTILISÉE',
+                    'Grille tarifaire utilisée',
                     style: TextStyle(
                       color: _blue, fontSize: 12,
                       fontWeight: FontWeight.w800,
@@ -294,27 +260,21 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
                         child: _tierLine(line),
                       ),
                   const Divider(height: 23),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'TOTAL ANNUEL HT',
-                          style: TextStyle(
-                            color: _blue, fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        _money(quote.amountExclTax),
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          color: _blue, fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'TOTAL ANNUEL HT : ${_money(quote.amountExclTax)}',
+                    style: const TextStyle(
+                      color: _blue, fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  const Text(
+                    'Avant TVA et fiscalité...',
+                    style: TextStyle(
+                      color: _muted, fontSize: 11,
+                      decoration: TextDecoration.none,
+                    ),
                   ),
                 ],
               ),
@@ -336,32 +296,18 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
     };
     final count = line['count'] as num;
     final unit = line['unitExclTax'] as num;
-    final amount = line['amountExclTax'] as num;
+    // Tarifs exclusivement issus de la grille commerciale publiée.
+    final detail = tier == 1
+        ? '$label : ${_money(unit)}'
+        : '$label : ${count.toInt()} × ${_money(unit)}';
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Text(
-            tier == 1 ? '$label :' : '$label : $count × ${_money(unit)}',
-            style: const TextStyle(
-              color: Color(0xFF334155),
-              fontSize: 12,
-              height: 1.35,
-            ),
-          ),
-        ),
-        const SizedBox(width: 9),
-        Text(
-          _money(amount),
-          textAlign: TextAlign.right,
-          style: const TextStyle(
-            color: _blue,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
+    return Text(
+      detail,
+      style: const TextStyle(
+        color: Color(0xFF334155),
+        fontSize: 12, height: 1.35,
+        decoration: TextDecoration.none,
+      ),
     );
   }
 
