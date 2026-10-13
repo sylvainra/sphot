@@ -14842,18 +14842,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       }
                     }
 
-                    // Nom affiché dans le volet PAIEMENT de l'Admin connecté.
-                    // Ne pas déduire l'organisme des marqueurs de la carte.
-                    final currentStructure = currentAdminRequest?['structure'];
-                    final currentTerritory = currentAdminRequest?['territoire'];
-                    final paymentOrganisationName = _firstCleanText([
-                      if (currentStructure is Map) currentStructure['nom'],
-                      currentAdminRequest?['organisation'],
-                      currentAdminRequest?['nomStructure'],
-                      currentSubscription?['billingOrganisation'],
-                      if (currentTerritory is Map) currentTerritory['ville'],
-                    ]);
-
                     final rawTrialRequest =
                         currentAdminRequest?['trialRequest'];
 
@@ -15251,7 +15239,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         else if (_showAdminPaymentPanel)
                           AdminPaymentPanel(
                             adminUid: widget.adminUid,
-                            organisationName: paymentOrganisationName,
                             rescueStationNames: {
                               for (final doc in docs)
                                 if (doc.data()['isPosteSecours'] == true ||
