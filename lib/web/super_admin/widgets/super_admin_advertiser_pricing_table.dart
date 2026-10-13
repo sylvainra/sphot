@@ -191,6 +191,89 @@ class _SuperAdminAdvertiserPricingTableState
     });
   }
 
+
+  /// Nouvelle version : depuis la grille publiée ou une archive exacte.
+  Future<void> _chooseNewVersion() async {
+    if (_busy || _editing || _simulatedScheduled) return;
+    CommercialPricingState data;
+    try {
+      data = await _service.load('ADVERTISER');
+    } catch (e) {
+      if (mounted) _notice(e.toString());
+      return;
+    }
+    if (!mounted) return;
+    if (data.draft != null || data.scheduled != null) {
+      _notice('Un brouillon ou une programmation existe déjà. '
+          'Fermez et rouvrez le volet pour actualiser.');
+      return;
+    }
+    final archives = data.history
+        .where((version) => version['status'] == 'archived')
+        .toList();
+    final source = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('CRÉER UNE NOUVELLE VERSION'),
+        content: SizedBox(
+          width: 510,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('Choisissez la grille de départ. '
+                    'La reprise historique copie exactement les 90 tarifs, '
+                    'sans nouveau recalcul ni arrondi.'),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.pop(ctx, 0),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: Text(
+                    'PARTIR DE LA VERSION PUBLIÉE · '
+                    'FR-V${data.publishedVersion}',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (archives.isNotEmpty)
+                  const Text('REPRENDRE UNE VERSION ARCHIVÉE',
+                      style: TextStyle(
+                        color: _blue, fontWeight: FontWeight.w800,
+                      )),
+                for (final version in archives)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.pop(
+                        ctx, (version['version'] as num).toInt(),
+                      ),
+                      icon: const Icon(Icons.restore_outlined),
+                      label: Text('REPRENDRE FR-V${version["version"]} '
+                          '· ${CommercialPricingHistoryFormat.status(
+                              version["status"])}'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ANNULER'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || source == null) return;
+    if (source == 0) {
+      _applyRemote(data);
+      _startDraft();
+    } else {
+      await _restoreHistoricalVersion(source, data.revision);
+    }
+  }
+
   Future<void> _discardDraft() async {
     if (_draftSaved) {
       await _persist(() => _service.discard('ADVERTISER', revision: _revision));
@@ -631,7 +714,7 @@ class _SuperAdminAdvertiserPricingTableState
     if (!mounted) return;
     final canRestore = !_busy && !_editing &&
         data.draft == null && data.scheduled == null;
-    await showDialog<void>(
+    final selectedVersion = await showDialog<int>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('HISTORIQUE DES GRILLES ANNONCEUR'),
@@ -703,30 +786,25 @@ class _SuperAdminAdvertiserPricingTableState
                           ),
                         const Text('Afficher les 90 tarifs de cette version',
                           style: TextStyle(fontSize: 12)),
-                      ],
-                    ),
-                    children: [
-                      if (version['status'] == 'archived' ||
-                          version['status'] == 'published')
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 12, bottom: 12),
+                        const SizedBox(height: 8),
+                        if (version['status'] == 'archived' ||
+                            version['status'] == 'published')
+                          Align(
+                            alignment: Alignment.centerLeft,
                             child: OutlinedButton.icon(
                               onPressed: canRestore
-                                  ? () {
-                                      Navigator.pop(dialogContext);
-                                      _restoreHistoricalVersion(
+                                  ? () => Navigator.pop(
+                                        dialogContext,
                                         (version['version'] as num).toInt(),
-                                        data.revision,
-                                      );
-                                    }
+                                      )
                                   : null,
                               icon: const Icon(Icons.restore_outlined, size: 17),
                               label: const Text('REPRENDRE CETTE VERSION'),
                             ),
                           ),
-                        ),
+                      ],
+                    ),
+                    children: [
                       for (var l = 0; l < _levels.length; l++) ...[
                         Padding(
                           padding: const EdgeInsets.only(top: 10, bottom: 4),
@@ -764,6 +842,9 @@ class _SuperAdminAdvertiserPricingTableState
         ],
       ),
     );
+    if (selectedVersion != null && mounted) {
+      await _restoreHistoricalVersion(selectedVersion, data.revision);
+    }
   }
 
   @override
@@ -924,7 +1005,7 @@ class _SuperAdminAdvertiserPricingTableState
                   _topButton(
                     label: 'CRÉER UNE NOUVELLE VERSION',
                     icon: Icons.copy,
-                    onPressed: _busy || _loadError != null ? null : _startDraft,
+                    onPressed: _busy || _loadError != null ? null : _chooseNewVersion,
                     primary: true,
                   ),
                 if (_editing) ...[
