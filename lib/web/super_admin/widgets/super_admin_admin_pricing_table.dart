@@ -152,23 +152,29 @@ class _SuperAdminAdminPricingTableState
     });
   }
 
-  void _cancelDraft() {
+  Future<void> _cancelDraft() async {
+    if (_draftSaved) {
+      await _persist(() => _service.discard('ADMIN', revision: _revision));
+      return;
+    }
     setState(() {
       _editing = false;
       _draftSaved = false;
-      for (var i = 0; i < _controllers.length; i++) {
+      for (var i = 0; i < 4; i++) {
         _controllers[i].text = _published[i].toString();
       }
     });
   }
 
-  void _save() {
-    if (_values() == null) {
-      _message('Renseignez les quatre tarifs annuels : entiers positifs.');
+  Future<void> _save() async {
+    final values = _values();
+    if (values == null) {
+      _message('Renseignez quatre montants annuels positifs.');
       return;
     }
-    setState(() => _draftSaved = true);
-    _message('Brouillon ADMIN enregistré en mémoire (sans Firebase).');
+    await _persist(() => _service.save(
+      'ADMIN', revision: _revision, prices: values,
+    ));
   }
 
   List<String> _warnings(List<int> prices) {
@@ -188,109 +194,73 @@ class _SuperAdminAdminPricingTableState
   }
 
   Future<void> _publish() async {
-    if (!_editing || !_draftSaved) return;
-    final prices = _values();
-    if (prices == null) {
-      _message('Un tarif est invalide ; publication impossible.');
-      return;
-    }
-    final count = List<int>.generate(4, (i) => i)
-        .where((i) => prices[i] != _published[i])
-        .length;
-    final warnings = _warnings(prices);
+    if (!_editing || !_draftSaved || _busy) return;
+    final values = _values();
+    if (values == null) return;
+    final changes = List<int>.generate(4, (i) => i)
+        .where((i) => values[i] != _published[i]).length;
     final action = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('PUBLIER LA GRILLE ADMIN'),
-        content: SingleChildScrollView(
-          child: Text(
-            'France · EUR HT · ADMIN-V${_publishedVersion + 1}\n'
-            '4 tranches · $count tarifs modifiés\n'
-            '1er poste : ${_money(prices[0])} / an\n'
-            '2e–4e : ${_money(prices[1])} / poste / an\n'
-            '5e–9e : ${_money(prices[2])} / poste / an\n'
-            '10e et suivants : ${_money(prices[3])} / poste / an\n'
-            'Frais de mise en place / formation : 0 €\n\n'
-            '${warnings.isEmpty ? "Aucun avertissement." : warnings.join("\n")}\n\n'
-            'SIMULATION LOCALE UNIQUEMENT : pas de mise à jour Firebase, '
-            'de devis, d’abonnement ni de CGV.',
-          ),
+        content: Text(
+          'France · EUR HT · ADMIN-V${_publishedVersion + 1}\n'
+          'Quatre tranches, $changes modifications.\n'
+          '${_warnings(values).join("\n")}\n\n'
+          'La version sera enregistrée dans Firestore. '
+          'Les abonnements existants restent inchangés.',
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('ANNULER'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, 'schedule'),
-            child: const Text('PROGRAMMER'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, 'now'),
-            child: const Text('PUBLIER MAINTENANT'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx),
+              child: const Text('ANNULER')),
+          TextButton(onPressed: () => Navigator.pop(ctx, 'schedule'),
+              child: const Text('PROGRAMMER')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, 'now'),
+              child: const Text('PUBLIER MAINTENANT')),
         ],
       ),
     );
     if (!mounted || action == null) return;
+    DateTime? effectiveAt;
     if (action == 'schedule') {
-      final today = DateTime.now();
+      final now = DateTime.now();
       final date = await showDatePicker(
         context: context,
-        initialDate: today.add(const Duration(days: 1)),
-        firstDate: today.add(const Duration(days: 1)),
-        lastDate: today.add(const Duration(days: 3650)),
-        helpText: 'DATE DE PUBLICATION (MODE TEST)',
+        initialDate: now.add(const Duration(days: 1)),
+        firstDate: now.add(const Duration(days: 1)),
+        lastDate: now.add(const Duration(days: 3650)),
+        helpText: 'DATE DE PUBLICATION',
       );
-      if (date == null || !mounted) return;
-      setState(() {
-        _scheduled = true;
-        _scheduledDate = date;
-        _editing = false;
-      });
-      _message('Publication ADMIN programmée en simulation seulement.');
-      return;
+      if (!mounted || date == null) return;
+      effectiveAt = DateTime(date.year, date.month, date.day);
     }
-    setState(() {
-      _archives.add(List<int>.from(_published));
-      _published = List<int>.from(prices);
-      _publishedVersion++;
-      _editing = false;
-      _draftSaved = false;
-      _scheduled = false;
-      _scheduledDate = null;
-    });
-    _message('Grille ADMIN publiée en simulation (aucune écriture Firebase).');
+    await _persist(() => _service.publish('ADMIN',
+        revision: _revision, effectiveAt: effectiveAt));
   }
 
   Future<void> _history() async {
-    final archived = <String>[];
-    for (var i = _archives.length - 1; i >= 0; i--) {
-      archived.add(
-        'ADMIN-V${i + 1} — ARCHIVÉE · '
-        '${_archives[i].map(_money).join(" / ")}',
-      );
-    }
+    await _loadRemote();
+    if (!mounted || _loadError != null) return;
+    final lines = _remoteHistory.map((row) {
+      final values = (row['prices'] as List<dynamic>)
+          .map((v) => _money((v as num).toInt())).join(' / ');
+      return 'ADMIN-V${row["version"]} · ${row["status"]} · $values';
+    }).join('\n');
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('HISTORIQUE TARIFAIRE ADMIN'),
         content: SingleChildScrollView(
-          child: Text(
-            'ADMIN-V$_publishedVersion — PUBLIÉE (simulation)\n'
-            '${_editing ? "ADMIN-V${_publishedVersion + 1} — BROUILLON\n" : ""}'
-            '${_scheduled ? "ADMIN-V${_publishedVersion + 1} — PROGRAMMÉE\n" : ""}'
-            '${archived.join("\n")}\n\n'
-            'Historique disponible seulement pendant cette session de test. '
-            'Firestore et l’historisation juridique seront raccordés '
-            'après validation.',
+          child: SelectableText(
+            'Versions sauvegardées dans Firestore\n'
+            '${_editing ? "BROUILLON ENREGISTRÉ\n" : ""}'
+            '${_scheduled ? "PUBLICATION PROGRAMMÉE\n" : ""}\n'
+            '$lines',
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('FERMER'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx),
+              child: const Text('FERMER')),
         ],
       ),
     );
@@ -466,8 +436,8 @@ class _SuperAdminAdminPricingTableState
     final status = _editing
         ? (_draftSaved ? 'BROUILLON ENREGISTRÉ' : 'BROUILLON NON ENREGISTRÉ')
         : _scheduled
-            ? 'PROGRAMMÉE (TEST)'
-            : 'PUBLIÉE (TEST)';
+            ? 'PROGRAMMÉE'
+            : 'PUBLIÉE';
     return ColoredBox(
       color: _bg,
       child: Padding(
@@ -483,13 +453,17 @@ class _SuperAdminAdminPricingTableState
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Text(
-                'MODE TEST — Grille ADMIN dégressive. Enregistrer, publier '
-                'et programmer sont simulés ; aucune écriture Firebase.',
+                'GRILLE ADMIN — Les versions sont enregistrées dans Firestore. '
+                'Les factures et abonnements restent inchangés.',
                 style: TextStyle(
                   color: Color(0xFF775B13), fontWeight: FontWeight.w700,
                 ),
               ),
             ),
+            if (_busy) const LinearProgressIndicator(),
+            if (_loadError != null)
+              SelectableText('Service tarifaire indisponible : $_loadError',
+                  style: const TextStyle(color: _red, fontSize: 12)),
             const SizedBox(height: 10),
             Wrap(
               spacing: 10,
@@ -503,7 +477,7 @@ class _SuperAdminAdminPricingTableState
                   'ADMIN-V${_editing || _scheduled ? _publishedVersion + 1 : _publishedVersion}',
                 )),
                 Chip(label: Text(status)),
-                _button('HISTORIQUE', Icons.history, _history),
+                _button('HISTORIQUE', Icons.history, _busy ? null : _history),
               ],
             ),
             const SizedBox(height: 12),
@@ -589,25 +563,22 @@ class _SuperAdminAdminPricingTableState
                   _button(
                     'CRÉER UNE NOUVELLE VERSION',
                     Icons.copy,
-                    _newVersion,
+                    _busy || _loadError != null ? null : _newVersion,
                     primary: true,
                   ),
                 if (_editing) ...[
-                  _button('ANNULER LE BROUILLON', Icons.undo, _cancelDraft),
-                  _button('ENREGISTRER', Icons.save_outlined, _save),
+                  _button('ANNULER LE BROUILLON', Icons.undo, _busy ? null : _cancelDraft),
+                  _button('ENREGISTRER', Icons.save_outlined, _busy || _loadError != null ? null : _save),
                   _button('PUBLIER', Icons.send_outlined,
-                      _draftSaved ? _publish : null, primary: true),
+                      _draftSaved && !_busy ? _publish : null, primary: true),
                 ],
                 if (_scheduled)
                   _button(
                     'ANNULER LA PROGRAMMATION (TEST)',
                     Icons.event_busy,
-                    () => setState(() {
-                      _scheduled = false;
-                      _scheduledDate = null;
-                      _editing = true;
-                      _draftSaved = true;
-                    }),
+                    _busy ? null : () => _persist(() => _service.cancelSchedule(
+                      'ADMIN', revision: _revision,
+                    )),
                   ),
               ],
             ),
