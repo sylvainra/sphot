@@ -28,7 +28,6 @@ class AdminPaymentPanel extends StatefulWidget {
 
 class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
   static const _blue = Color(0xFF1E3A8A);
-  static const _red = Color(0xFFDC2626);
   static const _muted = Color(0xFF64748B);
   static const _border = Color(0xFFD5DFEC);
   static const _canvas = Color(0xFFF5F7FA);
@@ -456,7 +455,7 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
                   ],
                 ),
               ),
-            const Divider(height: 1, color: _border),
+              const Divider(height: 1, color: _border),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
