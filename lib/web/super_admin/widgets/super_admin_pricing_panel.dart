@@ -31,7 +31,11 @@ class _SuperAdminPricingPanelState extends State<SuperAdminPricingPanel> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: widget.onTabChanged == null ? 560 : null,
+      // ADMIN reste un volet latéral de 560 px à côté de la carte.
+      // ANNONCEUR prend l'espace central via Expanded dans le dashboard.
+      // Sans cette largeur, le Row parent donne des contraintes horizontales
+      // non bornées aux widgets Expanded du volet et bloque le rendu Flutter.
+      width: _tab == 0 ? 560 : null,
       decoration: BoxDecoration(
         color: const Color(0xFFF5F7FA),
         border: Border(
