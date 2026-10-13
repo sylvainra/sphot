@@ -587,29 +587,62 @@ class _SuperAdminAdvertiserPricingTableState
   }
 
   Future<void> _showHistory() async {
+    List<Map<String, dynamic>> records;
     try {
       final data = await _service.load('ADVERTISER');
       if (!mounted) return;
-      _remoteHistory = data.history;
+      records = data.history;
     } catch (e) {
       if (!mounted) return;
       _notice(e.toString());
       return;
     }
-    final records = _remoteHistory.map((item) =>
-      'FR-V${item["version"]} · ${item["status"]} · 90 tarifs HT'
-    ).join('\n');
+    if (!mounted) return;
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('HISTORIQUE DES VERSIONS'),
-        content: SingleChildScrollView(
-          child: SelectableText(
-            'FRANCE · ANNONCEUR · VERSIONS FIRESTORE\n'
-            '${_editing ? "BROUILLON ENREGISTRÉ\n" : ""}'
-            '${_simulatedScheduled ? "PUBLICATION PROGRAMMÉE\n" : ""}\n'
-            '$records',
-          ),
+        title: const Text('HISTORIQUE DES GRILLES ANNONCEUR'),
+        content: SizedBox(
+          width: 750,
+          height: 450,
+          child: records.isEmpty
+              ? const Center(child: Text(
+                  'La grille initiale sera historisée au premier enregistrement.'))
+              : ListView(
+                  children: [
+                    for (final version in records)
+                      ExpansionTile(
+                        title: Text('FR-V${version["version"]} · ${version["status"]}'),
+                        subtitle: const Text('90 tarifs archivés, lecture seule'),
+                        children: [
+                          for (var l = 0; l < _levels.length; l++) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(top: 10, bottom: 4),
+                              child: Text(_levels[l],
+                                  style: const TextStyle(
+                                    color: _blue, fontWeight: FontWeight.w900)),
+                            ),
+                            for (var o = 0; o < _offers.length; o++)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                child: Text(
+                                  '${_offers[o]} : ${List<String>.generate(
+                                    _durations.length, (d) {
+                                      final key = _key(l, o, d);
+                                      final raw = (version["prices"] as Map)[key];
+                                      final amount = (raw as num).toInt();
+                                      return "${_durations[d]} : $amount €";
+                                    }).join("  ·  ")}',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                          ],
+                          const SizedBox(height: 10),
+                        ],
+                      ),
+                  ],
+                ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx),
