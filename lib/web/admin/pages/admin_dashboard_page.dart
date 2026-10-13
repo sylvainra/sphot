@@ -620,6 +620,29 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+  // Inclure le numéro du SPHOT si celui-ci est renseigné.
+  String _paymentRescueStationLabel(
+    String documentId,
+    Map<String, dynamic> spot,
+  ) {
+    final number = _firstCleanText([
+      spot['idSphot'],
+      spot['numeroSphot'],
+      spot['numeroPoste'],
+    ]);
+    final name = _firstCleanText([
+      spot['nomSphot'],
+      spot['nomSecours'],
+      spot['name'],
+      spot['nom'],
+      spot['title'],
+      documentId,
+    ]);
+    if (number.isEmpty) return name;
+    if (name.toUpperCase().startsWith(number.toUpperCase())) return name;
+    return '$number - $name';
+  }
+
   String _normalizeType(String value) {
     return value
         .toUpperCase()
@@ -15262,14 +15285,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                         .toString()
                                         .toUpperCase()
                                         .contains('POSTE DE SECOURS'))
-                                  doc.id: _firstCleanText([
-                                    doc.data()['nomSphot'],
-                                    doc.data()['nomSecours'],
-                                    doc.data()['name'],
-                                    doc.data()['nom'],
-                                    doc.data()['title'],
+                                  doc.id: _paymentRescueStationLabel(
                                     doc.id,
-                                  ]),
+                                    doc.data(),
+                                  ),
                             },
                             // Memes SPHOTS que ceux de la carte de l'Admin :
                             // ne pas utiliser le compteur historique de
