@@ -8,6 +8,7 @@ class CommercialPricingState {
   CommercialPricingState(Map<String, dynamic> data)
       : revision = (data['revision'] as num).toInt(),
         publishedVersion = (data['publishedVersion'] as num).toInt(),
+        latestVersion = (data['latestVersion'] as num).toInt(),
         publishedPrices = data['publishedPrices'],
         publishedPersonalised = (data['publishedPersonalised'] as List<dynamic>?)
                 ?.map((e) => e.toString()).toList() ??
@@ -25,6 +26,7 @@ class CommercialPricingState {
 
   final int revision;
   final int publishedVersion;
+  final int latestVersion;
   final dynamic publishedPrices;
   final List<String> publishedPersonalised;
   final Map<String, dynamic>? draft;
