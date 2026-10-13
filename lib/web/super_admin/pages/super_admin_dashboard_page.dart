@@ -65,7 +65,9 @@ class _SuperAdminTileStyle {
 }
 
 class SuperAdminDashboardPage extends StatefulWidget {
-  const SuperAdminDashboardPage({super.key});
+  const SuperAdminDashboardPage({super.key, this.pricingSessionToken = ''});
+
+  final String pricingSessionToken;
 
   @override
   State<SuperAdminDashboardPage> createState() =>
@@ -7243,6 +7245,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                             Expanded(
                               child: SuperAdminPricingPanel(
                                 key: _pricingPanelKey,
+                                pricingSessionToken: widget.pricingSessionToken,
                                 selectedTab: _selectedPricingTab,
                                 onTabChanged: (tab) => setState(() => _selectedPricingTab = tab),
                                 onClose: () => setState(() => _showPricingPanel = false),
@@ -7251,6 +7254,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                           else
                             SuperAdminPricingPanel(
                               key: _pricingPanelKey,
+                              pricingSessionToken: widget.pricingSessionToken,
                               selectedTab: _selectedPricingTab,
                               onTabChanged: (tab) => setState(() => _selectedPricingTab = tab),
                               onClose: () => setState(() => _showPricingPanel = false),
