@@ -319,61 +319,138 @@ class _SuperAdminAdvertiserPricingTableState
     );
   }
 
+
+  /// French currency display for the before/after comparison.
+  String _displayEuro(int amount) {
+    final digits = amount.toString();
+    final buffer = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(' ');
+      buffer.write(digits[i]);
+    }
+    return '${buffer.toString()} €';
+  }
+
+  Widget _previousPrice(int amount) {
+    return Text(
+      _displayEuro(amount),
+      textAlign: TextAlign.right,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(
+        color: Color(0xFF64748B),
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        decoration: TextDecoration.lineThrough,
+        decorationColor: Color(0xFF64748B),
+        decorationThickness: 1.5,
+      ),
+    );
+  }
+
   Widget _priceCell(int level, int offer, int duration) {
     final key = _key(level, offer, duration);
     final isPivot = level == 0 && offer == 0 && duration == 0;
     final personal = _personalised.contains(key);
     final price = _amount(key);
+    final previousPrice = _published[key]!;
+    // Compare against the published version, not the preceding edit.
+    // This also stays visible after saving a draft; a publish clears it.
+    final changed = _editing && price != null && price != previousPrice;
+
     if (!_editing || isPivot) {
       return Container(
-        height: 49,
+        height: _editing ? 70 : 49,
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            if (isPivot) const Icon(Icons.push_pin_outlined, size: 14, color: _red),
+            if (isPivot)
+              const Icon(Icons.push_pin_outlined, size: 14, color: _red),
             if (personal && !isPivot)
               const Icon(Icons.lock_outline, size: 13, color: _red),
-            Text(
-              price == null ? '—' : '$price €',
-              style: TextStyle(
-                fontSize: 13,
-                color: isPivot ? _red : _blue,
-                fontWeight: FontWeight.w800,
+            const SizedBox(width: 3),
+            Flexible(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (changed) ...[
+                    _previousPrice(previousPrice),
+                    const SizedBox(height: 3),
+                  ],
+                  Text(
+                    price == null ? '—' : _displayEuro(price),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isPivot ? _red : _blue,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
       );
     }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-      child: TextField(
-        controller: _fields[key],
-        keyboardType: TextInputType.number,
-        textAlign: TextAlign.right,
-        style: const TextStyle(fontSize: 13, color: _blue, fontWeight: FontWeight.w700),
-        onChanged: (_) => setState(() {
-          _personalised.add(key);
-          _draftSaved = false;
-        }),
-        decoration: InputDecoration(
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 7, vertical: 12),
-          filled: personal,
-          fillColor: const Color(0xFFFFF0F0),
-          suffixIcon: personal
-              ? IconButton(
-                  tooltip: 'Réinitialiser au tarif calculé',
-                  icon: const Icon(Icons.undo, size: 16, color: _red),
-                  onPressed: () => _resetCell(level, offer, duration),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minHeight: 28, minWidth: 28),
-                )
-              : null,
-          border: const OutlineInputBorder(),
-        ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (changed) ...[
+            Align(
+              alignment: Alignment.centerRight,
+              child: _previousPrice(previousPrice),
+            ),
+            const SizedBox(height: 3),
+          ],
+          SizedBox(
+            height: 43,
+            child: TextField(
+              controller: _fields[key],
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontSize: 13,
+                color: _blue,
+                fontWeight: FontWeight.w700,
+              ),
+              onChanged: (_) => setState(() {
+                _personalised.add(key);
+                _draftSaved = false;
+              }),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 7,
+                  vertical: 12,
+                ),
+                filled: personal,
+                fillColor: const Color(0xFFFFF0F0),
+                suffixIcon: personal
+                    ? IconButton(
+                        tooltip: 'Réinitialiser au tarif calculé',
+                        icon: const Icon(Icons.undo, size: 16, color: _red),
+                        onPressed: () => _resetCell(level, offer, duration),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minHeight: 28,
+                          minWidth: 28,
+                        ),
+                      )
+                    : null,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -567,6 +644,24 @@ class _SuperAdminAdvertiserPricingTableState
             const SizedBox(height: 12),
             const Text('TABLEAU COMPLET DES 90 TARIFS HT',
                 style: TextStyle(color: _blue, fontSize: 15, fontWeight: FontWeight.w900)),
+            if (_editing) ...[
+              const SizedBox(height: 4),
+              const Row(
+                children: [
+                  Text(
+                    'Ancien tarif',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 11,
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                  SizedBox(width: 7),
+                  Text('→ nouveau tarif : seules les cellules modifiées affichent les deux montants',
+                      style: TextStyle(fontSize: 11, color: _blue)),
+                ],
+              ),
+            ],
             const SizedBox(height: 6),
             Expanded(
               child: Container(
