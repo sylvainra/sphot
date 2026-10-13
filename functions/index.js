@@ -9,6 +9,7 @@ const {
 } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
+const commercialPricing = require("./commercial_pricing");
 const {getDownloadURL} = require("firebase-admin/storage");
 const nodemailer = require("nodemailer");
 const PDFDocument = require("pdfkit");
@@ -7570,7 +7571,13 @@ exports.consumeSuperAdminWebSession = onRequest(
           return;
         }
 
-        response.status(200).json({success: true});
+        const pricingSessionToken = await commercialPricing.issueSession(
+            admin, crypto, accepted,
+        );
+        response.status(200).json({
+          success: true,
+          pricingSessionToken,
+        });
       } catch (error) {
         console.error(
             "Erreur validation session Web Super Admin:",
@@ -7580,6 +7587,15 @@ exports.consumeSuperAdminWebSession = onRequest(
       }
     },
 );
+
+// Protected by the short-lived session minted after consuming the existing
+// single-use Super Admin login token.
+exports.manageCommercialPricing = commercialPricing.endpoint({
+  admin, crypto, onRequest,
+});
+exports.activateScheduledCommercialPricing = commercialPricing.scheduler({
+  admin, onSchedule,
+});
 
 exports.requestAdminReplacement = onRequest(
     {
