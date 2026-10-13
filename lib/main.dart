@@ -286,6 +286,7 @@ class _SuperAdminSessionGate extends StatefulWidget {
 class _SuperAdminSessionGateState extends State<_SuperAdminSessionGate> {
   bool _loading = true;
   bool _authorized = false;
+  String _pricingSessionToken = '';
 
   @override
   void initState() {
@@ -310,6 +311,7 @@ class _SuperAdminSessionGateState extends State<_SuperAdminSessionGate> {
       final data = jsonDecode(response.body);
       if (data is Map<String, dynamic> && data['success'] == true) {
         _authorized = true;
+        _pricingSessionToken = data['pricingSessionToken']?.toString() ?? '';
       }
     } catch (error, stackTrace) {
       debugPrint('Ouverture session Super Admin impossible : $error');
@@ -339,6 +341,6 @@ class _SuperAdminSessionGateState extends State<_SuperAdminSessionGate> {
       );
     }
 
-    return const WebSuperAdminApp();
+    return WebSuperAdminApp(pricingSessionToken: _pricingSessionToken);
   }
 }
