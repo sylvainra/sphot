@@ -85,6 +85,6 @@ test("Only a published Firestore catalog can be quoted", () => {
   assert.throws(() => publishedState({exists: false}, "ADMIN"),
       (error) => error.httpStatus === 503);
   assert.throws(() => publishedState({
-    exists: true, data: () => {...admin, publishedVersion: null},
+    exists: true, data: () => ({...admin, publishedVersion: null}),
   }, "ADMIN"), (error) => error.httpStatus === 503);
 });
