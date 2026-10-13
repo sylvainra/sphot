@@ -160,7 +160,7 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
           padding: const EdgeInsets.all(13),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            color: selected ? _blue.withOpacity(0.06) : Colors.white,
+            color: selected ? _blue.withValues(alpha: 0.06) : Colors.white,
             border: Border.all(
               color: selected ? _blue : const Color(0xFFCED9E8),
               width: selected ? 1.8 : 1,
@@ -212,7 +212,7 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
       width: 540,
       decoration: BoxDecoration(
         color: const Color(0xFFF5F7FA),
-        border: Border(left: BorderSide(color: _blue.withOpacity(0.25), width: 1.5)),
+        border: Border(left: BorderSide(color: _blue.withValues(alpha: 0.25), width: 1.5)),
       ),
       child: SafeArea(
         child: Column(
