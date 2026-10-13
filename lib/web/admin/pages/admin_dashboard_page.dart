@@ -116,6 +116,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _showAdminWelcomePromotion = false;
   bool _welcomePromotionStateLoaded = false;
   bool _welcomePromotionSeenLocally = false;
+  bool _welcomePromotionShownThisSession = false;
   bool _showSauveteurEditorPanel = false;
   bool _showSauveteursManagementPanel = false;
   bool _showSurveillancePeriodsPanel = false;
@@ -6253,6 +6254,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Widget _buildAdminWelcomePromotion() {
+    // Une impression du message suffit pour le considérer comme vu.
+    // On conserve son affichage pendant cette connexion, puis on le
+    // masque définitivement lors des connexions suivantes.
+    if (!_welcomePromotionShownThisSession) {
+      _welcomePromotionShownThisSession = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _persistAdminWelcomePromotionSeen();
+        }
+      });
+    }
     return Positioned.fill(
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -13904,19 +13916,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     });
   }
 
-  Future<void> _dismissAdminWelcomePromotion() async {
-    if (!_showAdminWelcomePromotion) return;
-    setState(() {
-      _showAdminWelcomePromotion = false;
-      _welcomePromotionSeenLocally = true;
-    });
+  Future<void> _persistAdminWelcomePromotionSeen() async {
     final uid = widget.adminUid.trim();
     if (uid.isEmpty) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_welcomePromotionStorageKey, true);
     } catch (_) {
-      // Les restrictions de stockage navigateur ne doivent pas bloquer l'UI.
+      // Le stockage navigateur n'est qu'un secours à la trace Firestore.
     }
     try {
       await FirebaseFirestore.instance
@@ -13926,9 +13933,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             'welcomePromotionSeenAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
     } catch (_) {
-      // Sur un navigateur qui refuse cette ecriture, la preference locale
-      // empeche toujours une nouvelle ouverture sur le meme profil/browser.
+      // L'enregistrement local évite l'ouverture répétée sur ce navigateur.
     }
+  }
+
+  Future<void> _dismissAdminWelcomePromotion() async {
+    if (!_showAdminWelcomePromotion) return;
+    setState(() {
+      _showAdminWelcomePromotion = false;
+      _welcomePromotionSeenLocally = true;
+    });
+    await _persistAdminWelcomePromotionSeen();
   }
 
   @override
@@ -15172,7 +15187,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                   docs.isEmpty &&
                                   !hasAlreadyRequestedTrial &&
                                   currentAdminRequest != null &&
-                                  currentAdminRequest['welcomePromotionSeenAt'] == null &&
+                                  (currentAdminRequest['welcomePromotionSeenAt'] == null ||
+                                      _welcomePromotionShownThisSession) &&
                                   !_showSphotEditorPanel &&
                                   !_showSurveillancePeriodsPanel &&
                                   !_showSauveteurEditorPanel &&
