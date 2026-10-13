@@ -31,6 +31,14 @@
 - **Branche erronée à IGNORER** : `fix/admin-paiement-compact-20261013`, commits `4a5333e` puis `55f7378`. Ils modifient un ancien `admin_subscription_panel.dart` non conforme au chantier actuel et **ne doivent pas être fusionnés**.
 - Les corrections sont sur une branche et **non fusionnées dans `main`** à la date de cette note. Une compilation et des tests visuels/fonctionnels Flutter restent à faire.
 
+## Corrections complémentaires du 13 octobre (captures utilisateur)
+
+- `2da5869ea2fd06cf77e35f793109dea82bc920f5` : `admin_payment_panel.dart` harmonisé avec le panneau ABONNEMENT (430 px, même header et Fire rouge SVG à échelle 1,5), lignes comptables avec montants alignés à droite, TOTAL ANNUEL HT **rouge** et mention exacte « Avant TVA et fiscalité applicable. Aucun devis contractuel ni montant à payer confirmé. ».
+- `0b7d756aed3343944be96fe5fb0839430636f7d2` : `admin_dashboard_page.dart` transmet `idSphot` (ou numéro explicite alternatif) + nom du poste de secours au volet PAIEMENT lorsque le numéro est renseigné.
+- Audit statique des deux fichiers effectué : conservation du service de grille publiée et de ses montants ; gabarit de 430 px et SVG contrôlés. **Compilation et test visuel Flutter non effectués** (SDK non disponible dans l'environnement d'exécution distant).
+- Pour tester sur la branche : `git switch codex/advertiser-pricing-table-v1` puis `git pull --ff-only origin codex/advertiser-pricing-table-v1` (après `git status` et sauvegarde des changements locaux), `flutter pub get`, `flutter run -d chrome -t lib/main_web_admin.dart`.
+- Vérifier notamment le cas des deux postes à 499 € + 399 € = 898 € HT, le libellé `numéro - nom`, l'alignement et le total rouge, la mention sans soulignement jaune.
+
 ## Règles pour la reprise
 
 - Ne pas repartir d'une version ancienne récupérée sur `main` ni réécrire le composant PAIEMENT au complet.
