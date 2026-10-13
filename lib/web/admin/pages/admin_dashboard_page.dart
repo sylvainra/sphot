@@ -111,6 +111,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Color _sphotHoverColor = adminColor;
 
   bool _showSphotEditorPanel = false;
+  bool _showAdminWelcomePromotion = true;
   bool _showSauveteurEditorPanel = false;
   bool _showSauveteursManagementPanel = false;
   bool _showSurveillancePeriodsPanel = false;
@@ -6209,6 +6210,153 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAdminWelcomePromotion() {
+    return Positioned.fill(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: math.min(650.0, constraints.maxWidth - 32),
+                maxHeight: math.min(460.0, constraints.maxHeight * 0.76),
+              ),
+              child: Material(
+                color: Colors.white.withOpacity(0.95),
+                elevation: 9,
+                borderRadius: BorderRadius.circular(18),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: adminColor.withOpacity(0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(22, 12, 20, 18),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'SPHOT ADMIN · VOS LIEUX DE BAIGNADE',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  color: adminColor,
+                                  fontSize: 13,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Fermer le message et afficher la carte',
+                              icon: const Icon(Icons.close_rounded, color: adminColor),
+                              onPressed: () {
+                                setState(() => _showAdminWelcomePromotion = false);
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        const Text(
+                          'Diffusez gratuitement* vos SPHOTS de baignade '
+                          'ainsi que votre structure sur l’application SPHOT.',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontStyle: FontStyle.italic,
+                            fontWeight: FontWeight.w800,
+                            color: adminColor,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 13),
+                        const Text(
+                          'Présentez au grand public les caractéristiques de '
+                          'vos lieux de baignade : nom, localisation, type de '
+                          'site, équipements, accès, labels et informations utiles.',
+                          style: TextStyle(
+                            fontSize: 13.5, color: Colors.black87, height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Valorisez également votre structure',
+                                style: TextStyle(fontWeight: FontWeight.w900),
+                              ),
+                              TextSpan(
+                                text: ' par un accès direct à votre site internet.',
+                              ),
+                            ],
+                          ),
+                          style: TextStyle(
+                            fontSize: 13.5, color: Colors.black87, height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Pour les SPHOTS surveillés',
+                                style: TextStyle(fontWeight: FontWeight.w900),
+                              ),
+                              TextSpan(text: ', l’abonnement '),
+                              TextSpan(
+                                text: 'SPHOT ADMIN',
+                                style: TextStyle(fontWeight: FontWeight.w900),
+                              ),
+                              TextSpan(text: ' permet en plus de diffuser les '),
+                              TextSpan(
+                                text: 'informations de surveillance en temps réel',
+                                style: TextStyle(fontWeight: FontWeight.w900),
+                              ),
+                              TextSpan(
+                                text: ', renseignées directement par les '
+                                    'professionnels chargés de la surveillance.',
+                              ),
+                            ],
+                          ),
+                          style: TextStyle(
+                            fontSize: 13.5, color: Colors.black87, height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 13),
+                        Divider(color: adminColor.withOpacity(0.2)),
+                        const SizedBox(height: 4),
+                        const Text(
+                          '* La diffusion gratuite concerne la présence de tous '
+                          'les types de SPHOTS sur la carte, leurs caractéristiques '
+                          'descriptives et le référencement de la structure '
+                          'gestionnaire. La diffusion des informations de '
+                          'surveillance en temps réel des SPHOTS surveillés '
+                          'nécessite l’activation des fonctionnalités SPHOT ADMIN, '
+                          'pendant la période d’essai autorisée ou dans le cadre '
+                          'd’un abonnement en vigueur.',
+                          style: TextStyle(
+                            color: Color(0xFF475569),
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -14910,6 +15058,22 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               _buildRecenterButton(),
                               _buildNorthButton(),
                               _buildMapStyleButton(),
+
+                              if (_showAdminWelcomePromotion &&
+                                  !_showSphotEditorPanel &&
+                                  !_showSurveillancePeriodsPanel &&
+                                  !_showSauveteurEditorPanel &&
+                                  !_showSauveteursManagementPanel &&
+                                  !_showTrialSummaryPanel &&
+                                  !_showSubscriptionPanel &&
+                                  !_showBillingDocumentsPanel &&
+                                  !_showStatisticsPanel &&
+                                  !_showMainCourantePanel &&
+                                  _selectedSpot == null &&
+                                  _selectedAdmin == null &&
+                                  _selectedAdvertiser == null)
+                                _buildAdminWelcomePromotion(),
+
 
                               Positioned(
                                 left: 0,
