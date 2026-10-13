@@ -453,6 +453,49 @@ class _SuperAdminAdminPricingTableState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _blue.withOpacity(0.28),
+                            ),
+                          ),
+                          child: const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Avec SPHOT, la diffusion sur la carte et les '
+                                'caractéristiques descriptives des lieux '
+                                'peuvent être publiées gratuitement*. '
+                                'Les abonnements SPHOT ADMIN ajoutent les '
+                                'fonctionnalités temps réel des SPHOTS surveillés.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: _blue,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.4,
+                                ),
+                              ),
+                              SizedBox(height: 5),
+                              Text(
+                                '* La gratuité couvre les informations '
+                                'descriptives. La diffusion des informations '
+                                'de surveillance en temps réel nécessite '
+                                'une période d’essai autorisée ou un '
+                                'abonnement SPHOT ADMIN en vigueur.',
+                                style: TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 11,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
                         const Text('TARIFICATION DÉGRESSIVE PAR POSTE',
                             style: TextStyle(
                               color: _blue, fontSize: 16, fontWeight: FontWeight.w900,
