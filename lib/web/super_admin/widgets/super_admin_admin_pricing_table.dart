@@ -155,6 +155,87 @@ class _SuperAdminAdminPricingTableState
     });
   }
 
+  /// Choisir le point de départ sans écraser d'autre brouillon.
+  Future<void> _chooseNewVersion() async {
+    if (_busy || _editing || _scheduled) return;
+    CommercialPricingState data;
+    try {
+      data = await _service.load('ADMIN');
+    } catch (e) {
+      if (mounted) _message(e.toString());
+      return;
+    }
+    if (!mounted) return;
+    if (data.draft != null || data.scheduled != null) {
+      _message('Un brouillon ou une programmation existe déjà. '
+          'Fermez et rouvrez le volet pour actualiser.');
+      return;
+    }
+    final archives = data.history
+        .where((version) => version['status'] == 'archived')
+        .toList();
+    final source = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('CRÉER UNE NOUVELLE VERSION'),
+        content: SizedBox(
+          width: 490,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('Sélectionnez la grille ADMIN de départ. '
+                    'Les versions historiques restent intactes.'),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.pop(ctx, 0),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: Text(
+                    'PARTIR DE LA VERSION PUBLIÉE · '
+                    'ADMIN-V${data.publishedVersion}',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (archives.isNotEmpty)
+                  const Text('REPRENDRE UNE VERSION ARCHIVÉE',
+                      style: TextStyle(
+                        color: _blue, fontWeight: FontWeight.w800,
+                      )),
+                for (final version in archives)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.pop(
+                        ctx, (version['version'] as num).toInt(),
+                      ),
+                      icon: const Icon(Icons.restore_outlined),
+                      label: Text('REPRENDRE ADMIN-V${version["version"]} '
+                          '· ${CommercialPricingHistoryFormat.status(
+                              version["status"])}'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ANNULER'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || source == null) return;
+    if (source == 0) {
+      _applyRemote(data);
+      _newVersion();
+    } else {
+      await _restoreHistoricalVersion(source, data.revision);
+    }
+  }
+
   Future<void> _cancelDraft() async {
     if (_draftSaved) {
       await _persist(() => _service.discard('ADMIN', revision: _revision));
@@ -286,7 +367,7 @@ class _SuperAdminAdminPricingTableState
     if (!mounted) return;
     final canRestore = !_busy && !_editing &&
         data.draft == null && data.scheduled == null;
-    await showDialog<void>(
+    final selectedVersion = await showDialog<int>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('HISTORIQUE TARIFAIRE ADMIN'),
@@ -367,13 +448,10 @@ class _SuperAdminAdminPricingTableState
                             alignment: Alignment.centerRight,
                             child: OutlinedButton.icon(
                               onPressed: canRestore
-                                  ? () {
-                                      Navigator.pop(dialogContext);
-                                      _restoreHistoricalVersion(
+                                  ? () => Navigator.pop(
+                                        dialogContext,
                                         (version['version'] as num).toInt(),
-                                        data.revision,
-                                      );
-                                    }
+                                      )
                                   : null,
                               icon: const Icon(Icons.restore_outlined, size: 17),
                               label: const Text('REPRENDRE CETTE VERSION'),
@@ -394,6 +472,9 @@ class _SuperAdminAdminPricingTableState
         ],
       ),
     );
+    if (selectedVersion != null && mounted) {
+      await _restoreHistoricalVersion(selectedVersion, data.revision);
+    }
   }
 
   Widget _button(
@@ -693,7 +774,7 @@ class _SuperAdminAdminPricingTableState
                   _button(
                     'CRÉER UNE NOUVELLE VERSION',
                     Icons.copy,
-                    _busy || _loadError != null ? null : _newVersion,
+                    _busy || _loadError != null ? null : _chooseNewVersion,
                     primary: true,
                   ),
                 if (_editing) ...[
