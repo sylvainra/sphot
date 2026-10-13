@@ -52,6 +52,7 @@ class CommercialPricingService {
     dynamic prices,
     List<String>? personalised,
     DateTime? effectiveAt,
+    int? sourceVersion,
   }) async {
     if (sessionToken.isEmpty) {
       throw StateError('Session Super Admin absente. Reconnectez-vous.');
@@ -65,6 +66,7 @@ class CommercialPricingService {
       body: jsonEncode({
         'market': market,
         'action': action,
+        if (sourceVersion != null) 'sourceVersion': sourceVersion,
         if (revision != null) 'revision': revision,
         if (prices != null) 'prices': prices,
         if (personalised != null) 'personalised': personalised,
@@ -110,6 +112,16 @@ class CommercialPricingService {
     required int revision,
   }) =>
       _post(market, 'discard', revision: revision);
+
+  /// Reprend les prix EXACTS d'une version historique en un nouveau brouillon.
+  /// Le serveur refuse si une autre version est déjà en brouillon/programmée.
+  Future<CommercialPricingState> restoreVersion(
+    String market, {
+    required int revision,
+    required int sourceVersion,
+  }) =>
+      _post(market, 'restoreVersion',
+          revision: revision, sourceVersion: sourceVersion);
 
   Future<CommercialPricingState> cancelSchedule(
     String market, {
