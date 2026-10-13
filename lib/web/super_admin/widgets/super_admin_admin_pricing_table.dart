@@ -100,7 +100,7 @@ class _SuperAdminAdminPricingTableState
       if (!mounted) return;
       setState(() => _busy = false);
       _message(e.toString());
-      await _loadRemote();
+      // Preserve unsaved edits on network errors or revision conflicts.
     }
   }
 
@@ -238,9 +238,20 @@ class _SuperAdminAdminPricingTableState
         revision: _revision, effectiveAt: effectiveAt));
   }
 
+  void _noticeHistoryError(String error) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+  }
+
   Future<void> _history() async {
-    await _loadRemote();
-    if (!mounted || _loadError != null) return;
+    try {
+      final data = await _service.load('ADMIN');
+      if (!mounted) return;
+      _remoteHistory = data.history;
+    } catch (e) {
+      if (!mounted) return;
+      _noticeHistoryError(e.toString());
+      return;
+    }
     final lines = _remoteHistory.map((row) {
       final values = (row['prices'] as List<dynamic>)
           .map((v) => _money((v as num).toInt())).join(' / ');
