@@ -117,6 +117,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   bool _showLegalDocumentsPanel = false;
   bool _showPricingPanel = false;
   int _selectedPricingTab = 0;
+  final GlobalKey _pricingPanelKey = GlobalKey();
 
   String? _selectedLegalDocument;
   String? _selectedLegalChapter;
@@ -7227,6 +7228,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                           if (_selectedPricingTab == 1)
                             Expanded(
                               child: SuperAdminPricingPanel(
+                                key: _pricingPanelKey,
                                 selectedTab: _selectedPricingTab,
                                 onTabChanged: (tab) => setState(() => _selectedPricingTab = tab),
                                 onClose: () => setState(() => _showPricingPanel = false),
@@ -7234,6 +7236,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                             )
                           else
                             SuperAdminPricingPanel(
+                              key: _pricingPanelKey,
                               selectedTab: _selectedPricingTab,
                               onTabChanged: (tab) => setState(() => _selectedPricingTab = tab),
                               onClose: () => setState(() => _showPricingPanel = false),
