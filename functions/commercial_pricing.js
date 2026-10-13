@@ -323,11 +323,13 @@ async function cancelSchedule(admin, type, body, login) {
     }
     const futureRef = root.collection("versions").doc(versionId(scheduled.version));
     const future = await tx.get(futureRef);
-    if (future.exists) tx.update(futureRef, {
-      status: "cancelled",
-      cancelledAt: admin.firestore.Timestamp.now(),
-      cancelledBy: login,
-    });
+    if (future.exists) {
+      tx.update(futureRef, {
+        status: "cancelled",
+        cancelledAt: admin.firestore.Timestamp.now(),
+        cancelledBy: login,
+      });
+    }
     tx.update(root, {
       scheduled: null,
       draft: {version: current.latestVersion + 1,
@@ -437,11 +439,13 @@ function scheduler({admin, onSchedule}) {
             if (!scheduledVersion.exists ||
                 scheduledVersion.data().status !== "scheduled") return;
             const now = admin.firestore.Timestamp.now();
-            if (previous.exists) tx.update(previousRef, {
-              status: "archived",
-              archivedAt: now,
-              archivedBy: "scheduled-activation",
-            });
+            if (previous.exists) {
+              tx.update(previousRef, {
+                status: "archived",
+                archivedAt: now,
+                archivedBy: "scheduled-activation",
+              });
+            }
             tx.update(nextRef, {
               status: "published",
               publishedAt: now,
