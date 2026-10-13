@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../services/published_commercial_quote_service.dart';
 
 /// Étape de paiement ADMIN : aperçu ergonomique uniquement.
 /// Aucun numéro de carte n'est collecté et aucune transaction n'est lancée.
 /// Le raccordement au devis et au prestataire de paiement sera réalisé
 /// après validation des règles de facturation internationale.
 class AdminPaymentPanel extends StatefulWidget {
-  const AdminPaymentPanel({super.key, required this.onClose});
+  const AdminPaymentPanel({
+    super.key,
+    required this.adminUid,
+    required this.onClose,
+  });
 
+  final String adminUid;
   final VoidCallback onClose;
 
   @override
@@ -17,6 +24,125 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
   static const _blue = Color(0xFF1E3A8A);
   static const _red = Color(0xFFDC2626);
   String _method = 'card';
+  final Map<int, Future<PublishedCommercialQuote>> _quoteFutures = {};
+
+
+  /// Apercu des prix PUBLIES uniquement : aucune ecriture commerciale.
+  Widget _publishedAdminQuotePreview() {
+    final uid = widget.adminUid.trim();
+    if (uid.isEmpty) {
+      return const Text(
+        'Identifiant Admin indisponible : estimation impossible.',
+        style: TextStyle(color: _red, fontSize: 12),
+      );
+    }
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('subscriptions')
+          .doc(uid)
+          .snapshots(),
+      builder: (context, subscriptionSnapshot) {
+        if (subscriptionSnapshot.hasError) {
+          return const Text(
+            'La sélection des postes de secours est inaccessible.',
+            style: TextStyle(color: _red, fontSize: 12),
+          );
+        }
+        if (!subscriptionSnapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final data = subscriptionSnapshot.data?.data() ??
+            const <String, dynamic>{};
+        final value = data['numberOfRescueStations'];
+        final stations = value is num ? value.toInt() : 0;
+        if (stations <= 0) {
+          return const Text(
+            'Sélectionnez et enregistrez vos postes de secours dans '
+            'l’étape ABONNEMENT pour afficher le nouveau devis indicatif.',
+            style: TextStyle(color: _red, fontSize: 12),
+          );
+        }
+        final future = _quoteFutures.putIfAbsent(
+          stations,
+          () => const PublishedCommercialQuoteService()
+              .admin(numberOfRescueStations: stations),
+        );
+        return FutureBuilder<PublishedCommercialQuote>(
+          future: future,
+          builder: (context, quoteSnapshot) {
+            if (quoteSnapshot.hasError) {
+              return Text(
+                'Devis indicatif indisponible : ${quoteSnapshot.error}',
+                style: const TextStyle(color: _red, fontSize: 12),
+              );
+            }
+            final quote = quoteSnapshot.data;
+            if (quote == null) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final lines = quote.details['lines'] is List
+                ? quote.details['lines'] as List
+                : const [];
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'APERÇU DES TARIFS PUBLIÉS · ${quote.pricingReference}',
+                    style: const TextStyle(
+                      color: _blue,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '$stations poste${stations > 1 ? "s" : ""} de secours',
+                    style: const TextStyle(
+                      color: _blue, fontSize: 12, fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final line in lines)
+                    if (line is Map && (line['count'] as num?) != null &&
+                        (line['count'] as num) > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          'Tranche ${line["tier"]} · ${line["count"]} × '
+                          '${line["unitExclTax"]} € = '
+                          '${line["amountExclTax"]} € HT',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                  const Divider(),
+                  Text(
+                    'TOTAL INDICATIF : ${quote.amountExclTax} € HT / an',
+                    style: const TextStyle(
+                      color: _red, fontWeight: FontWeight.w900, fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Lecture de la version publiée. Aucun devis contractuel '
+                    'ni montant à payer n’est encore confirmé. TVA et '
+                    'conditions de facturation seront vérifiées séparément.',
+                    style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   Widget _methodTile({
     required String value,
@@ -152,6 +278,8 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
                         fontSize: 13, height: 1.45, color: Color(0xFF334155),
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    _publishedAdminQuotePreview(),
                     const SizedBox(height: 12),
                     const Text(
                       'Montant à payer : en attente du devis confirmé',
