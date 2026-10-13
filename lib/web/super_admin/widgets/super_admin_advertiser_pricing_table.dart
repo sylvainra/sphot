@@ -327,7 +327,7 @@ class _SuperAdminAdvertiserPricingTableState
         title: const Text('PUBLIER LA GRILLE ANNONCEUR'),
         content: SingleChildScrollView(
           child: Text(
-            'FRANCE · EUR · FR-V${_workingVersion}\n'
+            'FRANCE · EUR · FR-V$_workingVersion\n'
             '90 tarifs · $changed prix modifiés\n'
             '${warnings.isEmpty ? "Aucun avertissement." :
               warnings.take(5).join("\n")}\n\n'
