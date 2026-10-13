@@ -35,6 +35,7 @@ class _SuperAdminAdminPricingTableState
   bool _busy = true;
   String? _loadError;
   int _publishedVersion = 1;
+  int _workingVersion = 2;
   int _stationCount = 10;
   bool _editing = false;
   bool _draftSaved = false;
@@ -61,6 +62,9 @@ class _SuperAdminAdminPricingTableState
     setState(() {
       _published = prices;
       _publishedVersion = data.publishedVersion;
+      _workingVersion = (data.draft?['version'] as num?)?.toInt() ??
+          (data.scheduled?['version'] as num?)?.toInt() ??
+          data.latestVersion + 1;
       _revision = data.revision;
       _remoteHistory = data.history;
       _editing = draft != null;
@@ -485,7 +489,7 @@ class _SuperAdminAdminPricingTableState
                     style: TextStyle(color: _blue, fontWeight: FontWeight.w900,
                         fontSize: 17)),
                 Chip(label: Text(
-                  'ADMIN-V${_editing || _scheduled ? _publishedVersion + 1 : _publishedVersion}',
+                  'ADMIN-V${_editing || _scheduled ? _workingVersion : _publishedVersion}',
                 )),
                 Chip(label: Text(status)),
                 _button('HISTORIQUE', Icons.history, _busy ? null : _history),
