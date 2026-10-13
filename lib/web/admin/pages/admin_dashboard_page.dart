@@ -15179,9 +15179,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           )
                         else if (_showAdminPaymentPanel)
                           AdminPaymentPanel(
-                             adminUid: widget.adminUid,
-                             onClose: _closeAdminPaymentPanel,
-                           )
+                            adminUid: widget.adminUid,
+                            // Memes SPHOTS que ceux de la carte de l'Admin :
+                            // ne pas utiliser le compteur historique de
+                            // subscriptions/{uid} pour cette estimation.
+                            availableRescueStationIds: docs
+                                .where((doc) {
+                                  final spot = doc.data();
+                                  return spot['isPosteSecours'] == true ||
+                                      (spot['typeSphot'] ?? '')
+                                          .toString()
+                                          .toUpperCase()
+                                          .contains('POSTE DE SECOURS');
+                                })
+                                .map((doc) => doc.id)
+                                .toList(),
+                            onClose: _closeAdminPaymentPanel,
+                          )
                         else if (_showBillingDocumentsPanel)
                           _buildBillingDocumentsPanel()
                         else if (_showStatisticsPanel)
