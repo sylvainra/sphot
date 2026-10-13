@@ -153,7 +153,7 @@ class _SuperAdminAdvertiserPricingTableState
       if (!mounted) return;
       setState(() => _busy = false);
       _notice(e.toString());
-      await _loadRemote();
+      // Preserve the user's unsaved prices after a failed request.
     }
   }
 
@@ -583,8 +583,15 @@ class _SuperAdminAdvertiserPricingTableState
   }
 
   Future<void> _showHistory() async {
-    await _loadRemote();
-    if (!mounted || _loadError != null) return;
+    try {
+      final data = await _service.load('ADVERTISER');
+      if (!mounted) return;
+      _remoteHistory = data.history;
+    } catch (e) {
+      if (!mounted) return;
+      _notice(e.toString());
+      return;
+    }
     final records = _remoteHistory.map((item) =>
       'FR-V${item["version"]} · ${item["status"]} · 90 tarifs HT'
     ).join('\n');
