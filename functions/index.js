@@ -10,6 +10,7 @@ const {
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 const commercialPricing = require("./commercial_pricing");
+const commercialQuotePricing = require("./commercial_quote_pricing");
 const {getDownloadURL} = require("firebase-admin/storage");
 const nodemailer = require("nodemailer");
 const PDFDocument = require("pdfkit");
@@ -7595,6 +7596,12 @@ exports.manageCommercialPricing = commercialPricing.endpoint({
 });
 exports.activateScheduledCommercialPricing = commercialPricing.scheduler({
   admin, onSchedule,
+});
+
+// Lecture publique des seuls montants PUBLIES. Aucun devis ni commande n'est
+// creee ici; la validation commerciale sera raccordee dans une phase separee.
+exports.previewPublishedCommercialQuote = commercialQuotePricing.endpoint({
+  admin, onRequest,
 });
 
 exports.requestAdminReplacement = onRequest(
