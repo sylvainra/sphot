@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/commercial_pricing_service.dart';
 
-/// Preview of the new advertiser tariff editor.
-/// All changes (including SAVE and PUBLISH) are session-only in this test.
+/// Catalogue annonceur Firestore, isole des tarifs encore utilises en production.
+/// Les devis, commandes et paiements ne sont pas modifies par cet ecran.
 class SuperAdminAdvertiserPricingTable extends StatefulWidget {
   const SuperAdminAdvertiserPricingTable({super.key, required this.sessionToken});
 
@@ -328,7 +328,7 @@ class _SuperAdminAdvertiserPricingTableState
         title: const Text('PUBLIER LA GRILLE ANNONCEUR'),
         content: SingleChildScrollView(
           child: Text(
-            'FRANCE · EUR · FR-V${_publishedVersion + 1}\n'
+            'FRANCE · EUR · FR-V${_workingVersion}\n'
             '90 tarifs · $changed prix modifiés\n'
             '${warnings.isEmpty ? "Aucun avertissement." :
               warnings.take(5).join("\n")}\n\n'
@@ -800,7 +800,7 @@ class _SuperAdminAdvertiserPricingTableState
                 ],
                 if (_simulatedScheduled)
                   _topButton(
-                    label: 'ANNULER LA PROGRAMMATION (TEST)',
+                    label: 'ANNULER LA PROGRAMMATION',
                     icon: Icons.event_busy,
                     onPressed: _busy ? null : () => _persist(() =>
                       _service.cancelSchedule('ADVERTISER', revision: _revision)),
@@ -809,7 +809,7 @@ class _SuperAdminAdvertiserPricingTableState
             ),
             if (_simulatedScheduled && _scheduledFor != null)
               Text(
-                'Date programmée (simulation) : ${_scheduledFor!.day}/${_scheduledFor!.month}/${_scheduledFor!.year}',
+                'Date programmée : ${_scheduledFor!.day}/${_scheduledFor!.month}/${_scheduledFor!.year}',
                 style: const TextStyle(color: _blue),
               ),
           ],
