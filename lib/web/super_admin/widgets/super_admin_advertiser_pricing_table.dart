@@ -188,7 +188,11 @@ class _SuperAdminAdvertiserPricingTableState
     });
   }
 
-  void _discardDraft() {
+  Future<void> _discardDraft() async {
+    if (_draftSaved) {
+      await _persist(() => _service.discard('ADVERTISER', revision: _revision));
+      return;
+    }
     setState(() {
       _editing = false;
       _draftSaved = false;
@@ -240,7 +244,7 @@ class _SuperAdminAdvertiserPricingTableState
           'Variation : ${((factor - 1) * 100).toStringAsFixed(2)} %\n'
           '$affected tarifs recalculés, '
           '${_personalised.length} tarifs personnalisés protégés.\n\n'
-          'Seul le brouillon de test sera modifié.',
+          'Le recalcul sera appliqué au brouillon non publié.',
         ),
         actions: [
           TextButton(
@@ -261,7 +265,7 @@ class _SuperAdminAdvertiserPricingTableState
       }
       _draftSaved = false;
     });
-    _notice('Recalcul appliqué au brouillon de test.');
+    _notice('Recalcul appliqué : enregistrez pour le conserver.');
   }
 
   void _resetCell(int level, int offer, int duration) {
@@ -276,13 +280,16 @@ class _SuperAdminAdvertiserPricingTableState
     });
   }
 
-  void _saveDraft() {
-    if (_validPrices() == null) {
-      _notice('Les 90 prix doivent être renseignés et supérieurs à zéro.');
+  Future<void> _saveDraft() async {
+    final prices = _validPrices();
+    if (prices == null) {
+      _notice('Les 90 montants doivent être positifs.');
       return;
     }
-    setState(() => _draftSaved = true);
-    _notice('Brouillon enregistré pour cet essai (sans Firebase).');
+    await _persist(() => _service.save(
+      'ADVERTISER', revision: _revision,
+      prices: prices, personalised: _personalised.toList(),
+    ));
   }
 
   List<String> _warnings(Map<String, int> prices) {
@@ -306,73 +313,52 @@ class _SuperAdminAdvertiserPricingTableState
   }
 
   Future<void> _publish() async {
-    if (!_editing || !_draftSaved) return;
+    if (!_editing || !_draftSaved || _busy) return;
     final prices = _validPrices();
-    if (prices == null) {
-      _notice('Impossible de publier une grille incomplète.');
-      return;
-    }
-    final warnings = _warnings(prices);
+    if (prices == null) return;
     final changed = prices.keys.where((k) => prices[k] != _published[k]).length;
+    final warnings = _warnings(prices);
     final action = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('PUBLIER LA GRILLE ANNONCEUR'),
         content: SingleChildScrollView(
           child: Text(
             'FRANCE · EUR · FR-V${_publishedVersion + 1}\n'
-            '90 tarifs complets · $changed montants modifiés\n'
-            '${warnings.isEmpty ? "Aucune incohérence détectée." : "Avertissements :\n${warnings.take(4).join("\n")}"}\n\n'
-            'MODE TEST : cette publication ne modifie pas Firebase.',
+            '90 tarifs · $changed prix modifiés\n'
+            '${warnings.isEmpty ? "Aucun avertissement." :
+              warnings.take(5).join("\n")}\n\n'
+            'La nouvelle grille sera enregistrée dans Firestore. '
+            'Les devis et campagnes existants restent inchangés.',
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('ANNULER'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop('schedule'),
-            child: const Text('PROGRAMMER'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop('now'),
-            child: const Text('PUBLIER MAINTENANT'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx),
+              child: const Text('ANNULER')),
+          TextButton(onPressed: () => Navigator.pop(ctx, 'schedule'),
+              child: const Text('PROGRAMMER')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, 'now'),
+              child: const Text('PUBLIER MAINTENANT')),
         ],
       ),
     );
     if (!mounted || action == null) return;
+    DateTime? effectiveAt;
     if (action == 'schedule') {
-      final now = DateTime.now();
+      final today = DateTime.now();
       final date = await showDatePicker(
         context: context,
-        initialDate: now.add(const Duration(days: 1)),
-        firstDate: now.add(const Duration(days: 1)),
-        lastDate: now.add(const Duration(days: 3650)),
-        helpText: 'DATE DE PUBLICATION (SIMULATION)',
+        initialDate: today.add(const Duration(days: 1)),
+        firstDate: today.add(const Duration(days: 1)),
+        lastDate: today.add(const Duration(days: 3650)),
+        helpText: 'DATE DE PUBLICATION',
       );
       if (date == null || !mounted) return;
-      setState(() {
-        _scheduledFor = date;
-        _simulatedScheduled = true;
-        _editing = false;
-      });
-      _notice('Publication programmée (simulation locale uniquement).');
-    } else {
-      setState(() {
-        _published = Map<String, int>.from(prices);
-        _publishedPersonalised
-          ..clear()
-          ..addAll(_personalised);
-        _publishedVersion++;
-        _editing = false;
-        _draftSaved = false;
-        _scheduledFor = null;
-        _simulatedScheduled = false;
-      });
-      _notice('Version publiée en simulation locale — aucun changement Firebase.');
+      effectiveAt = DateTime(date.year, date.month, date.day);
     }
+    await _persist(() => _service.publish(
+      'ADVERTISER', revision: _revision, effectiveAt: effectiveAt,
+    ));
   }
 
   Widget _topButton({
@@ -597,23 +583,26 @@ class _SuperAdminAdvertiserPricingTableState
   }
 
   Future<void> _showHistory() async {
+    await _loadRemote();
+    if (!mounted || _loadError != null) return;
+    final records = _remoteHistory.map((item) =>
+      'FR-V${item["version"]} · ${item["status"]} · 90 tarifs HT'
+    ).join('\n');
     await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('HISTORIQUE DES VERSIONS'),
-        content: Text(
-          'FR-V$_publishedVersion — PUBLIÉE (simulation)\n'
-          '${_editing ? "FR-V${_publishedVersion + 1} — BROUILLON\n" : ""}'
-          '${_simulatedScheduled ? "FR-V${_publishedVersion + 1} — PROGRAMMÉE\n" : ""}'
-          '\nLes versions du test sont conservées uniquement en mémoire. '
-          'Le stockage et le véritable historique Firestore seront ajoutés '
-          'après validation de l’ergonomie.',
+        content: SingleChildScrollView(
+          child: SelectableText(
+            'FRANCE · ANNONCEUR · VERSIONS FIRESTORE\n'
+            '${_editing ? "BROUILLON ENREGISTRÉ\n" : ""}'
+            '${_simulatedScheduled ? "PUBLICATION PROGRAMMÉE\n" : ""}\n'
+            '$records',
+          ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('FERMER'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx),
+              child: const Text('FERMER')),
         ],
       ),
     );
@@ -624,8 +613,8 @@ class _SuperAdminAdvertiserPricingTableState
     final status = _editing
         ? (_draftSaved ? 'BROUILLON ENREGISTRÉ' : 'BROUILLON NON ENREGISTRÉ')
         : _simulatedScheduled
-            ? 'PROGRAMMÉE (TEST)'
-            : 'PUBLIÉE (TEST)';
+            ? 'PROGRAMMÉE'
+            : 'PUBLIÉE';
     return Container(
       color: _grey,
       child: Padding(
@@ -641,12 +630,15 @@ class _SuperAdminAdvertiserPricingTableState
                 border: Border.all(color: const Color(0xFFEDC974)),
               ),
               child: const Text(
-                'MODE TEST — 90 tarifs français validés. '
-                'Enregistrer et publier sont simulés dans cette session : '
-                'aucune écriture Firebase.',
+                'GRILLE ANNONCEUR — Les versions sont enregistrées dans Firestore. '
+                'Les devis et paiements restent inchangés.',
                 style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF775B13)),
               ),
             ),
+            if (_busy) const LinearProgressIndicator(),
+            if (_loadError != null)
+              SelectableText('Service tarifaire indisponible : $_loadError',
+                style: const TextStyle(color: _red, fontSize: 12)),
             const SizedBox(height: 10),
             Wrap(
               spacing: 10,
@@ -661,7 +653,7 @@ class _SuperAdminAdvertiserPricingTableState
                 _topButton(
                   label: 'HISTORIQUE',
                   icon: Icons.history,
-                  onPressed: _showHistory,
+                  onPressed: _busy ? null : _showHistory,
                 ),
               ],
             ),
@@ -774,24 +766,24 @@ class _SuperAdminAdvertiserPricingTableState
                   _topButton(
                     label: 'CRÉER UNE NOUVELLE VERSION',
                     icon: Icons.copy,
-                    onPressed: _startDraft,
+                    onPressed: _busy || _loadError != null ? null : _startDraft,
                     primary: true,
                   ),
                 if (_editing) ...[
                   _topButton(
                     label: 'ANNULER LE BROUILLON',
                     icon: Icons.undo,
-                    onPressed: _discardDraft,
+                    onPressed: _busy ? null : _discardDraft,
                   ),
                   _topButton(
                     label: 'ENREGISTRER',
                     icon: Icons.save_outlined,
-                    onPressed: _saveDraft,
+                    onPressed: _busy || _loadError != null ? null : _saveDraft,
                   ),
                   _topButton(
                     label: 'PUBLIER',
                     icon: Icons.send_outlined,
-                    onPressed: _draftSaved ? _publish : null,
+                    onPressed: _draftSaved && !_busy ? _publish : null,
                     primary: true,
                   ),
                 ],
@@ -799,12 +791,8 @@ class _SuperAdminAdvertiserPricingTableState
                   _topButton(
                     label: 'ANNULER LA PROGRAMMATION (TEST)',
                     icon: Icons.event_busy,
-                    onPressed: () => setState(() {
-                      _simulatedScheduled = false;
-                      _scheduledFor = null;
-                      _editing = true;
-                      _draftSaved = true;
-                    }),
+                    onPressed: _busy ? null : () => _persist(() =>
+                      _service.cancelSchedule('ADVERTISER', revision: _revision)),
                   ),
               ],
             ),
