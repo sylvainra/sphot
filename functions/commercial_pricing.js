@@ -303,9 +303,9 @@ function cors(request, response) {
     const allowed = hostname === "sphot.app" ||
         hostname.endsWith(".sphot.app") ||
         hostname === "localhost" || hostname === "127.0.0.1" ||
-        (hostname.startsWith("sphot-ab80b") &&
-          (hostname.endsWith(".web.app") ||
-           hostname.endsWith(".firebaseapp.com")));
+        hostname === "sphot-ab80b.web.app" ||
+        hostname === "sphot-ab80b.firebaseapp.com" ||
+        /^sphot-ab80b--[a-z0-9-]+\.web\.app$/.test(hostname);
     if (!allowed) return false;
     response.set("Access-Control-Allow-Origin", origin);
     response.set("Vary", "Origin");
