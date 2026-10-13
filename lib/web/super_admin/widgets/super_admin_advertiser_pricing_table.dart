@@ -585,6 +585,40 @@ class _SuperAdminAdvertiserPricingTableState
     return rows;
   }
 
+  Future<void> _restoreHistoricalVersion(
+    int sourceVersion,
+    int expectedRevision,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('REPRENDRE FR-V$sourceVersion'),
+        content: Text(
+          'Les 90 prix et les tarifs personnalisés de FR-V$sourceVersion '
+          'seront repris sans recalcul ni arrondi dans un nouveau brouillon.\n\n'
+          'Le brouillon sera enregistré dans Firestore. '
+          'La grille actuellement publiée et les archives '
+          'resteront inchangées. Aucune publication automatique.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('ANNULER'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('CRÉER LE BROUILLON'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _persist(() => _service.restoreVersion(
+      'ADVERTISER', revision: expectedRevision,
+      sourceVersion: sourceVersion,
+    ));
+  }
+
   Future<void> _showHistory() async {
     CommercialPricingState data;
     try {
@@ -595,6 +629,8 @@ class _SuperAdminAdvertiserPricingTableState
       return;
     }
     if (!mounted) return;
+    final canRestore = !_busy && !_editing &&
+        data.draft == null && data.scheduled == null;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -604,6 +640,15 @@ class _SuperAdminAdvertiserPricingTableState
           height: 475,
           child: ListView(
             children: [
+              if (!canRestore)
+                const Padding(
+                  padding: EdgeInsets.all(10),
+                  child: Text(
+                    'Pour reprendre une version, publiez ou annulez le '
+                    'brouillon ou la programmation actuellement en cours.',
+                    style: TextStyle(fontSize: 12, color: _red),
+                  ),
+                ),
               if (data.draft != null)
                 Card(
                   child: Padding(
@@ -661,6 +706,27 @@ class _SuperAdminAdvertiserPricingTableState
                       ],
                     ),
                     children: [
+                      if (version['status'] == 'archived' ||
+                          version['status'] == 'published')
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 12, bottom: 12),
+                            child: OutlinedButton.icon(
+                              onPressed: canRestore
+                                  ? () {
+                                      Navigator.pop(dialogContext);
+                                      _restoreHistoricalVersion(
+                                        (version['version'] as num).toInt(),
+                                        data.revision,
+                                      );
+                                    }
+                                  : null,
+                              icon: const Icon(Icons.restore_outlined, size: 17),
+                              label: const Text('REPRENDRE CETTE VERSION'),
+                            ),
+                          ),
+                        ),
                       for (var l = 0; l < _levels.length; l++) ...[
                         Padding(
                           padding: const EdgeInsets.only(top: 10, bottom: 4),
