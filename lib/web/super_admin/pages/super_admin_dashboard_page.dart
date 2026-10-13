@@ -1529,6 +1529,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     );
   }
 
+  /// Super Admin sidebar: nine uniformly-sized actions fill the available
+  /// vertical space. A minimum content height preserves readability and keeps
+  /// scrolling available on smaller browser windows.
   Widget _buildRightPanel({required int visibleSpots}) {
     return Container(
       width: 360,
@@ -1539,134 +1542,145 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         ),
       ),
       child: SafeArea(
-        child: Scrollbar(
-          controller: _leftPanelScrollController,
-          thumbVisibility: true,
-          child: SingleChildScrollView(
-            controller: _leftPanelScrollController,
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _summaryCard(
-                  title: 'SPHOTS',
-                  value: '$_visibleOnMapSpotCount',
-                  color: adminColor,
-                ),
-                const SizedBox(height: 10),
-                _buildFiltersBlock(),
-                const SizedBox(height: 18),
-                _summaryCard(
-                  title: 'ADMINS',
-                  value: '$_visibleOnMapAdminCount',
-                  color: adminColor,
-                ),
-                const SizedBox(height: 10),
-                _buildAdminFiltersBlock(),
-                const SizedBox(height: 18),
-                _summaryCard(
-                  title: 'ANNONCEURS',
-                  value: '$_visibleAdvertiserCount',
-                  color: adminColor,
-                ),
-                const SizedBox(height: 10),
-                _buildAdvertiserFiltersBlock(),
-                const SizedBox(height: 18),
-                _summaryCard(
-                  title: 'SAUVETEURS',
-                  value: '$_visibleOnMapSauveteurCount',
-                  color: adminColor,
-                ),
-                const SizedBox(height: 12),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _showLegalDocumentsPanel = true;
-                      _showPricingPanel = false;
-                      _selectedSpot = null;
-                      _selectedAdmin = null;
-                      _selectedAdvertiser = null;
-                    });
-                  },
-                  child: Container(
-                    height: 54,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: (_showLegalDocumentsPanel ? redColor : adminColor)
-                          .withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: _showLegalDocumentsPanel ? redColor : adminColor,
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        AdaptiveAssetImage(
-                          'data/icons/fire_blue_icon.svg',
-                          width: 28,
-                          height: 28,
-                          filterQuality: FilterQuality.high,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final contentHeight = math.max(
+              680.0,
+              constraints.maxHeight - 34.0,
+            );
+            return Scrollbar(
+              controller: _leftPanelScrollController,
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                controller: _leftPanelScrollController,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+                child: SizedBox(
+                  height: contentHeight,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: _summaryCard(
+                          title: 'SPHOTS',
+                          value: '$_visibleOnMapSpotCount',
+                          color: adminColor,
                         ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'DOCUMENTS JURIDIQUES',
-                            style: TextStyle(
-                              color: adminColor,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                            ),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(child: _buildFiltersBlock()),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: _summaryCard(
+                          title: 'ADMINS',
+                          value: '$_visibleOnMapAdminCount',
+                          color: adminColor,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(child: _buildAdminFiltersBlock()),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: _summaryCard(
+                          title: 'ANNONCEURS',
+                          value: '$_visibleAdvertiserCount',
+                          color: adminColor,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(child: _buildAdvertiserFiltersBlock()),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: _summaryCard(
+                          title: 'SAUVETEURS',
+                          value: '$_visibleOnMapSauveteurCount',
+                          color: adminColor,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: _superAdminSidebarAction(
+                          label: 'DOCUMENTS JURIDIQUES',
+                          selected: _showLegalDocumentsPanel,
+                          onTap: () {
+                            setState(() {
+                              _showLegalDocumentsPanel = true;
+                              _showPricingPanel = false;
+                              _selectedSpot = null;
+                              _selectedAdmin = null;
+                              _selectedAdvertiser = null;
+                            });
+                          },
+                          icon: AdaptiveAssetImage(
+                            'data/icons/fire_blue_icon.svg',
+                            width: 28,
+                            height: 28,
+                            filterQuality: FilterQuality.high,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _showPricingPanel = true;
-                      _showLegalDocumentsPanel = false;
-                      _selectedSpot = null;
-                      _selectedAdmin = null;
-                      _selectedAdvertiser = null;
-                    });
-                  },
-                  child: Container(
-                    height: 54,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: (_showPricingPanel ? redColor : adminColor)
-                          .withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: _showPricingPanel ? redColor : adminColor,
-                        width: 1.5,
                       ),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.euro_rounded, color: adminColor, size: 28),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'GRILLES TARIFAIRES',
-                            style: TextStyle(
-                              color: adminColor,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                            ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: _superAdminSidebarAction(
+                          label: 'GRILLES TARIFAIRES',
+                          selected: _showPricingPanel,
+                          onTap: () {
+                            setState(() {
+                              _showPricingPanel = true;
+                              _showLegalDocumentsPanel = false;
+                              _selectedSpot = null;
+                              _selectedAdmin = null;
+                              _selectedAdvertiser = null;
+                            });
+                          },
+                          icon: const Icon(
+                            Icons.euro_rounded, color: adminColor, size: 28,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _superAdminSidebarAction({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    required Widget icon,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: (selected ? redColor : adminColor).withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? redColor : adminColor,
+            width: 1.5,
           ),
+        ),
+        child: Row(
+          children: [
+            icon,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: adminColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
