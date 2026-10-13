@@ -1,3 +1,4 @@
+/* eslint-disable max-len, require-jsdoc, valid-jsdoc, indent, brace-style, operator-linebreak, object-curly-spacing, comma-dangle */
 "use strict";
 
 // Isolated, versioned commercial price catalog. It does NOT alter the
@@ -302,7 +303,9 @@ function cors(request, response) {
     const allowed = hostname === "sphot.app" ||
         hostname.endsWith(".sphot.app") ||
         hostname === "localhost" || hostname === "127.0.0.1" ||
-        hostname.endsWith(".web.app") || hostname.endsWith(".firebaseapp.com");
+        (hostname.startsWith("sphot-ab80b") &&
+          (hostname.endsWith(".web.app") ||
+           hostname.endsWith(".firebaseapp.com")));
     if (!allowed) return false;
     response.set("Access-Control-Allow-Origin", origin);
     response.set("Vary", "Origin");
