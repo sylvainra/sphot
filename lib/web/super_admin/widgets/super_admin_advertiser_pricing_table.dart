@@ -63,6 +63,7 @@ class _SuperAdminAdvertiserPricingTableState
   final TextEditingController _pivotInput = TextEditingController(text: '49');
   Map<String, int> _published = {};
   int _publishedVersion = 1;
+  int _workingVersion = 2;
   bool _editing = false;
   bool _draftSaved = false;
   DateTime? _scheduledFor;
@@ -104,6 +105,9 @@ class _SuperAdminAdvertiserPricingTableState
     setState(() {
       _published = published;
       _publishedVersion = data.publishedVersion;
+      _workingVersion = (data.draft?['version'] as num?)?.toInt() ??
+          (data.scheduled?['version'] as num?)?.toInt() ??
+          data.latestVersion + 1;
       _revision = data.revision;
       _remoteHistory = data.history;
       _editing = draft != null;
@@ -655,7 +659,7 @@ class _SuperAdminAdvertiserPricingTableState
                 const Text('FRANCE · EUR (€)',
                     style: TextStyle(color: _blue, fontSize: 17,
                         fontWeight: FontWeight.w900)),
-                Chip(label: Text('FR-V${_editing || _simulatedScheduled ? _publishedVersion + 1 : _publishedVersion}')),
+                Chip(label: Text('FR-V${_editing || _simulatedScheduled ? _workingVersion : _publishedVersion}')),
                 Chip(label: Text(status)),
                 _topButton(
                   label: 'HISTORIQUE',
