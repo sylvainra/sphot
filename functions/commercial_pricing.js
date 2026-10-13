@@ -33,31 +33,31 @@ function validate(type, value, personalised) {
   const values = type === "ADMIN" ? seedAdmin : seededAdvertiser;
   if (type === "ADMIN") {
     if (!Array.isArray(value) || value.length !== 4) {
-      throw new Error("Les 4 tarifs ADMIN sont requis.");
+      throw err(400, "Les 4 tarifs ADMIN sont requis.");
     }
   } else {
     if (!value || Array.isArray(value) || typeof value !== "object" ||
         Object.keys(value).length !== 90 ||
         Object.keys(value).sort().join("|") !== allowedAdvertiserKeys.join("|")) {
-      throw new Error("Les 90 tarifs ANNONCEUR sont requis.");
+      throw err(400, "Les 90 tarifs ANNONCEUR sont requis.");
     }
   }
   const amounts = type === "ADMIN" ? value : Object.values(value);
   for (const n of amounts) {
     if (!Number.isSafeInteger(n) || n <= 0 || n > 10000000) {
-      throw new Error("Les tarifs doivent être des euros entiers positifs.");
+      throw err(400, "Les tarifs doivent être des euros entiers positifs.");
     }
   }
   if (!Array.isArray(personalised) || personalised.length > 90 ||
       personalised.some((key) => typeof key !== "string" ||
           !(key in values) && type !== "ADMIN")) {
-    throw new Error("Liste des tarifs personnalisés invalide.");
+    throw err(400, "Liste des tarifs personnalisés invalide.");
   }
   return {prices: copyPrices(value, type), personalised: [...new Set(personalised)]};
 }
 function marketId(type) {
   if (type !== "ADMIN" && type !== "ADVERTISER") {
-    throw new Error("Marché tarifaire inconnu.");
+    throw err(400, "Marché tarifaire inconnu.");
   }
   return "FR_" + type;
 }
@@ -87,7 +87,10 @@ function externalState(data, type) {
     publishedPrices: state.publishedPrices,
     publishedPersonalised: state.publishedPersonalised || [],
     draft: state.draft || null,
-    scheduled: state.scheduled || null,
+    scheduled: state.scheduled ? {
+      ...state.scheduled,
+      effectiveAt: state.scheduled.effectiveAt.toDate().toISOString(),
+    } : null,
     seeded: !data,
   };
 }
@@ -350,7 +353,7 @@ function endpoint({admin, crypto, onRequest}) {
           response.status(200).json({success: true, data: result});
         } catch (e) {
           console.error("Commercial pricing API:", e.message);
-          response.status(e.status || (e.message.includes("invalid") ? 400 : 500))
+          response.status(e.status || 500)
               .json({success: false, error: e.message || "Erreur serveur."});
         }
       });
