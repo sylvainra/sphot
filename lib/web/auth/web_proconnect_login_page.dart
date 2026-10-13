@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/web_proconnect_auth_service.dart';
 import '../shared/web_colors.dart';
-import '../admin/web_admin_registration_page.dart';
+import '../admin/pages/admin_trial_request_page.dart';
 
 import '../super_admin/web_super_admin_app.dart';
 
@@ -105,15 +105,7 @@ void initState() {
       case WebAdminAccessStatus.registrationRequired:
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => WebAdminRegistrationPage(
-              proConnectUid: 'test_uid_admin_001',
-              proConnectEmail: 'admin@testville.fr',
-              proConnectNom: 'DUPONT',
-              proConnectPrenom: 'Marie',
-              proConnectOrganisation: 'MAIRIE DE TESTVILLE',
-              proConnectSiret: '12345678901234',
-              proConnectSiren: '123456789',
-            ),
+            builder: (_) => const AdminTrialRequestPage(),
           ),
         );
         break;
