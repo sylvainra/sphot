@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../services/admin_subscription_order_service.dart';
 
@@ -878,8 +879,16 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('PAIEMENT',
-                        style: TextStyle(color: _blue, fontSize: 14, fontWeight: FontWeight.w900)),
+                      Row(
+                        children: [
+                          SvgPicture.asset('data/icons/fire_red_icon.svg',
+                            width: 22, height: 22),
+                          const SizedBox(width: 8),
+                          const Text('PAIEMENT',
+                            style: TextStyle(color: _blue, fontSize: 14,
+                              fontWeight: FontWeight.w900)),
+                        ],
+                      ),
                       const SizedBox(height: 12),
                       const Text('Postes de Secours sollicités',
                         style: TextStyle(color: _blue, fontWeight: FontWeight.w800)),
