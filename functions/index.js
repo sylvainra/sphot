@@ -7562,7 +7562,7 @@ exports.consumeSuperAdminWebSession = onRequest(
               }
 
               transaction.delete(sessionReference);
-              return true;
+              return String(session.login || "super-admin");
             },
         );
 
