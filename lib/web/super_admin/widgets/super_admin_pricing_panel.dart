@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'super_admin_admin_pricing_table.dart';
 import 'super_admin_advertiser_pricing_table.dart';
 
-/// Super Admin pricing test shell. All pricing actions are local simulations.
-/// Other pricing/devis/renewal services remain unchanged.
+/// Shell des catalogues tarifaires Firestore ADMIN et ANNONCEUR.
+/// Aucun prix de devis, abonnement ou renouvellement existant n'est modifie.
 class SuperAdminPricingPanel extends StatefulWidget {
   const SuperAdminPricingPanel({
     super.key,
