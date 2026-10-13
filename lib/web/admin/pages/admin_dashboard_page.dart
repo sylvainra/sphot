@@ -15178,7 +15178,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             onClose: _closeSubscriptionPanel,
                           )
                         else if (_showAdminPaymentPanel)
-                          AdminPaymentPanel(onClose: _closeAdminPaymentPanel)
+                          AdminPaymentPanel(
+                             adminUid: widget.adminUid,
+                             onClose: _closeAdminPaymentPanel,
+                           )
                         else if (_showBillingDocumentsPanel)
                           _buildBillingDocumentsPanel()
                         else if (_showStatisticsPanel)
