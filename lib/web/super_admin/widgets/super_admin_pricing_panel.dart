@@ -10,11 +10,13 @@ class SuperAdminPricingPanel extends StatefulWidget {
     super.key,
     required this.onClose,
     this.selectedTab = 0,
+    this.pricingSessionToken = '',
     this.onTabChanged,
   });
 
   final VoidCallback onClose;
   final int selectedTab;
+  final String pricingSessionToken;
   final ValueChanged<int>? onTabChanged;
 
   @override
@@ -84,9 +86,9 @@ class _SuperAdminPricingPanelState extends State<SuperAdminPricingPanel> {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: IndexedStack(
                   index: _tab,
-                  children: const [
-                    SuperAdminAdminPricingTable(),
-                    SuperAdminAdvertiserPricingTable(),
+                  children: [
+                    SuperAdminAdminPricingTable(sessionToken: widget.pricingSessionToken),
+                    SuperAdminAdvertiserPricingTable(sessionToken: widget.pricingSessionToken),
                   ],
                 ),
               ),
