@@ -223,29 +223,15 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
                         ),
                       ),
                     ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Grille tarifaire utilisée',
-                    style: TextStyle(
-                      color: _blue, fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    quote.pricingReference,
-                    style: const TextStyle(
-                      color: Color(0xFF334155), fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
                   const Divider(height: 27),
-                  const Text(
-                    'TARIFICATION',
-                    style: TextStyle(
+                  Text(
+                    'TARIFICATION SUIVANT GRILLE TARIFAIRE '
+                    '${quote.pricingReference}',
+                    style: const TextStyle(
                       color: _blue,
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                   const SizedBox(height: 11),
