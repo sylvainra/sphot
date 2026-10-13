@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../services/published_commercial_quote_service.dart';
+import '../services/admin_station_pricing_preview.dart';
 
 /// Étape de paiement ADMIN : aperçu ergonomique uniquement.
 /// Aucun numéro de carte n'est collecté et aucune transaction n'est lancée.
@@ -10,10 +11,12 @@ class AdminPaymentPanel extends StatefulWidget {
   const AdminPaymentPanel({
     super.key,
     required this.adminUid,
+    required this.availableRescueStationIds,
     required this.onClose,
   });
 
   final String adminUid;
+  final List<String> availableRescueStationIds;
   final VoidCallback onClose;
 
   @override
@@ -53,12 +56,30 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
         }
         final data = subscriptionSnapshot.data?.data() ??
             const <String, dynamic>{};
-        final value = data['numberOfRescueStations'];
-        final stations = value is num ? value.toInt() : 0;
+        final preview = AdminStationPricingPreview.resolve(
+          availableSpotIds: widget.availableRescueStationIds,
+          subscription: data,
+        );
+        final stations = preview.quotedCount;
+        if (preview.availableCount == 0) {
+          return const Text(
+            'Aucun poste de secours référencé pour cette collectivité. '
+            'Aucune estimation ne peut être calculée.',
+            style: TextStyle(color: _red, fontSize: 12),
+          );
+        }
+        if (preview.unmatchedSavedCount > 0) {
+          return Text(
+            'La sélection enregistrée contient '
+            '${preview.unmatchedSavedCount} poste(s) qui ne sont plus '
+            'référencés dans ce territoire. Ouvrez ABONNEMENT → '
+            'OFFRE ET DEVIS pour actualiser et enregistrer la sélection.',
+            style: const TextStyle(color: _red, fontSize: 12),
+          );
+        }
         if (stations <= 0) {
           return const Text(
-            'Sélectionnez et enregistrez vos postes de secours dans '
-            'l’étape ABONNEMENT pour afficher le nouveau devis indicatif.',
+            'Aucun poste sélectionné : estimation indisponible.',
             style: TextStyle(color: _red, fontSize: 12),
           );
         }
@@ -108,6 +129,30 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
                       color: _blue, fontSize: 12, fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const SizedBox(height: 4),
+                  Text(
+                    preview.hasSavedSelection
+                        ? 'Sélection enregistrée dans OFFRE ET DEVIS : '
+                          '$stations sur ${preview.availableCount} poste(s) '
+                          'de secours référencé(s).'
+                        : 'SIMULATION : ${preview.availableCount} poste(s) '
+                          'de secours référencé(s) pour cette collectivité. '
+                          'Aucune sélection d’offre enregistrée.',
+                    style: const TextStyle(
+                      color: Color(0xFF475569), fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (preview.hasLegacyCountMismatch) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Ancien compteur enregistré : ${preview.legacyCount}. '
+                      'Il n’est pas utilisé pour cette estimation.',
+                      style: const TextStyle(
+                        color: _red, fontSize: 11,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   for (final line in lines)
                     if (line is Map && (line['count'] as num?) != null &&
@@ -269,11 +314,11 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'L’abonnement annuel et les postes de secours concernés '
-                      'sont sélectionnés dans l’étape ABONNEMENT. '
-                      'Le paiement utilisera le montant exact du devis confirmé, '
-                      'calculé avec les tarifs dégressifs publiés et la fiscalité '
-                      'applicable au pays de facturation.',
+                      'Cette simulation utilise les postes de secours '
+                      'référencés pour la collectivité connectée, ou la '
+                      'sélection explicitement enregistrée dans ABONNEMENT. '
+                      'Les montants contractuels, la fiscalité et l’état '
+                      'de l’abonnement seront vérifiés avant toute commande.',
                       style: TextStyle(
                         fontSize: 13, height: 1.45, color: Color(0xFF334155),
                       ),
