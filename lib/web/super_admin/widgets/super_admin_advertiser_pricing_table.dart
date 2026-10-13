@@ -113,7 +113,9 @@ class _SuperAdminAdvertiserPricingTableState
       _draftSaved = draft != null;
       _simulatedScheduled = data.scheduled != null;
       _scheduledFor = data.scheduled?['effectiveAt'] is String
-          ? DateTime.tryParse(data.scheduled!['effectiveAt'] as String) : null;
+          ? DateTime.tryParse(data.scheduled!['effectiveAt'] as String)
+              ?.toLocal()
+          : null;
       _publishedPersonalised
         ..clear()
         ..addAll(data.publishedPersonalised);
