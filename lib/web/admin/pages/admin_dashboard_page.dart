@@ -6048,7 +6048,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           child: Column(
             children: [
               _buildCommercialPanelHeader(
-                title: 'ABONNEMENT',
+                title: 'ABONNEMENT & PAIEMENT',
                 onClose: _closeSubscriptionPanel,
               ),
               Divider(height: 1, color: adminColor.withOpacity(0.20)),
@@ -6185,7 +6185,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           child: Column(
             children: [
               _buildCommercialPanelHeader(
-                title: 'FACTURES & PAIEMENTS',
+                title: 'FACTURES & DOCUMENTS',
                 onClose: _closeBillingDocumentsPanel,
               ),
               Divider(height: 1, color: adminColor.withOpacity(0.20)),
@@ -6567,7 +6567,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 : null,
                           ),
                           _summaryCard(
-                            title: 'ABONNEMENT',
+                            title: 'ABONNEMENT & PAIEMENT',
                             value: '',
                             color: adminColor,
                             iconPath: 'data/icons/fire_red_icon.svg',
@@ -6579,7 +6579,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             onTap: _openSubscriptionPanel,
                           ),
                           _summaryCard(
-                            title: 'FACTURES & PAIEMENTS',
+                            title: 'FACTURES & DOCUMENTS',
                             value: '',
                             color: adminColor,
                             iconPath: 'data/icons/fire_red_icon.svg',
