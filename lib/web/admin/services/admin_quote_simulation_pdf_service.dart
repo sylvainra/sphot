@@ -174,7 +174,7 @@ class AdminQuoteSimulationPdfService {
             decoration: pw.BoxDecoration(
               color: PdfColors.white,
               border: pw.Border.all(color: _blue, width: 1),
-              borderRadius: pw.BorderRadius.circular(9),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(9)),
             ),
             child: pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
