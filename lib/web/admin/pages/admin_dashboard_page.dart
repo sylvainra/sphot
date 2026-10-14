@@ -6185,7 +6185,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           child: Column(
             children: [
               _buildCommercialPanelHeader(
-                title: 'DOCUMENTS & FACTURES',
+                title: 'FACTURES & PAIEMENTS',
                 onClose: _closeBillingDocumentsPanel,
               ),
               Divider(height: 1, color: adminColor.withOpacity(0.20)),
@@ -6579,23 +6579,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             onTap: _openSubscriptionPanel,
                           ),
                           _summaryCard(
-                            title: 'PAIEMENT',
+                            title: 'FACTURES & PAIEMENTS',
                             value: '',
                             color: adminColor,
                             iconPath: 'data/icons/fire_red_icon.svg',
                             stepNumber: 7,
-                            titleFontSize: 16,
-                            titleLetterSpacing: 0.5,
-                            showValue: false,
-                            isActive: _showAdminPaymentPanel,
-                            onTap: _openAdminPaymentPanel,
-                          ),
-                          _summaryCard(
-                            title: 'DOCUMENTS & FACTURES',
-                            value: '',
-                            color: adminColor,
-                            iconPath: 'data/icons/fire_red_icon.svg',
-                            stepNumber: 8,
                             titleFontSize: 16,
                             titleLetterSpacing: 0.5,
                             showValue: false,
@@ -6607,7 +6595,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             value: '',
                             color: adminColor,
                             iconPath: 'data/icons/fire_red_icon.svg',
-                            stepNumber: 9,
+                            stepNumber: 8,
                             titleFontSize: 16,
                             titleLetterSpacing: 0.5,
                             showValue: false,
@@ -6621,7 +6609,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 ? adminColor
                                 : pendingColor,
                             iconPath: 'data/icons/fire_red_icon.svg',
-                            stepNumber: 10,
+                            stepNumber: 9,
                             titleFontSize: 16,
                             titleLetterSpacing: 0.5,
                             showValue: false,
