@@ -721,6 +721,8 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                   selectedCount: selectedCount,
                   selectedIds: activeSelectedIds.toList()..sort(),
                   selectedStations: selectedStations,
+                  isActiveSubscription:
+                      _text(data['status']).toLowerCase() == 'active',
                 ),
               ],
             );
@@ -737,6 +739,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     required int selectedCount,
     required List<String> selectedIds,
     required List<Map<String, dynamic>> selectedStations,
+    required bool isActiveSubscription,
   }) {
     if (selectedCount == 0) {
       return const Text(
@@ -873,9 +876,17 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
               style: TextStyle(color: _grey, fontSize: 11),
             ),
             const SizedBox(height: 12),
-            _saveButton(
-              section: 'offer',
-              onPressed: () {
+            if (isActiveSubscription)
+              const Text(
+                'Abonnement actif : son montant contractuel reste inchangé. '
+                'Une modification devra passer par un nouveau dossier '
+                'commercial ou un renouvellement.',
+                style: TextStyle(color: _grey, fontSize: 11),
+              )
+            else
+              _saveButton(
+                section: 'offer',
+                onPressed: () {
                 _saveSection(
                   'offer',
                   <String, dynamic>{
