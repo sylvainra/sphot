@@ -19,13 +19,14 @@ class AdminQuoteSimulationPdfService {
   // Les polices PDF standard peuvent mal afficher certains signes Unicode.
   // Convertir les apostrophes et tirets typographiques du contenu saisi.
   String _text(dynamic value) => (value?.toString().trim() ?? '')
-      .replaceAll('\\u2019', "'")
-      .replaceAll('\\u2018', "'")
-      .replaceAll('\\u2013', '-')
-      .replaceAll('\\u2014', '-');
+      .replaceAll('’', "'")
+      .replaceAll('‘', "'")
+      .replaceAll('–', '-')
+      .replaceAll('—', '-');
 
   bool _validFrenchSiret(String value) =>
-      RegExp(r'^\\d{14}
+      value.length == 14 &&
+      value.codeUnits.every((code) => code >= 48 && code <= 57);
 
   String _money(num value) =>
       '${value.toStringAsFixed(2).replaceAll('.', ',')} EUR';
