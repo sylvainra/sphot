@@ -1282,6 +1282,103 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     );
   }
 
+  /// Étape documentaire facultative.
+  /// Le moteur de calcul existant ne produit PAS encore de devis émis.
+  /// La génération finale utilisera un service serveur authentifié,
+  /// la grille publiée, le profil payeur vérifié et le traitement fiscal.
+  Widget _quotePreparationPanel({
+    required bool offerComplete,
+    required bool payerComplete,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Un devis peut être demandé avant toute commande ou paiement.',
+          style: TextStyle(
+            color: _blue,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              offerComplete ? Icons.check_circle_rounded : Icons.pending_outlined,
+              color: offerComplete ? _green : _grey,
+              size: 19,
+            ),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Postes de secours et offre enregistrés',
+                style: TextStyle(color: _blue, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              payerComplete ? Icons.check_circle_rounded : Icons.pending_outlined,
+              color: payerComplete ? _green : _grey,
+              size: 19,
+            ),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Coordonnées de l’organisme payeur renseignées',
+                style: TextStyle(color: _blue, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Le devis officiel devra comporter son numéro SPHOT automatique, '
+          'sa date, sa validité, les postes concernés, la grille publiée '
+          'et le montant fiscalement applicable. Il sera ensuite conservé '
+          'dans FACTURES & DOCUMENTS.',
+          style: TextStyle(
+            color: _grey, fontSize: 11, height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: ElevatedButton.icon(
+            onPressed: null,
+            icon: const Icon(Icons.description_outlined, size: 19),
+            label: const Text(
+              'ÉTABLIR UN DEVIS',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _blue,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: _grey.withOpacity(0.16),
+              disabledForegroundColor: _grey,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 7),
+        const Text(
+          'Émission encore désactivée pendant le raccordement du document '
+          'officiel. Un devis restera facultatif pour souscrire.',
+          style: TextStyle(color: _grey, fontSize: 11, height: 1.35),
+        ),
+      ],
+    );
+  }
+
   Widget _paymentMethodForm(Map<String, dynamic> data) {
     final chosen = _draftPaymentMethod ?? _text(data['preferredPaymentMethod']);
     final selected = chosen == 'card' || chosen == 'public_invoice' ? chosen : '';
@@ -1327,14 +1424,16 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                 setState(() => _draftNoOrderRequired = value == true),
           ),
           _field(data: data, field: 'purchaseOrderNumber',
-            label: 'Numéro de bon de commande'),
+            label: 'Bon de commande de l’organisme payeur'),
           _field(data: data, field: 'engagementNumber',
-            label: 'Numéro d’engagement juridique'),
+            label: 'N° d’engagement fourni par le payeur'),
           _field(data: data, field: 'chorusServiceCode',
             label: 'Code service Chorus Pro'),
           const Text(
-            'Une référence saisie ne vaut pas preuve contractuelle. '
-            'Le contrôle sera effectué avant activation.',
+            'Le numéro de commande SPHOT sera attribué automatiquement '
+            'lors de la confirmation. Les références ci-dessus sont celles '
+            'du payeur et ne sont demandées que si elles sont exigées. '
+            'Le contrôle de l’engagement sera effectué avant activation.',
             style: TextStyle(color: _grey, fontSize: 11),
           ),
         ],
@@ -1743,9 +1842,23 @@ _accordionSection(
                                 ),
                                 const SizedBox(height: 12),
                                 _accordionSection(
+                                  id: 'quote',
+                                  icon: Icons.request_quote_outlined,
+                                  title: '03 — DEVIS (FACULTATIF)',
+                                  description:
+                                      'Établir et télécharger un devis officiel avant paiement.',
+                                  status: 'ÉMISSION EN PRÉPARATION',
+                                  statusColor: _orange,
+                                  child: _quotePreparationPanel(
+                                    offerComplete: offerComplete,
+                                    payerComplete: payerComplete,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                _accordionSection(
                                   id: 'payment',
                                   icon: Icons.credit_card_rounded,
-                                  title: '03 — MODALITÉS DE RÈGLEMENT',
+                                  title: '04 — MODALITÉS DE RÈGLEMENT',
                                   description:
                                       'Carte bancaire ou commande publique suivant votre organisme.',
                                   status: _status(
@@ -1762,7 +1875,7 @@ _accordionSection(
                                 _accordionSection(
                                   id: 'conditions',
                                   icon: Icons.verified_user_outlined,
-                                  title: '04 — CONDITIONS ET CONFIRMATION',
+                                  title: '05 — CONDITIONS ET CONFIRMATION',
                                   description:
                                       'Récapitulatif, fiscalité, CGV et validation sécurisée.',
                                   status: 'EN PRÉPARATION',
