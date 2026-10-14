@@ -231,3 +231,22 @@ Test conseillé : cas prérempli mairie française avec SIRET de 4 chiffres (doi
 **État actuel des fonctions** : le nouveau panneau DEVIS est placé au bon endroit avec un bouton `ÉTABLIR UN DEVIS` encore désactivé, car il faut construire la création contractuelle côté serveur, le calcul fiscal, l'édition du PDF et la consultation de l'original. La commande réelle reste également désactivée. Le devis **n'est pas obligatoire** pour passer directement au règlement/à la commande. Le changement des numéros n'a pas modifié les écritures Firestore. Aucun nouveau devis n'a été produit. **Ne pas présenter ce stade comme une émission de devis fonctionnelle.**
 
 **À décider avant développement de l'émission** : durée de validité des devis (suggestion à faire à l'utilisateur : 30 jours, mais jamais plus tard que la fin de l'année concernée sans reconfirmation des conditions), régime TVA applicable au vendeur SPHOT en France et à l'international, contenu final du PDF. Toute modification de grille tarifaire publiée après émission doit préserver l'historique/conditions de validité d'un devis signé.
+
+## 17. VALIDÉ — Validité des devis SPHOT ADMIN : 30 jours (14/10/2026)
+
+**Décision explicite utilisateur :** validité de **30 jours calendaires** pour un devis officiel, limitée au **31 décembre de l'année d'abonnement concernée**. Le devis est facultatif, placé en étape 03 avant les modalités de règlement, et ne déclenche jamais de paiement/activation.
+
+**Convention technique pour lever l'ambiguïté :** jour d'émission compté comme **premier jour**, dernier jour de validité **inclus**. Exemples :
+- Devis émis le 14/10/2026 pour 2026 → valable jusqu'au **12/11/2026 inclus**.
+- Devis émis le 20/12/2026 pour 2026 → valable jusqu'au **31/12/2026 inclus**.
+- Devis émis le 14/10/2026 pour une année ultérieure → expiration à 30 jours (sous réserve que prix/conditions de cette année soient publiés et légitimes).
+- Aucune proratisation, et l'expiration du devis n'est pas la date de fin de l'abonnement.
+
+**Code ajouté :**
+- `functions/admin_quote_validity.js` : fonction pure `quoteValidityForCalendarYear(issuedOn, subscriptionYear)`, date `AAAA-MM-JJ`, règle 30 jours et plafond 31 décembre, exception si date/année invalide. Ce calcul DOIT être invoqué côté serveur lors de la création réelle d'un devis et son résultat figé dans le document.
+- `functions/test/admin_quote_validity.test.js` : cinq scénarios de non-régression (30 jours, plafond 31 décembre, année bissextile, année suivante, date invalide).
+- `lib/web/admin/pages/admin_subscription_panel.dart` : texte informatif de validité dans 03 — DEVIS (FACULTATIF).
+
+**Statut technique sans ambiguïté :** aucun devis officiel ni PDF généré à ce jour. Le bouton d'émission reste désactivé. Le moteur de prévisualisation n'est pas un devis contractuel. Il manque **la personne morale émettrice réelle** de SPHOT et ses informations fiscales, le calcul/traitement fiscal approprié, les conditions et mentions obligatoires et le serveur authentifié de création+PDF+archivage. Ne pas coder de raison sociale, de numéro SIRET de l'émetteur ou de taux de TVA fictifs. Aucun paiement réel ni abonnement activé.
+
+**Vérifications encore nécessaires :** tests Node `node --test functions/test/admin_quote_validity.test.js` dans l'environnement du projet, puis tests Flutter de présentation. Aucun service n'a été déployé.
