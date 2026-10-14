@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -152,6 +153,27 @@ class AdminQuoteSimulationPdfService {
       throw StateError('Le total de la simulation publiée est incohérent.');
     }
 
+    // Réutilisation exacte des images de marque du site et du marker SVG
+    // des emails ; aucun logo SPHOT recréé en simple texte.
+    final headerBackgroundData =
+        await rootBundle.load('data/images/map_background.jpg');
+    final siteTitleData = await rootBundle.load('data/icons/title.png');
+    final fireSvg = await rootBundle.loadString(
+      'data/icons/fire_red_icon.svg',
+    );
+    final headerBackground = pw.MemoryImage(
+      headerBackgroundData.buffer.asUint8List(
+        headerBackgroundData.offsetInBytes,
+        headerBackgroundData.lengthInBytes,
+      ),
+    );
+    final siteTitle = pw.MemoryImage(
+      siteTitleData.buffer.asUint8List(
+        siteTitleData.offsetInBytes,
+        siteTitleData.lengthInBytes,
+      ),
+    );
+
     final generatedAt = DateTime.now();
     final document = pw.Document(
       title: 'SPHOT - Simulation tarifaire non contractuelle',
@@ -164,49 +186,76 @@ class AdminQuoteSimulationPdfService {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(36),
         footer: (context) => pw.Column(
+          mainAxisSize: pw.MainAxisSize.min,
           children: [
+            // Signature visuelle identique aux mails SPHOT :
+            // l'asset SVG d'origine reste vectoriel dans le PDF.
+            pw.Center(
+              child: pw.SvgImage(
+                svg: fireSvg,
+                width: 24,
+                height: 38,
+              ),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              "L'équipe SPHOT",
+              style: pw.TextStyle(
+                color: _blue,
+                fontSize: 8,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 5),
             pw.Divider(color: _blue),
             pw.Text(
               'SIMULATION NON CONTRACTUELLE - Document préparatoire '
-              '- Ne constitue ni un devis, ni une facture, ni un bon de commande.',
+              '- Ni devis, ni facture, ni bon de commande.',
               textAlign: pw.TextAlign.center,
               style: const pw.TextStyle(fontSize: 7, color: _red),
             ),
-            pw.Text('SPHOT - Page ${context.pageNumber}/${context.pagesCount}',
-                style: const pw.TextStyle(fontSize: 7, color: _grey)),
+            pw.Text(
+              'SPHOT - Page ${context.pageNumber}/${context.pagesCount}',
+              style: const pw.TextStyle(fontSize: 7, color: _grey),
+            ),
           ],
         ),
         build: (context) => [
-          pw.Container(
-            padding: const pw.EdgeInsets.symmetric(
-                horizontal: 16, vertical: 15),
-            decoration: pw.BoxDecoration(
-              color: PdfColors.white,
-              border: pw.Border.all(color: _blue, width: 1),
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(9)),
-            ),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          // Bandeau de la page Web SPHOT : fond cartographique
+          // et véritable titre graphique, centré comme sur le site.
+          pw.SizedBox(
+            width: double.infinity,
+            height: 76,
+            child: pw.Stack(
               children: [
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text('SPHOT',
-                        style: pw.TextStyle(
-                            color: _red,
-                            fontSize: 24,
-                            fontWeight: pw.FontWeight.bold)),
-                    pw.Text('Surveiller - Préserver - Informer - Ensemble',
-                        style: const pw.TextStyle(
-                            fontSize: 8, color: _blue)),
-                  ],
+                pw.Positioned.fill(
+                  child: pw.Image(
+                    headerBackground,
+                    fit: pw.BoxFit.cover,
+                  ),
                 ),
-                pw.Text('DOCUMENT DE PRÉPARATION',
-                    style: pw.TextStyle(
-                        fontSize: 10,
-                        fontWeight: pw.FontWeight.bold,
-                        color: _blue)),
+                pw.Positioned.fill(
+                  child: pw.Center(
+                    child: pw.Image(
+                      siteTitle,
+                      height: 51,
+                      fit: pw.BoxFit.contain,
+                    ),
+                  ),
+                ),
               ],
+            ),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'DOCUMENT DE PRÉPARATION',
+              style: pw.TextStyle(
+                color: _blue,
+                fontSize: 8,
+                fontWeight: pw.FontWeight.bold,
+              ),
             ),
           ),
           pw.SizedBox(height: 18),
