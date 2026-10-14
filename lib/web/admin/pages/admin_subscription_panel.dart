@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../widgets/adaptive_asset_image.dart';
-import '../services/admin_subscription_order_service.dart';
 import '../../../services/published_commercial_quote_service.dart';
 
 class AdminSubscriptionPanel extends StatefulWidget {
@@ -32,6 +31,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
 
   String? _savingSection;
   bool? _draftNoOrderRequired;
+  String? _draftPaymentMethod;
   late final Stream<Map<String, dynamic>> _dataStream;
   late final Future<String> _territoireIdFuture;
   final Set<String> _selectedRescueStationIds = <String>{};
@@ -141,8 +141,9 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   ) {
     final idSphot = _text(data['idSphot']);
     final name = _spotName(data);
-    final displayedId = idSphot.isEmpty ? documentId : idSphot;
-    return displayedId.isEmpty ? name : '$displayedId - $name';
+    if (idSphot.isEmpty) return name;
+    if (name.toUpperCase().startsWith(idSphot.toUpperCase())) return name;
+    return '$idSphot - $name';
   }
 
   void _initializeOfferSelection(Map<String, dynamic> data) {
@@ -896,254 +897,176 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     );
   }
 
-  Widget _orderForm(Map<String, dynamic> data) {
+  Widget _paymentMethodForm(Map<String, dynamic> data) {
+    final chosen = _draftPaymentMethod ?? _text(data['preferredPaymentMethod']);
+    final selected = chosen == 'card' || chosen == 'public_invoice' ? chosen : '';
     final noOrderRequired = _noOrderRequired(data);
-    final administrativeReference =
-        _periodAdministrativeReference(data);
-
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (administrativeReference.isNotEmpty) ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
-            decoration: BoxDecoration(
-              color: _blue.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: _blue.withOpacity(0.30),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'RÉFÉRENCE ADMIN SPHOT',
-                  style: TextStyle(
-                    color: _grey,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  administrativeReference,
-                  style: const TextStyle(
-                    color: _red,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'À rappeler sur les devis, commandes et documents '
-                  'rattachés à cet espace Admin.',
-                  style: TextStyle(
-                    color: _blue,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-        CheckboxListTile(
+        const Text('Choisissez le mode de règlement de votre organisme.',
+          style: TextStyle(color: _blue, fontSize: 12)),
+        RadioListTile<String>(
+          value: 'card',
+          groupValue: selected,
+          activeColor: _red,
           contentPadding: EdgeInsets.zero,
-          value: noOrderRequired,
-          activeColor: _blue,
-          title: const Text(
-            'Aucun bon de commande exigé par l’organisme',
-            style: TextStyle(
-              color: _blue,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+          title: const Text('Carte bancaire',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+          subtitle: const Text(
+            'Paiement sécurisé par un prestataire à raccorder.',
+            style: TextStyle(fontSize: 11)),
+          onChanged: (value) => setState(() => _draftPaymentMethod = value),
+        ),
+        RadioListTile<String>(
+          value: 'public_invoice',
+          groupValue: selected,
+          activeColor: _red,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Commande publique / facturation administrative',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+          subtitle: const Text(
+            'Sous réserve de vérification d’un engagement valide.',
+            style: TextStyle(fontSize: 11)),
+          onChanged: (value) => setState(() => _draftPaymentMethod = value),
+        ),
+        if (selected == 'public_invoice') ...[
+          const Divider(height: 18),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: noOrderRequired,
+            activeColor: _blue,
+            title: const Text('Aucun bon de commande exigé par l’organisme',
+              style: TextStyle(fontSize: 12, color: _blue)),
+            onChanged: (value) =>
+                setState(() => _draftNoOrderRequired = value == true),
+          ),
+          _field(data: data, field: 'purchaseOrderNumber',
+            label: 'Numéro de bon de commande'),
+          _field(data: data, field: 'engagementNumber',
+            label: 'Numéro d’engagement juridique'),
+          _field(data: data, field: 'chorusServiceCode',
+            label: 'Code service Chorus Pro'),
+          const Text(
+            'Une référence saisie ne vaut pas preuve contractuelle. '
+            'Le contrôle sera effectué avant activation.',
+            style: TextStyle(color: _grey, fontSize: 11),
+          ),
+        ],
+        if (selected == 'card')
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              'Le paiement et son renouvellement devront être autorisés '
+              'et confirmés par le prestataire. Aucun débit pendant le test.',
+              style: TextStyle(color: _grey, fontSize: 11),
             ),
           ),
-          onChanged: (value) {
-            setState(() {
-              _draftNoOrderRequired = value == true;
-            });
-          },
-        ),
-        const SizedBox(height: 4),
-        _field(
-          data: data,
-          field: 'purchaseOrderNumber',
-          label: 'Numéro de bon de commande de l’organisme',
-        ),
-        _field(
-          data: data,
-          field: 'engagementNumber',
-          label: 'Numéro d’engagement juridique',
-        ),
-        _field(
-          data: data,
-          field: 'chorusServiceCode',
-          label: 'Code service Chorus Pro',
-        ),
-        _saveButton(
-          section: 'order',
-          onPressed: () {
-            _saveSection(
-              'order',
-              {
-                'purchaseOrderNotRequired': _noOrderRequired(data),
-                'purchaseOrderNumber':
-                    _fieldValue(data, 'purchaseOrderNumber'),
-                'engagementNumber':
-                    _fieldValue(data, 'engagementNumber'),
-                'chorusServiceCode':
-                    _fieldValue(data, 'chorusServiceCode'),
+        if (selected.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _saveButton(
+            section: 'payment',
+            onPressed: () => _saveSection(
+              'payment',
+              <String, dynamic>{
+                'preferredPaymentMethod': selected,
+                if (selected == 'public_invoice') ...{
+                  'purchaseOrderNotRequired': noOrderRequired,
+                  'purchaseOrderNumber': _fieldValue(data, 'purchaseOrderNumber'),
+                  'engagementNumber': _fieldValue(data, 'engagementNumber'),
+                  'chorusServiceCode': _fieldValue(data, 'chorusServiceCode'),
+                },
               },
-              'Commande enregistrée.',
-            );
-          },
-        ),
+              'Préférence de règlement enregistrée.',
+            ),
+          ),
+        ],
       ],
     );
   }
 
-  Widget _activationSummary({
+  Widget _conditionsSummary({
     required Map<String, dynamic> data,
     required bool payerComplete,
     required bool offerComplete,
-    required bool orderComplete,
+    required bool paymentReady,
   }) {
-    final isActive = _text(data['status']).toLowerCase() == 'active';
-    final canActivate = payerComplete && offerComplete && orderComplete;
+    final annualAmount = _number(data['annualAmountExclTax']);
+    final reference = _text(data['publishedPricingReference']);
+    final status = _text(data['status']).toLowerCase();
 
-    Widget line(String label, bool complete) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Row(
-          children: [
-            Icon(
-              complete
-                  ? Icons.check_circle_rounded
-                  : Icons.pending_outlined,
-              color: complete ? _green : _grey,
-              size: 19,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: complete ? _green : _grey,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+    Widget progress(String label, bool valid) => Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(children: [
+        Icon(valid ? Icons.check_circle_rounded : Icons.pending_outlined,
+          color: valid ? _green : _grey, size: 19),
+        const SizedBox(width: 8),
+        Expanded(child: Text(label,
+          style: TextStyle(color: valid ? _green : _grey,
+            fontSize: 12, fontWeight: FontWeight.w700))),
+      ]),
+    );
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        line('Organisme payeur', payerComplete),
-        line('Offre et devis', offerComplete),
-        line('Commande', orderComplete),
-        const SizedBox(height: 6),
-        if (isActive) ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _green.withOpacity(0.07),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _green.withOpacity(0.35)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'ABONNEMENT ACTIF',
-                  style: TextStyle(
-                    color: _green,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Début : ${_formatDate(data['subscriptionStartDate'])}',
-                  style: const TextStyle(
-                    color: _blue,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  'Fin : ${_formatDate(data['subscriptionEndDate'])}',
-                  style: const TextStyle(
-                    color: _blue,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ] else ...[
+        progress('Postes et offre enregistrés', offerComplete),
+        progress('Organisme payeur renseigné', payerComplete),
+        progress('Mode de règlement choisi', paymentReady),
+        if (offerComplete) ...[
+          const Divider(height: 18),
+          Text('Grille tarifaire : $reference',
+            style: const TextStyle(color: _blue, fontSize: 12)),
+          const SizedBox(height: 6),
           Text(
-            canActivate
-                ? 'Le dossier est complet. Vous pouvez valider la commande d’abonnement annuel SPHOT ADMIN.'
-                : 'Complétez les trois rubriques ci-dessus pour pouvoir activer l\'abonnement.',
-            style: const TextStyle(
-              color: _grey,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              height: 1.35,
-            ),
+            'TOTAL ANNUEL HT : ${annualAmount.toStringAsFixed(2).replaceAll('.', ',')} €',
+            style: const TextStyle(color: _red, fontWeight: FontWeight.w900,
+              fontSize: 14),
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: ElevatedButton.icon(
-              onPressed: canActivate && _savingSection == null
-    ? () => AdminSubscriptionOrderService.showAndSubmit(
-          context: context,
-          adminUid: _uid,
-          data: data,
-        )
-    : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _red,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: _grey.withOpacity(0.16),
-                disabledForegroundColor: _grey,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              icon: _savingSection == 'activation'
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.verified_rounded, size: 20),
-              label: const Text(
-                'VALIDER LA COMMANDE D’ABONNEMENT',
-                style: TextStyle(fontWeight: FontWeight.w900),
-              ),
-            ),
+          const Text(
+            'Année civile, renouvellement au 1er janvier, sans prorata. '
+            'Fiscalité et montant définitif à confirmer avant engagement.',
+            style: TextStyle(color: _grey, fontSize: 11, height: 1.35),
           ),
         ],
+        if (status == 'active') ...[
+          const SizedBox(height: 8),
+          const Text('ABONNEMENT ACTIF — les droits existants restent inchangés.',
+            style: TextStyle(color: _green, fontWeight: FontWeight.w800,
+              fontSize: 12)),
+        ],
+        const Divider(height: 24),
+        const Text('CONDITIONS GÉNÉRALES DE VENTE — SPHOT ADMIN',
+          style: TextStyle(color: _blue, fontSize: 12,
+            fontWeight: FontWeight.w900)),
+        const SizedBox(height: 7),
+        const Text(
+          'Le document de CGV publié, sa version et l’acceptation '
+          'traçable restent à raccorder. Aucun accord n’est présumé.',
+          style: TextStyle(color: _grey, fontSize: 11, height: 1.35),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity, height: 44,
+          child: ElevatedButton.icon(
+            onPressed: null,
+            icon: const Icon(Icons.lock_outline_rounded, size: 19),
+            label: const Text('CONFIRMER MA COMMANDE',
+              style: TextStyle(fontWeight: FontWeight.w900)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _red,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: _grey.withOpacity(0.18),
+              disabledForegroundColor: _grey,
+            ),
+          ),
+        ),
+        const SizedBox(height: 7),
+        const Text(
+          'Action désactivée pendant les tests : contrôle serveur, fiscalité '
+          'et CGV non finalisés. Aucune commande ni aucun paiement réel.',
+          style: TextStyle(color: _grey, fontSize: 11),
+        ),
       ],
     );
   }
