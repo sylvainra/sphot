@@ -1301,6 +1301,13 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
             fontWeight: FontWeight.w700,
           ),
         ),
+        const SizedBox(height: 6),
+        const Text(
+          'Validité : 30 jours calendaires à compter de son émission, '
+          'sans dépasser le 31 décembre de l’année d’abonnement concernée. '
+          'La date exacte figurera sur le devis émis.',
+          style: TextStyle(color: _grey, fontSize: 11, height: 1.4),
+        ),
         const SizedBox(height: 10),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
