@@ -214,6 +214,12 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     ].where((value) => value.isNotEmpty).join(' ');
 
     dynamic value(String field, List<dynamic> fallbacks) {
+      // Pour un payeur distinct, une case vide reste vide :
+      // ne JAMAIS lui substituer le SIRET ou l'adresse du gestionnaire.
+      if (_text(subscription['billingPayerRelation']) == 'other' &&
+          _payerFields.contains(field)) {
+        return subscription[field] ?? '';
+      }
       return _firstFilled(<dynamic>[
         subscription[field],
         ...fallbacks,
