@@ -285,3 +285,25 @@ Quatre captures de l'utilisateur confirment :
 **Précaution** : contrôles statiques, mais compilation Flutter et inspection du **nouveau** PDF impossible sans le SDK Flutter / navigateur local. Il faut réexécuter Chrome et regarder si l'espacement et les glyphes sont désormais correctement rendus. Si les défauts persistent, envisager intégration d'une fonte Unicode autorisée dans les assets Flutter, puis tests multi-rendu PDF ; ne pas valider le PDF actuel comme modèle de devis final.
 
 **Prochaine phase** : maquette visuelle SPHOT commune aux documents officiels, système émetteur immatriculé, calcul fiscal sécurisé et archivage du devis officiel numéroté.
+
+## 20. Charte PDF — vrai bandeau du site + marker SVG Fire au pied (14/10/2026)
+
+**Demande explicite utilisateur** : ne pas préparer de maquette théorique, **modifier directement le PDF et tester**. Réutiliser un **header identique à celui du site SPHOT** et le **marker red fire icon SVG centré en bas**, dans l'esprit des emails SPHOT.
+
+**Vérification des sources graphiques dans la branche :**
+- Le document imprimable existant `lib/web/admin/pages/sphot_admin_summary_page.dart` utilise en header une carte `data/images/map_background.jpg` et l'image du titre `data/icons/title.png` centrée.
+- `functions/sphot_email_design.js` utilise la marque SPHOT en haut et le Fire rouge centré en fin de mail.
+- Le marker exact est `data/icons/fire_red_icon.svg`.
+
+**Implémentation faite** dans `lib/web/admin/services/admin_quote_simulation_pdf_service.dart` :
+1. Chargement via `rootBundle` des deux images graphiques de l'en-tête du site et du SVG du marker ; pas de copie inventée ni de police utilisée pour simuler le vrai titre du site.
+2. Bandeau image de 76 points de hauteur avec carte en fond (`pw.Image`, `BoxFit.cover`) et titre SPHOT superposé au centre (`pw.Image`, `BoxFit.contain`). `DOCUMENT DE PRÉPARATION` est présenté séparément sous le bandeau.
+3. Pied de chaque page : `pw.SvgImage(svg: fireSvg)` **vectoriel** centré (24 x 38 points), signature `L'équipe SPHOT`, trait bleu fin, mention NON CONTRACTUELLE et pagination.
+4. Aucun changement aux montants publiés (exemple courant : deux postes = 898 € HT), aux données de postes/payeur, au format de SIRET, au téléchargement du PDF ou au statut documentaire.
+5. Aucun numéro officiel de devis, aucune TVA fictive, aucune création de commande, facture, abonnement, ou droit commercial.
+
+**Tests réalisés** : recherche des assets référencés et contrôle de leur existence via GitHub, revue des composants `pw.Stack`, `pw.Positioned.fill` et `pw.SvgImage` via documentation de la dépendance PDF, contrôle statique des délimiteurs, référence des trois assets, et conservation du bouton officiel désactivé. **Flutter n'est pas disponible côté assistant : pas de compilation ni de test du rendu Web effectué.**
+
+**Essai à faire sur ordinateur** : `git pull --ff-only origin codex/advertiser-pricing-table-v1` puis `flutter run -d chrome -t lib/main_web_admin.dart` ; étape 03 -> TÉLÉCHARGER LA SIMULATION PDF ; vérifier bandeau cartographique/titre au centre, marker rouge SVG net au centre du footer (une page), absence de débordement et maintien des lignes, prix et mentions non contractuelles. Si le gros SVG d'origine provoque une exception de parser ou dépassement, recueillir l'erreur exacte avant toute adaptation de rendu.
+
+**Principe à généraliser APRÈS validation** : même header + signature Fire pour tous les documents administratifs et commerciaux SPHOT, sans refonte structurelle non demandée.
