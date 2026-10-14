@@ -15,7 +15,6 @@ class AdminQuoteSimulationPdfService {
 
   static const _blue = PdfColor.fromInt(0xFF1E3A8A);
   static const _red = PdfColor.fromInt(0xFFDC2626);
-  static const _grey = PdfColor.fromInt(0xFF6B7280);
 
   // Les polices PDF standard peuvent mal afficher certains signes Unicode.
   // Convertir les apostrophes et tirets typographiques du contenu saisi.
@@ -35,6 +34,19 @@ class AdminQuoteSimulationPdfService {
   String _formatCivilDate(DateTime date) =>
       '${date.day.toString().padLeft(2, '0')}/'
       '${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+  String _stationPlace(Map<String, dynamic> station) {
+    final id = _text(station['idSphot']);
+    final name = _text(station['name']);
+    if (id.isNotEmpty && name.toUpperCase().startsWith(id.toUpperCase())) {
+      var label = name.substring(id.length).trim();
+      if (label.startsWith('-') || label.startsWith(':')) {
+        label = label.substring(1).trim();
+      }
+      if (label.isNotEmpty) return label;
+    }
+    return name.isEmpty ? 'Lieu non renseigné' : name;
+  }
 
   pw.Widget _section(String title, List<pw.Widget> children) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -68,7 +80,7 @@ class AdminQuoteSimulationPdfService {
             pw.SizedBox(
               width: 125,
               child: pw.Text(label,
-                  style: const pw.TextStyle(fontSize: 9, color: _grey)),
+                  style: const pw.TextStyle(fontSize: 9, color: _blue)),
             ),
             pw.Expanded(
               child: pw.Text(
@@ -130,20 +142,20 @@ class AdminQuoteSimulationPdfService {
         child: pw.Row(
           children: [
             pw.Expanded(
-              child: pw.Text(title, style: const pw.TextStyle(fontSize: 9)),
+              child: pw.Text(title, style: const pw.TextStyle(fontSize: 9, color: _blue)),
             ),
             pw.SizedBox(
               width: 112,
               child: pw.Text('$count x ${_money(unit)}',
                   textAlign: pw.TextAlign.right,
-                  style: const pw.TextStyle(fontSize: 9)),
+                  style: const pw.TextStyle(fontSize: 9, color: _blue)),
             ),
             pw.SizedBox(
               width: 95,
               child: pw.Text(_money(amount),
                   textAlign: pw.TextAlign.right,
                   style: pw.TextStyle(
-                      fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                      fontSize: 9, color: _blue, fontWeight: pw.FontWeight.bold)),
             ),
           ],
         ),
@@ -196,7 +208,7 @@ class AdminQuoteSimulationPdfService {
             ),
             pw.Text(
               'SPHOT - Page ${context.pageNumber}/${context.pagesCount}',
-              style: const pw.TextStyle(fontSize: 7, color: _grey),
+              style: const pw.TextStyle(fontSize: 7, color: _blue),
             ),
           ],
         ),
@@ -240,16 +252,21 @@ class AdminQuoteSimulationPdfService {
           pw.Text(
             'Simulation calculée le ${_formatCivilDate(generatedAt)} '
             '- Année d\'abonnement : $subscriptionYear',
-            style: const pw.TextStyle(fontSize: 9, color: _grey),
+            style: const pw.TextStyle(fontSize: 9, color: _blue),
           ),
           pw.SizedBox(height: 6),
           pw.Text(
-            'Référence de dossier : '
+            'Référence du dossier administratif : '
             '${administrativeReference.isEmpty ? 'non renseignée' : administrativeReference}',
-            style: const pw.TextStyle(fontSize: 9, color: _grey),
+            style: const pw.TextStyle(fontSize: 9, color: _blue),
           ),
-          pw.SizedBox(height: 16),
-          _section('ORGANISME PAYEUR (DONNÉES DÉCLARÉES)', [
+          pw.SizedBox(height: 5),
+          pw.Text(
+            'Numéro de devis : non attribué (simulation non contractuelle)',
+            style: const pw.TextStyle(fontSize: 8, color: _red),
+          ),
+          pw.SizedBox(height: 12),
+          _section('SPHOT ADMIN - COORDONNÉES DE FACTURATION', [
             _detail('Organisme', _text(billing['billingOrganisation'])),
             _detail(
               'Identifiant',
@@ -270,16 +287,58 @@ class AdminQuoteSimulationPdfService {
             _detail('Contact', _text(billing['billingContactName'])),
             _detail('Email', _text(billing['billingContactEmail'])),
           ]),
-          _section('POSTES CONCERNÉS', [
+          _section('SPHOTS CONCERNÉS', [
+            pw.Row(
+              children: [
+                pw.SizedBox(
+                  width: 95,
+                  child: pw.Text('N° SPHOT', style: pw.TextStyle(
+                    color: _blue, fontSize: 8, fontWeight: pw.FontWeight.bold,
+                  )),
+                ),
+                pw.SizedBox(
+                  width: 125,
+                  child: pw.Text('TYPE DE SPHOT', style: pw.TextStyle(
+                    color: _blue, fontSize: 8, fontWeight: pw.FontWeight.bold,
+                  )),
+                ),
+                pw.Expanded(
+                  child: pw.Text('LIEU', style: pw.TextStyle(
+                    color: _blue, fontSize: 8, fontWeight: pw.FontWeight.bold,
+                  )),
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 6),
             for (final station in stations)
               pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 4),
-                child: pw.Text(
-                  [
-                    _text(station['idSphot']),
-                    _text(station['name']),
-                  ].where((part) => part.isNotEmpty).join(' - '),
-                  style: const pw.TextStyle(fontSize: 9, color: _blue),
+                padding: const pw.EdgeInsets.only(bottom: 5),
+                child: pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.SizedBox(
+                      width: 95,
+                      child: pw.Text(
+                        _text(station['idSphot']).isEmpty
+                            ? 'Non attribué'
+                            : _text(station['idSphot']),
+                        style: const pw.TextStyle(color: _blue, fontSize: 9),
+                      ),
+                    ),
+                    pw.SizedBox(
+                      width: 125,
+                      child: pw.Text(
+                        'Poste de secours',
+                        style: const pw.TextStyle(color: _blue, fontSize: 9),
+                      ),
+                    ),
+                    pw.Expanded(
+                      child: pw.Text(
+                        _stationPlace(station),
+                        style: const pw.TextStyle(color: _blue, fontSize: 9),
+                      ),
+                    ),
+                  ],
                 ),
               ),
           ]),
@@ -308,7 +367,7 @@ class AdminQuoteSimulationPdfService {
             pw.Text(
               'Taxes et montant TTC : non déterminés. '
               'Aucun taux de TVA n\'est présumé.',
-              style: const pw.TextStyle(fontSize: 8, color: _grey),
+              style: const pw.TextStyle(fontSize: 8, color: _blue),
             ),
           ]),
           _section('PÉRIODE ET CONDITIONS', [
@@ -316,14 +375,14 @@ class AdminQuoteSimulationPdfService {
               'Année civile $subscriptionYear : abonnement jusqu\'au '
               '31 décembre, renouvellement au 1er janvier. '
               'Tarif annuel sans prorata.',
-              style: const pw.TextStyle(fontSize: 9, lineSpacing: 2),
+              style: const pw.TextStyle(fontSize: 9, color: _blue, lineSpacing: 2),
             ),
             pw.SizedBox(height: 8),
             pw.Text(
               'Un futur devis officiel sera valable 30 jours calendaires '
               'à compter de son émission (jour inclus), sans dépasser '
               'le 31 décembre de l\'année concernée.',
-              style: const pw.TextStyle(fontSize: 9, lineSpacing: 2),
+              style: const pw.TextStyle(fontSize: 9, color: _blue, lineSpacing: 2),
             ),
           ]),
           pw.Container(
