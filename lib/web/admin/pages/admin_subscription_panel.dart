@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../services/admin_subscription_order_service.dart';
+import '../../../services/published_commercial_quote_service.dart';
 
 class AdminSubscriptionPanel extends StatefulWidget {
   final String adminUid;
@@ -24,7 +25,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   static const Color _grey = Color(0xFF6B7280);
   static const Color _green = Color(0xFF16A34A);
   static const Color _orange = Color(0xFFF59E0B);
-  static const double _fallbackAnnualPricePerStationExclTax = 500.0;
+  final Map<int, Future<PublishedCommercialQuote>> _offerQuotes = {};
 
   final Map<String, String> _draft = <String, String>{};
   final Set<String> _expandedSections = <String>{};
@@ -680,25 +681,9 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   }
 
   Widget _offerForm(Map<String, dynamic> data) {
-  _initializeOfferSelection(data);
+    _initializeOfferSelection(data);
 
-  return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-    stream: FirebaseFirestore.instance
-        .collection('settings')
-        .doc('subscriptionPricing')
-        .snapshots(),
-    builder: (context, pricingSnapshot) {
-      final pricingData = pricingSnapshot.data?.data();
-
-      final configuredPrice = _number(
-        pricingData?['annualPricePerRescueStationExclTax'],
-      );
-
-      final annualPricePerStationExclTax = configuredPrice > 0
-          ? configuredPrice
-          : _fallbackAnnualPricePerStationExclTax;
-
-      return FutureBuilder<String>(
+    return FutureBuilder<String>(
       future: _territoireIdFuture,
       builder: (context, territoireSnapshot) {
         if (territoireSnapshot.connectionState == ConnectionState.waiting) {
@@ -757,9 +742,6 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                 .where(availableIds.contains)
                 .toSet();
             final selectedCount = activeSelectedIds.length;
-            final annualTotalExclTax =
-                selectedCount * annualPricePerStationExclTax;
-
             final selectedStations = rescueStations
                 .where((document) => activeSelectedIds.contains(document.id))
                 .map(
@@ -847,116 +829,10 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                     );
                   }),
                 const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _blue.withOpacity(0.045),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _blue.withOpacity(0.22)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "$selectedCount poste${selectedCount > 1 ? 's' : ''} sélectionné${selectedCount > 1 ? 's' : ''}",
-                        style: const TextStyle(
-                          color: _blue,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-  'Tarif unique : ${annualPricePerStationExclTax.toStringAsFixed(2).replaceAll('.', ',')} € HT par poste et par an',
-  style: const TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        'TOTAL ANNUEL HT : ${annualTotalExclTax.toStringAsFixed(2).replaceAll('.', ',')} €',
-                        style: const TextStyle(
-                          color: _red,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Divider(height: 1),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'PÉRIODE D\'ABONNEMENT',
-                        style: TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Début : date réelle d\'activation',
-                        style: TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      const Text(
-                        'Fin : 31 décembre de l\'année d\'activation',
-                        style: TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      const Text(
-                        'Renouvellement : du 1er janvier au 31 décembre',
-                        style: TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),                      
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Abonnement annuel uniquement. La sélection prépare l’offre et le devis sans activer l’abonnement.',
-                  style: TextStyle(
-                    color: _grey,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _saveButton(
-                  section: 'offer',
-                  onPressed: () {
-                    _saveSection(
-                      'offer',
-                      {
-                        'selectedRescueStationIds':
-                            activeSelectedIds.toList(),
-                        'selectedRescueStations': selectedStations,
-                        'numberOfRescueStations': selectedCount,
-                        'pricePerStationExclTax':
-                            annualPricePerStationExclTax,
-                        'annualAmountExclTax': annualTotalExclTax,
-                        'billingCycle': 'annual',
-                        'subscriptionPeriodRule': 'calendar_year',
-                        'firstPeriodProrated': false,
-                        'subscriptionDurationMonths': FieldValue.delete(),
-                        'vatRate': 20.0,
-                      },
-                      'Offre annuelle et sélection des postes enregistrées.',
-                    );
-                  },
+                _publishedOfferSummary(
+                  selectedCount: selectedCount,
+                  selectedIds: activeSelectedIds.toList()..sort(),
+                  selectedStations: selectedStations,
                 ),
               ],
             );
@@ -964,9 +840,174 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         );
       },
     );
-    },
-  );
-}
+  }
+
+  /// L'offre reprend EXCLUSIVEMENT le devis simulé de la grille publiée.
+  /// Les champs enregistrés restent un BROUILLON : la commande contractuelle
+  /// devra toujours être recalculée et validée côté serveur.
+  Widget _publishedOfferSummary({
+    required int selectedCount,
+    required List<String> selectedIds,
+    required List<Map<String, dynamic>> selectedStations,
+  }) {
+    if (selectedCount == 0) {
+      return const Text(
+        'Sélectionnez au moins un poste pour consulter la grille publiée.',
+        style: TextStyle(color: _grey, fontSize: 12),
+      );
+    }
+
+    final future = _offerQuotes.putIfAbsent(
+      selectedCount,
+      () => const PublishedCommercialQuoteService().admin(
+        numberOfRescueStations: selectedCount,
+      ),
+    );
+
+    return FutureBuilder<PublishedCommercialQuote>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Text(
+            'Grille publiée indisponible. Aucun tarif de remplacement '
+            'n’est appliqué et l’offre ne peut pas être enregistrée.',
+            style: TextStyle(color: _red, fontSize: 12),
+          );
+        }
+        final quote = snapshot.data;
+        if (quote == null) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: CircularProgressIndicator(color: _blue),
+            ),
+          );
+        }
+
+        final raw = quote.details['lines'];
+        final lines = raw is List ? raw : const [];
+        if (lines.isEmpty) {
+          return const Text(
+            'Détail de grille indisponible : impossible d’enregistrer l’offre.',
+            style: TextStyle(color: _red, fontSize: 12),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _blue.withOpacity(0.045),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _blue.withOpacity(0.22)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$selectedCount poste(s) sélectionné(s)',
+                    style: const TextStyle(
+                      color: _blue, fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    'TARIFICATION SUIVANT GRILLE ${quote.pricingReference}',
+                    style: const TextStyle(
+                      color: _blue, fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  for (final line in lines)
+                    if (line is Map &&
+                        line['count'] is num &&
+                        (line['count'] as num) > 0 &&
+                        line['unitExclTax'] is num &&
+                        line['amountExclTax'] is num)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${(line['count'] as num).toInt()} × '
+                                '${(line['unitExclTax'] as num).toStringAsFixed(2).replaceAll('.', ',')} €',
+                                style: const TextStyle(
+                                  color: _blue, fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '${(line['amountExclTax'] as num).toStringAsFixed(2).replaceAll('.', ',')} €',
+                              style: const TextStyle(
+                                color: _blue, fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  const Divider(),
+                  Text(
+                    'TOTAL ANNUEL HT : ${quote.amountExclTax.toStringAsFixed(2).replaceAll('.', ',')} €',
+                    style: const TextStyle(
+                      color: _red, fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text('PÉRIODE D’ABONNEMENT',
+                    style: TextStyle(color: _blue, fontSize: 12,
+                      fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 5),
+                  const Text('Début : date réelle d’activation',
+                    style: TextStyle(color: _blue, fontSize: 12)),
+                  const Text('Fin : 31 décembre de l’année d’activation',
+                    style: TextStyle(color: _blue, fontSize: 12)),
+                  const Text('Renouvellement : 1er janvier — sans prorata',
+                    style: TextStyle(color: _blue, fontSize: 12)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Cette simulation prépare l’offre. Elle ne confirme aucune '
+              'commande et n’active pas l’abonnement.',
+              style: TextStyle(color: _grey, fontSize: 11),
+            ),
+            const SizedBox(height: 12),
+            _saveButton(
+              section: 'offer',
+              onPressed: () {
+                _saveSection(
+                  'offer',
+                  <String, dynamic>{
+                    'selectedRescueStationIds': selectedIds,
+                    'selectedRescueStations': selectedStations,
+                    'numberOfRescueStations': selectedCount,
+                    'annualAmountExclTax': quote.amountExclTax,
+                    'publishedPricingReference': quote.pricingReference,
+                    'publishedPricingVersion': quote.version,
+                    'pricePerStationExclTax': FieldValue.delete(),
+                    'vatRate': FieldValue.delete(),
+                    'billingCycle': 'annual',
+                    'subscriptionPeriodRule': 'calendar_year',
+                    'firstPeriodProrated': false,
+                    'subscriptionDurationMonths': FieldValue.delete(),
+                  },
+                  'Sélection et simulation publiées enregistrées.',
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Widget _orderForm(Map<String, dynamic> data) {
     final noOrderRequired = _noOrderRequired(data);
@@ -1446,7 +1487,8 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                                   hasSavedStations;
                           final offerComplete =
     hasSavedStations &&
-        _number(data['pricePerStationExclTax']) > 0 &&
+        _text(data['publishedPricingReference']).isNotEmpty &&
+        _number(data['annualAmountExclTax']) > 0 &&
         _text(data['billingCycle']) == 'annual';
 
                           final orderValues = [
