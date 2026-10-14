@@ -1219,7 +1219,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
           ),
           const Expanded(
             child: Text(
-              'ABONNEMENT',
+              'ABONNEMENT & PAIEMENT',
               style: TextStyle(
                 color: _blue,
                 fontSize: 20,
