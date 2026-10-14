@@ -6241,8 +6241,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         icon: Icons.request_quote_outlined,
                         title: 'DEVIS',
                         description:
-                            'Les devis générés pour votre organisme apparaîtront ici.',
-                        status: 'AUCUN DOCUMENT',
+                            'Les devis officiels émis seront consultables ici. '
+                            'Leur génération et téléchargement restent à raccorder.',
+                        status: 'ÉMISSION NON ENCORE DISPONIBLE',
                       ),
                       const SizedBox(height: 12),
                       _buildCommercialSection(
