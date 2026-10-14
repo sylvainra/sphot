@@ -207,3 +207,27 @@ Test conseillé : cas prérempli mairie française avec SIRET de 4 chiffres (doi
 **À valider avec l'utilisateur :** emplacement du bouton devis dans l'étape 6 après l'offre et l'identité du payeur ; absence de devis obligatoire ; règles de validité, émission des PDF et acceptation sans signature électronique obligatoire si le circuit de commande publique est utilisé.
 
 **Compilation et test navigateur de la personnalisation du menu restent à réaliser localement.**
+
+## 16. Devis AVANT règlement et distinction des numéros — décision utilisateur 14/10/2026
+
+**Retour utilisateur** : le numéro de commande doit-il se générer automatiquement ? Le numéro d'engagement juridique est-il intrinsèque à l'Admin ? Le devis doit être présenté **entre l'ancienne étape 02 ORGANISME PAYEUR et l'ancienne étape 03 MODALITÉS DE RÈGLEMENT**.
+
+**Clarification métier approuvée comme principe d'organisation** :
+- Référence du dossier Admin SPHOT : attribuée par SPHOT lors de l'inscription/dossier. Elle n'est ni commande, ni devis, ni engagement juridique du client.
+- **Numéro de devis SPHOT** : attribué automatiquement à l'émission par le système documentaire existant `quotes/{quoteId}` / `assignQuoteNumberOnWrite`; modèle `DV-{ANNEE}-{ADHERENT}-{SEQUENCE}`.
+- **Numéro de commande SPHOT** : attribué automatiquement lors de la confirmation contractuelle effective (pas au choix du mode de règlement ni à la simulation), par `orders/{orderId}` / `assignOrderNumberOnWrite`, modèle `CMD-{ANNEE}-{ADHERENT}-{SEQUENCE}`.
+- **Bon de commande externe de l'organisme** (`purchaseOrderNumber`) : émis ou communiqué par le client public, ne doit pas être inventé par SPHOT.
+- **Numéro d'engagement juridique externe** (`engagementNumber`) : propre à un engagement/contrat/commande du payeur, pas intrinsèque au compte Admin ; peut coïncider avec le numéro du bon de commande ou du marché. Un numéro déjà stocké peut être prérempli pour le brouillon mais ne doit pas être réutilisé automatiquement sur une nouvelle période sans vérification.
+- **Code service Chorus Pro** : généralement associé au service de l'entité publique destinataire. Nécessaire selon les règles de routage du destinataire (voir annuaire Chorus) ; ne pas imposer aveuglément les trois champs à tous les organismes. Le cochage « aucun bon de commande exigé » ne prouve pas à lui seul l'engagement.
+- Source officielle Chorus Pro, guide de lecture annuaire : https://communaute.chorus-pro.gouv.fr/documentation/guide-de-lecture-de-lannuaire-des-entites-publiques/
+
+**Nouvel ordre validé par la préférence explicite de l'utilisateur**, appliqué dans l'interface sur la branche :
+1. `01 — POSTES ET OFFRE` — simulation et sauvegarde de l'offre.
+2. `02 — ORGANISME PAYEUR` — identité commerciale/facturation.
+3. `03 — DEVIS (FACULTATIF)` — avant tout règlement. À terme établissement, numérotation, PDF et archivage.
+4. `04 — MODALITÉS DE RÈGLEMENT` — choix CB ou commande publique, saisie des références fournies par le payeur si elles sont nécessaires.
+5. `05 — CONDITIONS ET CONFIRMATION` — CGV, fiscalité, engagement.
+
+**État actuel des fonctions** : le nouveau panneau DEVIS est placé au bon endroit avec un bouton `ÉTABLIR UN DEVIS` encore désactivé, car il faut construire la création contractuelle côté serveur, le calcul fiscal, l'édition du PDF et la consultation de l'original. La commande réelle reste également désactivée. Le devis **n'est pas obligatoire** pour passer directement au règlement/à la commande. Le changement des numéros n'a pas modifié les écritures Firestore. Aucun nouveau devis n'a été produit. **Ne pas présenter ce stade comme une émission de devis fonctionnelle.**
+
+**À décider avant développement de l'émission** : durée de validité des devis (suggestion à faire à l'utilisateur : 30 jours, mais jamais plus tard que la fin de l'année concernée sans reconfirmation des conditions), régime TVA applicable au vendeur SPHOT en France et à l'international, contenu final du PDF. Toute modification de grille tarifaire publiée après émission doit préserver l'historique/conditions de validité d'un devis signé.
