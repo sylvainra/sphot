@@ -1475,9 +1475,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           subscription['numberOfRescueStations'],
         ).toInt();
 
-        final pricePerSpot = _toDouble(subscription['pricePerStationExclTax']);
-
-        final totalPrice = numberOfSpots * pricePerSpot;
+        final totalPrice = _toDouble(subscription['annualAmountExclTax']);
+        final priceLabel = totalPrice > 0
+            ? '${totalPrice.toStringAsFixed(2).replaceAll('.', ',')} € HT / an'
+            : 'Tarification à actualiser';
 
         return Container(
           width: double.infinity,
@@ -1522,7 +1523,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               _spotInfoLine('SPHOTS', '$numberOfSpots'),
               _spotInfoLine(
                 'Coût',
-                '${totalPrice.toStringAsFixed(0)} € HT / an',
+                priceLabel,
               ),
             ],
           ),
