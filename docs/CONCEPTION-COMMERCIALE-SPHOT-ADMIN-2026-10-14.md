@@ -331,3 +331,24 @@ Après capture d'une version à titre seul sur fond blanc, l'utilisateur a expre
 **Contrôles statiques** : délimiteurs équilibrés ; présence du titre sans carte/contour, absence de signature textuelle au pied ; **tous les appels `pw.Text` contiennent maintenant explicitement un style bleu ou rouge**, ainsi que les 3 colonnes et les deux références distinguées. **Compilation Flutter et rendu PDF visuel encore à tester sur le poste de l'utilisateur**.
 
 **Fondement documentaire** : sur une facture l'identité réelle du client/acheteur doit être conservée, quel que soit le libellé marketing de la section ; https://www.service-public.gouv.fr/entreprendre/vosdroits/F31808.
+
+## 23. Décision définitive : SUPPRESSION de la simulation PDF, devis unique (14/10/2026 soir)
+
+**Instruction explicite de l'utilisateur :** une simulation tarifaire téléchargeable fait double emploi avec le devis et complexifie inutilement SPHOT. **La supprimer entièrement** ; ne conserver **qu'un vrai devis officiel** comme document commercial facultatif, sans « usine à gaz », dans le respect des mentions légales applicables.
+
+**Règle finale :**
+- **Étape 01 — POSTES ET OFFRE** : les postes de secours sélectionnés, les paliers de la grille tarifaire publiée, les montants HT et la période annuelle restent affichés directement dans l'interface. **Ceci est un aperçu tarifaire à l'écran, sans PDF ni document autonome**. Le bouton ENREGISTRER conserve la sélection en brouillon ; aucun paiement/abonnement n'est créé.
+- **Étape 02 — ORGANISME PAYEUR** : véritable identité du client et coordonnées de facturation.
+- **Étape 03 — DEVIS (FACULTATIF)** : **un seul bouton « ÉTABLIR UN DEVIS »**, actuellement désactivé tant que SPHOT n'est pas immatriculé et que le traitement fiscal, l'identité émettrice, le contrôle serveur et la génération de PDF officiel ne sont pas opérationnels. Le devis, **une fois émis légalement**, sera numéroté automatiquement `DV-...`, valable **30 jours calendaires maximum, sans dépasser le 31 décembre de l'année concernée**, et historisé dans FACTURES & DOCUMENTS. Jamais de devis obligatoire pour souscrire si le client n'en a pas besoin.
+- **Étape 04 — MODALITÉS DE RÈGLEMENT** puis **05 — CONDITIONS ET CONFIRMATION** inchangées, paiement/commande réels toujours verrouillés à ce stade.
+- La numérotation `SPHOT-ADM-...` est celle du **dossier administratif**, jamais celle d'un devis. Aucune fausse référence `DV-...` n'est générée.
+
+**Code supprimé sur la branche** `codex/advertiser-pricing-table-v1` :
+- import, champ d'état, méthode de partage et bouton de simulation dans `lib/web/admin/pages/admin_subscription_panel.dart` ;
+- fichiers devenus orphelins `lib/web/admin/services/admin_quote_simulation_pdf_service.dart`, `admin_quote_pdf_export.dart`, `admin_quote_pdf_export_web.dart`, `admin_quote_pdf_export_stub.dart`.
+
+**Ce qui reste** : `PublishedCommercialQuoteService` et ses fonctions sécurisées de consultation de la grille publiée, car **le calcul du prix à l'écran est nécessaire**, et `functions/admin_quote_validity.js` et ses tests (validité du FUTUR devis officiel). Les anciennes sections 18 à 22 de ce document sont de l'**historique** et ne correspondent plus à un PDF de simulation présent dans le code. Ne pas le rétablir.
+
+**Conformité future du devis** : émetteur identifié officiellement, client facturé correctement, prestations/SPHOTS, conditions (période calendaire sans prorata, validité 30 jours), prix HT et fiscalité applicable déterminée, références/document unique et horodatage, version du tarif publié, document conservé sans écrasement. Seules les mentions légalement pertinentes seront ajoutées au PDF, pas de documents parallèles ni de contrôles commerciaux quotidiens du Super Admin.
+
+**Contrôle demandé** : l'utilisateur doit constater l'absence totale du bouton et de la simulation PDF dans l'étape 03, la présence du seul bouton devis désactivé, et la conservation de l'affichage tarifaire en étape 01. Aucun test Flutter/Chrome réalisé côté assistant.
