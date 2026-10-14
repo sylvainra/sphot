@@ -384,149 +384,28 @@ class SuperAdminDashboardFinancesPage extends StatelessWidget {
   }
 }
 
-class _SubscriptionPricingEditor extends StatefulWidget {
+/// L'ancien éditeur à tarif unitaire est désactivé.
+//// La gestion courante des tarifs se fait dans les grilles publiées.
+class _SubscriptionPricingEditor extends StatelessWidget {
   const _SubscriptionPricingEditor();
 
   @override
-  State<_SubscriptionPricingEditor> createState() =>
-      _SubscriptionPricingEditorState();
-}
-
-class _SubscriptionPricingEditorState
-    extends State<_SubscriptionPricingEditor> {
-  static const Color _blue = Color(0xFF1E3A8A);
-  static const Color _red = Color(0xFFDC2626);
-
-  final TextEditingController _priceController =
-      TextEditingController();
-
-  bool _loading = true;
-  bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPrice();
-  }
-
-  Future<void> _loadPrice() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('settings')
-        .doc('subscriptionPricing')
-        .get();
-
-    final data = snapshot.data();
-    final value =
-        (data?['annualPricePerRescueStationExclTax'] as num?)
-            ?.toDouble();
-
-    _priceController.text =
-        (value ?? 500.0).toStringAsFixed(2);
-
-    if (mounted) {
-      setState(() {
-        _loading = false;
-      });
-    }
-  }
-
-  Future<void> _savePrice() async {
-    final price = double.tryParse(
-      _priceController.text.trim().replaceAll(',', '.'),
-    );
-
-    if (price == null || price <= 0) {
-      return;
-    }
-
-    setState(() {
-      _saving = true;
-    });
-
-    try {
-      await FirebaseFirestore.instance
-          .collection('settings')
-          .doc('subscriptionPricing')
-          .set(
-        {
-          'annualPricePerRescueStationExclTax': price,
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
-
-      if (!mounted) return;
-
-    } finally {
-      if (mounted) {
-        setState(() {
-          _saving = false;
-        });
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _priceController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: _blue,
-          width: 2,
-        ),
+        border: Border.all(color: const Color(0xFF1E3A8A)),
       ),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Text(
-              'TARIF ANNUEL PAR POSTE DE SECOURS',
-              style: TextStyle(
-                color: _blue,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 180,
-            child: TextField(
-              controller: _priceController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: const InputDecoration(
-                labelText: '€ HT / an',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          ElevatedButton.icon(
-            onPressed: _saving ? null : _savePrice,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _blue,
-              foregroundColor: Colors.white,
-            ),
-            icon: const Icon(Icons.save_rounded),
-            label: Text(
-              _saving ? 'ENREGISTREMENT...' : 'ENREGISTRER',
-            ),
-          ),
-        ],
+      child: const Text(
+        'Le tarif annuel unique a été abandonné. '
+        'Les montants SPHOT ADMIN sont exclusivement définis par la '
+        'grille progressive publiée dans GRILLES TARIFAIRES du Super Admin.',
+        style: TextStyle(
+          color: Color(0xFF1E3A8A),
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
