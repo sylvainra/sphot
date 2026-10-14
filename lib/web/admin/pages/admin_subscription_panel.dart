@@ -33,6 +33,8 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   bool? _draftNoOrderRequired;
   String? _draftPaymentMethod;
   String? _draftBillingRelation;
+  OverlayEntry? _payerTypeOverlay;
+  final GlobalKey _payerTypeFieldKey = GlobalKey();
   // Brouillons séparés : basculer d'un payeur à l'autre ne mélange pas
   // les coordonnées de deux personnes morales.
   final Map<String, Map<String, String>> _payerDraftByRelation = {};
@@ -61,6 +63,104 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     super.initState();
     _dataStream = _subscriptionDataStream();
     _territoireIdFuture = _resolveTerritoireId();
+  }
+
+  @override
+  void dispose() {
+    _closePayerTypeMenu();
+    super.dispose();
+  }
+
+  void _closePayerTypeMenu() {
+    _payerTypeOverlay?.remove();
+    _payerTypeOverlay = null;
+  }
+
+  void _openPayerTypeMenu() {
+    _closePayerTypeMenu();
+    final renderBox = _payerTypeFieldKey.currentContext?.findRenderObject();
+    if (renderBox is! RenderBox) return;
+    final position = renderBox.localToGlobal(Offset.zero);
+    final size = renderBox.size;
+    const choices = <String, String>{
+      'public': 'Organisme public',
+      'private': 'Entreprise / organisme privé',
+    };
+
+    _payerTypeOverlay = OverlayEntry(
+      builder: (overlayContext) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _closePayerTypeMenu,
+              child: const SizedBox.expand(),
+            ),
+          ),
+          Positioned(
+            left: position.dx,
+            top: position.dy + size.height - 12,
+            width: size.width,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.97),
+                  border: const Border(
+                    left: BorderSide(color: _blue, width: 1.4),
+                    right: BorderSide(color: _blue, width: 1.4),
+                    bottom: BorderSide(color: _blue, width: 1.4),
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(10),
+                    bottomRight: Radius.circular(10),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.18),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final choice in choices.entries)
+                      InkWell(
+                        onTap: () {
+                          _closePayerTypeMenu();
+                          if (!mounted) return;
+                          setState(() {
+                            _draft['billingPayerType'] = choice.key;
+                          });
+                        },
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12,
+                            ),
+                            child: Text(
+                              choice.value,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: _blue,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    Overlay.of(context).insert(_payerTypeOverlay!);
   }
 
   String get _uid => widget.adminUid.trim();
@@ -615,6 +715,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   }
 
   void _changePayerRelation(String next, Map<String, dynamic> data) {
+    _closePayerTypeMenu();
     final previous = _payerRelation(data);
     if (previous == next) return;
     _payerDraftByRelation[previous] = {
@@ -700,22 +801,53 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
           label: 'Dénomination de l’organisme'),
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
-          child: DropdownButtonFormField<String>(
-            key: ValueKey<String>('payer-type-$relation'),
-            value: type == 'public' || type == 'private' ? type : null,
-            isExpanded: true,
-            decoration: _inputDecoration('Nature de l’organisme'),
-            items: const [
-              DropdownMenuItem(
-                value: 'public', child: Text('Organisme public')),
-              DropdownMenuItem(
-                value: 'private', child: Text('Entreprise / organisme privé')),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _draft['billingPayerType'] = value);
-              }
-            },
+          child: GestureDetector(
+            key: _payerTypeFieldKey,
+            onTap: _openPayerTypeMenu,
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: type.isEmpty ? null : 'Nature de l’organisme',
+                labelStyle: const TextStyle(
+                  color: _blue, fontWeight: FontWeight.w700,
+                ),
+                filled: true,
+                fillColor: Colors.transparent,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: _blue, width: 1.6),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: _blue, width: 1.6),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      switch (type) {
+                        'public' => 'Organisme public',
+                        'private' => 'Entreprise / organisme privé',
+                        _ => 'Nature de l’organisme',
+                      },
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _blue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: _red, size: 26,
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         _field(data: source, field: 'billingCountry',
