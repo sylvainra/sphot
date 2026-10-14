@@ -701,6 +701,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: DropdownButtonFormField<String>(
+            key: ValueKey<String>('payer-type-$relation'),
             value: type == 'public' || type == 'private' ? type : null,
             isExpanded: true,
             decoration: _inputDecoration('Nature de l’organisme'),
