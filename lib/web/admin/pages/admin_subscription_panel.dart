@@ -1301,19 +1301,13 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         _number(data['annualAmountExclTax']) > 0 &&
         _text(data['billingCycle']) == 'annual';
 
-                          final orderValues = [
-                            data['purchaseOrderNumber'],
-                            data['engagementNumber'],
-                            data['chorusServiceCode'],
-                          ];
-                          final orderStarted =
-                              data['purchaseOrderNotRequired'] == true ||
-                                  orderValues.any(
-                                    (value) => _text(value).isNotEmpty,
-                                  );
-                          final orderComplete = orderStarted;
-                          final subscriptionActive =
-                              _text(data['status']).toLowerCase() == 'active';
+                          final savedPayment = _text(data['preferredPaymentMethod']);
+                          final chosenPayment = _draftPaymentMethod ?? savedPayment;
+                          final paymentStarted = chosenPayment.isNotEmpty;
+                          final paymentReady =
+                              (savedPayment == 'card' ||
+                               savedPayment == 'public_invoice') &&
+                              chosenPayment == savedPayment;
 
                           return Container(
                             color: const Color(0xFFF8FAFC),
@@ -1321,28 +1315,11 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                               padding: const EdgeInsets.all(20),
                               children: [
 _accordionSection(
-  id: 'payer',
-                                  icon: Icons.apartment_rounded,
-                                  title: 'ORGANISME PAYEUR',
-                                  description:
-                                      'Coordonnées administratives et informations de facturation de votre organisme.',
-                                  status: _status(
-                                    complete: payerComplete,
-                                    started: payerStarted,
-                                  ),
-                                  statusColor: _statusColor(
-                                    complete: payerComplete,
-                                    started: payerStarted,
-                                  ),
-                                  child: _payerForm(data),
-                                ),
-                                const SizedBox(height: 12),
-                                _accordionSection(
                                   id: 'offer',
-                                  icon: Icons.description_outlined,
-                                  title: 'OFFRE ET DEVIS',
+                                  icon: Icons.place_outlined,
+                                  title: '01 — POSTES ET OFFRE',
                                   description:
-                                      'Sélection des postes de secours et montant annuel de l’abonnement.',
+                                      'Postes de secours et tarif annuel suivant la grille publiée.',
                                   status: _status(
                                     complete: offerComplete,
                                     started: offerStarted,
@@ -1355,47 +1332,52 @@ _accordionSection(
                                 ),
                                 const SizedBox(height: 12),
                                 _accordionSection(
-                                  id: 'order',
-                                  icon:
-                                      Icons.assignment_turned_in_outlined,
-                                  title: 'COMMANDE',
+                                  id: 'payer',
+                                  icon: Icons.apartment_rounded,
+                                  title: '02 — ORGANISME PAYEUR',
                                   description:
-                                      'Références communiquées par votre organisme pour la commande et Chorus Pro.',
+                                      'Coordonnées et informations pour la facturation électronique.',
                                   status: _status(
-                                    complete: orderComplete,
-                                    started: orderStarted,
+                                    complete: payerComplete,
+                                    started: payerStarted,
                                   ),
                                   statusColor: _statusColor(
-                                    complete: orderComplete,
-                                    started: orderStarted,
+                                    complete: payerComplete,
+                                    started: payerStarted,
                                   ),
-                                  child: _orderForm(data),
+                                  child: _payerForm(data),
                                 ),
                                 const SizedBox(height: 12),
                                 _accordionSection(
-                                  id: 'activation',
-                                  icon: Icons.verified_outlined,
-                                  title: 'ACTIVATION',
+                                  id: 'payment',
+                                  icon: Icons.credit_card_rounded,
+                                  title: '03 — MODALITÉS DE RÈGLEMENT',
                                   description:
-                                      'Contrôle des renseignements avant activation de l’abonnement.',
-                                  status: subscriptionActive
-                                      ? 'ABONNEMENT ACTIF'
-                                      : payerComplete &&
-                                              offerComplete &&
-                                              orderComplete
-                                          ? 'PRÊT À ACTIVER'
-                                          : 'EN ATTENTE',
-                                  statusColor: subscriptionActive ||
-                                          (payerComplete &&
-                                              offerComplete &&
-                                              orderComplete)
-                                      ? _green
-                                      : _grey,
-                                  child: _activationSummary(
+                                      'Carte bancaire ou commande publique suivant votre organisme.',
+                                  status: _status(
+                                    complete: paymentReady,
+                                    started: paymentStarted,
+                                  ),
+                                  statusColor: _statusColor(
+                                    complete: paymentReady,
+                                    started: paymentStarted,
+                                  ),
+                                  child: _paymentMethodForm(data),
+                                ),
+                                const SizedBox(height: 12),
+                                _accordionSection(
+                                  id: 'conditions',
+                                  icon: Icons.verified_user_outlined,
+                                  title: '04 — CONDITIONS ET CONFIRMATION',
+                                  description:
+                                      'Récapitulatif, fiscalité, CGV et validation sécurisée.',
+                                  status: 'EN PRÉPARATION',
+                                  statusColor: _orange,
+                                  child: _conditionsSummary(
                                     data: data,
                                     payerComplete: payerComplete,
                                     offerComplete: offerComplete,
-                                    orderComplete: orderComplete,
+                                    paymentReady: paymentReady,
                                   ),
                                 ),
                               ],
