@@ -18,7 +18,6 @@ const SMTP_USER = "admin@sphot.app";
 const MAIL_FROM = "\"SPHOT\" <no-reply@sphot.app>";
 const SPHOT_LOGIN_URL = "https://sphot.app/#/professional-login";
 const DEFAULT_TRIAL_DAYS = 8;
-const DEFAULT_PRICE_PER_STATION_EXCL_TAX = 500;
 const DEFAULT_VAT_RATE = 20;
 
 function cleanValue(value, fallback = "") {
@@ -1138,10 +1137,8 @@ async function expireTrial(subscriptionDoc, now) {
   const requestSnap = await getRequestByUid(uid);
   const requestData = requestSnap?.data() || {};
   const stations = Number(subscription.numberOfRescueStations || 0);
-  const price = Number(
-      subscription.pricePerStationExclTax || DEFAULT_PRICE_PER_STATION_EXCL_TAX,
-  );
-  const annual = stations * price;
+  // Aucun tarif n'est déduit d'un ancien prix fixe à la fin de l'essai.
+  // Seule la grille publiée peut établir une nouvelle offre commerciale.
   const batch = db.batch();
 
   batch.set(subscriptionDoc.ref, {
@@ -1150,9 +1147,7 @@ async function expireTrial(subscriptionDoc, now) {
     subscriptionOffer: {
       status: "available",
       numberOfRescueStations: stations,
-      pricePerStationExclTax: price,
-      annualAmountExclTax: annual,
-      vatRate: Number(subscription.vatRate || DEFAULT_VAT_RATE),
+      pricingStatus: "awaiting_published_quote",
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     },
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1212,20 +1207,14 @@ async function sendTrialReminder(subscriptionDoc) {
   const requestSnap = await getRequestByUid(uid);
   if (!requestSnap) return;
   const data = requestSnap.data() || {};
-  const price = Number(
-      subscription.pricePerStationExclTax || DEFAULT_PRICE_PER_STATION_EXCL_TAX,
-  );
-  const stations = Number(subscription.numberOfRescueStations || 0);
-  const annual = price * stations;
   const html = `
     <p>${escapeHtml(buildGreeting(data))}</p>
     <p>Votre <strong>période d’essai gratuite SPHOT ADMIN</strong> prendra fin le
     <strong>${escapeHtml(formatFrenchDate(subscription.trialEndDate))}</strong>.</p>
     <p>Afin d’éviter toute interruption de diffusion, vous pouvez dès maintenant
     préparer votre abonnement annuel SPHOT ADMIN.</p>
-    <p>Tarif : <strong>${currency(price)} HT / an / poste de secours</strong>.<br>
-    Montant prévisionnel : <strong>${currency(annual)} HT / an</strong>
-    pour ${stations} poste(s).</p>
+    <p>Votre offre tarifaire actualisée, calculée sur la grille publiée,
+    est consultable dans l'espace ABONNEMENT.</p>
     <p><a href="${SPHOT_LOGIN_URL}">Accéder à SPHOT ADMIN</a></p>
     <p>Cordialement,<br>L’équipe SPHOT</p>`;
   const sent = await sendLifecycleMail({
@@ -1247,20 +1236,14 @@ async function sendRenewalReminder(subscriptionDoc, days) {
   const requestSnap = await getRequestByUid(uid);
   if (!requestSnap) return;
   const data = requestSnap.data() || {};
-  const price = Number(
-      subscription.pricePerStationExclTax || DEFAULT_PRICE_PER_STATION_EXCL_TAX,
-  );
-  const stations = Number(subscription.numberOfRescueStations || 0);
-  const annual = price * stations;
   const fieldName = `renewalReminder${days}dEmail`;
   const html = `
     <p>${escapeHtml(buildGreeting(data))}</p>
     <p>Votre abonnement annuel SPHOT ADMIN arrive à échéance le
     <strong>${escapeHtml(formatFrenchDate(subscription.subscriptionEndDate, false))}</strong>.</p>
     <p>Vous pouvez préparer son renouvellement dès maintenant.</p>
-    <p>Base tarifaire actuelle : <strong>${currency(price)} HT / an / poste de secours</strong>.<br>
-    Montant prévisionnel : <strong>${currency(annual)} HT / an</strong>
-    pour ${stations} poste(s).</p>
+    <p>Votre prochaine offre sera calculée selon la grille publiée
+    en vigueur pour le renouvellement, sans prorata.</p>
     <p>Lors du renouvellement, vos informations administratives et de facturation
     seront préremplies et devront être confirmées. Les références propres à la
     nouvelle commande (bon de commande / engagement) pourront être mises à jour.</p>
@@ -1463,7 +1446,8 @@ exports.processAdminOrderCreated = onDocumentCreated(
           {heading: "Commande"},
           {label: "Nombre de postes", value: order.numberOfRescueStations},
           {label: "Prix unitaire HT", value:
-            currency(order.unitPriceExclTax || DEFAULT_PRICE_PER_STATION_EXCL_TAX)},
+            Number(order.unitPriceExclTax) > 0 ?
+              currency(order.unitPriceExclTax) : "Non renseigné"},
           {label: "Montant HT", value: currency(order.totalExclTax)},
           {label: "TVA", value: `${Number(order.vatRate || DEFAULT_VAT_RATE)} %`},
           {label: "Montant TTC", value: currency(order.totalInclTax)},
@@ -1505,7 +1489,8 @@ exports.processAdminOrderCreated = onDocumentCreated(
         engagementNumber: order.engagementNumber || "",
         chorusServiceCode: order.chorusServiceCode || "",
         numberOfRescueStations: Number(order.numberOfRescueStations || 0),
-        unitPriceExclTax: Number(order.unitPriceExclTax || DEFAULT_PRICE_PER_STATION_EXCL_TAX),
+        unitPriceExclTax: Number(order.unitPriceExclTax) > 0 ?
+          Number(order.unitPriceExclTax) : null,
         subtotalExclTax: Number(order.totalExclTax || 0),
         vatRate: Number(order.vatRate || DEFAULT_VAT_RATE),
         vatAmount: Number(order.vatAmount || 0),
