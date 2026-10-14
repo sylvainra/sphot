@@ -131,18 +131,18 @@ La branche utilisée reste `codex/advertiser-pricing-table-v1`. Aucun service de
 
 ## 12. Proposition de conception — 02 ORGANISME PAYEUR (14/10/2026, À VALIDER)
 
-Contexte : écran ABONNEMENT & PAIEMENT déjà testé visuellement ; volet FACTURES & DOCUMENTS distinct. La rubrique organisme payeur actuelle préremplit les champs à partir de `adminRequests/{uid}` (facturation, structure, territoire, ProConnect) puis `subscriptions/{uid}`. **Ne pas effacer ces données ni toucher aux champs d'identité ProConnect certifiée**.
+Contexte : écran ABONNEMENT & PAIEMENT déjà testé visuellement ; volet FACTURES & DOCUMENTS distinct. La rubrique organisme payeur actuelle préremplit les champs à partir de `adminRequests/{uid}` (facturation, structure, territoire, profil) puis `subscriptions/{uid}`. **ProConnect a été abandonné pour dysfonctionnement et incompatibilité avec l'internationalisation : aucune certification ni exigence d'identité ProConnect ne doit être réintroduite.** Conserver les valeurs commerciales déjà enregistrées, sans effacer les historiques.
 
 ### Proposition visible, minimale
 1. **Entité à facturer** : case/sélecteur « Identique à la structure gestionnaire du SPHOT » (préremplie si correspondance) / « Autre organisme payeur » pour collectivités ou structures facturant séparément ; toute modification d'entité exige preuve d'habilitation contractuelle avant commande.
-2. **Pays de facturation** (France par défaut si attesté, sinon à sélectionner, enregistrer en code pays ISO) ; **nature du payeur** selon catégories « organisme public », « entreprise/organisme privé » ; préremplir d'après organisation enregistrée, mais ne pas assimiler ProConnect à validation commerciale automatique.
+2. **Pays de facturation** (France par défaut si attesté, sinon à sélectionner, enregistrer en code pays ISO) ; **nature du payeur** selon catégories « organisme public », « entreprise/organisme privé » ; préremplir d'après organisation enregistrée, mais ne pas assimiler la simple inscription SPHOT à une vérification juridique de l'organisme.
 3. **Identification de l'entité** : dénomination complète, SIRET français 14 chiffres et SIREN dérivé/contrôlé 9 chiffres (si France), ou identifiant officiel local selon pays ; identifiant TVA intra-UE seulement si pertinent. Éviter SIRET obligatoire pour les entités étrangères ; ne pas inventer de n° TVA.
 4. **Adresse de facturation** : ligne d'adresse, complément facultatif, code postal, ville, pays. Conserver les adresses du lieu de baignade séparées de celles de facturation.
-5. **Contact facturation** : nom, email de réception/notification, téléphone facultatif sauf besoin avéré. Contact facturation distinct de l'identité ProConnect certifiée et du signataire habilité.
+5. **Contact facturation** : nom, email de réception/notification, téléphone facultatif sauf besoin avéré. Contact facturation distinct du profil de connexion SPHOT et du signataire habilité.
 6. **Section 03, hors du présent formulaire** : mode de règlement, numéro d'engagement, bon de commande, code service Chorus Pro, règles de routage selon annuaire public ; ne pas dupliquer ces champs dans organisme payeur.
 7. **Statuts** : « à compléter », « en cours », « à corriger » et « renseigné et vérifié ». La validation d'un brouillon permet de compléter plus tard, mais aucune commande ferme avec SIRET tronqué / adresse manquante / email invalide / entité sans autorisation. Les vérifications serveur et annuaires sont nécessaires, une simple longueur valide ne prouve pas l'identité.
 8. **International** : sélection pays pilote les champs d'identification et validation par pays ; enregistrer code ISO, identifiants et règles de facturation, mais devise et traitement TVA issus du catalogue tarifaire et du moteur fiscal, pas modifiables arbitrairement par le client.
-9. **Historisation** : copie de l'organisme facturé, identifiants, adresse et coordonnées au moment de la commande, sans réécriture des factures émises quand le client modifie son profil ultérieurement. Séparer `verifiedProConnectIdentity` (intangible) du `billingProfile` modifiable. Un changement de payeur peut nécessiter de reprendre l'étape contractuelle.
+9. **Historisation** : copie de l'organisme facturé, identifiants, adresse et coordonnées au moment de la commande, sans réécriture des factures émises quand le client modifie son profil ultérieurement. Séparer le compte de connexion SPHOT du `billingProfile` modifiable ; aucun champ ProConnect certifié n'est requis. Un changement de payeur peut nécessiter de reprendre l'étape contractuelle.
 
 ### Audit code pour implémentation après validation
 - `lib/web/admin/pages/admin_subscription_panel.dart`, `_mergeRegistrationData` reprend les valeurs du dossier et `_payerForm` propose 9 champs.
@@ -157,3 +157,8 @@ Contexte : écran ABONNEMENT & PAIEMENT déjà testé visuellement ; volet FACTU
 - Réforme et plateformes agréées : https://entreprendre.service-public.gouv.fr/actualites/A15683
 
 **Statut : proposition métier à soumettre à l'utilisateur, PAS de modification du formulaire Flutter effectuée à cette étape.**
+
+## 13. Confirmations définitives (14/10/2026)
+- **ProConnect supprimé du périmètre du portail SPHOT ADMIN** : abandon lié au non-fonctionnement constaté et à la nécessité d'une ouverture internationale. Ne pas exiger de ProConnect, ne pas le présenter comme une identité certifiée et ne pas y rattacher l'autorisation de facturation. Le code hérité du dépôt peut contenir d'anciens champs, mais le nouveau parcours doit s'appuyer sur le compte SPHOT et sur les données d'organisation/facturation vérifiées par des moyens adaptés.
+- **Le payeur peut être une entité juridique différente de l'organisme qui gère les SPHOTS**. Deux choix explicites dans la rubrique 02 : organisme gestionnaire (par défaut) ou autre organisme payeur. Le deuxième choix doit demander les données du payeur, non réutiliser silencieusement les identifiants juridiques du gestionnaire. Habilitation à vérifier avant commande ferme.
+- La rubrique 02 est validée dans son principe. La commande réelle et le paiement restent désactivés jusqu'à mise en œuvre des CGV, des contrôles serveurs et de la facturation électronique.
