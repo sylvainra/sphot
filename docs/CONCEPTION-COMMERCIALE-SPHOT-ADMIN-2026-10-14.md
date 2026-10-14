@@ -268,3 +268,20 @@ L'utilisateur conserve son emploi CMA Formation à temps complet pendant 1–2 a
 **Vérifications réalisées par l'assistant** : lecture du code du PDF Flutter existant (sauveteurs) pour reprendre ses APIs, contrôles statiques de délimiteurs et de la non-écriture Firestore, vérification documentaire de l'API `pdf`. Pas de SDK Flutter disponible : **aucune compilation Flutter, ni rendu effectif du PDF Flutter, ni test Chrome n'a pu être effectué**.
 
 **Limites des étapes ultérieures** : identité juridique de SPHOT à définir après démarche RH et immatriculation, taux et mécanisme TVA, mention de validité datée, fiscalité internationale, commande/CGV et preuve d'engagement, PDF officiel serveur vérifiable, chronologie FACTURES & DOCUMENTS.
+
+## 19. Essai Chrome validé et corrections de PDF (14/10/2026, 13h55 Paris)
+
+Quatre captures de l'utilisateur confirment :
+- deux postes `LONGE 09 - PLAGE DU ROCHER` et `LONGE 13 - PLAGE DES CONCHES` sélectionnés ; grille publiée `FR_ADMIN-V3`, **499 + 399 = 898 € HT** et étape 01 « RENSEIGNÉ » ;
+- étape 03 DEVIS et bouton de simulation visible et utilisable ; fenêtre Windows « Partager » ouverte avec fichier `SPHOT_SIMULATION_ADMIN_20261014.pdf` de 6,9 Ko ;
+- le PDF est effectivement généré sur son poste mais **présente des apostrophes et certains glyphes superposés**, donc maquette PDF non validée ; les données de payeur contiennent aussi le **SIRET factice/incomplet `0123`** ;
+- l'émission de devis officiel est toujours verrouillée, à raison, car SPHOT n'est pas immatriculé.
+
+**Correctifs engagés sur la branche** :
+1. `lib/web/admin/services/admin_quote_simulation_pdf_service.dart` : retrait des apostrophes typographiques des littéraux du PDF (non prises en charge de façon fiable par la police standard utilisée), nettoyage similaire des valeurs dynamiques, espacement de lignes pour les paragraphes longs, et distinction explicite `FORMAT INVALIDE` pour un SIRET à moins de 14 chiffres (y compris `0123`). Un SIRET de 14 chiffres est seulement au **format plausible / non vérifié**. Aucun contrôle officiel SIRENE n'est prétendu.
+2. Export Web réel : `lib/web/admin/services/admin_quote_pdf_export.dart` avec import conditionnel, `admin_quote_pdf_export_web.dart` (lien Blob + attribut `download` dans Chrome), `admin_quote_pdf_export_stub.dart` (partage natif sur les autres plateformes). Le bouton conserve son intitulé « TÉLÉCHARGER LA SIMULATION PDF » et ne doit plus ouvrir Windows Partager sur le Web.
+3. Le générateur reste **strictement non contractuel**, sans numéro officiel, aucun taux de TVA inventé, aucune écriture dans Firestore et aucune activation.
+
+**Précaution** : contrôles statiques, mais compilation Flutter et inspection du **nouveau** PDF impossible sans le SDK Flutter / navigateur local. Il faut réexécuter Chrome et regarder si l'espacement et les glyphes sont désormais correctement rendus. Si les défauts persistent, envisager intégration d'une fonte Unicode autorisée dans les assets Flutter, puis tests multi-rendu PDF ; ne pas valider le PDF actuel comme modèle de devis final.
+
+**Prochaine phase** : maquette visuelle SPHOT commune aux documents officiels, système émetteur immatriculé, calcul fiscal sécurisé et archivage du devis officiel numéroté.
