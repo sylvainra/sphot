@@ -173,14 +173,8 @@ class _SuperAdminAdminRequestsPageState
       'trialDurationDays':
           subscriptionPreview['trialDurationDays'] ?? 8,
 
-      'pricePerStationExclTax':
-          subscriptionPreview['pricePerStationExclTax'] ?? 500,
-
       'billingCycle':
           subscriptionPreview['billingCycle'] ?? 'annual',
-
-      'vatRate':
-          subscriptionPreview['vatRate'] ?? 20,
 
       // L’essai ne commence pas à l’approbation.
       'status': 'awaiting_configuration',
@@ -840,9 +834,9 @@ Text(
   ),
 ),
 
-Text(
-  'Tarif estimé : ${subscriptionPreview['pricePerStationExclTax'] ?? 500} € HT / poste / an',
-  style: const TextStyle(
+const Text(
+  'Tarification suivant la grille progressive publiée lors de la souscription.',
+  style: TextStyle(
     color: adminColor,
     fontWeight: FontWeight.w700,
   ),
