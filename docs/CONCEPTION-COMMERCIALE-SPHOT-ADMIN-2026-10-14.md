@@ -77,3 +77,19 @@ Même panneau, sans recalcul indépendant du prix.
 - DGFiP, réforme : https://www.impots.gouv.fr/actualite/facturation-electronique
 
 **Important : document d'architecture, aucune modification d'écran, code, Firestore, règlement ou déploiement par ce document.**
+
+## 9. Décision confirmée et nettoyage commencé le 14/10/2026
+
+**Décision définitive utilisateur :** l'ancienne proposition d'un tarif unique de 500 € HT par poste ne s'applique **plus à aucune nouvelle offre SPHOT ADMIN**. Grille marginale progressive publiée uniquement, conservant les conditions annuelles sans prorata. Les pièces et montants d'anciens contrats effectivement signés ne sont pas modifiés.
+
+**Nettoyage du code réalisé sur la branche de travail (aucun déploiement, aucune migration destructive de Firestore)** :
+- `admin_subscription_panel.dart` : retrait du prix unique de 500 €, suppression du calcul local `nombre × prix fixe`, affichage et enregistrement du **brouillon** selon le seul devis simulé de la grille publiée (`pricingReference`, `version`, montant et postes) ; retrait de l'ancienne méthode inutilisée qui pouvait activer l'abonnement côté client. Si la grille est indisponible, aucun montant de remplacement ni enregistrement d'offre.
+- `admin_subscription_order_service.dart` : **ancienne confirmation de commande volontairement neutralisée** tant que recalcul/validation serveur, CGV et fiscalité ne sont pas prêts. Ne pas la réactiver sans remplacement sûr ; il n'y a plus de création directe de commande depuis ce service Flutter.
+- `admin_trial_request_page.dart` : demande d'accès et essai sans prix unitaire ni TVA de remplacement.
+- `admin_dashboard_page.dart` : estimation basée sur `annualAmountExclTax` enregistré, et « tarification à actualiser » si absent ; plus de multiplication par prix unique.
+- `functions/admin_workflow.js` : suppression de la constante de prix unique ; les rappels de fin d'essai/renouvellement orientent vers la grille publiée plutôt que d'inventer un montant, et les PDF/brouillons issus d'anciens ordres n'inventent plus 500 € si champ manquant.
+- `super_admin_admin_requests_page.dart`, `super_admin_admin_workflow_panel.dart` : le prix fixe n'est plus introduit lors de l'approbation de la demande ou de l'essai.
+- `super_admin_dashboard_finances_page.dart` : ancien éditeur de prix unitaire remplacé par un message renvoyant au module de grilles publiées.
+- `super_admin_subscriptions_page.dart` : tableaux affichant les totaux annuels enregistrés, sans multiplication par un ancien prix unitaire.
+
+**Attention** : les nouveaux écrans en deux rubriques et le parcours de commande complet restent **à concevoir puis à coder après validation de la maquette** ; l'ancien parcours de commande est bloqué par sécurité, l'activation CB/commande publique et les CGV ne sont pas encore raccordées. Les données historiques Firestore ne sont pas migrées et les obligations réglementaires doivent être validées par un professionnel. Le SDK Flutter et une compilation/test de l'application n'ont pas été exécutés dans l'environnement de l'assistant. Vérifier la branche et compiler localement avant toute fusion ou déploiement.
