@@ -261,14 +261,8 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       'trialDurationDays': value('trialDurationDays', [
         preview['trialDurationDays'],
       ]),
-      'pricePerStationExclTax': value('pricePerStationExclTax', [
-        preview['pricePerStationExclTax'],
-      ]),
       'billingCycle': value('billingCycle', [
         preview['billingCycle'],
-      ]),
-      'vatRate': value('vatRate', [
-        preview['vatRate'],
       ]),
     };
   }
