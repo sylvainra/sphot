@@ -178,3 +178,32 @@ Contexte : écran ABONNEMENT & PAIEMENT déjà testé visuellement ; volet FACTU
 Modifications sur `lib/web/admin/pages/admin_subscription_panel.dart` dans `codex/advertiser-pricing-table-v1`, sans fusion ni déploiement. Contrôles statiques de délimiteurs et de présence du formulaire effectués ; **aucune compilation Flutter ni test de navigateur réalisé côté assistant**.
 
 Test conseillé : cas prérempli mairie française avec SIRET de 4 chiffres (doit être signalé), passage à autre organisme (nom et SIRET vierges), remplissage d'un SIRET 14 chiffres et adresse, choix pays non français (identifiant officiel local à la place du SIRET), retour au gestionnaire sans pollution des champs, enregistrement brouillon et réouverture, confirmation de commande toujours inactive.
+
+## 15. Test visuel — menu organisme payeur et devise officiel (14/10/2026)
+
+**Retour utilisateur :**
+- Le menu déroulant « Nature de l'organisme » est grisé avec une apparence standard Flutter, contrairement aux autres menus SPHOT. Il doit suivre le modèle de la page de demande d'accès (fond blanc, bord bleu, option bleu soutenu, chevron rouge).
+- La rubrique **DEVIS** de l'étape 7 « FACTURES & DOCUMENTS » affiche « AUCUN DOCUMENT », mais aucune commande d'émission de devis n'existe dans le parcours Admin. L'utilisateur confirme qu'un vrai devis est indispensable même si certains organismes n'en ont pas besoin pour commander.
+
+**Réalisations techniques limitées :**
+- `lib/web/admin/pages/admin_subscription_panel.dart` : remplacement du `DropdownButtonFormField` natif par un sélecteur visuellement aligné sur le composant existant de `admin_trial_request_page.dart` (OverlayEntry, carte blanche, bord bleu, chevron rouge, libellés bleus). Fermeture au clic extérieur, à la sélection, au changement d'organisme ou à la fermeture du panneau. Aucun changement de données fiscales ou tarifaires.
+- `lib/web/admin/pages/admin_dashboard_page.dart` : la rubrique DEVIS indique « ÉMISSION NON ENCORE DISPONIBLE » au lieu d'affirmer que la liste a été consultée et est vide ; information provisoire véridique, pas de faux devis.
+- Aucune émission de devis, aucun ordre, paiement ni PDF commercial n'a été déclenché par ces changements.
+
+**Audit du devis existant :**
+- Le service `PublishedCommercialQuoteService.admin` et la Cloud Function `previewPublishedCommercialQuote` fournissent une **SIMULATION HT uniquement**, avec version de grille publiée et tranches, et n'écrivent ni devis ni commande dans Firestore.
+- `functions/index.js` fournit déjà `assignQuoteNumberOnWrite` pour `quotes/{quoteId}` et la numérotation transactionnelle `DV-{ANNEE}-{ADHERENT}-{SEQUENCE}`, selon `docs/numerotation_documents_commerciaux.md`. Le déclencheur attribue un numéro si le document contient une référence admin admissible. **Cela ne suffit pas pour créer un devis contractuel** : il n'existe pas à ce stade de flux Admin qui crée un devis contrôlé côté serveur, lui associe le bon émetteur/payeur, le traitement fiscal, la date de validité, un PDF de marque SPHOT, et une consultation depuis le portail.
+- Ne pas générer un numéro ou PDF contractuel automatiquement lors de la simple simulation, afin de ne pas polluer la séquence des devis émis.
+
+**Parcours devis proposé, à valider avant codage :**
+1. Dans **ABONNEMENT & PAIEMENT**, un bouton **ÉTABLIR UN DEVIS**, facultatif, après sélection des postes et renseignements obligatoires de l'organisme payeur. L'Admin peut continuer directement à la commande sans devis.
+2. Fonction serveur authentifiée et transactionnelle : vérification organisation/périmètre, recalcul avec la grille **PUBLIÉE** en vigueur, version et tranches, année civile sans prorata, statut fiscal et montants HT / taxes / TTC (ou autres mentions légales) adaptés au pays et à l'entité émettrice ; sans moteur fiscal validé, **ne pas émettre**.
+3. Création et numérotation via infrastructure existante `quotes` / `DV-...` ; document horodaté, référence dossier, destinataire, sélection SPHOTS, période concernée, validité/conditions contractuelles à définir, identifiant de génération idempotent, et **copie immuable** des valeurs du moment.
+4. PDF SPHOT signé « L'équipe SPHOT » avec charte documentaire commune, consultation/téléchargement de l'original depuis **FACTURES & DOCUMENTS**. Pas de statut « devis émis » avant présence du PDF et numéro cohérents. Pas de suppression/écrasement de documents émis.
+5. Devis `issued`, `expired`, `superseded` ou `accepted` selon règle à définir ; un changement de prix, nombre de postes ou payeur exige nouveau devis plutôt que mutation silencieuse.
+6. Lors de la souscription, possibilité de rattacher le devis en vigueur à la commande, mais montant/recalcul serveur à vérifier à l'engagement selon règles de validité. **Devis ≠ paiement ≠ commande ≠ activation des SPHOTS.**
+7. Aucun contrôle financier courant requis du Super Admin ; traitement automatisé de bout en bout, erreurs renvoyées à l'Admin de façon explicite.
+
+**À valider avec l'utilisateur :** emplacement du bouton devis dans l'étape 6 après l'offre et l'identité du payeur ; absence de devis obligatoire ; règles de validité, émission des PDF et acceptation sans signature électronique obligatoire si le circuit de commande publique est utilisé.
+
+**Compilation et test navigateur de la personnalisation du menu restent à réaliser localement.**
