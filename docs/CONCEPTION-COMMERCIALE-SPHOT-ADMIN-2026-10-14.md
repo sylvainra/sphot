@@ -97,3 +97,20 @@ Même panneau, sans recalcul indépendant du prix.
 - La source de prix publiés reste `commercialPricingMarkets/FR_ADMIN`, et la nouvelle confirmation de commande devra utiliser le même calcul serveur ; aucun nouveau montant tarifaire n'est inventé par les écrans.
 
 **Attention** : les nouveaux écrans en deux rubriques et le parcours de commande complet restent **à concevoir puis à coder après validation de la maquette** ; l'ancien parcours de commande est bloqué par sécurité, l'activation CB/commande publique et les CGV ne sont pas encore raccordées. Les données historiques Firestore ne sont pas migrées et les obligations réglementaires doivent être validées par un professionnel. Le SDK Flutter et une compilation/test de l'application n'ont pas été exécutés dans l'environnement de l'assistant. Vérifier la branche et compiler localement avant toute fusion ou déploiement.
+
+## 10. Premier écran ABONNEMENT mis en place pour tests — 14/10/2026
+
+**Version de travail, non déployée :** l'utilisateur a validé les quatre sections et demandé de les mettre en place pour essai dans Chrome. Les modifications sont sur la branche `codex/advertiser-pricing-table-v1`.
+
+- `lib/web/admin/pages/admin_subscription_panel.dart` : quatre accordéons dans l'ordre validé :
+  1. POSTES ET OFFRE ;
+  2. ORGANISME PAYEUR ;
+  3. MODALITÉS DE RÈGLEMENT ;
+  4. CONDITIONS ET CONFIRMATION.
+  L'offre continue d'utiliser `PublishedCommercialQuoteService.admin` sur la grille publiée, avec libellés comptables par tranches, prix HT, absence de prorata, numéros `idSphot` lorsque renseignés. Les données de facturation existantes sont conservées. Le mode de règlement est enregistré comme **préférence de brouillon**, non comme preuve de paiement ou commande ferme. La sélection modifiée n'apparaît plus comme « renseignée » tant qu'elle n'est pas enregistrée.
+- `lib/web/admin/pages/admin_dashboard_page.dart` : menu limité à **ABONNEMENT** et **FACTURES & PAIEMENTS** pour le parcours commercial. L'ancien volet PAIEMENT peut subsister dans le code pendant la migration, sans bouton dédié. La seconde rubrique conserve pour l'instant ses composants historiques en attente de raccordement au vrai journal financier.
+- La section 4 affiche les CGV à raccorder et un bouton **CONFIRMER MA COMMANDE** désactivé : pas de CGV fictivement acceptées, pas de fiscalité inventée, pas de création de commande/CB.
+- Vérifications statiques des fichiers modifiés : délimiteurs équilibrés, quatre sections présentes, aucune référence UI au tarif unique, l'appel à l'ancien service de commande n'est pas réintroduit. **Compilation Flutter, test navigateur, vérifications Firebase non réalisés par l'assistant (SDK Flutter absent)** ; ils doivent être effectués localement.
+- Pour essai local : vérifier `git status`, sauvegarder les changements non committés si nécessaire, puis `git fetch origin`, `git switch codex/advertiser-pricing-table-v1`, `git pull --ff-only origin codex/advertiser-pricing-table-v1`, `flutter pub get`, `flutter run -d chrome -t lib/main_web_admin.dart`.
+- Vérifier : menu à deux rubriques, 430 px et icône Fire, accordéons, choix des postes et statuts, tarification 1/2/4/5/9/10 postes, modes de règlement (sans encaissement), sauvegarde du brouillon, bouton final désactivé et aucun document `orders` créé.
+- Prochaine phase **après retour visuel** : finaliser organisme payeur multi-pays, affichage réel des CGV publiées et acceptation immuable, taxation selon régime, fonction serveur de commande, authentification des paiements, puis chronologie des vrais documents dans FACTURES & PAIEMENTS. Ne pas modifier l'activation des SPHOTS sans validation.
