@@ -114,3 +114,17 @@ Même panneau, sans recalcul indépendant du prix.
 - Pour essai local : vérifier `git status`, sauvegarder les changements non committés si nécessaire, puis `git fetch origin`, `git switch codex/advertiser-pricing-table-v1`, `git pull --ff-only origin codex/advertiser-pricing-table-v1`, `flutter pub get`, `flutter run -d chrome -t lib/main_web_admin.dart`.
 - Vérifier : menu à deux rubriques, 430 px et icône Fire, accordéons, choix des postes et statuts, tarification 1/2/4/5/9/10 postes, modes de règlement (sans encaissement), sauvegarde du brouillon, bouton final désactivé et aucun document `orders` créé.
 - Prochaine phase **après retour visuel** : finaliser organisme payeur multi-pays, affichage réel des CGV publiées et acceptation immuable, taxation selon régime, fonction serveur de commande, authentification des paiements, puis chronologie des vrais documents dans FACTURES & PAIEMENTS. Ne pas modifier l'activation des SPHOTS sans validation.
+
+## 11. Validation visuelle et noms définitifs des étapes 6 et 7 (14/10/2026)
+
+L'utilisateur a testé les écrans dans Chrome avec captures : panneau de 430 px et Fire SVG, accordéons 01–04, montant 499 € HT pour 1 poste, montant 898 € HT pour 2 postes sur grille `FR_ADMIN-V3`, organisme payeur prérempli, choix de modalité de règlement et bouton contractuel désactivé ; le volet financier apparaît toujours sous forme de rubriques provisoires. L'ensemble paraît raccordé visuellement, **mais la validation métier complète n'est pas faite** (CGV, fiscalité, émission de facture et paiements non raccordés).
+
+**Intitulés validés par l'utilisateur** :
+- Étape 6 = **ABONNEMENT & PAIEMENT** : souscription, offre et choix/paiement effectif futur.
+- Étape 7 = **FACTURES & DOCUMENTS** : consultation des devis/commandes/factures/avoirs et suivi du règlement ; pas de paiement initial dans cette étape.
+
+Changement limité des titres visibles du tableau de bord (boutons et en-têtes) dans `admin_dashboard_page.dart`, et en-tête du vrai volet `admin_subscription_panel.dart`. Le libellé ancien peut subsister dans le suivi documentaire historique comme trace, mais ne doit pas réapparaître dans la navigation client.
+
+La branche utilisée reste `codex/advertiser-pricing-table-v1`. Aucun service de paiement, commande réelle, émission de facture ou validation juridique n'a été activé par le renommage.
+
+**À continuer :** compléter les champs et règles de l'organisme payeur français/étranger, puis rendre la section CGV réellement consultable et acceptable et concevoir la chronologie financière, après validation des écrans.
