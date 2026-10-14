@@ -1,12 +1,11 @@
 import 'dart:typed_data';
 
-import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:share_plus/share_plus.dart';
 
 import '../../../services/published_commercial_quote_service.dart';
+import 'admin_quote_pdf_export.dart';
 
 /// Exporte une SIMULATION NON CONTRACTUELLE, sans écriture Firestore.
 /// Ne remplace jamais un devis émis, numéroté, fiscalisé et archivé côté serveur.
@@ -17,7 +16,16 @@ class AdminQuoteSimulationPdfService {
   static const _red = PdfColor.fromInt(0xFFDC2626);
   static const _grey = PdfColor.fromInt(0xFF6B7280);
 
-  String _text(dynamic value) => value?.toString().trim() ?? '';
+  // Les polices PDF standard peuvent mal afficher certains signes Unicode.
+  // Convertir les apostrophes et tirets typographiques du contenu saisi.
+  String _text(dynamic value) => (value?.toString().trim() ?? '')
+      .replaceAll('\\u2019', "'")
+      .replaceAll('\\u2018', "'")
+      .replaceAll('\\u2013', '-')
+      .replaceAll('\\u2014', '-');
+
+  bool _validFrenchSiret(String value) =>
+      RegExp(r'^\\d{14}
 
   String _money(num value) =>
       '${value.toStringAsFixed(2).replaceAll('.', ',')} EUR';
@@ -210,7 +218,7 @@ class AdminQuoteSimulationPdfService {
           pw.SizedBox(height: 7),
           pw.Text(
             'Simulation calculée le ${_formatCivilDate(generatedAt)} '
-            '- Année d’abonnement : $subscriptionYear',
+            '- Année d\'abonnement : $subscriptionYear',
             style: const pw.TextStyle(fontSize: 9, color: _grey),
           ),
           pw.SizedBox(height: 6),
@@ -222,10 +230,16 @@ class AdminQuoteSimulationPdfService {
           pw.SizedBox(height: 16),
           _section('ORGANISME PAYEUR (DONNÉES DÉCLARÉES)', [
             _detail('Organisme', _text(billing['billingOrganisation'])),
-            _detail('Identifiant',
-                _text(billing['billingSiret']).isNotEmpty
-                    ? _text(billing['billingSiret'])
-                    : _text(billing['billingLegalId'])),
+            _detail(
+              'Identifiant',
+              _text(billing['billingSiret']).isNotEmpty
+                  ? (_validFrenchSiret(_text(billing['billingSiret']))
+                      ? 'SIRET ${_text(billing['billingSiret'])} (non verifie)'
+                      : 'SIRET ${_text(billing['billingSiret'])} - FORMAT INVALIDE')
+                  : _text(billing['billingLegalId']).isNotEmpty
+                      ? '${_text(billing['billingLegalId'])} (non verifie)'
+                      : 'Non renseigne',
+            ),
             _detail('Adresse', [
               _text(billing['billingAddress']),
               _text(billing['billingAddressComplement']),
@@ -248,7 +262,7 @@ class AdminQuoteSimulationPdfService {
                 ),
               ),
           ]),
-          _section('SIMULATION DE L’OFFRE ANNUELLE', [
+          _section('SIMULATION DE L\'OFFRE ANNUELLE', [
             _detail('Grille publiée', quote.pricingReference),
             _detail('Nombre de postes', '${stations.length}'),
             ...tierRows,
@@ -272,23 +286,23 @@ class AdminQuoteSimulationPdfService {
             pw.SizedBox(height: 7),
             pw.Text(
               'Taxes et montant TTC : non déterminés. '
-              'Aucun taux de TVA n’est présumé.',
+              'Aucun taux de TVA n\'est présumé.',
               style: const pw.TextStyle(fontSize: 8, color: _grey),
             ),
           ]),
           _section('PÉRIODE ET CONDITIONS', [
             pw.Text(
-              'Année civile $subscriptionYear : abonnement jusqu’au '
+              'Année civile $subscriptionYear : abonnement jusqu\'au '
               '31 décembre, renouvellement au 1er janvier. '
               'Tarif annuel sans prorata.',
-              style: const pw.TextStyle(fontSize: 9),
+              style: const pw.TextStyle(fontSize: 9, lineSpacing: 2),
             ),
             pw.SizedBox(height: 8),
             pw.Text(
               'Un futur devis officiel sera valable 30 jours calendaires '
               'à compter de son émission (jour inclus), sans dépasser '
-              'le 31 décembre de l’année concernée.',
-              style: const pw.TextStyle(fontSize: 9),
+              'le 31 décembre de l\'année concernée.',
+              style: const pw.TextStyle(fontSize: 9, lineSpacing: 2),
             ),
           ]),
           pw.Container(
@@ -300,7 +314,7 @@ class AdminQuoteSimulationPdfService {
             ),
             child: pw.Text(
               'DOCUMENT DE TEST - NON CONTRACTUEL. '
-              'L’émetteur SPHOT n’est pas encore immatriculé. '
+              'L\'émetteur SPHOT n\'est pas encore immatriculé. '
               'Aucun numéro de devis officiel, aucune TVA et aucune '
               'acceptation contractuelle ne sont attribués. '
               'Ce document ne peut servir de commande ni de justificatif '
@@ -318,20 +332,10 @@ class AdminQuoteSimulationPdfService {
     final dateTag = '${generatedAt.year}'
         '${generatedAt.month.toString().padLeft(2, '0')}'
         '${generatedAt.day.toString().padLeft(2, '0')}';
-    await SharePlus.instance.share(
-      ShareParams(
-        subject: 'SPHOT - Simulation tarifaire non contractuelle',
-        text: 'Simulation tarifaire SPHOT : non contractuelle, '
-            'ni devis ni facture.',
-        files: [
-          XFile.fromData(
-            bytes,
-            mimeType: 'application/pdf',
-            name: 'SPHOT_SIMULATION_ADMIN_$dateTag.pdf',
-          ),
-        ],
-        sharePositionOrigin: sharePositionOrigin,
-      ),
+    await exportAdminQuotePdf(
+      bytes,
+      'SPHOT_SIMULATION_ADMIN_$dateTag.pdf',
+      sharePositionOrigin: sharePositionOrigin,
     );
   }
 }
