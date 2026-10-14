@@ -405,6 +405,15 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       );
 
       if (!mounted) return;
+      if (section == 'payer') {
+        setState(() {
+          _draftBillingRelation = null;
+          _payerDraftByRelation.clear();
+          for (final field in _payerFields) {
+            _draft.remove(field);
+          }
+        });
+      }
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         SnackBar(content: Text(successMessage)),
       );
@@ -464,20 +473,24 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     String fallback = '',
     TextInputType? keyboardType,
     VoidCallback? onSubmitted,
+    bool liveUpdate = false,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: TextFormField(
-        key: ValueKey<String>(
-          '$field-${_fieldValue(data, field, fallback: fallback)}',
-        ),
+        key: ValueKey<String>(liveUpdate
+            ? '$field-${_payerRelation(data)}'
+            : '$field-${_fieldValue(data, field, fallback: fallback)}'),
         initialValue: _fieldValue(data, field, fallback: fallback),
         style: const TextStyle(
           color: _blue,
           fontWeight: FontWeight.w600,
         ),
         keyboardType: keyboardType,
-        onChanged: (value) => _draft[field] = value,
+        onChanged: (value) {
+          _draft[field] = value;
+          if (liveUpdate) setState(() {});
+        },
         onFieldSubmitted: onSubmitted == null ? null : (_) => onSubmitted(),
         decoration: _inputDecoration(label),
       ),
@@ -700,7 +713,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         ),
         _field(data: source, field: 'billingCountry',
           label: 'Pays de facturation',
-          onSubmitted: () => setState(() {})),
+          liveUpdate: true),
         if (isFrance) ...[
           _field(data: source, field: 'billingSiret',
             label: 'SIRET — 14 chiffres',
@@ -708,7 +721,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
           if (siret.isNotEmpty && !_validSiret(siret))
             const Padding(
               padding: EdgeInsets.only(bottom: 10),
-              child: Text('SIRET incomplet : 14 chiffres requis. '
+              child: Text('SIRET invalide : 14 chiffres requis. '
                 'Contrôle officiel nécessaire avant commande.',
                 style: TextStyle(color: _red, fontSize: 11)),
             ),
