@@ -92,4 +92,8 @@ Même panneau, sans recalcul indépendant du prix.
 - `super_admin_dashboard_finances_page.dart` : ancien éditeur de prix unitaire remplacé par un message renvoyant au module de grilles publiées.
 - `super_admin_subscriptions_page.dart` : tableaux affichant les totaux annuels enregistrés, sans multiplication par un ancien prix unitaire.
 
+- `super_admin_dashboard_page.dart` : synthèse du coût fondée sur le total enregistré, sans multiplication par tarif unitaire.
+- **Attention comptable :** les totaux des anciennes souscriptions ne doivent pas être reconstitués arbitrairement. Si `annualAmountExclTax` est absent, la rubrique affiche une information à actualiser ; les montants historiques réels devront être rapprochés des commandes/factures avant migration.
+- La source de prix publiés reste `commercialPricingMarkets/FR_ADMIN`, et la nouvelle confirmation de commande devra utiliser le même calcul serveur ; aucun nouveau montant tarifaire n'est inventé par les écrans.
+
 **Attention** : les nouveaux écrans en deux rubriques et le parcours de commande complet restent **à concevoir puis à coder après validation de la maquette** ; l'ancien parcours de commande est bloqué par sécurité, l'activation CB/commande publique et les CGV ne sont pas encore raccordées. Les données historiques Firestore ne sont pas migrées et les obligations réglementaires doivent être validées par un professionnel. Le SDK Flutter et une compilation/test de l'application n'ont pas été exécutés dans l'environnement de l'assistant. Vérifier la branche et compiler localement avant toute fusion ou déploiement.
