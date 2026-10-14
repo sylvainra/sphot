@@ -1738,9 +1738,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           subscription['numberOfRescueStations'],
         ).toInt();
 
-        final pricePerSpot = _toDouble(subscription['pricePerStationExclTax']);
-
-        final totalPrice = numberOfSpots * pricePerSpot;
+        // Le montant affiché provient du total d'offre enregistré,
+        // jamais d'un ancien prix unitaire multiplié par les postes.
+        final totalPrice = _toDouble(subscription['annualAmountExclTax']);
+        final priceLabel = totalPrice > 0
+            ? '${totalPrice.toStringAsFixed(2).replaceAll('.', ',')} € HT / an'
+            : 'Tarification à actualiser';
 
         return Container(
           width: double.infinity,
@@ -1785,7 +1788,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               _spotInfoLine('SPHOTS', '$numberOfSpots'),
               _spotInfoLine(
                 'Coût',
-                '${totalPrice.toStringAsFixed(0)} € HT / an',
+                priceLabel,
               ),
             ],
           ),
