@@ -315,3 +315,19 @@ La capture utilisateur confirme que le bandeau du site est désormais bien prés
 **Ajustement visuel réalisé après inspection** : marker du pied agrandi de 24 x 38 à **42 x 65 points**, pour retrouver la proportion utilisée dans les courriels SPHOT (42 x 65 px) ; réduction des séparations verticales du contenu de 16 à 10 points et de l'espace après bandeau de 18 à 14 pour limiter le risque de débordement ou de passage à deux pages. Le titre graphique, le fond et les informations commerciales ne sont pas modifiés.
 
 **À vérifier dans Chrome** : rendu sur une seule page, absence de chevauchement entre l'encadré rouge non contractuel et le nouveau marker, centrage et lisibilité de « L'équipe SPHOT ». Aucun test de compilation Flutter ou de PDF rendu n'a été effectué sur la machine de l'assistant.
+
+## 22. Validation partielle et corrections demandées sur simulation PDF (14/10/2026 soir)
+
+Après capture d'une version à titre seul sur fond blanc, l'utilisateur a expressément demandé **sans maquette supplémentaire** :
+- retirer tout **contour bleu autour du titre SPHOT**, conserver le titre graphique centré **sans fond carte** ;
+- conserver le Fire rouge SVG centré (42 x 65 points) au pied mais **retirer le texte « L'équipe SPHOT » situé en dessous** (cette exception vaut pour la signature visuelle du PDF, sans annuler la signature historique des courriers administratifs) ;
+- remplacer `POSTES CONCERNÉS` par `SPHOTS CONCERNÉS`, avec 3 colonnes : **numéro SPHOT si fourni (sinon non attribué)**, **type = Poste de secours** et **nom du lieu**, sans recopier le préfixe du numéro deux fois ;
+- renommer seulement le titre de la rubrique `ORGANISME PAYEUR` en **SPHOT ADMIN - COORDONNÉES DE FACTURATION**, tout en conservant les renseignements effectifs de la personne morale facturée (qui peut différer de l'organisme gestionnaire). SPHOT ADMIN seul ne saurait remplacer la dénomination juridique obligatoire du client sur les futures factures ;
+- distinguer clairement **la référence du dossier administratif** `SPHOT-ADM-2026-000001` du **numéro de devis DV** : le PDF de simulation indique « Numéro de devis : non attribué (simulation non contractuelle) ». Un numéro `DV-...` ne sera attribué que par l'émetteur officiel serveur quand les conditions légales et fiscales seront réunies, sans jamais le fabriquer localement ;
+- forcer tous les textes ordinaires en bleu SPHOT et les textes d'avertissement/totaux en rouge, **aucun texte noir par défaut**.
+
+**Code modifié dans** `lib/web/admin/services/admin_quote_simulation_pdf_service.dart` sur `codex/advertiser-pricing-table-v1`. Le bandeau cartographique n'est plus chargé, aucun contour n'est dessiné autour du titre ; le pied reste vectoriel et centré. L'offre reste la simulation publiée, aucun changement du calcul ou du prix. Aucun devis, commande, facture ou activation produit.
+
+**Contrôles statiques** : délimiteurs équilibrés ; présence du titre sans carte/contour, absence de signature textuelle au pied ; **tous les appels `pw.Text` contiennent maintenant explicitement un style bleu ou rouge**, ainsi que les 3 colonnes et les deux références distinguées. **Compilation Flutter et rendu PDF visuel encore à tester sur le poste de l'utilisateur**.
+
+**Fondement documentaire** : sur une facture l'identité réelle du client/acheteur doit être conservée, quel que soit le libellé marketing de la section ; https://www.service-public.gouv.fr/entreprendre/vosdroits/F31808.
