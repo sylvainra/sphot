@@ -822,8 +822,13 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                           children: [
                             Expanded(
                               child: Text(
-                                '${(line['count'] as num).toInt()} × '
-                                '${(line['unitExclTax'] as num).toStringAsFixed(2).replaceAll('.', ',')} €',
+                                switch (line['tier']) {
+                                  1 => '1er Poste de Secours',
+                                  2 => 'Du 2e au 4e : ${(line['count'] as num).toInt()} × ${(line['unitExclTax'] as num).toStringAsFixed(2).replaceAll('.', ',')} €',
+                                  3 => 'Du 5e au 9e : ${(line['count'] as num).toInt()} × ${(line['unitExclTax'] as num).toStringAsFixed(2).replaceAll('.', ',')} €',
+                                  4 => 'À partir du 10e : ${(line['count'] as num).toInt()} × ${(line['unitExclTax'] as num).toStringAsFixed(2).replaceAll('.', ',')} €',
+                                  _ => 'Tranche tarifaire',
+                                },
                                 style: const TextStyle(
                                   color: _blue, fontSize: 12,
                                 ),
@@ -1295,11 +1300,18 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                           final offerStarted =
                               _selectedRescueStationIds.isNotEmpty ||
                                   hasSavedStations;
+                          final savedIds = savedStationIds is Iterable
+                              ? savedStationIds.map(_text).toSet()
+                              : <String>{};
+                          final sameSelection =
+                              savedIds.length == _selectedRescueStationIds.length &&
+                              savedIds.containsAll(_selectedRescueStationIds);
                           final offerComplete =
-    hasSavedStations &&
-        _text(data['publishedPricingReference']).isNotEmpty &&
-        _number(data['annualAmountExclTax']) > 0 &&
-        _text(data['billingCycle']) == 'annual';
+                              hasSavedStations &&
+                              sameSelection &&
+                              _text(data['publishedPricingReference']).isNotEmpty &&
+                              _number(data['annualAmountExclTax']) > 0 &&
+                              _text(data['billingCycle']) == 'annual';
 
                           final savedPayment = _text(data['preferredPaymentMethod']);
                           final chosenPayment = _draftPaymentMethod ?? savedPayment;
