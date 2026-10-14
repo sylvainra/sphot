@@ -128,3 +128,32 @@ Changement limité des titres visibles du tableau de bord (boutons et en-têtes)
 La branche utilisée reste `codex/advertiser-pricing-table-v1`. Aucun service de paiement, commande réelle, émission de facture ou validation juridique n'a été activé par le renommage.
 
 **À continuer :** compléter les champs et règles de l'organisme payeur français/étranger, puis rendre la section CGV réellement consultable et acceptable et concevoir la chronologie financière, après validation des écrans.
+
+## 12. Proposition de conception — 02 ORGANISME PAYEUR (14/10/2026, À VALIDER)
+
+Contexte : écran ABONNEMENT & PAIEMENT déjà testé visuellement ; volet FACTURES & DOCUMENTS distinct. La rubrique organisme payeur actuelle préremplit les champs à partir de `adminRequests/{uid}` (facturation, structure, territoire, ProConnect) puis `subscriptions/{uid}`. **Ne pas effacer ces données ni toucher aux champs d'identité ProConnect certifiée**.
+
+### Proposition visible, minimale
+1. **Entité à facturer** : case/sélecteur « Identique à la structure gestionnaire du SPHOT » (préremplie si correspondance) / « Autre organisme payeur » pour collectivités ou structures facturant séparément ; toute modification d'entité exige preuve d'habilitation contractuelle avant commande.
+2. **Pays de facturation** (France par défaut si attesté, sinon à sélectionner, enregistrer en code pays ISO) ; **nature du payeur** selon catégories « organisme public », « entreprise/organisme privé » ; préremplir d'après organisation enregistrée, mais ne pas assimiler ProConnect à validation commerciale automatique.
+3. **Identification de l'entité** : dénomination complète, SIRET français 14 chiffres et SIREN dérivé/contrôlé 9 chiffres (si France), ou identifiant officiel local selon pays ; identifiant TVA intra-UE seulement si pertinent. Éviter SIRET obligatoire pour les entités étrangères ; ne pas inventer de n° TVA.
+4. **Adresse de facturation** : ligne d'adresse, complément facultatif, code postal, ville, pays. Conserver les adresses du lieu de baignade séparées de celles de facturation.
+5. **Contact facturation** : nom, email de réception/notification, téléphone facultatif sauf besoin avéré. Contact facturation distinct de l'identité ProConnect certifiée et du signataire habilité.
+6. **Section 03, hors du présent formulaire** : mode de règlement, numéro d'engagement, bon de commande, code service Chorus Pro, règles de routage selon annuaire public ; ne pas dupliquer ces champs dans organisme payeur.
+7. **Statuts** : « à compléter », « en cours », « à corriger » et « renseigné et vérifié ». La validation d'un brouillon permet de compléter plus tard, mais aucune commande ferme avec SIRET tronqué / adresse manquante / email invalide / entité sans autorisation. Les vérifications serveur et annuaires sont nécessaires, une simple longueur valide ne prouve pas l'identité.
+8. **International** : sélection pays pilote les champs d'identification et validation par pays ; enregistrer code ISO, identifiants et règles de facturation, mais devise et traitement TVA issus du catalogue tarifaire et du moteur fiscal, pas modifiables arbitrairement par le client.
+9. **Historisation** : copie de l'organisme facturé, identifiants, adresse et coordonnées au moment de la commande, sans réécriture des factures émises quand le client modifie son profil ultérieurement. Séparer `verifiedProConnectIdentity` (intangible) du `billingProfile` modifiable. Un changement de payeur peut nécessiter de reprendre l'étape contractuelle.
+
+### Audit code pour implémentation après validation
+- `lib/web/admin/pages/admin_subscription_panel.dart`, `_mergeRegistrationData` reprend les valeurs du dossier et `_payerForm` propose 9 champs.
+- Aujourd'hui `payerComplete` se limite à 7 valeurs non vides ; ni validation 14 chiffres SIRET, ni email, ni code postal, ni logique selon pays. Les captures ont un SIRET de quatre caractères (« 0123 »), ainsi qu'adresse et code postal vides. Cet état ne doit pas devenir « renseigné/vérifié ».
+- Conserver le bouton ENREGISTRER comme **sauvegarde de brouillon** (sans contrat). Ajouter retour d'erreur et message de succès (la méthode `_saveSection` masque actuellement toutes erreurs).
+- Les contrôles réglementaires doivent être confirmés avec le prestataire de facturation, le régime du vendeur SPHOT et les CGV avant transaction réelle ; ne jamais coder un taux de TVA général à 20 % comme vérité internationale.
+
+### Références officielles vérifiées
+- Chorus Pro annuaire destinataires publics et champs obligatoires conditionnels : https://portail.chorus-pro.gouv.fr/aife_documentation?id=kb_article_view&sysparm_article=KB0011481
+- Chorus Pro plateforme publique depuis 2026 : https://www.economie.gouv.fr/actualites/chorus-pro-restera-la-plateforme-de-reference-pour-la-facturation-electronique-du
+- Mentions obligatoires factures : https://entreprendre.service-public.gouv.fr/vosdroits/F31808
+- Réforme et plateformes agréées : https://entreprendre.service-public.gouv.fr/actualites/A15683
+
+**Statut : proposition métier à soumettre à l'utilisateur, PAS de modification du formulaire Flutter effectuée à cette étape.**
