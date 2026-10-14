@@ -7,7 +7,6 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
   static const Color _red = Color(0xFFDC2626);
   static const Color _green = Color(0xFF16A34A);
   static const Color _orange = Color(0xFFF59E0B);
-  static const double _pricePerStationExclTax = 500.0;
 
   final Map<String, dynamic> adminData;
 
@@ -305,10 +304,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
         'trialStartDate': Timestamp.fromDate(start),
         'trialEndDate': Timestamp.fromDate(end),
         'numberOfRescueStations': numberOfStations,
-        'pricePerStationExclTax': subscription['pricePerStationExclTax'] ??
-            _pricePerStationExclTax,
         'billingCycle': 'annual',
-        'vatRate': subscription['vatRate'] ?? 20,
         'trialActivatedAt': serverNow,
         'updatedAt': serverNow,
       },
