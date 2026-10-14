@@ -549,10 +549,10 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   }
 
   bool _validSiret(String value) =>
-      RegExp(r'^\\d{14}$').hasMatch(value.trim());
+      RegExp(r'^\d{14}$').hasMatch(value.trim());
 
   bool _validBillingEmail(String value) =>
-      RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(value.trim());
+      RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value.trim());
 
   String _managerPayerType(Map<String, dynamic> data) {
     final type = _text(data['managerBillingType']).toUpperCase();
@@ -1503,21 +1503,24 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                           final data = snapshot.data ??
                               const <String, dynamic>{};
 
-                          final payerValues = [
-                            data['billingOrganisation'],
-                            data['billingSiret'],
-                            data['billingAddress'],
-                            data['billingPostalCode'],
-                            data['billingCity'],
-                            data['billingContactName'],
-                            data['billingContactEmail'],
-                          ];
-                          final payerStarted = payerValues.any(
-                            (value) => _text(value).isNotEmpty,
+                          final payerStarted = _payerFields.any(
+                            (field) => _text(data[field]).isNotEmpty,
                           );
-                          final payerComplete = payerValues.every(
-                            (value) => _text(value).isNotEmpty,
-                          );
+                          // RENSEIGNÉ ne signifie pas « identité certifiée ».
+                          // Le changement de payeur est une modification non
+                          // enregistrée tant que l'Admin n'a pas sauvegardé.
+                          final payerComplete =
+                              _draftBillingRelation == null &&
+                              _payerComplete(data);
+                          final payerInvalid = _payerHasInvalidData(data);
+                          final payerStatus = payerInvalid
+                              ? 'À CORRIGER'
+                              : _draftBillingRelation != null
+                                  ? 'EN COURS'
+                                  : _status(
+                                      complete: payerComplete,
+                                      started: payerStarted,
+                                    );
 
                           _initializeOfferSelection(data);
                           final savedStationIds = data['selectedRescueStationIds'];
@@ -1577,14 +1580,13 @@ _accordionSection(
                                   title: '02 — ORGANISME PAYEUR',
                                   description:
                                       'Coordonnées et informations pour la facturation électronique.',
-                                  status: _status(
-                                    complete: payerComplete,
-                                    started: payerStarted,
-                                  ),
-                                  statusColor: _statusColor(
-                                    complete: payerComplete,
-                                    started: payerStarted,
-                                  ),
+                                  status: payerStatus,
+                                  statusColor: payerInvalid
+                                      ? _red
+                                      : _statusColor(
+                                          complete: payerComplete,
+                                          started: payerStarted,
+                                        ),
                                   child: _payerForm(data),
                                 ),
                                 const SizedBox(height: 12),
