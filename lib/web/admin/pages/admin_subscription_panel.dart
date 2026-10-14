@@ -32,6 +32,25 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   String? _savingSection;
   bool? _draftNoOrderRequired;
   String? _draftPaymentMethod;
+  String? _draftBillingRelation;
+  // Brouillons séparés : basculer d'un payeur à l'autre ne mélange pas
+  // les coordonnées de deux personnes morales.
+  final Map<String, Map<String, String>> _payerDraftByRelation = {};
+  static const List<String> _payerFields = <String>[
+    'billingOrganisation',
+    'billingPayerType',
+    'billingSiret',
+    'billingLegalId',
+    'billingVatId',
+    'billingAddress',
+    'billingAddressComplement',
+    'billingPostalCode',
+    'billingCity',
+    'billingCountry',
+    'billingContactName',
+    'billingContactEmail',
+    'billingContactPhone',
+  ];
   late final Stream<Map<String, dynamic>> _dataStream;
   late final Future<String> _territoireIdFuture;
   final Set<String> _selectedRescueStationIds = <String>{};
@@ -187,7 +206,6 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     final profile = _nestedMap(request, 'profile');
     final structure = _nestedMap(request, 'structure');
     final territoire = _nestedMap(request, 'territoire');
-    final proConnect = _nestedMap(request, 'proConnect');
     final preview = _nestedMap(request, 'subscriptionPreview');
 
     final contactName = [
@@ -207,16 +225,57 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       'administrativeReference': value('administrativeReference', [
         request['requestNumber'],
       ]),
+      // Identité administrative du gestionnaire distincte du payeur.
+      // Les champs historiques ProConnect ne sont plus utilisés.
+      'managerBillingOrganisation': _firstFilled([
+        structure['nom'], request['nomStructure'],
+      ]),
+      'managerBillingSiret': _firstFilled([
+        structure['siret'], request['siret'],
+      ]),
+      'managerBillingAddress': _firstFilled([
+        territoire['adresse'],
+      ]),
+      'managerBillingPostalCode': _firstFilled([
+        territoire['codePostal'],
+      ]),
+      'managerBillingCity': _firstFilled([
+        territoire['ville'],
+      ]),
+      'managerBillingCountry': _firstFilled([
+        territoire['pays'], 'France',
+      ]),
+      'managerBillingContactName': contactName,
+      'managerBillingContactEmail': _firstFilled([
+        profile['email'], request['email'],
+      ]),
+      'managerBillingContactPhone': _firstFilled([
+        profile['telephone'],
+      ]),
+      'managerBillingType': _text(structure['type']),
       'billingOrganisation': value('billingOrganisation', [
         facturation['billingOrganisation'],
         structure['nom'],
-        proConnect['organisation'],
       ]),
       'billingSiret': value('billingSiret', [
         facturation['billingSiret'],
         structure['siret'],
         request['siret'],
-        proConnect['siret'],
+      ]),
+      'billingPayerRelation': value('billingPayerRelation', [
+        facturation['billingPayerRelation'], 'manager',
+      ]),
+      'billingPayerType': value('billingPayerType', [
+        facturation['billingPayerType'],
+      ]),
+      'billingLegalId': value('billingLegalId', [
+        facturation['billingLegalId'],
+      ]),
+      'billingVatId': value('billingVatId', [
+        facturation['billingVatId'],
+      ]),
+      'billingAddressComplement': value('billingAddressComplement', [
+        facturation['billingAddressComplement'],
       ]),
       'billingAddress': value('billingAddress', [
         facturation['billingAddress'],
@@ -241,7 +300,6 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       'billingContactEmail': value('billingContactEmail', [
         facturation['billingContactEmail'],
         profile['email'],
-        proConnect['email'],
       ]),
       'billingContactPhone': value('billingContactPhone', [
         facturation['billingContactPhone'],
@@ -347,10 +405,16 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       );
 
       if (!mounted) return;
-
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text(successMessage)),
+      );
     } catch (error) {
       if (!mounted) return;
-
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text('Enregistrement impossible. Vérifiez votre connexion et réessayez.'),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
