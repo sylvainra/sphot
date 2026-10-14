@@ -153,20 +153,9 @@ class AdminQuoteSimulationPdfService {
       throw StateError('Le total de la simulation publiée est incohérent.');
     }
 
-    // Réutilisation exacte des images de marque du site et du marker SVG
-    // des emails ; aucun logo SPHOT recréé en simple texte.
-    final headerBackgroundData =
-        await rootBundle.load('data/images/map_background.jpg');
+    // Utiliser le vrai titre SPHOT sans carte de fond.
     final siteTitleData = await rootBundle.load('data/icons/title.png');
-    final fireSvg = await rootBundle.loadString(
-      'data/icons/fire_red_icon.svg',
-    );
-    final headerBackground = pw.MemoryImage(
-      headerBackgroundData.buffer.asUint8List(
-        headerBackgroundData.offsetInBytes,
-        headerBackgroundData.lengthInBytes,
-      ),
-    );
+    final fireSvg = await rootBundle.loadString('data/icons/fire_red_icon.svg');
     final siteTitle = pw.MemoryImage(
       siteTitleData.buffer.asUint8List(
         siteTitleData.offsetInBytes,
@@ -197,16 +186,7 @@ class AdminQuoteSimulationPdfService {
                 height: 65,
               ),
             ),
-            pw.SizedBox(height: 4),
-            pw.Text(
-              "L'équipe SPHOT",
-              style: pw.TextStyle(
-                color: _blue,
-                fontSize: 8,
-                fontWeight: pw.FontWeight.bold,
-              ),
-            ),
-            pw.SizedBox(height: 5),
+            pw.SizedBox(height: 7),
             pw.Divider(color: _blue),
             pw.Text(
               'SIMULATION NON CONTRACTUELLE - Document préparatoire '
@@ -221,44 +201,35 @@ class AdminQuoteSimulationPdfService {
           ],
         ),
         build: (context) => [
-          // Bandeau de la page Web SPHOT : fond cartographique
-          // et véritable titre graphique, centré comme sur le site.
+          // Header SPHOT : titre authentique sur fond blanc sans contour.
           pw.SizedBox(
             width: double.infinity,
-            height: 76,
-            child: pw.Stack(
+            height: 73,
+            child: pw.Column(
               children: [
-                pw.Positioned.fill(
+                pw.Center(
                   child: pw.Image(
-                    headerBackground,
-                    fit: pw.BoxFit.cover,
+                    siteTitle,
+                    height: 47,
+                    fit: pw.BoxFit.contain,
                   ),
                 ),
-                pw.Positioned.fill(
-                  child: pw.Center(
-                    child: pw.Image(
-                      siteTitle,
-                      height: 51,
-                      fit: pw.BoxFit.contain,
+                pw.SizedBox(height: 8),
+                pw.Align(
+                  alignment: pw.Alignment.centerRight,
+                  child: pw.Text(
+                    'DOCUMENT DE PRÉPARATION',
+                    style: pw.TextStyle(
+                      color: _blue,
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          pw.SizedBox(height: 6),
-          pw.Align(
-            alignment: pw.Alignment.centerRight,
-            child: pw.Text(
-              'DOCUMENT DE PRÉPARATION',
-              style: pw.TextStyle(
-                color: _blue,
-                fontSize: 8,
-                fontWeight: pw.FontWeight.bold,
-              ),
-            ),
-          ),
-          pw.SizedBox(height: 14),
+          pw.SizedBox(height: 12),
           pw.Text('SIMULATION TARIFAIRE - NON CONTRACTUELLE',
               style: pw.TextStyle(
                 color: _red,
