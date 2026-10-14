@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../../../services/published_commercial_quote_service.dart';
+import '../services/admin_quote_simulation_pdf_service.dart';
 
 class AdminSubscriptionPanel extends StatefulWidget {
   final String adminUid;
@@ -57,6 +58,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   late final Future<String> _territoireIdFuture;
   final Set<String> _selectedRescueStationIds = <String>{};
   bool _offerSelectionInitialized = false;
+  bool _preparingQuotePdf = false;
 
   @override
   void initState() {
@@ -1282,11 +1284,73 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     );
   }
 
+  Future<void> _shareQuoteSimulation(Map<String, dynamic> data) async {
+    if (_preparingQuotePdf) return;
+    final selected = data['selectedRescueStations'];
+    if (selected is! List || selected.isEmpty) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(
+        content: Text('Enregistrez d’abord les postes sélectionnés dans l’étape 01.'),
+      ));
+      return;
+    }
+    final stations = <Map<String, dynamic>>[];
+    for (final entry in selected) {
+      if (entry is! Map) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text('Liste des postes incomplète.')),
+        );
+        return;
+      }
+      stations.add(Map<String, dynamic>.from(entry));
+    }
+    setState(() => _preparingQuotePdf = true);
+    try {
+      // Prévisualisation : recalculer depuis la grille PUBLIÉE.
+      // Aucun prix unitaire historique ni montant arbitraire du client.
+      final quote = await const PublishedCommercialQuoteService().admin(
+        numberOfRescueStations: stations.length,
+      );
+      if (quote.pricingReference != _text(data['publishedPricingReference']) ||
+          quote.amountExclTax != _number(data['annualAmountExclTax'])) {
+        throw StateError(
+          'La grille publiée a changé. Réenregistrez l’offre '
+          'dans l’étape 01 avant de télécharger la simulation.',
+        );
+      }
+      if (!mounted) return;
+      Rect? shareOrigin;
+      final object = context.findRenderObject();
+      if (object is RenderBox && object.hasSize) {
+        shareOrigin = object.localToGlobal(Offset.zero) & object.size;
+      }
+      await const AdminQuoteSimulationPdfService().share(
+        quote: quote,
+        billing: data,
+        stations: stations,
+        administrativeReference: _periodAdministrativeReference(data),
+        subscriptionYear: DateTime.now().year,
+        sharePositionOrigin: shareOrigin,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(error is StateError
+              ? error.message.toString()
+              : 'Simulation PDF indisponible. Réessayez.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _preparingQuotePdf = false);
+    }
+  }
+
   /// Étape documentaire facultative.
   /// Le moteur de calcul existant ne produit PAS encore de devis émis.
   /// La génération finale utilisera un service serveur authentifié,
   /// la grille publiée, le profil payeur vérifié et le traitement fiscal.
   Widget _quotePreparationPanel({
+    required Map<String, dynamic> data,
     required bool offerComplete,
     required bool payerComplete,
   }) {
@@ -1353,6 +1417,41 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
           style: TextStyle(
             color: _grey, fontSize: 11, height: 1.4,
           ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: OutlinedButton.icon(
+            onPressed: offerComplete && !_preparingQuotePdf
+                ? () => _shareQuoteSimulation(data)
+                : null,
+            icon: _preparingQuotePdf
+                ? const SizedBox(
+                    width: 17, height: 17,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.picture_as_pdf_outlined, size: 19),
+            label: Text(
+              _preparingQuotePdf
+                  ? 'PRÉPARATION DU PDF...'
+                  : 'TÉLÉCHARGER LA SIMULATION PDF',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _blue,
+              side: const BorderSide(color: _blue, width: 1.3),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 7),
+        const Text(
+          'Document préparatoire non contractuel : sans numéro de devis, '
+          'sans TVA présumée et sans signature commerciale.',
+          style: TextStyle(color: _red, fontSize: 11, height: 1.3),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -1857,6 +1956,7 @@ _accordionSection(
                                   status: 'ÉMISSION EN PRÉPARATION',
                                   statusColor: _orange,
                                   child: _quotePreparationPanel(
+                                    data: data,
                                     offerComplete: offerComplete,
                                     payerComplete: payerComplete,
                                   ),
