@@ -168,14 +168,14 @@ class SuperAdminDashboardFinancesPage extends StatelessWidget {
 
                                 final numberOfStations =
                                     _price(data['numberOfRescueStations']);
-                                final pricePerStation =
-                                    _price(data['pricePerStationExclTax']);
+                                final annualAmount =
+                                    _price(data['annualAmountExclTax']);
 
                                 if (status == 'active') {
                                   activeSubscriptions++;
                                   rescueStations += numberOfStations;
                                   estimatedSubscriptionRevenue +=
-                                      numberOfStations * pricePerStation;
+                                      annualAmount;
                                 } else if (status == 'trial') {
                                   trialSubscriptions++;
                                 } else if (status == 'overdue') {
