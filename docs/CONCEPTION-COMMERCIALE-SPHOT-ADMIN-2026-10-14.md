@@ -307,3 +307,11 @@ Quatre captures de l'utilisateur confirment :
 **Essai à faire sur ordinateur** : `git pull --ff-only origin codex/advertiser-pricing-table-v1` puis `flutter run -d chrome -t lib/main_web_admin.dart` ; étape 03 -> TÉLÉCHARGER LA SIMULATION PDF ; vérifier bandeau cartographique/titre au centre, marker rouge SVG net au centre du footer (une page), absence de débordement et maintien des lignes, prix et mentions non contractuelles. Si le gros SVG d'origine provoque une exception de parser ou dépassement, recueillir l'erreur exacte avant toute adaptation de rendu.
 
 **Principe à généraliser APRÈS validation** : même header + signature Fire pour tous les documents administratifs et commerciaux SPHOT, sans refonte structurelle non demandée.
+
+## 21. Capture du PDF avec charte SPHOT — taille du Fire (14/10/2026)
+
+La capture utilisateur confirme que le bandeau du site est désormais bien présent en tête du PDF, avec le titre SPHOT réel sur fond de carte, et que le marker SVG rouge est effectivement centré en bas. Le document est lisible sur une page, avec les deux postes et le total **898 EUR HT** issus de `FR_ADMIN-V3`. Le SIRET incomplet `0123` y est signalé **FORMAT INVALIDE** ; aucun devis contractuel n'est émis.
+
+**Ajustement visuel réalisé après inspection** : marker du pied agrandi de 24 x 38 à **42 x 65 points**, pour retrouver la proportion utilisée dans les courriels SPHOT (42 x 65 px) ; réduction des séparations verticales du contenu de 16 à 10 points et de l'espace après bandeau de 18 à 14 pour limiter le risque de débordement ou de passage à deux pages. Le titre graphique, le fond et les informations commerciales ne sont pas modifiés.
+
+**À vérifier dans Chrome** : rendu sur une seule page, absence de chevauchement entre l'encadré rouge non contractuel et le nouveau marker, centrage et lisibilité de « L'équipe SPHOT ». Aucun test de compilation Flutter ou de PDF rendu n'a été effectué sur la machine de l'assistant.
