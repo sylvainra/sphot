@@ -463,6 +463,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     required String label,
     String fallback = '',
     TextInputType? keyboardType,
+    VoidCallback? onSubmitted,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -477,6 +478,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         ),
         keyboardType: keyboardType,
         onChanged: (value) => _draft[field] = value,
+        onFieldSubmitted: onSubmitted == null ? null : (_) => onSubmitted(),
         decoration: _inputDecoration(label),
       ),
     );
@@ -536,98 +538,249 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     );
   }
 
+  String _payerRelation(Map<String, dynamic> data) {
+    final value = _draftBillingRelation ?? _text(data['billingPayerRelation']);
+    return value == 'other' ? 'other' : 'manager';
+  }
+
+  bool _isFrance(String country) {
+    final text = country.trim().toUpperCase();
+    return text == 'FRANCE' || text == 'FR';
+  }
+
+  bool _validSiret(String value) =>
+      RegExp(r'^\\d{14}$').hasMatch(value.trim());
+
+  bool _validBillingEmail(String value) =>
+      RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(value.trim());
+
+  String _managerPayerType(Map<String, dynamic> data) {
+    final type = _text(data['managerBillingType']).toUpperCase();
+    if (type.contains('MAIRIE') || type.contains('COMMUNE') ||
+        type.contains('METROPOLE') || type.contains('MÉTROPOLE') ||
+        type.contains('DEPARTEMENT') || type.contains('DÉPARTEMENT') ||
+        type.contains('REGION') || type.contains('RÉGION') ||
+        type.contains('COLLECTIVITE') || type.contains('COLLECTIVITÉ')) {
+      return 'public';
+    }
+    return '';
+  }
+
+  Map<String, dynamic> _payerDisplayData(
+      Map<String, dynamic> data, String relation) {
+    final storedRelation =
+        _text(data['billingPayerRelation']) == 'other' ? 'other' : 'manager';
+    if (storedRelation == relation) return data;
+    final source = Map<String, dynamic>.from(data);
+    for (final field in _payerFields) {
+      source[field] = '';
+    }
+    if (relation == 'manager') {
+      const keys = <String, String>{
+        'billingOrganisation': 'managerBillingOrganisation',
+        'billingSiret': 'managerBillingSiret',
+        'billingAddress': 'managerBillingAddress',
+        'billingPostalCode': 'managerBillingPostalCode',
+        'billingCity': 'managerBillingCity',
+        'billingCountry': 'managerBillingCountry',
+        'billingContactName': 'managerBillingContactName',
+        'billingContactEmail': 'managerBillingContactEmail',
+        'billingContactPhone': 'managerBillingContactPhone',
+      };
+      for (final entry in keys.entries) {
+        source[entry.key] = _text(data[entry.value]);
+      }
+      source['billingPayerType'] = _managerPayerType(data);
+    }
+    return source;
+  }
+
+  void _changePayerRelation(String next, Map<String, dynamic> data) {
+    final previous = _payerRelation(data);
+    if (previous == next) return;
+    _payerDraftByRelation[previous] = {
+      for (final field in _payerFields)
+        if (_draft.containsKey(field)) field: _draft[field]!,
+    };
+    for (final field in _payerFields) {
+      _draft.remove(field);
+    }
+    _draft.addAll(_payerDraftByRelation[next] ?? {});
+    setState(() => _draftBillingRelation = next);
+  }
+
+  bool _payerComplete(Map<String, dynamic> data) {
+    final country = _text(data['billingCountry']);
+    final kind = _text(data['billingPayerType']);
+    return _text(data['billingOrganisation']).isNotEmpty &&
+        (kind == 'public' || kind == 'private') &&
+        country.isNotEmpty &&
+        (_isFrance(country)
+            ? _validSiret(_text(data['billingSiret']))
+            : _text(data['billingLegalId']).isNotEmpty) &&
+        _text(data['billingAddress']).isNotEmpty &&
+        _text(data['billingPostalCode']).isNotEmpty &&
+        _text(data['billingCity']).isNotEmpty &&
+        _text(data['billingContactName']).isNotEmpty &&
+        _validBillingEmail(_text(data['billingContactEmail']));
+  }
+
+  bool _payerHasInvalidData(Map<String, dynamic> data) {
+    final email = _text(data['billingContactEmail']);
+    final siret = _text(data['billingSiret']);
+    return (_isFrance(_text(data['billingCountry'])) &&
+            siret.isNotEmpty && !_validSiret(siret)) ||
+        (email.isNotEmpty && !_validBillingEmail(email));
+  }
+
   Widget _payerForm(Map<String, dynamic> data) {
+    final relation = _payerRelation(data);
+    final source = _payerDisplayData(data, relation);
+    final country = _fieldValue(source, 'billingCountry');
+    final isFrance = _isFrance(country);
+    final type = _fieldValue(source, 'billingPayerType');
+    final siret = _fieldValue(source, 'billingSiret');
+    final email = _fieldValue(source, 'billingContactEmail');
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _field(
-          data: data,
-          field: 'billingOrganisation',
-          label: 'Organisation de facturation',
-        ),
-        _field(
-          data: data,
-          field: 'billingSiret',
-          label: 'SIRET',
-          keyboardType: TextInputType.number,
-        ),
-        _field(
-          data: data,
-          field: 'billingAddress',
-          label: 'Adresse de facturation',
-        ),
-        Row(
-          children: [
-            SizedBox(
-              width: 85,
-              child: _field(
-                data: data,
-                field: 'billingPostalCode',
-                label: 'Code postal',
-                keyboardType: TextInputType.number,
-              ),
+        const Text('DESTINATAIRE DE LA FACTURE',
+          style: TextStyle(color: _blue, fontSize: 12,
+            fontWeight: FontWeight.w900)),
+        for (final relationOption in const ['manager', 'other'])
+          RadioListTile<String>(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            value: relationOption,
+            groupValue: relation,
+            activeColor: _red,
+            title: Text(relationOption == 'manager'
+              ? 'Même organisme que le gestionnaire des SPHOTS'
+              : 'Autre organisme payeur',
+              style: const TextStyle(color: _blue, fontSize: 12,
+                fontWeight: FontWeight.w700)),
+            onChanged: (value) {
+              if (value != null) _changePayerRelation(value, data);
+            },
+          ),
+        if (relation == 'other')
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: Text(
+              'Renseignez les coordonnées du véritable payeur. '
+              'Son habilitation à payer devra être vérifiée avant commande.',
+              style: TextStyle(color: _grey, fontSize: 11),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _field(
-                data: data,
-                field: 'billingCity',
-                label: 'Ville',
-              ),
+          ),
+        const Divider(),
+        const Text('IDENTIFICATION',
+          style: TextStyle(color: _blue, fontSize: 12,
+            fontWeight: FontWeight.w900)),
+        const SizedBox(height: 9),
+        _field(data: source, field: 'billingOrganisation',
+          label: 'Dénomination de l’organisme'),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: DropdownButtonFormField<String>(
+            value: type == 'public' || type == 'private' ? type : null,
+            isExpanded: true,
+            decoration: _inputDecoration('Nature de l’organisme'),
+            items: const [
+              DropdownMenuItem(
+                value: 'public', child: Text('Organisme public')),
+              DropdownMenuItem(
+                value: 'private', child: Text('Entreprise / organisme privé')),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _draft['billingPayerType'] = value);
+              }
+            },
+          ),
+        ),
+        _field(data: source, field: 'billingCountry',
+          label: 'Pays de facturation',
+          onSubmitted: () => setState(() {})),
+        if (isFrance) ...[
+          _field(data: source, field: 'billingSiret',
+            label: 'SIRET — 14 chiffres',
+            keyboardType: TextInputType.number),
+          if (siret.isNotEmpty && !_validSiret(siret))
+            const Padding(
+              padding: EdgeInsets.only(bottom: 10),
+              child: Text('SIRET incomplet : 14 chiffres requis. '
+                'Contrôle officiel nécessaire avant commande.',
+                style: TextStyle(color: _red, fontSize: 11)),
             ),
-          ],
-        ),
-        _field(
-          data: data,
-          field: 'billingCountry',
-          label: 'Pays',
-          fallback: 'France',
-        ),
-        _field(
-          data: data,
-          field: 'billingContactName',
-          label: 'Contact facturation',
-        ),
-        _field(
-          data: data,
-          field: 'billingContactEmail',
+        ] else if (country.isNotEmpty) ...[
+          _field(data: source, field: 'billingLegalId',
+            label: 'Identifiant officiel de l’organisme'),
+        ] else
+          const Text('Indiquez le pays puis validez le champ.',
+            style: TextStyle(color: _grey, fontSize: 11)),
+        _field(data: source, field: 'billingVatId',
+          label: 'Numéro TVA (si applicable)'),
+        const Divider(height: 22),
+        const Text('ADRESSE DE FACTURATION',
+          style: TextStyle(color: _blue, fontSize: 12,
+            fontWeight: FontWeight.w900)),
+        const SizedBox(height: 9),
+        _field(data: source, field: 'billingAddress',
+          label: 'Adresse de facturation'),
+        _field(data: source, field: 'billingAddressComplement',
+          label: 'Complément d’adresse (facultatif)'),
+        Row(children: [
+          SizedBox(width: 145,
+            child: _field(data: source, field: 'billingPostalCode',
+              label: 'Code postal')),
+          const SizedBox(width: 8),
+          Expanded(child: _field(data: source, field: 'billingCity',
+            label: 'Ville')),
+        ]),
+        const Divider(height: 22),
+        const Text('CONTACT FACTURATION',
+          style: TextStyle(color: _blue, fontSize: 12,
+            fontWeight: FontWeight.w900)),
+        const SizedBox(height: 9),
+        _field(data: source, field: 'billingContactName',
+          label: 'Nom du contact'),
+        _field(data: source, field: 'billingContactEmail',
           label: 'Email de facturation',
-          keyboardType: TextInputType.emailAddress,
+          keyboardType: TextInputType.emailAddress),
+        if (email.isNotEmpty && !_validBillingEmail(email))
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: Text('Adresse e-mail invalide.',
+              style: TextStyle(color: _red, fontSize: 11)),
+          ),
+        _field(data: source, field: 'billingContactPhone',
+          label: 'Téléphone (facultatif)',
+          keyboardType: TextInputType.phone),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 10),
+          child: Text(
+            'Enregistrement du brouillon uniquement. '
+            'Les données seront vérifiées avant la commande.',
+            style: TextStyle(color: _grey, fontSize: 11),
+          ),
         ),
-        _field(
-          data: data,
-          field: 'billingContactPhone',
-          label: 'Téléphone de facturation',
-          keyboardType: TextInputType.phone,
-        ),
-        _saveButton(
-          section: 'payer',
-          onPressed: () {
-            _saveSection(
-              'payer',
-              {
-                'billingOrganisation':
-                    _fieldValue(data, 'billingOrganisation'),
-                'billingSiret': _fieldValue(data, 'billingSiret'),
-                'billingAddress': _fieldValue(data, 'billingAddress'),
-                'billingPostalCode':
-                    _fieldValue(data, 'billingPostalCode'),
-                'billingCity': _fieldValue(data, 'billingCity'),
-                'billingCountry': _fieldValue(
-                  data,
-                  'billingCountry',
-                  fallback: 'France',
-                ),
-                'billingContactName':
-                    _fieldValue(data, 'billingContactName'),
-                'billingContactEmail':
-                    _fieldValue(data, 'billingContactEmail'),
-                'billingContactPhone':
-                    _fieldValue(data, 'billingContactPhone'),
-              },
-              'Organisme payeur enregistré.',
-            );
-          },
-        ),
+        _saveButton(section: 'payer', onPressed: () {
+          final values = <String, dynamic>{
+            'billingPayerRelation': relation,
+            for (final field in _payerFields)
+              field: _fieldValue(source, field),
+          };
+          if (isFrance) {
+            values['billingSiren'] = _validSiret(siret)
+                ? siret.substring(0, 9) : '';
+            values['billingLegalId'] = FieldValue.delete();
+          } else {
+            values['billingSiret'] = FieldValue.delete();
+            values['billingSiren'] = FieldValue.delete();
+          }
+          _saveSection('payer', values,
+            'Brouillon de facturation enregistré.');
+        }),
       ],
     );
   }
