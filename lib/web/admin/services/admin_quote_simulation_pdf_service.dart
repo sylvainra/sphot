@@ -56,7 +56,7 @@ class AdminQuoteSimulationPdfService {
           ),
           pw.SizedBox(height: 8),
           ...children,
-          pw.SizedBox(height: 16),
+          pw.SizedBox(height: 10),
         ],
       );
 
@@ -193,8 +193,8 @@ class AdminQuoteSimulationPdfService {
             pw.Center(
               child: pw.SvgImage(
                 svg: fireSvg,
-                width: 24,
-                height: 38,
+                width: 42,
+                height: 65,
               ),
             ),
             pw.SizedBox(height: 4),
@@ -258,7 +258,7 @@ class AdminQuoteSimulationPdfService {
               ),
             ),
           ),
-          pw.SizedBox(height: 18),
+          pw.SizedBox(height: 14),
           pw.Text('SIMULATION TARIFAIRE - NON CONTRACTUELLE',
               style: pw.TextStyle(
                 color: _red,
