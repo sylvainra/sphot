@@ -545,9 +545,10 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: TextFormField(
-        key: ValueKey<String>(liveUpdate
-            ? '$field-${_payerRelation(data)}'
-            : '$field-${_fieldValue(data, field, fallback: fallback)}'),
+        // IMPORTANT : ne jamais inclure le texte saisi dans la clé.
+        // Une clé qui change à chaque frappe détruit le champ et son focus.
+        // La relation payeur permet de garder les brouillons séparés.
+        key: ValueKey<String>('payer-field-$field-${_payerRelation(data)}'),
         initialValue: _fieldValue(data, field, fallback: fallback),
         style: const TextStyle(
           color: _blue,
