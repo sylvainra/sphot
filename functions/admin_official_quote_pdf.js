@@ -164,7 +164,6 @@ function renderOfficialAdminQuotePdf(context, quoteNumber,
 
     // PIED : véritable Fire SPHOT au centre, sans « L'équipe SPHOT ».
     // L'emplacement est fixe sur la dernière page, hors du contenu.
-    const page = doc.page;
     if (doc.y > usableBottom()) doc.addPage();
     doc.image(fireImage.content, doc.page.width / 2 - 15,
         doc.page.height - 94, {fit: [30, 47]});
@@ -175,7 +174,6 @@ function renderOfficialAdminQuotePdf(context, quoteNumber,
         .text("Document officiel " + quoteNumber,
             PAD, doc.page.height - 35,
             {width: fullWidth, align: "center"});
-    void page;
     doc.end();
   });
 }
