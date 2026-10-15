@@ -113,6 +113,18 @@ test("La grille publiée et les lignes doivent être recalculées au serveur", (
   assert.ok(result.issues.includes("PUBLISHED_PRICE_NOT_REVALIDATED"));
 });
 
+test("La somme des quantités des tranches doit égaler les postes", () => {
+  const c = verifiedFixture();
+  c.publishedQuote.lines[1].count = 0;
+  c.publishedQuote.lines[1].amountExclTax = 0;
+  c.publishedQuote.amountExclTax = 499;
+  c.taxDecision.amountExclTax = 499;
+  c.taxDecision.amountInclTax = 499;
+  const result = assessAdminQuoteIssueReadiness(c);
+  assert.equal(result.ready, false);
+  assert.ok(result.issues.includes("PUBLISHED_PRICE_NOT_REVALIDATED"));
+});
+
 test("Aucun taux ni montant TTC ne peut être présumé", () => {
   const c = verifiedFixture();
   c.taxDecision.calculationVerified = false;
