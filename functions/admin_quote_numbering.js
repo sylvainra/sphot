@@ -85,7 +85,8 @@ async function assignAuthorizedAdminQuoteNumber({db, event, serverTimestamp}) {
     const counterRef = db.collection("counters")
         .doc("quotes_" + year + "_" + member);
     const counterSnapshot = await tx.get(counterRef);
-    const lastNumber = (counterSnapshot.data() || {}).lastNumber || 0;
+    const counterData = counterSnapshot.data() || {};
+    const lastNumber = counterSnapshot.exists ? counterData.lastNumber : 0;
     if (!Number.isSafeInteger(lastNumber) || lastNumber < 0 ||
         lastNumber >= Number.MAX_SAFE_INTEGER) {
       throw new Error("Compteur de devis invalide.");

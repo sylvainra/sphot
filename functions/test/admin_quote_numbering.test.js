@@ -197,3 +197,13 @@ test("Un numéro préexistant n'est jamais remplacé", async () => {
   assert.equal(await t.call(), false);
   assert.equal(t.counters.writes, 0);
 });
+
+test("Un compteur NaN ou incomplet bloque toute réservation", async () => {
+  const t = fakeEnvironment();
+  t.authorize();
+  t.values.set("counters/quotes_2026_000001", {lastNumber: NaN});
+  await assert.rejects(t.call(), /Compteur de devis invalide/);
+  t.values.set("counters/quotes_2026_000001", {});
+  await assert.rejects(t.call(), /Compteur de devis invalide/);
+  assert.equal(t.values.get("quotes/" + QUOTE_ID).quoteNumber, undefined);
+});
