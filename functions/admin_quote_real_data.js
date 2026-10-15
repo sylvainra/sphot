@@ -93,7 +93,7 @@ async function loadRealAdminQuoteDraft({auth, db, idToken} = {}) {
   const admin = read(adminSnap);
   const request = read(requestSnap);
   const subscription = read(subscriptionSnap);
-  const requestTerritory = request && request.territoire || {};
+  const requestTerritory = (request && request.territoire) || {};
   const requestTerritoryId = string(requestTerritory.territoireId ||
       (request && request.territoireId));
   if (!admin || !request || !subscription ||
