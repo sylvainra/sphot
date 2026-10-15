@@ -113,7 +113,7 @@ function archiveOfficialAdminQuote(args) {
         contentType: "application/pdf",
         preconditionOpts: {ifGenerationMatch: 0},
         metadata: {
-          contentDisposition: 'attachment; filename="' + number + '.pdf"',
+          contentDisposition: "attachment; filename=\"" + number + ".pdf\"",
           metadata: {
             adminUid, requestId, quoteId, quoteNumber: number, sha256: hash,
           },

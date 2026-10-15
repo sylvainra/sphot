@@ -76,7 +76,7 @@ function buildAdminOfficialQuoteEmail(record) {
   // cid:sphot-brand-fire-png, largeur 42 et hauteur 65, comme pour
   // les emails de comptes sauveteurs, administrateurs et annonceurs.
   return buildSphotMessage({
-    from: '"SPHOT" <no-reply@sphot.app>',
+    from: "\"SPHOT\" <no-reply@sphot.app>",
     to: recipient,
     replyTo: "contact@sphot.app",
     subject: "SPHOT ADMIN - Votre devis " + number,

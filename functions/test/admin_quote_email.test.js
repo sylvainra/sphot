@@ -46,7 +46,7 @@ test("Même marker Fire et mêmes dimensions que tous les emails SPHOT", () => {
   assert.match(actual.html,
       /<img src="cid:sphot-brand-fire-png" alt="SPHOT" width="42" height="65"/);
   assert.equal(
-      actual.html.split('src="cid:sphot-brand-fire-png"').length - 1, 1);
+      actual.html.split("src=\"cid:sphot-brand-fire-png\"").length - 1, 1);
   assert.equal(actual.attachments.filter(
       (part) => part.cid === "sphot-brand-fire-png").length, 1);
 });
@@ -55,7 +55,7 @@ test("Le devis PDF réel accompagne un mail envoyé à l'Admin", () => {
   const record = officialTestRecord();
   const mail = buildAdminOfficialQuoteEmail(record);
   assert.equal(mail.to, record.adminEmail);
-  assert.equal(mail.from, '"SPHOT" <no-reply@sphot.app>');
+  assert.equal(mail.from, "\"SPHOT\" <no-reply@sphot.app>");
   assert.equal(mail.replyTo, "contact@sphot.app");
   assert.ok(mail.subject.includes(record.quoteNumber));
   assert.ok(mail.html.includes("898,00 EUR HT"));

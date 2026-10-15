@@ -1186,10 +1186,9 @@ async function expireTrial(subscriptionDoc, now) {
       à son terme le <strong>${escapeHtml(formatFrenchDate(end))}</strong>.</p>
       <p><strong>Vos droits de diffusion sont désormais suspendus.</strong>
       Votre configuration, vos SPHOTS, vos périodes et vos sauveteurs restent enregistrés.</p>
-      <p>Vous pouvez poursuivre la diffusion avec l’abonnement annuel SPHOT ADMIN
-      au tarif de <strong>${currency(price)} HT par an et par poste de secours</strong>.</p>
-      <p>Montant prévisionnel actuel : <strong>${currency(annual)} HT / an</strong>
-      pour ${stations} poste(s) de secours.</p>
+      <p>Vous pouvez poursuivre la diffusion avec l’abonnement annuel SPHOT ADMIN.</p>
+      <p>Votre offre tarifaire actualisée, calculée selon la grille publiée,
+      est consultable dans votre espace ABONNEMENT &amp; PAIEMENT.</p>
       <p><a href="${SPHOT_LOGIN_URL}">Accéder à SPHOT ADMIN</a></p>
       <p>Cordialement,<br>L’équipe SPHOT</p>`;
     await sendLifecycleMail({
