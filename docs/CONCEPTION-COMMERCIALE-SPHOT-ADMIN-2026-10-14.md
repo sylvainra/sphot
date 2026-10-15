@@ -403,3 +403,17 @@ Demande explicite « poursuivons » après validation du parcours 01 à 05 et co
 Si `pdfkit` manque : `npm --prefix functions install` puis relancer. **Ne pas déployer de nouvelle fonction de facturation à ce stade.**
 
 **Statut non négociable** : bouton « ÉTABLIR UN DEVIS » désactivé, aucun devis numéroté ou archivé réel, aucun paiement ni commande, jusqu'à immatriculation de l'émetteur, fiscalité validée, conformité juridique, endpoint serveur authentifié, numérotation idempotente et conservation immuable du PDF. La validation des tests n'autorise pas le passage en production.
+
+## 27. VALIDÉ SUR PC — test du moteur PDF officiel (15/10/2026)
+
+L'utilisateur a exécuté, après un `git pull --ff-only` réussi :
+
+`node --test functions/test/admin_official_quote_pdf.test.js`
+
+**Résultat : 5/5 tests réussis, aucun échec**, répété une deuxième fois avec succès. Le test confirme la création d'octets PDF en mémoire avec des données fictives, sans émission commerciale ni écriture dans Firestore. Avec les 18 tests de règles/validité déjà réussis : **23 tests réussis** sur les trois fichiers de tests.
+
+La commande `npm --prefix functions install` a ensuite échoué localement avec `ENOENT C:\\Users\\surfS\\sphot\\package.json`. **Aucune installation n'était nécessaire**, puisque `pdfkit` était déjà accessible et les cinq tests PDF avaient réussi avant et après. Si une installation devait devenir nécessaire sur cette machine, ouvrir le sous-dossier `functions` puis `npm install`, et revenir à la racine. Ne pas faire réinstaller l'utilisateur pour ces tests.
+
+**État actuel validé :** les contrôles et le moteur PDF en mémoire sont fonctionnels selon les tests Node. L'affichage réel du PDF, le raccordement du service d'émission authentifié, la numérotation transactionnelle DV, l'archivage immuable et la facturation légale restent non testés / non opérationnels. La section 03 du portail Admin reste bloquée car SPHOT n'est pas immatriculé ; aucun devis réel ni paiement ne doit être créé.
+
+**Étape de développement suivante :** conception ciblée du service d'émission sécurisé qui récupère en serveur l'identité de l'Admin authentifié, son territoire, les postes sélectionnés, la grille publiée, les données de facturation légitimement vérifiées et la configuration émetteur/fiscalité ; blocage par défaut si un élément manque. Ensuite seulement numéro DV transactionnel, PDF officiel et archivage idempotent. Ne pas activer l'émission à partir de tests fictifs.
