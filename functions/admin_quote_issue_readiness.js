@@ -70,6 +70,8 @@ function assessAdminQuoteIssueReadiness(context) {
         item.count * item.unitExclTax !== item.amountExclTax) return NaN;
     return sum + item.amountExclTax;
   }, 0);
+  const pricedStationCount = lines.reduce((sum, item) =>
+    sum + (item && Number.isSafeInteger(item.count) ? item.count : 0), 0);
   requireCondition(
       quote.market === "ADMIN" &&
       quote.country === "FR" && quote.currency === "EUR" &&
@@ -77,6 +79,7 @@ function assessAdminQuoteIssueReadiness(context) {
       quote.pricingReference === "FR_ADMIN-V" + quote.version &&
       quote.fromServerPublishedCatalog === true &&
       quote.numberOfRescueStations === stations.length &&
+      pricedStationCount === stations.length &&
       lines.length === 4 &&
       Number.isSafeInteger(quote.amountExclTax) &&
       quote.amountExclTax > 0 &&
