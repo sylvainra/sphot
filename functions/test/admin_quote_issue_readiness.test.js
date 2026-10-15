@@ -122,6 +122,24 @@ test("Aucun taux ni montant TTC ne peut être présumé", () => {
   assert.ok(result.issues.includes("TAX_TREATMENT_NOT_VERIFIED"));
 });
 
+test("Une fiscalité vérifiée peut comporter des centimes", () => {
+  const c = verifiedFixture();
+  c.taxDecision.taxAmount = 179.60;
+  c.taxDecision.amountInclTax = 1077.60;
+  const result = assessAdminQuoteIssueReadiness(c);
+  assert.equal(result.ready, true);
+  assert.deepEqual(result.issues, []);
+});
+
+test("Un montant avec plus de deux décimales n'est pas accepté", () => {
+  const c = verifiedFixture();
+  c.taxDecision.taxAmount = 179.601;
+  c.taxDecision.amountInclTax = 1077.601;
+  const result = assessAdminQuoteIssueReadiness(c);
+  assert.equal(result.ready, false);
+  assert.ok(result.issues.includes("TAX_TREATMENT_NOT_VERIFIED"));
+});
+
 test("La validité contractuelle est plafonnée au 31 décembre", () => {
   const c = verifiedFixture();
   c.issuedOn = "2026-12-20";
