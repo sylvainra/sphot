@@ -239,9 +239,12 @@ test("Si grille non publiée, impossible de chiffrer le brouillon", async () => 
 test("Le module ne dispose d'aucune opération d'écriture", async () => {
   const f = fixture();
   let changed = false;
-  f.db.collection = (original => (name) => {
+  f.db.collection = ((original) => (name) => {
     const instance = original(name);
-    instance.set = () => { changed = true; throw new Error("write"); };
+    instance.set = () => {
+      changed = true;
+      throw new Error("write");
+    };
     return instance;
   })(f.db.collection);
   await f.call();
