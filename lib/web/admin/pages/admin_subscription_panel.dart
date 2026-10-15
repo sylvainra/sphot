@@ -1307,12 +1307,29 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
             ),
           ],
         ),
+        const SizedBox(height: 9),
+        const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.lock_outline_rounded, color: _orange, size: 19),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Immatriculation et fiscalité de SPHOT : '
+                'en attente de finalisation',
+                style: TextStyle(
+                  color: _orange, fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 12),
         const Text(
-          'Le devis officiel devra comporter son numéro SPHOT automatique, '
-          'sa date, sa validité, les postes concernés, la grille publiée '
-          'et le montant fiscalement applicable. Il sera ensuite conservé '
-          'dans FACTURES & DOCUMENTS.',
+          'Dès que SPHOT sera juridiquement et fiscalement configuré, '
+          'le devis officiel sera numéroté automatiquement (DV-...), '
+          'valable 30 jours et conservé dans FACTURES & DOCUMENTS.',
           style: TextStyle(
             color: _grey, fontSize: 11, height: 1.4,
           ),
@@ -1341,9 +1358,9 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         ),
         const SizedBox(height: 7),
         const Text(
-          'Devis officiel indisponible tant que les informations '
-          'juridiques et fiscales de SPHOT ne sont pas finalisées. '
-          'Le devis restera facultatif pour souscrire.',
+          'Votre dossier Admin peut être complet : le blocage vient '
+          'de SPHOT, qui n’est pas encore immatriculé. Aucun devis '
+          'n’est émis pour le moment. Le devis restera facultatif.',
           style: TextStyle(color: _grey, fontSize: 11, height: 1.35),
         ),
       ],
@@ -1818,7 +1835,7 @@ _accordionSection(
                                   title: '03 — DEVIS (FACULTATIF)',
                                   description:
                                       'Établir un devis officiel, facultatif et valable 30 jours.',
-                                  status: 'ÉMISSION EN PRÉPARATION',
+                                  status: 'EN ATTENTE D’IMMATRICULATION SPHOT',
                                   statusColor: _orange,
                                   child: _quotePreparationPanel(
                                     offerComplete: offerComplete,
