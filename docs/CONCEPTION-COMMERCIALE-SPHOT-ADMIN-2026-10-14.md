@@ -436,3 +436,15 @@ Après validation des aperçus visuels du devis et du mail, l'utilisateur a dema
 **Test à lancer (PowerShell, racine SPHOT, après git pull sur la branche) :**
 `node --test functions/test/admin_quote_email.test.js`.
 Le résultat attendu est **6 tests réussis** ; ne pas déployer avant validation juridique et backend de génération/archivage.
+
+## 29. Six tests des emails de devis réussis et point de vigilance numérotation (15/10/2026)
+
+**Résultat exécuté par l'utilisateur dans PowerShell** : après mise à jour sur `dfa6061`, commande `node --test functions/test/admin_quote_email.test.js` : **6/6 tests réussis, 0 échec**, durée 238,7313 ms. Les tests contrôlent la correspondance octet par octet du marker Fire avec les autres emails SPHOT, le CID unique à 42 × 65 px, les données et pièce jointe, les blocages d'émission, les dates et la protection contre l'injection HTML. Avec les 18 tests de tarifs/prérequis et les 5 tests PDF déjà passés : **29/29 tests réussis** en cumul de ces suites (exécutées séparément).
+
+**Inspection technique complémentaire** :
+- `functions/index.js` contient déjà `assignQuoteNumberOnWrite`, un déclencheur `onDocumentWritten("quotes/{quoteId}")` qui attribue le numéro `DV-...` transactionnellement dès qu'un document `quotes` sans numéro et muni d'une référence Admin reconnaissable existe. **Il ne vérifie pas, à lui seul, la conformité de l'émetteur, de la fiscalité ou la présence d'un PDF archivé.** Il ne faut donc PAS créer des documents `quotes` de prévisualisation ou de brouillon pour tester : cela pourrait consommer des numéros officiels prématurément.
+- `functions/admin_workflow.js` contient un registre documentaire `documents` et des PDF Storage utilisés ailleurs ; la rubrique `FACTURES & DOCUMENTS` de `lib/web/admin/pages/admin_dashboard_page.dart` est encore un affichage de préparation, sans consultation réelle des devis.
+- **Chemin sûr à construire avant activation** : validation préalable uniquement en lecture ; après identité légale et fiscalité vérifiées, création d'un document de devis officiel avec contrôle serveur authentifié, attribution `DV` via la séquence unique existante et préparation durable du PDF, puis publication dans `documents`/Storage et notification email **après** archivage. Les cas de défaillance partielle devront être idempotents et explicitement récupérables sans écraser un devis historisé. Aucun trigger financier existant ne doit être modifié sans test d'intégration.
+- `loginAdmin` crée un jeton Firebase avec UID/role/territoire ; les éventuelles routes de devis devront vérifier le token côté serveur et les droits en base, sans refaire ProConnect. Le modèle d'email de devis est **un préparateur sans envoi**, et le bouton reste volontairement désactivé.
+
+**Aucune modification de déclencheur Firebase, des règles Firestore ou du bouton Admin dans cette étape.** Les 29 tests sont des tests unitaires, pas une émission réelle, une preuve de fiscalité, un rendu email en Outlook ou une intégration complète.
