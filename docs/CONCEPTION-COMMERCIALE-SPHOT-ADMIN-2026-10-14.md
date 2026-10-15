@@ -514,3 +514,23 @@ Le déclencheur existant `assignQuoteNumberOnWrite` numérotait auparavant tout 
 - **Point bloquant réel à traiter avant raccordement** : plusieurs collections Firestore (dont `admins`, `adminRequests`, `subscriptions`) permettent encore des écritures clientes libres. Les marques de vérification lues dans de telles collections ne sont pas fiables juridiquement ni en sécurité. Les futurs adaptateurs devront utiliser des sources protégées et une politique d'accès serveur stricte. L'ajout d'un simple booléen "verified" à un document client ne suffira pas.
 - Étapes restant à développer et soumises à validation explicite : adaptateurs de lecture authentifiés des données réelles, enregistrement transactionnel de l'autorisation et du devis prêt à numéroter, reprise après attribution par le trigger, rendu/archivage idempotent, envoi email fiable, accès sécurisé au PDF, contrôles d'intégration avec émulateurs Firebase. Pas de déploiement.
 - Commandes de vérification à la racine : `git pull --ff-only origin codex/advertiser-pricing-table-v1`, `node --test functions/test/admin_quote_orchestrator.test.js`, `npm --prefix functions run lint`.
+
+## 33. Chaîne documentaire du devis : génération → archivage → email préparé (15/10/2026)
+
+**Objectif métier** : réunir les composants déjà validés sans modifier le parcours Web Admin. Le service n'est ni publié, ni accessible depuis Flutter, et n'envoie aucun email.
+
+- Nouveau module interne `functions/admin_quote_delivery.js` : exige un devis déjà numéroté `numbered_pending_archive`, vérifie la concordance avec le contexte juridique/fiscal exclusivement issu de sources serveur fiables, produit les octets PDF avec le moteur `admin_official_quote_pdf`, appelle l'archiveur `admin_official_quote_archive` et ne prépare le mail SPHOT qu'après confirmation du statut `issued` et de l'archive.
+- Reprise d'un devis déjà archivé : charge les octets conservés dans Storage, en vérifie le SHA-256 et le registre `documents`, puis prépare à nouveau l'objet mail **sans le transmettre** et sans régénérer ni remplacer le PDF. Rejette un registre ou un fichier incohérent.
+- Le module renvoie `email_prepared_not_sent` et `emailSent: false`. L'envoi SMTP, le verrou anti-double-envoi et les notifications ne sont PAS raccordés ; aucun débit, aucune commande ni abonnement ne sont créés.
+- Nouveau fichier `functions/test/admin_quote_delivery.test.js` : 10 tests en mémoire sans accès réseau/Firebase. Comprend la chaîne complète fictive `autorisation→numérotation→PDF réel (octets en mémoire)→archivage simulé→préparation email`, ainsi que les refus et reprises. La pièce jointe du message correspond exactement aux octets archivés.
+- Aucune modification de `functions/index.js`, du dashboard ou de `firebase.json`. **Aucune Cloud Function déployée, aucun numéro DV ni devis officiel produit en production.**
+- Commandes de vérification : `node --test functions/test/admin_quote_delivery.test.js`, `npm --prefix functions run lint`, puis la suite de tests précédents.
+
+**Avant le raccordement réel (reste spécifique au devis)** :
+1. Source serveur de confiance pour identité et droit Admin, émetteur réellement immatriculé, payeur habilité, postes sur territoire, tarif versionné et décision fiscale ; **pas** de validation fondée uniquement sur un booléen `verified` d'un document modifiable par le client.
+2. Enregistrement atomique d'un contexte commercial figé (prix, fiscalité, poste, émetteur, payeur) associé à l'autorisation DV ; comparer son empreinte jusqu'à l'archivage. Sans cela, le contexte peut dériver entre numérotation et PDF.
+3. Reprise d'un PDF enregistré en Storage avant l'inscription Firestore en cas d'échec partiel : garantir que les octets réutilisés sont ceux du premier rendu, car PDFKit peut produire des octets différents à chaque rendu. Pour l'instant l'archiveur refuse un fichier différent, ce qui évite l'écrasement mais peut nécessiter une reprise contrôlée.
+4. Expédition de l'email avec registre de livraison idempotent et gestion des erreurs/reprises ; contrôle d'accès au téléchargement PDF et tests Firebase Emulator.
+5. Levée explicite des conditions juridiques et fiscales SPHOT avant activation du bouton `ÉTABLIR UN DEVIS`. La période d'essai, l'abonnement, la commande et le paiement restent séparés.
+
+**État** : assemblage documentaire préparé, tests intégrés à exécuter sur le PC, aucune émission réelle.
