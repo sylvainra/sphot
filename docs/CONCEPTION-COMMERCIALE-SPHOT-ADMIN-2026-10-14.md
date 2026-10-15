@@ -386,3 +386,20 @@ Demande explicite « poursuivons » après validation du parcours 01 à 05 et co
 **Tests recommandés sur le PC de développement** depuis la racine du dépôt, après `git pull` :
 `node --test functions/test/admin_quote_validity.test.js functions/test/admin_quote_issue_readiness.test.js`.
 `flutter run -d chrome -t lib/main_web_admin.dart` doit montrer le **nouveau statut explicite** et le bouton devis toujours désactivé. Les contrôles de délimiteurs et présence du code ont été réalisés ; compilation Node/PDF réelle et Flutter non exécutées par l'assistant.
+
+## 26. Tests Node validés et test du moteur PDF ajouté (15/10/2026)
+
+**Retour de l'utilisateur depuis Windows PowerShell** :
+`node --test functions/test/admin_quote_validity.test.js functions/test/admin_quote_issue_readiness.test.js`
+→ **18 tests réussis sur 18 ; 0 échec**, durée rapportée ~179,56 ms. Les cas incluent les validations légales/fiscales et la validité plafonnée à 30 jours dans l'année civile.
+
+**Code ajouté suite au retour :**
+- `functions/test/admin_official_quote_pdf.test.js` : 5 nouveaux tests pour le moteur PDF officiel. Rejet si l'émetteur n'est pas immatriculé, si numéro DV absent, si année DV incorrecte, si référence de dossier absente ; production de simples **octets PDF en mémoire** pour un contexte fictif strictement technique, sans créer de fichier commercial, sans envoi ni écriture Firestore.
+- Le générateur testé `functions/admin_official_quote_pdf.js` réutilise le titre SPHOT réel et l'image Fire des emails et exige une numérotation DV préalable. **Les cinq tests PDF n'ont pas encore été exécutés par l'utilisateur**. La syntaxe JS a été vérifiée sur les 4 modules de devis/tests ; aucune compilation Flutter ni rendu PDF réel n'a été effectué par l'assistant.
+- Confirmation par lecture du code existant `functions/index.js` : `loginAdmin` crée déjà un token Firebase personnalisé avec `adminUid`, `role`, `territoireId`. L'authentification de toute future route d'émission devra exiger **un ID token Firebase vérifié par le serveur**, contrôler le rôle et le territoire **en base**, la situation du compte et les droits; ne pas rétablir ProConnect ni faire confiance à un `adminUid` arbitraire envoyé par Flutter. Le mécanisme `assignQuoteNumberOnWrite` existe déjà, sans émetteur de devis raccordé.
+
+**Test suivant sur PC**, à la racine de SPHOT, après synchronisation de `codex/advertiser-pricing-table-v1` et installation des dépendances `functions` au besoin :
+`node --test functions/test/admin_quote_validity.test.js functions/test/admin_quote_issue_readiness.test.js functions/test/admin_official_quote_pdf.test.js`.
+Si `pdfkit` manque : `npm --prefix functions install` puis relancer. **Ne pas déployer de nouvelle fonction de facturation à ce stade.**
+
+**Statut non négociable** : bouton « ÉTABLIR UN DEVIS » désactivé, aucun devis numéroté ou archivé réel, aucun paiement ni commande, jusqu'à immatriculation de l'émetteur, fiscalité validée, conformité juridique, endpoint serveur authentifié, numérotation idempotente et conservation immuable du PDF. La validation des tests n'autorise pas le passage en production.
