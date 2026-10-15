@@ -183,6 +183,13 @@ test("Un PDF SPHOT réel traverse l'archivage et prépare le mail, sans envoi", 
   assert.equal(document.documentType, "quote");
   assert.equal(document.status, "issued");
   assert.equal(document.adminUid, ADMIN);
+  assert.equal(document.commercialSnapshot.schemaVersion, 1);
+  assert.equal(document.commercialSnapshot.issuer.legalName,
+      "Emetteur FICTIF de test");
+  assert.equal(document.commercialSnapshot.buyer.legalName,
+      "Commune FICTIVE de test");
+  assert.equal(document.commercialSnapshot.rescueStations.length, 2);
+  assert.equal(document.commercialSnapshot.pricing.amountExclTax, 898);
   assert.equal(result.message.to, EMAIL);
   assert.ok(result.message.subject.includes(DV));
   const attachment = result.message.attachments.find(
@@ -283,3 +290,12 @@ test("Chaîne complète : autorisation fictive, DV, PDF, archive, mail prêt", a
   assert.equal(again, false);
   assert.equal(f.records.get("counters/quotes_2026_000001").lastNumber, 1);
 });
+
+test("Un changement d'organisme payeur après émission bloque la reprise",
+    async () => {
+      const f = memoryServices();
+      await f.call();
+      f.context.buyer.legalName = "Organisme modifié";
+      await assert.rejects(f.call(), /Registre d'archive incohérent/);
+      assert.equal(f.count.pdfUploads, 1);
+    });

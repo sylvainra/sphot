@@ -2,6 +2,62 @@
 "use strict";
 
 const crypto = require("node:crypto");
+const {isDeepStrictEqual} = require("node:util");
+
+// Photographie COMMERCIALE du devis, copiée du contexte vérifié coté serveur.
+// Elle sert à rapprocher plus tard ce devis des commandes et factures.
+// Ce n'est ni une écriture comptable, ni une facture, ni un encaissement.
+function commercialSnapshotForQuote(context) {
+  const issuer = context.issuer;
+  const buyer = context.buyer;
+  const price = context.publishedQuote;
+  const tax = context.taxDecision;
+  const legalIdentity = (entity) => ({
+    legalName: entity.legalName,
+    country: entity.country,
+    legalIdType: entity.country === "FR" ? "SIRET" : "OFFICIAL_ID",
+    legalId: entity.country === "FR" ? entity.siret : entity.officialId,
+    address: entity.address,
+    postalCode: entity.postalCode,
+    city: entity.city,
+  });
+  return {
+    schemaVersion: 1,
+    commercialDocumentType: "quote",
+    subscriptionYear: context.subscriptionYear,
+    issuer: legalIdentity(issuer),
+    buyer: {
+      ...legalIdentity(buyer),
+      billingEmail: buyer.billingEmail,
+      isDifferentFromManager: buyer.isDifferentFromManager === true,
+    },
+    rescueStations: context.stations.map((station) => ({
+      spotDocumentId: station.spotDocumentId,
+      idSphot: station.idSphot || "",
+      name: station.name,
+    })),
+    pricing: {
+      reference: price.pricingReference,
+      version: price.version,
+      currency: price.currency,
+      lines: price.lines.map((line, index) => ({
+        tier: index + 1,
+        count: line.count,
+        unitExclTax: line.unitExclTax,
+        amountExclTax: line.amountExclTax,
+      })),
+      amountExclTax: price.amountExclTax,
+    },
+    fiscality: {
+      jurisdiction: tax.jurisdiction,
+      taxTreatment: tax.taxTreatment,
+      legalBasis: tax.legalBasis,
+      amountExclTax: tax.amountExclTax,
+      taxAmount: tax.taxAmount,
+      amountInclTax: tax.amountInclTax,
+    },
+  };
+}
 const {assessAdminQuoteIssueReadiness} =
     require("./admin_quote_issue_readiness");
 
@@ -78,6 +134,17 @@ function archiveOfficialAdminQuote(args) {
         "/devis/" + number + ".pdf";
     const registryRef = db.collection("documents").doc(docId);
 
+    const readiness = assessAdminQuoteIssueReadiness(context);
+    if (!readiness.ready) {
+      const e = new Error("Devis non prêt : " + readiness.issues.join(", "));
+      e.code = "QUOTE_NOT_READY";
+      throw e;
+    }
+    if (quote.validUntil !== readiness.validity.validUntil) {
+      throw new Error("Date limite de validité différente du devis.");
+    }
+    const commercialSnapshot = commercialSnapshotForQuote(context);
+
     const existing = await registryRef.get();
     const previous = existing.exists ? existing.data() || {} : {};
     if (existing.exists) {
@@ -86,6 +153,8 @@ function archiveOfficialAdminQuote(args) {
           previous.quoteId !== quoteId ||
           previous.sha256 !== hash ||
           previous.storagePath !== archivePath ||
+          !isDeepStrictEqual(previous.commercialSnapshot,
+              commercialSnapshot) ||
           quote.status !== "issued") {
         throw new Error("Conflit d'archivage : document existant différent.");
       }
@@ -96,16 +165,6 @@ function archiveOfficialAdminQuote(args) {
     if (quote.status !== "numbered_pending_archive") {
       throw new Error("Le devis n'est pas autorisé à être archivé.");
     }
-    const readiness = assessAdminQuoteIssueReadiness(context);
-    if (!readiness.ready) {
-      const e = new Error("Devis non prêt : " + readiness.issues.join(", "));
-      e.code = "QUOTE_NOT_READY";
-      throw e;
-    }
-    if (quote.validUntil !== readiness.validity.validUntil) {
-      throw new Error("Date limite de validité différente du devis.");
-    }
-
     const file = bucket.file(archivePath);
     try {
       await file.save(pdfBuffer, {
@@ -155,6 +214,8 @@ function archiveOfficialAdminQuote(args) {
             stored.quoteId !== quoteId ||
             stored.status !== "issued" ||
             stored.storagePath !== archivePath ||
+            !isDeepStrictEqual(stored.commercialSnapshot,
+                commercialSnapshot) ||
             liveQuote.status !== "issued") {
           throw new Error("Un autre document est déjà archivé sous ce numéro.");
         }
@@ -183,6 +244,7 @@ function archiveOfficialAdminQuote(args) {
         amountInclTax: context.taxDecision.amountInclTax,
         taxTreatment: context.taxDecision.taxTreatment,
         currency: context.publishedQuote.currency,
+        commercialSnapshot,
         sha256: hash, pdfSize: pdfBuffer.length,
         storagePath: archivePath,
         issuedAt: timestamp, createdAt: timestamp,
@@ -205,4 +267,4 @@ function archiveOfficialAdminQuote(args) {
   })();
 }
 
-module.exports = {archiveOfficialAdminQuote};
+module.exports = {archiveOfficialAdminQuote, commercialSnapshotForQuote};

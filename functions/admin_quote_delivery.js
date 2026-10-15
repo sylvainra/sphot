@@ -2,9 +2,10 @@
 "use strict";
 
 const crypto = require("node:crypto");
+const {isDeepStrictEqual} = require("node:util");
 const {renderOfficialAdminQuotePdf} =
     require("./admin_official_quote_pdf");
-const {archiveOfficialAdminQuote} =
+const {archiveOfficialAdminQuote, commercialSnapshotForQuote} =
     require("./admin_official_quote_archive");
 const {buildAdminOfficialQuoteEmail} =
     require("./admin_quote_email");
@@ -117,7 +118,9 @@ async function prepareOfficialAdminQuoteDelivery(args = {}) {
         registry.amountExclTax !==
             context.publishedQuote.amountExclTax ||
         registry.taxAmount !== context.taxDecision.taxAmount ||
-        registry.amountInclTax !== context.taxDecision.amountInclTax) {
+        registry.amountInclTax !== context.taxDecision.amountInclTax ||
+        !isDeepStrictEqual(registry.commercialSnapshot,
+            commercialSnapshotForQuote(context))) {
       throw new Error("Registre d'archive incohérent.");
     }
     const downloaded = await bucket.file(expectedPath).download();

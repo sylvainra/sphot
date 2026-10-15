@@ -221,6 +221,17 @@ test("Devis PDF archivé : objet non écrasable et registre chronologique", asyn
   assert.equal(registry.amountInclTax, 1077.60);
   assert.equal(registry.pricingReference, "FR_ADMIN-V3");
   assert.equal(registry.numberOfRescueStations, 2);
+  assert.equal(registry.commercialSnapshot.schemaVersion, 1);
+  assert.equal(registry.commercialSnapshot.commercialDocumentType, "quote");
+  assert.equal(registry.commercialSnapshot.subscriptionYear, 2026);
+  assert.equal(registry.commercialSnapshot.issuer.legalId,
+      "12345678901234");
+  assert.equal(registry.commercialSnapshot.buyer.legalName,
+      "Commune FICTIVE");
+  assert.equal(registry.commercialSnapshot.pricing.lines[0].unitExclTax,
+      499);
+  assert.equal(registry.commercialSnapshot.fiscality.taxAmount, 179.60);
+  assert.equal(registry.commercialSnapshot.rescueStations.length, 2);
   assert.equal(registry.sha256, result.sha256);
   assert.equal("downloadUrl" in registry, false);
   assert.equal(fake.records.get("quotes/" + QUOTE_ID).status, "issued");
@@ -286,4 +297,19 @@ test("Un état non prêt pour archivage ne consomme aucun numéro ni PDF",
           /pas autorisé à être archivé/);
       assert.equal(fake.counters.uploads, 0);
       assert.equal(fake.records.has("documents/" + DOC_ID), false);
+    });
+
+test("Une réexécution ne peut pas réécrire l'identité commerciale du devis",
+    async () => {
+      const fake = fakeServices();
+      await archiveOfficialAdminQuote(fake.args());
+      const changed = approvedContext();
+      changed.buyer.legalName = "Une autre commune";
+      await assert.rejects(
+          archiveOfficialAdminQuote(fake.args(fakePdf(), changed)),
+          /Conflit d'archivage/,
+      );
+      assert.equal(fake.counters.uploads, 1);
+      assert.equal(fake.records.get("documents/" + DOC_ID)
+          .commercialSnapshot.buyer.legalName, "Commune FICTIVE");
     });

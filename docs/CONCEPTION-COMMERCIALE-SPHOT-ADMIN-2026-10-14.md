@@ -534,3 +534,15 @@ Le déclencheur existant `assignQuoteNumberOnWrite` numérotait auparavant tout 
 5. Levée explicite des conditions juridiques et fiscales SPHOT avant activation du bouton `ÉTABLIR UN DEVIS`. La période d'essai, l'abonnement, la commande et le paiement restent séparés.
 
 **État** : assemblage documentaire préparé, tests intégrés à exécuter sur le PC, aucune émission réelle.
+
+
+## 34. Traçabilité commerciale des devis pour les futurs exercices comptables (15/10/2026)
+
+**Principe métier confirmé :** un devis émis n'est ni une facture, ni une écriture de vente, ni un encaissement. Les futures factures, avoirs et paiements devront être exploitables par exercice pour le Super Admin et les professionnels de la comptabilité. Ce chantier d'export comptable n'est **pas** ouvert à ce stade.
+
+- Lors de l'archivage interne d'un devis **déjà officiellement numéroté et juridiquement autorisé**, le document `documents/{requestId_quoteNumber}` mémorise désormais un `commercialSnapshot` de version 1 : identité juridique et adresse de l'émetteur et du payeur, email de facturation, année d'abonnement, identifiants et noms des postes, grille publiée et tranches tarifaires, montants HT, traitement fiscal, fondement, taxes et TTC.
+- Le registre possède déjà `documentType: quote`, `adminUid`, `quoteId`, `documentNumber`, `year`, `issuedOn`, `validUntil`, `storagePath` et `sha256`. Ces références permettent à une future commande/facture de mentionner le devis source par `quoteId` et `documentId`, **sans modifier le devis archivé**.
+- Le snapshot est construit uniquement à partir du contexte de serveur **pré-vérifié**. Les contrôles internes de réexécution et de reprise refusent tout changement du snapshot, notamment de l'organisme payeur. Le PDF initial n'est jamais remplacé.
+- Ne pas renseigner artificiellement une TVA légale, un numéro SIRET de SPHOT, une date de paiement ou un numéro de facture. La qualification fiscale et la conformité de la facture électronique seront traitées au moment de leur mise en œuvre et de l'immatriculation.
+- Aucun affichage Super Admin, aucune exportation, aucun envoi, aucun endpoint et aucune règle Firebase ne sont ajoutés ici.
+- Vérification locale demandée : `node --test functions/test/admin_official_quote_archive.test.js functions/test/admin_quote_delivery.test.js` et `npm --prefix functions run lint`. Pas de déploiement.
