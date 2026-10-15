@@ -85,17 +85,26 @@ function assessAdminQuoteIssueReadiness(context) {
   );
 
   // Pas de taux TVA implicite, même lorsque le taux final est de 0 %.
-  // Chaque montant doit provenir d'une décision fiscale vérifiée au serveur.
+  // Les devis peuvent comporter des CENTIMES ; contrôler les montants
+  // monétaires en centimes avant de comparer HT + taxe avec le TTC.
+  function cents(value) {
+    if (!Number.isFinite(value) || value < 0) return null;
+    const scaled = value * 100;
+    const rounded = Math.round(scaled);
+    return Number.isSafeInteger(rounded) &&
+        Math.abs(scaled - rounded) < 0.000001 ? rounded : null;
+  }
+  const baseCents = cents(tax.amountExclTax);
+  const taxCents = cents(tax.taxAmount);
+  const ttcCents = cents(tax.amountInclTax);
   requireCondition(tax.status === "validated" &&
       filled(tax.jurisdiction) &&
       filled(tax.taxTreatment) &&
       filled(tax.legalBasis) &&
       tax.currency === quote.currency &&
-      Number.isSafeInteger(tax.amountExclTax) &&
-      tax.amountExclTax === quote.amountExclTax &&
-      Number.isSafeInteger(tax.taxAmount) && tax.taxAmount >= 0 &&
-      Number.isSafeInteger(tax.amountInclTax) &&
-      tax.amountInclTax === tax.amountExclTax + tax.taxAmount &&
+      baseCents !== null && baseCents === cents(quote.amountExclTax) &&
+      taxCents !== null && ttcCents !== null &&
+      ttcCents === baseCents + taxCents &&
       tax.calculationVerified === true,
   "TAX_TREATMENT_NOT_VERIFIED");
 
