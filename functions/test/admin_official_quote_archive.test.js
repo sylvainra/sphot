@@ -216,6 +216,11 @@ test("Devis PDF archivé : objet non écrasable et registre chronologique", asyn
   assert.equal(registry.createdByRole, "system");
   assert.equal(registry.issuedAt, "SERVER_TIMESTAMP_FOR_TESTS");
   assert.equal(registry.pdfSize, pdf.length);
+  assert.equal(registry.amountExclTax, 898);
+  assert.equal(registry.taxAmount, 179.60);
+  assert.equal(registry.amountInclTax, 1077.60);
+  assert.equal(registry.pricingReference, "FR_ADMIN-V3");
+  assert.equal(registry.numberOfRescueStations, 2);
   assert.equal(registry.sha256, result.sha256);
   assert.equal("downloadUrl" in registry, false);
   assert.equal(fake.records.get("quotes/" + QUOTE_ID).status, "issued");
