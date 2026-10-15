@@ -546,3 +546,14 @@ Le déclencheur existant `assignQuoteNumberOnWrite` numérotait auparavant tout 
 - Ne pas renseigner artificiellement une TVA légale, un numéro SIRET de SPHOT, une date de paiement ou un numéro de facture. La qualification fiscale et la conformité de la facture électronique seront traitées au moment de leur mise en œuvre et de l'immatriculation.
 - Aucun affichage Super Admin, aucune exportation, aucun envoi, aucun endpoint et aucune règle Firebase ne sont ajoutés ici.
 - Vérification locale demandée : `node --test functions/test/admin_official_quote_archive.test.js functions/test/admin_quote_delivery.test.js` et `npm --prefix functions run lint`. Pas de déploiement.
+
+
+## 35. Lecture réelle du dossier Admin pour chiffrer un brouillon (15/10/2026)
+
+- Nouveau module interne `functions/admin_quote_real_data.js` (`loadRealAdminQuoteDraft`), sans endpoint Flutter ni écriture : vérifie le Firebase ID Token (révocation comprise), exige le rôle ADMIN, retrouve le compte protégé `adminAccounts` par `adminUid`, puis recoupe `admins/{uid}`, `adminRequests/{uid}`, `subscriptions/{uid}` et `territoires/{territoireId}/spots/{spotId}`.
+- Le numéro administratif et le territoire doivent correspondre ; la sélection de postes est relue individuellement, les postes fictifs/non-secours/hors territoire et les doublons sont refusés. Les cas historiques où `requestId != adminUid` sont explicitement bloqués pour l'architecture DV actuelle.
+- Le montant HT est recalculé à partir de `commercialPricingMarkets/FR_ADMIN` publié. Les champs `annualAmountExclTax`, `numberOfRescueStations` et `selectedRescueStations` fournis par le navigateur ne servent jamais d'autorité. Un organisme payeur distinct ne récupère jamais par défaut le SIRET du gestionnaire.
+- Résultat `draft_preview` : postes, identité du payeur **déclarée mais non certifiée**, tarif publié, et trois marqueurs négatifs `legalIdentityVerified: false`, `fiscalityVerified: false`, `issuanceAuthorized: false`. Les taxes et le TTC restent inconnus (`null`) : **aucun taux fiscal supposé**.
+- 14 tests de simulation dans `functions/test/admin_quote_real_data.test.js`, sans Firestore réel. Le code source peut lire les collections réelles via le SDK Admin mais n'est **pas** appelé par `functions/index.js`, donc ni exposé ni déployé.
+- **Reste pour finaliser le devis** : vérification légale et fiscale sur sources protégées, raccordement contrôlé à l'orchestrateur et autorisation transactionnelle, envoi d'email idempotent, consultation/téléchargement sécurisé, tests d'intégration Firebase ; émission réelle seulement après immatriculation et validations expresses.
+- Vérifications locales : `node --test functions/test/admin_quote_real_data.test.js` et `npm --prefix functions run lint`. Le travail sur la facturation globale est reporté.
