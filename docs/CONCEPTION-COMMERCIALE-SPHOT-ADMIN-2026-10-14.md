@@ -488,3 +488,16 @@ Demande utilisateur : **« archivons »**. Un module d'archivage des futurs devi
 - **Tests statiques JS vérifiés**, mais nouveaux 8 tests Node **à exécuter sur le PC de développement** :
   `node --test functions/test/admin_quote_archive.test.js`.
 - Le cumul antérieur est de **29 tests réussis** ; les 8 nouveaux ne sont pas encore validés en exécution. Pas de mise en production ni émission réelle avant immatriculation SPHOT et validations juridiques, fiscales et sécurité serveur.
+
+## 31. Sécurisation de la numérotation DV — autorisation serveur requise (15/10/2026)
+
+Le déclencheur existant `assignQuoteNumberOnWrite` numérotait auparavant tout document `quotes` suffisamment référencé. La branche a été préparée pour **bloquer par défaut** toute attribution de numéro DV tant que le futur orchestrateur authentifié n'a pas créé une autorisation distincte et concordante.
+
+- Nouveau module `functions/admin_quote_numbering.js`, appelé exclusivement par le trigger `quotes/{quoteId}` de `functions/index.js`. Le traitement générique `assignCommercialDocumentNumber` des **commandes, factures et avoirs** reste inchangé.
+- Seul l'état `authorized_pending_number` est éligible, à condition que `quoteIssueAuthorizations/{quoteId}` existe avec le statut `approved_for_numbering`, des références et dates strictement concordantes, et des validations émetteur, fiscalité, tarif publié, payeur/tiers, postes et droits Admin attestées **par le futur backend de confiance**. Aucun booléen provenant de Flutter ne vaut autorisation.
+- Vérification du dossier `adminRequests/{requestId}`, de l'identité Admin, de la validité civile (30 jours maximum selon l'année d'abonnement), puis transaction unique : compteur `counters/quotes_{année}_{adhérent}`, numéro `DV-{année}-{adhérent}-{séquence}`, statut `numbered_pending_archive`, et consommation irréversible de l'autorisation.
+- Aucun état `issued` n'est fixé lors de la numérotation. La génération PDF, l'archivage définitif et l'email restent des étapes séparées, toujours NON raccordées.
+- `quoteIssueAuthorizations` doit rester **inaccessible en lecture/écriture directe depuis les clients**. Les règles Firestore actuelles, sans match sur cette collection, refusent l'accès par défaut. Seul le SDK Admin d'un endpoint authentifié et validé juridiquement/fiscalement devra pouvoir créer l'autorisation. **Le présent changement ne crée aucun endpoint ni aucune autorisation.**
+- 12 tests Node de non-régression ajoutés dans `functions/test/admin_quote_numbering.test.js` : brouillon, autorisation manquante ou incomplète, discordance Admin, dossier, date, succès transactionnel fictif, idempotence, autorisation consommée, compteur invalide et protection d'un numéro existant.
+- Validation à réaliser sur le PC : `node --test functions/test/admin_quote_numbering.test.js` puis `npm --prefix functions run lint`. **Aucun déploiement**, aucun numéro réel et aucun devis émis pendant cette étape.
+- Vigilance restante : les règles ouvertes des collections `adminRequests`, `admins`, `subscriptions` et d'autres données métier sont un risque indépendant ; il faudra les restreindre sans interrompre les parcours existants. Ne pas mettre en service le futur endpoint de devis avant cet audit et les tests d'intégration Firebase.

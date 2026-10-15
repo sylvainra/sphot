@@ -11,6 +11,8 @@ const admin = require("firebase-admin");
 const crypto = require("crypto");
 const commercialPricing = require("./commercial_pricing");
 const commercialQuotePricing = require("./commercial_quote_pricing");
+const {assignAuthorizedAdminQuoteNumber} =
+    require("./admin_quote_numbering");
 const {getDownloadURL} = require("firebase-admin/storage");
 const nodemailer = require("nodemailer");
 const PDFDocument = require("pdfkit");
@@ -4000,10 +4002,11 @@ exports.assignQuoteNumberOnWrite = onDocumentWritten(
       memory: "256MiB",
     },
     async (event) => {
-      await assignCommercialDocumentNumber(
-          event,
-          COMMERCIAL_DOCUMENTS.quote,
-      );
+      await assignAuthorizedAdminQuoteNumber({
+        db: admin.firestore(),
+        event,
+        serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      });
     },
 );
 
