@@ -6168,6 +6168,104 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return '';
   }
 
+  /// Lecture seule : les vrais devis archivés dans le registre SPHOT.
+  /// Aucune numérotation, génération de PDF ou écriture n'est déclenchée ici.
+  Widget _buildArchivedAdminQuotes() {
+    final uid = widget.adminUid.trim();
+    if (uid.isEmpty) {
+      return _buildCommercialSection(
+        icon: Icons.request_quote_outlined,
+        title: 'DEVIS',
+        description: 'Devis officiels de votre organisme.',
+        status: 'ADMINISTRATEUR NON IDENTIFIÉ',
+        statusColor: redColor,
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('documents')
+          .where('adminUid', isEqualTo: uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _buildCommercialSection(
+            icon: Icons.request_quote_outlined,
+            title: 'DEVIS',
+            description:
+                'La consultation des archives nécessite des droits '
+                'de lecture sur le registre documentaire.',
+            status: 'ARCHIVES INDISPONIBLES',
+            statusColor: redColor,
+          );
+        }
+        if (!snapshot.hasData) {
+          return _buildCommercialSection(
+            icon: Icons.request_quote_outlined,
+            title: 'DEVIS',
+            description: 'Recherche des devis officiels archivés.',
+            status: 'CHARGEMENT...',
+          );
+        }
+
+        final documents = snapshot.data!.docs
+            .where((doc) {
+              final data = doc.data();
+              return data['documentType'] == 'quote' &&
+                  data['status'] == 'issued' &&
+                  _cleanText(data['documentNumber']).startsWith('DV-') &&
+                  _cleanText(data['storagePath']).isNotEmpty;
+            })
+            .toList()
+          ..sort((a, b) {
+            final first = a.data();
+            final second = b.data();
+            final byDate = _cleanText(second['issuedOn'])
+                .compareTo(_cleanText(first['issuedOn']));
+            return byDate != 0 ? byDate :
+                _cleanText(second['documentNumber'])
+                    .compareTo(_cleanText(first['documentNumber']));
+          });
+
+        if (documents.isEmpty) {
+          return _buildCommercialSection(
+            icon: Icons.request_quote_outlined,
+            title: 'DEVIS',
+            description:
+                'Les devis officiels seront conservés ici après '
+                'leur émission et leur archivage sécurisé.',
+            status: 'AUCUN DEVIS ÉMIS',
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final document in documents) ...[
+              Builder(builder: (context) {
+                final data = document.data();
+                final numero = _cleanText(data['documentNumber']);
+                final date = _cleanText(data['issuedOn']);
+                final validite = _cleanText(data['validUntil']);
+                return _buildCommercialSection(
+                  icon: Icons.request_quote_outlined,
+                  title: 'DEVIS $numero',
+                  description:
+                      'Émis le $date'
+                      '${validite.isEmpty ? '' : ' · Valable jusqu’au $validite'}'
+                      '\nPDF conservé dans le registre documentaire.',
+                  status: 'DEVIS ARCHIVÉ',
+                  statusColor: const Color(0xFF15803D),
+                );
+              }),
+              const SizedBox(height: 10),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildBillingDocumentsPanel() {
     final administrativeReference = _currentAdministrativeReference();
 
@@ -6237,14 +6335,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         const SizedBox(height: 12),
                       ],
 
-                      _buildCommercialSection(
-                        icon: Icons.request_quote_outlined,
-                        title: 'DEVIS',
-                        description:
-                            'Les devis officiels émis seront consultables ici. '
-                            'Leur génération et téléchargement restent à raccorder.',
-                        status: 'ÉMISSION NON ENCORE DISPONIBLE',
-                      ),
+                      _buildArchivedAdminQuotes(),
                       const SizedBox(height: 12),
                       _buildCommercialSection(
                         icon: Icons.shopping_cart_checkout_rounded,
