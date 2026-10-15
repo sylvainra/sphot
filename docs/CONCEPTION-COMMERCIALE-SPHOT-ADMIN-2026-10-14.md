@@ -352,3 +352,13 @@ Après capture d'une version à titre seul sur fond blanc, l'utilisateur a expre
 **Conformité future du devis** : émetteur identifié officiellement, client facturé correctement, prestations/SPHOTS, conditions (période calendaire sans prorata, validité 30 jours), prix HT et fiscalité applicable déterminée, références/document unique et horodatage, version du tarif publié, document conservé sans écrasement. Seules les mentions légalement pertinentes seront ajoutées au PDF, pas de documents parallèles ni de contrôles commerciaux quotidiens du Super Admin.
 
 **Contrôle demandé** : l'utilisateur doit constater l'absence totale du bouton et de la simulation PDF dans l'étape 03, la présence du seul bouton devis désactivé, et la conservation de l'affichage tarifaire en étape 01. Aucun test Flutter/Chrome réalisé côté assistant.
+
+## 24. Correctif saisis champs facturation — perte du focus après chaque lettre (15/10/2026)
+
+Capture utilisateur de la rubrique 02 « AUTRE ORGANISME PAYEUR » : saisie de « mai » dans la dénomination impossible de façon continue, l'Admin doit recliquer après chaque lettre. Dysfonctionnement constaté dans les champs de saisie du panneau.
+
+**Cause dans `lib/web/admin/pages/admin_subscription_panel.dart` :** `_field()` donnait au `TextFormField` une `ValueKey` incluant `_fieldValue(...)` (le texte entré). Les reconstructions du formulaire (notamment `liveUpdate` pour le pays et toute actualisation réactive des données) remplaçaient le widget lorsqu'une lettre changeait la valeur ; focus et curseur perdus.
+
+**Correction appliquée** : `ValueKey<String>('payer-field-$field-${_payerRelation(data)}')` — identité stable pendant la frappe, différente seulement si l'Admin change de relation payeur. La valeur saisie reste conservée dans `_draft`; `liveUpdate` sur le pays garde l'affichage conditionnel SIRET français / identifiant étranger sans reconstruire le champ à chaque caractère. Tous les champs texte de la rubrique reposent sur `_field()`, donc correctif commun. Aucun changement des données Firestore, contrats, tarifs ou des sections.
+
+**Vérifications** : relecture de tous les `TextFormField` du fichier, la clé ne contient plus de texte évolutif et les champs utilisent `_field()`; inspection statique. Pas de Flutter local chez l'assistant. **À tester dans Chrome** : saisir plusieurs mots dans « Dénomination », adresse, SIRET, contact, email et pays en continu ; choisir « Autre organisme payeur », revenir au gestionnaire, puis revenir au payeur distinct ; enregistrer et vérifier l'absence de perte de focus / de caractères / de mélange entre organismes. Aucune commande ni paiement réels actifs.
