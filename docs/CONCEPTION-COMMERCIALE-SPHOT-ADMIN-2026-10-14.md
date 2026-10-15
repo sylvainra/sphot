@@ -448,3 +448,31 @@ Le résultat attendu est **6 tests réussis** ; ne pas déployer avant validatio
 - `loginAdmin` crée un jeton Firebase avec UID/role/territoire ; les éventuelles routes de devis devront vérifier le token côté serveur et les droits en base, sans refaire ProConnect. Le modèle d'email de devis est **un préparateur sans envoi**, et le bouton reste volontairement désactivé.
 
 **Aucune modification de déclencheur Firebase, des règles Firestore ou du bouton Admin dans cette étape.** Les 29 tests sont des tests unitaires, pas une émission réelle, une preuve de fiscalité, un rendu email en Outlook ou une intégration complète.
+
+## 30. Préparation de l'archivage officiel des devis — sans émission anticipée (15/10/2026)
+
+**Demande explicite : « archivons »** après validation des 29 tests cumulés (18 règles/validité, 5 PDF, 6 email). Le devis n'est pas encore émissible légalement : SPHOT non immatriculé et fiscalité non configurée. Il est strictement interdit de créer des devis officiels, des PDF contractuels ou des emails à de vrais administrateurs simplement pour tester l'archivage.
+
+**Module serveur interne ajouté** : `functions/admin_official_quote_archive.js`, fonction `archiveOfficialAdminQuote` :
+- N'est exporté par AUCUN endpoint Cloud Function : **pas déployé ni déclenché par le portail**. Il doit être appelé exclusivement par un futur orchestrateur authentifié, avec les validations d'identité, de droits, d'émetteur, de fiscalité, de territoires et de grille effectivement réalisées côté serveur.
+- Attend un document `quotes/{quoteId}` **déjà numéroté** `DV-{année}-{adhérent}-{séquence}` et en état `numbered_pending_archive`. Vérifie cohérence du document, de la référence `SPHOT-ADM-...`, du contexte serveur et de la validité 30 jours. **Ne crée pas de document quotes ni ne consomme de numéros.**
+- Stocke le PDF à chemin stable `adminRequests/{requestId}/documents/financier/{année}/devis/{numeroDV}.pdf`, dans **l'arborescence Storage déjà employée** par les documents administratifs SPHOT. Upload avec précondition GCS `ifGenerationMatch: 0` : refuse l'écrasement de l'objet ; identifiant et empreinte SHA-256 de l'original.
+- Écrit dans une transaction Firestore `documents/{requestId}_{numeroDV}` avec `documentType=quote`, `category=financial`, `subcategory=devis`, `status=issued`, références, date, validité, version et référence du tarif publié, nombre de postes, ventilation HT/taxes/TTC, chemin Storage, taille et empreinte du PDF ; **dans la même transaction** marque `quotes/{quoteId}` comme `issued` et `pdfArchived=true`.
+- Reprise après incident entre Storage et Firestore : si un PDF identique existe déjà, il compare les octets par SHA-256 et complète uniquement le registre manquant. Si l'original diffère, arrêt sur conflit. Un deuxième appel identique rend `alreadyArchived: true`, sans création d'autre document ni écrasement.
+- Aucun `downloadUrl` public n'est émis par l'archiveur ; l'accès authentifié au PDF devra être finalisé lors du développement de la consultation sécurisée et des règles Storage.
+
+**10 tests unitaires Node ajoutés** dans `functions/test/admin_official_quote_archive.test.js` ; ils utilisent exclusivement des imitations de Firestore et Storage en mémoire, sans données réelles. Cas couverts : prérequis serveur, numéro de devis, refus fiscal/juridique, séparation Admin, succès du registre immuable, appel idempotent, impossibilité de remplacer les octets, reprise après transaction interrompue, conflit d'objet existant, état de devis incorrect.
+
+**Portail Admin, lecture seule** : `lib/web/admin/pages/admin_dashboard_page.dart`, rubrique **FACTURES & DOCUMENTS → DEVIS** : remplacement du bloc statique par un `StreamBuilder` filtrant `documents` sur l'UID Admin connecté, puis `documentType=quote`, `status=issued` et présence du chemin Storage. Affiche les références et dates de vrais devis archivés ou **AUCUN DEVIS ÉMIS** si liste vide. Aucun faux devis ou PDF de simulation n'est créé, aucune action d'émission ou de téléchargement sensible n'est activée. Si les règles Firestore interdisent la lecture, indique **ARCHIVES INDISPONIBLES** : **les droits de lecture Firestore/Storage devront être vérifiés avant exploitation**.
+
+**Contrôles effectués côté assistant** : lecture du registre `documents` existant, du mécanisme de numérotation DV déjà en place, du bandeau Admin et des conventions de stockage ; vérification de la syntaxe JavaScript et de la présence des protections. **Les dix tests Node et la compilation Flutter restent à exécuter sur le PC utilisateur.**
+
+**Commandes de test PowerShell, à la racine SPHOT, sans aucun déploiement Firebase :**
+```powershell
+git pull --ff-only origin codex/advertiser-pricing-table-v1
+node --test functions/test/admin_official_quote_archive.test.js
+flutter run -d chrome -t lib/main_web_admin.dart
+```
+Dans FACTURES & DOCUMENTS, aucune entrée DV ne doit être inventée. Le texte visible pourra indiquer « AUCUN DEVIS ÉMIS » ou, si l'accès Firestore n'est pas autorisé, « ARCHIVES INDISPONIBLES ». Un numéro DV ne doit être attribué que par la procédure officielle future, après finalisation juridique et fiscale.
+
+**Travail à faire avant exploitation** : endpoint serveur authentifié et idempotent d'émission (non présent), vérification réelle des droits Admin et d'un payeur tiers, contrôle du tarif publié et fiscalité, alignement avec le trigger `assignQuoteNumberOnWrite`, test en émulateur Firebase du stockage + transactions/reprise, sécurisation des règles Firestore et Storage, accès au PDF pour le bon Admin, traçabilité de l'envoi email après PDF effectivement archivé. Pas d'activation du bouton DEVIS ni de paiement.
