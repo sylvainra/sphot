@@ -417,3 +417,22 @@ La commande `npm --prefix functions install` a ensuite échoué localement avec 
 **État actuel validé :** les contrôles et le moteur PDF en mémoire sont fonctionnels selon les tests Node. L'affichage réel du PDF, le raccordement du service d'émission authentifié, la numérotation transactionnelle DV, l'archivage immuable et la facturation légale restent non testés / non opérationnels. La section 03 du portail Admin reste bloquée car SPHOT n'est pas immatriculé ; aucun devis réel ni paiement ne doit être créé.
 
 **Étape de développement suivante :** conception ciblée du service d'émission sécurisé qui récupère en serveur l'identité de l'Admin authentifié, son territoire, les postes sélectionnés, la grille publiée, les données de facturation légitimement vérifiées et la configuration émetteur/fiscalité ; blocage par défaut si un élément manque. Ensuite seulement numéro DV transactionnel, PDF officiel et archivage idempotent. Ne pas activer l'émission à partir de tests fictifs.
+
+## 28. Marker Fire unique dans les emails de devis (15/10/2026)
+
+Après validation des aperçus visuels du devis et du mail, l'utilisateur a demandé de corriger uniquement le **Fire rouge en bas de l'email**, qui différait du Fire habituel. **La mise en page générale est validée.**
+
+**Source visuelle officielle vérifiée dans le dépôt :** tous les emails SPHOT communs passent par `functions/sphot_email_design.js`, avec le marker à `cid:sphot-brand-fire-png`, le fichier intégré `fire_red_icon.png` et la taille stable `42 × 65` pixels. Le SVG historique `data/icons/fire_red_icon.svg` reste la source graphique utilisée dans les interfaces/documents qui prennent en charge le vectoriel. Pour l'email, **réutiliser la version PNG embarquée du modèle partagé**, compatible avec les clients mails, est préférable à un SVG incorporé non fiable. Ne pas recadrer une capture ni créer un second marker.
+
+**Code ajouté :**
+- `functions/admin_quote_email.js` : générateur d'options Nodemailer pour l'email du DEVIS OFFICIEL (destiné à l'Admin), passant uniquement par `buildSphotMessage`. Celui-ci ajoute automatiquement la véritable image SPHOT dans l'en-tête et un unique Fire officiel en pied, dimensions **42×65**, sans duplication et sans autre variante.
+- Vérifications de garde avant préparation de l'email : statut de devis émis et PDF archivé, émetteur et fiscalité vérifiés, numéro `DV-...`, dates/validité sur 30 jours, PDF transmis en pièce jointe et destinataire Admin renseigné. Ces indicateurs doivent être construits par le futur **backend de confiance** à partir d'un enregistrement vérifié, **jamais** reçus comme booléens contrôlés par le navigateur. Le module ne réalise **aucun envoi**, ni écriture Firestore.
+- `functions/test/admin_quote_email.test.js` : **6 tests** vérifiant la correspondance exacte des octets du marker embarqué avec le modèle des autres emails, l'unicité du Fire dans le HTML, ses dimensions `42×65`, la pièce jointe DV, le refus de préparer un mail avant émission/archivage, les dates et l'échappement HTML.
+
+**Code existant préservé :** `functions/sphot_email_design.js` et les emails Admin, sauveteur, publicitaire déjà en production ne sont pas modifiés, car leur marker commun est la référence souhaitée. `functions/admin_official_quote_pdf.js` emploie déjà les images issues de `buildSphotMessage` pour le PDF futur ; ne pas changer son habillage visuel sans demande.
+
+**Contrôles effectués :** lecture du vrai header/footer commun SPHOT et de l'implémentation de `buildSphotMessage`, vérification statique de syntaxe JS des deux nouveaux fichiers et de l'absence d'envoi/écritures. **Les 6 nouveaux tests n'ont pas encore été exécutés sur le PC.** Aucun vrai devis, mail, facture ou commande n'a été créé ; le bouton reste bloqué en attente d'immatriculation/fiscalité. Le modèle est un préparateur de message futur, pas un raccordement de production.
+
+**Test à lancer (PowerShell, racine SPHOT, après git pull sur la branche) :**
+`node --test functions/test/admin_quote_email.test.js`.
+Le résultat attendu est **6 tests réussis** ; ne pas déployer avant validation juridique et backend de génération/archivage.
