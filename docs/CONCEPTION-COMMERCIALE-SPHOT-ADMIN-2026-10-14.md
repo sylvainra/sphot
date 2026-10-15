@@ -557,3 +557,9 @@ Le déclencheur existant `assignQuoteNumberOnWrite` numérotait auparavant tout 
 - 14 tests de simulation dans `functions/test/admin_quote_real_data.test.js`, sans Firestore réel. Le code source peut lire les collections réelles via le SDK Admin mais n'est **pas** appelé par `functions/index.js`, donc ni exposé ni déployé.
 - **Reste pour finaliser le devis** : vérification légale et fiscale sur sources protégées, raccordement contrôlé à l'orchestrateur et autorisation transactionnelle, envoi d'email idempotent, consultation/téléchargement sécurisé, tests d'intégration Firebase ; émission réelle seulement après immatriculation et validations expresses.
 - Vérifications locales : `node --test functions/test/admin_quote_real_data.test.js` et `npm --prefix functions run lint`. Le travail sur la facturation globale est reporté.
+
+## 36. Accès privé au PDF archivé du devis — lecture serveur (15/10/2026)
+
+- `functions/admin_quote_download.js` prépare la consultation du PDF d'un devis **déjà émis et archivé**. Identité Firebase vérifiée et non révoquée ; rôle ADMIN ; compte actif dans la collection serveur `adminAccounts` ; interdiction de récupérer les documents d'un autre UID. Le fichier doit correspondre au dossier `documents`, à `quotes`, à son chemin attendu et à son empreinte SHA-256. Pas d'URL de téléchargement publique.
+- `functions/test/admin_quote_download.test.js` contient 11 scénarios fictifs (propriétaire, autre Admin, annonceur, suspension, doublon de comptes, archive altérée, etc.). **Tests locaux à effectuer**.
+- Aucun bouton ni endpoint n'est créé et `functions/index.js` n'est pas modifié. Cette étape ne télécharge rien depuis la base réelle, n'envoie aucun mail, n'émet aucun devis et n'altère aucun fichier. L'exposition contrôlée au portail reste à réaliser après test d'intégration, sans déploiement avant décision explicite.
