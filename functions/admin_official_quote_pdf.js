@@ -118,6 +118,7 @@ function adminQuoteDocumentDefinition(context = {}, {
 
   return {
     title: "DEVIS SPHOT ADMIN",
+    quoteBranding: true,
     documentNumber: official ? quoteNumber : "NON ATTRIBUÉ - SPÉCIMEN",
     requestNumber: filled(administrativeReference ||
         context.administrativeReference),

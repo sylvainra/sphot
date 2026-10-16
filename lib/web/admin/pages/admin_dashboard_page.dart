@@ -5985,6 +5985,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required String description,
     String status = 'À COMPLÉTER',
     Color statusColor = pendingColor,
+    Widget? footer,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -5993,7 +5994,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: adminColor.withOpacity(0.22)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: adminColor, size: 27),
@@ -6033,6 +6037,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ],
             ),
           ),
+        ],
+      ),
+      if (footer != null) ...[
+        const SizedBox(height: 10),
+        footer,
+      ],
         ],
       ),
     );
@@ -6235,15 +6245,36 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
-  /// Lecture seule : les vrais devis archivés dans le registre SPHOT.
-  /// Aucune numérotation, génération de PDF ou écriture n'est déclenchée ici.
+  /// Le devis consultable reste accessible dans le MÊME encart DEVIS,
+  /// qu'un document officiel ait déjà été émis ou non.
+  Widget _consultQuoteAction() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _consultingQuoteFromDocuments
+            ? null
+            : _consultQuoteFromDocuments,
+        icon: _consultingQuoteFromDocuments
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.picture_as_pdf_outlined),
+        label: Text(_consultingQuoteFromDocuments
+            ? 'PRÉPARATION DU PDF...'
+            : 'CONSULTER LE DEVIS (PDF)'),
+      ),
+    );
+  }
+
   Widget _buildArchivedAdminQuotes() {
     final uid = widget.adminUid.trim();
     if (uid.isEmpty) {
       return _buildCommercialSection(
         icon: Icons.request_quote_outlined,
         title: 'DEVIS',
-        description: 'Devis officiels de votre organisme.',
+        description: 'Devis consultable avec les informations disponibles.',
         status: 'ADMINISTRATEUR NON IDENTIFIÉ',
         statusColor: redColor,
       );
@@ -6255,106 +6286,85 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           .where('adminUid', isEqualTo: uid)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _buildCommercialSection(
-            icon: Icons.request_quote_outlined,
-            title: 'DEVIS',
-            description:
-                'La consultation des archives nécessite des droits '
-                'de lecture sur le registre documentaire.',
-            status: 'ARCHIVES INDISPONIBLES',
-            statusColor: redColor,
-          );
-        }
-        if (!snapshot.hasData) {
-          return _buildCommercialSection(
-            icon: Icons.request_quote_outlined,
-            title: 'DEVIS',
-            description: 'Recherche des devis officiels archivés.',
-            status: 'CHARGEMENT...',
-          );
-        }
+        final documents = snapshot.data?.docs
+                .where((doc) {
+                  final data = doc.data();
+                  return data['documentType'] == 'quote' &&
+                      data['status'] == 'issued' &&
+                      _cleanText(data['documentNumber']).startsWith('DV-') &&
+                      _cleanText(data['storagePath']).isNotEmpty;
+                })
+                .toList() ??
+            <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+        documents.sort((a, b) {
+          final first = a.data();
+          final second = b.data();
+          final byDate = _cleanText(second['issuedOn'])
+              .compareTo(_cleanText(first['issuedOn']));
+          return byDate != 0
+              ? byDate
+              : _cleanText(second['documentNumber'])
+                  .compareTo(_cleanText(first['documentNumber']));
+        });
 
-        final documents = snapshot.data!.docs
-            .where((doc) {
-              final data = doc.data();
-              return data['documentType'] == 'quote' &&
-                  data['status'] == 'issued' &&
-                  _cleanText(data['documentNumber']).startsWith('DV-') &&
-                  _cleanText(data['storagePath']).isNotEmpty;
-            })
-            .toList()
-          ..sort((a, b) {
-            final first = a.data();
-            final second = b.data();
-            final byDate = _cleanText(second['issuedOn'])
-                .compareTo(_cleanText(first['issuedOn']));
-            return byDate != 0 ? byDate :
-                _cleanText(second['documentNumber'])
-                    .compareTo(_cleanText(first['documentNumber']));
-          });
+        final archiveStatus = snapshot.hasError
+            ? 'ARCHIVES INDISPONIBLES'
+            : !snapshot.hasData
+                ? 'CHARGEMENT DES ARCHIVES...'
+                : documents.isEmpty
+                    ? 'AUCUN DEVIS ÉMIS'
+                    : '${documents.length} DEVIS ARCHIVÉ(S)';
 
-        if (documents.isEmpty) {
-          return _buildCommercialSection(
-            icon: Icons.request_quote_outlined,
-            title: 'DEVIS',
-            description:
-                'Les devis officiels seront conservés ici après '
-                'leur émission et leur archivage sécurisé.',
-            status: 'AUCUN DEVIS ÉMIS',
-          );
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final document in documents) ...[
-              Builder(builder: (context) {
-                final data = document.data();
-                final numero = _cleanText(data['documentNumber']);
-                final date = _cleanText(data['issuedOn']);
-                final validite = _cleanText(data['validUntil']);
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildCommercialSection(
-                      icon: Icons.request_quote_outlined,
-                      title: 'DEVIS $numero',
-                      description:
-                          'Émis le $date'
-                          '${validite.isEmpty ? '' : ' · Valable jusqu’au $validite'}'
-                          '\nPDF conservé dans le registre documentaire.',
-                      status: 'DEVIS ARCHIVÉ',
-                      statusColor: const Color(0xFF15803D),
-                    ),
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: OutlinedButton.icon(
-                        onPressed: _loadingQuoteArchiveIds.contains(document.id)
-                            ? null
-                            : () => _downloadArchivedAdminQuote(
-                                document.id, numero),
-                        icon: _loadingQuoteArchiveIds.contains(document.id)
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.picture_as_pdf_outlined),
-                        label: Text(_loadingQuoteArchiveIds.contains(document.id)
-                            ? 'OUVERTURE...'
-                            : 'TÉLÉCHARGER LE PDF'),
-                      ),
-                    ),
-                  ],
-                );
-              }),
-              const SizedBox(height: 10),
+        return _buildCommercialSection(
+          icon: Icons.request_quote_outlined,
+          title: 'DEVIS',
+          description:
+              'Consulter le devis avec les données disponibles. '
+              'Les devis officiellement émis sont conservés ici.',
+          status: archiveStatus,
+          statusColor: snapshot.hasError
+              ? redColor
+              : documents.isNotEmpty
+                  ? const Color(0xFF15803D)
+                  : pendingColor,
+          footer: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _consultQuoteAction(),
+              for (final document in documents) ...[
+                const Divider(height: 18),
+                Text(
+                  'DEVIS ${_cleanText(document.data()['documentNumber'])}',
+                  style: const TextStyle(
+                    color: adminColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Émis le ${_cleanText(document.data()['issuedOn'])}',
+                  style: const TextStyle(
+                    color: adminColor,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                OutlinedButton.icon(
+                  onPressed: _loadingQuoteArchiveIds.contains(document.id)
+                      ? null
+                      : () => _downloadArchivedAdminQuote(
+                            document.id,
+                            _cleanText(document.data()['documentNumber']),
+                          ),
+                  icon: const Icon(Icons.download_outlined, size: 18),
+                  label: Text(_loadingQuoteArchiveIds.contains(document.id)
+                      ? 'TÉLÉCHARGEMENT...'
+                      : 'TÉLÉCHARGER LE PDF OFFICIEL'),
+                ),
+              ],
             ],
-          ],
+          ),
         );
       },
     );
@@ -6429,38 +6439,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         const SizedBox(height: 12),
                       ],
 
-                      _buildCommercialSection(
-                        icon: Icons.picture_as_pdf_outlined,
-                        title: 'DEVIS CONSULTABLE',
-                        description:
-                            'Document PDF disponible avec les données '
-                            'enregistrées, même si certaines informations '
-                            'restent à compléter.',
-                        status: 'CONSULTATION DISPONIBLE',
-                        statusColor: const Color(0xFF15803D),
-                      ),
-                      const SizedBox(height: 6),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: OutlinedButton.icon(
-                          onPressed: _consultingQuoteFromDocuments
-                              ? null
-                              : _consultQuoteFromDocuments,
-                          icon: _consultingQuoteFromDocuments
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.picture_as_pdf_outlined),
-                          label: Text(_consultingQuoteFromDocuments
-                              ? 'PRÉPARATION DU PDF...'
-                              : 'CONSULTER LE DEVIS (PDF)'),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
                       _buildArchivedAdminQuotes(),
                       const SizedBox(height: 12),
                       _buildCommercialSection(

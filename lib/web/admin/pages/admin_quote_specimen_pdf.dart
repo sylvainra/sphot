@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
+
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -105,6 +107,16 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
       .replaceAll(' ', ' ')
       .replaceAll('…', '...');
 
+  // Les deux images officielles déjà utilisées dans la charte SPHOT.
+  // Le titre ne doit jamais être redessiné en texte ou en cartouche.
+  final titleImage = pw.MemoryImage(
+    (await rootBundle.load('data/icons/title.png')).buffer.asUint8List(),
+  );
+  final fireRedIcon = pw.MemoryImage(
+    (await rootBundle.load('data/icons/fire_red_icon.png'))
+        .buffer.asUint8List(),
+  );
+
   final document = pw.Document(
     title: 'DEVIS SPHOT ADMIN - SPECIMEN',
     author: 'SPHOT',
@@ -163,58 +175,44 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
 
   document.addPage(pw.MultiPage(
     pageFormat: PdfPageFormat.a4,
-    margin: const pw.EdgeInsets.fromLTRB(40, 26, 40, 36),
+    margin: const pw.EdgeInsets.fromLTRB(40, 24, 40, 71),
     header: (ctx) => pw.Container(
-      height: 65,
-      padding: const pw.EdgeInsets.fromLTRB(18, 8, 14, 6),
-      decoration: pw.BoxDecoration(
-        color: PdfColors.white,
-        border: pw.Border.all(color: border, width: 0.9),
-        borderRadius: pw.BorderRadius.circular(14),
-      ),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.center,
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start,
-            mainAxisAlignment: pw.MainAxisAlignment.center,
-            children: [
-              pw.Text('SPHOT', style: pw.TextStyle(
-                fontWeight: pw.FontWeight.bold,
-                fontSize: 25, color: red,
-                letterSpacing: 2,
-              )),
-              pw.SizedBox(height: 4),
-              pw.Text('Des plages plus sûres, propres et connectées',
-                style: pw.TextStyle(fontSize: 7.2, color: grey)),
-            ],
-          ),
-          pw.SizedBox(width: 12),
-          pw.Flexible(child: pw.Text(
-            'SURVEILLER  -  PRÉSERVER  -  INFORMER  -  ENSEMBLE',
-            textAlign: pw.TextAlign.right,
-            style: pw.TextStyle(
-              fontSize: 8, fontWeight: pw.FontWeight.bold, color: blue,
-            ),
-          )),
-        ],
+      height: 53,
+      alignment: pw.Alignment.center,
+      child: pw.Image(
+        titleImage,
+        width: 235,
+        height: 49,
+        fit: pw.BoxFit.contain,
       ),
     ),
-    footer: (ctx) => pw.Container(
-      padding: const pw.EdgeInsets.only(top: 8),
-      decoration: pw.BoxDecoration(
-        border: pw.Border(top: pw.BorderSide(color: border, width: 0.7)),
-      ),
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          pw.Text('Document généré automatiquement par SPHOT',
-            style: pw.TextStyle(fontSize: 6.6, color: grey)),
-          pw.Text('SPÉCIMEN - Version 01 - Page ' +
-              ctx.pageNumber.toString() + ' / ' + ctx.pagesCount.toString(),
-            style: pw.TextStyle(fontSize: 6.6, color: grey)),
-        ],
-      ),
+    footer: (ctx) => pw.Column(
+      mainAxisSize: pw.MainAxisSize.min,
+      children: [
+        pw.Center(
+          child: pw.Image(
+            fireRedIcon,
+            height: 32,
+            fit: pw.BoxFit.contain,
+          ),
+        ),
+        pw.SizedBox(height: 5),
+        pw.Container(
+          height: 0.7,
+          color: border,
+        ),
+        pw.SizedBox(height: 5),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text('Document généré automatiquement par SPHOT',
+              style: pw.TextStyle(fontSize: 6.6, color: grey)),
+            pw.Text('SPÉCIMEN - Version 01 - Page ' +
+                ctx.pageNumber.toString() + ' / ' + ctx.pagesCount.toString(),
+              style: pw.TextStyle(fontSize: 6.6, color: grey)),
+          ],
+        ),
+      ],
     ),
     build: (ctx) => [
       pw.SizedBox(height: 7),

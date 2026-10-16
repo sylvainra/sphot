@@ -154,6 +154,9 @@ test("Consultable et officiel utilisent la même structure documentaire",
       const keys = (document) => document.lines.map((line) =>
         line.heading ? "heading:" + line.heading : "label:" + line.label);
       assert.deepEqual(keys(specimen), keys(official));
+      // Header PNG SPHOT et marker Fire rouge dans les DEUX états.
+      assert.equal(specimen.quoteBranding, true);
+      assert.equal(official.quoteBranding, true);
       assert.equal(specimen.statusLabel, "NON ÉMIS");
       assert.equal(official.statusLabel, "ÉMIS");
       assert.equal(specimen.documentNumber, "NON ATTRIBUÉ - SPÉCIMEN");

@@ -19,6 +19,7 @@ function simplePdfBuffer({
   introduction = "",
   lines,
   notice = "",
+  quoteBranding = false,
 }) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
@@ -30,6 +31,20 @@ function simplePdfBuffer({
         Subject: documentNumber,
       },
     });
+
+    // Only the quote uses the already-approved SPHOT image header/footer.
+    // Other Admin documents retain their original template unchanged.
+    let quoteLogo = null;
+    let quoteFire = null;
+    if (quoteBranding) {
+      const {buildSphotMessage} = require("./sphot_email_design");
+      const assets = buildSphotMessage({text: ""}).attachments;
+      quoteLogo = assets.find((a) => a.filename === "sphot_title.png")?.content;
+      quoteFire = assets.find((a) => a.filename === "fire_red_icon.png")?.content;
+      if (!Buffer.isBuffer(quoteLogo) || !Buffer.isBuffer(quoteFire)) {
+        throw new Error("Images du devis SPHOT introuvables.");
+      }
+    }
 
     const chunks = [];
     doc.on("data", (chunk) => chunks.push(chunk));
@@ -75,6 +90,12 @@ function simplePdfBuffer({
       doc.y = titleY + 20;
     };
 
+    if (quoteBranding) {
+      doc.image(quoteLogo, (doc.page.width - 240) / 2, 28, {
+        fit: [240, 53],
+        align: "center",
+      });
+    } else {
     doc
         .roundedRect(left, 30, contentWidth, 72, 14)
         .fillAndStroke(white, "#D9E2EC");
@@ -109,6 +130,8 @@ function simplePdfBuffer({
               align: "right",
             },
         );
+
+    }
 
     doc.y = 116;
 
@@ -282,6 +305,12 @@ function simplePdfBuffer({
           width: contentWidth,
           align: "right",
         });
+
+    if (quoteBranding) {
+      // Marker Fire rouge fixe en bas de page, séparé de la signature.
+      doc.image(quoteFire, doc.page.width / 2 - 16, 
+          doc.page.height - 111, {fit: [32, 48]});
+    }
 
     const footerY = doc.page.height - 54;
     doc
