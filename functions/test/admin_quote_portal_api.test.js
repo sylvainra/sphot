@@ -98,7 +98,7 @@ test("Téléchargement : octets exacts et aucune URL publique", async () => {
   assert.deepEqual(f.answers[0], PDF);
   assert.equal(f.headers["Content-Type"], "application/pdf");
   assert.equal(f.headers["Content-Disposition"],
-      'attachment; filename="DV-2026-000001-001.pdf"');
+      "attachment; filename=\"DV-2026-000001-001.pdf\"");
 });
 
 test("Sans jeton, aucune lecture n'est possible", async () => {
