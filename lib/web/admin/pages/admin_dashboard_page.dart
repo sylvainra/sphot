@@ -24,6 +24,8 @@ import 'admin_subscription_panel.dart';
 import 'admin_quote_server_pdf_service.dart';
 import 'admin_quote_consultation.dart';
 import 'admin_quote_pdf_download.dart';
+import 'admin_financial_document_pdf.dart';
+import 'admin_financial_document_consultation.dart';
 import 'admin_payment_panel.dart';
 import 'admin_statistics_panel.dart';
 import '../../institutional/pages/institutional_main_courante_page.dart';
@@ -129,6 +131,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _showBillingDocumentsPanel = false;
   final Set<String> _loadingQuoteArchiveIds = <String>{};
   bool _consultingQuoteFromDocuments = false;
+  AdminFinancialDocumentKind? _loadingFinancialSpecimen;
   bool _showStatisticsPanel = false;
   bool _showMainCourantePanel = false;
   bool _operationalAlertActive = false;
@@ -6221,6 +6224,64 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  /// Spécimens consultables dans leurs encarts de l'étape 7.
+  /// Aucune émission FA/AV/CMD ni changement de statut de paiement.
+  Future<void> _consultFinancialDocument(
+      AdminFinancialDocumentKind kind) async {
+    if (_loadingFinancialSpecimen != null) return;
+    setState(() => _loadingFinancialSpecimen = kind);
+    try {
+      final uid = widget.adminUid.trim();
+      if (uid.isEmpty) throw StateError('Administrateur non identifié.');
+      final saved = await FirebaseFirestore.instance
+          .collection('subscriptions')
+          .doc(uid)
+          .get();
+      final data = <String, dynamic>{...?saved.data()};
+      final reference = _currentAdministrativeReference();
+      if (_cleanText(data['administrativeReference']).isEmpty &&
+          reference.isNotEmpty) {
+        data['administrativeReference'] = reference;
+      }
+      final pdf = await createAdminFinancialDocumentSpecimen(
+        kind: kind,
+        subscription: data,
+      );
+      if (!mounted) return;
+      downloadAdminQuoteSpecimen(pdf, kind.filename);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text(
+          'Document momentanément indisponible. '
+          'Actualisez le dossier puis réessayez.',
+        )),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingFinancialSpecimen = null);
+    }
+  }
+
+  Widget _financialSpecimenButton(
+      AdminFinancialDocumentKind kind, String label) {
+    final loading = _loadingFinancialSpecimen == kind;
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _loadingFinancialSpecimen != null
+            ? null : () => _consultFinancialDocument(kind),
+        icon: loading
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+        label: Text(loading ? 'PRÉPARATION DU PDF...' : label),
+      ),
+    );
+  }
+
   /// Lecture sécurisée du PDF existant, jamais depuis son URL Storage.
   Future<void> _downloadArchivedAdminQuote(
     String documentId,
@@ -6445,24 +6506,51 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         icon: Icons.shopping_cart_checkout_rounded,
                         title: 'COMMANDES',
                         description:
-                            'Bons de commande et références d’engagement associés.',
-                        status: 'AUCUN DOCUMENT',
+                            'Références de commande et engagement à compléter '
+                            'avant toute confirmation contractuelle.',
+                        status: 'AUCUNE COMMANDE ÉMISE',
+                        footer: _financialSpecimenButton(
+                          AdminFinancialDocumentKind.order,
+                          'CONSULTER LA COMMANDE (PDF)',
+                        ),
                       ),
                       const SizedBox(height: 12),
                       _buildCommercialSection(
                         icon: Icons.receipt_long_outlined,
                         title: 'FACTURES ET AVOIRS',
                         description:
-                            'Factures, avoirs et état de leur transmission électronique.',
-                        status: 'AUCUN DOCUMENT',
+                            'Consultation préparatoire. Les véritables '
+                            'factures FA et avoirs AV seront numérotés '
+                            'et archivés après leur émission.',
+                        status: 'AUCUNE PIÈCE COMPTABLE ÉMISE',
+                        footer: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _financialSpecimenButton(
+                              AdminFinancialDocumentKind.invoice,
+                              'CONSULTER LA FACTURE (PDF)',
+                            ),
+                            const SizedBox(height: 6),
+                            _financialSpecimenButton(
+                              AdminFinancialDocumentKind.creditNote,
+                              'CONSULTER L’AVOIR (PDF)',
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 12),
                       _buildCommercialSection(
                         icon: Icons.account_balance_outlined,
                         title: 'SUIVI DU PAIEMENT',
                         description:
-                            'État du dépôt, du traitement et du règlement des factures.',
-                        status: 'AUCUNE FACTURE',
+                            'État préparatoire des références de facture, '
+                            'du dépôt et du règlement. Aucun encaissement '
+                            'n’est présumé.',
+                        status: 'AUCUN RÈGLEMENT VÉRIFIÉ',
+                        footer: _financialSpecimenButton(
+                          AdminFinancialDocumentKind.paymentStatus,
+                          'CONSULTER LE SUIVI (PDF)',
+                        ),
                       ),
                     ],
                   ),

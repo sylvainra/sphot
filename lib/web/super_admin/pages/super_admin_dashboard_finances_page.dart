@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../widgets/super_admin_annual_financial_export_card.dart';
 
 class SuperAdminDashboardFinancesPage extends StatelessWidget {
   const SuperAdminDashboardFinancesPage({super.key});
@@ -317,6 +318,10 @@ class SuperAdminDashboardFinancesPage extends StatelessWidget {
                                         ),
                                       ],
                                     ),
+
+                                    const SizedBox(height: 26),
+                                    _sectionTitle('PIÈCES COMPTABLES ANNUELLES'),
+                                    const SuperAdminAnnualFinancialExportCard(),
 
                                     const SizedBox(height: 26),
                                     _sectionTitle('PLATEFORME'),

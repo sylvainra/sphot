@@ -1,11 +1,11 @@
 import 'dart:typed_data';
 
-import 'package:flutter/services.dart';
 
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../../services/published_commercial_quote_service.dart';
+import 'admin_financial_pdf_brand.dart';
 
 /// Spécimen de consultation SPHOT ADMIN.
 /// Gabarit aligné sur simplePdfBuffer de functions/admin_workflow.js :
@@ -107,15 +107,7 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
       .replaceAll(' ', ' ')
       .replaceAll('…', '...');
 
-  // Les deux images officielles déjà utilisées dans la charte SPHOT.
-  // Le titre ne doit jamais être redessiné en texte ou en cartouche.
-  final titleImage = pw.MemoryImage(
-    (await rootBundle.load('data/icons/title.png')).buffer.asUint8List(),
-  );
-  final fireRedIcon = pw.MemoryImage(
-    (await rootBundle.load('data/icons/fire_red_icon.png'))
-        .buffer.asUint8List(),
-  );
+  final brand = await AdminFinancialPdfBrand.load();
 
   final document = pw.Document(
     title: 'DEVIS SPHOT ADMIN - SPECIMEN',
@@ -176,44 +168,8 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
   document.addPage(pw.MultiPage(
     pageFormat: PdfPageFormat.a4,
     margin: const pw.EdgeInsets.fromLTRB(40, 24, 40, 71),
-    header: (ctx) => pw.Container(
-      height: 53,
-      alignment: pw.Alignment.center,
-      child: pw.Image(
-        titleImage,
-        width: 235,
-        height: 49,
-        fit: pw.BoxFit.contain,
-      ),
-    ),
-    footer: (ctx) => pw.Column(
-      mainAxisSize: pw.MainAxisSize.min,
-      children: [
-        pw.Center(
-          child: pw.Image(
-            fireRedIcon,
-            height: 32,
-            fit: pw.BoxFit.contain,
-          ),
-        ),
-        pw.SizedBox(height: 5),
-        pw.Container(
-          height: 0.7,
-          color: border,
-        ),
-        pw.SizedBox(height: 5),
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text('Document généré automatiquement par SPHOT',
-              style: pw.TextStyle(fontSize: 6.6, color: grey)),
-            pw.Text('SPÉCIMEN - Version 01 - Page ' +
-                ctx.pageNumber.toString() + ' / ' + ctx.pagesCount.toString(),
-              style: pw.TextStyle(fontSize: 6.6, color: grey)),
-          ],
-        ),
-      ],
-    ),
+    header: (ctx) => brand.header(),
+    footer: (ctx) => brand.footer(ctx, specimen: true),
     build: (ctx) => [
       pw.SizedBox(height: 7),
       pw.Center(child: pw.Text('DEVIS SPHOT ADMIN', style: pw.TextStyle(

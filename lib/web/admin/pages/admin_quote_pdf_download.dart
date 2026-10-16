@@ -7,3 +7,9 @@ import 'admin_quote_pdf_download_stub.dart'
 void downloadAdminQuoteSpecimen(Uint8List bytes, String filename) {
   platform.downloadPdf(bytes, filename);
 }
+
+
+/// Export comptable préparatoire destiné au Super Admin.
+void downloadSuperAdminFinancialCsv(Uint8List bytes, String filename) {
+  platform.downloadCsv(bytes, filename);
+}

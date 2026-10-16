@@ -643,3 +643,22 @@ Les captures du portail local ont montré deux écarts : (1) le PDF local passai
 - `lib/web/admin/pages/admin_dashboard_page.dart` : ajout sous **FACTURES & DOCUMENTS** d'une section « DEVIS CONSULTABLE », avec bouton **CONSULTER LE DEVIS (PDF)**, visible **même lorsque la liste officielle indique « AUCUN DEVIS ÉMIS »**. Le bouton relit `subscriptions/{uid}`, puis invoque **le même service de consultation** que le bouton d'abonnement ; donc la même fiche payeur, les mêmes postes, prix et mentions manquantes, sans DV ni écriture en base. Le téléchargement des vrais devis archivés demeure séparé et conditionné à l'API sécurisée.
 - Aucun document factice n'est ajouté au registre `documents`. La mention « AUCUN DEVIS ÉMIS » reste exacte jusqu'à la création d'un vrai document `issued`.
 - Les deux corrections sont des ajustements localisés à vérifier visuellement sur Flutter Web. L'API serveur reste non déployée et conditionnée à `SPHOT_ENABLE_ADMIN_QUOTE_PORTAL=true`.
+
+
+## 44. Étape 7 : commande, facture, avoir, suivi du paiement et export annuel Super Admin (16/10/2026)
+
+**Référentiel visuel verrouillé** : les modèles financiers utilisent `lib/web/admin/pages/admin_financial_pdf_brand.dart`, qui charge les deux images déjà validées `data/icons/title.png` (haut) et `data/icons/fire_red_icon.png` (bas). Le générateur consultable du devis reprend dorénavant la même classe visuelle, sans altérer ses données commerciales.
+
+**Dans les encarts EXISTANTS de l'étape 7** :
+- **COMMANDES** : `CONSULTER LA COMMANDE (PDF)`. Champs : émetteur, payeur, postes, tarification HT indicative depuis la grille publiée, TVA/TTC non déterminés, références externes `purchaseOrderNumber`, `engagementNumber`, `chorusServiceCode` et confirmation des CGV à venir.
+- **FACTURES ET AVOIRS** : deux PDF consultables distincts, `CONSULTER LA FACTURE (PDF)` et `CONSULTER L’AVOIR (PDF)`. La facture comporte un total HT **indicatif**, jamais présenté comme une créance ; l'avoir attend le numéro de sa facture d'origine et ne présume pas d'un remboursement.
+- **SUIVI DU PAIEMENT** : `CONSULTER LE SUIVI (PDF)` avec références de factures, de dépôt Chorus Pro, échéance, encaissements et justificatifs **non vérifiés** jusqu'à présence d'informations réelles.
+- Tous ces documents sont des **spécimens non contractuels**, peuvent être consultés sans renseignements complets (`À compléter`), et ne créent aucune donnée en base, commande, facture, avoir, état payé, email ou numéro commercial. Les formats réservés restent `CMD-{ANNEE}-{ADHERENT}-{SEQ}`, `FA-{ANNEE}-{SEQ_FISCALE}` et `AV-{ANNEE}-{SEQ_AVOIR}` conformément à `docs/numerotation_documents_commerciaux.md`.
+
+**Super Admin, FINANCES** :
+- Carte `PIÈCES FINANCIÈRES ANNUELLES` avec choix de l'exercice et export CSV des **seules pièces réellement émises** de `documents`, `documentType=invoice|creditNote`, `status=issued`, numérotation FA/AV, année et archive référencée, SHA-256 présent, montants HT + TVA = TTC cohérents.
+- Chaque ligne conserve le dossier, l'identité payeur disponible, la référence de commande/devis, la facture d'origine pour un avoir, le traitement fiscal et les références d'archive. Les avoirs sont signés négativement pour le rapprochement documentaire. La recherche est limitée par année.
+- Aucun devis, commande, spécimen, revenu estimé ou paiement non rapproché n'entre dans l'export. En l'absence de facture émise, il n'y a **aucune donnée comptable à exporter**. L'export CSV est un dossier de pièces pour le comptable, **pas le fichier FEC légal**, ni un journal de comptabilité à partie double.
+- Les PDF émis, preuves de paiement, numéros fiscaux, factures/avoirs définitifs, règlements et exports réglementaires devront être branchés ultérieurement sur des collections et écritures serveur fiables. Toute émission et modification fiscale demeure bloquée tant que les validations administratives et le contrôle des accès ne sont pas opérationnels.
+
+**Validation à réaliser sur le poste local** : `flutter analyze` ciblé puis lancement Web ; ouvrir successivement les PDF commande/facture/avoir/suivi à l'étape 7 et vérifier la carte annuelle dans Super Admin → FINANCES. Aucune nouvelle Cloud Function déployée.
