@@ -9,11 +9,25 @@ const {
 } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
+const commercialPricing = require("./commercial_pricing");
+const commercialQuotePricing = require("./commercial_quote_pricing");
+const {registerAdminQuotePortalEndpoint} =
+    require("./admin_quote_portal_endpoint");
+const {assignAuthorizedAdminQuoteNumber} =
+    require("./admin_quote_numbering");
 const {getDownloadURL} = require("firebase-admin/storage");
 const nodemailer = require("nodemailer");
 const PDFDocument = require("pdfkit");
 
 admin.initializeApp();
+
+// Opt-in explicite : évite de publier ce nouvel accès documentaire lors
+// d'un déploiement global de Functions tant que les droits et les parcours
+// n'ont pas été validés avec Firebase Emulator.
+if (process.env.SPHOT_ENABLE_ADMIN_QUOTE_PORTAL === "true") {
+  exports.adminQuotePortal =
+      registerAdminQuotePortalEndpoint({admin, onRequest});
+}
 
 const SMTP_USER = "admin@sphot.app";
 const MAIL_FROM = "\"SPHOT\" <no-reply@sphot.app>";
@@ -3998,10 +4012,11 @@ exports.assignQuoteNumberOnWrite = onDocumentWritten(
       memory: "256MiB",
     },
     async (event) => {
-      await assignCommercialDocumentNumber(
-          event,
-          COMMERCIAL_DOCUMENTS.quote,
-      );
+      await assignAuthorizedAdminQuoteNumber({
+        db: admin.firestore(),
+        event,
+        serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+      });
     },
 );
 
@@ -7561,7 +7576,7 @@ exports.consumeSuperAdminWebSession = onRequest(
               }
 
               transaction.delete(sessionReference);
-              return true;
+              return String(session.login || "super-admin");
             },
         );
 
@@ -7570,7 +7585,13 @@ exports.consumeSuperAdminWebSession = onRequest(
           return;
         }
 
-        response.status(200).json({success: true});
+        const pricingSessionToken = await commercialPricing.issueSession(
+            admin, crypto, accepted,
+        );
+        response.status(200).json({
+          success: true,
+          pricingSessionToken,
+        });
       } catch (error) {
         console.error(
             "Erreur validation session Web Super Admin:",
@@ -7580,6 +7601,21 @@ exports.consumeSuperAdminWebSession = onRequest(
       }
     },
 );
+
+// Protected by the short-lived session minted after consuming the existing
+// single-use Super Admin login token.
+exports.manageCommercialPricing = commercialPricing.endpoint({
+  admin, crypto, onRequest,
+});
+exports.activateScheduledCommercialPricing = commercialPricing.scheduler({
+  admin, onSchedule,
+});
+
+// Lecture publique des seuls montants PUBLIES. Aucun devis ni commande n'est
+// creee ici; la validation commerciale sera raccordee dans une phase separee.
+exports.previewPublishedCommercialQuote = commercialQuotePricing.endpoint({
+  admin, onRequest,
+});
 
 exports.requestAdminReplacement = onRequest(
     {

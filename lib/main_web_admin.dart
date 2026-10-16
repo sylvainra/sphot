@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
-import 'pages/professional/professional_login_page.dart';
-import 'web/admin/web_admin_registration_page.dart';
+import 'main.dart' show SphotApp;
 
+/// Point d'entree Web ADMIN.
+/// Reutilise le routeur SPHOT principal au lieu du formulaire
+/// d'inscription historique avec des donnees ProConnect fictives.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -12,34 +14,13 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  runApp(const SphotWebAdminApp());
-}
+  // La connexion professionnelle est l'accueil par defaut pour ce point
+  // d'entree. Les liens /#/super-admin et autres routes existantes restent
+  // disponibles via le routeur commun.
+  final fragment = Uri.base.fragment.trim();
+  final initialRoute = fragment.isEmpty
+      ? '/professional-login'
+      : (fragment.startsWith('/') ? fragment : '/$fragment');
 
-class SphotWebAdminApp extends StatelessWidget {
-  const SphotWebAdminApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'SPHOT Admin Web',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.orange,
-      ),
-      routes: {
-        '/professional-login': (context) =>
-            const ProfessionalLoginPage(),
-      },
-      home: const WebAdminRegistrationPage(
-        proConnectUid: 'test-admin',
-        proConnectEmail: 'admin@sphot.app',
-        proConnectNom: 'DUPONT',
-        proConnectPrenom: 'Jean',
-        proConnectOrganisation: 'Mairie de Nice',
-        proConnectSiret: '12345678901234',
-        proConnectSiren: '123456789',
-      ),
-    );
-  }
+  runApp(SphotApp(initialRoute: initialRoute));
 }

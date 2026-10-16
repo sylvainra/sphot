@@ -1402,9 +1402,9 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
           'subscriptionPreview': {
             'trialDurationDays': 8,
-            'pricePerStationExclTax': 500,
+            // Aucun prix n'est défini pendant la demande d'accès.
+            // L'abonnement utilisera exclusivement la grille publiée.
             'billingCycle': 'annual',
-            'vatRate': 20,
             'status': 'awaiting_validation',
           },
 

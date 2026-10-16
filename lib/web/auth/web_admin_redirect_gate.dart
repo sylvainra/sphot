@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../services/web_proconnect_auth_service.dart';
-import '../admin/web_admin_registration_page.dart';
 import '../admin/pages/admin_request_pending_page.dart';
 
 class WebAdminRedirectGate extends StatefulWidget {

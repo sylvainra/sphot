@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../widgets/adaptive_asset_image.dart';
-import '../services/admin_subscription_order_service.dart';
+import '../../../services/published_commercial_quote_service.dart';
+import 'admin_quote_consultation.dart';
+import 'admin_quote_pdf_download.dart';
 
 class AdminSubscriptionPanel extends StatefulWidget {
   final String adminUid;
@@ -24,13 +26,36 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   static const Color _grey = Color(0xFF6B7280);
   static const Color _green = Color(0xFF16A34A);
   static const Color _orange = Color(0xFFF59E0B);
-  static const double _fallbackAnnualPricePerStationExclTax = 500.0;
+  final Map<int, Future<PublishedCommercialQuote>> _offerQuotes = {};
 
   final Map<String, String> _draft = <String, String>{};
   final Set<String> _expandedSections = <String>{};
 
   String? _savingSection;
+  bool _preparingQuotePdf = false;
   bool? _draftNoOrderRequired;
+  String? _draftPaymentMethod;
+  String? _draftBillingRelation;
+  OverlayEntry? _payerTypeOverlay;
+  final GlobalKey _payerTypeFieldKey = GlobalKey();
+  // Brouillons séparés : basculer d'un payeur à l'autre ne mélange pas
+  // les coordonnées de deux personnes morales.
+  final Map<String, Map<String, String>> _payerDraftByRelation = {};
+  static const List<String> _payerFields = <String>[
+    'billingOrganisation',
+    'billingPayerType',
+    'billingSiret',
+    'billingLegalId',
+    'billingVatId',
+    'billingAddress',
+    'billingAddressComplement',
+    'billingPostalCode',
+    'billingCity',
+    'billingCountry',
+    'billingContactName',
+    'billingContactEmail',
+    'billingContactPhone',
+  ];
   late final Stream<Map<String, dynamic>> _dataStream;
   late final Future<String> _territoireIdFuture;
   final Set<String> _selectedRescueStationIds = <String>{};
@@ -41,6 +66,104 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     super.initState();
     _dataStream = _subscriptionDataStream();
     _territoireIdFuture = _resolveTerritoireId();
+  }
+
+  @override
+  void dispose() {
+    _closePayerTypeMenu();
+    super.dispose();
+  }
+
+  void _closePayerTypeMenu() {
+    _payerTypeOverlay?.remove();
+    _payerTypeOverlay = null;
+  }
+
+  void _openPayerTypeMenu() {
+    _closePayerTypeMenu();
+    final renderBox = _payerTypeFieldKey.currentContext?.findRenderObject();
+    if (renderBox is! RenderBox) return;
+    final position = renderBox.localToGlobal(Offset.zero);
+    final size = renderBox.size;
+    const choices = <String, String>{
+      'public': 'Organisme public',
+      'private': 'Entreprise / organisme privé',
+    };
+
+    _payerTypeOverlay = OverlayEntry(
+      builder: (overlayContext) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _closePayerTypeMenu,
+              child: const SizedBox.expand(),
+            ),
+          ),
+          Positioned(
+            left: position.dx,
+            top: position.dy + size.height - 12,
+            width: size.width,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.97),
+                  border: const Border(
+                    left: BorderSide(color: _blue, width: 1.4),
+                    right: BorderSide(color: _blue, width: 1.4),
+                    bottom: BorderSide(color: _blue, width: 1.4),
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(10),
+                    bottomRight: Radius.circular(10),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.18),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final choice in choices.entries)
+                      InkWell(
+                        onTap: () {
+                          _closePayerTypeMenu();
+                          if (!mounted) return;
+                          setState(() {
+                            _draft['billingPayerType'] = choice.key;
+                          });
+                        },
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12,
+                            ),
+                            child: Text(
+                              choice.value,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: _blue,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    Overlay.of(context).insert(_payerTypeOverlay!);
   }
 
   String get _uid => widget.adminUid.trim();
@@ -55,45 +178,6 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       FirebaseFirestore.instance.collection('admins').doc(_uid);
 
   String _text(dynamic value) => value?.toString().trim() ?? '';
-
-  int? _administrativeReferenceYear(Map<String, dynamic> data) {
-    for (final field in const [
-      'currentPeriodStartDate',
-      'renewalStartDate',
-      'subscriptionStartDate',
-      'trialStartDate',
-    ]) {
-      final value = data[field];
-      if (value is Timestamp) return value.toDate().year;
-      if (value is DateTime) return value.year;
-      if (value is String) {
-        final parsed = DateTime.tryParse(value);
-        if (parsed != null) return parsed.year;
-      }
-    }
-
-    final explicitYear = data['billingYear'] ?? data['subscriptionYear'];
-    return explicitYear is num ? explicitYear.toInt() : null;
-  }
-
-  String _periodAdministrativeReference(Map<String, dynamic> data) {
-    final reference = _text(
-      data['administrativeReference'] ?? data['requestNumber'],
-    );
-    final year = _administrativeReferenceYear(data);
-    if (reference.isEmpty || year == null) return reference;
-
-    final pattern = RegExp(
-      r'^(SPHOT-ADM-[A-Z]{3}-)\d{4}(-\d+)$',
-      caseSensitive: false,
-    );
-    if (!pattern.hasMatch(reference)) return reference;
-
-    return reference.replaceFirstMapped(
-      pattern,
-      (match) => '${match.group(1)}$year${match.group(2)}',
-    );
-  }
 
   Future<String> _resolveTerritoireId() async {
     if (_uid.isEmpty) return '';
@@ -140,8 +224,9 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   ) {
     final idSphot = _text(data['idSphot']);
     final name = _spotName(data);
-    final displayedId = idSphot.isEmpty ? documentId : idSphot;
-    return displayedId.isEmpty ? name : '$displayedId - $name';
+    if (idSphot.isEmpty) return name;
+    if (name.toUpperCase().startsWith(idSphot.toUpperCase())) return name;
+    return '$idSphot - $name';
   }
 
   void _initializeOfferSelection(Map<String, dynamic> data) {
@@ -185,7 +270,6 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     final profile = _nestedMap(request, 'profile');
     final structure = _nestedMap(request, 'structure');
     final territoire = _nestedMap(request, 'territoire');
-    final proConnect = _nestedMap(request, 'proConnect');
     final preview = _nestedMap(request, 'subscriptionPreview');
 
     final contactName = [
@@ -194,6 +278,12 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     ].where((value) => value.isNotEmpty).join(' ');
 
     dynamic value(String field, List<dynamic> fallbacks) {
+      // Pour un payeur distinct, une case vide reste vide :
+      // ne JAMAIS lui substituer le SIRET ou l'adresse du gestionnaire.
+      if (_text(subscription['billingPayerRelation']) == 'other' &&
+          _payerFields.contains(field)) {
+        return subscription[field] ?? '';
+      }
       return _firstFilled(<dynamic>[
         subscription[field],
         ...fallbacks,
@@ -205,16 +295,57 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       'administrativeReference': value('administrativeReference', [
         request['requestNumber'],
       ]),
+      // Identité administrative du gestionnaire distincte du payeur.
+      // Les champs historiques ProConnect ne sont plus utilisés.
+      'managerBillingOrganisation': _firstFilled([
+        structure['nom'], request['nomStructure'],
+      ]),
+      'managerBillingSiret': _firstFilled([
+        structure['siret'], request['siret'],
+      ]),
+      'managerBillingAddress': _firstFilled([
+        territoire['adresse'],
+      ]),
+      'managerBillingPostalCode': _firstFilled([
+        territoire['codePostal'],
+      ]),
+      'managerBillingCity': _firstFilled([
+        territoire['ville'],
+      ]),
+      'managerBillingCountry': _firstFilled([
+        territoire['pays'], 'France',
+      ]),
+      'managerBillingContactName': contactName,
+      'managerBillingContactEmail': _firstFilled([
+        profile['email'], request['email'],
+      ]),
+      'managerBillingContactPhone': _firstFilled([
+        profile['telephone'],
+      ]),
+      'managerBillingType': _text(structure['type']),
       'billingOrganisation': value('billingOrganisation', [
         facturation['billingOrganisation'],
         structure['nom'],
-        proConnect['organisation'],
       ]),
       'billingSiret': value('billingSiret', [
         facturation['billingSiret'],
         structure['siret'],
         request['siret'],
-        proConnect['siret'],
+      ]),
+      'billingPayerRelation': value('billingPayerRelation', [
+        facturation['billingPayerRelation'], 'manager',
+      ]),
+      'billingPayerType': value('billingPayerType', [
+        facturation['billingPayerType'],
+      ]),
+      'billingLegalId': value('billingLegalId', [
+        facturation['billingLegalId'],
+      ]),
+      'billingVatId': value('billingVatId', [
+        facturation['billingVatId'],
+      ]),
+      'billingAddressComplement': value('billingAddressComplement', [
+        facturation['billingAddressComplement'],
       ]),
       'billingAddress': value('billingAddress', [
         facturation['billingAddress'],
@@ -239,7 +370,6 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       'billingContactEmail': value('billingContactEmail', [
         facturation['billingContactEmail'],
         profile['email'],
-        proConnect['email'],
       ]),
       'billingContactPhone': value('billingContactPhone', [
         facturation['billingContactPhone'],
@@ -260,14 +390,8 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       'trialDurationDays': value('trialDurationDays', [
         preview['trialDurationDays'],
       ]),
-      'pricePerStationExclTax': value('pricePerStationExclTax', [
-        preview['pricePerStationExclTax'],
-      ]),
       'billingCycle': value('billingCycle', [
         preview['billingCycle'],
-      ]),
-      'vatRate': value('vatRate', [
-        preview['vatRate'],
       ]),
     };
   }
@@ -322,113 +446,6 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     return '$day/$month/${date.year}';
   }
 
-  Future<void> _activateSubscription() async {
-    if (_uid.isEmpty || _savingSection != null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text(
-            'ACTIVER MON ABONNEMENT',
-            style: TextStyle(
-              color: _blue,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          content: const Text(
-            'L\'activation ouvre immédiatement les droits d\'exploitation. '
-            'La date de ce clic devient la date de début de l\'abonnement. '
-            'La première période se terminera le 31 décembre de cette année, '
-            'sans prorata.',
-            style: TextStyle(
-              color: _blue,
-              fontWeight: FontWeight.w600,
-              height: 1.4,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('ANNULER'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _red,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('CONFIRMER L\'ACTIVATION'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    setState(() {
-      _savingSection = 'activation';
-    });
-
-    final now = DateTime.now();
-    final endDate = DateTime(now.year, 12, 31, 23, 59, 59, 999);
-    final serverNow = FieldValue.serverTimestamp();
-
-    try {
-      final batch = FirebaseFirestore.instance.batch();
-
-      batch.set(
-        _subscriptionReference,
-        <String, dynamic>{
-          'adminUid': _uid,
-          'status': 'active',
-          'subscriptionStartDate': Timestamp.fromDate(now),
-          'subscriptionEndDate': Timestamp.fromDate(endDate),
-          'subscriptionPeriodRule': 'calendar_year',
-          'firstPeriodProrated': false,
-          'billingCycle': 'annual',
-          'activatedAt': serverNow,
-          'activatedBy': _uid,
-          'activatedByRole': 'admin',
-          'updatedAt': serverNow,
-        },
-        SetOptions(merge: true),
-      );
-
-      batch.set(
-        _adminRequestReference,
-        <String, dynamic>{
-          'commercialTracking': <String, dynamic>{
-            'status': 'subscription_active',
-            'subscriptionActivatedAt': serverNow,
-          },
-          'lastEvent': <String, dynamic>{
-            'type': 'subscription_activated_by_admin',
-            'category': 'commercial',
-            'label': 'Abonnement activé par l\'administrateur',
-            'createdAt': serverNow,
-            'createdByRole': 'admin',
-          },
-          'updatedAt': serverNow,
-        },
-        SetOptions(merge: true),
-      );
-
-      await batch.commit();
-
-      if (!mounted) return;
-    } catch (error) {
-      if (!mounted) return;
-    } finally {
-      if (mounted) {
-        setState(() {
-          _savingSection = null;
-        });
-      }
-    }
-  }
-
   Future<void> _saveSection(
     String section,
     Map<String, dynamic> fields,
@@ -458,10 +475,25 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       );
 
       if (!mounted) return;
-
+      if (section == 'payer') {
+        setState(() {
+          _draftBillingRelation = null;
+          _payerDraftByRelation.clear();
+          for (final field in _payerFields) {
+            _draft.remove(field);
+          }
+        });
+      }
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text(successMessage)),
+      );
     } catch (error) {
       if (!mounted) return;
-
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text('Enregistrement impossible. Vérifiez votre connexion et réessayez.'),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -510,20 +542,27 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     required String label,
     String fallback = '',
     TextInputType? keyboardType,
+    VoidCallback? onSubmitted,
+    bool liveUpdate = false,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: TextFormField(
-        key: ValueKey<String>(
-          '$field-${_fieldValue(data, field, fallback: fallback)}',
-        ),
+        // IMPORTANT : ne jamais inclure le texte saisi dans la clé.
+        // Une clé qui change à chaque frappe détruit le champ et son focus.
+        // La relation payeur permet de garder les brouillons séparés.
+        key: ValueKey<String>('payer-field-$field-${_payerRelation(data)}'),
         initialValue: _fieldValue(data, field, fallback: fallback),
         style: const TextStyle(
           color: _blue,
           fontWeight: FontWeight.w600,
         ),
         keyboardType: keyboardType,
-        onChanged: (value) => _draft[field] = value,
+        onChanged: (value) {
+          _draft[field] = value;
+          if (liveUpdate) setState(() {});
+        },
+        onFieldSubmitted: onSubmitted == null ? null : (_) => onSubmitted(),
         decoration: _inputDecoration(label),
       ),
     );
@@ -583,122 +622,290 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     );
   }
 
+  String _payerRelation(Map<String, dynamic> data) {
+    final value = _draftBillingRelation ?? _text(data['billingPayerRelation']);
+    return value == 'other' ? 'other' : 'manager';
+  }
+
+  bool _isFrance(String country) {
+    final text = country.trim().toUpperCase();
+    return text == 'FRANCE' || text == 'FR';
+  }
+
+  bool _validSiret(String value) =>
+      RegExp(r'^\d{14}$').hasMatch(value.trim());
+
+  bool _validBillingEmail(String value) =>
+      RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value.trim());
+
+  String _managerPayerType(Map<String, dynamic> data) {
+    final type = _text(data['managerBillingType']).toUpperCase();
+    if (type.contains('MAIRIE') || type.contains('COMMUNE') ||
+        type.contains('METROPOLE') || type.contains('MÉTROPOLE') ||
+        type.contains('DEPARTEMENT') || type.contains('DÉPARTEMENT') ||
+        type.contains('REGION') || type.contains('RÉGION') ||
+        type.contains('COLLECTIVITE') || type.contains('COLLECTIVITÉ')) {
+      return 'public';
+    }
+    return '';
+  }
+
+  Map<String, dynamic> _payerDisplayData(
+      Map<String, dynamic> data, String relation) {
+    final storedRelation =
+        _text(data['billingPayerRelation']) == 'other' ? 'other' : 'manager';
+    if (storedRelation == relation) return data;
+    final source = Map<String, dynamic>.from(data);
+    for (final field in _payerFields) {
+      source[field] = '';
+    }
+    if (relation == 'manager') {
+      const keys = <String, String>{
+        'billingOrganisation': 'managerBillingOrganisation',
+        'billingSiret': 'managerBillingSiret',
+        'billingAddress': 'managerBillingAddress',
+        'billingPostalCode': 'managerBillingPostalCode',
+        'billingCity': 'managerBillingCity',
+        'billingCountry': 'managerBillingCountry',
+        'billingContactName': 'managerBillingContactName',
+        'billingContactEmail': 'managerBillingContactEmail',
+        'billingContactPhone': 'managerBillingContactPhone',
+      };
+      for (final entry in keys.entries) {
+        source[entry.key] = _text(data[entry.value]);
+      }
+      source['billingPayerType'] = _managerPayerType(data);
+    }
+    return source;
+  }
+
+  void _changePayerRelation(String next, Map<String, dynamic> data) {
+    _closePayerTypeMenu();
+    final previous = _payerRelation(data);
+    if (previous == next) return;
+    _payerDraftByRelation[previous] = {
+      for (final field in _payerFields)
+        if (_draft.containsKey(field)) field: _draft[field]!,
+    };
+    for (final field in _payerFields) {
+      _draft.remove(field);
+    }
+    _draft.addAll(_payerDraftByRelation[next] ?? {});
+    setState(() => _draftBillingRelation = next);
+  }
+
+  bool _payerComplete(Map<String, dynamic> data) {
+    final country = _text(data['billingCountry']);
+    final kind = _text(data['billingPayerType']);
+    return _text(data['billingOrganisation']).isNotEmpty &&
+        (kind == 'public' || kind == 'private') &&
+        country.isNotEmpty &&
+        (_isFrance(country)
+            ? _validSiret(_text(data['billingSiret']))
+            : _text(data['billingLegalId']).isNotEmpty) &&
+        _text(data['billingAddress']).isNotEmpty &&
+        _text(data['billingPostalCode']).isNotEmpty &&
+        _text(data['billingCity']).isNotEmpty &&
+        _text(data['billingContactName']).isNotEmpty &&
+        _validBillingEmail(_text(data['billingContactEmail']));
+  }
+
+  bool _payerHasInvalidData(Map<String, dynamic> data) {
+    final email = _text(data['billingContactEmail']);
+    final siret = _text(data['billingSiret']);
+    return (_isFrance(_text(data['billingCountry'])) &&
+            siret.isNotEmpty && !_validSiret(siret)) ||
+        (email.isNotEmpty && !_validBillingEmail(email));
+  }
+
   Widget _payerForm(Map<String, dynamic> data) {
+    final relation = _payerRelation(data);
+    final source = _payerDisplayData(data, relation);
+    final country = _fieldValue(source, 'billingCountry');
+    final isFrance = _isFrance(country);
+    final type = _fieldValue(source, 'billingPayerType');
+    final siret = _fieldValue(source, 'billingSiret');
+    final email = _fieldValue(source, 'billingContactEmail');
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _field(
-          data: data,
-          field: 'billingOrganisation',
-          label: 'Organisation de facturation',
-        ),
-        _field(
-          data: data,
-          field: 'billingSiret',
-          label: 'SIRET',
-          keyboardType: TextInputType.number,
-        ),
-        _field(
-          data: data,
-          field: 'billingAddress',
-          label: 'Adresse de facturation',
-        ),
-        Row(
-          children: [
-            SizedBox(
-              width: 85,
-              child: _field(
-                data: data,
-                field: 'billingPostalCode',
-                label: 'Code postal',
-                keyboardType: TextInputType.number,
-              ),
+        const Text('DESTINATAIRE DE LA FACTURE',
+          style: TextStyle(color: _blue, fontSize: 12,
+            fontWeight: FontWeight.w900)),
+        for (final relationOption in const ['manager', 'other'])
+          RadioListTile<String>(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            value: relationOption,
+            groupValue: relation,
+            activeColor: _red,
+            title: Text(relationOption == 'manager'
+              ? 'Même organisme que le gestionnaire des SPHOTS'
+              : 'Autre organisme payeur',
+              style: const TextStyle(color: _blue, fontSize: 12,
+                fontWeight: FontWeight.w700)),
+            onChanged: (value) {
+              if (value != null) _changePayerRelation(value, data);
+            },
+          ),
+        if (relation == 'other')
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: Text(
+              'Renseignez les coordonnées du véritable payeur. '
+              'Son habilitation à payer devra être vérifiée avant commande.',
+              style: TextStyle(color: _grey, fontSize: 11),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _field(
-                data: data,
-                field: 'billingCity',
-                label: 'Ville',
-              ),
-            ),
-          ],
-        ),
-        _field(
-          data: data,
-          field: 'billingCountry',
-          label: 'Pays',
-          fallback: 'France',
-        ),
-        _field(
-          data: data,
-          field: 'billingContactName',
-          label: 'Contact facturation',
-        ),
-        _field(
-          data: data,
-          field: 'billingContactEmail',
-          label: 'Email de facturation',
-          keyboardType: TextInputType.emailAddress,
-        ),
-        _field(
-          data: data,
-          field: 'billingContactPhone',
-          label: 'Téléphone de facturation',
-          keyboardType: TextInputType.phone,
-        ),
-        _saveButton(
-          section: 'payer',
-          onPressed: () {
-            _saveSection(
-              'payer',
-              {
-                'billingOrganisation':
-                    _fieldValue(data, 'billingOrganisation'),
-                'billingSiret': _fieldValue(data, 'billingSiret'),
-                'billingAddress': _fieldValue(data, 'billingAddress'),
-                'billingPostalCode':
-                    _fieldValue(data, 'billingPostalCode'),
-                'billingCity': _fieldValue(data, 'billingCity'),
-                'billingCountry': _fieldValue(
-                  data,
-                  'billingCountry',
-                  fallback: 'France',
+          ),
+        const Divider(),
+        const Text('IDENTIFICATION',
+          style: TextStyle(color: _blue, fontSize: 12,
+            fontWeight: FontWeight.w900)),
+        const SizedBox(height: 9),
+        _field(data: source, field: 'billingOrganisation',
+          label: 'Dénomination de l’organisme'),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: GestureDetector(
+            key: _payerTypeFieldKey,
+            onTap: _openPayerTypeMenu,
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: type.isEmpty ? null : 'Nature de l’organisme',
+                labelStyle: const TextStyle(
+                  color: _blue, fontWeight: FontWeight.w700,
                 ),
-                'billingContactName':
-                    _fieldValue(data, 'billingContactName'),
-                'billingContactEmail':
-                    _fieldValue(data, 'billingContactEmail'),
-                'billingContactPhone':
-                    _fieldValue(data, 'billingContactPhone'),
-              },
-              'Organisme payeur enregistré.',
-            );
-          },
+                filled: true,
+                fillColor: Colors.transparent,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: _blue, width: 1.6),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: _blue, width: 1.6),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      switch (type) {
+                        'public' => 'Organisme public',
+                        'private' => 'Entreprise / organisme privé',
+                        _ => 'Nature de l’organisme',
+                      },
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _blue,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: _red, size: 26,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
+        _field(data: source, field: 'billingCountry',
+          label: 'Pays de facturation',
+          liveUpdate: true),
+        if (isFrance) ...[
+          _field(data: source, field: 'billingSiret',
+            label: 'SIRET — 14 chiffres',
+            keyboardType: TextInputType.number),
+          if (siret.isNotEmpty && !_validSiret(siret))
+            const Padding(
+              padding: EdgeInsets.only(bottom: 10),
+              child: Text('SIRET invalide : 14 chiffres requis. '
+                'Contrôle officiel nécessaire avant commande.',
+                style: TextStyle(color: _red, fontSize: 11)),
+            ),
+        ] else if (country.isNotEmpty) ...[
+          _field(data: source, field: 'billingLegalId',
+            label: 'Identifiant officiel de l’organisme'),
+        ] else
+          const Text('Indiquez le pays puis validez le champ.',
+            style: TextStyle(color: _grey, fontSize: 11)),
+        _field(data: source, field: 'billingVatId',
+          label: 'Numéro TVA (si applicable)'),
+        const Divider(height: 22),
+        const Text('ADRESSE DE FACTURATION',
+          style: TextStyle(color: _blue, fontSize: 12,
+            fontWeight: FontWeight.w900)),
+        const SizedBox(height: 9),
+        _field(data: source, field: 'billingAddress',
+          label: 'Adresse de facturation'),
+        _field(data: source, field: 'billingAddressComplement',
+          label: 'Complément d’adresse (facultatif)'),
+        Row(children: [
+          SizedBox(width: 145,
+            child: _field(data: source, field: 'billingPostalCode',
+              label: 'Code postal')),
+          const SizedBox(width: 8),
+          Expanded(child: _field(data: source, field: 'billingCity',
+            label: 'Ville')),
+        ]),
+        const Divider(height: 22),
+        const Text('CONTACT FACTURATION',
+          style: TextStyle(color: _blue, fontSize: 12,
+            fontWeight: FontWeight.w900)),
+        const SizedBox(height: 9),
+        _field(data: source, field: 'billingContactName',
+          label: 'Nom du contact'),
+        _field(data: source, field: 'billingContactEmail',
+          label: 'Email de facturation',
+          keyboardType: TextInputType.emailAddress),
+        if (email.isNotEmpty && !_validBillingEmail(email))
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: Text('Adresse e-mail invalide.',
+              style: TextStyle(color: _red, fontSize: 11)),
+          ),
+        _field(data: source, field: 'billingContactPhone',
+          label: 'Téléphone (facultatif)',
+          keyboardType: TextInputType.phone),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 10),
+          child: Text(
+            'Enregistrement du brouillon uniquement. '
+            'Les données seront vérifiées avant la commande.',
+            style: TextStyle(color: _grey, fontSize: 11),
+          ),
+        ),
+        _saveButton(section: 'payer', onPressed: () {
+          final values = <String, dynamic>{
+            'billingPayerRelation': relation,
+            for (final field in _payerFields)
+              field: _fieldValue(source, field),
+          };
+          if (isFrance) {
+            values['billingSiren'] = _validSiret(siret)
+                ? siret.substring(0, 9) : '';
+            values['billingLegalId'] = FieldValue.delete();
+          } else {
+            values['billingSiret'] = FieldValue.delete();
+            values['billingSiren'] = FieldValue.delete();
+          }
+          _saveSection('payer', values,
+            'Brouillon de facturation enregistré.');
+        }),
       ],
     );
   }
 
   Widget _offerForm(Map<String, dynamic> data) {
-  _initializeOfferSelection(data);
+    _initializeOfferSelection(data);
 
-  return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-    stream: FirebaseFirestore.instance
-        .collection('settings')
-        .doc('subscriptionPricing')
-        .snapshots(),
-    builder: (context, pricingSnapshot) {
-      final pricingData = pricingSnapshot.data?.data();
-
-      final configuredPrice = _number(
-        pricingData?['annualPricePerRescueStationExclTax'],
-      );
-
-      final annualPricePerStationExclTax = configuredPrice > 0
-          ? configuredPrice
-          : _fallbackAnnualPricePerStationExclTax;
-
-      return FutureBuilder<String>(
+    return FutureBuilder<String>(
       future: _territoireIdFuture,
       builder: (context, territoireSnapshot) {
         if (territoireSnapshot.connectionState == ConnectionState.waiting) {
@@ -757,9 +964,6 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                 .where(availableIds.contains)
                 .toSet();
             final selectedCount = activeSelectedIds.length;
-            final annualTotalExclTax =
-                selectedCount * annualPricePerStationExclTax;
-
             final selectedStations = rescueStations
                 .where((document) => activeSelectedIds.contains(document.id))
                 .map(
@@ -847,116 +1051,12 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                     );
                   }),
                 const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _blue.withOpacity(0.045),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _blue.withOpacity(0.22)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "$selectedCount poste${selectedCount > 1 ? 's' : ''} sélectionné${selectedCount > 1 ? 's' : ''}",
-                        style: const TextStyle(
-                          color: _blue,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-  'Tarif unique : ${annualPricePerStationExclTax.toStringAsFixed(2).replaceAll('.', ',')} € HT par poste et par an',
-  style: const TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        'TOTAL ANNUEL HT : ${annualTotalExclTax.toStringAsFixed(2).replaceAll('.', ',')} €',
-                        style: const TextStyle(
-                          color: _red,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Divider(height: 1),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'PÉRIODE D\'ABONNEMENT',
-                        style: TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Début : date réelle d\'activation',
-                        style: TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      const Text(
-                        'Fin : 31 décembre de l\'année d\'activation',
-                        style: TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      const Text(
-                        'Renouvellement : du 1er janvier au 31 décembre',
-                        style: TextStyle(
-                          color: _blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),                      
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Abonnement annuel uniquement. La sélection prépare l’offre et le devis sans activer l’abonnement.',
-                  style: TextStyle(
-                    color: _grey,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _saveButton(
-                  section: 'offer',
-                  onPressed: () {
-                    _saveSection(
-                      'offer',
-                      {
-                        'selectedRescueStationIds':
-                            activeSelectedIds.toList(),
-                        'selectedRescueStations': selectedStations,
-                        'numberOfRescueStations': selectedCount,
-                        'pricePerStationExclTax':
-                            annualPricePerStationExclTax,
-                        'annualAmountExclTax': annualTotalExclTax,
-                        'billingCycle': 'annual',
-                        'subscriptionPeriodRule': 'calendar_year',
-                        'firstPeriodProrated': false,
-                        'subscriptionDurationMonths': FieldValue.delete(),
-                        'vatRate': 20.0,
-                      },
-                      'Offre annuelle et sélection des postes enregistrées.',
-                    );
-                  },
+                _publishedOfferSummary(
+                  selectedCount: selectedCount,
+                  selectedIds: activeSelectedIds.toList()..sort(),
+                  selectedStations: selectedStations,
+                  isActiveSubscription:
+                      _text(data['status']).toLowerCase() == 'active',
                 ),
               ],
             );
@@ -964,258 +1064,539 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         );
       },
     );
-    },
-  );
-}
+  }
 
-  Widget _orderForm(Map<String, dynamic> data) {
-    final noOrderRequired = _noOrderRequired(data);
-    final administrativeReference =
-        _periodAdministrativeReference(data);
+  /// L'offre reprend EXCLUSIVEMENT la grille tarifaire publiée.
+  /// Les montants affichés sont un APERÇU de prix, pas un document commercial.
+  /// La commande contractuelle devra être recalculée côté serveur.
+  Widget _publishedOfferSummary({
+    required int selectedCount,
+    required List<String> selectedIds,
+    required List<Map<String, dynamic>> selectedStations,
+    required bool isActiveSubscription,
+  }) {
+    if (selectedCount == 0) {
+      return const Text(
+        'Sélectionnez au moins un poste pour consulter la grille publiée.',
+        style: TextStyle(color: _grey, fontSize: 12),
+      );
+    }
 
-    return Column(
-      children: [
-        if (administrativeReference.isNotEmpty) ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
+    final future = _offerQuotes.putIfAbsent(
+      selectedCount,
+      () => const PublishedCommercialQuoteService().admin(
+        numberOfRescueStations: selectedCount,
+      ),
+    );
+
+    return FutureBuilder<PublishedCommercialQuote>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Text(
+            'Grille publiée indisponible. Aucun tarif de remplacement '
+            'n’est appliqué et l’offre ne peut pas être enregistrée.',
+            style: TextStyle(color: _red, fontSize: 12),
+          );
+        }
+        final quote = snapshot.data;
+        if (quote == null) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: CircularProgressIndicator(color: _blue),
             ),
-            decoration: BoxDecoration(
-              color: _blue.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: _blue.withOpacity(0.30),
+          );
+        }
+
+        final raw = quote.details['lines'];
+        final lines = raw is List ? raw : const [];
+        if (lines.isEmpty) {
+          return const Text(
+            'Détail de grille indisponible : impossible d’enregistrer l’offre.',
+            style: TextStyle(color: _red, fontSize: 12),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _blue.withOpacity(0.045),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _blue.withOpacity(0.22)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$selectedCount poste(s) sélectionné(s)',
+                    style: const TextStyle(
+                      color: _blue, fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    'TARIFICATION SUIVANT GRILLE ${quote.pricingReference}',
+                    style: const TextStyle(
+                      color: _blue, fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  for (final line in lines)
+                    if (line is Map &&
+                        line['count'] is num &&
+                        (line['count'] as num) > 0 &&
+                        line['unitExclTax'] is num &&
+                        line['amountExclTax'] is num)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                switch (line['tier']) {
+                                  1 => '1er Poste de Secours',
+                                  2 => 'Du 2e au 4e : ${(line['count'] as num).toInt()} × ${(line['unitExclTax'] as num).toStringAsFixed(2).replaceAll('.', ',')} €',
+                                  3 => 'Du 5e au 9e : ${(line['count'] as num).toInt()} × ${(line['unitExclTax'] as num).toStringAsFixed(2).replaceAll('.', ',')} €',
+                                  4 => 'À partir du 10e : ${(line['count'] as num).toInt()} × ${(line['unitExclTax'] as num).toStringAsFixed(2).replaceAll('.', ',')} €',
+                                  _ => 'Tranche tarifaire',
+                                },
+                                style: const TextStyle(
+                                  color: _blue, fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '${(line['amountExclTax'] as num).toStringAsFixed(2).replaceAll('.', ',')} €',
+                              style: const TextStyle(
+                                color: _blue, fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  const Divider(),
+                  Text(
+                    'TOTAL ANNUEL HT : ${quote.amountExclTax.toStringAsFixed(2).replaceAll('.', ',')} €',
+                    style: const TextStyle(
+                      color: _red, fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text('PÉRIODE D’ABONNEMENT',
+                    style: TextStyle(color: _blue, fontSize: 12,
+                      fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 5),
+                  const Text('Début : date réelle d’activation',
+                    style: TextStyle(color: _blue, fontSize: 12)),
+                  const Text('Fin : 31 décembre de l’année d’activation',
+                    style: TextStyle(color: _blue, fontSize: 12)),
+                  const Text('Renouvellement : 1er janvier — sans prorata',
+                    style: TextStyle(color: _blue, fontSize: 12)),
+                ],
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'RÉFÉRENCE ADMIN SPHOT',
-                  style: TextStyle(
-                    color: _grey,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  administrativeReference,
-                  style: const TextStyle(
-                    color: _red,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'À rappeler sur les devis, commandes et documents '
-                  'rattachés à cet espace Admin.',
-                  style: TextStyle(
-                    color: _blue,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+            const SizedBox(height: 10),
+            const Text(
+              'Tarif annuel hors taxes, sans prorata. Les taxes applicables '
+              'et le montant à régler seront présentés avant confirmation. '
+              'L’enregistrement ne constitue pas une commande.',
+              style: TextStyle(color: _grey, fontSize: 11),
             ),
-          ),
-          const SizedBox(height: 12),
-        ],
-        CheckboxListTile(
-          contentPadding: EdgeInsets.zero,
-          value: noOrderRequired,
-          activeColor: _blue,
-          title: const Text(
-            'Aucun bon de commande exigé par l’organisme',
-            style: TextStyle(
-              color: _blue,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          onChanged: (value) {
-            setState(() {
-              _draftNoOrderRequired = value == true;
-            });
-          },
-        ),
-        const SizedBox(height: 4),
-        _field(
-          data: data,
-          field: 'purchaseOrderNumber',
-          label: 'Numéro de bon de commande de l’organisme',
-        ),
-        _field(
-          data: data,
-          field: 'engagementNumber',
-          label: 'Numéro d’engagement juridique',
-        ),
-        _field(
-          data: data,
-          field: 'chorusServiceCode',
-          label: 'Code service Chorus Pro',
-        ),
-        _saveButton(
-          section: 'order',
-          onPressed: () {
-            _saveSection(
-              'order',
-              {
-                'purchaseOrderNotRequired': _noOrderRequired(data),
-                'purchaseOrderNumber':
-                    _fieldValue(data, 'purchaseOrderNumber'),
-                'engagementNumber':
-                    _fieldValue(data, 'engagementNumber'),
-                'chorusServiceCode':
-                    _fieldValue(data, 'chorusServiceCode'),
+            const SizedBox(height: 12),
+            if (isActiveSubscription)
+              const Text(
+                'Abonnement actif : son montant contractuel reste inchangé. '
+                'Une modification devra passer par un nouveau dossier '
+                'commercial ou un renouvellement.',
+                style: TextStyle(color: _grey, fontSize: 11),
+              )
+            else
+              _saveButton(
+                section: 'offer',
+                onPressed: () {
+                _saveSection(
+                  'offer',
+                  <String, dynamic>{
+                    'selectedRescueStationIds': selectedIds,
+                    'selectedRescueStations': selectedStations,
+                    'numberOfRescueStations': selectedCount,
+                    'annualAmountExclTax': quote.amountExclTax,
+                    'publishedPricingReference': quote.pricingReference,
+                    'publishedPricingVersion': quote.version,
+                    'pricePerStationExclTax': FieldValue.delete(),
+                    'vatRate': FieldValue.delete(),
+                    'billingCycle': 'annual',
+                    'subscriptionPeriodRule': 'calendar_year',
+                    'firstPeriodProrated': false,
+                    'subscriptionDurationMonths': FieldValue.delete(),
+                  },
+                  'Sélection et tarif publié enregistrés.'
+                );
               },
-              'Commande enregistrée.',
-            );
-          },
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _activationSummary({
-    required Map<String, dynamic> data,
-    required bool payerComplete,
-    required bool offerComplete,
-    required bool orderComplete,
-  }) {
-    final isActive = _text(data['status']).toLowerCase() == 'active';
-    final canActivate = payerComplete && offerComplete && orderComplete;
+  /// Document de consultation : affichage des champs disponibles,
+  /// mentions manquantes à compléter et prix HT uniquement si publié.
+  /// N'émet aucun devis officiel et ne contacte pas le transporteur email.
+  Future<void> _consultQuotePdf(Map<String, dynamic> data) async {
+    if (_preparingQuotePdf) return;
+    setState(() => _preparingQuotePdf = true);
+    try {
+      final bytes = await createConsultableAdminQuotePdf(data);
+      if (!mounted) return;
+      downloadAdminQuoteSpecimen(bytes, 'SPHOT-DEVIS-SPECIMEN.pdf');
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text(
+          'Impossible de préparer le PDF. Réessayez après actualisation.',
+        )),
+      );
+    } finally {
+      if (mounted) setState(() => _preparingQuotePdf = false);
+    }
+  }
 
-    Widget line(String label, bool complete) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Row(
+  Widget _quotePreparationPanel({
+    required Map<String, dynamic> data,
+    required bool offerComplete,
+    required bool payerComplete,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Le devis est consultable en PDF, même si certaines '
+          'informations ne sont pas encore renseignées.',
+          style: TextStyle(
+            color: _blue,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Les champs manquants apparaissent « À compléter ». '
+          'Le montant HT est affiché uniquement si la sélection des '
+          'postes et la grille tarifaire publiée sont disponibles.',
+          style: TextStyle(color: _grey, fontSize: 11, height: 1.4),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(
-              complete
-                  ? Icons.check_circle_rounded
-                  : Icons.pending_outlined,
-              color: complete ? _green : _grey,
+              offerComplete ? Icons.check_circle_rounded : Icons.pending_outlined,
+              color: offerComplete ? _green : _grey,
               size: 19,
             ),
             const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Postes de secours et offre enregistrés',
+                style: TextStyle(color: _blue, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              payerComplete ? Icons.check_circle_rounded : Icons.pending_outlined,
+              color: payerComplete ? _green : _grey,
+              size: 19,
+            ),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Coordonnées de l’organisme payeur renseignées',
+                style: TextStyle(color: _blue, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 9),
+        const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.picture_as_pdf_outlined, color: _blue, size: 19),
+            SizedBox(width: 8),
             Expanded(
               child: Text(
-                label,
+                'Consultation disponible indépendamment des '
+                'informations encore à compléter.',
                 style: TextStyle(
-                  color: complete ? _green : _grey,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
+                  color: _blue, fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
           ],
         ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        line('Organisme payeur', payerComplete),
-        line('Offre et devis', offerComplete),
-        line('Commande', orderComplete),
+        const SizedBox(height: 12),
+        const Text(
+          'La version consultable n’est pas encore émise : '
+          'aucun numéro DV, aucune facture et aucun email. '
+          'Lors d’une émission officielle, les mentions et les dates '
+          'seront vérifiées et figées.',
+          style: TextStyle(
+            color: _grey, fontSize: 11, height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: OutlinedButton.icon(
+            onPressed: _preparingQuotePdf
+                ? null
+                : () => _consultQuotePdf(data),
+            icon: _preparingQuotePdf
+                ? const SizedBox(
+                    width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.picture_as_pdf_outlined, size: 19),
+            label: Text(
+              _preparingQuotePdf
+                  ? 'PRÉPARATION DU PDF...'
+                  : 'CONSULTER LE DEVIS (PDF)',
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _blue,
+              side: const BorderSide(color: _blue, width: 1.3),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: 6),
-        if (isActive) ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _green.withOpacity(0.07),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _green.withOpacity(0.35)),
+        const Text(
+          'Le PDF sera téléchargé pour consultation. '
+          'Aucune donnée commerciale n’est modifiée.',
+          style: TextStyle(color: _grey, fontSize: 11),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: ElevatedButton.icon(
+            onPressed: null,
+            icon: const Icon(Icons.description_outlined, size: 19),
+            label: const Text(
+              'ÉTABLIR UN DEVIS',
+              style: TextStyle(fontWeight: FontWeight.w900),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'ABONNEMENT ACTIF',
-                  style: TextStyle(
-                    color: _green,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Début : ${_formatDate(data['subscriptionStartDate'])}',
-                  style: const TextStyle(
-                    color: _blue,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  'Fin : ${_formatDate(data['subscriptionEndDate'])}',
-                  style: const TextStyle(
-                    color: _blue,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _blue,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: _grey.withOpacity(0.16),
+              disabledForegroundColor: _grey,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
-        ] else ...[
-          Text(
-            canActivate
-                ? 'Le dossier est complet. Vous pouvez valider la commande d’abonnement annuel SPHOT ADMIN.'
-                : 'Complétez les trois rubriques ci-dessus pour pouvoir activer l\'abonnement.',
-            style: const TextStyle(
-              color: _grey,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              height: 1.35,
+        ),
+        const SizedBox(height: 7),
+        const Text(
+          'L’émission officielle et l’envoi du devis constituent '
+          'une opération distincte, encore désactivée.',
+          style: TextStyle(color: _grey, fontSize: 11, height: 1.35),
+        ),
+      ],
+    );
+  }
+
+  Widget _paymentMethodForm(Map<String, dynamic> data) {
+    final chosen = _draftPaymentMethod ?? _text(data['preferredPaymentMethod']);
+    final selected = chosen == 'card' || chosen == 'public_invoice' ? chosen : '';
+    final noOrderRequired = _noOrderRequired(data);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('Choisissez le mode de règlement de votre organisme.',
+          style: TextStyle(color: _blue, fontSize: 12)),
+        RadioListTile<String>(
+          value: 'card',
+          groupValue: selected,
+          activeColor: _red,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Carte bancaire',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+          subtitle: const Text(
+            'Paiement sécurisé par un prestataire à raccorder.',
+            style: TextStyle(fontSize: 11)),
+          onChanged: (value) => setState(() => _draftPaymentMethod = value),
+        ),
+        RadioListTile<String>(
+          value: 'public_invoice',
+          groupValue: selected,
+          activeColor: _red,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Commande publique / facturation administrative',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+          subtitle: const Text(
+            'Sous réserve de vérification d’un engagement valide.',
+            style: TextStyle(fontSize: 11)),
+          onChanged: (value) => setState(() => _draftPaymentMethod = value),
+        ),
+        if (selected == 'public_invoice') ...[
+          const Divider(height: 18),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: noOrderRequired,
+            activeColor: _blue,
+            title: const Text('Aucun bon de commande exigé par l’organisme',
+              style: TextStyle(fontSize: 12, color: _blue)),
+            onChanged: (value) =>
+                setState(() => _draftNoOrderRequired = value == true),
+          ),
+          _field(data: data, field: 'purchaseOrderNumber',
+            label: 'Bon de commande de l’organisme payeur'),
+          _field(data: data, field: 'engagementNumber',
+            label: 'N° d’engagement fourni par le payeur'),
+          _field(data: data, field: 'chorusServiceCode',
+            label: 'Code service Chorus Pro'),
+          const Text(
+            'Le numéro de commande SPHOT sera attribué automatiquement '
+            'lors de la confirmation. Les références ci-dessus sont celles '
+            'du payeur et ne sont demandées que si elles sont exigées. '
+            'Le contrôle de l’engagement sera effectué avant activation.',
+            style: TextStyle(color: _grey, fontSize: 11),
+          ),
+        ],
+        if (selected == 'card')
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              'Le paiement et son renouvellement devront être autorisés '
+              'et confirmés par le prestataire. Aucun débit pendant le test.',
+              style: TextStyle(color: _grey, fontSize: 11),
             ),
           ),
+        if (selected.isNotEmpty) ...[
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: ElevatedButton.icon(
-              onPressed: canActivate && _savingSection == null
-    ? () => AdminSubscriptionOrderService.showAndSubmit(
-          context: context,
-          adminUid: _uid,
-          data: data,
-        )
-    : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _red,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: _grey.withOpacity(0.16),
-                disabledForegroundColor: _grey,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              icon: _savingSection == 'activation'
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.verified_rounded, size: 20),
-              label: const Text(
-                'VALIDER LA COMMANDE D’ABONNEMENT',
-                style: TextStyle(fontWeight: FontWeight.w900),
-              ),
+          _saveButton(
+            section: 'payment',
+            onPressed: () => _saveSection(
+              'payment',
+              <String, dynamic>{
+                'preferredPaymentMethod': selected,
+                if (selected == 'public_invoice') ...{
+                  'purchaseOrderNotRequired': noOrderRequired,
+                  'purchaseOrderNumber': _fieldValue(data, 'purchaseOrderNumber'),
+                  'engagementNumber': _fieldValue(data, 'engagementNumber'),
+                  'chorusServiceCode': _fieldValue(data, 'chorusServiceCode'),
+                },
+              },
+              'Préférence de règlement enregistrée.',
             ),
           ),
         ],
+      ],
+    );
+  }
+
+  Widget _conditionsSummary({
+    required Map<String, dynamic> data,
+    required bool payerComplete,
+    required bool offerComplete,
+    required bool paymentReady,
+  }) {
+    final annualAmount = _number(data['annualAmountExclTax']);
+    final reference = _text(data['publishedPricingReference']);
+    final status = _text(data['status']).toLowerCase();
+
+    Widget progress(String label, bool valid) => Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(children: [
+        Icon(valid ? Icons.check_circle_rounded : Icons.pending_outlined,
+          color: valid ? _green : _grey, size: 19),
+        const SizedBox(width: 8),
+        Expanded(child: Text(label,
+          style: TextStyle(color: valid ? _green : _grey,
+            fontSize: 12, fontWeight: FontWeight.w700))),
+      ]),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        progress('Postes et offre enregistrés', offerComplete),
+        progress('Organisme payeur renseigné', payerComplete),
+        progress('Mode de règlement choisi', paymentReady),
+        if (offerComplete) ...[
+          const Divider(height: 18),
+          Text('Grille tarifaire : $reference',
+            style: const TextStyle(color: _blue, fontSize: 12)),
+          const SizedBox(height: 6),
+          Text(
+            'TOTAL ANNUEL HT : ${annualAmount.toStringAsFixed(2).replaceAll('.', ',')} €',
+            style: const TextStyle(color: _red, fontWeight: FontWeight.w900,
+              fontSize: 14),
+          ),
+          const Text(
+            'Année civile, renouvellement au 1er janvier, sans prorata. '
+            'Fiscalité et montant définitif à confirmer avant engagement.',
+            style: TextStyle(color: _grey, fontSize: 11, height: 1.35),
+          ),
+        ],
+        if (status == 'active') ...[
+          const SizedBox(height: 8),
+          const Text('ABONNEMENT ACTIF — les droits existants restent inchangés.',
+            style: TextStyle(color: _green, fontWeight: FontWeight.w800,
+              fontSize: 12)),
+        ],
+        const Divider(height: 24),
+        const Text('CONDITIONS GÉNÉRALES DE VENTE — SPHOT ADMIN',
+          style: TextStyle(color: _blue, fontSize: 12,
+            fontWeight: FontWeight.w900)),
+        const SizedBox(height: 7),
+        const Text(
+          'Le document de CGV publié, sa version et l’acceptation '
+          'traçable restent à raccorder. Aucun accord n’est présumé.',
+          style: TextStyle(color: _grey, fontSize: 11, height: 1.35),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity, height: 44,
+          child: ElevatedButton.icon(
+            onPressed: null,
+            icon: const Icon(Icons.lock_outline_rounded, size: 19),
+            label: const Text('CONFIRMER MA COMMANDE',
+              style: TextStyle(fontWeight: FontWeight.w900)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _red,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: _grey.withOpacity(0.18),
+              disabledForegroundColor: _grey,
+            ),
+          ),
+        ),
+        const SizedBox(height: 7),
+        const Text(
+          'Action désactivée pendant les tests : contrôle serveur, fiscalité '
+          'et CGV non finalisés. Aucune commande ni aucun paiement réel.',
+          style: TextStyle(color: _grey, fontSize: 11),
+        ),
       ],
     );
   }
@@ -1352,7 +1733,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
           ),
           const Expanded(
             child: Text(
-              'ABONNEMENT',
+              'ABONNEMENT & PAIEMENT',
               style: TextStyle(
                 color: _blue,
                 fontSize: 20,
@@ -1419,21 +1800,24 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                           final data = snapshot.data ??
                               const <String, dynamic>{};
 
-                          final payerValues = [
-                            data['billingOrganisation'],
-                            data['billingSiret'],
-                            data['billingAddress'],
-                            data['billingPostalCode'],
-                            data['billingCity'],
-                            data['billingContactName'],
-                            data['billingContactEmail'],
-                          ];
-                          final payerStarted = payerValues.any(
-                            (value) => _text(value).isNotEmpty,
+                          final payerStarted = _payerFields.any(
+                            (field) => _text(data[field]).isNotEmpty,
                           );
-                          final payerComplete = payerValues.every(
-                            (value) => _text(value).isNotEmpty,
-                          );
+                          // RENSEIGNÉ ne signifie pas « identité certifiée ».
+                          // Le changement de payeur est une modification non
+                          // enregistrée tant que l'Admin n'a pas sauvegardé.
+                          final payerComplete =
+                              _draftBillingRelation == null &&
+                              _payerComplete(data);
+                          final payerInvalid = _payerHasInvalidData(data);
+                          final payerStatus = payerInvalid
+                              ? 'À CORRIGER'
+                              : _draftBillingRelation != null
+                                  ? 'EN COURS'
+                                  : _status(
+                                      complete: payerComplete,
+                                      started: payerStarted,
+                                    );
 
                           _initializeOfferSelection(data);
                           final savedStationIds = data['selectedRescueStationIds'];
@@ -1444,24 +1828,26 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                           final offerStarted =
                               _selectedRescueStationIds.isNotEmpty ||
                                   hasSavedStations;
+                          final savedIds = savedStationIds is Iterable
+                              ? savedStationIds.map(_text).toSet()
+                              : <String>{};
+                          final sameSelection =
+                              savedIds.length == _selectedRescueStationIds.length &&
+                              savedIds.containsAll(_selectedRescueStationIds);
                           final offerComplete =
-    hasSavedStations &&
-        _number(data['pricePerStationExclTax']) > 0 &&
-        _text(data['billingCycle']) == 'annual';
+                              hasSavedStations &&
+                              sameSelection &&
+                              _text(data['publishedPricingReference']).isNotEmpty &&
+                              _number(data['annualAmountExclTax']) > 0 &&
+                              _text(data['billingCycle']) == 'annual';
 
-                          final orderValues = [
-                            data['purchaseOrderNumber'],
-                            data['engagementNumber'],
-                            data['chorusServiceCode'],
-                          ];
-                          final orderStarted =
-                              data['purchaseOrderNotRequired'] == true ||
-                                  orderValues.any(
-                                    (value) => _text(value).isNotEmpty,
-                                  );
-                          final orderComplete = orderStarted;
-                          final subscriptionActive =
-                              _text(data['status']).toLowerCase() == 'active';
+                          final savedPayment = _text(data['preferredPaymentMethod']);
+                          final chosenPayment = _draftPaymentMethod ?? savedPayment;
+                          final paymentStarted = chosenPayment.isNotEmpty;
+                          final paymentReady =
+                              (savedPayment == 'card' ||
+                               savedPayment == 'public_invoice') &&
+                              chosenPayment == savedPayment;
 
                           return Container(
                             color: const Color(0xFFF8FAFC),
@@ -1469,28 +1855,11 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                               padding: const EdgeInsets.all(20),
                               children: [
 _accordionSection(
-  id: 'payer',
-                                  icon: Icons.apartment_rounded,
-                                  title: 'ORGANISME PAYEUR',
-                                  description:
-                                      'Coordonnées administratives et informations de facturation de votre organisme.',
-                                  status: _status(
-                                    complete: payerComplete,
-                                    started: payerStarted,
-                                  ),
-                                  statusColor: _statusColor(
-                                    complete: payerComplete,
-                                    started: payerStarted,
-                                  ),
-                                  child: _payerForm(data),
-                                ),
-                                const SizedBox(height: 12),
-                                _accordionSection(
                                   id: 'offer',
-                                  icon: Icons.description_outlined,
-                                  title: 'OFFRE ET DEVIS',
+                                  icon: Icons.place_outlined,
+                                  title: '01 — POSTES ET OFFRE',
                                   description:
-                                      'Sélection des postes de secours et montant annuel de l’abonnement.',
+                                      'Postes de secours et tarif annuel suivant la grille publiée.',
                                   status: _status(
                                     complete: offerComplete,
                                     started: offerStarted,
@@ -1503,47 +1872,66 @@ _accordionSection(
                                 ),
                                 const SizedBox(height: 12),
                                 _accordionSection(
-                                  id: 'order',
-                                  icon:
-                                      Icons.assignment_turned_in_outlined,
-                                  title: 'COMMANDE',
+                                  id: 'payer',
+                                  icon: Icons.apartment_rounded,
+                                  title: '02 — ORGANISME PAYEUR',
                                   description:
-                                      'Références communiquées par votre organisme pour la commande et Chorus Pro.',
-                                  status: _status(
-                                    complete: orderComplete,
-                                    started: orderStarted,
-                                  ),
-                                  statusColor: _statusColor(
-                                    complete: orderComplete,
-                                    started: orderStarted,
-                                  ),
-                                  child: _orderForm(data),
+                                      'Coordonnées et informations pour la facturation électronique.',
+                                  status: payerStatus,
+                                  statusColor: payerInvalid
+                                      ? _red
+                                      : _statusColor(
+                                          complete: payerComplete,
+                                          started: payerStarted,
+                                        ),
+                                  child: _payerForm(data),
                                 ),
                                 const SizedBox(height: 12),
                                 _accordionSection(
-                                  id: 'activation',
-                                  icon: Icons.verified_outlined,
-                                  title: 'ACTIVATION',
+                                  id: 'quote',
+                                  icon: Icons.request_quote_outlined,
+                                  title: '03 — DEVIS (FACULTATIF)',
                                   description:
-                                      'Contrôle des renseignements avant activation de l’abonnement.',
-                                  status: subscriptionActive
-                                      ? 'ABONNEMENT ACTIF'
-                                      : payerComplete &&
-                                              offerComplete &&
-                                              orderComplete
-                                          ? 'PRÊT À ACTIVER'
-                                          : 'EN ATTENTE',
-                                  statusColor: subscriptionActive ||
-                                          (payerComplete &&
-                                              offerComplete &&
-                                              orderComplete)
-                                      ? _green
-                                      : _grey,
-                                  child: _activationSummary(
+                                      'Consulter le PDF avec les données disponibles.',
+                                  status: 'CONSULTATION DISPONIBLE',
+                                  statusColor: _green,
+                                  child: _quotePreparationPanel(
+                                    data: data,
+                                    offerComplete: offerComplete,
+                                    payerComplete: payerComplete,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                _accordionSection(
+                                  id: 'payment',
+                                  icon: Icons.credit_card_rounded,
+                                  title: '04 — MODALITÉS DE RÈGLEMENT',
+                                  description:
+                                      'Carte bancaire ou commande publique suivant votre organisme.',
+                                  status: _status(
+                                    complete: paymentReady,
+                                    started: paymentStarted,
+                                  ),
+                                  statusColor: _statusColor(
+                                    complete: paymentReady,
+                                    started: paymentStarted,
+                                  ),
+                                  child: _paymentMethodForm(data),
+                                ),
+                                const SizedBox(height: 12),
+                                _accordionSection(
+                                  id: 'conditions',
+                                  icon: Icons.verified_user_outlined,
+                                  title: '05 — CONDITIONS ET CONFIRMATION',
+                                  description:
+                                      'Récapitulatif, fiscalité, CGV et validation sécurisée.',
+                                  status: 'EN PRÉPARATION',
+                                  statusColor: _orange,
+                                  child: _conditionsSummary(
                                     data: data,
                                     payerComplete: payerComplete,
                                     offerComplete: offerComplete,
-                                    orderComplete: orderComplete,
+                                    paymentReady: paymentReady,
                                   ),
                                 ),
                               ],

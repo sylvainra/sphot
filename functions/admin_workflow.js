@@ -7,7 +7,7 @@ const {onSchedule} = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 const {getDownloadURL} = require("firebase-admin/storage");
 const nodemailer = require("nodemailer");
-const PDFDocument = require("pdfkit");
+const {simplePdfBuffer} = require("./admin_document_pdf_template");
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -18,7 +18,6 @@ const SMTP_USER = "admin@sphot.app";
 const MAIL_FROM = "\"SPHOT\" <no-reply@sphot.app>";
 const SPHOT_LOGIN_URL = "https://sphot.app/#/professional-login";
 const DEFAULT_TRIAL_DAYS = 8;
-const DEFAULT_PRICE_PER_STATION_EXCL_TAX = 500;
 const DEFAULT_VAT_RATE = 20;
 
 function cleanValue(value, fallback = "") {
@@ -128,315 +127,6 @@ function safeDocumentId(value) {
       .slice(0, 700);
 }
 
-function simplePdfBuffer({
-  title,
-  documentNumber,
-  requestNumber,
-  rubric = "",
-  statusLabel = "ÉMIS",
-  introduction = "",
-  lines,
-  notice = "",
-}) {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({
-      size: "A4",
-      margins: {top: 30, bottom: 30, left: 40, right: 40},
-      info: {
-        Title: title,
-        Author: "SPHOT",
-        Subject: documentNumber,
-      },
-    });
-
-    const chunks = [];
-    doc.on("data", (chunk) => chunks.push(chunk));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
-
-    const blue = "#1E3A8A";
-    const red = "#DC2626";
-    const dark = "#263238";
-    const grey = "#607D8B";
-    const pale = "#F3F6FB";
-    const paleWarm = "#FFF8E1";
-    const white = "#FFFFFF";
-
-    const left = doc.page.margins.left;
-    const right = doc.page.width - doc.page.margins.right;
-    const contentWidth = right - left;
-
-    const headingCount = lines.filter((line) => line?.heading).length;
-    const dataCount = lines.filter((line) => line && !line.heading).length;
-    const compact = dataCount > 9 || headingCount > 3;
-    const valueFontSize = compact ? 7.2 : 7.8;
-    const rowHeight = compact ? 11.5 : 13;
-
-    const drawSectionTitle = (heading) => {
-      const titleY = doc.y + 3;
-
-      doc
-          .font("Helvetica-Bold")
-          .fontSize(8.4)
-          .fillColor(red)
-          .text(cleanValue(heading).toUpperCase(), left, titleY, {
-            width: contentWidth,
-          });
-
-      doc
-          .strokeColor(blue)
-          .lineWidth(0.65)
-          .moveTo(left, titleY + 14)
-          .lineTo(right, titleY + 14)
-          .stroke();
-
-      doc.y = titleY + 20;
-    };
-
-    doc
-        .roundedRect(left, 30, contentWidth, 72, 14)
-        .fillAndStroke(white, "#D9E2EC");
-
-    doc
-        .font("Helvetica-Bold")
-        .fontSize(25)
-        .fillColor(red)
-        .text("SPHOT", left + 18, 43, {width: 120});
-
-    doc
-        .font("Helvetica")
-        .fontSize(7.2)
-        .fillColor(grey)
-        .text(
-            "Des plages plus sûres, propres et connectées",
-            left + 18,
-            73,
-            {width: 200},
-        );
-
-    doc
-        .font("Helvetica-Bold")
-        .fontSize(8)
-        .fillColor(blue)
-        .text(
-            "SURVEILLER  •  PRÉSERVER  •  INFORMER  •  ENSEMBLE",
-            left + 222,
-            56,
-            {
-              width: contentWidth - 240,
-              align: "right",
-            },
-        );
-
-    doc.y = 116;
-
-    doc
-        .font("Helvetica-Bold")
-        .fontSize(12.6)
-        .fillColor(blue)
-        .text(title.toUpperCase(), {
-          align: "center",
-          width: contentWidth,
-          lineGap: 1,
-        });
-
-    doc.moveDown(0.35);
-
-    const referenceY = doc.y;
-    doc
-        .roundedRect(left, referenceY, contentWidth, 76, 12)
-        .fillAndStroke(pale, blue);
-
-    doc
-        .font("Helvetica-Bold")
-        .fontSize(7.1)
-        .fillColor(grey)
-        .text("RÉFÉRENCE DU DOCUMENT", left + 14, referenceY + 11);
-
-    doc
-        .font("Helvetica-Bold")
-        .fontSize(10.3)
-        .fillColor(red)
-        .text(documentNumber, left + 14, referenceY + 27, {
-          width: 330,
-        });
-
-    doc
-        .font("Helvetica")
-        .fontSize(7)
-        .fillColor(grey)
-        .text(
-            `Dossier : ${requestNumber}`,
-            left + 14,
-            referenceY + 50,
-        );
-
-    if (rubric) {
-      doc
-          .font("Helvetica-Bold")
-          .fontSize(7.1)
-          .fillColor(blue)
-          .text("RUBRIQUE", right - 145, referenceY + 11, {
-            width: 130,
-            align: "right",
-          });
-
-      doc
-          .font("Helvetica-Bold")
-          .fontSize(8.1)
-          .fillColor(dark)
-          .text(rubric.toUpperCase(), right - 145, referenceY + 27, {
-            width: 130,
-            align: "right",
-          });
-    }
-
-    doc
-        .font("Helvetica-Bold")
-        .fontSize(7.1)
-        .fillColor(blue)
-        .text("STATUT", right - 145, referenceY + 50, {
-          width: 130,
-          align: "right",
-        });
-
-    doc
-        .font("Helvetica-Bold")
-        .fontSize(8.1)
-        .fillColor(dark)
-        .text(statusLabel.toUpperCase(), right - 145, referenceY + 63, {
-          width: 130,
-          align: "right",
-        });
-
-    doc.y = referenceY + 89;
-
-    if (introduction) {
-      doc
-          .font("Helvetica")
-          .fontSize(8)
-          .fillColor(dark)
-          .text(introduction, left + 8, doc.y, {
-            width: contentWidth - 16,
-            lineGap: 1.1,
-          });
-      doc.moveDown(0.45);
-    }
-
-    for (const line of lines) {
-      if (!line) continue;
-
-      if (line.heading) {
-        drawSectionTitle(line.heading);
-        continue;
-      }
-
-      const rowY = doc.y;
-      const label = cleanValue(line.label);
-      const value = cleanValue(line.value, "Non renseigné");
-
-      doc
-          .font("Helvetica-Bold")
-          .fontSize(valueFontSize)
-          .fillColor(blue)
-          .text(label, left + 10, rowY, {
-            width: 118,
-          });
-
-      doc
-          .font("Helvetica")
-          .fontSize(valueFontSize)
-          .fillColor(dark)
-          .text(value, left + 132, rowY, {
-            width: contentWidth - 142,
-            ellipsis: true,
-          });
-
-      doc.y = rowY + rowHeight;
-    }
-
-    if (notice) {
-      const noticeY = doc.y + 8;
-      const noticeHeight = compact ? 56 : 62;
-
-      doc
-          .roundedRect(left, noticeY, contentWidth, noticeHeight, 10)
-          .fillAndStroke(paleWarm, "#F59E0B");
-
-      doc
-          .font("Helvetica-Bold")
-          .fontSize(7.8)
-          .fillColor(red)
-          .text("INFORMATION IMPORTANTE", left + 12, noticeY + 10);
-
-      doc
-          .font("Helvetica")
-          .fontSize(compact ? 7.1 : 7.5)
-          .fillColor(dark)
-          .text(notice, left + 12, noticeY + 25, {
-            width: contentWidth - 24,
-            lineGap: 0.8,
-          });
-
-      doc.y = noticeY + noticeHeight + 10;
-    } else {
-      doc.y += 10;
-    }
-
-    doc
-        .font("Helvetica")
-        .fontSize(8.1)
-        .fillColor(dark)
-        .text("À bientôt sur SPHOT,", left, doc.y, {
-          width: contentWidth,
-          align: "right",
-        });
-
-    doc
-        .font("Helvetica-Bold")
-        .fontSize(8.4)
-        .fillColor(blue)
-        .text("L'équipe SPHOT", left, doc.y + 2, {
-          width: contentWidth,
-          align: "right",
-        });
-
-    const footerY = doc.page.height - 54;
-    doc
-        .strokeColor("#D9E2EC")
-        .lineWidth(0.7)
-        .moveTo(left, footerY)
-        .lineTo(right, footerY)
-        .stroke();
-
-    doc
-        .font("Helvetica")
-        .fontSize(6.6)
-        .fillColor(grey)
-        .text(
-            "Document généré automatiquement par SPHOT",
-            left,
-            footerY + 10,
-            {width: 220},
-        );
-
-    doc
-        .font("Helvetica")
-        .fontSize(6.6)
-        .fillColor(grey)
-        .text(
-            `${documentNumber}  •  Version 01  •  Page 1 / 1`,
-            left + 210,
-            footerY + 10,
-            {
-              width: contentWidth - 210,
-              align: "right",
-            },
-        );
-
-    doc.end();
-  });
-}
 
 async function createRegistryPdf({
   requestId,
@@ -1138,10 +828,8 @@ async function expireTrial(subscriptionDoc, now) {
   const requestSnap = await getRequestByUid(uid);
   const requestData = requestSnap?.data() || {};
   const stations = Number(subscription.numberOfRescueStations || 0);
-  const price = Number(
-      subscription.pricePerStationExclTax || DEFAULT_PRICE_PER_STATION_EXCL_TAX,
-  );
-  const annual = stations * price;
+  // Aucun tarif n'est déduit d'un ancien prix fixe à la fin de l'essai.
+  // Seule la grille publiée peut établir une nouvelle offre commerciale.
   const batch = db.batch();
 
   batch.set(subscriptionDoc.ref, {
@@ -1150,9 +838,7 @@ async function expireTrial(subscriptionDoc, now) {
     subscriptionOffer: {
       status: "available",
       numberOfRescueStations: stations,
-      pricePerStationExclTax: price,
-      annualAmountExclTax: annual,
-      vatRate: Number(subscription.vatRate || DEFAULT_VAT_RATE),
+      pricingStatus: "awaiting_published_quote",
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     },
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1191,10 +877,9 @@ async function expireTrial(subscriptionDoc, now) {
       à son terme le <strong>${escapeHtml(formatFrenchDate(end))}</strong>.</p>
       <p><strong>Vos droits de diffusion sont désormais suspendus.</strong>
       Votre configuration, vos SPHOTS, vos périodes et vos sauveteurs restent enregistrés.</p>
-      <p>Vous pouvez poursuivre la diffusion avec l’abonnement annuel SPHOT ADMIN
-      au tarif de <strong>${currency(price)} HT par an et par poste de secours</strong>.</p>
-      <p>Montant prévisionnel actuel : <strong>${currency(annual)} HT / an</strong>
-      pour ${stations} poste(s) de secours.</p>
+      <p>Vous pouvez poursuivre la diffusion avec l’abonnement annuel SPHOT ADMIN.</p>
+      <p>Votre offre tarifaire actualisée, calculée selon la grille publiée,
+      est consultable dans votre espace ABONNEMENT &amp; PAIEMENT.</p>
       <p><a href="${SPHOT_LOGIN_URL}">Accéder à SPHOT ADMIN</a></p>
       <p>Cordialement,<br>L’équipe SPHOT</p>`;
     await sendLifecycleMail({
@@ -1212,20 +897,14 @@ async function sendTrialReminder(subscriptionDoc) {
   const requestSnap = await getRequestByUid(uid);
   if (!requestSnap) return;
   const data = requestSnap.data() || {};
-  const price = Number(
-      subscription.pricePerStationExclTax || DEFAULT_PRICE_PER_STATION_EXCL_TAX,
-  );
-  const stations = Number(subscription.numberOfRescueStations || 0);
-  const annual = price * stations;
   const html = `
     <p>${escapeHtml(buildGreeting(data))}</p>
     <p>Votre <strong>période d’essai gratuite SPHOT ADMIN</strong> prendra fin le
     <strong>${escapeHtml(formatFrenchDate(subscription.trialEndDate))}</strong>.</p>
     <p>Afin d’éviter toute interruption de diffusion, vous pouvez dès maintenant
     préparer votre abonnement annuel SPHOT ADMIN.</p>
-    <p>Tarif : <strong>${currency(price)} HT / an / poste de secours</strong>.<br>
-    Montant prévisionnel : <strong>${currency(annual)} HT / an</strong>
-    pour ${stations} poste(s).</p>
+    <p>Votre offre tarifaire actualisée, calculée sur la grille publiée,
+    est consultable dans l'espace ABONNEMENT.</p>
     <p><a href="${SPHOT_LOGIN_URL}">Accéder à SPHOT ADMIN</a></p>
     <p>Cordialement,<br>L’équipe SPHOT</p>`;
   const sent = await sendLifecycleMail({
@@ -1247,20 +926,14 @@ async function sendRenewalReminder(subscriptionDoc, days) {
   const requestSnap = await getRequestByUid(uid);
   if (!requestSnap) return;
   const data = requestSnap.data() || {};
-  const price = Number(
-      subscription.pricePerStationExclTax || DEFAULT_PRICE_PER_STATION_EXCL_TAX,
-  );
-  const stations = Number(subscription.numberOfRescueStations || 0);
-  const annual = price * stations;
   const fieldName = `renewalReminder${days}dEmail`;
   const html = `
     <p>${escapeHtml(buildGreeting(data))}</p>
     <p>Votre abonnement annuel SPHOT ADMIN arrive à échéance le
     <strong>${escapeHtml(formatFrenchDate(subscription.subscriptionEndDate, false))}</strong>.</p>
     <p>Vous pouvez préparer son renouvellement dès maintenant.</p>
-    <p>Base tarifaire actuelle : <strong>${currency(price)} HT / an / poste de secours</strong>.<br>
-    Montant prévisionnel : <strong>${currency(annual)} HT / an</strong>
-    pour ${stations} poste(s).</p>
+    <p>Votre prochaine offre sera calculée selon la grille publiée
+    en vigueur pour le renouvellement, sans prorata.</p>
     <p>Lors du renouvellement, vos informations administratives et de facturation
     seront préremplies et devront être confirmées. Les références propres à la
     nouvelle commande (bon de commande / engagement) pourront être mises à jour.</p>
@@ -1463,7 +1136,8 @@ exports.processAdminOrderCreated = onDocumentCreated(
           {heading: "Commande"},
           {label: "Nombre de postes", value: order.numberOfRescueStations},
           {label: "Prix unitaire HT", value:
-            currency(order.unitPriceExclTax || DEFAULT_PRICE_PER_STATION_EXCL_TAX)},
+            Number(order.unitPriceExclTax) > 0 ?
+              currency(order.unitPriceExclTax) : "Non renseigné"},
           {label: "Montant HT", value: currency(order.totalExclTax)},
           {label: "TVA", value: `${Number(order.vatRate || DEFAULT_VAT_RATE)} %`},
           {label: "Montant TTC", value: currency(order.totalInclTax)},
@@ -1505,7 +1179,8 @@ exports.processAdminOrderCreated = onDocumentCreated(
         engagementNumber: order.engagementNumber || "",
         chorusServiceCode: order.chorusServiceCode || "",
         numberOfRescueStations: Number(order.numberOfRescueStations || 0),
-        unitPriceExclTax: Number(order.unitPriceExclTax || DEFAULT_PRICE_PER_STATION_EXCL_TAX),
+        unitPriceExclTax: Number(order.unitPriceExclTax) > 0 ?
+          Number(order.unitPriceExclTax) : null,
         subtotalExclTax: Number(order.totalExclTax || 0),
         vatRate: Number(order.vatRate || DEFAULT_VAT_RATE),
         vatAmount: Number(order.vatAmount || 0),

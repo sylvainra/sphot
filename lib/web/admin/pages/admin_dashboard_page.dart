@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../models/advertising_pricing_config.dart';
 import '../../../services/admin_logo_storage_service.dart';
 import '../../../services/sphot_media_storage_service.dart';
@@ -20,6 +21,12 @@ import '../../../map/map_page.dart';
 import 'package:flutter/services.dart';
 import 'sphot_admin_summary_page.dart';
 import 'admin_subscription_panel.dart';
+import 'admin_quote_server_pdf_service.dart';
+import 'admin_quote_consultation.dart';
+import 'admin_quote_pdf_download.dart';
+import 'admin_financial_document_pdf.dart';
+import 'admin_financial_document_consultation.dart';
+import 'admin_payment_panel.dart';
 import 'admin_statistics_panel.dart';
 import '../../institutional/pages/institutional_main_courante_page.dart';
 import '../../institutional/services/operational_alert_sound.dart';
@@ -111,12 +118,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Color _sphotHoverColor = adminColor;
 
   bool _showSphotEditorPanel = false;
+  bool _showAdminWelcomePromotion = false;
+  bool _welcomePromotionStateLoaded = false;
+  bool _welcomePromotionSeenLocally = false;
+  bool _welcomePromotionShownThisSession = false;
   bool _showSauveteurEditorPanel = false;
   bool _showSauveteursManagementPanel = false;
   bool _showSurveillancePeriodsPanel = false;
   bool _showTrialSummaryPanel = false;
   bool _showSubscriptionPanel = false;
+  bool _showAdminPaymentPanel = false;
   bool _showBillingDocumentsPanel = false;
+  final Set<String> _loadingQuoteArchiveIds = <String>{};
+  bool _consultingQuoteFromDocuments = false;
+  AdminFinancialDocumentKind? _loadingFinancialSpecimen;
   bool _showStatisticsPanel = false;
   bool _showMainCourantePanel = false;
   bool _operationalAlertActive = false;
@@ -611,6 +626,29 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           data['title'] ??
           'SPHOT sans nom',
     );
+  }
+
+  // Inclure le numéro du SPHOT si celui-ci est renseigné.
+  String _paymentRescueStationLabel(
+    String documentId,
+    Map<String, dynamic> spot,
+  ) {
+    final number = _firstCleanText([
+      spot['idSphot'],
+      spot['numeroSphot'],
+      spot['numeroPoste'],
+    ]);
+    final name = _firstCleanText([
+      spot['nomSphot'],
+      spot['nomSecours'],
+      spot['name'],
+      spot['nom'],
+      spot['title'],
+      documentId,
+    ]);
+    if (number.isEmpty) return name;
+    if (name.toUpperCase().startsWith(number.toUpperCase())) return name;
+    return '$number - $name';
   }
 
   String _normalizeType(String value) {
@@ -1708,9 +1746,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           subscription['numberOfRescueStations'],
         ).toInt();
 
-        final pricePerSpot = _toDouble(subscription['pricePerStationExclTax']);
-
-        final totalPrice = numberOfSpots * pricePerSpot;
+        // Le montant affiché provient du total d'offre enregistré,
+        // jamais d'un ancien prix unitaire multiplié par les postes.
+        final totalPrice = _toDouble(subscription['annualAmountExclTax']);
+        final priceLabel = totalPrice > 0
+            ? '${totalPrice.toStringAsFixed(2).replaceAll('.', ',')} € HT / an'
+            : 'Tarification à actualiser';
 
         return Container(
           width: double.infinity,
@@ -1755,7 +1796,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               _spotInfoLine('SPHOTS', '$numberOfSpots'),
               _spotInfoLine(
                 'Coût',
-                '${totalPrice.toStringAsFixed(0)} € HT / an',
+                priceLabel,
               ),
             ],
           ),
@@ -4819,6 +4860,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           _showTrialSummaryPanel = true;
                           _showSubscriptionPanel = false;
                           _showBillingDocumentsPanel = false;
+                          _showAdminPaymentPanel = false;
                           _trialSummaryPanelFuture = _loadTrialSummaryData();
                         });
                       },
@@ -5577,6 +5619,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _showTrialSummaryPanel = false;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
       _showSauveteursManagementPanel = false;
       _showSurveillancePeriodsPanel = false;
       _showSauveteurEditorPanel = false;
@@ -5613,6 +5656,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _showTrialSummaryPanel = true;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
 
       _showSauveteursManagementPanel = false;
       _showSurveillancePeriodsPanel = false;
@@ -5747,6 +5791,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _showMainCourantePanel = false;
       _showSubscriptionPanel = true;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSauveteursManagementPanel = false;
@@ -5761,11 +5806,37 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     });
   }
 
+  void _openAdminPaymentPanel() {
+    setState(() {
+      _showStatisticsPanel = false;
+      _showMainCourantePanel = false;
+      _showSubscriptionPanel = false;
+      _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = true;
+      _showTrialSummaryPanel = false;
+      _trialSummaryPanelFuture = null;
+      _showSauveteursManagementPanel = false;
+      _showSurveillancePeriodsPanel = false;
+      _showSauveteurEditorPanel = false;
+      _showSphotEditorPanel = false;
+      _placingSphotOnMap = false;
+      _selectedSpot = null;
+      _selectedAdmin = null;
+      _selectedAdvertiser = null;
+      _showLegalDocumentsPanel = false;
+    });
+  }
+
+  void _closeAdminPaymentPanel() {
+    setState(() => _showAdminPaymentPanel = false);
+  }
+
   void _openBillingDocumentsPanel() {
     setState(() {
       _showStatisticsPanel = false;
       _showMainCourantePanel = false;
       _showBillingDocumentsPanel = true;
+      _showAdminPaymentPanel = false;
       _showSubscriptionPanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
@@ -5790,6 +5861,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _closeBillingDocumentsPanel() {
     setState(() {
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
     });
   }
 
@@ -5799,6 +5871,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _showMainCourantePanel = false;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSauveteursManagementPanel = false;
@@ -5829,6 +5902,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _showMainCourantePanel = true;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
       _showTrialSummaryPanel = false;
       _trialSummaryPanelFuture = null;
       _showSauveteursManagementPanel = false;
@@ -5914,6 +5988,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required String description,
     String status = 'À COMPLÉTER',
     Color statusColor = pendingColor,
+    Widget? footer,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -5922,7 +5997,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: adminColor.withOpacity(0.22)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: adminColor, size: 27),
@@ -5964,6 +6042,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
         ],
       ),
+      if (footer != null) ...[
+        const SizedBox(height: 10),
+        footer,
+      ],
+        ],
+      ),
     );
   }
 
@@ -5982,7 +6066,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           child: Column(
             children: [
               _buildCommercialPanelHeader(
-                title: 'ABONNEMENT',
+                title: 'ABONNEMENT & PAIEMENT',
                 onClose: _closeSubscriptionPanel,
               ),
               Divider(height: 1, color: adminColor.withOpacity(0.20)),
@@ -6102,6 +6186,251 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return '';
   }
 
+  /// Même PDF consultable que dans ABONNEMENT, sans générer de DV.
+  /// Le dossier est relu pour refléter les dernières données enregistrées.
+  Future<void> _consultQuoteFromDocuments() async {
+    if (_consultingQuoteFromDocuments) return;
+    setState(() => _consultingQuoteFromDocuments = true);
+    try {
+      final uid = widget.adminUid.trim();
+      if (uid.isEmpty) {
+        throw StateError('Administrateur non identifié.');
+      }
+      final saved = await FirebaseFirestore.instance
+          .collection('subscriptions')
+          .doc(uid)
+          .get();
+      final data = <String, dynamic>{
+        ...?saved.data(),
+      };
+      final reference = _currentAdministrativeReference();
+      if (_cleanText(data['administrativeReference']).isEmpty &&
+          reference.isNotEmpty) {
+        data['administrativeReference'] = reference;
+      }
+      final bytes = await createConsultableAdminQuotePdf(data);
+      if (!mounted) return;
+      downloadAdminQuoteSpecimen(bytes, 'SPHOT-DEVIS-SPECIMEN.pdf');
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text(
+          'Le devis consultable n’a pas pu être téléchargé. '
+          'Réessayez après actualisation du dossier.',
+        )),
+      );
+    } finally {
+      if (mounted) setState(() => _consultingQuoteFromDocuments = false);
+    }
+  }
+
+  /// Spécimens consultables dans leurs encarts de l'étape 7.
+  /// Aucune émission FA/AV/CMD ni changement de statut de paiement.
+  Future<void> _consultFinancialDocument(
+      AdminFinancialDocumentKind kind) async {
+    if (_loadingFinancialSpecimen != null) return;
+    setState(() => _loadingFinancialSpecimen = kind);
+    try {
+      final uid = widget.adminUid.trim();
+      if (uid.isEmpty) throw StateError('Administrateur non identifié.');
+      final saved = await FirebaseFirestore.instance
+          .collection('subscriptions')
+          .doc(uid)
+          .get();
+      final data = <String, dynamic>{...?saved.data()};
+      final reference = _currentAdministrativeReference();
+      if (_cleanText(data['administrativeReference']).isEmpty &&
+          reference.isNotEmpty) {
+        data['administrativeReference'] = reference;
+      }
+      final pdf = await createAdminFinancialDocumentSpecimen(
+        kind: kind,
+        subscription: data,
+      );
+      if (!mounted) return;
+      downloadAdminQuoteSpecimen(pdf, kind.filename);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text(
+          'Document momentanément indisponible. '
+          'Actualisez le dossier puis réessayez.',
+        )),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingFinancialSpecimen = null);
+    }
+  }
+
+  Widget _financialSpecimenButton(
+      AdminFinancialDocumentKind kind, String label) {
+    final loading = _loadingFinancialSpecimen == kind;
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _loadingFinancialSpecimen != null
+            ? null : () => _consultFinancialDocument(kind),
+        icon: loading
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+        label: Text(loading ? 'PRÉPARATION DU PDF...' : label),
+      ),
+    );
+  }
+
+  /// Lecture sécurisée du PDF existant, jamais depuis son URL Storage.
+  Future<void> _downloadArchivedAdminQuote(
+    String documentId,
+    String documentNumber,
+  ) async {
+    if (_loadingQuoteArchiveIds.contains(documentId)) return;
+    setState(() => _loadingQuoteArchiveIds.add(documentId));
+    try {
+      final bytes = await const AdminQuotePortalClient()
+          .downloadIssuedPdf(documentId);
+      if (!mounted) return;
+      downloadAdminQuoteSpecimen(bytes, '$documentNumber.pdf');
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text(error is AdminQuoteEndpointUnavailable
+            ? 'Service documentaire non encore activé sur Firebase.'
+            : 'Téléchargement du devis impossible : $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingQuoteArchiveIds.remove(documentId));
+    }
+  }
+
+  /// Le devis consultable reste accessible dans le MÊME encart DEVIS,
+  /// qu'un document officiel ait déjà été émis ou non.
+  Widget _consultQuoteAction() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _consultingQuoteFromDocuments
+            ? null
+            : _consultQuoteFromDocuments,
+        icon: _consultingQuoteFromDocuments
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.picture_as_pdf_outlined),
+        label: Text(_consultingQuoteFromDocuments
+            ? 'PRÉPARATION DU PDF...'
+            : 'CONSULTER LE DEVIS (PDF)'),
+      ),
+    );
+  }
+
+  Widget _buildArchivedAdminQuotes() {
+    final uid = widget.adminUid.trim();
+    if (uid.isEmpty) {
+      return _buildCommercialSection(
+        icon: Icons.request_quote_outlined,
+        title: 'DEVIS',
+        description: 'Devis consultable avec les informations disponibles.',
+        status: 'ADMINISTRATEUR NON IDENTIFIÉ',
+        statusColor: redColor,
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('documents')
+          .where('adminUid', isEqualTo: uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final documents = snapshot.data?.docs
+                .where((doc) {
+                  final data = doc.data();
+                  return data['documentType'] == 'quote' &&
+                      data['status'] == 'issued' &&
+                      _cleanText(data['documentNumber']).startsWith('DV-') &&
+                      _cleanText(data['storagePath']).isNotEmpty;
+                })
+                .toList() ??
+            <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+        documents.sort((a, b) {
+          final first = a.data();
+          final second = b.data();
+          final byDate = _cleanText(second['issuedOn'])
+              .compareTo(_cleanText(first['issuedOn']));
+          return byDate != 0
+              ? byDate
+              : _cleanText(second['documentNumber'])
+                  .compareTo(_cleanText(first['documentNumber']));
+        });
+
+        final archiveStatus = snapshot.hasError
+            ? 'ARCHIVES INDISPONIBLES'
+            : !snapshot.hasData
+                ? 'CHARGEMENT DES ARCHIVES...'
+                : documents.isEmpty
+                    ? 'AUCUN DEVIS ÉMIS'
+                    : '${documents.length} DEVIS ARCHIVÉ(S)';
+
+        return _buildCommercialSection(
+          icon: Icons.request_quote_outlined,
+          title: 'DEVIS',
+          description:
+              'Consulter le devis avec les données disponibles. '
+              'Les devis officiellement émis sont conservés ici.',
+          status: archiveStatus,
+          statusColor: snapshot.hasError
+              ? redColor
+              : documents.isNotEmpty
+                  ? const Color(0xFF15803D)
+                  : pendingColor,
+          footer: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _consultQuoteAction(),
+              for (final document in documents) ...[
+                const Divider(height: 18),
+                Text(
+                  'DEVIS ${_cleanText(document.data()['documentNumber'])}',
+                  style: const TextStyle(
+                    color: adminColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Émis le ${_cleanText(document.data()['issuedOn'])}',
+                  style: const TextStyle(
+                    color: adminColor,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                OutlinedButton.icon(
+                  onPressed: _loadingQuoteArchiveIds.contains(document.id)
+                      ? null
+                      : () => _downloadArchivedAdminQuote(
+                            document.id,
+                            _cleanText(document.data()['documentNumber']),
+                          ),
+                  icon: const Icon(Icons.download_outlined, size: 18),
+                  label: Text(_loadingQuoteArchiveIds.contains(document.id)
+                      ? 'TÉLÉCHARGEMENT...'
+                      : 'TÉLÉCHARGER LE PDF OFFICIEL'),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildBillingDocumentsPanel() {
     final administrativeReference = _currentAdministrativeReference();
 
@@ -6119,7 +6448,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           child: Column(
             children: [
               _buildCommercialPanelHeader(
-                title: 'DOCUMENTS & FACTURES',
+                title: 'FACTURES & DOCUMENTS',
                 onClose: _closeBillingDocumentsPanel,
               ),
               Divider(height: 1, color: adminColor.withOpacity(0.20)),
@@ -6171,36 +6500,57 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         const SizedBox(height: 12),
                       ],
 
-                      _buildCommercialSection(
-                        icon: Icons.request_quote_outlined,
-                        title: 'DEVIS',
-                        description:
-                            'Les devis générés pour votre organisme apparaîtront ici.',
-                        status: 'AUCUN DOCUMENT',
-                      ),
+                      _buildArchivedAdminQuotes(),
                       const SizedBox(height: 12),
                       _buildCommercialSection(
                         icon: Icons.shopping_cart_checkout_rounded,
                         title: 'COMMANDES',
                         description:
-                            'Bons de commande et références d’engagement associés.',
-                        status: 'AUCUN DOCUMENT',
+                            'Références de commande et engagement à compléter '
+                            'avant toute confirmation contractuelle.',
+                        status: 'AUCUNE COMMANDE ÉMISE',
+                        footer: _financialSpecimenButton(
+                          AdminFinancialDocumentKind.order,
+                          'CONSULTER LA COMMANDE (PDF)',
+                        ),
                       ),
                       const SizedBox(height: 12),
                       _buildCommercialSection(
                         icon: Icons.receipt_long_outlined,
                         title: 'FACTURES ET AVOIRS',
                         description:
-                            'Factures, avoirs et état de leur transmission électronique.',
-                        status: 'AUCUN DOCUMENT',
+                            'Consultation préparatoire. Les véritables '
+                            'factures FA et avoirs AV seront numérotés '
+                            'et archivés après leur émission.',
+                        status: 'AUCUNE PIÈCE COMPTABLE ÉMISE',
+                        footer: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _financialSpecimenButton(
+                              AdminFinancialDocumentKind.invoice,
+                              'CONSULTER LA FACTURE (PDF)',
+                            ),
+                            const SizedBox(height: 6),
+                            _financialSpecimenButton(
+                              AdminFinancialDocumentKind.creditNote,
+                              'CONSULTER L’AVOIR (PDF)',
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 12),
                       _buildCommercialSection(
                         icon: Icons.account_balance_outlined,
                         title: 'SUIVI DU PAIEMENT',
                         description:
-                            'État du dépôt, du traitement et du règlement des factures.',
-                        status: 'AUCUNE FACTURE',
+                            'État préparatoire des références de facture, '
+                            'du dépôt et du règlement. Aucun encaissement '
+                            'n’est présumé.',
+                        status: 'AUCUN RÈGLEMENT VÉRIFIÉ',
+                        footer: _financialSpecimenButton(
+                          AdminFinancialDocumentKind.paymentStatus,
+                          'CONSULTER LE SUIVI (PDF)',
+                        ),
                       ),
                     ],
                   ),
@@ -6209,6 +6559,164 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAdminWelcomePromotion() {
+    // Une impression du message suffit pour le considérer comme vu.
+    // On conserve son affichage pendant cette connexion, puis on le
+    // masque définitivement lors des connexions suivantes.
+    if (!_welcomePromotionShownThisSession) {
+      _welcomePromotionShownThisSession = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _persistAdminWelcomePromotionSeen();
+        }
+      });
+    }
+    return Positioned.fill(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: math.min(650.0, constraints.maxWidth - 32),
+                maxHeight: math.min(460.0, constraints.maxHeight * 0.76),
+              ),
+              child: Material(
+                color: Colors.white.withOpacity(0.95),
+                elevation: 9,
+                borderRadius: BorderRadius.circular(18),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: adminColor.withOpacity(0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(22, 12, 20, 18),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'SPHOT ADMIN · VOS LIEUX DE BAIGNADE',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  color: adminColor,
+                                  fontSize: 13,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Fermer le message et afficher la carte',
+                              icon: const Icon(Icons.close_rounded, color: adminColor),
+                              onPressed: () {
+                                _dismissAdminWelcomePromotion();
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        const Text(
+                          'Diffusez gratuitement* vos SPHOTS de baignade '
+                          'ainsi que votre structure sur l’application SPHOT.',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontStyle: FontStyle.italic,
+                            fontWeight: FontWeight.w800,
+                            color: adminColor,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 13),
+                        const Text(
+                          'Présentez au grand public les caractéristiques de '
+                          'vos lieux de baignade : nom, localisation, type de '
+                          'site, équipements, accès, labels et informations utiles.',
+                          style: TextStyle(
+                            fontSize: 13.5, color: Colors.black87, height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Valorisez également votre structure',
+                                style: TextStyle(fontWeight: FontWeight.w900),
+                              ),
+                              TextSpan(
+                                text: ' par un accès direct à votre site internet.',
+                              ),
+                            ],
+                          ),
+                          style: TextStyle(
+                            fontSize: 13.5, color: Colors.black87, height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Pour les SPHOTS surveillés',
+                                style: TextStyle(fontWeight: FontWeight.w900),
+                              ),
+                              TextSpan(text: ', l’abonnement '),
+                              TextSpan(
+                                text: 'SPHOT ADMIN',
+                                style: TextStyle(fontWeight: FontWeight.w900),
+                              ),
+                              TextSpan(text: ' permet en plus de diffuser les '),
+                              TextSpan(
+                                text: 'informations de surveillance en temps réel',
+                                style: TextStyle(fontWeight: FontWeight.w900),
+                              ),
+                              TextSpan(
+                                text: ', renseignées directement par les '
+                                    'professionnels chargés de la surveillance.',
+                              ),
+                            ],
+                          ),
+                          style: TextStyle(
+                            fontSize: 13.5, color: Colors.black87, height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 13),
+                        Divider(color: adminColor.withOpacity(0.2)),
+                        const SizedBox(height: 4),
+                        const Text(
+                          '* La diffusion gratuite concerne la présence de tous '
+                          'les types de SPHOTS sur la carte, leurs caractéristiques '
+                          'descriptives et le référencement de la structure '
+                          'gestionnaire. La diffusion des informations de '
+                          'surveillance en temps réel des SPHOTS surveillés '
+                          'nécessite l’activation des fonctionnalités SPHOT ADMIN, '
+                          'pendant la période d’essai autorisée ou dans le cadre '
+                          'd’un abonnement en vigueur.',
+                          style: TextStyle(
+                            color: Color(0xFF475569),
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -6343,7 +6851,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 : null,
                           ),
                           _summaryCard(
-                            title: 'ABONNEMENT',
+                            title: 'ABONNEMENT & PAIEMENT',
                             value: '',
                             color: adminColor,
                             iconPath: 'data/icons/fire_red_icon.svg',
@@ -6355,7 +6863,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             onTap: _openSubscriptionPanel,
                           ),
                           _summaryCard(
-                            title: 'DOCUMENTS & FACTURES',
+                            title: 'FACTURES & DOCUMENTS',
                             value: '',
                             color: adminColor,
                             iconPath: 'data/icons/fire_red_icon.svg',
@@ -6939,6 +7447,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
 
       _showSurveillancePeriodsPanel = true;
       _showSauveteurEditorPanel = false;
@@ -7966,6 +8475,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
 
       _clearSphotEditor();
       _showSauveteurEditorPanel = false;
@@ -7996,6 +8506,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
 
       _clearSauveteurEditor();
       _showSauveteurEditorPanel = true;
@@ -8021,6 +8532,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
 
       _clearSauveteurEditor();
       _showSauveteursManagementPanel = true;
@@ -8058,6 +8570,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
 
       _clearSauveteurEditor();
 
@@ -8229,6 +8742,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _trialSummaryPanelFuture = null;
       _showSubscriptionPanel = false;
       _showBillingDocumentsPanel = false;
+      _showAdminPaymentPanel = false;
 
       _editingSphotDocId = _cleanText(data['_docId']);
 
@@ -8661,6 +9175,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _showTrialSummaryPanel = true;
         _showSubscriptionPanel = false;
         _showBillingDocumentsPanel = false;
+        _showAdminPaymentPanel = false;
         _trialSummaryPanelFuture = _loadTrialSummaryData();
       });
 
@@ -13677,6 +14192,58 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  // Le message commercial concerne la toute premiere utilisation de
+  // l'espace ADMIN. La fermeture est memorisee par profil, y compris
+  // apres une nouvelle connexion, et synchronisee dans adminRequests.
+  String get _welcomePromotionStorageKey =>
+      'sphot_admin_welcome_promotion_seen_${widget.adminUid.trim()}';
+
+  Future<void> _loadAdminWelcomePromotionState() async {
+    bool seen = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      seen = prefs.getBool(_welcomePromotionStorageKey) ?? false;
+    } catch (_) {
+      // Firestore conserve egalement une trace de la premiere fermeture.
+    }
+    if (!mounted) return;
+    setState(() {
+      _welcomePromotionSeenLocally = seen;
+      _welcomePromotionStateLoaded = true;
+      _showAdminWelcomePromotion = !seen;
+    });
+  }
+
+  Future<void> _persistAdminWelcomePromotionSeen() async {
+    final uid = widget.adminUid.trim();
+    if (uid.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_welcomePromotionStorageKey, true);
+    } catch (_) {
+      // Le stockage navigateur n'est qu'un secours à la trace Firestore.
+    }
+    try {
+      await FirebaseFirestore.instance
+          .collection('adminRequests')
+          .doc(uid)
+          .set({
+            'welcomePromotionSeenAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+    } catch (_) {
+      // L'enregistrement local évite l'ouverture répétée sur ce navigateur.
+    }
+  }
+
+  Future<void> _dismissAdminWelcomePromotion() async {
+    if (!_showAdminWelcomePromotion) return;
+    setState(() {
+      _showAdminWelcomePromotion = false;
+      _welcomePromotionSeenLocally = true;
+    });
+    await _persistAdminWelcomePromotionSeen();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -13692,6 +14259,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _loadAllLegalChaptersFromFirebase();
 
     _loadAdministratorTerritoryCenter();
+    _loadAdminWelcomePromotionState();
 
     if (widget.mainCouranteToken.trim().isNotEmpty) {
       Future<void>.delayed(
@@ -14911,6 +15479,30 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               _buildNorthButton(),
                               _buildMapStyleButton(),
 
+                              if (_showAdminWelcomePromotion &&
+                                  _welcomePromotionStateLoaded &&
+                                  !_welcomePromotionSeenLocally &&
+                                  docs.isEmpty &&
+                                  !hasAlreadyRequestedTrial &&
+                                  currentAdminRequest != null &&
+                                  (currentAdminRequest['welcomePromotionSeenAt'] == null ||
+                                      _welcomePromotionShownThisSession) &&
+                                  !_showSphotEditorPanel &&
+                                  !_showSurveillancePeriodsPanel &&
+                                  !_showSauveteurEditorPanel &&
+                                  !_showSauveteursManagementPanel &&
+                                  !_showTrialSummaryPanel &&
+                                  !_showSubscriptionPanel &&
+                                  !_showAdminPaymentPanel &&
+                                  !_showBillingDocumentsPanel &&
+                                  !_showStatisticsPanel &&
+                                  !_showMainCourantePanel &&
+                                  _selectedSpot == null &&
+                                  _selectedAdmin == null &&
+                                  _selectedAdvertiser == null)
+                                _buildAdminWelcomePromotion(),
+
+
                               Positioned(
                                 left: 0,
                                 right: 0,
@@ -14957,6 +15549,37 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           AdminSubscriptionPanel(
                             adminUid: widget.adminUid,
                             onClose: _closeSubscriptionPanel,
+                          )
+                        else if (_showAdminPaymentPanel)
+                          AdminPaymentPanel(
+                            adminUid: widget.adminUid,
+                            rescueStationNames: {
+                              for (final doc in docs)
+                                if (doc.data()['isPosteSecours'] == true ||
+                                    (doc.data()['typeSphot'] ?? '')
+                                        .toString()
+                                        .toUpperCase()
+                                        .contains('POSTE DE SECOURS'))
+                                  doc.id: _paymentRescueStationLabel(
+                                    doc.id,
+                                    doc.data(),
+                                  ),
+                            },
+                            // Memes SPHOTS que ceux de la carte de l'Admin :
+                            // ne pas utiliser le compteur historique de
+                            // subscriptions/{uid} pour cette estimation.
+                            availableRescueStationIds: docs
+                                .where((doc) {
+                                  final spot = doc.data();
+                                  return spot['isPosteSecours'] == true ||
+                                      (spot['typeSphot'] ?? '')
+                                          .toString()
+                                          .toUpperCase()
+                                          .contains('POSTE DE SECOURS');
+                                })
+                                .map((doc) => doc.id)
+                                .toList(),
+                            onClose: _closeAdminPaymentPanel,
                           )
                         else if (_showBillingDocumentsPanel)
                           _buildBillingDocumentsPanel()

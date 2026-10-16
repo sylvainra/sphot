@@ -17,6 +17,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 
 import '../widgets/super_admin_admin_workflow_panel.dart';
+import '../widgets/super_admin_annual_financial_export_card.dart';
+import '../widgets/sphot_dropdown_visuals.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -65,7 +67,9 @@ class _SuperAdminTileStyle {
 }
 
 class SuperAdminDashboardPage extends StatefulWidget {
-  const SuperAdminDashboardPage({super.key});
+  const SuperAdminDashboardPage({super.key, this.pricingSessionToken = ''});
+
+  final String pricingSessionToken;
 
   @override
   State<SuperAdminDashboardPage> createState() =>
@@ -116,6 +120,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   bool _showLegalDocumentsPanel = false;
   bool _showPricingPanel = false;
+  bool _showAnnualFinancialPanel = false;
+  int _selectedPricingTab = 0;
+  final GlobalKey _pricingPanelKey = GlobalKey();
 
   String? _selectedLegalDocument;
   String? _selectedLegalChapter;
@@ -748,11 +755,17 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     _dropdownOverlay?.remove();
     _dropdownOverlay = null;
 
-    final renderBox =
-        _filtersKey.currentContext!.findRenderObject() as RenderBox;
-
-    final position = renderBox.localToGlobal(Offset.zero);
-    final size = renderBox.size;
+    // Utiliser les coordonnées de la couche Overlay, comme Exercice :
+    // localToGlobal() seul décale le menu dans un Overlay imbriqué.
+    final overlay = Overlay.of(context);
+    final overlayBox = overlay.context.findRenderObject();
+    final target = _filtersKey.currentContext?.findRenderObject();
+    if (target is! RenderBox || overlayBox is! RenderBox) return;
+    final position = target.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+    final size = target.size;
 
     final scrollController = ScrollController();
 
@@ -773,41 +786,26 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ),
                 Positioned(
                   left: position.dx,
-                  top: position.dy + size.height - 12,
+                  top: position.dy + size.height - SphotDropdownVisuals.popupOverlap,
                   width: size.width,
                   child: Material(
                     color: Colors.transparent,
                     child: Container(
-                      constraints: const BoxConstraints(maxHeight: 245),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: const Border(
-                          left: BorderSide(color: adminColor, width: 1.4),
-                          right: BorderSide(color: adminColor, width: 1.4),
-                          bottom: BorderSide(color: adminColor, width: 1.4),
-                        ),
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(10),
-                          bottomRight: Radius.circular(10),
-                        ),
-                      ),
+                      constraints: const BoxConstraints(maxHeight: 270),
+                      decoration: SphotDropdownVisuals.popupDecoration,
+                  clipBehavior: Clip.antiAlias,
                       child: ScrollbarTheme(
-                        data: const ScrollbarThemeData(
-                          thumbColor: WidgetStatePropertyAll(adminColor),
-                          trackVisibility: WidgetStatePropertyAll(false),
-                        ),
+                        data: SphotDropdownVisuals.scrollbarTheme.copyWith(mainAxisMargin: 16),
                         child: Scrollbar(
                           controller: scrollController,
                           thumbVisibility: true,
                           thickness: 10,
                           radius: const Radius.circular(10),
-                          // Le menu chevauche son en-tête de 12 px :
-                          // garder le curseur entièrement visible dans la zone.
-                          mainAxisMargin: 16,
-                          crossAxisMargin: 5,
                           child: ListView(
                             controller: scrollController,
-                            padding: EdgeInsets.zero,
+                            padding: const EdgeInsets.only(
+                          top: SphotDropdownVisuals.popupContentInset,
+                        ),
                             shrinkWrap: true,
                             children: DashboardSpotFilter.values.map((filter) {
                               final selected = _selectedFilters.contains(
@@ -815,6 +813,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                               );
 
                               return InkWell(
+                                hoverColor: Colors.transparent,
+                                focusColor: Colors.transparent,
                                 onTap: () {
                                   setState(() {
                                     if (filter == DashboardSpotFilter.none) {
@@ -892,6 +892,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     ),
                   ),
                 ),
+              ...SphotDropdownVisuals.joinedFieldEdges(position, size),
               ],
             );
           },
@@ -899,18 +900,24 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       },
     );
 
-    Overlay.of(context).insert(_dropdownOverlay!);
+    overlay.insert(_dropdownOverlay!);
   }
 
   void _openAdminFiltersMenu() {
     _dropdownOverlay?.remove();
     _dropdownOverlay = null;
 
-    final renderBox =
-        _adminFiltersKey.currentContext!.findRenderObject() as RenderBox;
-
-    final position = renderBox.localToGlobal(Offset.zero);
-    final size = renderBox.size;
+    // Utiliser les coordonnées de la couche Overlay, comme Exercice :
+    // localToGlobal() seul décale le menu dans un Overlay imbriqué.
+    final overlay = Overlay.of(context);
+    final overlayBox = overlay.context.findRenderObject();
+    final target = _adminFiltersKey.currentContext?.findRenderObject();
+    if (target is! RenderBox || overlayBox is! RenderBox) return;
+    final position = target.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+    final size = target.size;
     final scrollController = ScrollController();
 
     _dropdownOverlay = OverlayEntry(
@@ -928,36 +935,16 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             ),
             Positioned(
               left: position.dx,
-              top: position.dy + size.height - 12,
+              top: position.dy + size.height - SphotDropdownVisuals.popupOverlap,
               width: size.width,
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  constraints: const BoxConstraints(maxHeight: 190),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: const Border(
-                      left: BorderSide(color: adminColor, width: 1.4),
-                      right: BorderSide(color: adminColor, width: 1.4),
-                      bottom: BorderSide(color: adminColor, width: 1.4),
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(10),
-                      bottomRight: Radius.circular(10),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.18),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
+                  constraints: const BoxConstraints(maxHeight: 270),
+                  decoration: SphotDropdownVisuals.popupDecoration,
+                  clipBehavior: Clip.antiAlias,
                   child: ScrollbarTheme(
-                    data: const ScrollbarThemeData(
-                      thumbColor: MaterialStatePropertyAll(adminColor),
-                      trackVisibility: MaterialStatePropertyAll(false),
-                    ),
+                    data: SphotDropdownVisuals.scrollbarTheme.copyWith(mainAxisMargin: 16),
                     child: Scrollbar(
                       controller: scrollController,
                       thumbVisibility: true,
@@ -965,12 +952,16 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                       radius: Radius.circular(10),
                       child: ListView(
                         controller: scrollController,
-                        padding: EdgeInsets.zero,
+                        padding: const EdgeInsets.only(
+                          top: SphotDropdownVisuals.popupContentInset,
+                        ),
                         shrinkWrap: true,
                         children: DashboardAdminFilter.values.map((filter) {
                           final selected = _selectedAdminFilter == filter;
 
                           return InkWell(
+                                hoverColor: Colors.transparent,
+                                focusColor: Colors.transparent,
                             onTap: () {
                               setState(() {
                                 _selectedAdminFilter = filter;
@@ -1017,12 +1008,13 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ),
               ),
             ),
+            ...SphotDropdownVisuals.joinedFieldEdges(position, size),
           ],
         );
       },
     );
 
-    Overlay.of(context).insert(_dropdownOverlay!);
+    overlay.insert(_dropdownOverlay!);
   }
 
   Color _clusterBorderColor(List<Marker> markers) {
@@ -1475,9 +1467,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           subscription['numberOfRescueStations'],
         ).toInt();
 
-        final pricePerSpot = _toDouble(subscription['pricePerStationExclTax']);
-
-        final totalPrice = numberOfSpots * pricePerSpot;
+        final totalPrice = _toDouble(subscription['annualAmountExclTax']);
+        final priceLabel = totalPrice > 0
+            ? '${totalPrice.toStringAsFixed(2).replaceAll('.', ',')} € HT / an'
+            : 'Tarification à actualiser';
 
         return Container(
           width: double.infinity,
@@ -1522,7 +1515,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               _spotInfoLine('SPHOTS', '$numberOfSpots'),
               _spotInfoLine(
                 'Coût',
-                '${totalPrice.toStringAsFixed(0)} € HT / an',
+                priceLabel,
               ),
             ],
           ),
@@ -1531,6 +1524,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     );
   }
 
+  /// Super Admin sidebar: uniform actions fill the available vertical space.
+  /// A minimum content height preserves readability and keeps scrolling
+  /// available on smaller browser windows.
   Widget _buildRightPanel({required int visibleSpots}) {
     return Container(
       width: 360,
@@ -1541,134 +1537,169 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         ),
       ),
       child: SafeArea(
-        child: Scrollbar(
-          controller: _leftPanelScrollController,
-          thumbVisibility: true,
-          child: SingleChildScrollView(
-            controller: _leftPanelScrollController,
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _summaryCard(
-                  title: 'SPHOTS',
-                  value: '$_visibleOnMapSpotCount',
-                  color: adminColor,
-                ),
-                const SizedBox(height: 10),
-                _buildFiltersBlock(),
-                const SizedBox(height: 18),
-                _summaryCard(
-                  title: 'ADMINS',
-                  value: '$_visibleOnMapAdminCount',
-                  color: adminColor,
-                ),
-                const SizedBox(height: 10),
-                _buildAdminFiltersBlock(),
-                const SizedBox(height: 18),
-                _summaryCard(
-                  title: 'ANNONCEURS',
-                  value: '$_visibleAdvertiserCount',
-                  color: adminColor,
-                ),
-                const SizedBox(height: 10),
-                _buildAdvertiserFiltersBlock(),
-                const SizedBox(height: 18),
-                _summaryCard(
-                  title: 'SAUVETEURS',
-                  value: '$_visibleOnMapSauveteurCount',
-                  color: adminColor,
-                ),
-                const SizedBox(height: 12),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _showLegalDocumentsPanel = true;
-                      _showPricingPanel = false;
-                      _selectedSpot = null;
-                      _selectedAdmin = null;
-                      _selectedAdvertiser = null;
-                    });
-                  },
-                  child: Container(
-                    height: 54,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: (_showLegalDocumentsPanel ? redColor : adminColor)
-                          .withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: _showLegalDocumentsPanel ? redColor : adminColor,
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        AdaptiveAssetImage(
-                          'data/icons/fire_blue_icon.svg',
-                          width: 28,
-                          height: 28,
-                          filterQuality: FilterQuality.high,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final contentHeight = math.max(
+              680.0,
+              constraints.maxHeight - 34.0,
+            );
+            return Scrollbar(
+              controller: _leftPanelScrollController,
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                controller: _leftPanelScrollController,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+                child: SizedBox(
+                  height: contentHeight,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: _summaryCard(
+                          title: 'SPHOTS',
+                          value: '$_visibleOnMapSpotCount',
+                          color: adminColor,
                         ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'DOCUMENTS JURIDIQUES',
-                            style: TextStyle(
-                              color: adminColor,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                            ),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(child: _buildFiltersBlock()),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: _summaryCard(
+                          title: 'ADMINS',
+                          value: '$_visibleOnMapAdminCount',
+                          color: adminColor,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(child: _buildAdminFiltersBlock()),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: _summaryCard(
+                          title: 'ANNONCEURS',
+                          value: '$_visibleAdvertiserCount',
+                          color: adminColor,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(child: _buildAdvertiserFiltersBlock()),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: _summaryCard(
+                          title: 'SAUVETEURS',
+                          value: '$_visibleOnMapSauveteurCount',
+                          color: adminColor,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: _superAdminSidebarAction(
+                          label: 'DOCUMENTS JURIDIQUES',
+                          selected: _showLegalDocumentsPanel,
+                          onTap: () {
+                            setState(() {
+                              _showLegalDocumentsPanel = true;
+                              _showPricingPanel = false;
+                              _showAnnualFinancialPanel = false;
+                              _selectedSpot = null;
+                              _selectedAdmin = null;
+                              _selectedAdvertiser = null;
+                            });
+                          },
+                          icon: AdaptiveAssetImage(
+                            'data/icons/fire_blue_icon.svg',
+                            width: 28,
+                            height: 28,
+                            filterQuality: FilterQuality.high,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _showPricingPanel = true;
-                      _showLegalDocumentsPanel = false;
-                      _selectedSpot = null;
-                      _selectedAdmin = null;
-                      _selectedAdvertiser = null;
-                    });
-                  },
-                  child: Container(
-                    height: 54,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: (_showPricingPanel ? redColor : adminColor)
-                          .withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: _showPricingPanel ? redColor : adminColor,
-                        width: 1.5,
                       ),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.euro_rounded, color: adminColor, size: 28),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'GRILLES TARIFAIRES',
-                            style: TextStyle(
-                              color: adminColor,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                            ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: _superAdminSidebarAction(
+                          label: 'GRILLES TARIFAIRES',
+                          selected: _showPricingPanel,
+                          onTap: () {
+                            setState(() {
+                              _showPricingPanel = true;
+                              _showLegalDocumentsPanel = false;
+                              _showAnnualFinancialPanel = false;
+                              _selectedSpot = null;
+                              _selectedAdmin = null;
+                              _selectedAdvertiser = null;
+                            });
+                          },
+                          icon: const Icon(
+                            Icons.euro_rounded, color: adminColor, size: 28,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: _superAdminSidebarAction(
+                          label: 'PIÈCES FINANCIÈRES',
+                          selected: _showAnnualFinancialPanel,
+                          onTap: () {
+                            setState(() {
+                              _showAnnualFinancialPanel = true;
+                              _showPricingPanel = false;
+                              _showLegalDocumentsPanel = false;
+                              _selectedSpot = null;
+                              _selectedAdmin = null;
+                              _selectedAdvertiser = null;
+                            });
+                          },
+                          icon: const Icon(
+                            Icons.account_balance_outlined,
+                            color: adminColor,
+                            size: 28,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _superAdminSidebarAction({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    required Widget icon,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: (selected ? redColor : adminColor).withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? redColor : adminColor,
+            width: 1.5,
           ),
+        ),
+        child: Row(
+          children: [
+            icon,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: adminColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1827,11 +1858,17 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     _dropdownOverlay?.remove();
     _dropdownOverlay = null;
 
-    final renderBox =
-        _advertiserFiltersKey.currentContext!.findRenderObject() as RenderBox;
-
-    final position = renderBox.localToGlobal(Offset.zero);
-    final size = renderBox.size;
+    // Utiliser les coordonnées de la couche Overlay, comme Exercice :
+    // localToGlobal() seul décale le menu dans un Overlay imbriqué.
+    final overlay = Overlay.of(context);
+    final overlayBox = overlay.context.findRenderObject();
+    final target = _advertiserFiltersKey.currentContext?.findRenderObject();
+    if (target is! RenderBox || overlayBox is! RenderBox) return;
+    final position = target.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+    final size = target.size;
     final scrollController = ScrollController();
 
     _dropdownOverlay = OverlayEntry(
@@ -1849,36 +1886,16 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             ),
             Positioned(
               left: position.dx,
-              top: position.dy + size.height - 12,
+              top: position.dy + size.height - SphotDropdownVisuals.popupOverlap,
               width: size.width,
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  constraints: const BoxConstraints(maxHeight: 190),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: const Border(
-                      left: BorderSide(color: adminColor, width: 1.4),
-                      right: BorderSide(color: adminColor, width: 1.4),
-                      bottom: BorderSide(color: adminColor, width: 1.4),
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(10),
-                      bottomRight: Radius.circular(10),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.18),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
+                  constraints: const BoxConstraints(maxHeight: 270),
+                  decoration: SphotDropdownVisuals.popupDecoration,
+                  clipBehavior: Clip.antiAlias,
                   child: ScrollbarTheme(
-                    data: const ScrollbarThemeData(
-                      thumbColor: WidgetStatePropertyAll(adminColor),
-                      trackVisibility: WidgetStatePropertyAll(false),
-                    ),
+                    data: SphotDropdownVisuals.scrollbarTheme.copyWith(mainAxisMargin: 16),
                     child: Scrollbar(
                       controller: scrollController,
                       thumbVisibility: true,
@@ -1886,7 +1903,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                       radius: const Radius.circular(10),
                       child: ListView(
                         controller: scrollController,
-                        padding: EdgeInsets.zero,
+                        padding: const EdgeInsets.only(
+                          top: SphotDropdownVisuals.popupContentInset,
+                        ),
                         shrinkWrap: true,
                         children: DashboardAdvertiserFilter.values.map((
                           filter,
@@ -1894,6 +1913,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                           final selected = _selectedAdvertiserFilter == filter;
 
                           return InkWell(
+                                hoverColor: Colors.transparent,
+                                focusColor: Colors.transparent,
                             onTap: () {
                               setState(() {
                                 _selectedAdvertiserFilter = filter;
@@ -1941,12 +1962,13 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ),
               ),
             ),
+            ...SphotDropdownVisuals.joinedFieldEdges(position, size),
           ],
         );
       },
     );
 
-    Overlay.of(context).insert(_dropdownOverlay!);
+    overlay.insert(_dropdownOverlay!);
   }
 
   bool _matchesAdvertiserFilter(Map<String, dynamic> data) {
@@ -4616,6 +4638,77 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     });
   }
 
+  /// Accessible depuis le menu latéral du véritable dashboard Carte Monde.
+  /// L'export ne transforme jamais le CA estimé en recettes encaissées.
+  Widget _buildAnnualFinancialPanel() {
+    return Container(
+      width: 460,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.98),
+        border: Border(
+          left: BorderSide(color: adminColor.withOpacity(0.25), width: 1.5),
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 10, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.account_balance_outlined,
+                      color: adminColor, size: 26),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'FINANCES · DOCUMENTS ANNUELS',
+                      style: TextStyle(
+                        color: adminColor,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Fermer les documents financiers',
+                    icon: const Icon(Icons.close_rounded, color: adminColor),
+                    onPressed: () {
+                      setState(() => _showAnnualFinancialPanel = false);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: adminColor.withOpacity(0.2)),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SuperAdminAnnualFinancialExportCard(),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Les factures et avoirs définitifs seront disponibles '
+                      'pour l’export uniquement après leur émission et '
+                      'leur archivage. Un devis consultable ou une estimation '
+                      'd’abonnement ne représente pas un encaissement.',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 12,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildLegalDocumentsPanel() {
     return Container(
       width: 420,
@@ -6698,6 +6791,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
       _showPricingPanel = false;
       _showLegalDocumentsPanel = false;
+      _showAnnualFinancialPanel = false;
     });
 
     _mapController.move(
@@ -6742,6 +6836,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               _selectedAdvertiser = null;
               _showLegalDocumentsPanel = false;
               _showPricingPanel = false;
+              _showAnnualFinancialPanel = false;
               _selectedLegalDocument = null;
               _selectedLegalChapter = null;
             });
@@ -6856,6 +6951,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             _selectedAdvertiser = Map<String, dynamic>.from(data);
             _showPricingPanel = false;
             _showLegalDocumentsPanel = false;
+            _showAnnualFinancialPanel = false;
             _selectedLegalDocument = null;
             _selectedLegalChapter = null;
           });
@@ -7034,7 +7130,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _buildRightPanel(visibleSpots: validSpots.length),
-                        Expanded(
+                        if (!_showPricingPanel || _selectedPricingTab == 0)
+                          Expanded(
                           child: Stack(
                             children: [
                               FlutterMap(
@@ -7068,6 +7165,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
                                       _showLegalDocumentsPanel = false;
                                       _showPricingPanel = false;
+                                      _showAnnualFinancialPanel = false;
 
                                       _selectedLegalDocument = null;
                                       _selectedLegalChapter = null;
@@ -7175,11 +7273,37 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                                 left: 0,
                                 right: 0,
                                 child: Center(
-                                  child: Image.asset(
-                                    'data/icons/title.png',
+                                  // Le titre est un asset unique (sans variantes
+                                  // de résolution). ExactAssetImage évite la
+                                  // recherche dans AssetManifest.bin.json, dont
+                                  // l'absence temporaire sur Flutter Web debug
+                                  // faisait disparaître le header de la carte.
+                                  child: Image(
+                                    image: const ExactAssetImage(
+                                      'data/icons/title.png',
+                                      scale: 1.0,
+                                    ),
                                     height: 68,
                                     fit: BoxFit.contain,
                                     filterQuality: FilterQuality.high,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      // Conserve un titre lisible sans laisser
+                                      // apparaître l'erreur Flutter sur la carte.
+                                      return const SizedBox(
+                                        height: 68,
+                                        child: Center(
+                                          child: Text(
+                                            'SPHOT',
+                                            style: TextStyle(
+                                              color: Color(0xFFEA580C),
+                                              fontSize: 44,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 7,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ),
                               ),
@@ -7226,13 +7350,28 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         ),
 
                         if (_showPricingPanel)
-                          SuperAdminPricingPanel(
-                            onClose: () {
-                              setState(() => _showPricingPanel = false);
-                            },
-                          )
+                          if (_selectedPricingTab == 1)
+                            Expanded(
+                              child: SuperAdminPricingPanel(
+                                key: _pricingPanelKey,
+                                pricingSessionToken: widget.pricingSessionToken,
+                                selectedTab: _selectedPricingTab,
+                                onTabChanged: (tab) => setState(() => _selectedPricingTab = tab),
+                                onClose: () => setState(() => _showPricingPanel = false),
+                              ),
+                            )
+                          else
+                            SuperAdminPricingPanel(
+                              key: _pricingPanelKey,
+                              pricingSessionToken: widget.pricingSessionToken,
+                              selectedTab: _selectedPricingTab,
+                              onTabChanged: (tab) => setState(() => _selectedPricingTab = tab),
+                              onClose: () => setState(() => _showPricingPanel = false),
+                            )
                         else if (_showLegalDocumentsPanel)
                           _buildLegalDocumentsPanel()
+                        else if (_showAnnualFinancialPanel)
+                          _buildAnnualFinancialPanel()
                         else if (_selectedSpot != null)
                           _buildSpotDetailPanel()
                         else if (_selectedAdvertiser != null)

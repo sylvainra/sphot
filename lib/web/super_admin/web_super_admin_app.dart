@@ -11,7 +11,9 @@ import 'pages/super_admin_sphots_page.dart';
 import 'pages/super_admin_subscriptions_page.dart';
 
 class WebSuperAdminApp extends StatelessWidget {
-  const WebSuperAdminApp({super.key});
+  const WebSuperAdminApp({super.key, this.pricingSessionToken = ''});
+
+  final String pricingSessionToken;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +28,7 @@ class WebSuperAdminApp extends StatelessWidget {
         WebMenuItem(
           title: 'Carte Monde',
           icon: Icons.public,
-          page: SuperAdminDashboardPage(),
+          page: SuperAdminDashboardPage(pricingSessionToken: pricingSessionToken),
         ),
         WebMenuItem(
           title: 'SPHOTS',

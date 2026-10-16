@@ -322,9 +322,9 @@ class _SuperAdminSubscriptionsPageState extends State<SuperAdminSubscriptionsPag
         final estimatedAnnualRevenue =
             allSubscriptions.fold<int>(0, (total, doc) {
           final data = doc.data();
-          final stations = _intValue(data['numberOfRescueStations']);
-          final price = _intValue(data['pricePerStationExclTax']);
-          return total + (stations * price);
+          // Seuls les totaux enregistrés (et non un prix unique reconstitué)
+          // participent aux indicateurs financiers.
+          return total + _intValue(data['annualAmountExclTax']);
         });
 
         final countryValues = _uniqueValues(allSubscriptions, 'country');
@@ -478,10 +478,10 @@ class _SuperAdminSubscriptionsPageState extends State<SuperAdminSubscriptionsPag
                         final status = _text(data['status']);
                         final numberOfRescueStations =
                             _intValue(data['numberOfRescueStations']);
-                        final pricePerStation =
-                            _intValue(data['pricePerStationExclTax']);
                         final annualAmount =
-                            numberOfRescueStations * pricePerStation;
+                            _intValue(data['annualAmountExclTax']);
+                        final pricingReference =
+                            _text(data['publishedPricingReference']);
 
                         return Container(
                           padding: const EdgeInsets.all(18),
@@ -636,14 +636,18 @@ Text(
 
                               const SizedBox(height: 8),
                               Text(
-                                'Tarif : $pricePerStation € HT / poste / an',
+                                pricingReference.isEmpty
+                                    ? 'Grille tarifaire : à actualiser'
+                                    : 'Grille tarifaire : $pricingReference',
                                 style: const TextStyle(
                                   color: adminColor,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                               Text(
-                                'Montant annuel estimé : $annualAmount € HT / an',
+                                annualAmount > 0
+                                    ? 'Montant annuel HT : $annualAmount €'
+                                    : 'Montant annuel : non renseigné',
                                 style: const TextStyle(
                                   color: redColor,
                                   fontWeight: FontWeight.w900,
