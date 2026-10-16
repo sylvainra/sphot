@@ -1,6 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../services/published_commercial_quote_service.dart';
+import 'admin_quote_pdf_download.dart';
+import 'admin_quote_specimen_pdf.dart';
 
 /// Présentation du dossier commercial ENREGISTRÉ, sans création de devis.
 /// Aucun document officiel, numéro DV, email ou écriture Firestore.
@@ -55,6 +59,16 @@ void showAdminQuoteDraftPreview({
       : const PublishedCommercialQuoteService()
           .admin(numberOfRescueStations: selectedIds.length);
 
+  // Profil de SPHOT déjà prévu pour accueillir les données définitives.
+  // Il sert seulement au spécimen : aucune autorisation légale n'est déduite
+  // de la présence de ce document Firestore.
+  final issuerFuture = FirebaseFirestore.instance
+      .collection('settings')
+      .doc('sphotLegalIdentity')
+      .get()
+      .then((snapshot) => snapshot.data() ?? <String, dynamic>{})
+      .catchError((Object _) => <String, dynamic>{});
+
   showDialog<void>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -106,9 +120,37 @@ void showAdminQuoteDraftPreview({
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const Text(
-                'SPHOT — immatriculation et situation fiscale à finaliser.',
-                style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+              FutureBuilder<Map<String, dynamic>>(
+                future: issuerFuture,
+                builder: (context, snapshot) {
+                  final company = snapshot.data ?? <String, dynamic>{};
+                  final legalName = str(company['legalName']);
+                  final siret = str(company['siret']);
+                  final issuerCity = [
+                    str(company['postalCode']),
+                    str(company['city']),
+                  ].where((part) => part.isNotEmpty).join(' ');
+                  final issuerDetails = <String>[
+                    legalName.isEmpty
+                        ? 'SPHOT — raison sociale à compléter'
+                        : legalName,
+                    'SIRET : ' + (siret.isEmpty ? 'À compléter' : siret),
+                    if (str(company['address']).isNotEmpty)
+                      str(company['address']),
+                    if (issuerCity.isNotEmpty) issuerCity,
+                    if (str(company['country']).isNotEmpty)
+                      str(company['country']),
+                    if (str(company['email']).isNotEmpty)
+                      'Email : ' + str(company['email']),
+                    'Fiscalité : à déterminer pour l’émission officielle.',
+                  ];
+                  return SelectableText(
+                    issuerDetails.join('\n'),
+                    style: const TextStyle(
+                      color: Color(0xFF6B7280), fontSize: 12, height: 1.5,
+                    ),
+                  );
+                },
               ),
               const Divider(height: 26),
               const Text(
@@ -255,6 +297,36 @@ void showAdminQuoteDraftPreview({
         ),
       ),
       actions: [
+        FutureBuilder<PublishedCommercialQuote>(
+          future: future,
+          builder: (buttonContext, snapshot) {
+            return TextButton.icon(
+              onPressed: !kIsWeb || snapshot.data == null ? null : () async {
+                try {
+                  final issuer = await issuerFuture;
+                  final bytes = await buildAdminQuoteSpecimenPdf(
+                    subscription: data,
+                    issuer: issuer,
+                    quote: snapshot.data!,
+                  );
+                  downloadAdminQuoteSpecimen(
+                    bytes, 'SPHOT-DEVIS-SPECIMEN.pdf',
+                  );
+                } catch (_) {
+                  if (!dialogContext.mounted) return;
+                  ScaffoldMessenger.maybeOf(dialogContext)?.showSnackBar(
+                    const SnackBar(content: Text(
+                      'PDF non généré : vérifiez les postes et le tarif '
+                      'publié, puis réessayez.',
+                    )),
+                  );
+                }
+              },
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              label: const Text('TÉLÉCHARGER LE PDF'),
+            );
+          },
+        ),
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(),
           child: const Text('FERMER'),
