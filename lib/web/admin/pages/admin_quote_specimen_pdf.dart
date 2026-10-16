@@ -10,7 +10,7 @@ import '../../../services/published_commercial_quote_service.dart';
 Future<Uint8List> buildAdminQuoteSpecimenPdf({
   required Map<String, dynamic> subscription,
   required Map<String, dynamic> issuer,
-  required PublishedCommercialQuote quote,
+  required PublishedCommercialQuote? quote,
 }) async {
   String str(dynamic v) => v?.toString().trim() ?? '';
   String field(Map<String, dynamic> data, String key) =>
@@ -31,26 +31,28 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
   final ids = selected is Iterable
       ? selected.whereType<String>().where((v) => v.trim().isNotEmpty).toSet()
       : <String>{};
-  if (ids.isEmpty || quote.market != 'ADMIN' || quote.currency != 'EUR') {
-    throw StateError('Tarif ou postes non disponibles pour le spécimen.');
-  }
-  final raw = quote.details['lines'];
-  if (raw is! List) {
-    throw StateError('Détail du tarif publié manquant.');
-  }
-  final lines = raw.whereType<Map>().where((l) =>
-      l['count'] is num && l['unitExclTax'] is num &&
-      l['amountExclTax'] is num && l['tier'] is num &&
-      (l['tier'] as num).toInt() >= 1 &&
-      (l['tier'] as num).toInt() <= 4).toList();
+  // Les informations commerciales incomplètes n'empêchent jamais
+  // la consultation. En cas de tarif non disponible ou incohérent,
+  // aucun montant n'est inventé et les cases restent à compléter.
+  final raw = quote?.details['lines'];
+  final lines = raw is List
+      ? raw.whereType<Map>().where((l) =>
+          l['count'] is num && l['unitExclTax'] is num &&
+          l['amountExclTax'] is num && l['tier'] is num &&
+          (l['tier'] as num).toInt() >= 1 &&
+          (l['tier'] as num).toInt() <= 4).toList()
+      : <Map>[];
   final count = lines.fold<int>(0,
       (total, l) => total + (l['count'] as num).toInt());
   final sum = lines.fold<num>(0,
       (total, l) => total + (l['amountExclTax'] as num));
-  if (lines.length != 4 || count != ids.length ||
-      sum != quote.amountExclTax) {
-    throw StateError('Prix publié incohérent avec les postes.');
-  }
+  final hasPublishedPrice = quote != null &&
+      quote.market == 'ADMIN' &&
+      quote.currency == 'EUR' &&
+      ids.isNotEmpty &&
+      lines.length == 4 &&
+      count == ids.length &&
+      sum == quote.amountExclTax;
 
   final nameById = <String, String>{};
   final stored = subscription['selectedRescueStations'];
@@ -186,36 +188,41 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
       line('Email : ' + field(subscription, 'billingContactEmail')),
       heading('POSTES DE SECOURS CONCERNÉS (' +
           stations.length.toString() + ')'),
+      if (stations.isEmpty)
+        line('Postes de secours : à renseigner', color: grey),
       ...stations.map((name) => line('• ' + name, size: 8.5)),
       heading('OFFRE ET TARIFICATION ANNUELLE'),
-      line('Grille publiée : ' + quote.pricingReference,
-          size: 8, color: grey),
-      pw.Table.fromTextArray(
-        headers: const ['Tranche', 'Qté', 'Prix unitaire HT', 'Montant HT'],
-        data: rows,
-        headerDecoration: pw.BoxDecoration(color: blue),
-        headerStyle: pw.TextStyle(color: PdfColors.white,
-            fontSize: 8, fontWeight: pw.FontWeight.bold),
-        cellStyle: pw.TextStyle(fontSize: 8.5, color: blue),
-        cellPadding: const pw.EdgeInsets.all(7),
-        cellAlignments: {
-          1: pw.Alignment.center,
-          2: pw.Alignment.centerRight,
-          3: pw.Alignment.centerRight,
-        },
-      ),
-      pw.SizedBox(height: 11),
-      pw.Container(alignment: pw.Alignment.centerRight,
-        child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end,
-          children: [
-            line('TOTAL ANNUEL ESTIMATIF HT : ' +
-                money(quote!.amountExclTax),
-                bold: true, color: red, size: 13),
-            line('TVA : à déterminer selon le régime applicable',
-                color: grey),
-            line('TOTAL TTC : non déterminé', color: grey),
-          ]),
-      ),
+      if (hasPublishedPrice) ...[
+        line('Grille publiée : ' + quote!.pricingReference,
+            size: 8, color: grey),
+        pw.Table.fromTextArray(
+          headers: const ['Tranche', 'Qté', 'Prix unitaire HT', 'Montant HT'],
+          data: rows,
+          headerDecoration: pw.BoxDecoration(color: blue),
+          headerStyle: pw.TextStyle(color: PdfColors.white,
+              fontSize: 8, fontWeight: pw.FontWeight.bold),
+          cellStyle: pw.TextStyle(fontSize: 8.5, color: blue),
+          cellPadding: const pw.EdgeInsets.all(7),
+          cellAlignments: {
+            1: pw.Alignment.center,
+            2: pw.Alignment.centerRight,
+            3: pw.Alignment.centerRight,
+          },
+        ),
+        pw.SizedBox(height: 11),
+        pw.Container(alignment: pw.Alignment.centerRight,
+          child: line('TOTAL ANNUEL ESTIMATIF HT : ' +
+              money(quote!.amountExclTax),
+              bold: true, color: red, size: 13),
+        ),
+      ] else ...[
+        line('Tarification HT : à compléter ou à actualiser',
+            color: orange, bold: true),
+        line('Le montant ne peut pas être confirmé tant que les postes '
+            'et le tarif publié ne correspondent pas.', color: grey, size: 8),
+      ],
+      line('TVA : à déterminer selon le régime applicable', color: grey),
+      line('TOTAL TTC : non déterminé', color: grey),
       heading('PÉRIODE ET CONDITIONS'),
       line('Abonnement annuel par poste. Début à l’activation réelle ; '
           'fin au 31 décembre de l’année d’activation ; '
