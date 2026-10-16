@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../../../services/published_commercial_quote_service.dart';
+import 'admin_quote_draft_preview_dialog.dart';
 
 class AdminSubscriptionPanel extends StatefulWidget {
   final String adminUid;
@@ -1250,6 +1251,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   /// La génération finale utilisera un service serveur authentifié,
   /// la grille publiée, le profil payeur vérifié et le traitement fiscal.
   Widget _quotePreparationPanel({
+    required Map<String, dynamic> data,
     required bool offerComplete,
     required bool payerComplete,
   }) {
@@ -1333,6 +1335,35 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
           style: TextStyle(
             color: _grey, fontSize: 11, height: 1.4,
           ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: OutlinedButton.icon(
+            onPressed: () => showAdminQuoteDraftPreview(
+              context: context,
+              data: data,
+            ),
+            icon: const Icon(Icons.visibility_outlined, size: 19),
+            label: const Text(
+              'VOIR LE BROUILLON',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _blue,
+              side: const BorderSide(color: _blue, width: 1.3),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Consultation des informations enregistrées : aucun devis '
+          'officiel créé, envoyé ou facturé.',
+          style: TextStyle(color: _grey, fontSize: 11),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -1838,6 +1869,7 @@ _accordionSection(
                                   status: 'EN ATTENTE D’IMMATRICULATION SPHOT',
                                   statusColor: _orange,
                                   child: _quotePreparationPanel(
+                                    data: data,
                                     offerComplete: offerComplete,
                                     payerComplete: payerComplete,
                                   ),
