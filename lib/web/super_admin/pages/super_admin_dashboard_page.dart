@@ -892,6 +892,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     ),
                   ),
                 ),
+              ...SphotDropdownVisuals.joinedFieldEdges(position, size),
               ],
             );
           },
@@ -1007,6 +1008,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ),
               ),
             ),
+            ...SphotDropdownVisuals.joinedFieldEdges(position, size),
           ],
         );
       },
@@ -1960,6 +1962,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ),
               ),
             ),
+            ...SphotDropdownVisuals.joinedFieldEdges(position, size),
           ],
         );
       },

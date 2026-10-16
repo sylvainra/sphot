@@ -11,6 +11,38 @@ class SphotDropdownVisuals {
   static const double popupOverlap = 12;
   static const double popupContentInset = 12;
 
+  /// Relie visuellement le contour des filtres à leur liste ouverte.
+  /// Le cadre du champ ne doit pas créer une ligne horizontale qui
+  /// sépare visuellement le popup. Dessiné au-dessus des deux widgets.
+  static List<Widget> joinedFieldEdges(Offset origin, Size size) => [
+    Positioned(
+      left: origin.dx + 2,
+      top: origin.dy + size.height - 4,
+      width: size.width - 4,
+      height: 7,
+      child: const IgnorePointer(
+        child: ColoredBox(color: Colors.white),
+      ),
+    ),
+    Positioned(
+      left: origin.dx,
+      top: origin.dy + size.height - 26,
+      width: size.width,
+      height: 29,
+      child: const IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(color: blue, width: 1.8),
+              right: BorderSide(color: blue, width: 1.8),
+            ),
+          ),
+        ),
+      ),
+    ),
+  ];
+
+
   static final BoxDecoration popupDecoration = BoxDecoration(
     color: Colors.white,
     border: const Border(
