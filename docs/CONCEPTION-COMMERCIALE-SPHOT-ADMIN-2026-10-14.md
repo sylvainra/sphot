@@ -662,3 +662,14 @@ Les captures du portail local ont montré deux écarts : (1) le PDF local passai
 - Les PDF émis, preuves de paiement, numéros fiscaux, factures/avoirs définitifs, règlements et exports réglementaires devront être branchés ultérieurement sur des collections et écritures serveur fiables. Toute émission et modification fiscale demeure bloquée tant que les validations administratives et le contrôle des accès ne sont pas opérationnels.
 
 **Validation à réaliser sur le poste local** : `flutter analyze` ciblé puis lancement Web ; ouvrir successivement les PDF commande/facture/avoir/suivi à l'étape 7 et vérifier la carte annuelle dans Super Admin → FINANCES. Aucune nouvelle Cloud Function déployée.
+
+
+## 45. Accès annuel depuis le vrai Super Admin Carte Monde (16/10/2026)
+
+**Correction de navigation** : le panneau `PIÈCES FINANCIÈRES ANNUELLES` avait été ajouté uniquement à `lib/web/super_admin/pages/super_admin_dashboard_finances_page.dart`, alors que le Super Admin utilisé lors de la démonstration est le tableau Carte Monde `lib/web/super_admin/pages/super_admin_dashboard_page.dart`, avec les boutons `DOCUMENTS JURIDIQUES` et `GRILLES TARIFAIRES`. L'accès annoncé n'était donc pas visible sur l'écran courant.
+
+Ajout, sans remplacer aucun bouton existant, de `PIÈCES FINANCIÈRES` dans **le menu gauche Carte Monde**, et d'un panneau latéral droit `FINANCES · DOCUMENTS ANNUELS`, incluant **l'outil d'export existant** `SuperAdminAnnualFinancialExportCard`. Le panneau conserve le style des outils administratifs et se ferme sans quitter la carte. La carte et les autres panneaux existants restent accessibles.
+
+Validation attendue : lancer `flutter run -d chrome -t lib/main_web_admin.dart`, ouvrir `/#/super-admin`, puis cliquer sur `PIÈCES FINANCIÈRES` dans le menu Carte Monde. Vérifier l'affichage du choix d'exercice et du bouton d'export. L'export ne fabrique aucun revenu à partir des devis, n'émet pas de facture ni de paiement et n'est pas un FEC.
+
+Aucune modification du gabarit des documents financiers de l'étape 7, ni déploiement Firebase.

@@ -17,6 +17,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 
 import '../widgets/super_admin_admin_workflow_panel.dart';
+import '../widgets/super_admin_annual_financial_export_card.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -118,6 +119,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   bool _showLegalDocumentsPanel = false;
   bool _showPricingPanel = false;
+  bool _showAnnualFinancialPanel = false;
   int _selectedPricingTab = 0;
   final GlobalKey _pricingPanelKey = GlobalKey();
 
@@ -1532,9 +1534,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     );
   }
 
-  /// Super Admin sidebar: nine uniformly-sized actions fill the available
-  /// vertical space. A minimum content height preserves readability and keeps
-  /// scrolling available on smaller browser windows.
+  /// Super Admin sidebar: uniform actions fill the available vertical space.
+  /// A minimum content height preserves readability and keeps scrolling
+  /// available on smaller browser windows.
   Widget _buildRightPanel({required int visibleSpots}) {
     return Container(
       width: 360,
@@ -1608,6 +1610,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                             setState(() {
                               _showLegalDocumentsPanel = true;
                               _showPricingPanel = false;
+                              _showAnnualFinancialPanel = false;
                               _selectedSpot = null;
                               _selectedAdmin = null;
                               _selectedAdvertiser = null;
@@ -1630,6 +1633,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                             setState(() {
                               _showPricingPanel = true;
                               _showLegalDocumentsPanel = false;
+                              _showAnnualFinancialPanel = false;
                               _selectedSpot = null;
                               _selectedAdmin = null;
                               _selectedAdvertiser = null;
@@ -1637,6 +1641,28 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                           },
                           icon: const Icon(
                             Icons.euro_rounded, color: adminColor, size: 28,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: _superAdminSidebarAction(
+                          label: 'PIÈCES FINANCIÈRES',
+                          selected: _showAnnualFinancialPanel,
+                          onTap: () {
+                            setState(() {
+                              _showAnnualFinancialPanel = true;
+                              _showPricingPanel = false;
+                              _showLegalDocumentsPanel = false;
+                              _selectedSpot = null;
+                              _selectedAdmin = null;
+                              _selectedAdvertiser = null;
+                            });
+                          },
+                          icon: const Icon(
+                            Icons.account_balance_outlined,
+                            color: adminColor,
+                            size: 28,
                           ),
                         ),
                       ),
@@ -4631,6 +4657,77 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     });
   }
 
+  /// Accessible depuis le menu latéral du véritable dashboard Carte Monde.
+  /// L'export ne transforme jamais le CA estimé en recettes encaissées.
+  Widget _buildAnnualFinancialPanel() {
+    return Container(
+      width: 460,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.98),
+        border: Border(
+          left: BorderSide(color: adminColor.withOpacity(0.25), width: 1.5),
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 10, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.account_balance_outlined,
+                      color: adminColor, size: 26),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'FINANCES · DOCUMENTS ANNUELS',
+                      style: TextStyle(
+                        color: adminColor,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Fermer les documents financiers',
+                    icon: const Icon(Icons.close_rounded, color: adminColor),
+                    onPressed: () {
+                      setState(() => _showAnnualFinancialPanel = false);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: adminColor.withOpacity(0.2)),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SuperAdminAnnualFinancialExportCard(),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Les factures et avoirs définitifs seront disponibles '
+                      'pour l’export uniquement après leur émission et '
+                      'leur archivage. Un devis consultable ou une estimation '
+                      'd’abonnement ne représente pas un encaissement.',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 12,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildLegalDocumentsPanel() {
     return Container(
       width: 420,
@@ -6713,6 +6810,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
       _showPricingPanel = false;
       _showLegalDocumentsPanel = false;
+      _showAnnualFinancialPanel = false;
     });
 
     _mapController.move(
@@ -6757,6 +6855,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               _selectedAdvertiser = null;
               _showLegalDocumentsPanel = false;
               _showPricingPanel = false;
+              _showAnnualFinancialPanel = false;
               _selectedLegalDocument = null;
               _selectedLegalChapter = null;
             });
@@ -6871,6 +6970,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             _selectedAdvertiser = Map<String, dynamic>.from(data);
             _showPricingPanel = false;
             _showLegalDocumentsPanel = false;
+            _showAnnualFinancialPanel = false;
             _selectedLegalDocument = null;
             _selectedLegalChapter = null;
           });
@@ -7084,6 +7184,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
                                       _showLegalDocumentsPanel = false;
                                       _showPricingPanel = false;
+                                      _showAnnualFinancialPanel = false;
 
                                       _selectedLegalDocument = null;
                                       _selectedLegalChapter = null;
@@ -7288,6 +7389,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                             )
                         else if (_showLegalDocumentsPanel)
                           _buildLegalDocumentsPanel()
+                        else if (_showAnnualFinancialPanel)
+                          _buildAnnualFinancialPanel()
                         else if (_selectedSpot != null)
                           _buildSpotDetailPanel()
                         else if (_selectedAdvertiser != null)
