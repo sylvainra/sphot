@@ -151,3 +151,48 @@ test("Aucune dépendance de facturation ou de SMTP n'est appelée", async () => 
   assert.equal(f.calls.pdf, 0);
   assert.equal(f.answers[0].success, true);
 });
+
+
+test("Consultation : PDF commun et aucune donnée commerciale cliente", async () => {
+  const f = fixture("consult");
+  f.req.body.adminUid = "admin-pirate";
+  f.req.body.amountExclTax = 0;
+  f.req.body.storagePath = "other.pdf";
+  let received;
+  f.services.readConsultation = async (args) => {
+    received = args;
+    return {
+      issuanceAuthorized: false, stations: [],
+      buyer: {}, issuer: {}, publishedQuote: null,
+    };
+  };
+  f.services.renderConsultation = async (context) => {
+    assert.equal(context.issuanceAuthorized, false);
+    return PDF;
+  };
+  await f.run();
+  assert.equal(f.res.code, 200);
+  assert.deepEqual(f.answers[0], PDF);
+  assert.equal(received.idToken, "FAKE_TOKEN");
+  assert.deepEqual(Object.keys(received).sort(), ["auth", "db", "idToken"]);
+  assert.equal(f.headers["Content-Type"], "application/pdf");
+  assert.equal(f.headers["Content-Disposition"],
+      "attachment; filename=\"SPHOT-DEVIS-SPECIMEN.pdf\"");
+  assert.equal(f.calls.pdf, 0);
+  assert.equal(f.calls.preview, 0);
+});
+
+test("Le mode consultation ne peut être converti en émission", async () => {
+  const f = fixture("consult");
+  f.services.readConsultation = async () => ({
+    issuanceAuthorized: true,
+  });
+  f.services.renderConsultation = async () => {
+    throw new Error("Doit être inaccessible");
+  };
+  await f.run();
+  assert.equal(f.res.code, 403);
+  assert.deepEqual(f.answers[0], {
+    success: false, error: "CONSULTATION_DENIED",
+  });
+});

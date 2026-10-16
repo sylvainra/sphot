@@ -1,6 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+import 'admin_quote_server_pdf_service.dart';
+
 
 import '../../../services/published_commercial_quote_service.dart';
 import 'admin_quote_specimen_pdf.dart';
@@ -10,6 +13,16 @@ import 'admin_quote_specimen_pdf.dart';
 Future<Uint8List> createConsultableAdminQuotePdf(
   Map<String, dynamic> data,
 ) async {
+  // Le serveur commun reste prioritaire dès son activation.
+  // Tant qu'aucune fonction n'est déployée, préserver la consultation
+  // locale existante ; ne JAMAIS contourner un refus d'identité (401/403).
+  try {
+    return await const AdminQuotePortalClient().consultPdf();
+  } on AdminQuoteEndpointUnavailable {
+    // Aucun endpoint déployé : consultation locale temporaire.
+  } on http.ClientException {
+    // Erreur réseau (notamment navigateur/CORS tant que non déployé).
+  }
   final chosen = data['selectedRescueStationIds'];
   final ids = chosen is Iterable
       ? chosen.whereType<String>().where((id) => id.trim().isNotEmpty).toSet()

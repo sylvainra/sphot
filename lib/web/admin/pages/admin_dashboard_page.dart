@@ -21,6 +21,8 @@ import '../../../map/map_page.dart';
 import 'package:flutter/services.dart';
 import 'sphot_admin_summary_page.dart';
 import 'admin_subscription_panel.dart';
+import 'admin_quote_server_pdf_service.dart';
+import 'admin_quote_pdf_download.dart';
 import 'admin_payment_panel.dart';
 import 'admin_statistics_panel.dart';
 import '../../institutional/pages/institutional_main_courante_page.dart';
@@ -124,6 +126,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _showSubscriptionPanel = false;
   bool _showAdminPaymentPanel = false;
   bool _showBillingDocumentsPanel = false;
+  final Set<String> _loadingQuoteArchiveIds = <String>{};
   bool _showStatisticsPanel = false;
   bool _showMainCourantePanel = false;
   bool _operationalAlertActive = false;
@@ -6168,6 +6171,30 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return '';
   }
 
+  /// Lecture sécurisée du PDF existant, jamais depuis son URL Storage.
+  Future<void> _downloadArchivedAdminQuote(
+    String documentId,
+    String documentNumber,
+  ) async {
+    if (_loadingQuoteArchiveIds.contains(documentId)) return;
+    setState(() => _loadingQuoteArchiveIds.add(documentId));
+    try {
+      final bytes = await const AdminQuotePortalClient()
+          .downloadIssuedPdf(documentId);
+      if (!mounted) return;
+      downloadAdminQuoteSpecimen(bytes, '$documentNumber.pdf');
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text(error is AdminQuoteEndpointUnavailable
+            ? 'Service documentaire non encore activé sur Firebase.'
+            : 'Téléchargement du devis impossible : $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingQuoteArchiveIds.remove(documentId));
+    }
+  }
+
   /// Lecture seule : les vrais devis archivés dans le registre SPHOT.
   /// Aucune numérotation, génération de PDF ou écriture n'est déclenchée ici.
   Widget _buildArchivedAdminQuotes() {
@@ -6247,15 +6274,42 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 final numero = _cleanText(data['documentNumber']);
                 final date = _cleanText(data['issuedOn']);
                 final validite = _cleanText(data['validUntil']);
-                return _buildCommercialSection(
-                  icon: Icons.request_quote_outlined,
-                  title: 'DEVIS $numero',
-                  description:
-                      'Émis le $date'
-                      '${validite.isEmpty ? '' : ' · Valable jusqu’au $validite'}'
-                      '\nPDF conservé dans le registre documentaire.',
-                  status: 'DEVIS ARCHIVÉ',
-                  statusColor: const Color(0xFF15803D),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildCommercialSection(
+                      icon: Icons.request_quote_outlined,
+                      title: 'DEVIS $numero',
+                      description:
+                          'Émis le $date'
+                          '${validite.isEmpty ? '' : ' · Valable jusqu’au $validite'}'
+                          '\nPDF conservé dans le registre documentaire.',
+                      status: 'DEVIS ARCHIVÉ',
+                      statusColor: const Color(0xFF15803D),
+                    ),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: OutlinedButton.icon(
+                        onPressed: _loadingQuoteArchiveIds.contains(document.id)
+                            ? null
+                            : () => _downloadArchivedAdminQuote(
+                                document.id, numero),
+                        icon: _loadingQuoteArchiveIds.contains(document.id)
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.picture_as_pdf_outlined),
+                        label: Text(_loadingQuoteArchiveIds.contains(document.id)
+                            ? 'OUVERTURE...'
+                            : 'TÉLÉCHARGER LE PDF'),
+                      ),
+                    ),
+                  ],
                 );
               }),
               const SizedBox(height: 10),

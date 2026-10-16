@@ -3,6 +3,10 @@
 
 const {loadRealAdminQuoteDraft} = require("./admin_quote_real_data");
 const {readArchivedAdminQuotePdf} = require("./admin_quote_download");
+const {loadAdminQuoteConsultationContext} =
+    require("./admin_quote_consultation_data");
+const {renderConsultableAdminQuotePdf} =
+    require("./admin_official_quote_pdf");
 
 // Liaison HTTP INTERNE en lecture seule : PAS d'export dans index.js.
 // AUCUN numéro DV, aucune création de devis, aucun email, aucune commande.
@@ -28,7 +32,7 @@ async function handleAdminQuotePortalRequest(req, res, services = {}) {
   const body = req.body && typeof req.body === "object" &&
       !Array.isArray(req.body) ? req.body : {};
   const action = body.action;
-  if (action !== "preview" && action !== "download") {
+  if (action !== "preview" && action !== "consult" && action !== "download") {
     res.status(400).json({success: false, error: "UNKNOWN_ACTION"});
     return;
   }
@@ -66,6 +70,33 @@ async function handleAdminQuotePortalRequest(req, res, services = {}) {
         amountInclTax: null,
         issuanceAuthorized: false,
       });
+      return;
+    }
+
+    if (action === "consult") {
+      // Même moteur PDF que le devis émis. Aucune donnée du navigateur
+      // n'est utilisée comme payeur, prix, numéro ou autorisation.
+      const readContext = services.readConsultation ||
+          loadAdminQuoteConsultationContext;
+      const render = services.renderConsultation ||
+          renderConsultableAdminQuotePdf;
+      const context = await readContext({
+        auth, db, idToken: match[1],
+      });
+      if (!context || context.issuanceAuthorized !== false) {
+        res.status(403).json({success: false, error: "CONSULTATION_DENIED"});
+        return;
+      }
+      const pdf = await render(context);
+      if (!Buffer.isBuffer(pdf) || pdf.length < 1024 ||
+          pdf.subarray(0, 5).toString("ascii") !== "%PDF-") {
+        res.status(503).json({success: false, error: "PDF_UNAVAILABLE"});
+        return;
+      }
+      res.set("Content-Type", "application/pdf");
+      res.set("Content-Disposition",
+          "attachment; filename=\"SPHOT-DEVIS-SPECIMEN.pdf\"");
+      res.status(200).send(pdf);
       return;
     }
 

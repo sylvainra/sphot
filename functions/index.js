@@ -11,6 +11,8 @@ const admin = require("firebase-admin");
 const crypto = require("crypto");
 const commercialPricing = require("./commercial_pricing");
 const commercialQuotePricing = require("./commercial_quote_pricing");
+const {registerAdminQuotePortalEndpoint} =
+    require("./admin_quote_portal_endpoint");
 const {assignAuthorizedAdminQuoteNumber} =
     require("./admin_quote_numbering");
 const {getDownloadURL} = require("firebase-admin/storage");
@@ -18,6 +20,11 @@ const nodemailer = require("nodemailer");
 const PDFDocument = require("pdfkit");
 
 admin.initializeApp();
+
+// Service HTTP à déployer séparément APRÈS validation des droits et des
+// parcours. Son enregistrement dans le code ne le déploie pas.
+exports.adminQuotePortal =
+    registerAdminQuotePortalEndpoint({admin, onRequest});
 
 const SMTP_USER = "admin@sphot.app";
 const MAIL_FROM = "\"SPHOT\" <no-reply@sphot.app>";
