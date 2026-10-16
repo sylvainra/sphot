@@ -148,8 +148,12 @@ test("Un double clic pendant SMTP ne déclenche qu'un essai", async () => {
   const f = fixture();
   let resume;
   let begun;
-  const sending = new Promise((resolve) => {resume = resolve;});
-  const started = new Promise((resolve) => {begun = resolve;});
+  const sending = new Promise((resolve) => {
+    resume = resolve;
+  });
+  const started = new Promise((resolve) => {
+    begun = resolve;
+  });
   const sendMail = async () => {
     f.stats.send++;
     begun();
