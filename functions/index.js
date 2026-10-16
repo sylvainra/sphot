@@ -21,10 +21,13 @@ const PDFDocument = require("pdfkit");
 
 admin.initializeApp();
 
-// Service HTTP à déployer séparément APRÈS validation des droits et des
-// parcours. Son enregistrement dans le code ne le déploie pas.
-exports.adminQuotePortal =
-    registerAdminQuotePortalEndpoint({admin, onRequest});
+// Opt-in explicite : évite de publier ce nouvel accès documentaire lors
+// d'un déploiement global de Functions tant que les droits et les parcours
+// n'ont pas été validés avec Firebase Emulator.
+if (process.env.SPHOT_ENABLE_ADMIN_QUOTE_PORTAL === "true") {
+  exports.adminQuotePortal =
+      registerAdminQuotePortalEndpoint({admin, onRequest});
+}
 
 const SMTP_USER = "admin@sphot.app";
 const MAIL_FROM = "\"SPHOT\" <no-reply@sphot.app>";
