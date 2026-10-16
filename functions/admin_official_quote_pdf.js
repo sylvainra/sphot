@@ -1,21 +1,145 @@
 /* eslint-disable max-len, require-jsdoc, valid-jsdoc, indent, object-curly-spacing, operator-linebreak */
 "use strict";
 
-const PDFDocument = require("pdfkit");
-const {buildSphotMessage} = require("./sphot_email_design");
+const {simplePdfBuffer} = require("./admin_document_pdf_template");
 const {assessAdminQuoteIssueReadiness} =
     require("./admin_quote_issue_readiness");
 
-const BLUE = "#1E3A8A";
-const RED = "#DC2626";
-const PAD = 42;
+const money = (value) => Number(value).toFixed(2).replace(".", ",") + " EUR";
+const clean = (value) => typeof value === "string" ? value.trim() : "";
+const filled = (value) => clean(value) || "À compléter";
+const address = (entity = {}) => {
+  const place = [clean(entity.postalCode), clean(entity.city)]
+      .filter(Boolean).join(" ");
+  return [clean(entity.address), place, clean(entity.country)]
+      .filter(Boolean).join(", ") || "À compléter";
+};
+const identity = (entity = {}) =>
+  clean(entity.country) === "FR" ?
+    filled(entity.siret) : filled(entity.officialId);
 
-// Moteur PDF du véritable DEVIS officiel.
-// AUCUN téléchargement client, AUCUNE écriture Firestore et AUCUN devis
-// émis par ce module. Le serveur appellera ce moteur seulement APRÈS :
-// authentification, vérification des droits et du payeur, fiscalité déterminée,
-// recalcul du tarif PUBLIÉ, numérotation DV transactionnelle.
-// Un document sans émetteur immatriculé ou sans numéro DV est refusé.
+/**
+ * Définit une seule structure documentaire pour le devis consultable
+ * et le devis officiel. Les données manquantes deviennent "À compléter".
+ * La fonction ne numérote, n'écrit, n'envoie et ne certifie rien.
+ * Le mode officiel n'est atteignable qu'après assessAdminQuoteIssueReadiness.
+ */
+function adminQuoteDocumentDefinition(context = {}, {
+  official = false,
+  quoteNumber = "",
+  administrativeReference = "",
+  validity = null,
+} = {}) {
+  const issuer = context.issuer || {};
+  const buyer = context.buyer || {};
+  const stations = Array.isArray(context.stations) ? context.stations : [];
+  const quote = context.publishedQuote || {};
+  const tax = context.taxDecision || {};
+  const rawLines = Array.isArray(quote.lines) ? quote.lines : [];
+  const pricedCount = rawLines.reduce((sum, item) =>
+    sum + (Number.isSafeInteger(item?.count) ? item.count : 0), 0);
+  const pricedSum = rawLines.reduce((sum, item) =>
+    sum + (Number.isFinite(item?.amountExclTax) ?
+      item.amountExclTax : 0), 0);
+  const usablePrice = quote.market === "ADMIN" &&
+      quote.country === "FR" && quote.currency === "EUR" &&
+      quote.fromServerPublishedCatalog === true &&
+      /^FR_ADMIN-V\d+$/.test(clean(quote.pricingReference)) &&
+      stations.length > 0 && pricedCount === stations.length &&
+      Number.isFinite(quote.amountExclTax) &&
+      pricedSum === quote.amountExclTax &&
+      rawLines.length === 4 && rawLines.every((line, index) =>
+        line && line.tier === index + 1 &&
+        Number.isSafeInteger(line.count) && line.count >= 0 &&
+        Number.isFinite(line.unitExclTax) &&
+        Number.isFinite(line.amountExclTax) &&
+        line.count * line.unitExclTax === line.amountExclTax);
+
+  const lines = [
+    {heading: "ÉMETTEUR"},
+    {label: "Organisation", value:
+      clean(issuer.legalName) || "SPHOT - raison sociale à compléter"},
+    {label: "SIRET / identifiant", value: identity(issuer)},
+    {label: "Adresse", value: address(issuer)},
+    {label: "Email", value: filled(issuer.email)},
+    {label: "TVA intracommunautaire", value:
+      filled(issuer.vatNumber)},
+    {heading: "ORGANISME PAYEUR"},
+    {label: "Organisation", value: filled(buyer.legalName)},
+    {label: "SIRET / identifiant", value: identity(buyer)},
+    {label: "Adresse", value: address(buyer)},
+    {label: "Contact", value: filled(buyer.billingContactName)},
+    {label: "Email", value: filled(buyer.billingEmail)},
+    {heading: "POSTES DE SECOURS CONCERNÉS"},
+    ...(stations.length ? stations.map((station, index) => ({
+      label: "Poste " + (index + 1),
+      value: [clean(station.idSphot), clean(station.name)]
+          .filter(Boolean).join(" - ") || "À compléter",
+    })) : [{label: "Postes", value: "À renseigner"}]),
+    {heading: "OFFRE ET TARIFICATION ANNUELLE"},
+  ];
+  if (usablePrice) {
+    lines.push({label: "Grille publiée",
+      value: quote.pricingReference});
+    const tiers = ["Premier poste", "Du 2e au 4e poste",
+      "Du 5e au 9e poste", "À partir du 10e poste"];
+    rawLines.forEach((line, index) => {
+      if (line.count > 0) {
+        lines.push({
+          label: tiers[index],
+          value: line.count + " x " + money(line.unitExclTax) +
+              " = " + money(line.amountExclTax),
+        });
+      }
+    });
+    lines.push({label: "TOTAL ANNUEL HT",
+      value: money(quote.amountExclTax)});
+  } else {
+    lines.push({label: "TOTAL ANNUEL HT",
+      value: "À compléter - tarif ou postes indisponibles"});
+  }
+  lines.push(
+      {label: "TVA", value: tax.status === "validated" ?
+        money(tax.taxAmount) : "À déterminer selon le régime applicable"},
+      {label: "TOTAL TTC", value: tax.status === "validated" ?
+        money(tax.amountInclTax) : "Non déterminé"},
+      {label: "Traitement fiscal", value: filled(tax.taxTreatment)},
+      {label: "Fondement fiscal", value: filled(tax.legalBasis)},
+      {heading: "PÉRIODE ET CONDITIONS"},
+      {label: "Abonnement", value: "Annuel par poste de secours"},
+      {label: "Période", value: "Activation réelle au 31 décembre ; " +
+        "renouvellement au 1er janvier, sans prorata"},
+      {label: "Émission", value: official ?
+        validity.issuedOn : "Non émis"},
+      {label: "Validité", value: official ?
+        validity.validUntil + " inclus" :
+        "30 jours après émission, au plus tard le 31 décembre"},
+  );
+
+  return {
+    title: "DEVIS SPHOT ADMIN",
+    documentNumber: official ? quoteNumber : "NON ATTRIBUÉ - SPÉCIMEN",
+    requestNumber: filled(administrativeReference ||
+        context.administrativeReference),
+    rubric: "DEVIS ADMIN",
+    statusLabel: official ? "ÉMIS" : "NON ÉMIS",
+    introduction: "Devis facultatif d'abonnement annuel SPHOT ADMIN " +
+        "pour les postes de secours désignés.",
+    lines,
+    notice: (official ? "" : "SPÉCIMEN NON CONTRACTUEL. ") +
+        "Ce document ne constitue ni une commande, ni une facture, " +
+        "ni un règlement ni une activation. Les informations fiscales " +
+        "et contractuelles applicables sont précisées à l'engagement.",
+  };
+}
+
+// Un seul moteur PDFKit et une seule charte pour les deux états.
+// Ce mode est UNIQUEMENT une consultation sans DV, archive ni email.
+function renderConsultableAdminQuotePdf(context = {}) {
+  return simplePdfBuffer(adminQuoteDocumentDefinition(context));
+}
+
+// La validation officielle et la numérotation ne sont jamais contournées.
 function renderOfficialAdminQuotePdf(context, quoteNumber,
     administrativeReference) {
   const readiness = assessAdminQuoteIssueReadiness(context);
@@ -37,145 +161,16 @@ function renderOfficialAdminQuotePdf(context, quoteNumber,
       !administrativeReference.startsWith("SPHOT-ADM-")) {
     throw new Error("Référence du dossier administratif manquante.");
   }
-
-  const issuer = context.issuer;
-  const buyer = context.buyer;
-  const quote = context.publishedQuote;
-  const tax = context.taxDecision;
-  const stations = context.stations;
-  const validity = readiness.validity;
-
-  // Images de la charte SPHOT déjà utilisées dans les emails :
-  // vrai titre PNG en haut (sans carte ni contour), Fire en bas sans signature.
-  const images = buildSphotMessage({text: ""}).attachments;
-  const titleImage = images.find((a) => a.filename === "sphot_title.png");
-  const fireImage = images.find((a) => a.filename === "fire_red_icon.png");
-  if (!titleImage || !fireImage) {
-    throw new Error("Images de la charte SPHOT indisponibles.");
-  }
-  const money = (n) => n.toFixed(2).replace(".", ",") + " EUR";
-  const clean = (value) => String(value ?? "").trim();
-  const address = (data) => [
-    clean(data.address), clean(data.postalCode) + " " + clean(data.city),
-    clean(data.country),
-  ].filter(Boolean).join(", ");
-
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({
-      size: "A4",
-      margins: {top: 28, bottom: 72, left: PAD, right: PAD},
-      info: {
-        Title: "DEVIS SPHOT ADMIN " + quoteNumber,
-        Author: issuer.legalName,
-        Subject: administrativeReference,
-      },
-    });
-    const buffers = [];
-    doc.on("data", (part) => buffers.push(part));
-    doc.on("end", () => resolve(Buffer.concat(buffers)));
-    doc.on("error", reject);
-
-    const fullWidth = doc.page.width - 2 * PAD;
-    const usableBottom = () => doc.page.height - 104;
-    const paragraph = (text, size = 9, color = BLUE, options = {}) => {
-      doc.font("Helvetica").fontSize(size).fillColor(color)
-          .text(clean(text), PAD, doc.y, {
-            width: fullWidth, lineGap: 2, ...options,
-          });
-      doc.moveDown(0.35);
-    };
-    const heading = (text) => {
-      if (doc.y > usableBottom() - 55) doc.addPage();
-      doc.moveDown(0.6);
-      doc.font("Helvetica-Bold").fontSize(10).fillColor(BLUE)
-          .text(text, PAD, doc.y, {width: fullWidth});
-      doc.moveDown(0.3);
-      doc.moveTo(PAD, doc.y).lineTo(PAD + fullWidth, doc.y)
-          .strokeColor(BLUE).lineWidth(0.6).stroke();
-      doc.moveDown(0.5);
-    };
-    const safeLine = (text) => {
-      if (doc.y > usableBottom() - 24) doc.addPage();
-      paragraph(text);
-    };
-
-    // Ne jamais utiliser le nom commercial à la place de l'émetteur légal.
-    doc.image(titleImage.content, doc.page.width / 2 - 115, 27,
-        {fit: [230, 43], align: "center"});
-    doc.y = 85;
-    doc.font("Helvetica-Bold").fontSize(15).fillColor(RED)
-        .text("DEVIS SPHOT ADMIN", PAD, doc.y, {width: fullWidth});
-    doc.moveDown(0.5);
-    paragraph("Devis : " + quoteNumber);
-    paragraph("Dossier administratif : " + administrativeReference);
-    paragraph("Émis le : " + validity.issuedOn +
-        "  |  Valable jusqu'au : " + validity.validUntil + " inclus");
-
-    heading("ÉMETTEUR");
-    safeLine(issuer.legalName);
-    safeLine("Identifiant : " +
-        (issuer.country === "FR" ? "SIRET " + issuer.siret : issuer.officialId));
-    safeLine(address(issuer));
-
-    heading("ORGANISME PAYEUR");
-    safeLine(buyer.legalName);
-    safeLine("Identifiant : " +
-        (buyer.country === "FR" ? "SIRET " + buyer.siret : buyer.officialId));
-    safeLine(address(buyer));
-    safeLine("Contact facturation : " + buyer.billingEmail);
-
-    heading("SPHOTS CONCERNÉS");
-    for (const spot of stations) {
-      safeLine((spot.idSphot ? spot.idSphot + " - " : "") +
-          "Poste de secours - " + spot.name);
-    }
-
-    heading("OFFRE ANNUELLE");
-    safeLine("Tarif publié : " + quote.pricingReference);
-    safeLine("Nombre de postes : " + quote.numberOfRescueStations);
-    const tiers = [
-      "1er poste", "Du 2e au 4e", "Du 5e au 9e", "À partir du 10e",
-    ];
-    quote.lines.forEach((line, index) => {
-      if (line.count > 0) {
-        safeLine(tiers[index] + " : " + line.count + " x " +
-            money(line.unitExclTax) + " = " + money(line.amountExclTax));
-      }
-    });
-
-    heading("MONTANTS ET FISCALITÉ");
-    safeLine("Total HT : " + money(tax.amountExclTax));
-    safeLine("Taxes applicables : " + money(tax.taxAmount));
-    doc.font("Helvetica-Bold").fontSize(12).fillColor(RED)
-        .text("TOTAL TTC : " + money(tax.amountInclTax), PAD, doc.y);
-    doc.moveDown(0.6);
-    safeLine("Traitement fiscal : " + tax.taxTreatment);
-    safeLine("Fondement fiscal : " + tax.legalBasis);
-    safeLine("Pays de facturation : " + buyer.country);
-
-    heading("PÉRIODE ET VALIDITÉ");
-    safeLine("Année d'abonnement : " + context.subscriptionYear);
-    safeLine("Abonnement annuel jusqu'au 31 décembre, sans prorata. " +
-        "Renouvellement au 1er janvier selon les conditions contractuelles.");
-    safeLine("Offre valable 30 jours calendaires maximum, " +
-        "jusqu'au " + validity.validUntil + " inclus.");
-    safeLine("Un devis n'est ni une commande ni un paiement. " +
-        "Les modalités et CGV applicables seront présentées à l'engagement.");
-
-    // PIED : véritable Fire SPHOT au centre, sans « L'équipe SPHOT ».
-    // L'emplacement est fixe sur la dernière page, hors du contenu.
-    if (doc.y > usableBottom()) doc.addPage();
-    doc.image(fireImage.content, doc.page.width / 2 - 15,
-        doc.page.height - 94, {fit: [30, 47]});
-    doc.strokeColor(BLUE).lineWidth(0.5)
-        .moveTo(PAD, doc.page.height - 42)
-        .lineTo(doc.page.width - PAD, doc.page.height - 42).stroke();
-    doc.font("Helvetica").fontSize(7).fillColor(BLUE)
-        .text("Document officiel " + quoteNumber,
-            PAD, doc.page.height - 35,
-            {width: fullWidth, align: "center"});
-    doc.end();
-  });
+  return simplePdfBuffer(adminQuoteDocumentDefinition(context, {
+    official: true,
+    quoteNumber,
+    administrativeReference,
+    validity: readiness.validity,
+  }));
 }
 
-module.exports = {renderOfficialAdminQuotePdf};
+module.exports = {
+  renderOfficialAdminQuotePdf,
+  renderConsultableAdminQuotePdf,
+  adminQuoteDocumentDefinition,
+};

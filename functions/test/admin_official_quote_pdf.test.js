@@ -5,6 +5,8 @@ const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const {
   renderOfficialAdminQuotePdf,
+  renderConsultableAdminQuotePdf,
+  adminQuoteDocumentDefinition,
 } = require("../admin_official_quote_pdf");
 
 function completeTestContext() {
@@ -121,3 +123,49 @@ test("Le moteur crée uniquement les octets d'un PDF en mémoire", async () => {
   assert.equal(data.subarray(0, 5).toString("ascii"), "%PDF-");
   // Ce test ne crée ni numéro, ni fichier, ni document Firestore.
 });
+
+
+test("Le devis consultable existe même sans identité juridique", async () => {
+  const ctx = completeTestContext();
+  ctx.issuer = {};
+  ctx.buyer = {};
+  ctx.stations = [];
+  ctx.publishedQuote = {};
+  ctx.taxDecision = {};
+  const pdf = await renderConsultableAdminQuotePdf(ctx);
+  assert.equal(pdf.subarray(0, 5).toString("ascii"), "%PDF-");
+  assert.ok(pdf.length > 1024);
+});
+
+test("Consultable et officiel utilisent la même structure documentaire",
+    async () => {
+      const c = completeTestContext();
+      const specimen = adminQuoteDocumentDefinition({
+        ...c,
+        issuer: {},
+        taxDecision: {},
+      });
+      const official = adminQuoteDocumentDefinition(c, {
+        official: true,
+        quoteNumber: CASE_DV,
+        administrativeReference: CASE_REFERENCE,
+        validity: {issuedOn: c.issuedOn, validUntil: "2026-11-14"},
+      });
+      const keys = (document) => document.lines.map((line) =>
+        line.heading ? "heading:" + line.heading : "label:" + line.label);
+      assert.deepEqual(keys(specimen), keys(official));
+      assert.equal(specimen.statusLabel, "NON ÉMIS");
+      assert.equal(official.statusLabel, "ÉMIS");
+      assert.equal(specimen.documentNumber, "NON ATTRIBUÉ - SPÉCIMEN");
+      assert.equal(official.documentNumber, CASE_DV);
+      assert.deepEqual(specimen.lines.filter((line) =>
+        line.label === "TOTAL ANNUEL HT"), official.lines.filter((line) =>
+        line.label === "TOTAL ANNUEL HT"));
+      const specimenPdf = await renderConsultableAdminQuotePdf(c);
+      const officialPdf = await renderOfficialAdminQuotePdf(
+          c, CASE_DV, CASE_REFERENCE);
+      assert.ok(Buffer.isBuffer(specimenPdf));
+      assert.ok(Buffer.isBuffer(officialPdf));
+      assert.equal(specimenPdf.subarray(0, 5).toString("ascii"), "%PDF-");
+      assert.equal(officialPdf.subarray(0, 5).toString("ascii"), "%PDF-");
+    });

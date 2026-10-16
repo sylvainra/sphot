@@ -282,8 +282,8 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
       row('Adresse', address(issuer, 'address',
           'postalCode', 'city', 'country')),
       row('Email', filled(issuer, 'email')),
-      row('TVA', issuerVat.isEmpty ?
-          'À déterminer si applicable' : issuerVat),
+      row('TVA intracommunautaire', issuerVat.isEmpty ?
+          'À compléter' : issuerVat),
       section('Organisme payeur'),
       row('Organisation', filled(subscription, 'billingOrganisation')),
       row('SIRET / identifiant', buyerId),
@@ -311,12 +311,15 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
         row('Montant HT', 'À compléter - grille ou postes indisponibles'),
       row('TVA', 'À déterminer selon le régime applicable'),
       row('TOTAL TTC', 'Non déterminé'),
+      row('Traitement fiscal', 'À compléter'),
+      row('Fondement fiscal', 'À compléter'),
       section('Période et conditions'),
       row('Abonnement', 'Annuel par poste de secours'),
       row('Période', 'Activation réelle au 31 décembre ; '
           'renouvellement au 1er janvier, sans prorata'),
-      row('Validité', '30 jours après émission officielle, '
-          'sans dépasser la fin de l\'année concernée'),
+      row('Émission', 'Non émis'),
+      row('Validité', '30 jours après émission, au plus tard '
+          'le 31 décembre'),
       pw.SizedBox(height: 7),
       pw.Container(
         width: double.infinity,
@@ -332,11 +335,11 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
               color: red, fontSize: 7.8, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 5),
             pw.Text(
-              'SPÉCIMEN NON CONTRACTUEL. Aucun numéro de devis officiel '
-              'n\'a été attribué. Le document ne vaut ni commande, '
-              'ni facture, ni règlement, ni activation. '
-              'Les informations légales et fiscales seront complétées '
-              'et vérifiées avant toute émission.',
+              'SPÉCIMEN NON CONTRACTUEL. Ce document ne constitue ni '
+              'une commande, ni une facture, ni un règlement ni '
+              'une activation. Les informations fiscales et '
+              'contractuelles applicables sont précisées à '
+              'l\'engagement.',
               style: pw.TextStyle(color: dark, fontSize: 7.3),
             ),
           ],

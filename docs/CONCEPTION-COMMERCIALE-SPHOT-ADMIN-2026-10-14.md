@@ -610,3 +610,15 @@ La disponibilité du **document de démonstration** est désormais **découplée
 - Le téléchargement local du spécimen PDF remplace l'ancienne fenêtre de brouillon. Un indicateur de chargement évite les clics répétitifs. Aucun envoi email, aucune modification du dossier, aucune numérotation DV, aucune émission officielle.
 - L'action `ÉTABLIR UN DEVIS` est conservée séparément et non activée : la consultation d'un document partiellement rempli n'est pas une émission officielle.
 - Contrôle attendu : compilation Web Flutter et ouverture du PDF depuis un dossier Admin complet puis incomplet. Ne pas lancer de déploiement sur Firebase.
+
+
+## 41. Parité de la présentation du devis consultable et du devis officiel (16/10/2026)
+
+**Règle validée :** il n'y a qu'un seul devis SPHOT ADMIN. Sa structure commerciale, ses postes, la grille publiée, les montants HT et la charte documentaire doivent rester identiques entre consultation et émission. Seules les informations liées à l'émission et les mentions juridiques/fiscales manquantes sont renseignées au moment opportun.
+
+- Le gabarit **déjà utilisé** dans `functions/admin_workflow.js` a été extrait **sans modification** dans `functions/admin_document_pdf_template.js`. Tous les documents administratifs existants continuent à appeler ce même gabarit ; les accusés et décisions ne sont pas redessinés.
+- `functions/admin_official_quote_pdf.js` utilise dorénavant ce gabarit commun, pour les deux fonctions `renderConsultableAdminQuotePdf` et `renderOfficialAdminQuotePdf`, et un constructeur unique `adminQuoteDocumentDefinition`. L'appel officiel conserve strictement le contrôle `assessAdminQuoteIssueReadiness`, l'obligation de numéro DV officiel et la vérification d'année et de référence.
+- Les rubriques et lignes sont communes : émetteur, organisme payeur, postes, offre/tarification, montant HT, TVA/TTC, traitement et fondement fiscaux, période et conditions. Les champs inconnus de la consultation portent `À compléter`. L'officiel reçoit le DV, la date/validité et les mentions validées.
+- Le PDF **local Flutter** reste nécessaire pour la consultation sans déploiement Firebase. Ses intitulés de rubriques, lignes et mentions sont alignés sur cette définition métier ; il reste techniquement un second moteur (`pdf` Dart contre PDFKit serveur) et **l'identité visuelle parfaite entre moteurs devra encore être vérifiée sur des PDF réellement générés**. À terme, le PDF officiel et la consultation autorisée seront alimentés par le même PDFKit serveur, sous réserve de l'intégration sécurisée.
+- Aucune numérotation, création de devis, archive, commande, SMTP, modification de droits Firebase ni activation de bouton n'est déclenchée par la consultation.
+- Vérification locale avant intégration : `node --test functions/test/admin_official_quote_pdf.test.js functions/test/admin_quote_delivery.test.js` et `npm --prefix functions run lint`, puis consultation visuelle du devis en Web Flutter. **Ne pas déployer**.
