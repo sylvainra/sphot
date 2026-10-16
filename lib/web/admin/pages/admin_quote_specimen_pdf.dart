@@ -1,248 +1,358 @@
 import 'dart:typed_data';
 
-import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../../services/published_commercial_quote_service.dart';
 
-/// Produit seulement un SPÉCIMEN de devis : aucune émission ou écriture.
+/// Spécimen de consultation SPHOT ADMIN.
+/// Gabarit aligné sur simplePdfBuffer de functions/admin_workflow.js :
+/// cartouche SPHOT, référence, rubriques rouge/bleu, lignes libellé/valeur,
+/// information importante, signature et pied de page.
+/// Ne crée aucun numéro DV, email, paiement ou document Firestore.
 Future<Uint8List> buildAdminQuoteSpecimenPdf({
   required Map<String, dynamic> subscription,
   required Map<String, dynamic> issuer,
   required PublishedCommercialQuote? quote,
 }) async {
-  String str(dynamic v) => v?.toString().trim() ?? '';
-  String field(Map<String, dynamic> data, String key) =>
-      str(data[key]).isEmpty ? 'À compléter' : str(data[key]);
-  String money(num n) =>
-      n.toStringAsFixed(2).replaceAll('.', ',') + ' EUR';
-  String address(Map<String, dynamic> data, String a, String p,
-      String c, String country) {
+  String value(dynamic input) => input?.toString().trim() ?? '';
+  String filled(Map<String, dynamic> source, String key) {
+    final input = value(source[key]);
+    return input.isEmpty ? 'À compléter' : input;
+  }
+  String money(num input) =>
+      input.toStringAsFixed(2).replaceAll('.', ',') + ' EUR';
+  String address(
+    Map<String, dynamic> source,
+    String street, String postal, String city, String country,
+  ) {
     final parts = <String>[
-      str(data[a]),
-      [str(data[p]), str(data[c])].where((v) => v.isNotEmpty).join(' '),
-      str(data[country]),
-    ].where((v) => v.isNotEmpty).toList();
-    return parts.isEmpty ? 'Adresse à compléter' : parts.join(', ');
+      value(source[street]),
+      [value(source[postal]), value(source[city])]
+          .where((part) => part.isNotEmpty).join(' '),
+      value(source[country]),
+    ].where((part) => part.isNotEmpty).toList();
+    return parts.isEmpty ? 'À compléter' : parts.join(', ');
   }
 
-  final selected = subscription['selectedRescueStationIds'];
-  final ids = selected is Iterable
-      ? selected.whereType<String>().where((v) => v.trim().isNotEmpty).toSet()
+  final rawSelection = subscription['selectedRescueStationIds'];
+  final stationIds = rawSelection is Iterable
+      ? rawSelection.whereType<String>()
+          .where((id) => id.trim().isNotEmpty).toSet()
       : <String>{};
-  // Les informations commerciales incomplètes n'empêchent jamais
-  // la consultation. En cas de tarif non disponible ou incohérent,
-  // aucun montant n'est inventé et les cases restent à compléter.
-  final raw = quote?.details['lines'];
-  final lines = raw is List
-      ? raw.whereType<Map>().where((l) =>
-          l['count'] is num && l['unitExclTax'] is num &&
-          l['amountExclTax'] is num && l['tier'] is num &&
-          (l['tier'] as num).toInt() >= 1 &&
-          (l['tier'] as num).toInt() <= 4).toList()
-      : <Map>[];
-  final count = lines.fold<int>(0,
-      (total, l) => total + (l['count'] as num).toInt());
-  final sum = lines.fold<num>(0,
-      (total, l) => total + (l['amountExclTax'] as num));
-  final hasPublishedPrice = quote != null &&
-      quote.market == 'ADMIN' &&
-      quote.currency == 'EUR' &&
-      ids.isNotEmpty &&
-      lines.length == 4 &&
-      count == ids.length &&
-      sum == quote.amountExclTax;
-
-  final nameById = <String, String>{};
-  final stored = subscription['selectedRescueStations'];
-  if (stored is Iterable) {
-    for (final item in stored) {
-      if (item is! Map) continue;
-      final id = str(item['spotDocumentId']);
-      if (ids.contains(id)) {
-        nameById[id] = [str(item['idSphot']), str(item['name'])]
-            .where((v) => v.isNotEmpty).join(' - ');
-      }
+  final namesById = <String, String>{};
+  final savedStations = subscription['selectedRescueStations'];
+  if (savedStations is Iterable) {
+    for (final station in savedStations) {
+      if (station is! Map) continue;
+      final id = value(station['spotDocumentId']);
+      if (!stationIds.contains(id)) continue;
+      namesById[id] = [
+        value(station['idSphot']),
+        value(station['name']),
+      ].where((part) => part.isNotEmpty).join(' - ');
     }
   }
-  final stations = ids.map((id) =>
-      nameById[id]?.isNotEmpty == true ? nameById[id]! :
-      'Poste à identifier : ' + id).toList()..sort();
+  final stations = stationIds.map((id) =>
+      namesById[id]?.isNotEmpty == true ? namesById[id]! :
+      'Poste à identifier : $id').toList()..sort();
+
+  // Ne jamais utiliser un montant soumis par le navigateur comme tarif.
+  final rawLines = quote?.details['lines'];
+  final lines = rawLines is List
+      ? rawLines.whereType<Map>().where((line) =>
+          line['tier'] is num &&
+          line['count'] is num &&
+          line['unitExclTax'] is num &&
+          line['amountExclTax'] is num &&
+          (line['tier'] as num).toInt() >= 1 &&
+          (line['tier'] as num).toInt() <= 4).toList()
+      : <Map>[];
+  final totalCount = lines.fold<int>(
+    0, (sum, line) => sum + (line['count'] as num).toInt(),
+  );
+  final totalAmount = lines.fold<num>(
+    0, (sum, line) => sum + (line['amountExclTax'] as num),
+  );
+  final validPublishedAmount = quote != null &&
+      quote.market == 'ADMIN' &&
+      quote.currency == 'EUR' &&
+      stations.isNotEmpty &&
+      lines.length == 4 &&
+      totalCount == stations.length &&
+      totalAmount == quote.amountExclTax;
 
   final blue = PdfColor.fromHex('1E3A8A');
   final red = PdfColor.fromHex('DC2626');
-  final grey = PdfColor.fromHex('64748B');
-  final soft = PdfColor.fromHex('F3F6FB');
-  final orange = PdfColor.fromHex('B45309');
-  final title = pw.MemoryImage(
-      (await rootBundle.load('data/icons/title.png')).buffer.asUint8List());
-  final fire = pw.MemoryImage((await rootBundle.load(
-      'data/icons/fire_red_icon.png')).buffer.asUint8List());
+  final dark = PdfColor.fromHex('263238');
+  final grey = PdfColor.fromHex('607D8B');
+  final pale = PdfColor.fromHex('F3F6FB');
+  final border = PdfColor.fromHex('D9E2EC');
+  final warm = PdfColor.fromHex('FFF8E1');
+  final orange = PdfColor.fromHex('F59E0B');
+  const leftWidth = 124.0;
 
-  pw.Widget line(String value, {bool bold = false, PdfColor? color,
-      double size = 9}) => pw.Padding(
-    padding: const pw.EdgeInsets.only(bottom: 4),
-    child: pw.Text(value, style: pw.TextStyle(
-      fontSize: size, color: color ?? blue,
-      fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-    )),
+  // Les polices PDF standard prennent en charge le français Latin-1.
+  // Éviter les puces et apostrophes typographiques non couvertes.
+  String pdfText(String input) => input
+      .replaceAll('’', "'")
+      .replaceAll('‘', "'")
+      .replaceAll('–', '-')
+      .replaceAll('—', '-')
+      .replaceAll('•', '-')
+      .replaceAll('œ', 'oe')
+      .replaceAll('Œ', 'OE')
+      .replaceAll(' ', ' ')
+      .replaceAll('…', '...');
+
+  final document = pw.Document(
+    title: 'DEVIS SPHOT ADMIN - SPECIMEN',
+    author: 'SPHOT',
+    theme: pw.ThemeData.withFont(
+      base: pw.Font.helvetica(),
+      bold: pw.Font.helveticaBold(),
+    ),
   );
-  pw.Widget heading(String value) => pw.Padding(
-    padding: const pw.EdgeInsets.only(top: 10, bottom: 8),
-    child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start,
+
+  pw.Widget section(String text) => pw.Padding(
+    padding: const pw.EdgeInsets.only(top: 8, bottom: 5),
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        line(value, bold: true, size: 10),
-        pw.Container(height: 0.7, color: blue),
+        pw.Text(pdfText(text.toUpperCase()),
+          style: pw.TextStyle(
+            fontSize: 8.4, fontWeight: pw.FontWeight.bold, color: red,
+          )),
+        pw.SizedBox(height: 5),
+        pw.Container(height: 0.65, color: blue),
       ],
     ),
   );
 
-  const tiers = <String>[
-    'Premier poste', '2e au 4e poste', '5e au 9e poste',
-    '10e poste et suivants',
+  pw.Widget row(String label, String text, {bool emphasis = false}) =>
+      pw.Padding(
+        padding: const pw.EdgeInsets.only(left: 10, top: 2.5, bottom: 2.5),
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.SizedBox(width: leftWidth,
+              child: pw.Text(pdfText(label), style: pw.TextStyle(
+                color: blue, fontSize: 7.7,
+                fontWeight: pw.FontWeight.bold,
+              )),
+            ),
+            pw.Expanded(child: pw.Text(pdfText(text), style: pw.TextStyle(
+              color: emphasis ? red : dark,
+              fontSize: emphasis ? 8.6 : 7.7,
+              fontWeight: emphasis ?
+                  pw.FontWeight.bold : pw.FontWeight.normal,
+            ))),
+          ],
+        ),
+      );
+
+  final buyerId = value(subscription['billingSiret']).isNotEmpty
+      ? value(subscription['billingSiret'])
+      : filled(subscription, 'billingLegalId');
+  final issuerVat = value(issuer['vatNumber']);
+  final labelLines = <String>[
+    'Premier poste', 'Du 2e au 4e poste',
+    'Du 5e au 9e poste', 'À partir du 10e poste',
   ];
-  final rows = <List<String>>[
-    for (final l in lines)
-      if ((l['count'] as num) > 0)
-        [
-          tiers[(l['tier'] as num).toInt() - 1],
-          (l['count'] as num).toInt().toString(),
-          money(l['unitExclTax'] as num),
-          money(l['amountExclTax'] as num),
-        ],
-  ];
-  final document = pw.Document(
-      title: 'SPHOT - SPECIMEN DE DEVIS', author: 'SPHOT');
+  final dossier = filled(subscription, 'administrativeReference');
+
   document.addPage(pw.MultiPage(
     pageFormat: PdfPageFormat.a4,
-    margin: const pw.EdgeInsets.fromLTRB(42, 30, 42, 42),
+    margin: const pw.EdgeInsets.fromLTRB(40, 30, 40, 39),
     header: (ctx) => pw.Container(
-      padding: const pw.EdgeInsets.only(bottom: 10),
-      decoration: pw.BoxDecoration(border: pw.Border(
-        bottom: pw.BorderSide(color: blue, width: 0.8),
-      )),
-      child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      height: 72,
+      padding: const pw.EdgeInsets.fromLTRB(18, 10, 14, 8),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.white,
+        border: pw.Border.all(color: border, width: 0.9),
+        borderRadius: pw.BorderRadius.circular(14),
+      ),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Image(title, width: 145, height: 45, fit: pw.BoxFit.contain),
-          pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end,
+          pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start,
+            mainAxisAlignment: pw.MainAxisAlignment.center,
             children: [
-              line('DEVIS SPHOT ADMIN', bold: true, size: 12),
-              line('SPÉCIMEN - NON CONTRACTUEL', color: red,
-                  bold: true, size: 8.5),
-            ]),
-        ]),
+              pw.Text('SPHOT', style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 25, color: red,
+                letterSpacing: 2,
+              )),
+              pw.SizedBox(height: 4),
+              pw.Text('Des plages plus sûres, propres et connectées',
+                style: pw.TextStyle(fontSize: 7.2, color: grey)),
+            ],
+          ),
+          pw.SizedBox(width: 12),
+          pw.Flexible(child: pw.Text(
+            'SURVEILLER  -  PRÉSERVER  -  INFORMER  -  ENSEMBLE',
+            textAlign: pw.TextAlign.right,
+            style: pw.TextStyle(
+              fontSize: 8, fontWeight: pw.FontWeight.bold, color: blue,
+            ),
+          )),
+        ],
+      ),
     ),
     footer: (ctx) => pw.Container(
-      padding: const pw.EdgeInsets.only(top: 7),
-      decoration: pw.BoxDecoration(border: pw.Border(
-        top: pw.BorderSide(color: blue, width: 0.6),
-      )),
-      child: pw.Row(children: [
-        pw.Image(fire, height: 22),
-        pw.SizedBox(width: 8),
-        pw.Expanded(child: line(
-          'SPHOT - Document de démonstration sans valeur commerciale. '
-          'L’équipe SPHOT.', size: 7, color: grey)),
-        line('Page ' + ctx.pageNumber.toString() + ' / ' +
-            ctx.pagesCount.toString(), color: grey, size: 7),
-      ]),
+      padding: const pw.EdgeInsets.only(top: 8),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(top: pw.BorderSide(color: border, width: 0.7)),
+      ),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text('Document généré automatiquement par SPHOT',
+            style: pw.TextStyle(fontSize: 6.6, color: grey)),
+          pw.Text('SPÉCIMEN - Version 01 - Page ' +
+              ctx.pageNumber.toString() + ' / ' + ctx.pagesCount.toString(),
+            style: pw.TextStyle(fontSize: 6.6, color: grey)),
+        ],
+      ),
     ),
     build: (ctx) => [
       pw.SizedBox(height: 12),
+      pw.Center(child: pw.Text('DEVIS SPHOT ADMIN', style: pw.TextStyle(
+        fontSize: 12.6, color: blue, fontWeight: pw.FontWeight.bold,
+      ))),
+      pw.SizedBox(height: 8),
       pw.Container(
-        padding: const pw.EdgeInsets.all(11),
+        width: double.infinity,
+        padding: const pw.EdgeInsets.fromLTRB(14, 9, 14, 9),
         decoration: pw.BoxDecoration(
-          color: soft, border: pw.Border.all(color: blue, width: 0.6),
+          color: pale, border: pw.Border.all(color: blue, width: 0.75),
+          borderRadius: pw.BorderRadius.circular(12),
         ),
-        child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start,
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            line('DOSSIER ADMIN : ' +
-                field(subscription, 'administrativeReference'), bold: true),
-            line('Numéro de devis : non attribué', color: grey),
-            line('Date d’émission : non émis', color: grey),
-            line('Validité : 30 jours à compter d’une émission officielle, '
-                'sans dépasser le 31 décembre de l’année concernée.',
-                color: grey, size: 8),
-          ]),
+            pw.Expanded(child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('RÉFÉRENCE DU DOCUMENT',
+                  style: pw.TextStyle(fontSize: 7.1, color: grey,
+                    fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 5),
+                pw.Text('NON ATTRIBUÉE - SPÉCIMEN',
+                  style: pw.TextStyle(fontSize: 10.3, color: red,
+                    fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 5),
+                pw.Text('Dossier : ' + pdfText(dossier),
+                  style: pw.TextStyle(fontSize: 7, color: dark)),
+              ],
+            )),
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Text('RUBRIQUE', style: pw.TextStyle(
+                  fontSize: 7, color: blue, fontWeight: pw.FontWeight.bold)),
+                pw.Text('DEVIS ADMIN', style: pw.TextStyle(
+                  fontSize: 8, color: dark, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 7),
+                pw.Text('STATUT', style: pw.TextStyle(
+                  fontSize: 7, color: blue, fontWeight: pw.FontWeight.bold)),
+                pw.Text('NON ÉMIS', style: pw.TextStyle(
+                  fontSize: 8, color: dark, fontWeight: pw.FontWeight.bold)),
+              ],
+            ),
+          ],
+        ),
       ),
-      heading('ÉMETTEUR'),
-      line(str(issuer['legalName']).isEmpty ?
-          'SPHOT (raison sociale à compléter)' :
-          str(issuer['legalName']), bold: true),
-      line('SIRET : ' + field(issuer, 'siret')),
-      line(address(issuer, 'address', 'postalCode', 'city', 'country')),
-      line('Email : ' + field(issuer, 'email')),
-      line('TVA intracommunautaire : ' +
-          (str(issuer['vatNumber']).isEmpty ?
-              'À déterminer si applicable' : str(issuer['vatNumber']))),
-      heading('ORGANISME PAYEUR - DONNÉES DÉCLARÉES'),
-      line(field(subscription, 'billingOrganisation'), bold: true),
-      line('SIRET / identifiant : ' +
-          (str(subscription['billingSiret']).isNotEmpty ?
-              str(subscription['billingSiret']) :
-              field(subscription, 'billingLegalId'))),
-      line(address(subscription, 'billingAddress',
+      pw.SizedBox(height: 9),
+      pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 8),
+        child: pw.Text(
+          'Document consultable pour préparer un devis facultatif '
+          'd\'abonnement SPHOT ADMIN. Les informations encore '
+          'inconnues seront complétées automatiquement.',
+          style: pw.TextStyle(color: dark, fontSize: 8),
+        ),
+      ),
+      section('Émetteur'),
+      row('Organisation', value(issuer['legalName']).isEmpty
+          ? 'SPHOT - raison sociale à compléter'
+          : value(issuer['legalName'])),
+      row('SIRET', filled(issuer, 'siret')),
+      row('Adresse', address(issuer, 'address',
+          'postalCode', 'city', 'country')),
+      row('Email', filled(issuer, 'email')),
+      row('TVA', issuerVat.isEmpty ?
+          'À déterminer si applicable' : issuerVat),
+      section('Organisme payeur'),
+      row('Organisation', filled(subscription, 'billingOrganisation')),
+      row('SIRET / identifiant', buyerId),
+      row('Adresse', address(subscription, 'billingAddress',
           'billingPostalCode', 'billingCity', 'billingCountry')),
-      line('Contact : ' + field(subscription, 'billingContactName')),
-      line('Email : ' + field(subscription, 'billingContactEmail')),
-      heading('POSTES DE SECOURS CONCERNÉS (' +
-          stations.length.toString() + ')'),
-      if (stations.isEmpty)
-        line('Postes de secours : à renseigner', color: grey),
-      ...stations.map((name) => line('• ' + name, size: 8.5)),
-      heading('OFFRE ET TARIFICATION ANNUELLE'),
-      if (hasPublishedPrice) ...[
-        line('Grille publiée : ' + quote!.pricingReference,
-            size: 8, color: grey),
-        pw.Table.fromTextArray(
-          headers: const ['Tranche', 'Qté', 'Prix unitaire HT', 'Montant HT'],
-          data: rows,
-          headerDecoration: pw.BoxDecoration(color: blue),
-          headerStyle: pw.TextStyle(color: PdfColors.white,
-              fontSize: 8, fontWeight: pw.FontWeight.bold),
-          cellStyle: pw.TextStyle(fontSize: 8.5, color: blue),
-          cellPadding: const pw.EdgeInsets.all(7),
-          cellAlignments: {
-            1: pw.Alignment.center,
-            2: pw.Alignment.centerRight,
-            3: pw.Alignment.centerRight,
-          },
-        ),
-        pw.SizedBox(height: 11),
-        pw.Container(alignment: pw.Alignment.centerRight,
-          child: line('TOTAL ANNUEL ESTIMATIF HT : ' +
-              money(quote!.amountExclTax),
-              bold: true, color: red, size: 13),
-        ),
-      ] else ...[
-        line('Tarification HT : à compléter ou à actualiser',
-            color: orange, bold: true),
-        line('Le montant ne peut pas être confirmé tant que les postes '
-            'et le tarif publié ne correspondent pas.', color: grey, size: 8),
-      ],
-      line('TVA : à déterminer selon le régime applicable', color: grey),
-      line('TOTAL TTC : non déterminé', color: grey),
-      heading('PÉRIODE ET CONDITIONS'),
-      line('Abonnement annuel par poste. Début à l’activation réelle ; '
-          'fin au 31 décembre de l’année d’activation ; '
-          'renouvellement au 1er janvier, sans prorata.', size: 8.5),
-      line('Le devis reste facultatif. Ce spécimen ne constitue '
-          'ni commande, ni facture, ni paiement, ni activation.',
-          size: 8.5),
+      row('Contact', filled(subscription, 'billingContactName')),
+      row('Email', filled(subscription, 'billingContactEmail')),
+      section('Postes de secours concernés'),
+      if (stations.isEmpty) row('Postes', 'À renseigner'),
+      for (var i = 0; i < stations.length; i++)
+        row('Poste ' + (i + 1).toString(), stations[i]),
+      section('Offre et tarification annuelle'),
+      if (validPublishedAmount) ...[
+        row('Grille publiée', quote!.pricingReference),
+        for (final line in lines)
+          if ((line['count'] as num) > 0)
+            row(labelLines[(line['tier'] as num).toInt() - 1],
+              (line['count'] as num).toInt().toString() + ' x ' +
+              money(line['unitExclTax'] as num) + ' = ' +
+              money(line['amountExclTax'] as num)),
+        pw.SizedBox(height: 4),
+        row('TOTAL ANNUEL HT', money(quote!.amountExclTax),
+            emphasis: true),
+      ] else
+        row('Montant HT', 'À compléter - grille ou postes indisponibles'),
+      row('TVA', 'À déterminer selon le régime applicable'),
+      row('TOTAL TTC', 'Non déterminé'),
+      section('Période et conditions'),
+      row('Abonnement', 'Annuel par poste de secours'),
+      row('Période', 'Activation réelle au 31 décembre ; '
+          'renouvellement au 1er janvier, sans prorata'),
+      row('Validité', '30 jours après émission officielle, '
+          'sans dépasser la fin de l\'année concernée'),
       pw.SizedBox(height: 7),
       pw.Container(
-        padding: const pw.EdgeInsets.all(9),
+        width: double.infinity,
+        padding: const pw.EdgeInsets.fromLTRB(12, 9, 12, 10),
         decoration: pw.BoxDecoration(
-          color: PdfColor.fromHex('FFF7ED'),
-          border: pw.Border.all(color: orange, width: 0.8),
+          color: warm, border: pw.Border.all(color: orange, width: 0.8),
+          borderRadius: pw.BorderRadius.circular(10),
         ),
-        child: line('SPÉCIMEN NON CONTRACTUEL. '
-          'La fiche settings/sphotLegalIdentity alimente les coordonnées '
-          'de SPHOT lorsqu’elles seront renseignées. '
-          'L’émission officielle fixera les mentions fiscales, '
-          'le numéro DV et la date après vérifications.',
-          color: orange, size: 8),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text('INFORMATION IMPORTANTE', style: pw.TextStyle(
+              color: red, fontSize: 7.8, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 5),
+            pw.Text(
+              'SPÉCIMEN NON CONTRACTUEL. Aucun numéro de devis officiel '
+              'n\'a été attribué. Le document ne vaut ni commande, '
+              'ni facture, ni règlement, ni activation. '
+              'Les informations légales et fiscales seront complétées '
+              'et vérifiées avant toute émission.',
+              style: pw.TextStyle(color: dark, fontSize: 7.3),
+            ),
+          ],
+        ),
+      ),
+      pw.SizedBox(height: 9),
+      pw.Align(alignment: pw.Alignment.centerRight,
+        child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end,
+          children: [
+            pw.Text('À bientôt sur SPHOT,',
+              style: pw.TextStyle(fontSize: 8.1, color: dark)),
+            pw.SizedBox(height: 3),
+            pw.Text("L'équipe SPHOT", style: pw.TextStyle(
+              color: blue, fontSize: 8.4, fontWeight: pw.FontWeight.bold)),
+          ],
+        ),
       ),
     ],
   ));
