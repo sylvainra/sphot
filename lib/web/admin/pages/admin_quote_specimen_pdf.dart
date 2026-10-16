@@ -115,7 +115,7 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
   );
 
   pw.Widget section(String text) => pw.Padding(
-    padding: const pw.EdgeInsets.only(top: 8, bottom: 5),
+    padding: const pw.EdgeInsets.only(top: 5, bottom: 3),
     child: pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
@@ -123,7 +123,7 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
           style: pw.TextStyle(
             fontSize: 8.4, fontWeight: pw.FontWeight.bold, color: red,
           )),
-        pw.SizedBox(height: 5),
+        pw.SizedBox(height: 3),
         pw.Container(height: 0.65, color: blue),
       ],
     ),
@@ -131,19 +131,19 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
 
   pw.Widget row(String label, String text, {bool emphasis = false}) =>
       pw.Padding(
-        padding: const pw.EdgeInsets.only(left: 10, top: 2.5, bottom: 2.5),
+        padding: const pw.EdgeInsets.only(left: 10, top: 1.4, bottom: 1.4),
         child: pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.SizedBox(width: leftWidth,
               child: pw.Text(pdfText(label), style: pw.TextStyle(
-                color: blue, fontSize: 7.7,
+                color: blue, fontSize: 8,
                 fontWeight: pw.FontWeight.bold,
               )),
             ),
             pw.Expanded(child: pw.Text(pdfText(text), style: pw.TextStyle(
               color: emphasis ? red : dark,
-              fontSize: emphasis ? 8.6 : 7.7,
+              fontSize: emphasis ? 9 : 8,
               fontWeight: emphasis ?
                   pw.FontWeight.bold : pw.FontWeight.normal,
             ))),
@@ -163,10 +163,10 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
 
   document.addPage(pw.MultiPage(
     pageFormat: PdfPageFormat.a4,
-    margin: const pw.EdgeInsets.fromLTRB(40, 30, 40, 39),
+    margin: const pw.EdgeInsets.fromLTRB(40, 26, 40, 36),
     header: (ctx) => pw.Container(
-      height: 72,
-      padding: const pw.EdgeInsets.fromLTRB(18, 10, 14, 8),
+      height: 65,
+      padding: const pw.EdgeInsets.fromLTRB(18, 8, 14, 6),
       decoration: pw.BoxDecoration(
         color: PdfColors.white,
         border: pw.Border.all(color: border, width: 0.9),
@@ -217,14 +217,14 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
       ),
     ),
     build: (ctx) => [
-      pw.SizedBox(height: 12),
+      pw.SizedBox(height: 7),
       pw.Center(child: pw.Text('DEVIS SPHOT ADMIN', style: pw.TextStyle(
         fontSize: 12.6, color: blue, fontWeight: pw.FontWeight.bold,
       ))),
-      pw.SizedBox(height: 8),
+      pw.SizedBox(height: 6),
       pw.Container(
         width: double.infinity,
-        padding: const pw.EdgeInsets.fromLTRB(14, 9, 14, 9),
+        padding: const pw.EdgeInsets.fromLTRB(14, 7, 14, 7),
         decoration: pw.BoxDecoration(
           color: pale, border: pw.Border.all(color: blue, width: 0.75),
           borderRadius: pw.BorderRadius.circular(12),
@@ -264,7 +264,7 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
           ],
         ),
       ),
-      pw.SizedBox(height: 9),
+      pw.SizedBox(height: 6),
       pw.Padding(
         padding: const pw.EdgeInsets.symmetric(horizontal: 8),
         child: pw.Text(
@@ -320,10 +320,10 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
       row('Émission', 'Non émis'),
       row('Validité', '30 jours après émission, au plus tard '
           'le 31 décembre'),
-      pw.SizedBox(height: 7),
+      pw.SizedBox(height: 5),
       pw.Container(
         width: double.infinity,
-        padding: const pw.EdgeInsets.fromLTRB(12, 9, 12, 10),
+        padding: const pw.EdgeInsets.fromLTRB(12, 7, 12, 8),
         decoration: pw.BoxDecoration(
           color: warm, border: pw.Border.all(color: orange, width: 0.8),
           borderRadius: pw.BorderRadius.circular(10),
@@ -345,7 +345,7 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
           ],
         ),
       ),
-      pw.SizedBox(height: 9),
+      pw.SizedBox(height: 4),
       pw.Align(alignment: pw.Alignment.centerRight,
         child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end,
           children: [

@@ -22,6 +22,7 @@ import 'package:flutter/services.dart';
 import 'sphot_admin_summary_page.dart';
 import 'admin_subscription_panel.dart';
 import 'admin_quote_server_pdf_service.dart';
+import 'admin_quote_consultation.dart';
 import 'admin_quote_pdf_download.dart';
 import 'admin_payment_panel.dart';
 import 'admin_statistics_panel.dart';
@@ -127,6 +128,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _showAdminPaymentPanel = false;
   bool _showBillingDocumentsPanel = false;
   final Set<String> _loadingQuoteArchiveIds = <String>{};
+  bool _consultingQuoteFromDocuments = false;
   bool _showStatisticsPanel = false;
   bool _showMainCourantePanel = false;
   bool _operationalAlertActive = false;
@@ -6171,6 +6173,44 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return '';
   }
 
+  /// Même PDF consultable que dans ABONNEMENT, sans générer de DV.
+  /// Le dossier est relu pour refléter les dernières données enregistrées.
+  Future<void> _consultQuoteFromDocuments() async {
+    if (_consultingQuoteFromDocuments) return;
+    setState(() => _consultingQuoteFromDocuments = true);
+    try {
+      final uid = widget.adminUid.trim();
+      if (uid.isEmpty) {
+        throw StateError('Administrateur non identifié.');
+      }
+      final saved = await FirebaseFirestore.instance
+          .collection('subscriptions')
+          .doc(uid)
+          .get();
+      final data = <String, dynamic>{
+        ...?saved.data(),
+      };
+      final reference = _currentAdministrativeReference();
+      if (_cleanText(data['administrativeReference']).isEmpty &&
+          reference.isNotEmpty) {
+        data['administrativeReference'] = reference;
+      }
+      final bytes = await createConsultableAdminQuotePdf(data);
+      if (!mounted) return;
+      downloadAdminQuoteSpecimen(bytes, 'SPHOT-DEVIS-SPECIMEN.pdf');
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text(
+          'Le devis consultable n’a pas pu être téléchargé. '
+          'Réessayez après actualisation du dossier.',
+        )),
+      );
+    } finally {
+      if (mounted) setState(() => _consultingQuoteFromDocuments = false);
+    }
+  }
+
   /// Lecture sécurisée du PDF existant, jamais depuis son URL Storage.
   Future<void> _downloadArchivedAdminQuote(
     String documentId,
@@ -6389,6 +6429,38 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         const SizedBox(height: 12),
                       ],
 
+                      _buildCommercialSection(
+                        icon: Icons.picture_as_pdf_outlined,
+                        title: 'DEVIS CONSULTABLE',
+                        description:
+                            'Document PDF disponible avec les données '
+                            'enregistrées, même si certaines informations '
+                            'restent à compléter.',
+                        status: 'CONSULTATION DISPONIBLE',
+                        statusColor: const Color(0xFF15803D),
+                      ),
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: OutlinedButton.icon(
+                          onPressed: _consultingQuoteFromDocuments
+                              ? null
+                              : _consultQuoteFromDocuments,
+                          icon: _consultingQuoteFromDocuments
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.picture_as_pdf_outlined),
+                          label: Text(_consultingQuoteFromDocuments
+                              ? 'PRÉPARATION DU PDF...'
+                              : 'CONSULTER LE DEVIS (PDF)'),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       _buildArchivedAdminQuotes(),
                       const SizedBox(height: 12),
                       _buildCommercialSection(
