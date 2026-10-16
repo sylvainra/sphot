@@ -59,7 +59,9 @@ class _SuperAdminAnnualFinancialExportCardState
         remainingAbove > remainingBelow;
     final height = math.min(270.0,
         math.max(90.0, above ? remainingAbove : remainingBelow));
-    final top = above ? point.dy - height : point.dy + size.height - 1;
+    final top = above
+        ? point.dy - height + SphotDropdownVisuals.popupOverlap
+        : point.dy + size.height - SphotDropdownVisuals.popupOverlap;
 
     final scrollController = ScrollController();
     _yearScrollController = scrollController;
@@ -83,6 +85,7 @@ class _SuperAdminAnnualFinancialExportCardState
               child: Container(
                 constraints: BoxConstraints(maxHeight: height),
                 decoration: SphotDropdownVisuals.popupDecoration,
+                clipBehavior: Clip.antiAlias,
                 child: ScrollbarTheme(
                   data: SphotDropdownVisuals.scrollbarTheme,
                   child: Scrollbar(
@@ -92,11 +95,17 @@ class _SuperAdminAnnualFinancialExportCardState
                     radius: const Radius.circular(10),
                     child: ListView(
                       controller: scrollController,
-                      padding: EdgeInsets.zero,
+                      padding: EdgeInsets.only(
+                        top: above ? 0 : SphotDropdownVisuals.popupContentInset,
+                        bottom: above ? SphotDropdownVisuals.popupContentInset : 0,
+                      ),
                       shrinkWrap: true,
                       children: [
                         for (final year in years)
                           InkWell(
+                            hoverColor: Colors.transparent,
+                            focusColor: Colors.transparent,
+                            splashColor: Colors.transparent,
                             onTap: () {
                               setState(() => _year = year);
                               _closeYearMenu();
@@ -261,7 +270,7 @@ class _SuperAdminAnnualFinancialExportCardState
               const Text('Exercice :', style: TextStyle(
                 color: blue, fontWeight: FontWeight.w800, fontSize: 15)),
               const SizedBox(width: 12),
-              SizedBox(width: 155, child: _yearSelector()),
+              Expanded(child: _yearSelector()),
             ],
           ),
           const SizedBox(height: 16),

@@ -780,13 +780,14 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ),
                 Positioned(
                   left: position.dx,
-                  top: position.dy + size.height - 1,
+                  top: position.dy + size.height - SphotDropdownVisuals.popupOverlap,
                   width: size.width,
                   child: Material(
                     color: Colors.transparent,
                     child: Container(
                       constraints: const BoxConstraints(maxHeight: 270),
                       decoration: SphotDropdownVisuals.popupDecoration,
+                  clipBehavior: Clip.antiAlias,
                       child: ScrollbarTheme(
                         data: SphotDropdownVisuals.scrollbarTheme,
                         child: Scrollbar(
@@ -796,7 +797,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                           radius: const Radius.circular(10),
                           child: ListView(
                             controller: scrollController,
-                            padding: EdgeInsets.zero,
+                            padding: const EdgeInsets.only(
+                          top: SphotDropdownVisuals.popupContentInset,
+                        ),
                             shrinkWrap: true,
                             children: DashboardSpotFilter.values.map((filter) {
                               final selected = _selectedFilters.contains(
@@ -804,6 +807,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                               );
 
                               return InkWell(
+                                hoverColor: Colors.transparent,
+                                focusColor: Colors.transparent,
                                 onTap: () {
                                   setState(() {
                                     if (filter == DashboardSpotFilter.none) {
@@ -917,13 +922,14 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             ),
             Positioned(
               left: position.dx,
-              top: position.dy + size.height - 1,
+              top: position.dy + size.height - SphotDropdownVisuals.popupOverlap,
               width: size.width,
               child: Material(
                 color: Colors.transparent,
                 child: Container(
                   constraints: const BoxConstraints(maxHeight: 270),
                   decoration: SphotDropdownVisuals.popupDecoration,
+                  clipBehavior: Clip.antiAlias,
                   child: ScrollbarTheme(
                     data: SphotDropdownVisuals.scrollbarTheme,
                     child: Scrollbar(
@@ -933,12 +939,16 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                       radius: Radius.circular(10),
                       child: ListView(
                         controller: scrollController,
-                        padding: EdgeInsets.zero,
+                        padding: const EdgeInsets.only(
+                          top: SphotDropdownVisuals.popupContentInset,
+                        ),
                         shrinkWrap: true,
                         children: DashboardAdminFilter.values.map((filter) {
                           final selected = _selectedAdminFilter == filter;
 
                           return InkWell(
+                                hoverColor: Colors.transparent,
+                                focusColor: Colors.transparent,
                             onTap: () {
                               setState(() {
                                 _selectedAdminFilter = filter;
@@ -1856,13 +1866,14 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             ),
             Positioned(
               left: position.dx,
-              top: position.dy + size.height - 1,
+              top: position.dy + size.height - SphotDropdownVisuals.popupOverlap,
               width: size.width,
               child: Material(
                 color: Colors.transparent,
                 child: Container(
                   constraints: const BoxConstraints(maxHeight: 270),
                   decoration: SphotDropdownVisuals.popupDecoration,
+                  clipBehavior: Clip.antiAlias,
                   child: ScrollbarTheme(
                     data: SphotDropdownVisuals.scrollbarTheme,
                     child: Scrollbar(
@@ -1872,7 +1883,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                       radius: const Radius.circular(10),
                       child: ListView(
                         controller: scrollController,
-                        padding: EdgeInsets.zero,
+                        padding: const EdgeInsets.only(
+                          top: SphotDropdownVisuals.popupContentInset,
+                        ),
                         shrinkWrap: true,
                         children: DashboardAdvertiserFilter.values.map((
                           filter,
@@ -1880,6 +1893,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                           final selected = _selectedAdvertiserFilter == filter;
 
                           return InkWell(
+                                hoverColor: Colors.transparent,
+                                focusColor: Colors.transparent,
                             onTap: () {
                               setState(() {
                                 _selectedAdvertiserFilter = filter;
