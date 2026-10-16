@@ -563,3 +563,17 @@ Le déclencheur existant `assignQuoteNumberOnWrite` numérotait auparavant tout 
 - `functions/admin_quote_download.js` prépare la consultation du PDF d'un devis **déjà émis et archivé**. Identité Firebase vérifiée et non révoquée ; rôle ADMIN ; compte actif dans la collection serveur `adminAccounts` ; interdiction de récupérer les documents d'un autre UID. Le fichier doit correspondre au dossier `documents`, à `quotes`, à son chemin attendu et à son empreinte SHA-256. Pas d'URL de téléchargement publique.
 - `functions/test/admin_quote_download.test.js` contient 11 scénarios fictifs (propriétaire, autre Admin, annonceur, suspension, doublon de comptes, archive altérée, etc.). **Tests locaux à effectuer**.
 - Aucun bouton ni endpoint n'est créé et `functions/index.js` n'est pas modifié. Cette étape ne télécharge rien depuis la base réelle, n'envoie aucun mail, n'émet aucun devis et n'altère aucun fichier. L'exposition contrôlée au portail reste à réaliser après test d'intégration, sans déploiement avant décision explicite.
+
+
+## 37. Liaison HTTP interne lecture seule : aperçu Admin et téléchargement privé (16/10/2026)
+
+La finalisation technique est limitée ici au **raccordement de consultation**, sans émission commerciale : nouveau module `functions/admin_quote_portal_api.js` exportant `handleAdminQuotePortalRequest`, non publié dans `functions/index.js` et non branché au bouton `ÉTABLIR UN DEVIS`.
+
+Deux opérations exclusivement en lecture : `preview` relie une demande HTTP authentifiée à `loadRealAdminQuoteDraft` (dossier, postes et tarif HT publié vérifiés en lecture serveur, **sans TVA/TTC supposés**) ; `download` relie le titulaire à `readArchivedAdminQuotePdf` (seul PDF déjà émis, empreinte et propriétaire vérifiés). L'identifiant et les montants envoyés par le navigateur ne font pas autorité. Pas de chemin ni d'URL Storage publics, aucune modification Firebase, aucun email.
+
+Le futur endpoint doit encore imposer une politique CORS adaptée, les protections d'exploitation et les tests sur Firebase Emulator avant tout déploiement ; ce module seul n'est pas une API en production. Ses refus ne révèlent aucune donnée personnelle. Le bouton officiel reste **désactivé en attente d'immatriculation de SPHOT et de validation fiscale**. Aucun dispositif automatique de numérotation/émission n'est créé ou activé ici.
+
+Fichier de tests sans Firebase réel : `functions/test/admin_quote_portal_api.test.js` (7 cas). Validation locale attendue :
+`node --test functions/test/admin_quote_portal_api.test.js functions/test/admin_quote_download.test.js` puis `npm --prefix functions run lint`.
+
+**Reste incompressible avant un devis officiel** : décision juridique/fiscale vérifiée depuis des sources serveur non modifiables par le client, gel transactionnel du devis/autorisation, émission/archivage puis livraison email contrôlée, validation de bout en bout et autorisation expresse de mise en service. Les modules déjà en place sont conservés ; ne pas confondre cette liaison de consultation avec une émission effective.
