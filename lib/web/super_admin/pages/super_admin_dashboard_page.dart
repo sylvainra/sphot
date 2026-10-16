@@ -18,6 +18,7 @@ import 'dart:async';
 
 import '../widgets/super_admin_admin_workflow_panel.dart';
 import '../widgets/super_admin_annual_financial_export_card.dart';
+import '../widgets/sphot_dropdown_visuals.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -779,29 +780,15 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ),
                 Positioned(
                   left: position.dx,
-                  top: position.dy + size.height - 12,
+                  top: position.dy + size.height - 1,
                   width: size.width,
                   child: Material(
                     color: Colors.transparent,
                     child: Container(
-                      constraints: const BoxConstraints(maxHeight: 245),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: const Border(
-                          left: BorderSide(color: adminColor, width: 1.4),
-                          right: BorderSide(color: adminColor, width: 1.4),
-                          bottom: BorderSide(color: adminColor, width: 1.4),
-                        ),
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(10),
-                          bottomRight: Radius.circular(10),
-                        ),
-                      ),
+                      constraints: const BoxConstraints(maxHeight: 270),
+                      decoration: SphotDropdownVisuals.popupDecoration,
                       child: ScrollbarTheme(
-                        data: const ScrollbarThemeData(
-                          thumbColor: WidgetStatePropertyAll(adminColor),
-                          trackVisibility: WidgetStatePropertyAll(false),
-                        ),
+                        data: SphotDropdownVisuals.scrollbarTheme,
                         child: Scrollbar(
                           controller: scrollController,
                           thumbVisibility: true,
@@ -930,36 +917,15 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             ),
             Positioned(
               left: position.dx,
-              top: position.dy + size.height - 12,
+              top: position.dy + size.height - 1,
               width: size.width,
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  constraints: const BoxConstraints(maxHeight: 190),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: const Border(
-                      left: BorderSide(color: adminColor, width: 1.4),
-                      right: BorderSide(color: adminColor, width: 1.4),
-                      bottom: BorderSide(color: adminColor, width: 1.4),
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(10),
-                      bottomRight: Radius.circular(10),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.18),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
+                  constraints: const BoxConstraints(maxHeight: 270),
+                  decoration: SphotDropdownVisuals.popupDecoration,
                   child: ScrollbarTheme(
-                    data: const ScrollbarThemeData(
-                      thumbColor: MaterialStatePropertyAll(adminColor),
-                      trackVisibility: MaterialStatePropertyAll(false),
-                    ),
+                    data: SphotDropdownVisuals.scrollbarTheme,
                     child: Scrollbar(
                       controller: scrollController,
                       thumbVisibility: true,
@@ -1890,36 +1856,15 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             ),
             Positioned(
               left: position.dx,
-              top: position.dy + size.height - 12,
+              top: position.dy + size.height - 1,
               width: size.width,
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  constraints: const BoxConstraints(maxHeight: 190),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: const Border(
-                      left: BorderSide(color: adminColor, width: 1.4),
-                      right: BorderSide(color: adminColor, width: 1.4),
-                      bottom: BorderSide(color: adminColor, width: 1.4),
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(10),
-                      bottomRight: Radius.circular(10),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.18),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
+                  constraints: const BoxConstraints(maxHeight: 270),
+                  decoration: SphotDropdownVisuals.popupDecoration,
                   child: ScrollbarTheme(
-                    data: const ScrollbarThemeData(
-                      thumbColor: WidgetStatePropertyAll(adminColor),
-                      trackVisibility: WidgetStatePropertyAll(false),
-                    ),
+                    data: SphotDropdownVisuals.scrollbarTheme,
                     child: Scrollbar(
                       controller: scrollController,
                       thumbVisibility: true,
