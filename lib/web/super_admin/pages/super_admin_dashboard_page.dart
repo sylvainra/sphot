@@ -795,7 +795,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                       decoration: SphotDropdownVisuals.popupDecoration,
                   clipBehavior: Clip.antiAlias,
                       child: ScrollbarTheme(
-                        data: SphotDropdownVisuals.scrollbarTheme,
+                        data: SphotDropdownVisuals.scrollbarTheme.copyWith(mainAxisMargin: 16),
                         child: Scrollbar(
                           controller: scrollController,
                           thumbVisibility: true,
@@ -944,7 +944,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   decoration: SphotDropdownVisuals.popupDecoration,
                   clipBehavior: Clip.antiAlias,
                   child: ScrollbarTheme(
-                    data: SphotDropdownVisuals.scrollbarTheme,
+                    data: SphotDropdownVisuals.scrollbarTheme.copyWith(mainAxisMargin: 16),
                     child: Scrollbar(
                       controller: scrollController,
                       thumbVisibility: true,
@@ -1895,7 +1895,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   decoration: SphotDropdownVisuals.popupDecoration,
                   clipBehavior: Clip.antiAlias,
                   child: ScrollbarTheme(
-                    data: SphotDropdownVisuals.scrollbarTheme,
+                    data: SphotDropdownVisuals.scrollbarTheme.copyWith(mainAxisMargin: 16),
                     child: Scrollbar(
                       controller: scrollController,
                       thumbVisibility: true,
