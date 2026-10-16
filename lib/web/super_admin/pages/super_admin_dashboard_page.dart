@@ -755,11 +755,17 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     _dropdownOverlay?.remove();
     _dropdownOverlay = null;
 
-    final renderBox =
-        _filtersKey.currentContext!.findRenderObject() as RenderBox;
-
-    final position = renderBox.localToGlobal(Offset.zero);
-    final size = renderBox.size;
+    // Utiliser les coordonnées de la couche Overlay, comme Exercice :
+    // localToGlobal() seul décale le menu dans un Overlay imbriqué.
+    final overlay = Overlay.of(context);
+    final overlayBox = overlay.context.findRenderObject();
+    final target = _filtersKey.currentContext?.findRenderObject();
+    if (target is! RenderBox || overlayBox is! RenderBox) return;
+    final position = target.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+    final size = target.size;
 
     final scrollController = ScrollController();
 
@@ -893,18 +899,24 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       },
     );
 
-    Overlay.of(context).insert(_dropdownOverlay!);
+    overlay.insert(_dropdownOverlay!);
   }
 
   void _openAdminFiltersMenu() {
     _dropdownOverlay?.remove();
     _dropdownOverlay = null;
 
-    final renderBox =
-        _adminFiltersKey.currentContext!.findRenderObject() as RenderBox;
-
-    final position = renderBox.localToGlobal(Offset.zero);
-    final size = renderBox.size;
+    // Utiliser les coordonnées de la couche Overlay, comme Exercice :
+    // localToGlobal() seul décale le menu dans un Overlay imbriqué.
+    final overlay = Overlay.of(context);
+    final overlayBox = overlay.context.findRenderObject();
+    final target = _adminFiltersKey.currentContext?.findRenderObject();
+    if (target is! RenderBox || overlayBox is! RenderBox) return;
+    final position = target.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+    final size = target.size;
     final scrollController = ScrollController();
 
     _dropdownOverlay = OverlayEntry(
@@ -1000,7 +1012,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       },
     );
 
-    Overlay.of(context).insert(_dropdownOverlay!);
+    overlay.insert(_dropdownOverlay!);
   }
 
   Color _clusterBorderColor(List<Marker> markers) {
@@ -1844,11 +1856,17 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     _dropdownOverlay?.remove();
     _dropdownOverlay = null;
 
-    final renderBox =
-        _advertiserFiltersKey.currentContext!.findRenderObject() as RenderBox;
-
-    final position = renderBox.localToGlobal(Offset.zero);
-    final size = renderBox.size;
+    // Utiliser les coordonnées de la couche Overlay, comme Exercice :
+    // localToGlobal() seul décale le menu dans un Overlay imbriqué.
+    final overlay = Overlay.of(context);
+    final overlayBox = overlay.context.findRenderObject();
+    final target = _advertiserFiltersKey.currentContext?.findRenderObject();
+    if (target is! RenderBox || overlayBox is! RenderBox) return;
+    final position = target.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+    final size = target.size;
     final scrollController = ScrollController();
 
     _dropdownOverlay = OverlayEntry(
@@ -1947,7 +1965,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       },
     );
 
-    Overlay.of(context).insert(_dropdownOverlay!);
+    overlay.insert(_dropdownOverlay!);
   }
 
   bool _matchesAdvertiserFilter(Map<String, dynamic> data) {
