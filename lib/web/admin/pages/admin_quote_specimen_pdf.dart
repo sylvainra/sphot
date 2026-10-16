@@ -209,7 +209,7 @@ Future<Uint8List> buildAdminQuoteSpecimenPdf({
         child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end,
           children: [
             line('TOTAL ANNUEL ESTIMATIF HT : ' +
-                money(quote.amountExclTax),
+                money(quote!.amountExclTax),
                 bold: true, color: red, size: 13),
             line('TVA : à déterminer selon le régime applicable',
                 color: grey),

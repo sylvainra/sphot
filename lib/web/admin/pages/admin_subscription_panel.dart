@@ -2,7 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../../../services/published_commercial_quote_service.dart';
-import 'admin_quote_draft_preview_dialog.dart';
+import 'admin_quote_consultation.dart';
+import 'admin_quote_pdf_download.dart';
 
 class AdminSubscriptionPanel extends StatefulWidget {
   final String adminUid;
@@ -31,6 +32,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   final Set<String> _expandedSections = <String>{};
 
   String? _savingSection;
+  bool _preparingQuotePdf = false;
   bool? _draftNoOrderRequired;
   String? _draftPaymentMethod;
   String? _draftBillingRelation;
@@ -1246,10 +1248,28 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
     );
   }
 
-  /// Étape documentaire facultative.
-  /// Le moteur de calcul existant ne produit PAS encore de devis émis.
-  /// La génération finale utilisera un service serveur authentifié,
-  /// la grille publiée, le profil payeur vérifié et le traitement fiscal.
+  /// Document de consultation : affichage des champs disponibles,
+  /// mentions manquantes à compléter et prix HT uniquement si publié.
+  /// N'émet aucun devis officiel et ne contacte pas le transporteur email.
+  Future<void> _consultQuotePdf(Map<String, dynamic> data) async {
+    if (_preparingQuotePdf) return;
+    setState(() => _preparingQuotePdf = true);
+    try {
+      final bytes = await createConsultableAdminQuotePdf(data);
+      if (!mounted) return;
+      downloadAdminQuoteSpecimen(bytes, 'SPHOT-DEVIS-SPECIMEN.pdf');
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text(
+          'Impossible de préparer le PDF. Réessayez après actualisation.',
+        )),
+      );
+    } finally {
+      if (mounted) setState(() => _preparingQuotePdf = false);
+    }
+  }
+
   Widget _quotePreparationPanel({
     required Map<String, dynamic> data,
     required bool offerComplete,
@@ -1259,7 +1279,8 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          'Un devis peut être demandé avant toute commande ou paiement.',
+          'Le devis est consultable en PDF, même si certaines '
+          'informations ne sont pas encore renseignées.',
           style: TextStyle(
             color: _blue,
             fontSize: 12,
@@ -1268,9 +1289,9 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         ),
         const SizedBox(height: 6),
         const Text(
-          'Validité : 30 jours calendaires à compter de son émission, '
-          'sans dépasser le 31 décembre de l’année d’abonnement concernée. '
-          'La date exacte figurera sur le devis émis.',
+          'Les champs manquants apparaissent « À compléter ». '
+          'Le montant HT est affiché uniquement si la sélection des '
+          'postes et la grille tarifaire publiée sont disponibles.',
           style: TextStyle(color: _grey, fontSize: 11, height: 1.4),
         ),
         const SizedBox(height: 10),
@@ -1313,14 +1334,14 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         const Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.lock_outline_rounded, color: _orange, size: 19),
+            Icon(Icons.picture_as_pdf_outlined, color: _blue, size: 19),
             SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Immatriculation et fiscalité de SPHOT : '
-                'en attente de finalisation',
+                'Consultation disponible indépendamment des '
+                'informations encore à compléter.',
                 style: TextStyle(
-                  color: _orange, fontSize: 12,
+                  color: _blue, fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -1329,9 +1350,10 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         ),
         const SizedBox(height: 12),
         const Text(
-          'Dès que SPHOT sera juridiquement et fiscalement configuré, '
-          'le devis officiel sera numéroté automatiquement (DV-...), '
-          'valable 30 jours et conservé dans FACTURES & DOCUMENTS.',
+          'La version consultable n’est pas encore émise : '
+          'aucun numéro DV, aucune facture et aucun email. '
+          'Lors d’une émission officielle, les mentions et les dates '
+          'seront vérifiées et figées.',
           style: TextStyle(
             color: _grey, fontSize: 11, height: 1.4,
           ),
@@ -1341,14 +1363,20 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
           width: double.infinity,
           height: 44,
           child: OutlinedButton.icon(
-            onPressed: () => showAdminQuoteDraftPreview(
-              context: context,
-              data: data,
-            ),
-            icon: const Icon(Icons.visibility_outlined, size: 19),
-            label: const Text(
-              'VOIR LE BROUILLON',
-              style: TextStyle(fontWeight: FontWeight.w900),
+            onPressed: _preparingQuotePdf
+                ? null
+                : () => _consultQuotePdf(data),
+            icon: _preparingQuotePdf
+                ? const SizedBox(
+                    width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.picture_as_pdf_outlined, size: 19),
+            label: Text(
+              _preparingQuotePdf
+                  ? 'PRÉPARATION DU PDF...'
+                  : 'CONSULTER LE DEVIS (PDF)',
+              style: const TextStyle(fontWeight: FontWeight.w900),
             ),
             style: OutlinedButton.styleFrom(
               foregroundColor: _blue,
@@ -1361,8 +1389,8 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         ),
         const SizedBox(height: 6),
         const Text(
-          'Consultation des informations enregistrées : aucun devis '
-          'officiel créé, envoyé ou facturé.',
+          'Le PDF sera téléchargé pour consultation. '
+          'Aucune donnée commerciale n’est modifiée.',
           style: TextStyle(color: _grey, fontSize: 11),
         ),
         const SizedBox(height: 12),
@@ -1389,9 +1417,8 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         ),
         const SizedBox(height: 7),
         const Text(
-          'Votre dossier Admin peut être complet : le blocage vient '
-          'de SPHOT, qui n’est pas encore immatriculé. Aucun devis '
-          'n’est émis pour le moment. Le devis restera facultatif.',
+          'L’émission officielle et l’envoi du devis constituent '
+          'une opération distincte, encore désactivée.',
           style: TextStyle(color: _grey, fontSize: 11, height: 1.35),
         ),
       ],
@@ -1865,9 +1892,9 @@ _accordionSection(
                                   icon: Icons.request_quote_outlined,
                                   title: '03 — DEVIS (FACULTATIF)',
                                   description:
-                                      'Établir un devis officiel, facultatif et valable 30 jours.',
-                                  status: 'EN ATTENTE D’IMMATRICULATION SPHOT',
-                                  statusColor: _orange,
+                                      'Consulter le PDF avec les données disponibles.',
+                                  status: 'CONSULTATION DISPONIBLE',
+                                  statusColor: _green,
                                   child: _quotePreparationPanel(
                                     data: data,
                                     offerComplete: offerComplete,

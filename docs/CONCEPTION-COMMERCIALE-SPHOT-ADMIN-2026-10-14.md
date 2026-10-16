@@ -599,3 +599,14 @@ La disponibilité du **document de démonstration** est désormais **découplée
 - Les mentions **SPÉCIMEN - NON CONTRACTUEL**, **Numéro : non attribué**, **Date : non émis**, **TVA : à déterminer** et **TTC : non déterminé** sont volontairement explicites. Le véritable bouton **ÉTABLIR UN DEVIS** reste désactivé et la génération officielle protégée côté serveur est inchangée.
 - Ne pas confondre les clés déclaratives de `settings/sphotLegalIdentity` (affichage du spécimen) avec une source juridique fiscale certifiée permettant d'émettre un vrai devis ; cette dernière exigera une source serveur protégée.
 - **Validation recherchée désormais : visuelle et métier** : ouvrir le PDF dans Chrome à partir du portail Admin local, contrôler la présentation, les noms de postes, le payeur, les montants et les mentions. Vérification de compilation Flutter toujours requise sur le PC de développement. Aucun déploiement effectué.
+
+
+## 40. Consultation directe du devis, même avec des champs incomplets (16/10/2026)
+
+**Décision interface :** le bouton `VOIR LE BROUILLON` et la fenêtre de récapitulatif intermédiaire sont supprimés du parcours Admin. Dans `03 — DEVIS (FACULTATIF)`, `CONSULTER LE DEVIS (PDF)` télécharge directement le document consultable, sans condition de complétude du dossier. La rubrique devient `CONSULTATION DISPONIBLE`.
+
+- L'émetteur reste lié en lecture à `settings/sphotLegalIdentity` ; une valeur manquante est affichée `À compléter` dans le PDF. Même traitement pour les coordonnées du payeur et les autres informations non renseignées.
+- Si aucun poste n'est enregistré, le PDF mentionne `Postes de secours : à renseigner` ; si la grille publiée est absente, inaccessible ou incohérente avec la sélection, le PDF reste consultable **sans afficher de prix inventé** (`Tarification HT : à compléter ou à actualiser`). Si les données tarifaires sont valides, les lignes et le total HT sont affichés.
+- Le téléchargement local du spécimen PDF remplace l'ancienne fenêtre de brouillon. Un indicateur de chargement évite les clics répétitifs. Aucun envoi email, aucune modification du dossier, aucune numérotation DV, aucune émission officielle.
+- L'action `ÉTABLIR UN DEVIS` est conservée séparément et non activée : la consultation d'un document partiellement rempli n'est pas une émission officielle.
+- Contrôle attendu : compilation Web Flutter et ouverture du PDF depuis un dossier Admin complet puis incomplet. Ne pas lancer de déploiement sur Firebase.
