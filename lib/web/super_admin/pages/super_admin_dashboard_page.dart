@@ -801,6 +801,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                           thumbVisibility: true,
                           thickness: 10,
                           radius: const Radius.circular(10),
+                          // Le menu chevauche son en-tête de 12 px :
+                          // garder le curseur entièrement visible dans la zone.
+                          mainAxisMargin: 16,
+                          crossAxisMargin: 5,
                           child: ListView(
                             controller: scrollController,
                             padding: EdgeInsets.zero,
