@@ -183,10 +183,12 @@ class _PublicSphotPhotoGalleryState extends State<PublicSphotPhotoGallery> {
       );
     }
 
-    return Column(
-      children: [
-        Expanded(
-          child: PageView.builder(
+    return ColoredBox(
+      color: Colors.black,
+      child: Column(
+        children: [
+          Expanded(
+            child: PageView.builder(
             controller: _pageController,
             itemCount: widget.urls.length,
             onPageChanged: (index) => setState(() {
@@ -208,7 +210,8 @@ class _PublicSphotPhotoGalleryState extends State<PublicSphotPhotoGallery> {
                   tooltip: 'Photo précédente',
                   onPressed: _currentIndex > 0
                       ? () => _showPage(_currentIndex - 1) : null,
-                  icon: const Icon(Icons.chevron_left),
+                  icon: const Icon(Icons.chevron_left,
+                    color: Colors.white),
                 ),
                 Text(
                   (_currentIndex + 1).toString() +
@@ -221,12 +224,14 @@ class _PublicSphotPhotoGalleryState extends State<PublicSphotPhotoGallery> {
                   tooltip: 'Photo suivante',
                   onPressed: _currentIndex < widget.urls.length - 1
                       ? () => _showPage(_currentIndex + 1) : null,
-                  icon: const Icon(Icons.chevron_right),
+                  icon: const Icon(Icons.chevron_right,
+                    color: Colors.white),
                 ),
               ],
             ),
           ),
-      ],
+        ],
+      ),
     );
   }
 }
