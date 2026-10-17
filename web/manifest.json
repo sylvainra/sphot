@@ -1,11 +1,11 @@
 {
-    "name": "bathing_spots_app",
-    "short_name": "bathing_spots_app",
+    "name": "SPHOT",
+    "short_name": "SPHOT",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "SPHOT - Informations sur les zones de baignade.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
