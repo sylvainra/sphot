@@ -3905,16 +3905,48 @@ exports.syncPublicSpotOnWrite = onDocumentWritten(
       const publicReference = admin.firestore().collection("publicSpots")
           .doc(`${territoireId}__${spotId}`);
 
+      // Nettoyer les anciennes photos du SPHOT sans affecter celles des
+      // autres sites du territoire, y compris lors d'une suppression.
+      const previous = event.data.before.exists ?
+        event.data.before.data() || {} : {};
+      const current = event.data.after.exists ?
+        event.data.after.data() || {} : {};
+      const ownedPrefix =
+        "territoires/" + territoireId + "/spots/" + spotId + "/photos/";
+      const paths = (data) => {
+        const entries = Array.isArray(data.photoSphotPhotos) ?
+          data.photoSphotPhotos : [];
+        const values = [
+          data.photoSphotStoragePath,
+          ...entries.map((photo) => photo && photo.storagePath),
+        ];
+        return new Set(values.filter((path) =>
+          typeof path === "string" && path.startsWith(ownedPrefix) &&
+          !path.includes("..")));
+      };
+      const previousPaths = paths(previous);
+      const currentPaths = paths(current);
+
       if (!event.data.after.exists) {
         await publicReference.delete();
-        return;
+      } else {
+        // La présence sur la carte est indépendante de l'abonnement.
+        await reconcilePublicTerritory(territoireId, true);
       }
 
-      // La présence sur la carte est indépendante de l'essai et de
-      // l'abonnement. Dès qu'un SPHOT existe dans le territoire, sa
-      // projection publique est créée ou mise à jour. Les droits commerciaux
-      // ne pilotent que les informations opérationnelles temps réel.
-      await reconcilePublicTerritory(territoireId, true);
+      const removed = [...previousPaths]
+          .filter((path) => !currentPaths.has(path));
+      if (removed.length > 0) {
+        const bucket = admin.storage().bucket(
+            "sphot-ab80b.firebasestorage.app");
+        for (const path of removed) {
+          try {
+            await bucket.file(path).delete({ignoreNotFound: true});
+          } catch (error) {
+            console.warn("Nettoyage photo SPHOT différé:", error.message);
+          }
+        }
+      }
     },
 );
 
