@@ -93,6 +93,7 @@ function buildPublicSpot(
     "webcam",
     "mediaType",
     "photoSphotUrl",
+    "photoSphotPhotos",
     "photoSphotStoragePath",
     "photoSphotFileName",
     "photoSphotMimeType",
@@ -133,6 +134,23 @@ function buildPublicSpot(
   if (webcamUrl) {
     result.adresseWebcam = webcamUrl;
   }
+
+  // La carte ne reçoit que les URL, jamais les fichiers photo.
+  // Leur téléchargement appartient exclusivement à la fiche ouverte.
+  const storedPhotos = Array.isArray(spot.photoSphotPhotos) ?
+    spot.photoSphotPhotos : [];
+  const photoUrls = storedPhotos
+      .slice(0, 3)
+      .map((photo) => photo && typeof photo.url === "string" ?
+        photo.url.trim() : "")
+      .filter((url) => /^https:\/\//i.test(url));
+  if (photoUrls.length === 0 &&
+      typeof spot.photoSphotUrl === "string" &&
+      /^https:\/\//i.test(spot.photoSphotUrl.trim())) {
+    photoUrls.push(spot.photoSphotUrl.trim());
+  }
+  result.photoSphotUrls = spot.mediaType === "webcam" && webcamUrl ?
+    [] : photoUrls;
 
   const supervised = isSupervisedSpotData(spot);
 
