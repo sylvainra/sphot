@@ -122,16 +122,30 @@ class _PublicWebcamViewState extends State<PublicWebcamView> {
   }
 }
 
+// Même dégradé rouge -> orange -> jaune que les contours de la fiche SPHOT.
+const LinearGradient _defaultSphotPhotoGradient = LinearGradient(
+  begin: Alignment.topCenter,
+  end: Alignment.bottomCenter,
+  colors: <Color>[
+    Color(0xFFE72B20),
+    Color(0xFFF97316),
+    Color(0xFFF6B51B),
+  ],
+  stops: <double>[0, 0.56, 1],
+);
+
 // Cette galerie n'est construite que dans la fiche d'un SPHOT sélectionné.
 class PublicSphotPhotoGallery extends StatefulWidget {
   const PublicSphotPhotoGallery({
     super.key,
     required this.urls,
     this.initialIndex = 0,
+    this.navigationGradient = _defaultSphotPhotoGradient,
   });
 
   final List<String> urls;
   final int initialIndex;
+  final Gradient navigationGradient;
 
   @override
   State<PublicSphotPhotoGallery> createState() =>
@@ -183,12 +197,10 @@ class _PublicSphotPhotoGalleryState extends State<PublicSphotPhotoGallery> {
       );
     }
 
-    return ColoredBox(
-      color: Colors.black,
-      child: Column(
-        children: [
-          Expanded(
-            child: PageView.builder(
+    return Column(
+      children: [
+        Expanded(
+          child: PageView.builder(
             controller: _pageController,
             itemCount: widget.urls.length,
             onPageChanged: (index) => setState(() {
@@ -201,37 +213,54 @@ class _PublicSphotPhotoGalleryState extends State<PublicSphotPhotoGallery> {
           ),
         ),
         if (widget.urls.length > 1)
-          SizedBox(
+          Container(
             height: 38,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  tooltip: 'Photo précédente',
-                  onPressed: _currentIndex > 0
-                      ? () => _showPage(_currentIndex - 1) : null,
-                  icon: const Icon(Icons.chevron_left,
-                    color: Colors.white),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: widget.navigationGradient,
+            ),
+            child: Center(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xF5FFFFFF),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                Text(
-                  (_currentIndex + 1).toString() +
-                      ' / ' + widget.urls.length.toString(),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800, color: Colors.white,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Photo précédente',
+                      onPressed: _currentIndex > 0
+                          ? () => _showPage(_currentIndex - 1)
+                          : null,
+                      icon: const Icon(
+                        Icons.chevron_left,
+                        color: Color(0xFFE72B20),
+                      ),
+                    ),
+                    Text(
+                      '${_currentIndex + 1} / ${widget.urls.length}',
+                      style: const TextStyle(
+                        color: Color(0xFFE72B20),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Photo suivante',
+                      onPressed: _currentIndex < widget.urls.length - 1
+                          ? () => _showPage(_currentIndex + 1)
+                          : null,
+                      icon: const Icon(
+                        Icons.chevron_right,
+                        color: Color(0xFFE72B20),
+                      ),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  tooltip: 'Photo suivante',
-                  onPressed: _currentIndex < widget.urls.length - 1
-                      ? () => _showPage(_currentIndex + 1) : null,
-                  icon: const Icon(Icons.chevron_right,
-                    color: Colors.white),
-                ),
-              ],
+              ),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -240,12 +269,14 @@ class PublicWebcamFullScreenPage extends StatelessWidget {
   final String url;
   final bool forceImage;
   final List<String> photoUrls;
+  final Gradient photoNavigationGradient;
 
   const PublicWebcamFullScreenPage({
     super.key,
     required this.url,
     this.forceImage = false,
     this.photoUrls = const <String>[],
+    this.photoNavigationGradient = _defaultSphotPhotoGradient,
   });
 
   @override
@@ -256,7 +287,9 @@ class PublicWebcamFullScreenPage extends StatelessWidget {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: Text(
-          forceImage ? 'PHOTO DU SPHOT' : 'WEBCAM EN DIRECT',
+          forceImage
+              ? (photoUrls.length > 1 ? 'PHOTOS DU SPHOT' : 'PHOTO DU SPHOT')
+              : 'WEBCAM EN DIRECT',
           style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
@@ -264,7 +297,10 @@ class PublicWebcamFullScreenPage extends StatelessWidget {
         child: AspectRatio(
           aspectRatio: 16 / 9,
           child: forceImage && photoUrls.length > 1
-              ? PublicSphotPhotoGallery(urls: photoUrls)
+              ? PublicSphotPhotoGallery(
+                  urls: photoUrls,
+                  navigationGradient: photoNavigationGradient,
+                )
               : PublicWebcamView(url: url, forceImage: forceImage),
         ),
       ),
