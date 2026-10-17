@@ -1,6 +1,6 @@
-# bathing_spots_app
+# SPHOT
 
-A new Flutter project.
+Application SPHOT : informations sur les zones de baignade, portails d’administration, sauveteurs et annonceurs.
 
 ## Getting Started
 
