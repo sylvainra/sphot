@@ -230,13 +230,16 @@ class _PublicSphotPhotoGalleryState extends State<PublicSphotPhotoGallery> {
                   children: [
                     IconButton(
                       tooltip: 'Photo précédente',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 34, minHeight: 34,
+                      ),
+                      color: const Color(0xFFE72B20),
+                      disabledColor: const Color(0x66E72B20),
                       onPressed: _currentIndex > 0
                           ? () => _showPage(_currentIndex - 1)
                           : null,
-                      icon: const Icon(
-                        Icons.chevron_left,
-                        color: Color(0xFFE72B20),
-                      ),
+                      icon: const Icon(Icons.chevron_left, size: 23),
                     ),
                     Text(
                       '${_currentIndex + 1} / ${widget.urls.length}',
@@ -247,13 +250,16 @@ class _PublicSphotPhotoGalleryState extends State<PublicSphotPhotoGallery> {
                     ),
                     IconButton(
                       tooltip: 'Photo suivante',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 34, minHeight: 34,
+                      ),
+                      color: const Color(0xFFE72B20),
+                      disabledColor: const Color(0x66E72B20),
                       onPressed: _currentIndex < widget.urls.length - 1
                           ? () => _showPage(_currentIndex + 1)
                           : null,
-                      icon: const Icon(
-                        Icons.chevron_right,
-                        color: Color(0xFFE72B20),
-                      ),
+                      icon: const Icon(Icons.chevron_right, size: 23),
                     ),
                   ],
                 ),
