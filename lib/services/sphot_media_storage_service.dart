@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image/image.dart' as img;
 
 class SphotPhotoSelection {
   final Uint8List bytes;
@@ -37,6 +38,8 @@ class SphotPhotoUploadResult {
 
 class SphotMediaStorageService {
   static const int maxPhotoSizeBytes = 5 * 1024 * 1024;
+  static const int targetStoredPhotoSizeBytes = 350 * 1024;
+  static const int maxStoredPhotoDimension = 1600;
 
   static const Set<String> allowedPhotoExtensions = {
     'png',
@@ -74,16 +77,95 @@ class SphotMediaStorageService {
       );
     }
 
+    return optimizePhoto(bytes: bytes, fileName: file.name);
+  }
+
+  /// Réduit le volume des nouveaux clichés avant leur transfert à Firebase.
+  /// Les photos déjà légères sont conservées sans modification.
+  static SphotPhotoSelection optimizePhoto({
+    required Uint8List bytes,
+    required String fileName,
+  }) {
+    final extension = _extensionFromName(fileName).toLowerCase();
+    if (!allowedPhotoExtensions.contains(extension)) {
+      throw StateError('Format non accepté. Utilisez PNG, JPG, JPEG ou WebP.');
+    }
+    if (bytes.isEmpty) {
+      throw StateError('La photo sélectionnée est vide.');
+    }
     if (bytes.length > maxPhotoSizeBytes) {
       throw StateError('La photo ne doit pas dépasser 5 Mo.');
     }
 
-    return SphotPhotoSelection(
-      bytes: bytes,
-      fileName: file.name,
-      extension: extension,
-      mimeType: _mimeTypeForExtension(extension),
-      sizeBytes: bytes.length,
+    img.Image? decoded;
+    try {
+      decoded = img.decodeImage(bytes);
+    } catch (_) {
+      throw StateError('Le fichier image ne peut pas être lu.');
+    }
+    if (decoded == null) {
+      throw StateError('Le fichier image ne peut pas être lu.');
+    }
+
+    final originalMaxSide =
+        decoded.width > decoded.height ? decoded.width : decoded.height;
+    if (originalMaxSide <= maxStoredPhotoDimension &&
+        bytes.length <= targetStoredPhotoSizeBytes) {
+      return SphotPhotoSelection(
+        bytes: bytes,
+        fileName: fileName,
+        extension: extension,
+        mimeType: _mimeTypeForExtension(extension),
+        sizeBytes: bytes.length,
+      );
+    }
+
+    // Orientation des photos prises avec un téléphone conservée après JPEG.
+    final oriented = img.bakeOrientation(decoded);
+    final sourceMaxSide =
+        oriented.width > oriented.height ? oriented.width : oriented.height;
+
+    for (final maxSide in <int>[1600, 1280, 960, 720, 560]) {
+      final side = sourceMaxSide < maxSide ? sourceMaxSide : maxSide;
+      final img.Image scaled;
+      if (side < sourceMaxSide) {
+        scaled = oriented.width >= oriented.height
+            ? img.copyResize(oriented, width: side)
+            : img.copyResize(oriented, height: side);
+      } else {
+        scaled = oriented;
+      }
+
+      // Une transparence PNG/WebP devient blanche, pas noire, en JPEG.
+      final img.Image toEncode;
+      if (scaled.hasAlpha) {
+        final background = img.Image(
+          width: scaled.width, height: scaled.height, numChannels: 3,
+        );
+        img.fill(background, color: img.ColorRgb8(255, 255, 255));
+        img.compositeImage(background, scaled);
+        toEncode = background;
+      } else {
+        toEncode = scaled;
+      }
+
+      for (final quality in <int>[80, 68, 54]) {
+        final optimized = img.encodeJpg(toEncode, quality: quality);
+        if (optimized.length <= targetStoredPhotoSizeBytes) {
+          final lastDot = fileName.lastIndexOf('.');
+          final name = lastDot > 0 ? fileName.substring(0, lastDot) : fileName;
+          return SphotPhotoSelection(
+            bytes: optimized,
+            fileName: '$name.jpg',
+            extension: 'jpg',
+            mimeType: 'image/jpeg',
+            sizeBytes: optimized.length,
+          );
+        }
+      }
+    }
+    throw StateError(
+      'Photo trop volumineuse après optimisation. Choisissez un autre cliché.',
     );
   }
 
