@@ -4906,6 +4906,38 @@ async function resolveSauveteurAssignmentPeriods(
  * @param {string} login Identifiant du compte.
  * @return {Promise<Object>} Contexte opérationnel.
  */
+/**
+ * Fournit au sauveteur authentifié les libellés des postes déjà affectés.
+ * Cette lecture serveur ne donne aucun droit supplémentaire de publication.
+ *
+ * @param {FirebaseFirestore.Firestore} db Instance Firestore.
+ * @param {string} territoireId Territoire du sauveteur.
+ * @param {Array<string>} assignedSpotIds Identifiants déjà autorisés.
+ * @return {Promise<Array<Object>>} Postes existants et leurs libellés.
+ */
+async function sauveteurAssignedSpotDetails(db, territoireId, assignedSpotIds) {
+  if (!territoireId || assignedSpotIds.length === 0) return [];
+
+  const references = assignedSpotIds.map((spotId) => {
+    return db.collection("territoires")
+        .doc(territoireId)
+        .collection("spots")
+        .doc(spotId);
+  });
+
+  const snapshots = await db.getAll(...references);
+  return snapshots.filter((snapshot) => snapshot.exists).map((snapshot) => {
+    const data = snapshot.data() || {};
+    const idSphot = (data.idSphot || "").toString().trim();
+    const nomSecours = (data.nomSecours || "").toString().trim();
+    const nomSphot = (data.nomSphot || "").toString().trim();
+    const label = [idSphot, nomSecours || nomSphot]
+        .filter((value) => value)
+        .join(" - ");
+    return {id: snapshot.id, label: label || snapshot.id};
+  }).sort((first, second) => first.label.localeCompare(second.label, "fr"));
+}
+
 async function resolveSauveteurOperationalContext(accountData, login) {
   const db = admin.firestore();
   const territoireId = (accountData.territoireId || "").toString().trim();
@@ -4953,6 +4985,12 @@ async function resolveSauveteurOperationalContext(accountData, login) {
           .map((value) => (value || "").toString().trim())
           .filter((value) => value),
   )];
+
+  const assignedSpotDetails = await sauveteurAssignedSpotDetails(
+      db,
+      territoireId,
+      assignedSpotIds,
+  );
 
   const rawPeriods = Array.isArray(profileData.periodesSurveillance) ?
     profileData.periodesSurveillance :
@@ -5010,6 +5048,7 @@ async function resolveSauveteurOperationalContext(accountData, login) {
     functions,
     userRole,
     assignedSpotIds,
+    assignedSpotDetails,
     realtimeSpotIds,
     assignedPeriodIds,
     activePeriodIds: assignmentPeriods.activePeriodIds,
@@ -5394,6 +5433,7 @@ exports.loginSauveteur = onRequest(
           userRole: context.userRole,
           fonctions: context.functions,
           postesAffectes: context.assignedSpotIds,
+          postesAffectesDetails: context.assignedSpotDetails,
           periodesSurveillance: context.assignedPeriodIds,
           activePeriodIds: context.activePeriodIds,
           diffusionAccessGranted: context.diffusionAccessGranted,
@@ -5458,6 +5498,7 @@ exports.getSauveteurSessionState = onRequest(
           userRole: context.userRole,
           fonctions: context.functions,
           postesAffectes: context.assignedSpotIds,
+          postesAffectesDetails: context.assignedSpotDetails,
           periodesSurveillance: context.assignedPeriodIds,
           activePeriodIds: context.activePeriodIds,
           diffusionAccessGranted: context.diffusionAccessGranted,
