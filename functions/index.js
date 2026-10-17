@@ -93,7 +93,6 @@ function buildPublicSpot(
     "webcam",
     "mediaType",
     "photoSphotUrl",
-    "photoSphotPhotos",
     "photoSphotStoragePath",
     "photoSphotFileName",
     "photoSphotMimeType",
