@@ -76,6 +76,43 @@ class _SuperAdminTileStyle {
   });
 }
 
+class _SphotPhotoDraft {
+  const _SphotPhotoDraft({
+    this.url = '',
+    this.storagePath = '',
+    this.fileName = '',
+    this.mimeType = '',
+    this.sizeBytes,
+    this.pending,
+  });
+
+  final String url;
+  final String storagePath;
+  final String fileName;
+  final String mimeType;
+  final int? sizeBytes;
+  final SphotPhotoSelection? pending;
+
+  Map<String, dynamic> get storedData => <String, dynamic>{
+    'url': url,
+    'storagePath': storagePath,
+    'fileName': fileName,
+    'mimeType': mimeType,
+    'sizeBytes': sizeBytes,
+  };
+
+  factory _SphotPhotoDraft.fromData(Map<dynamic, dynamic> data) {
+    final size = data['sizeBytes'];
+    return _SphotPhotoDraft(
+      url: (data['url'] ?? '').toString().trim(),
+      storagePath: (data['storagePath'] ?? '').toString().trim(),
+      fileName: (data['fileName'] ?? '').toString().trim(),
+      mimeType: (data['mimeType'] ?? '').toString().trim(),
+      sizeBytes: size is num ? size.toInt() : null,
+    );
+  }
+}
+
 class AdminDashboardPage extends StatefulWidget {
   final String adminUid;
   final String territoireId;
@@ -169,12 +206,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       TextEditingController();
 
   String _sphotMediaMode = _sphotMediaPhoto;
-  SphotPhotoSelection? _selectedSphotPhoto;
-  String _sphotPhotoUrl = '';
-  String _sphotPhotoStoragePath = '';
-  String _sphotPhotoFileName = '';
-  String _sphotPhotoMimeType = '';
-  int? _sphotPhotoFileSizeBytes;
+  final List<_SphotPhotoDraft> _sphotPhotos = <_SphotPhotoDraft>[];
   String? _sphotPhotoErrorMessage;
 
   final TextEditingController _sauveteurNomController = TextEditingController();
