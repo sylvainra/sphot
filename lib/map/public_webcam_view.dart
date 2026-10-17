@@ -202,15 +202,22 @@ class _PublicSphotPhotoGalleryState extends State<PublicSphotPhotoGallery> {
     return Column(
       children: [
         Expanded(
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: widget.urls.length,
-            onPageChanged: (index) => setState(() {
-              _currentIndex = index;
-            }),
-            itemBuilder: (_, index) => PublicWebcamView(
-              url: widget.urls[index],
-              forceImage: true,
+          child: ClipRRect(
+            // Dans le volet SPHOT, la photo garde ses quatre coins arrondis.
+            // Le plein écran conserve son affichage sur fond noir.
+            borderRadius: widget.darkNavigationBackground
+                ? BorderRadius.zero
+                : BorderRadius.circular(14),
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: widget.urls.length,
+              onPageChanged: (index) => setState(() {
+                _currentIndex = index;
+              }),
+              itemBuilder: (_, index) => PublicWebcamView(
+                url: widget.urls[index],
+                forceImage: true,
+              ),
             ),
           ),
         ),
