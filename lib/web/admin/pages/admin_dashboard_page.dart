@@ -8251,25 +8251,26 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     ).hasMatch(normalized);
   }
 
-  Future<void> _pickSphotPhoto() async {
+  Future<void> _pickSphotPhoto(int index) async {
     try {
       final selection = await SphotMediaStorageService.pickPhoto();
-
-      if (selection == null || !mounted) {
-        return;
-      }
-
+      if (selection == null || !mounted) return;
       setState(() {
-        _selectedSphotPhoto = selection;
-        _sphotMediaMode = _sphotMediaPhoto;
-        _sphotPhotoFileName = selection.fileName;
-        _sphotPhotoMimeType = selection.mimeType;
-        _sphotPhotoFileSizeBytes = selection.sizeBytes;
+        final draft = _SphotPhotoDraft(
+          fileName: selection.fileName,
+          mimeType: selection.mimeType,
+          sizeBytes: selection.sizeBytes,
+          pending: selection,
+        );
+        if (index < _sphotPhotos.length) {
+          _sphotPhotos[index] = draft;
+        } else if (_sphotPhotos.length < 3) {
+          _sphotPhotos.add(draft);
+        }
         _sphotPhotoErrorMessage = null;
       });
     } catch (error) {
       if (!mounted) return;
-
       setState(() {
         _sphotPhotoErrorMessage =
             error.toString().replaceFirst('Bad state: ', '');
@@ -8279,49 +8280,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   String _formatSphotPhotoSize(int? bytes) {
     if (bytes == null || bytes <= 0) return '';
-
     if (bytes >= 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} Mo';
+      return (bytes / (1024 * 1024)).toStringAsFixed(2) + ' Mo';
     }
-
-    return '${(bytes / 1024).toStringAsFixed(1)} Ko';
+    return (bytes / 1024).toStringAsFixed(1) + ' Ko';
   }
 
   Widget _buildSphotMediaEditor() {
     final isWebcam = _sphotMediaMode == _sphotMediaWebcam;
-    final selectedPhoto = _selectedSphotPhoto;
-    final hasPhoto =
-        selectedPhoto != null || _sphotPhotoUrl.trim().isNotEmpty;
-
-    Widget photoPreview;
-
-    if (selectedPhoto != null) {
-      photoPreview = Image.memory(
-        selectedPhoto.bytes,
-        fit: BoxFit.cover,
-      );
-    } else if (_sphotPhotoUrl.trim().isNotEmpty) {
-      photoPreview = Image.network(
-        _sphotPhotoUrl,
-        fit: BoxFit.cover,
-        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-        errorBuilder: (_, __, ___) => const Center(
-          child: Icon(
-            Icons.broken_image_outlined,
-            color: Colors.grey,
-            size: 34,
-          ),
-        ),
-      );
-    } else {
-      photoPreview = const Center(
-        child: Icon(
-          Icons.add_photo_alternate_outlined,
-          color: adminColor,
-          size: 38,
-        ),
-      );
-    }
 
     Widget modeButton({
       required String mode,
@@ -8329,27 +8295,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       required String label,
     }) {
       final selected = _sphotMediaMode == mode;
-
       return Expanded(
         child: OutlinedButton.icon(
-          onPressed: () {
-            setState(() {
-              _sphotMediaMode = mode;
-              _sphotPhotoErrorMessage = null;
-            });
-          },
+          onPressed: () => setState(() {
+            _sphotMediaMode = mode;
+            _sphotPhotoErrorMessage = null;
+          }),
           icon: Icon(icon, size: 18),
-          label: Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.w900),
-          ),
+          label: Text(label,
+            style: const TextStyle(fontWeight: FontWeight.w900)),
           style: OutlinedButton.styleFrom(
             foregroundColor: selected ? Colors.white : adminColor,
             backgroundColor: selected ? adminColor : Colors.white,
             side: const BorderSide(color: adminColor, width: 1.4),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+              borderRadius: BorderRadius.circular(12)),
             padding: const EdgeInsets.symmetric(vertical: 12),
           ),
         ),
@@ -8359,21 +8319,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            modeButton(
-              mode: _sphotMediaWebcam,
-              icon: Icons.videocam_outlined,
-              label: 'WEBCAM',
-            ),
-            const SizedBox(width: 8),
-            modeButton(
-              mode: _sphotMediaPhoto,
-              icon: Icons.photo_outlined,
-              label: 'PHOTO',
-            ),
-          ],
-        ),
+        Row(children: [
+          modeButton(mode: _sphotMediaWebcam,
+            icon: Icons.videocam_outlined, label: 'WEBCAM'),
+          const SizedBox(width: 8),
+          modeButton(mode: _sphotMediaPhoto,
+            icon: Icons.photo_outlined, label: 'PHOTOS'),
+        ]),
         const SizedBox(height: 10),
         if (isWebcam)
           _sphotEditorField(
@@ -8390,80 +8342,89 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: _sphotPhotoErrorMessage == null
-                    ? adminColor.withOpacity(0.55)
-                    : redColor,
+                    ? adminColor.withOpacity(0.55) : redColor,
                 width: 1.3,
               ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  height: 126,
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: photoPreview,
-                ),
+                const Text('3 PHOTOS MAXIMUM PAR SPHOT · SANS WEBCAM',
+                  style: TextStyle(color: adminColor,
+                    fontSize: 11, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 10),
-                if (_sphotPhotoFileName.trim().isNotEmpty)
-                  Text(
-                    _sphotPhotoFileName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: adminColor,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
-                    ),
+                for (var i = 0; i < _sphotPhotos.length; i++) ...[
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 94, height: 70,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(9),
+                          child: _sphotPhotos[i].pending != null
+                              ? Image.memory(_sphotPhotos[i].pending!.bytes,
+                                  fit: BoxFit.cover)
+                              : Image.network(_sphotPhotos[i].url,
+                                  fit: BoxFit.cover,
+                                  webHtmlElementStrategy:
+                                      WebHtmlElementStrategy.prefer,
+                                  errorBuilder: (_, __, ___) =>
+                                      const Icon(Icons.broken_image_outlined)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('PHOTO ' + (i + 1).toString(),
+                            style: const TextStyle(color: adminColor,
+                              fontWeight: FontWeight.w900)),
+                          Text(_sphotPhotos[i].fileName.isNotEmpty
+                              ? _sphotPhotos[i].fileName : 'Photo enregistrée',
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11)),
+                          Text(_formatSphotPhotoSize(_sphotPhotos[i].sizeBytes),
+                            style: const TextStyle(
+                              color: Colors.black54, fontSize: 10)),
+                        ],
+                      )),
+                      IconButton(
+                        tooltip: 'Remplacer la photo',
+                        onPressed: () => _pickSphotPhoto(i),
+                        icon: const Icon(Icons.edit_outlined,
+                          color: adminColor)),
+                      IconButton(
+                        tooltip: 'Supprimer la photo',
+                        onPressed: () => setState(() {
+                          _sphotPhotos.removeAt(i);
+                        }),
+                        icon: const Icon(Icons.delete_outline,
+                          color: redColor)),
+                    ],
                   ),
-                if (_formatSphotPhotoSize(_sphotPhotoFileSizeBytes).isNotEmpty)
-                  Text(
-                    _formatSphotPhotoSize(_sphotPhotoFileSizeBytes),
-                    style: TextStyle(
-                      color: adminColor.withOpacity(0.65),
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                if (_sphotPhotoFileName.trim().isNotEmpty)
                   const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: _pickSphotPhoto,
-                  icon: const Icon(Icons.upload_file_rounded),
-                  label: Text(
-                    hasPhoto ? 'REMPLACER LA PHOTO' : 'CHOISIR UNE PHOTO',
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: adminColor,
-                    side: const BorderSide(color: adminColor, width: 1.4),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                ],
+                if (_sphotPhotos.length < 3)
+                  OutlinedButton.icon(
+                    onPressed: () => _pickSphotPhoto(_sphotPhotos.length),
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    label: const Text('AJOUTER UNE PHOTO',
+                      style: TextStyle(fontWeight: FontWeight.w900)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: adminColor,
+                      side: const BorderSide(color: adminColor, width: 1.4),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
-                ),
                 const SizedBox(height: 6),
-                const Text(
-                  'PNG, JPG, JPEG ou WebP · 5 Mo maximum.',
-                  style: TextStyle(
-                    color: Colors.black54,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                const Text('PNG, JPG, JPEG ou WebP · 5 Mo maximum par photo.',
+                  style: TextStyle(color: Colors.black54,
+                    fontSize: 10.5, fontWeight: FontWeight.w600)),
                 if (_sphotPhotoErrorMessage != null) ...[
                   const SizedBox(height: 6),
-                  Text(
-                    _sphotPhotoErrorMessage!,
-                    style: const TextStyle(
-                      color: redColor,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                  Text(_sphotPhotoErrorMessage!,
+                    style: const TextStyle(color: redColor,
+                      fontSize: 10.5, fontWeight: FontWeight.w800)),
                 ],
               ],
             ),
@@ -8490,12 +8451,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _sphotPhoneController.clear();
     _sphotWebcamUrlController.clear();
     _sphotMediaMode = _sphotMediaPhoto;
-    _selectedSphotPhoto = null;
-    _sphotPhotoUrl = '';
-    _sphotPhotoStoragePath = '';
-    _sphotPhotoFileName = '';
-    _sphotPhotoMimeType = '';
-    _sphotPhotoFileSizeBytes = null;
+    _sphotPhotos.clear();
     _sphotPhotoErrorMessage = null;
   }
 
