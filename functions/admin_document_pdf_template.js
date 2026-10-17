@@ -130,7 +130,6 @@ function simplePdfBuffer({
               align: "right",
             },
         );
-
     }
 
     doc.y = 116;
@@ -308,7 +307,7 @@ function simplePdfBuffer({
 
     if (quoteBranding) {
       // Marker Fire rouge fixe en bas de page, séparé de la signature.
-      doc.image(quoteFire, doc.page.width / 2 - 16, 
+      doc.image(quoteFire, doc.page.width / 2 - 16,
           doc.page.height - 111, {fit: [32, 48]});
     }
 
