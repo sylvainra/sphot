@@ -57,6 +57,7 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
   Timer? _modeRefreshTimer;
   bool _refreshingMode = false;
   bool _loadingSpots = true;
+  int _assignedSpotLoadVersion = 0;
   final List<SauveteurAssignedSpot> _assignedSpots = [];
   String? _selectedSpotId;
 
@@ -170,6 +171,23 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
               .toList()
           : <String>[];
 
+      // Les libellés sont fournis par la session authentifiée, même en
+      // SPHOT OFF. Ne dépend pas des permissions Firestore du navigateur.
+      final rawSpotDetails = decoded['postesAffectesDetails'];
+      final hasServerSpotDetails = rawSpotDetails is List;
+      final serverSpots = <SauveteurAssignedSpot>[];
+      if (rawSpotDetails is List) {
+        for (final entry in rawSpotDetails) {
+          if (entry is! Map) continue;
+          final id = (entry['id'] ?? '').toString().trim();
+          if (id.isEmpty || !currentSpots.contains(id)) continue;
+          final label = (entry['label'] ?? '').toString().trim();
+          serverSpots.add(
+            SauveteurAssignedSpot(id: id, label: label.isEmpty ? id : label),
+          );
+        }
+      }
+
       setState(() {
         _userRole = (decoded['userRole'] ?? _userRole).toString();
         _sphotMode =
@@ -179,9 +197,26 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
         _postesAffectes = currentSpots;
         _canManageRestrictedOperationalData =
             decoded['canManageRestrictedOperationalData'] == true;
+
+        if (hasServerSpotDetails) {
+          // Ignore toute ancienne lecture Firestore encore en cours.
+          _assignedSpotLoadVersion++;
+          _assignedSpots
+            ..clear()
+            ..addAll(serverSpots);
+          if (_selectedSpotId == null ||
+              !_assignedSpots.any((spot) => spot.id == _selectedSpotId)) {
+            _selectedSpotId =
+                _assignedSpots.isEmpty ? null : _assignedSpots.first.id;
+          }
+          _loadingSpots = false;
+        }
       });
 
-      await _loadAssignedSpots();
+      // Compatibilité avec l'ancienne version du serveur durant le déploiement.
+      if (!hasServerSpotDetails) {
+        await _loadAssignedSpots();
+      }
     } catch (_) {
       // Le dernier état connu reste affiché. Les écritures sensibles sont
       // de toute façon revérifiées côté Cloud Functions.
@@ -191,13 +226,14 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
   }
 
   Future<void> _loadAssignedSpots() async {
+    final loadVersion = ++_assignedSpotLoadVersion;
     try {
       final spots = await SauveteurLivePublicationService.loadAssignedSpots(
         territoireId: widget.territoireId,
         postesAffectes: _postesAffectes,
       );
 
-      if (!mounted) return;
+      if (!mounted || loadVersion != _assignedSpotLoadVersion) return;
 
       setState(() {
         _assignedSpots
@@ -214,8 +250,9 @@ class _SauveteurMenuPageState extends State<SauveteurMenuPage>
 
         _loadingSpots = false;
       });
-    } catch (_) {
-      if (!mounted) return;
+    } catch (error) {
+      if (!mounted || loadVersion != _assignedSpotLoadVersion) return;
+      debugPrint('Chargement des postes sauveteur impossible : $error');
       setState(() {
         _assignedSpots.clear();
         _selectedSpotId = null;
