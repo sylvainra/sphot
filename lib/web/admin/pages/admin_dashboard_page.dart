@@ -8788,14 +8788,26 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             data['webcam'],
       );
 
-      _selectedSphotPhoto = null;
-      _sphotPhotoUrl = storedPhotoUrl;
-      _sphotPhotoStoragePath = _cleanText(data['photoSphotStoragePath']);
-      _sphotPhotoFileName = _cleanText(data['photoSphotFileName']);
-      _sphotPhotoMimeType = _cleanText(data['photoSphotMimeType']);
-      final storedPhotoSize = data['photoSphotFileSizeBytes'];
-      _sphotPhotoFileSizeBytes =
-          storedPhotoSize is num ? storedPhotoSize.toInt() : null;
+      _sphotPhotos.clear();
+      final storedPhotos = data['photoSphotPhotos'];
+      if (storedPhotos is List) {
+        for (final raw in storedPhotos) {
+          if (raw is! Map || _sphotPhotos.length >= 3) continue;
+          final photo = _SphotPhotoDraft.fromData(raw);
+          if (photo.url.isNotEmpty) _sphotPhotos.add(photo);
+        }
+      }
+      // Compatibilité avec les anciennes fiches à photo unique.
+      if (_sphotPhotos.isEmpty && storedPhotoUrl.isNotEmpty) {
+        final size = data['photoSphotFileSizeBytes'];
+        _sphotPhotos.add(_SphotPhotoDraft(
+          url: storedPhotoUrl,
+          storagePath: _cleanText(data['photoSphotStoragePath']),
+          fileName: _cleanText(data['photoSphotFileName']),
+          mimeType: _cleanText(data['photoSphotMimeType']),
+          sizeBytes: size is num ? size.toInt() : null,
+        ));
+      }
       _sphotPhotoErrorMessage = null;
 
       if (storedMediaType == _sphotMediaWebcam) {
@@ -8809,7 +8821,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _sphotWebcamUrlController.clear();
       } else if (_looksLikeDirectPhotoUrl(legacyMediaUrl)) {
         _sphotMediaMode = _sphotMediaPhoto;
-        _sphotPhotoUrl = legacyMediaUrl;
+        if (_sphotPhotos.isEmpty) {
+          _sphotPhotos.add(_SphotPhotoDraft(url: legacyMediaUrl));
+        }
         _sphotWebcamUrlController.clear();
       } else if (legacyMediaUrl.isNotEmpty) {
         _sphotMediaMode = _sphotMediaWebcam;
