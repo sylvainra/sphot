@@ -222,8 +222,12 @@ class _PublicSphotPhotoGalleryState extends State<PublicSphotPhotoGallery> {
             child: Center(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: const Color(0xF5FFFFFF),
+                  color: const Color(0xFFFFFBF7),
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFFF3C9A6),
+                    width: 1,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
