@@ -8947,30 +8947,44 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         );
       }
 
-      var savedPhotoUrl = _sphotPhotoUrl;
-      var savedPhotoStoragePath = _sphotPhotoStoragePath;
-      var savedPhotoFileName = _sphotPhotoFileName;
-      var savedPhotoMimeType = _sphotPhotoMimeType;
-      var savedPhotoFileSizeBytes = _sphotPhotoFileSizeBytes;
-
-      if (_sphotMediaMode == _sphotMediaPhoto &&
-          _selectedSphotPhoto != null) {
-        final uploadResult = await SphotMediaStorageService.uploadPhoto(
-          territoireId: territoireId,
-          spotId: documentId,
-          selection: _selectedSphotPhoto!,
-        );
-
-        savedPhotoUrl = uploadResult.url;
-        savedPhotoStoragePath = uploadResult.storagePath;
-        savedPhotoFileName = uploadResult.fileName;
-        savedPhotoMimeType = uploadResult.mimeType;
-        savedPhotoFileSizeBytes = uploadResult.sizeBytes;
-      }
+      final existingSnapshot = wasEditing ? await targetDocument.get() : null;
+      final existingData = existingSnapshot?.data() ?? <String, dynamic>{};
+      final previousPaths = <String>{
+        if ((existingData['photoSphotStoragePath'] ?? '')
+            .toString().isNotEmpty)
+          existingData['photoSphotStoragePath'].toString(),
+        if (existingData['photoSphotPhotos'] is List)
+          for (final photo in existingData['photoSphotPhotos'] as List)
+            if (photo is Map &&
+                (photo['storagePath'] ?? '').toString().isNotEmpty)
+              photo['storagePath'].toString(),
+      };
 
       final activeWebcamUrl = _sphotMediaMode == _sphotMediaWebcam
           ? _sphotWebcamUrlController.text.trim()
           : '';
+      final savedPhotos = <_SphotPhotoDraft>[];
+      if (_sphotMediaMode == _sphotMediaPhoto) {
+        for (final photo in _sphotPhotos.take(3)) {
+          if (photo.pending == null) {
+            if (photo.url.isNotEmpty) savedPhotos.add(photo);
+            continue;
+          }
+          final uploaded = await SphotMediaStorageService.uploadPhoto(
+            territoireId: territoireId,
+            spotId: documentId,
+            selection: photo.pending!,
+          );
+          savedPhotos.add(_SphotPhotoDraft(
+            url: uploaded.url,
+            storagePath: uploaded.storagePath,
+            fileName: uploaded.fileName,
+            mimeType: uploaded.mimeType,
+            sizeBytes: uploaded.sizeBytes,
+          ));
+        }
+      }
+      final firstPhoto = savedPhotos.isNotEmpty ? savedPhotos.first : null;
 
       final territorySnapshot = await FirebaseFirestore.instance
           .collection('territoires')
@@ -9011,11 +9025,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         'mediaType': _sphotMediaMode,
         'webcamUrl': activeWebcamUrl,
         'adresseWebcam': activeWebcamUrl,
-        'photoSphotUrl': savedPhotoUrl,
-        'photoSphotStoragePath': savedPhotoStoragePath,
-        'photoSphotFileName': savedPhotoFileName,
-        'photoSphotMimeType': savedPhotoMimeType,
-        'photoSphotFileSizeBytes': savedPhotoFileSizeBytes,
+        'photoSphotPhotos':
+            savedPhotos.map((photo) => photo.storedData).toList(),
+        // Champs historiques maintenus pour les anciens lecteurs.
+        'photoSphotUrl': firstPhoto?.url ?? '',
+        'photoSphotStoragePath': firstPhoto?.storagePath ?? '',
+        'photoSphotFileName': firstPhoto?.fileName ?? '',
+        'photoSphotMimeType': firstPhoto?.mimeType ?? '',
+        'photoSphotFileSizeBytes': firstPhoto?.sizeBytes,
         'pays': territoryData['pays'] ?? '',
         'region': territoryData['region'] ?? '',
         'departement': territoryData['departement'] ?? '',
@@ -9037,6 +9054,22 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       }
 
       await targetDocument.set(data, SetOptions(merge: true));
+
+      // Nettoyage des anciennes photos après sauvegarde réussie.
+      final keptPaths = savedPhotos
+          .map((photo) => photo.storagePath)
+          .where((path) => path.isNotEmpty)
+          .toSet();
+      final ownPhotoFolder =
+          'territoires/$territoireId/spots/$documentId/photos/';
+      for (final path in previousPaths.difference(keptPaths)) {
+        if (!path.startsWith(ownPhotoFolder)) continue;
+        try {
+          await SphotMediaStorageService.deletePhoto(path);
+        } catch (_) {
+          // Une erreur Storage n'annule pas l'enregistrement du SPHOT.
+        }
+      }
 
       if (!mounted) {
         return;
