@@ -28,6 +28,7 @@ dependencies:
   flutter_map_marker_cluster: ^8.2.2
   speech_to_text: ^7.3.0
   image_picker: ^1.1.2
+  image: ^4.10.1
   csv: ^5.1.1
   firebase_storage: ^13.4.1
   file_picker: ^11.0.2
