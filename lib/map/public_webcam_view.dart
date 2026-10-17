@@ -122,14 +122,124 @@ class _PublicWebcamViewState extends State<PublicWebcamView> {
   }
 }
 
+// Cette galerie n'est construite que dans la fiche d'un SPHOT sélectionné.
+class PublicSphotPhotoGallery extends StatefulWidget {
+  const PublicSphotPhotoGallery({
+    super.key,
+    required this.urls,
+    this.initialIndex = 0,
+  });
+
+  final List<String> urls;
+  final int initialIndex;
+
+  @override
+  State<PublicSphotPhotoGallery> createState() =>
+      _PublicSphotPhotoGalleryState();
+}
+
+class _PublicSphotPhotoGalleryState extends State<PublicSphotPhotoGallery> {
+  late final PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex.clamp(0,
+        widget.urls.isEmpty ? 0 : widget.urls.length - 1);
+    _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  @override
+  void didUpdateWidget(covariant PublicSphotPhotoGallery oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.urls.join('|') != widget.urls.join('|')) {
+      _currentIndex = 0;
+      if (_pageController.hasClients) _pageController.jumpToPage(0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _showPage(int index) {
+    if (index < 0 || index >= widget.urls.length) return;
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.urls.isEmpty) {
+      return const Center(
+        child: Text('PHOTO TEMPORAIREMENT INDISPONIBLE'),
+      );
+    }
+
+    return Column(
+      children: [
+        Expanded(
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: widget.urls.length,
+            onPageChanged: (index) => setState(() {
+              _currentIndex = index;
+            }),
+            itemBuilder: (_, index) => PublicWebcamView(
+              url: widget.urls[index],
+              forceImage: true,
+            ),
+          ),
+        ),
+        if (widget.urls.length > 1)
+          SizedBox(
+            height: 38,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  tooltip: 'Photo précédente',
+                  onPressed: _currentIndex > 0
+                      ? () => _showPage(_currentIndex - 1) : null,
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                Text(
+                  (_currentIndex + 1).toString() +
+                      ' / ' + widget.urls.length.toString(),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800, color: Colors.white,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Photo suivante',
+                  onPressed: _currentIndex < widget.urls.length - 1
+                      ? () => _showPage(_currentIndex + 1) : null,
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class PublicWebcamFullScreenPage extends StatelessWidget {
   final String url;
   final bool forceImage;
+  final List<String> photoUrls;
 
   const PublicWebcamFullScreenPage({
     super.key,
     required this.url,
     this.forceImage = false,
+    this.photoUrls = const <String>[],
   });
 
   @override
@@ -147,10 +257,9 @@ class PublicWebcamFullScreenPage extends StatelessWidget {
       body: Center(
         child: AspectRatio(
           aspectRatio: 16 / 9,
-          child: PublicWebcamView(
-            url: url,
-            forceImage: forceImage,
-          ),
+          child: forceImage && photoUrls.length > 1
+              ? PublicSphotPhotoGallery(urls: photoUrls)
+              : PublicWebcamView(url: url, forceImage: forceImage),
         ),
       ),
     );
