@@ -87,6 +87,11 @@ class SphotMediaStorageService {
     );
   }
 
+  static Future<void> deletePhoto(String storagePath) async {
+    if (storagePath.trim().isEmpty) return;
+    await FirebaseStorage.instance.ref().child(storagePath).delete();
+  }
+
   static Future<SphotPhotoUploadResult> uploadPhoto({
     required String territoireId,
     required String spotId,
