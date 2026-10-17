@@ -713,6 +713,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             child: _PublicWebcamSection(
               url: spot.publicMediaUrl,
               isPhoto: spot.publicMediaIsPhoto,
+              photoUrls: spot.publicPhotoUrls,
             ),
           ),
         ],
@@ -1210,6 +1211,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             child: _PublicWebcamSection(
               url: spot.publicMediaUrl,
               isPhoto: spot.publicMediaIsPhoto,
+              photoUrls: spot.publicPhotoUrls,
             ),
           )
         else
@@ -2993,10 +2995,12 @@ class _LiveDataBlock extends StatelessWidget {
 class _PublicWebcamSection extends StatelessWidget {
   final String url;
   final bool isPhoto;
+  final List<String> photoUrls;
 
   const _PublicWebcamSection({
     required this.url,
     this.isPhoto = false,
+    this.photoUrls = const <String>[],
   });
 
   @override
@@ -3029,10 +3033,9 @@ class _PublicWebcamSection extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           child: AspectRatio(
             aspectRatio: 16 / 9,
-            child: PublicWebcamView(
-              url: url,
-              forceImage: isPhoto,
-            ),
+            child: isPhoto && photoUrls.length > 1
+                ? PublicSphotPhotoGallery(urls: photoUrls)
+                : PublicWebcamView(url: url, forceImage: isPhoto),
           ),
         ),
         const SizedBox(height: 9),
@@ -3044,6 +3047,7 @@ class _PublicWebcamSection extends StatelessWidget {
                 builder: (_) => PublicWebcamFullScreenPage(
                   url: url,
                   forceImage: isPhoto,
+                  photoUrls: photoUrls,
                 ),
               ),
             ),
