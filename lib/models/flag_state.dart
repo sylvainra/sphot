@@ -30,6 +30,7 @@ class SpotFlagState {
   final String adresseWebcam;
   final String mediaType;
   final String photoSphotUrl;
+  final List<String> photoSphotUrls;
   final String photoSphotMimeType;
   final String arretesMunicipaux;
   final Map<String, dynamic>? liveFlag;
@@ -71,6 +72,7 @@ class SpotFlagState {
     required this.adresseWebcam,
     this.mediaType = '',
     this.photoSphotUrl = '',
+    this.photoSphotUrls = const <String>[],
     this.photoSphotMimeType = '',
     required this.arretesMunicipaux,
     this.liveFlag,
@@ -125,6 +127,14 @@ class SpotFlagState {
     ),
     mediaType: _readString(data['mediaType']).toLowerCase(),
     photoSphotUrl: _readString(data['photoSphotUrl']),
+    photoSphotUrls: data['photoSphotUrls'] is List
+        ? (data['photoSphotUrls'] as List)
+            .whereType<String>()
+            .map((url) => url.trim())
+            .where((url) => url.startsWith('https://'))
+            .take(3)
+            .toList(growable: false)
+        : const <String>[],
     photoSphotMimeType: _readString(data['photoSphotMimeType']),
     arretesMunicipaux: _readString(data['arretesMunicipaux']),
 
@@ -208,39 +218,40 @@ class SpotFlagState {
     ).hasMatch(normalized);
   }
 
+  List<String> get publicPhotoUrls {
+    if (mediaType == 'webcam' && adresseWebcam.trim().isNotEmpty) {
+      return const <String>[];
+    }
+    final urls = <String>[];
+    for (final url in photoSphotUrls) {
+      if (url.isNotEmpty && !urls.contains(url)) urls.add(url);
+      if (urls.length >= 3) break;
+    }
+    if (urls.isEmpty && photoSphotUrl.trim().isNotEmpty) {
+      urls.add(photoSphotUrl.trim());
+    }
+    if (urls.isEmpty && _legacyMediaLooksLikePhoto) {
+      urls.add(adresseWebcam.trim());
+    }
+    return List<String>.unmodifiable(urls.take(3));
+  }
+
   String get publicMediaType {
-    if (mediaType == 'webcam' || mediaType == 'photo') {
-      return mediaType;
-    }
-
-    if (photoSphotUrl.trim().isNotEmpty) {
-      return 'photo';
-    }
-
-    if (_legacyMediaLooksLikePhoto) {
-      return 'photo';
-    }
-
-    if (adresseWebcam.trim().isNotEmpty) {
+    if (mediaType == 'webcam' && adresseWebcam.trim().isNotEmpty) {
       return 'webcam';
     }
-
+    if (publicPhotoUrls.isNotEmpty) return 'photo';
+    if (adresseWebcam.trim().isNotEmpty) return 'webcam';
     return '';
   }
 
   String get publicMediaUrl {
     if (publicMediaType == 'photo') {
-      if (photoSphotUrl.trim().isNotEmpty) {
-        return photoSphotUrl.trim();
-      }
-
-      return _legacyMediaLooksLikePhoto ? adresseWebcam.trim() : '';
+      return publicPhotoUrls.first;
     }
-
     if (publicMediaType == 'webcam') {
       return adresseWebcam.trim();
     }
-
     return '';
   }
 
