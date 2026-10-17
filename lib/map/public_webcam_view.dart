@@ -145,8 +145,9 @@ class _PublicSphotPhotoGalleryState extends State<PublicSphotPhotoGallery> {
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex.clamp(0,
-        widget.urls.isEmpty ? 0 : widget.urls.length - 1);
+    _currentIndex = widget.initialIndex
+        .clamp(0, widget.urls.isEmpty ? 0 : widget.urls.length - 1)
+        .toInt();
     _pageController = PageController(initialPage: _currentIndex);
   }
 
