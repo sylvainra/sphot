@@ -130,8 +130,16 @@ class SphotMediaStorageService {
       final img.Image scaled;
       if (side < sourceMaxSide) {
         scaled = oriented.width >= oriented.height
-            ? img.copyResize(oriented, width: side)
-            : img.copyResize(oriented, height: side);
+            ? img.copyResize(
+                oriented,
+                width: side,
+                interpolation: img.Interpolation.linear,
+              )
+            : img.copyResize(
+                oriented,
+                height: side,
+                interpolation: img.Interpolation.linear,
+              );
       } else {
         scaled = oriented;
       }
