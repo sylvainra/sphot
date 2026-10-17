@@ -141,11 +141,13 @@ class PublicSphotPhotoGallery extends StatefulWidget {
     required this.urls,
     this.initialIndex = 0,
     this.navigationGradient = _defaultSphotPhotoGradient,
+    this.darkNavigationBackground = false,
   });
 
   final List<String> urls;
   final int initialIndex;
   final Gradient navigationGradient;
+  final bool darkNavigationBackground;
 
   @override
   State<PublicSphotPhotoGallery> createState() =>
@@ -217,7 +219,10 @@ class _PublicSphotPhotoGalleryState extends State<PublicSphotPhotoGallery> {
             height: 38,
             width: double.infinity,
             decoration: BoxDecoration(
-              gradient: widget.navigationGradient,
+              color: widget.darkNavigationBackground ? Colors.black : null,
+              gradient: widget.darkNavigationBackground
+                  ? null
+                  : widget.navigationGradient,
             ),
             child: Center(
               child: DecoratedBox(
@@ -310,6 +315,7 @@ class PublicWebcamFullScreenPage extends StatelessWidget {
               ? PublicSphotPhotoGallery(
                   urls: photoUrls,
                   navigationGradient: photoNavigationGradient,
+                  darkNavigationBackground: true,
                 )
               : PublicWebcamView(url: url, forceImage: forceImage),
         ),
