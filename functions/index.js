@@ -4895,18 +4895,6 @@ async function resolveSauveteurAssignmentPeriods(
 }
 
 /**
- * Reconstitue le contexte opérationnel SPHOT ON / SPHOT OFF.
- *
- * SPHOT ON exige :
- * - un compte actif ;
- * - au moins une affectation à un SPHOT ;
- * - des droits de diffusion ouverts par l'administration de tutelle.
- *
- * @param {Object} accountData Données sauveteurAccounts.
- * @param {string} login Identifiant du compte.
- * @return {Promise<Object>} Contexte opérationnel.
- */
-/**
  * Fournit au sauveteur authentifié les libellés des postes déjà affectés.
  * Cette lecture serveur ne donne aucun droit supplémentaire de publication.
  *
@@ -4938,6 +4926,18 @@ async function sauveteurAssignedSpotDetails(db, territoireId, assignedSpotIds) {
   }).sort((first, second) => first.label.localeCompare(second.label, "fr"));
 }
 
+/**
+ * Reconstitue le contexte opérationnel SPHOT ON / SPHOT OFF.
+ *
+ * SPHOT ON exige :
+ * - un compte actif ;
+ * - au moins une affectation à un SPHOT ;
+ * - des droits de diffusion ouverts par l'administration de tutelle.
+ *
+ * @param {Object} accountData Données sauveteurAccounts.
+ * @param {string} login Identifiant du compte.
+ * @return {Promise<Object>} Contexte opérationnel.
+ */
 async function resolveSauveteurOperationalContext(accountData, login) {
   const db = admin.firestore();
   const territoireId = (accountData.territoireId || "").toString().trim();
