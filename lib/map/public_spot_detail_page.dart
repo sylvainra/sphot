@@ -3040,7 +3040,7 @@ class _PublicWebcamSection extends StatelessWidget {
             child: isPhoto && photoUrls.length > 1
                 ? PublicSphotPhotoGallery(
                     urls: photoUrls,
-                    navigationGradient: _sphotWarmGradient,
+                    navigationGradient: _sphotWarmSoftGradient,
                   )
                 : PublicWebcamView(url: url, forceImage: isPhoto),
           ),
@@ -3055,7 +3055,7 @@ class _PublicWebcamSection extends StatelessWidget {
                   url: url,
                   forceImage: isPhoto,
                   photoUrls: photoUrls,
-                  photoNavigationGradient: _sphotWarmGradient,
+                  photoNavigationGradient: _sphotWarmSoftGradient,
                 ),
               ),
             ),
