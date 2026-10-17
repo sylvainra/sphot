@@ -1349,14 +1349,14 @@ SpotFlagState? _findBestSpotMatch(
       return;
     }
 
+    // Sur un écran étroit, Web compris, le volet appartient à la Stack
+    // non modale de la carte : la partie découverte reste interactive.
     setState(() {
       _selectedPublicSpotId = spot.id;
-      if (!kIsWeb) _mobileDetailSpot = spot;
+      _mobileDetailSpot = spot;
     });
-    if (!kIsWeb) {
-      // Chaque nouveau SPHOT ouvre initialement son volet en totalité.
-      _mobileDetailHeightFraction.value = 1.0;
-    }
+    // Chaque nouveau SPHOT ouvre initialement son volet en totalité.
+    _mobileDetailHeightFraction.value = 1.0;
 
     const selectedSpotZoom = 17.2;
     final screenSize = MediaQuery.sizeOf(context);
@@ -1387,53 +1387,9 @@ SpotFlagState? _findBestSpotMatch(
       ),
     );
 
-    // Sur Android/iOS, l'affichage du volet est assuré par la Stack de
-    // la carte. showModalBottomSheet resterait bloquant pour les gestes
-    // sur la carte lorsque le volet est partiellement replié.
-    // Le comportement existant du Web étroit reste inchangé.
-    if (!kIsWeb) return;
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.transparent,
-      isDismissible: true,
-      // Fermer également par glissement vertical vers le bas depuis
-      // l'en-tête, tout en conservant le défilement des onglets.
-      enableDrag: true,
-      builder: (sheetContext) {
-        // Le volet mobile occupe toute la hauteur utile de l'écran,
-        // après déduction des zones système par useSafeArea.
-        return SizedBox(
-          width: double.infinity,
-          height: MediaQuery.sizeOf(sheetContext).height,
-          child: PublicSpotMobileSheet(
-            spot: spot,
-          ),
-        );
-      },
-    );
-
-    await _loadFavoriteSpotIds();
-
-    if (mounted) {
-      setState(() {
-        if (_selectedPublicSpotId == spot.id) {
-          _selectedPublicSpotId = null;
-        }
-        _mapTileRefreshVersion++;
-      });
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _mapController.move(
-          selectedSpotCenter,
-          selectedSpotZoom,
-        );
-      });
-    }
+    // Le volet mobile/Web étroit est déjà affiché par _buildMobileSpotPanel.
+    // Ne jamais ouvrir de route modale qui bloquerait les gestes sur la carte.
+    return;
   }
 
   void _closeMobileSpotDetail() {
@@ -1493,7 +1449,7 @@ SpotFlagState? _findBestSpotMatch(
   // L'en-tête SPHOT appartient à la carte et se dessine au-dessus du volet.
   // On le masque uniquement lorsque la position réelle du volet le recouvre.
   bool _mobileDetailOverlapsMapHeader(double fraction) {
-    if (kIsWeb || _mobileDetailSpot == null) return false;
+    if (_mobileDetailSpot == null) return false;
 
     final media = MediaQuery.of(context);
     final availableHeight = max(
@@ -3176,13 +3132,13 @@ Positioned(
 _buildVerticalFilterMenu(),
 // La publicité figure déjà dans la fiche : ne rien laisser dépasser
 // dans l'espace de 6 px réservé entre le volet et le menu inférieur.
-if (kIsWeb || _mobileDetailSpot == null)
+if (_mobileDetailSpot == null)
   _buildAdBanner(),
 if (!(kIsWeb &&
     MediaQuery.sizeOf(context).width >= 900 &&
     _selectedPublicSpotId != null))
   _buildBottomBar(),
-if (!kIsWeb && _mobileDetailSpot != null)
+if (_mobileDetailSpot != null)
   _buildMobileSpotPanel(),
                 ],
               );
