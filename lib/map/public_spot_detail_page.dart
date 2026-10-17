@@ -3005,9 +3005,13 @@ class _PublicWebcamSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = isPhoto ? 'PHOTO' : 'WEBCAM';
-    final fullscreenLabel =
-        isPhoto ? 'AGRANDIR LA PHOTO' : 'AGRANDIR LA WEBCAM';
+    final hasMultiplePhotos = isPhoto && photoUrls.length > 1;
+    final title = isPhoto
+        ? (hasMultiplePhotos ? 'PHOTOS' : 'PHOTO')
+        : 'WEBCAM';
+    final fullscreenLabel = isPhoto
+        ? (hasMultiplePhotos ? 'AGRANDIR LES PHOTOS' : 'AGRANDIR LA PHOTO')
+        : 'AGRANDIR LA WEBCAM';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3034,7 +3038,10 @@ class _PublicWebcamSection extends StatelessWidget {
           child: AspectRatio(
             aspectRatio: 16 / 9,
             child: isPhoto && photoUrls.length > 1
-                ? PublicSphotPhotoGallery(urls: photoUrls)
+                ? PublicSphotPhotoGallery(
+                    urls: photoUrls,
+                    navigationGradient: _sphotWarmGradient,
+                  )
                 : PublicWebcamView(url: url, forceImage: isPhoto),
           ),
         ),
@@ -3048,6 +3055,7 @@ class _PublicWebcamSection extends StatelessWidget {
                   url: url,
                   forceImage: isPhoto,
                   photoUrls: photoUrls,
+                  photoNavigationGradient: _sphotWarmGradient,
                 ),
               ),
             ),
