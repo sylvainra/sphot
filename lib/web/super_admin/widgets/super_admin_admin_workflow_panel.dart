@@ -359,10 +359,8 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
     BuildContext context,
     DocumentSnapshot<Map<String, dynamic>> requestSnapshot,
   ) async {
-    final reasonController = TextEditingController();
-    String? reason;
-    try {
-      reason = await showDialog<String>(
+    var typedReason = '';
+    final reason = await showDialog<String>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text(
@@ -380,7 +378,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               TextField(
-                controller: reasonController,
+                onChanged: (value) => typedReason = value,
                 maxLines: 2,
                 maxLength: 250,
                 decoration: const InputDecoration(
@@ -397,7 +395,7 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(dialogContext)
-                  .pop(reasonController.text.trim()),
+                  .pop(typedReason.trim()),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _blue,
                 foregroundColor: Colors.white,
@@ -407,9 +405,6 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
           ],
         ),
       );
-    } finally {
-      reasonController.dispose();
-    }
     if (reason == null || !context.mounted) return;
 
     final db = FirebaseFirestore.instance;
