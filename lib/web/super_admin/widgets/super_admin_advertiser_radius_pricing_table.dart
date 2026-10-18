@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/commercial_pricing_service.dart';
+import '../services/advertiser_radius_pricing_import.dart';
 
 /// Catalogue de 108 prix, SÉPARÉ du catalogue historique de 90 tarifs.
 /// Les montants ne sont jamais déduits des anciennes catégories.
@@ -31,6 +32,9 @@ class _SuperAdminAdvertiserRadiusPricingTableState
 
   late CommercialPricingService _service;
   final Map<String, TextEditingController> _fields = {};
+  final Map<String, String> _lastSavedValues = {};
+  bool _applyingSavedValues = false;
+  bool _hasPendingEdits = false;
   int _revision = 0;
   int _publishedVersion = 0;
   int? _draftVersion;
@@ -50,7 +54,8 @@ class _SuperAdminAdvertiserRadiusPricingTableState
     for (var r = 0; r < _radii.length; r++) {
       for (var o = 0; o < _offers.length; o++) {
         for (var d = 0; d < _durations.length; d++) {
-          _fields[_key(r, o, d)] = TextEditingController();
+          _fields[_key(r, o, d)] = TextEditingController()
+            ..addListener(_onPriceChanged);
         }
       }
     }
@@ -65,7 +70,18 @@ class _SuperAdminAdvertiserRadiusPricingTableState
     super.dispose();
   }
 
+  void _onPriceChanged() {
+    if (_applyingSavedValues || !mounted) return;
+    final dirty = _fields.entries.any(
+      (entry) => entry.value.text != _lastSavedValues[entry.key],
+    );
+    if (dirty != _hasPendingEdits) {
+      setState(() => _hasPendingEdits = dirty);
+    }
+  }
+
   void _apply(CommercialPricingState state) {
+    _applyingSavedValues = true;
     _revision = state.revision;
     _publishedVersion = state.publishedVersion;
     _draftVersion = (state.draft?['version'] as num?)?.toInt();
@@ -79,8 +95,77 @@ class _SuperAdminAdvertiserRadiusPricingTableState
     };
     final draft = state.draft?['prices'];
     final current = draft is Map ? Map<String, dynamic>.from(draft) : published;
+    _lastSavedValues.clear();
     for (final field in _fields.entries) {
-      field.value.text = current[field.key]?.toString() ?? '';
+      final value = current[field.key]?.toString() ?? '';
+      field.value.text = value;
+      _lastSavedValues[field.key] = value;
+    }
+    _hasPendingEdits = false;
+    _applyingSavedValues = false;
+  }
+
+  Future<void> _copyPricingTable() async {
+    final table = AdvertiserRadiusPricingImport.export({
+      for (final entry in _fields.entries)
+        entry.key: entry.value.text.trim(),
+    });
+    await Clipboard.setData(ClipboardData(text: table));
+    if (!mounted) return;
+    setState(() {
+      _notice = 'Tableau de 18 lignes copié. Renseignez les six prix HT '
+          'de chaque ligne dans un tableur, puis recollez-le ici.';
+      _error = null;
+    });
+  }
+
+  Future<void> _pastePricingTable() async {
+    if (_busy) return;
+    try {
+      final clipboard = await Clipboard.getData('text/plain');
+      final input = clipboard?.text ?? '';
+      final parsed = AdvertiserRadiusPricingImport.parse(input);
+      if (!mounted) return;
+      final accepted = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('IMPORTER LES 108 TARIFS ?'),
+          content: const Text(
+            'Les 108 cases actuellement affichées seront remplacées '
+            'par celles du tableau collé. Aucun tarif ne sera enregistré '
+            'ni publié avant votre validation séparée.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('ANNULER'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('REMPLACER LES CASES'),
+            ),
+          ],
+        ),
+      );
+      if (accepted != true || !mounted) return;
+      _applyingSavedValues = true;
+      for (final entry in parsed.entries) {
+        _fields[entry.key]!.text = entry.value.toString();
+      }
+      _applyingSavedValues = false;
+      setState(() {
+        _hasPendingEdits = true;
+        _error = null;
+        _notice = '108 prix chargés localement. '
+            'Cliquez ENREGISTRER BROUILLON avant toute publication.';
+      });
+    } catch (error) {
+      _applyingSavedValues = false;
+      if (!mounted) return;
+      setState(() {
+        _error = 'Import refusé : $error';
+        _notice = null;
+      });
     }
   }
 
@@ -149,7 +234,7 @@ class _SuperAdminAdvertiserRadiusPricingTableState
   }
 
   Future<void> _publish() async {
-    if (_busy || _draftVersion == null) return;
+    if (_busy || _draftVersion == null || _hasPendingEdits) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -221,6 +306,11 @@ class _SuperAdminAdvertiserRadiusPricingTableState
             'BROUILLON : V$_draftVersion, non applicable aux paiements',
             style: const TextStyle(color: _blue),
           ),
+        if (_hasPendingEdits)
+          const Text(
+            'MODIFICATIONS NON ENREGISTRÉES : publier est désactivé.',
+            style: TextStyle(color: _red, fontWeight: FontWeight.w800),
+          ),
         if (_history.isNotEmpty)
           Text(
             'Historique conservé : ${_history.length} version(s)',
@@ -233,6 +323,23 @@ class _SuperAdminAdvertiserRadiusPricingTableState
           ),
         if (_notice != null)
           Text(_notice!, style: const TextStyle(color: _blue)),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _copyPricingTable,
+              icon: const Icon(Icons.copy_all_outlined),
+              label: const Text('COPIER LE TABLEAU (CSV)'),
+            ),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _pastePricingTable,
+              icon: const Icon(Icons.content_paste),
+              label: const Text('COLLER LES 108 PRIX'),
+            ),
+          ],
+        ),
         const SizedBox(height: 10),
         Expanded(
           child: ListView.builder(
@@ -315,7 +422,8 @@ class _SuperAdminAdvertiserRadiusPricingTableState
             const SizedBox(width: 8),
             Expanded(
               child: FilledButton(
-                onPressed: _busy || _draftVersion == null ? null : _publish,
+                onPressed: _busy || _draftVersion == null ||
+                        _hasPendingEdits ? null : _publish,
                 style: FilledButton.styleFrom(backgroundColor: _red),
                 child: const Text('PUBLIER'),
               ),
