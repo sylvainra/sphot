@@ -491,6 +491,18 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
         ]).toLowerCase();
         final subStatus = _text(subscription['status']).toLowerCase();
 
+        // Ne jamais rattacher par erreur l'abonnement d'un autre Admin.
+        final subscriptionOwner = _firstNonEmpty([
+          subscription['adminUid'],
+          subscription['uid'],
+        ]);
+        if (subscriptionOwner.isNotEmpty && subscriptionOwner != uid) {
+          throw StateError(
+            'L’identifiant du compte et celui de l’abonnement diffèrent. '
+            'Vérification manuelle nécessaire.',
+          );
+        }
+
         if (registrationStatus == 'rejected' ||
             administrativeStatus == 'rejected' ||
             adminStatus == 'rejected' ||
@@ -1309,7 +1321,10 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                               label: const Text(
                                 'RENOUVELER LA PÉRIODE D’ESSAI',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontWeight: FontWeight.w900),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 10.5,
+                                ),
                               ),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: _blue,
@@ -1320,11 +1335,20 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                           ),
                         ],
                         if ((request['trialRenewalCount'] is num) &&
-                            (request['trialRenewalCount'] as num) > 0)
+                            (request['trialRenewalCount'] as num) > 0) ...[
                           _line(
                             'Renouvellements',
                             '${request['trialRenewalCount']}',
                           ),
+                          if (request['trialRenewalHistory'] is List &&
+                              (request['trialRenewalHistory'] as List).isNotEmpty)
+                            _line(
+                              'Dernier renouvellement',
+                              _formatDateTime(
+                                _map((request['trialRenewalHistory'] as List).last)['renewedAt'],
+                              ),
+                            ),
+                        ],
                         if (registrationStatus.toLowerCase() == 'approved' &&
                             trialStatus.toLowerCase() == 'pending') ...[
                           const SizedBox(height: 8),
