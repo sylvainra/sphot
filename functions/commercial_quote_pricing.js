@@ -4,17 +4,8 @@
 // Preview en lecture seule : aucune ecriture dans les devis ou abonnements.
 const MARKET_COLLECTION = "commercialPricingMarkets";
 const discounts = require("./commercial_discounts");
-const TERRITORIES = [
-  "commune", "intercommunalite", "departement", "region", "national",
-];
-const RADIUS_LEVELS = [
-  "radius_5km", "radius_15km", "radius_50km",
-  "radius_150km", "radius_300km", "country",
-];
-const OFFERS = ["map", "premium", "pack"];
-const DURATIONS = [
-  "1 semaine", "2 semaines", "1 mois", "2 mois", "6 mois", "1 an",
-];
+const {LEVELS, OFFERS, DURATIONS, PRICE_KEYS} =
+  require("./advertiser_radius_tariffs");
 
 function quoteError(status, message) {
   const e = new Error(message);
@@ -81,20 +72,21 @@ function adminQuote(data, stations) {
 }
 
 function advertiserQuote(data, territory, offer, duration) {
-  const newRadiusMarket = data.type === "ADVERTISER_RADIUS";
-  const levels = newRadiusMarket ? RADIUS_LEVELS : TERRITORIES;
-  const t = levels.indexOf(territory);
+  if (!data || data.type !== "ADVERTISER_RADIUS") {
+    throw quoteError(503, "Ancien catalogue non applicable.");
+  }
+  const t = LEVELS.indexOf(territory);
   const o = OFFERS.indexOf(offer);
   const d = DURATIONS.indexOf(duration);
   if (t < 0 || o < 0 || d < 0) {
     throw quoteError(400, "Territoire, offre ou duree non pris en charge.");
   }
   const prices = data.publishedPrices;
-  const expectedKeys = levels.length * OFFERS.length * DURATIONS.length;
-  if (!prices || Array.isArray(prices) || typeof prices !== "object" ||
-      Object.keys(prices).length !== expectedKeys) {
-    throw quoteError(503, "La grille publiee requiert " +
-        expectedKeys + " tarifs.");
+  const keys = !prices || Array.isArray(prices) ||
+      typeof prices !== "object" ? [] : Object.keys(prices).sort();
+  if (keys.length !== 108 ||
+      keys.join("|") !== PRICE_KEYS.join("|")) {
+    throw quoteError(503, "La grille publiee requiert 108 tarifs exacts.");
   }
   const key = t + ":" + o + ":" + d;
   const amount = safePrice(prices[key]);
@@ -135,7 +127,7 @@ function endpoint({admin, onRequest}) {
     try {
       const body = req.body || {};
       const market = body.market;
-      if (!["ADMIN", "ADVERTISER", "ADVERTISER_RADIUS"].includes(market)) {
+      if (!["ADMIN", "ADVERTISER_RADIUS"].includes(market)) {
         throw quoteError(400, "Marche tarifaire inconnu.");
       }
       const id = "FR_" + market;
