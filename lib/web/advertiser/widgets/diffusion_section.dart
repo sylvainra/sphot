@@ -274,7 +274,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
               'uid': requestId,
               'diffusionCompleted': true,
               'diffusion': <String, Object?>{
-                'visibilityType': selectedOption.value,
+                'visibilityType': selectedValue,
                 'visibilityLabel': selectedLabel,
                 'confirmedAt': FieldValue.serverTimestamp(),
               },
