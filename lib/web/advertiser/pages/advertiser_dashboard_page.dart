@@ -118,14 +118,14 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   int _selectedIndex = 0;
   final MapController _mapController = MapController();
 
-  // À un zoom trop faible, flutter_map peut afficher deux fois
-  // les mêmes continents. Un léger dézoom supplémentaire est permis,
-  // tout en conservant un monde plus large que le volet cartographique.
-  double _minimumWorldZoom(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
+  // Le dézoom dépend de la largeur RÉELLE de la carte centrale, pas de
+  // la fenêtre entière. Un tour du monde reste légèrement plus large que
+  // la carte afin de ne pas afficher deux fois les mêmes continents.
+  double _minimumWorldZoom(double mapWidth) {
+    final width = math.max(256.0, mapWidth);
     return math.max(
-      2.6,
-      math.log(math.max(width, 256.0) / 256.0) / math.ln2 - 0.15,
+      1.0,
+      math.log(width / 256.0) / math.ln2 + 0.10,
     );
   }
   final ScrollController _detailScrollController = ScrollController();
@@ -583,7 +583,14 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           return Row(
             children: [
               SizedBox(width: sidebarWidth, child: _buildSidebar()),
-              Expanded(child: _buildMap()),
+              Expanded(
+                child: _buildMap(
+                  mapWidth: math.max(
+                    0.0,
+                    constraints.maxWidth - sidebarWidth - panelWidth,
+                  ),
+                ),
+              ),
               SizedBox(width: panelWidth, child: _buildDetailPanel()),
             ],
           );
@@ -667,7 +674,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     );
   }
 
-  Widget _buildMap() {
+  Widget _buildMap({required double mapWidth}) {
     if (_approvedFlow &&
         _selectedIndex == 2 &&
         _diffusionPreview.hasSelection) {
@@ -687,8 +694,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           mapController: _mapController,
           options: MapOptions(
             initialCenter: const LatLng(20, 0),
-            initialZoom: _minimumWorldZoom(context),
-            minZoom: _minimumWorldZoom(context),
+            initialZoom: _minimumWorldZoom(mapWidth),
+            minZoom: _minimumWorldZoom(mapWidth),
             maxZoom: 18,
             onTap: canSelectApplicationPosition || canEditApprovedPosition
                 ? (_, point) => _setAdvertisingPoint(point, centerMap: false)
