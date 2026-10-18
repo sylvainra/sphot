@@ -181,14 +181,18 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       _scope = widget.requestedScope;
     }
     if (oldWidget.position == widget.position) return;
-    if (widget.position != null) {
-      _loadTerritories(widget.position!);
-    } else {
-      setState(() {
-        _territory = null;
-        _territoryOptions = null;
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final position = widget.position;
+      if (position != null) {
+        _loadTerritories(position);
+      } else {
+        setState(() {
+          _territory = null;
+          _territoryOptions = null;
+        });
+      }
+    });
     if (_loadingSavedPosition) {
       _loadingSavedPosition = false;
       return;
