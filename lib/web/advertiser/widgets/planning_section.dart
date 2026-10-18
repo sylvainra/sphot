@@ -217,69 +217,9 @@ class _PlanningSectionState extends State<PlanningSection> {
         math.atan2(math.sqrt(bounded), math.sqrt(1 - bounded));
   }
 
-  Future<List<DateTimeRange>> _fetchReservedPeriods() async {
-    final position = widget.advertisingPosition;
-    if (position == null) return const [];
-    if (widget.developmentBypass && widget.user == null) return const [];
-
-    final snapshot = await FirebaseFirestore.instance
-        .collection('adRequests')
-        .get();
-    final periods = <DateTimeRange>[];
-    final nationalScope =
-        widget.requestedScope == 'national' ||
-        widget.requestedScope == 'local_and_national';
-    final requestedActivity = _normaliseActivity(widget.activityType);
-    for (final document in snapshot.docs) {
-      final data = document.data();
-      final status = (data['status'] ?? '').toString().toLowerCase();
-      if (<String>{
-        'cancelled',
-        'deleted',
-        'disabled',
-        'finished',
-        'rejected',
-      }.contains(status)) {
-        continue;
-      }
-      final existingActivity = _normaliseActivity(
-        data['categoryLabel'] ?? data['activityType'],
-      );
-      if (requestedActivity.isNotEmpty &&
-          existingActivity.isNotEmpty &&
-          requestedActivity != existingActivity) {
-        continue;
-      }
-      final existingScope = (data['broadcastType'] ?? 'local').toString();
-      if (!nationalScope && existingScope == 'national') {
-        continue;
-      }
-
-      final latitude = _toDouble(data['centerLat']);
-      final longitude = _toDouble(data['centerLng']);
-      final start = _toDate(data['campaignStartDate']);
-      final end = _toDate(data['campaignEndDate']);
-      if (start == null || end == null) {
-        continue;
-      }
-
-      if (nationalScope && existingScope == 'national') {
-        periods.add(DateTimeRange(start: start, end: end));
-        continue;
-      }
-
-      if (latitude == null || longitude == null) continue;
-
-      final existingRadius = _toDouble(data['radiusKm']) ?? 0;
-      final exclusiveDistance = widget.radiusKm + existingRadius;
-      final tolerance = exclusiveDistance <= 0 ? 0.025 : 0.0;
-      final separation = _distanceKm(position, LatLng(latitude, longitude));
-      if (separation <= exclusiveDistance + tolerance) {
-        periods.add(DateTimeRange(start: start, end: end));
-      }
-    }
-    return periods;
-  }
+  // Plusieurs annonceurs peuvent diffuser simultanément sur un territoire.
+  // La planification ne réserve plus de zone ni de catégorie d’activité.
+  Future<List<DateTimeRange>> _fetchReservedPeriods() async => const [];
 
   Future<void> _load() async {
     final requestId = _requestId;
@@ -351,7 +291,7 @@ class _PlanningSectionState extends State<PlanningSection> {
         durationLabel: _durationLabel,
         startDate: _startDate,
         endDate: _endDate,
-        exclusiveReservation: true,
+        exclusiveReservation: false,
         availabilityConfirmed: _selectionIsAvailable,
       ),
     );
@@ -427,11 +367,8 @@ class _PlanningSectionState extends State<PlanningSection> {
                 'durationLabel': _durationLabel,
                 'campaignStartDate': Timestamp.fromDate(_startDate),
                 'campaignEndDate': Timestamp.fromDate(_endDate),
-                'exclusiveReservation': true,
+                'exclusiveReservation': false,
                 'availabilityStatus': 'available',
-                'requestedScope': widget.requestedScope,
-                'activityType': widget.activityType,
-                'radiusKm': widget.radiusKm,
                 'confirmedAt': FieldValue.serverTimestamp(),
               },
               'updatedAt': FieldValue.serverTimestamp(),
@@ -624,7 +561,7 @@ class _PlanningSectionState extends State<PlanningSection> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'PLANIFICATION EXCLUSIVE',
+                      'PLANIFICATION DE LA CAMPAGNE',
                       style: TextStyle(
                         color: WebColors.blue,
                         fontSize: 16,
@@ -633,9 +570,9 @@ class _PlanningSectionState extends State<PlanningSection> {
                     ),
                     const SizedBox(height: 7),
                     Text(
-                      widget.requestedScope == 'national'
-                          ? 'Une seule campagne de la même catégorie d’activité peut être active à l’échelle nationale pendant la période choisie. Votre SPHOT PUBLICITAIRE bénéficie ainsi d’une exclusivité d’affichage dans sa catégorie pendant toute la période réservée.'
-                          : 'Une seule campagne de la même catégorie d’activité peut être active dans le rayon et durant la période choisis. Votre SPHOT PUBLICITAIRE bénéficie ainsi d’une exclusivité d’affichage dans sa catégorie, dans toute la zone sélectionnée et pendant toute la période réservée.',
+                      'La diffusion respecte les dates choisies et le territoire administratif. '
+                          'Plusieurs annonceurs peuvent diffuser simultanément. '
+                          'Les publicités alternent équitablement, sans exclusivité.',
                       style: const TextStyle(
                         color: Color(0xFF4B5F97),
                         height: 1.4,
@@ -744,7 +681,9 @@ class _PlanningSectionState extends State<PlanningSection> {
               ),
               const SizedBox(height: 8),
               Text(
-                '${widget.costExclTax} € HT',
+                widget.costExclTax > 0
+                    ? '${widget.costExclTax} € HT'
+                    : 'TARIF PUBLIÉ NON DISPONIBLE',
                 style: const TextStyle(
                   color: WebColors.red,
                   fontSize: 25,
