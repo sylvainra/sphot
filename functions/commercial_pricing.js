@@ -8,55 +8,29 @@ const SESSION_COLLECTION = "superAdminPricingSessions";
 const MARKETS = "commercialPricingMarkets";
 const SESSION_MS = 2 * 60 * 60 * 1000;
 const seedAdmin = [499, 399, 299, 199];
-const advertiserMatrix = [
-  [[49, 95, 149, 249, 599, 999], [99, 189, 299, 499, 1199, 1999], [129, 239, 379, 629, 1519, 2539]],
-  [[89, 159, 249, 419, 999, 1669], [159, 289, 449, 759, 1799, 3009], [199, 369, 569, 969, 2279, 3809]],
-  [[139, 259, 399, 679, 1599, 2669], [259, 489, 749, 1269, 2999, 5019], [329, 619, 949, 1609, 3799, 6359]],
-  [[209, 379, 590, 999, 2359, 3949], [379, 709, 1090, 1859, 4359, 7299], [489, 899, 1390, 2369, 5559, 9309]],
-  [[250, 490, 790, 1390, 2900, 4900], [450, 890, 1490, 2600, 5400, 8900], [590, 1150, 1990, 3500, 7400, 11900]],
-];
-const seededAdvertiser = {};
-advertiserMatrix.forEach((level, l) => {
-  level.forEach((offer, o) => {
-    offer.forEach((amount, d) => {
-      seededAdvertiser[l + ":" + o + ":" + d] = amount;
-    });
-  });
-});
-const allowedAdvertiserKeys = Object.keys(seededAdvertiser).sort();
-// Nouveau catalogue indépendant : les 90 montants historiques sont immuables.
-// Aucun montant n'est inventé pour les six rayons géographiques.
-const RADIUS_KEYS = [];
-for (let radius = 0; radius < 6; radius++) {
-  for (let offer = 0; offer < 3; offer++) {
-    for (let duration = 0; duration < 6; duration++) {
-      RADIUS_KEYS.push(radius + ":" + offer + ":" + duration);
-    }
-  }
-}
-const allowedRadiusKeys = RADIUS_KEYS.sort();
+const advertiserTariffs = require("./advertiser_radius_tariffs");
+const allowedRadiusKeys = advertiserTariffs.PRICE_KEYS;
 
 
 function seed(type) {
   if (type === "ADMIN") return seedAdmin.slice();
-  if (type === "ADVERTISER_RADIUS") return {};
-  return {...seededAdvertiser};
+  if (type === "ADVERTISER_RADIUS") {
+    return advertiserTariffs.initialPrices();
+  }
+  throw err(400, "Marché tarifaire inconnu.");
 }
 function copyPrices(data, type) {
   return type === "ADMIN" ? data.slice() : {...data};
 }
 function validate(type, value, personalised) {
   const values = type === "ADMIN" ? seedAdmin :
-    type === "ADVERTISER_RADIUS" ?
-      Object.fromEntries(allowedRadiusKeys.map((key) => [key, 1])) :
-      seededAdvertiser;
+    advertiserTariffs.initialPrices();
   if (type === "ADMIN") {
     if (!Array.isArray(value) || value.length !== 4) {
       throw err(400, "Les 4 tarifs ADMIN sont requis.");
     }
   } else {
-    const keys = type === "ADVERTISER_RADIUS" ?
-      allowedRadiusKeys : allowedAdvertiserKeys;
+    const keys = allowedRadiusKeys;
     if (!value || Array.isArray(value) || typeof value !== "object" ||
         Object.keys(value).length !== keys.length ||
         Object.keys(value).sort().join("|") !== keys.join("|")) {
@@ -71,7 +45,7 @@ function validate(type, value, personalised) {
     }
   }
   if (!Array.isArray(personalised) ||
-      personalised.length > (type === "ADVERTISER_RADIUS" ? 108 : 90) ||
+      personalised.length > (type === "ADMIN" ? 4 : 108) ||
       personalised.some((key) => typeof key !== "string" ||
           !(key in values) && type !== "ADMIN")) {
     throw err(400, "Liste des tarifs personnalisés invalide.");
@@ -79,7 +53,7 @@ function validate(type, value, personalised) {
   return {prices: copyPrices(value, type), personalised: [...new Set(personalised)]};
 }
 function marketId(type) {
-  if (!["ADMIN", "ADVERTISER", "ADVERTISER_RADIUS"].includes(type)) {
+  if (!["ADMIN", "ADVERTISER_RADIUS"].includes(type)) {
     throw err(400, "Marché tarifaire inconnu.");
   }
   return "FR_" + type;
