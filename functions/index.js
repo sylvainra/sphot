@@ -11,6 +11,7 @@ const admin = require("firebase-admin");
 const crypto = require("crypto");
 const commercialPricing = require("./commercial_pricing");
 const commercialQuotePricing = require("./commercial_quote_pricing");
+const {spotCountry} = require("./advertiser_country_coverage");
 const {registerAdminQuotePortalEndpoint} =
     require("./admin_quote_portal_endpoint");
 const {assignAuthorizedAdminQuoteNumber} =
@@ -78,6 +79,7 @@ function buildPublicSpot(
     "sphotLat",
     "sphotLng",
     "pays",
+    "countryIso3",
     "region",
     "departement",
     "ville",
@@ -121,6 +123,11 @@ function buildPublicSpot(
       result[field] = spot[field];
     }
   });
+
+  // National advertising must use the validated country field, never
+  // a simplified coastline polygon or a latitude/longitude exclusion.
+  const normalizedCountry = spotCountry(spot);
+  if (normalizedCountry) result.countryIso3 = normalizedCountry;
 
   const webcamUrl = (
     spot.adresseWebcam ||
@@ -387,6 +394,7 @@ function mergePublicTerritoryData(spot, territory) {
   };
   const territoryFields = [
     "pays",
+    "countryIso3",
     "region",
     "departement",
     "ville",
@@ -548,6 +556,7 @@ async function reconcilePublicTerritory(territoireId, publish) {
     const parentTerritoryData = {territoireId};
     const parentTerritoryFields = [
       "pays",
+      "countryIso3",
       "region",
       "departement",
       "ville",
