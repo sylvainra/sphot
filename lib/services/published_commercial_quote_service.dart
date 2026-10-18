@@ -44,7 +44,6 @@ class PublishedCommercialQuote {
     final reference = data['pricingReference'];
     final date = DateTime.tryParse(data['calculatedAt']?.toString() ?? '');
     if ((market != 'ADMIN' &&
-            market != 'ADVERTISER' &&
             market != 'ADVERTISER_RADIUS') ||
         version is! int ||
         version <= 0 ||
@@ -84,22 +83,7 @@ class PublishedCommercialQuoteService {
         'numberOfRescueStations': numberOfRescueStations,
       });
 
-  /// territory: commune, intercommunalite, departement, region, national
-  /// offer: map, premium, pack
-  /// duration: 1 semaine, 2 semaines, 1 mois, 2 mois, 6 mois, 1 an
-  Future<PublishedCommercialQuote> advertiser({
-    required String territory,
-    required String offer,
-    required String duration,
-  }) =>
-      _request({
-        'market': 'ADVERTISER',
-        'territory': territory,
-        'offer': offer,
-        'duration': duration,
-      });
-
-  /// Nouveau catalogue indépendant : 6 rayons × 3 offres × 6 durées.
+  /// Catalogue de référence : cinq rayons + pays entier, 3 offres, 6 durées.
   /// Aucun prix n'est retourné tant qu'une version complète
   /// n'a pas été explicitement publiée par le Super Admin.
   Future<PublishedCommercialQuote> advertiserRadius({
