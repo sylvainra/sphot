@@ -456,7 +456,22 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
           ]);
         }
       }
-      final adminRef = db.collection('admins').doc(uid);
+      var adminRef = db.collection('admins').doc(uid);
+      if (subscriptionRef.id != uid) {
+        // Le calcul des droits temps réel associe admins/{id} à
+        // subscriptions/{id}. Vérifier la paire des anciens dossiers.
+        final legacyAdminRef = db.collection('admins').doc(subscriptionRef.id);
+        final legacyAdmin = await legacyAdminRef.get();
+        final legacyUid = _text(legacyAdmin.data()?['uid']);
+        if (!legacyAdmin.exists ||
+            (legacyUid.isNotEmpty && legacyUid != uid)) {
+          throw StateError(
+            'Ancien abonnement avec identifiant différent et sans compte '
+            'Admin correspondant : vérification manuelle nécessaire.',
+          );
+        }
+        adminRef = legacyAdminRef;
+      }
       final start = DateTime.now();
       final end = start.add(const Duration(days: 8));
       final stampStart = Timestamp.fromDate(start);
@@ -514,7 +529,9 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
         }
         if (subStatus == 'active' ||
             subStatus == 'subscription_active' ||
-            subscription['subscriptionStartDate'] != null) {
+            subscription['subscriptionStartDate'] != null ||
+            subscription['subscriptionEndDate'] != null ||
+            subscription['lastPaymentDate'] != null) {
           throw StateError(
             'Un abonnement payant existe pour ce dossier. '
             'Ne pas le remplacer par un essai.',
@@ -1301,6 +1318,8 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
                         ),
 
                         if ((trialStatus.toLowerCase() == 'expired' ||
+                                _text(request['accessPhase']).toLowerCase() ==
+                                    'awaiting_subscription' ||
                                 _text(subscription['status']).toLowerCase() ==
                                     'awaiting_subscription' ||
                                 (_firestoreDate(subscription['trialEndDate']) != null &&
