@@ -23,24 +23,44 @@ advertiserMatrix.forEach((level, l) => {
   });
 });
 const allowedAdvertiserKeys = Object.keys(seededAdvertiser).sort();
+// Nouveau catalogue indépendant : les 90 montants historiques sont immuables.
+// Aucun montant n'est inventé pour les six rayons géographiques.
+const RADIUS_KEYS = [];
+for (let radius = 0; radius < 6; radius++) {
+  for (let offer = 0; offer < 3; offer++) {
+    for (let duration = 0; duration < 6; duration++) {
+      RADIUS_KEYS.push(radius + ":" + offer + ":" + duration);
+    }
+  }
+}
+const allowedRadiusKeys = RADIUS_KEYS.sort();
+
 
 function seed(type) {
-  return type === "ADMIN" ? seedAdmin.slice() : {...seededAdvertiser};
+  if (type === "ADMIN") return seedAdmin.slice();
+  if (type === "ADVERTISER_RADIUS") return {};
+  return {...seededAdvertiser};
 }
 function copyPrices(data, type) {
   return type === "ADMIN" ? data.slice() : {...data};
 }
 function validate(type, value, personalised) {
-  const values = type === "ADMIN" ? seedAdmin : seededAdvertiser;
+  const values = type === "ADMIN" ? seedAdmin :
+    type === "ADVERTISER_RADIUS" ?
+      Object.fromEntries(allowedRadiusKeys.map((key) => [key, 1])) :
+      seededAdvertiser;
   if (type === "ADMIN") {
     if (!Array.isArray(value) || value.length !== 4) {
       throw err(400, "Les 4 tarifs ADMIN sont requis.");
     }
   } else {
+    const keys = type === "ADVERTISER_RADIUS" ?
+      allowedRadiusKeys : allowedAdvertiserKeys;
     if (!value || Array.isArray(value) || typeof value !== "object" ||
-        Object.keys(value).length !== 90 ||
-        Object.keys(value).sort().join("|") !== allowedAdvertiserKeys.join("|")) {
-      throw err(400, "Les 90 tarifs ANNONCEUR sont requis.");
+        Object.keys(value).length !== keys.length ||
+        Object.keys(value).sort().join("|") !== keys.join("|")) {
+      throw err(400, "La grille doit comporter exactement " +
+          keys.length + " tarifs valides.");
     }
   }
   const amounts = type === "ADMIN" ? value : Object.values(value);
@@ -49,7 +69,8 @@ function validate(type, value, personalised) {
       throw err(400, "Les tarifs doivent être des euros entiers positifs.");
     }
   }
-  if (!Array.isArray(personalised) || personalised.length > 90 ||
+  if (!Array.isArray(personalised) ||
+      personalised.length > (type === "ADVERTISER_RADIUS" ? 108 : 90) ||
       personalised.some((key) => typeof key !== "string" ||
           !(key in values) && type !== "ADMIN")) {
     throw err(400, "Liste des tarifs personnalisés invalide.");
@@ -57,7 +78,7 @@ function validate(type, value, personalised) {
   return {prices: copyPrices(value, type), personalised: [...new Set(personalised)]};
 }
 function marketId(type) {
-  if (type !== "ADMIN" && type !== "ADVERTISER") {
+  if (!["ADMIN", "ADVERTISER", "ADVERTISER_RADIUS"].includes(type)) {
     throw err(400, "Marché tarifaire inconnu.");
   }
   return "FR_" + type;
@@ -71,11 +92,13 @@ function err(status, message) {
   return error;
 }
 function defaultState(type) {
+  const isNewRadiusMarket = type === "ADVERTISER_RADIUS";
   return {
     country: "FR", currency: "EUR", type: type,
-    publishedVersion: 1, latestVersion: 1, revision: 0,
+    publishedVersion: isNewRadiusMarket ? 0 : 1,
+    latestVersion: isNewRadiusMarket ? 0 : 1, revision: 0,
     publishedPrices: seed(type), publishedPersonalised: [],
-    draft: null, scheduled: null, seeded: true,
+    draft: null, scheduled: null, seeded: !isNewRadiusMarket,
   };
 }
 function timeIso(value) {
@@ -185,7 +208,7 @@ async function saveDraft(admin, type, body, login) {
       throw err(409, "Annulez la programmation avant de créer un brouillon.");
     }
     const publishedRef = root.collection("versions").doc(versionId(1));
-    if (!snap.exists) {
+    if (!snap.exists && type !== "ADVERTISER_RADIUS") {
       tx.create(publishedRef, {
         version: 1, status: "published",
         prices: seed(type), personalised: [],
@@ -526,4 +549,4 @@ function scheduler({admin, onSchedule}) {
         }
       });
 }
-module.exports = {issueSession, endpoint, scheduler};
+module.exports = {issueSession, endpoint, scheduler, validate, defaultState};
