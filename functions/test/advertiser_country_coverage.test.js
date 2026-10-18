@@ -14,11 +14,17 @@ const france = {
   },
 };
 
-test("French coastal beaches remain eligible outside simplified red outline", () => {
+test("French coastal beaches remain eligible outside simplified red outline",
+    () => {
   const beaches = [
     {idSphot: "LONGE06", pays: "France", sphotLat: 46.4, sphotLng: -1.5},
     {idSphot: "ATLANTIC", countryIso3: "FRA", sphotLat: 46.41, sphotLng: -1.6},
-    {idSphot: "MEDITERRANEAN", countryIso3: "FRA", sphotLat: 43.2, sphotLng: 5.5},
+    {
+      idSphot: "MEDITERRANEAN",
+      countryIso3: "FRA",
+      sphotLat: 43.2,
+      sphotLng: 5.5,
+    },
   ];
   for (const spot of beaches) {
     assert.equal(countryCampaignCoversSpot(france, spot), true);
