@@ -132,7 +132,7 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
       case DiffusionPreviewType.map:
         return 'CARTE SPHOT';
       case DiffusionPreviewType.premium:
-        return 'FICHE SPHOT PREMIUM';
+        return 'FICHES SPHOT';
       case DiffusionPreviewType.pack:
         return 'PACK VISIBILITÉ TOTALE';
       case null:
@@ -205,7 +205,7 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
   Widget _diffusionChoices() {
     const values = <DiffusionPreviewType, String>{
       DiffusionPreviewType.map: 'CARTE',
-      DiffusionPreviewType.premium: 'PREMIUM',
+      DiffusionPreviewType.premium: 'FICHES SPHOT',
       DiffusionPreviewType.pack: 'PACK TOTAL',
     };
     return Wrap(
