@@ -125,9 +125,8 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       final options = await _territoryService.resolve(position);
       if (!mounted || request != _territoryRequestNumber) return;
       final previous = _territory;
-      final selected = previous != null &&
-              options[previous.level]?.code == previous.code
-          ? options[previous.level]!
+      final selected = previous != null
+          ? options[previous.level]
           : options[AdvertiserTerritoryLevel.commune];
       setState(() {
         _territoryOptions = options;
@@ -141,7 +140,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
         _territoryOptions = null;
         _territoryLoading = false;
         _territoryError =
-            'Impossible de charger les territoires officiels. Réessayez.';
+            'Impossible de préparer les cinq rayons. Réessayez.';
       });
     }
   }
@@ -517,9 +516,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     final position = widget.position;
     final territory = _territory;
     if (territory == null ||
-        _territoryOptions?[territory.level]?.code != territory.code) {
+        _territoryOptions?[territory.level] == null) {
       setState(() {
-        _error = 'Sélectionnez un territoire administratif valide.';
+        _error = 'Sélectionnez une des cinq portées de diffusion.';
       });
       return;
     }
@@ -785,7 +784,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'TERRITOIRE DE DIFFUSION',
+                  'RAYON DE DIFFUSION',
                   style: TextStyle(
                     color: WebColors.blue,
                     fontSize: 16,
@@ -797,8 +796,8 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Sélectionnez un territoire administratif. Aucun rayon ni '
-            'exclusivité territoriale ou sectorielle.',
+            'Cinq portées circulaires rouges, identiques dans tous les pays. '
+            'Aucune exclusivité géographique ou sectorielle.',
             style: TextStyle(
               color: Color(0xFF4B5F97),
               fontWeight: FontWeight.w700,
@@ -812,8 +811,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               children: [
                 Text(
                   _territoryError ??
-                      'Positionnez votre SPHOT sur la carte pour '
-                      'obtenir ses territoires officiels.',
+                      'Positionnez votre SPHOT pour afficher les cinq rayons.',
                   style: const TextStyle(color: WebColors.red),
                 ),
                 if (widget.position != null)
@@ -850,7 +848,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                         ),
                       ),
                       child: Text(
-                        level.label,
+                        '${level.label} · ${level.radiusLabel}',
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ),
@@ -859,7 +857,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             if (current != null) ...[
               const SizedBox(height: 12),
               Text(
-                '${current.level.label} : ${current.name}',
+                '${current.level.label} : ${current.level.radiusLabel}',
                 style: const TextStyle(
                   color: WebColors.blue,
                   fontWeight: FontWeight.w800,
@@ -867,10 +865,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               ),
               const SizedBox(height: 6),
               Text(
-                current.level == AdvertiserTerritoryLevel.national
-                    ? 'Diffusion nationale, sans contour local.'
-                    : 'Le contour officiel du territoire sélectionné '
-                        'est affiché sur la carte.',
+                'La zone rouge représente un rayon de '
+                    '${current.level.radiusLabel} autour du SPHOT, '
+                    'quel que soit le pays.',
                 style: const TextStyle(
                   color: Color(0xFF4B5F97),
                   fontSize: 12,
