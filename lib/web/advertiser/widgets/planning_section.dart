@@ -22,6 +22,8 @@ class PlanningSection extends StatefulWidget {
     this.pricingReference,
     this.pricingError,
     this.durationPrices = const {},
+    this.discountPercent = 0,
+    this.payableExclTaxCents = 0,
     required this.initialPlanning,
     required this.onPlanningChanged,
     this.requestedScope = 'local',
@@ -38,6 +40,8 @@ class PlanningSection extends StatefulWidget {
   final String? pricingReference;
   final String? pricingError;
   final Map<String, int> durationPrices;
+  final int discountPercent;
+  final int payableExclTaxCents;
   final PlanningData initialPlanning;
   final ValueChanged<PlanningData> onPlanningChanged;
   final String requestedScope;
@@ -696,6 +700,24 @@ class _PlanningSectionState extends State<PlanningSection> {
                   fontWeight: FontWeight.w900,
                 ),
               ),
+              if (widget.costExclTax > 0 &&
+                  widget.discountPercent > 0) ...[
+                const SizedBox(height: 5),
+                Text(
+                  'Remise client : -${widget.discountPercent} %',
+                  style: const TextStyle(
+                    color: WebColors.blue,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  'NET HT : ${(widget.payableExclTaxCents / 100).toStringAsFixed(2)} €',
+                  style: const TextStyle(
+                    color: WebColors.red,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
               const SizedBox(height: 6),
               Text(
                 widget.pricingReference == null
