@@ -36,6 +36,12 @@ function verifyQuote(quote) {
       quote.discountPercent < 0 || quote.discountPercent > 90) {
     throw invalid("Remise SPHOT invalide.");
   }
+  const expectedCents = quote.amountExclTax * (100 - quote.discountPercent);
+  if (!Number.isSafeInteger(expectedCents) ||
+      !Number.isSafeInteger(quote.payableExclTaxCents) ||
+      quote.payableExclTaxCents !== expectedCents) {
+    throw invalid("Total HT apres remise incoherent.");
+  }
 }
 
 function buildOdooDraft({quote, partnerId, productIds, sphotReference}) {
