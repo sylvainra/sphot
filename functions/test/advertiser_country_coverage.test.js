@@ -14,8 +14,7 @@ const france = {
   },
 };
 
-test("French coastal beaches remain eligible outside simplified red outline",
-    () => {
+test("French beaches remain eligible outside the map contour", () => {
   const beaches = [
     {idSphot: "LONGE06", pays: "France", sphotLat: 46.4, sphotLng: -1.5},
     {idSphot: "ATLANTIC", countryIso3: "FRA", sphotLat: 46.41, sphotLng: -1.6},
