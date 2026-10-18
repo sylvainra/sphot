@@ -202,7 +202,7 @@ class _SuperAdminAdvertiserRadiusPricingTableState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'NOUVEAU CATALOGUE : 108 PRIX · 6 RAYONS × 3 OFFRES × 6 DURÉES',
+          'NOUVEAU CATALOGUE : 108 PRIX · 5 RAYONS + 1 PAYS × 3 OFFRES × 6 DURÉES',
           style: const TextStyle(
             color: _blue,
             fontSize: 16,
