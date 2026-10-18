@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'super_admin_admin_pricing_table.dart';
 import 'super_admin_advertiser_pricing_table.dart';
 import 'super_admin_advertiser_radius_pricing_table.dart';
+import 'super_admin_customer_discounts_dialog.dart';
 
 /// Shell des catalogues tarifaires Firestore ADMIN et ANNONCEUR.
 /// Aucun prix de devis, abonnement ou renouvellement existant n'est modifie.
@@ -66,6 +67,17 @@ class _SuperAdminPricingPanelState extends State<SuperAdminPricingPanel> {
                       ),
                     ),
                   ),
+                  OutlinedButton.icon(
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (_) => SuperAdminCustomerDiscountsDialog(
+                        sessionToken: widget.pricingSessionToken,
+                      ),
+                    ),
+                    icon: const Icon(Icons.percent_rounded, size: 17),
+                    label: const Text('REMISES CLIENTS'),
+                  ),
+                  const SizedBox(width: 8),
                   IconButton(
                     onPressed: widget.onClose,
                     icon: const Icon(Icons.close_rounded, color: _blue),
