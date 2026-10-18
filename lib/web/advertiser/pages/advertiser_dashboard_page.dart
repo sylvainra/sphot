@@ -114,11 +114,6 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   LatLng? _advertisingPoint;
   double _advertisingRadiusKm = 0;
   AdvertiserTerritory? _advertisingTerritory;
-  AdvertiserTerritoryGeometry _advertisingTerritoryGeometry =
-      const AdvertiserTerritoryGeometry([]);
-  final AdvertiserTerritoryService _advertiserTerritoryService =
-      AdvertiserTerritoryService();
-  int _geometryRequestNumber = 0;
   AdvertisingVisualData _advertisingVisual = const AdvertisingVisualData();
   DiffusionPreviewData _diffusionPreview = const DiffusionPreviewData();
   PlanningData _planningData = const PlanningData();
@@ -201,8 +196,6 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
 
   @override
   void dispose() {
-    _geometryRequestNumber++;
-    _advertiserTerritoryService.dispose();
     _requestSubscription?.cancel();
     _detailScrollController.dispose();
     super.dispose();
@@ -272,9 +265,6 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   void _restoreRequestAssets(Map<String, dynamic> data) {
     final restoredTerritory =
         AdvertiserTerritory.fromFirestore(data['advertisingTerritory']);
-    if (restoredTerritory != null) {
-      _setAdvertisingTerritory(restoredTerritory);
-    }
     final approved = _map(data['approvedApplication']);
     final location = approved.isNotEmpty
         ? _map(approved['location'])
@@ -286,6 +276,9 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     final longitude = _double(location['longitude']);
     if (latitude != null && longitude != null) {
       _setAdvertisingPoint(LatLng(latitude, longitude), centerMap: false);
+    }
+    if (restoredTerritory != null) {
+      _setAdvertisingTerritory(restoredTerritory);
     }
     final url = _nullableText(visual['url'] ?? data['bannerUrl']);
     if (url != null) {
@@ -383,7 +376,10 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _mapController.move(point, 15);
+      _mapController.move(
+        point,
+        _advertisingTerritory?.level.suggestedZoom ?? 15,
+      );
     });
   }
 
@@ -399,38 +395,20 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     setState(() => _advertisingVisual = visual);
   }
 
-  Future<void> _setAdvertisingTerritory(
-    AdvertiserTerritory territory,
-  ) async {
+  void _setAdvertisingTerritory(AdvertiserTerritory territory) {
     if (!mounted) return;
     final old = _advertisingTerritory;
     if (old?.level == territory.level && old?.code == territory.code) return;
-    final requestNumber = ++_geometryRequestNumber;
-    setState(() {
-      _advertisingTerritory = territory;
-      _advertisingTerritoryGeometry =
-          const AdvertiserTerritoryGeometry([]);
-    });
+    setState(() => _advertisingTerritory = territory);
     _loadPublishedPrices();
-    try {
-      final geometry =
-          await _advertiserTerritoryService.geometry(territory);
-      if (!mounted || requestNumber != _geometryRequestNumber) return;
-      setState(() => _advertisingTerritoryGeometry = geometry);
-      final zoom = switch (territory.level) {
-        AdvertiserTerritoryLevel.commune => 12.0,
-        AdvertiserTerritoryLevel.intercommunalite => 10.5,
-        AdvertiserTerritoryLevel.departement => 9.0,
-        AdvertiserTerritoryLevel.region => 7.0,
-        AdvertiserTerritoryLevel.national => 5.0,
-      };
-      if (_advertisingPoint != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _mapController.move(_advertisingPoint!, zoom);
-        });
-      }
-    } catch (error) {
-      debugPrint('Contour du territoire indisponible : $error');
+    final center = _advertisingPoint;
+    if (center != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _mapController.move(
+          center,
+          territory.level.suggestedZoom,
+        );
+      });
     }
   }
 
@@ -622,17 +600,18 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               userAgentPackageName: 'com.sphot.app',
             ),
             if (showApprovedRadius &&
-                _advertisingTerritoryGeometry.polygons.isNotEmpty)
-              PolygonLayer(
-                polygons: [
-                  for (final ring in
-                      _advertisingTerritoryGeometry.polygons)
-                    Polygon(
-                      points: ring,
-                      color: WebColors.red.withOpacity(0.10),
-                      borderColor: WebColors.red,
-                      borderStrokeWidth: 2.0,
-                    ),
+                _advertisingPoint != null &&
+                _advertisingTerritory != null)
+              CircleLayer(
+                circles: [
+                  CircleMarker(
+                    point: _advertisingPoint!,
+                    radius: _advertisingTerritory!.radiusKm * 1000,
+                    useRadiusInMeter: true,
+                    color: WebColors.red.withOpacity(0.10),
+                    borderColor: WebColors.red,
+                    borderStrokeWidth: 2.2,
+                  ),
                 ],
               ),
             if (_advertisingPoint != null)
