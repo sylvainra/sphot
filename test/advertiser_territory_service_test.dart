@@ -1,127 +1,174 @@
+import 'dart:convert';
+
+import 'package:bathing_spots_app/web/advertiser/services/advertiser_country_boundary_service.dart';
 import 'package:bathing_spots_app/web/advertiser/services/advertiser_territory_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:latlong2/latlong.dart';
 
+Map<String, dynamic> _feature(
+  String iso,
+  String country,
+  List<List<num>> ring,
+) =>
+    {
+      'type': 'Feature',
+      'properties': {'ADM0_A3': iso, 'ADMIN': country},
+      'geometry': {
+        'type': 'Polygon',
+        'coordinates': [ring],
+      },
+    };
+
+Map<String, dynamic> _world() => {
+      'type': 'FeatureCollection',
+      'features': [
+        _feature('FRA', 'France', [
+          [-3, 44], [8, 44], [8, 52], [-3, 52], [-3, 44]
+        ]),
+        _feature('FRA', 'France', [
+          [-53, 3], [-51, 3], [-51, 5], [-53, 5], [-53, 3]
+        ]),
+        _feature('BRA', 'Brazil', [
+          [-75, -35], [-35, -35], [-35, 5], [-75, 5], [-75, -35]
+        ]),
+        _feature('JPN', 'Japan', [
+          [129, 30], [146, 30], [146, 46], [129, 46], [129, 30]
+        ]),
+      ],
+    };
+
+AdvertiserCountryBoundaryService _fakeBoundaries() =>
+    AdvertiserCountryBoundaryService(
+      client: MockClient((request) async =>
+          http.Response(jsonEncode(_world()), 200)),
+    );
+
 void main() {
-  test('les six rayons apparaissent seuls et dans le bon ordre', () {
+  test('cinq rayons inchangés et PAYS ENTIER en sixième position', () {
+    final levels = AdvertiserTerritoryLevel.values;
     expect(
-      AdvertiserTerritoryLevel.values.map((level) => level.label).toList(),
-      ['5 km', '15 km', '50 km', '150 km', '300 km', '500 km'],
+      levels.map((level) => level.label).toList(),
+      ['5 km', '15 km', '50 km', '150 km', '300 km', 'PAYS ENTIER'],
     );
     expect(
-      AdvertiserTerritoryLevel.values
-          .map((level) => level.storageKey)
-          .toList(),
+      levels.map((level) => level.storageKey).toList(),
       [
-        'radius_5km',
-        'radius_15km',
-        'radius_50km',
-        'radius_150km',
-        'radius_300km',
-        'radius_500km',
+        'radius_5km', 'radius_15km', 'radius_50km',
+        'radius_150km', 'radius_300km', 'country',
       ],
     );
-  });
-
-  test('tous les rayons sont positifs et croissants', () {
-    final radii = AdvertiserTerritoryLevel.values
-        .map((level) => level.radiusKm)
-        .toList();
-    expect(radii, [5.0, 15.0, 50.0, 150.0, 300.0, 500.0]);
-    for (var i = 1; i < radii.length; i++) {
-      expect(radii[i], greaterThan(radii[i - 1]));
-    }
-  });
-
-  test('les six choix sont identiques dans cinq pays', () async {
-    const service = AdvertiserTerritoryService();
-    const points = [
-      LatLng(46.4, -1.5), // France
-      LatLng(40.7, -74), // États-Unis
-      LatLng(35.7, 139.7), // Japon
-      LatLng(-33.9, 151.2), // Australie
-      LatLng(-23.5, -46.6), // Brésil
-    ];
-    for (final point in points) {
-      final options = await service.resolve(point);
-      expect(options.options, hasLength(6));
-      expect(
-        AdvertiserTerritoryLevel.values
-            .map((level) => options[level]!.radiusKm)
-            .toList(),
-        [5.0, 15.0, 50.0, 150.0, 300.0, 500.0],
-      );
-    }
-  });
-
-  test('les six choix ont un zoom associé', () {
-    for (final level in AdvertiserTerritoryLevel.values) {
-      expect(level.suggestedZoom, greaterThan(0));
-    }
-  });
-
-  test('le rayon sélectionné est conservé lors de la sérialisation', () {
-    const territory = AdvertiserTerritory(
-      level: AdvertiserTerritoryLevel.radius300km,
-      code: 'WORLD_radius_300km',
-      name: '300 km',
+    expect(
+      levels.where((level) => !level.isCountry)
+          .map((level) => level.radiusKm).toList(),
+      [5.0, 15.0, 50.0, 150.0, 300.0],
     );
-    final document = territory.toFirestore();
-    expect(document['level'], 'radius_300km');
-    expect(document['radiusKm'], 300.0);
-    expect(document['coverageModel'], 'worldwide_radius_v2');
-
-    final restored = AdvertiserTerritory.fromFirestore(document);
-    expect(restored?.level, territory.level);
-    expect(restored?.radiusKm, territory.radiusKm);
-    expect(restored?.name, '300 km');
   });
 
-  test('les six niveaux se rechargent depuis Firestore', () {
-    for (final level in AdvertiserTerritoryLevel.values) {
-      final data = AdvertiserTerritory(
-        level: level,
-        code: 'WORLD_${level.storageKey}',
-        name: level.label,
-      ).toFirestore();
-      expect(AdvertiserTerritory.fromFirestore(data)?.level, level);
-    }
+  test('détecte la France et le Brésil par la position du SPHOT', () async {
+    final service = AdvertiserTerritoryService(
+      countryService: _fakeBoundaries(),
+    );
+    final france = await service.resolve(const LatLng(46.5, 2));
+    final brazil = await service.resolve(const LatLng(-20, -50));
+    expect(france.options, hasLength(6));
+    expect(brazil.options, hasLength(6));
+    expect(france[AdvertiserTerritoryLevel.wholeCountry]?.code, 'FRA');
+    expect(france[AdvertiserTerritoryLevel.wholeCountry]?.name, 'France');
+    expect(brazil[AdvertiserTerritoryLevel.wholeCountry]?.code, 'BRA');
+    expect(brazil[AdvertiserTerritoryLevel.wholeCountry]?.name, 'Brazil');
   });
 
-  test('les anciens rayons identiques sont lisibles sans conversion', () {
-    final saved = AdvertiserTerritory.fromFirestore({
-      'level': 'commune',
-      'radiusKm': 5,
-      'coverageModel': 'worldwide_radius_v1',
-      'code': 'WORLD_commune',
-      'name': 'Ancien périmètre',
-    });
-    expect(saved?.radiusKm, 5.0);
-    expect(saved?.level, AdvertiserTerritoryLevel.radius5km);
+  test('plusieurs composantes du même pays sont conservées', () async {
+    final boundaries = _fakeBoundaries();
+    final france = await boundaries.findByIso3('FRA');
+    expect(france?.polygons, hasLength(2));
+    expect(france?.contains(const LatLng(4, -52)), isTrue);
   });
 
-  test('aucune conversion arbitraire des anciens niveaux administratifs', () {
+  test('aucun pays n’est attribué arbitrairement en haute mer', () async {
+    final service = AdvertiserTerritoryService(
+      countryService: _fakeBoundaries(),
+    );
+    final result = await service.resolve(const LatLng(-20, -120));
+    expect(result.options, hasLength(5));
+    expect(result[AdvertiserTerritoryLevel.wholeCountry], isNull);
+    expect(result[AdvertiserTerritoryLevel.radius300km], isNotNull);
+  });
+
+  test('PAYS ENTIER conserve son code ISO3 dans Firestore', () {
+    const chosen = AdvertiserTerritory(
+      level: AdvertiserTerritoryLevel.wholeCountry,
+      code: 'JPN',
+      name: 'Japan',
+    );
+    final saved = chosen.toFirestore();
+    expect(saved['level'], 'country');
+    expect(saved['countryIso3'], 'JPN');
+    expect(saved.containsKey('radiusKm'), isFalse);
+    expect(saved['coverageModel'], 'country_whole_v1');
+    final restored = AdvertiserTerritory.fromFirestore(saved);
+    expect(restored?.isWholeCountry, isTrue);
+    expect(restored?.code, 'JPN');
+    expect(restored?.name, 'Japan');
+  });
+
+  test('l’ancien rayon 500 km ne devient jamais PAYS ENTIER', () {
     expect(
       AdvertiserTerritory.fromFirestore({
-        'level': 'region',
+        'level': 'radius_500km',
+        'radiusKm': 500,
+        'coverageModel': 'worldwide_radius_v2',
+      }),
+      isNull,
+    );
+    expect(
+      AdvertiserTerritory.fromFirestore({
+        'level': 'national',
         'radiusKm': 1000,
         'coverageModel': 'worldwide_radius_v1',
       }),
       isNull,
     );
+  });
+
+  test('les anciens rayons compatibles restent lisibles', () {
+    for (final km in [5, 15, 50, 150, 300]) {
+      final restored = AdvertiserTerritory.fromFirestore({
+        'level': 'commune',
+        'radiusKm': km,
+        'coverageModel': 'worldwide_radius_v1',
+      });
+      expect(restored?.radiusKm, km.toDouble());
+      expect(restored?.isWholeCountry, isFalse);
+    }
+  });
+
+  test('GeoJSON invalide rejeté, aucun pays inventé', () {
+    expect(
+      () => AdvertiserCountryBoundaryService.parseFeatureCollection(null),
+      throwsFormatException,
+    );
     expect(
       AdvertiserTerritory.fromFirestore({
-        'level': 'commune',
-        'code': '85000',
-        'name': 'Commune historique',
+        'level': 'country',
+        'code': '???',
+        'name': 'Pays',
+        'coverageModel': 'country_whole_v1',
       }),
       isNull,
     );
   });
 
-  test('les valeurs inconnues restent rejetées', () {
-    expect(AdvertiserTerritory.fromFirestore(null), isNull);
-    expect(AdvertiserTerritory.fromFirestore({}), isNull);
-    expect(AdvertiserTerritory.fromFirestore({'level': 'incorrect'}), isNull);
+  test('les cinq rayons restent accessibles si la source tombe', () async {
+    final source = AdvertiserCountryBoundaryService(
+      client: MockClient((_) async => http.Response('erreur', 503)),
+    );
+    final choices = await AdvertiserTerritoryService(
+      countryService: source,
+    ).resolve(const LatLng(48.8, 2.3));
+    expect(choices.options, hasLength(5));
+    expect(choices[AdvertiserTerritoryLevel.wholeCountry], isNull);
   });
 }
