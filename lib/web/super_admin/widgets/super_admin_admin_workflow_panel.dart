@@ -649,20 +649,29 @@ class SuperAdminAdminWorkflowPanel extends StatelessWidget {
         }, SetOptions(merge: true));
       });
 
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(
-          'Période d’essai renouvelée pour 8 jours. '
-          'Historique enregistré.',
-        )),
-      );
+      // La fiche se met à jour via ses StreamBuilder Firestore.
+      // Pas de bannière temporaire de confirmation en bas de l'écran.
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(
-          'Renouvellement non effectué : '
-          '${error is StateError ? error.message : error}',
-        )),
+      // Un échec doit rester explicite : ne jamais laisser croire que
+      // les droits ont été réactivés si la transaction a échoué.
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text(
+            'RENOUVELLEMENT NON EFFECTUÉ',
+            style: TextStyle(color: _red, fontWeight: FontWeight.w900),
+          ),
+          content: Text(
+            error is StateError ? error.message.toString() : error.toString(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('FERMER'),
+            ),
+          ],
+        ),
       );
     }
   }
