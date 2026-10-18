@@ -271,6 +271,25 @@ class _AdminPaymentPanelState extends State<AdminPaymentPanel> {
                       ),
                     ],
                   ),
+                  if (quote.discountPercent > 0) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'REMISE CLIENT : -${quote.discountPercent} %',
+                      style: const TextStyle(
+                        color: _blue,
+                        fontWeight: FontWeight.w800,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                    Text(
+                      'NET ANNUEL HT : ${_money(quote.payableExclTaxCents / 100)}',
+                      style: const TextStyle(
+                        color: Color(0xFFDC2626),
+                        fontWeight: FontWeight.w900,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   const Text(
                     'Avant TVA et fiscalité applicable. Aucun devis contractuel '
