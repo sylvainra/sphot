@@ -78,7 +78,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'SPHOT PUBLICITAIRE',
       Icons.location_on_outlined,
-      'Choisissez une portée circulaire rouge parmi cinq niveaux, quel que soit le pays.',
+      'Choisissez une des six portées circulaires rouges, dans tous les pays.',
     ),
     _AdvertiserSection(
       'DIFFUSION',
@@ -95,6 +95,11 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
       'DEVIS & COMMANDE',
       Icons.assignment_turned_in_outlined,
       'Tarification, devis, bon de commande et validation.',
+    ),
+    _AdvertiserSection(
+      'PAIEMENT CB',
+      Icons.credit_card_outlined,
+      'Paiement sécurisé du devis confirmé, sans renouvellement automatique.',
     ),
     _AdvertiserSection(
       'DOCUMENTS & FACTURES',
@@ -1025,6 +1030,9 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             costExclTax: _costFor(
               durationLabel: _planningData.durationLabel ?? '1 semaine',
             ),
+            pricingReference: _publishedPricingReference,
+            pricingError: _publishedPricingError,
+            durationPrices: _durationPrices,
             initialPlanning: _planningData,
             onPlanningChanged: _setPlanningData,
             requestedScope: _requestedScope,
@@ -1056,6 +1064,29 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           ),
         ];
       case 5:
+        return [
+          _StatusCard(
+            icon: Icons.credit_card_outlined,
+            title: 'PAIEMENT SÉCURISÉ',
+            description: _publishedPricingReference == null ||
+                    !_planningData.isComplete
+                ? 'La grille des six rayons doit être publiée et '
+                    'la planification confirmée avant toute commande.'
+                : 'Devis et commande à établir dans Odoo. '
+                    'Paiement CB par Stripe après confirmation '
+                    'de la commande côté serveur.',
+            status: 'PAIEMENT NON ACTIVÉ',
+          ),
+          const _StatusCard(
+            icon: Icons.lock_outline,
+            title: 'AUCUN PAIEMENT INITIÉ',
+            description: 'Aucun prélèvement automatique. '
+                'La campagne ne devient pas active avant '
+                'la confirmation de paiement authentifiée.',
+            status: 'SÉCURISÉ',
+          ),
+        ];
+      case 6:
         return const [
           _StatusCard(
             icon: Icons.receipt_long_outlined,
