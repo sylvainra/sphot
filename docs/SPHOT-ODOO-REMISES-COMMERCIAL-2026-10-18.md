@@ -41,3 +41,5 @@
 - Toutes les anciennes références tarifaires, commandes et factures doivent rester immuables.
 - La suppression de collections Firebase historiques n'entre pas dans ce chantier.
 - `main` et la production restent inchangés jusqu'à validation finale.
+- **Bloquant avant tout déploiement** : auditer les règles Firestore actuellement publiées. Le dépôt ne contient pas de fichier de règles Firestore configuré dans `firebase.json`; ne pas supposer que `commercialCustomerDiscounts` est automatiquement privé. Refuser aux clients toute lecture et écriture directe de cette collection, tout en laissant les écritures serveur Admin SDK autorisées.
+- Ne jamais exposer un UID client, une remise individuelle ou une clé Odoo dans une projection publique.
