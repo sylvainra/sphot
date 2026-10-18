@@ -3,6 +3,7 @@
 
 // Isolated, versioned commercial price catalog. It does NOT alter the
 // legacy advertisingPricing/subscriptionPricing documents or live billing.
+const commercialDiscounts = require("./commercial_discounts");
 const SESSION_COLLECTION = "superAdminPricingSessions";
 const MARKETS = "commercialPricingMarkets";
 const SESSION_MS = 2 * 60 * 60 * 1000;
@@ -490,6 +491,14 @@ function endpoint({admin, crypto, onRequest}) {
               result = await publish(admin, type, body, login); break;
             case "cancelSchedule":
               result = await cancelSchedule(admin, type, body, login); break;
+            case "getCustomerDiscount":
+              result = await commercialDiscounts.getForSuperAdmin(
+                  admin, type, body.customerUid);
+              break;
+            case "setCustomerDiscount":
+              result = await commercialDiscounts.setForSuperAdmin(
+                  admin, type, body.customerUid, body.discountPercent, login);
+              break;
             default: throw err(400, "Action inconnue.");
           }
           response.status(200).json({success: true, data: result});
