@@ -295,7 +295,7 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
           title: 'RAYON DE DIFFUSION',
           value: widget.selectedTerritory == null
               ? 'À choisir à l’étape SPHOT PUBLICITAIRE'
-              : '${widget.selectedTerritory!.level.label} • ${widget.selectedTerritory!.name}',
+              : widget.selectedTerritory!.level.label,
           icon: Icons.location_on_outlined,
         ),
         _summaryCard(
