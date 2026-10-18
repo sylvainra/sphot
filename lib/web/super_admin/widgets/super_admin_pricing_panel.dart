@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'super_admin_admin_pricing_table.dart';
 import 'super_admin_advertiser_pricing_table.dart';
 import 'super_admin_advertiser_radius_pricing_table.dart';
-import 'super_admin_customer_discount_panel.dart';
 import 'super_admin_customer_discounts_dialog.dart';
 
 /// Shell des catalogues tarifaires Firestore ADMIN et ANNONCEUR.
@@ -31,7 +30,6 @@ class _SuperAdminPricingPanelState extends State<SuperAdminPricingPanel> {
   static const _red = Color(0xFFDC2626);
   int _localTab = 0;
   bool _radiusCatalog = true;
-  bool _discountMode = false;
 
   int get _tab => widget.onTabChanged == null ? _localTab : widget.selectedTab;
 
@@ -97,35 +95,10 @@ class _SuperAdminPricingPanelState extends State<SuperAdminPricingPanel> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => setState(() => _discountMode = false),
-                      child: const Text('GRILLES TARIFAIRES'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => setState(() => _discountMode = true),
-                      child: const Text('RISTOURNES CLIENTS'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: _discountMode
-                    ? SuperAdminCustomerDiscountPanel(
-                        sessionToken: widget.pricingSessionToken,
-                      )
-                    : IndexedStack(
+                child: IndexedStack(
                   index: _tab,
                   children: [
                     SuperAdminAdminPricingTable(sessionToken: widget.pricingSessionToken),
