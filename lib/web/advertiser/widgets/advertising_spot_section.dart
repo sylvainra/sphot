@@ -785,7 +785,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'RAYON DE DIFFUSION',
+                  'ZONE DE DIFFUSION',
                   style: TextStyle(
                     color: WebColors.blue,
                     fontSize: 16,
