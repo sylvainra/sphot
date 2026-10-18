@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sphot/web/advertiser/services/advertiser_territory_service.dart';
+import 'package:bathing_spots_app/web/advertiser/services/advertiser_territory_service.dart';
 
 void main() {
   test('les cinq niveaux territoriaux sont conservés dans l’ordre', () {
