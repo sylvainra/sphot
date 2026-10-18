@@ -25,18 +25,35 @@ function iso3(value) {
  * @param {Object} spot Spot publié avec pays métier (non cartographique).
  * @return {string} ISO3, ou chaîne vide si données insuffisantes.
  */
+// Rattachement souverain pour les audiences commerciales françaises.
+// Les régimes fiscaux locaux, distincts selon le territoire, NE SONT
+// PAS inférés de ces codes ; ils restent du ressort d'Odoo.
+const FRENCH_OVERSEAS_ISO3 = new Set([
+  "GLP", "MTQ", "GUF", "REU", "MYT", "SPM",
+  "PYF", "NCL", "WLF", "BLM", "MAF", "ATF",
+]);
+const FRENCH_OVERSEAS_NAMES = new Set([
+  "GUADELOUPE", "MARTINIQUE", "GUYANE", "GUYANE FRANCAISE",
+  "LA REUNION", "REUNION", "MAYOTTE", "POLYNESIE FRANCAISE",
+  "NOUVELLE CALEDONIE", "WALLIS ET FUTUNA",
+  "SAINT PIERRE ET MIQUELON", "SAINT BARTHELEMY",
+  "TERRES AUSTRALES ET ANTARCTIQUES FRANCAISES",
+]);
+
 function spotCountry(spot) {
   if (!spot || typeof spot !== "object") return "";
   const explicit = iso3(spot.countryIso3 || spot.paysIso3);
+  if (FRENCH_OVERSEAS_ISO3.has(explicit)) return "FRA";
   if (explicit) return explicit;
 
-  // Compatibilité avec les documents publics historiques français.
-  // L'international doit utiliser le code ISO3 exact, non un nom libre.
+  // Compatibilité avec les données historiques françaises :
+  // uniquement les libellés non ambigus, jamais les coordonnées.
   const label = String(spot.pays || "")
       .trim()
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .toUpperCase();
-  if (["FRANCE", "FRA", "FR"].includes(label)) return "FRA";
+      .toUpperCase().replace(/[-']/g, " ").replace(/\s+/g, " ");
+  if (["FRANCE", "FRA", "FR"].includes(label) ||
+      FRENCH_OVERSEAS_NAMES.has(label)) return "FRA";
   return "";
 }
 
