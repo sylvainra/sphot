@@ -46,25 +46,24 @@ class _DiffusionSectionState extends State<DiffusionSection> {
     return widget.user?.uid;
   }
 
+  // Deux zones réelles : 1 carte et 6 rubriques du volet SPHOT.
+  // La sélection simultanée reste enregistrée sous 'pack'.
   static const _options = <_DiffusionOption>[
     _DiffusionOption(
       value: 'map',
       label: 'CARTE SPHOT',
-      description: 'Votre publicité apparaît pendant la navigation sur la carte principale.',
+      description:
+          'Votre publicité apparaît dans l’encart de la carte principale '
+          '(1 emplacement).',
       icon: Icons.map_outlined,
     ),
     _DiffusionOption(
       value: 'premium',
-      label: 'FICHE SPHOT PREMIUM',
-      description: 'Votre publicité apparaît sur la fiche détaillée des SPHOTS concernés.',
+      label: 'FICHES SPHOT',
+      description:
+          'Votre publicité apparaît en bas de chacune des 6 rubriques '
+          'du volet de chaque SPHOT concerné (6 emplacements).',
       usesFireIcon: true,
-    ),
-    _DiffusionOption(
-      value: 'pack',
-      label: 'PACK VISIBILITÉ TOTALE',
-      description: 'Votre publicité est présente à la fois sur la carte et sur les fiches SPHOTS.',
-      icon: Icons.stars_outlined,
-      recommended: true,
     ),
   ];
 
@@ -118,7 +117,8 @@ class _DiffusionSectionState extends State<DiffusionSection> {
           final establishment = _map(data['establishment']);
           final advertisingSpot = _map(data['advertisingSpot']);
           final savedValue = diffusion['visibilityType']?.toString();
-          if (_options.any((option) => option.value == savedValue)) {
+          if (_options.any((option) => option.value == savedValue) ||
+              savedValue == 'pack') {
             _selectedValue = savedValue;
           }
           _savedBannerUrl = _nullableText(
@@ -208,13 +208,31 @@ class _DiffusionSectionState extends State<DiffusionSection> {
   }
 
   void _select(String value) {
+    final placement = value == 'map'
+        ? DiffusionPlacement.map
+        : DiffusionPlacement.spotPanels;
+    final selection =
+        DiffusionPlacementSelection.fromType(_previewType).toggle(placement);
     setState(() {
-      _selectedValue = value;
+      _selectedValue = _valueForPreviewType(selection.type);
       _completed = false;
       _error = null;
     });
     _notifyPreview();
   }
+
+  bool _isZoneSelected(String value) {
+    final selection = DiffusionPlacementSelection.fromType(_previewType);
+    return value == 'map' ? selection.onMap : selection.inSpotPanels;
+  }
+
+  String get _selectedOfferLabel => switch (_previewType) {
+        DiffusionPreviewType.map => 'CARTE SPHOT · 1 emplacement',
+        DiffusionPreviewType.premium => 'FICHES SPHOT · 6 emplacements',
+        DiffusionPreviewType.pack =>
+          'PACK VISIBILITÉ TOTALE · 7 emplacements',
+        null => 'Choisissez une ou deux zones de diffusion',
+      };
 
   Future<void> _save() async {
     final selectedValue = _selectedValue;
@@ -231,9 +249,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
       return;
     }
 
-    final selectedOption = _options.firstWhere(
-      (option) => option.value == selectedValue,
-    );
+    final selectedLabel = _selectedOfferLabel;
 
     setState(() {
       _saving = true;
@@ -259,7 +275,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
               'diffusionCompleted': true,
               'diffusion': <String, Object?>{
                 'visibilityType': selectedOption.value,
-                'visibilityLabel': selectedOption.label,
+                'visibilityLabel': selectedLabel,
                 'confirmedAt': FieldValue.serverTimestamp(),
               },
               'updatedAt': FieldValue.serverTimestamp(),
@@ -324,7 +340,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'SÉLECTIONNEZ UNE OFFRE',
+                          'SÉLECTIONNEZ UNE OU DEUX ZONES',
                           style: TextStyle(
                             color: Color(0xFF6B7280),
                             fontWeight: FontWeight.w900,
@@ -341,9 +357,44 @@ class _DiffusionSectionState extends State<DiffusionSection> {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _VisibilityOptionCard(
                     option: option,
-                    selected: option.value == _selectedValue,
+                    selected: _isZoneSelected(option.value),
                     onTap: () => _select(option.value),
                   ),
+                ),
+              ),
+              const SizedBox(height: 5),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 11,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF6F9FD),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _previewType == null
+                          ? Icons.touch_app_outlined
+                          : Icons.check_circle_outline_rounded,
+                      color: _previewType == null
+                          ? WebColors.blue
+                          : WebColors.red,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _selectedOfferLabel,
+                        style: const TextStyle(
+                          color: WebColors.blue,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -508,8 +559,8 @@ class _VisibilityOptionCard extends StatelessWidget {
               const SizedBox(width: 8),
               Icon(
                 selected
-                    ? Icons.radio_button_checked_rounded
-                    : Icons.radio_button_off_rounded,
+                    ? Icons.check_box_rounded
+                    : Icons.check_box_outline_blank_rounded,
                 color: accentColor,
                 size: 25,
               ),
