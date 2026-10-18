@@ -108,7 +108,7 @@ class _SuperAdminPricingPanelState extends State<SuperAdminPricingPanel> {
                           children: [
                             Expanded(
                               child: _catalogButton(
-                                '6 RAYONS · 108 PRIX',
+                                '5 RAYONS + PAYS · 108 PRIX',
                                 true,
                               ),
                             ),
