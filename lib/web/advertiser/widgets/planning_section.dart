@@ -580,7 +580,7 @@ class _PlanningSectionState extends State<PlanningSection> {
                     ),
                     const SizedBox(height: 7),
                     Text(
-                      'La diffusion respecte les dates et le rayon géographique choisi. '
+                      'La diffusion respecte les dates et la zone géographique choisie. '
                           'Plusieurs annonceurs peuvent diffuser simultanément. '
                           'Les publicités alternent équitablement, sans exclusivité.',
                       style: const TextStyle(
