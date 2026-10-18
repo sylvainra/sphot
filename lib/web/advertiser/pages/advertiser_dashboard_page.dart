@@ -476,13 +476,19 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
         debugPrint('Frontière absente pour ${territory.code}');
         return;
       }
+      final selectedSpot = _advertisingPoint;
+      if (selectedSpot == null) return;
+      final focusPoints = boundary.focusPointsNear(selectedSpot);
+      if (focusPoints.length < 3) return;
       setState(() => _countryOutline = boundary.polygons);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || request != _countryOutlineRequest) return;
-        // Inclut les régions insulaires et les composantes discontinues.
+        // Le cadrage utilise la composante du pays où se trouve le SPHOT,
+        // sans être repoussé vers l'océan par les territoires ultramarins.
+        // L'ensemble des contours nationaux demeure dessiné en rouge.
         _mapController.fitCamera(
           CameraFit.coordinates(
-            coordinates: boundary.allPoints,
+            coordinates: focusPoints,
             padding: const EdgeInsets.all(32),
             maxZoom: 7,
           ),
