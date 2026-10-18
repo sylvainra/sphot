@@ -71,8 +71,8 @@ class DiffusionCentralPreview extends StatelessWidget {
                           if (data.type == DiffusionPreviewType.premium ||
                               isPack)
                             _PreviewColumn(
-                              label: 'FICHE SPHOT PREMIUM',
-                              detail: 'INTÉGRATION INDICATIVE',
+                              label: 'FICHES SPHOT · 6 RUBRIQUES',
+                              detail: 'BANDEAU AU BAS DES 6 RUBRIQUES',
                               phoneWidth: phoneWidth,
                               child: _PremiumPhonePreview(data: data),
                             ),
@@ -94,9 +94,9 @@ class DiffusionCentralPreview extends StatelessWidget {
       DiffusionPreviewType.map =>
         'Visualisez l’emplacement réservé sur la carte principale.',
       DiffusionPreviewType.premium =>
-        'Visualisez l’intégration dans la fiche détaillée d’un SPHOT.',
+        'Visualisez la publicité au bas des six rubriques des volets SPHOT.',
       DiffusionPreviewType.pack =>
-        'Comparez vos deux emplacements publicitaires simultanément.',
+        'Visualisez les 7 emplacements : carte et six rubriques des volets.',
       null => '',
     };
   }
@@ -142,15 +142,11 @@ class _PreviewColumn extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => _openLargePreview(context),
-              child: AspectRatio(
-                aspectRatio: 0.60,
-                child: _PhoneShell(child: child),
-              ),
-            ),
+          // Laisser les six onglets interactifs. L’agrandissement possède
+          // son bouton séparé, pour ne pas intercepter les clics des onglets.
+          AspectRatio(
+            aspectRatio: 0.60,
+            child: _PhoneShell(child: child),
           ),
           const SizedBox(height: 8),
           MouseRegion(
