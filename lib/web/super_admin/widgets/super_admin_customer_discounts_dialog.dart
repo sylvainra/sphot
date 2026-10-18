@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/commercial_customer_discount_service.dart';
+import 'sphot_dropdown_visuals.dart';
 
 /// Remise nominative simple. Aucun code public à distribuer.
 class SuperAdminCustomerDiscountsDialog extends StatefulWidget {
@@ -24,15 +25,181 @@ class _SuperAdminCustomerDiscountsDialogState
   final _uidController = TextEditingController();
   final _percentController = TextEditingController(text: '0');
   String _market = 'ADVERTISER_RADIUS';
+  final GlobalKey _marketFieldKey = GlobalKey();
+  OverlayEntry? _marketOverlay;
+  bool _marketMenuOpen = false;
   bool _busy = false;
   String? _message;
   String? _error;
 
   @override
   void dispose() {
+    _marketOverlay?.remove();
+    _marketOverlay?.dispose();
+    _marketOverlay = null;
     _uidController.dispose();
     _percentController.dispose();
     super.dispose();
+  }
+
+  void _closeMarketMenu() {
+    _marketOverlay?.remove();
+    _marketOverlay?.dispose();
+    _marketOverlay = null;
+    if (mounted && _marketMenuOpen) {
+      setState(() => _marketMenuOpen = false);
+    }
+  }
+
+  Widget _marketOption(String value, String label) {
+    final selected = _market == value;
+    return InkWell(
+      hoverColor: Colors.transparent,
+      focusColor: Colors.transparent,
+      onTap: () {
+        _closeMarketMenu();
+        if (!mounted) return;
+        setState(() {
+          _market = value;
+          _message = null;
+          _error = null;
+        });
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(
+              selected
+                  ? Icons.check_box_rounded
+                  : Icons.check_box_outline_blank_rounded,
+              color: selected ? _red : _blue,
+              size: 22,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: selected ? _red : _blue,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _toggleMarketMenu() {
+    if (_busy) return;
+    if (_marketOverlay != null) {
+      _closeMarketMenu();
+      return;
+    }
+
+    final overlay = Overlay.of(context);
+    final overlayBox = overlay.context.findRenderObject();
+    final target = _marketFieldKey.currentContext?.findRenderObject();
+    if (overlayBox is! RenderBox || target is! RenderBox) return;
+    final position = target.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+    final size = target.size;
+
+    _marketOverlay = OverlayEntry(
+      builder: (overlayContext) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _closeMarketMenu,
+              child: const SizedBox.expand(),
+            ),
+          ),
+          Positioned(
+            left: position.dx,
+            top: position.dy + size.height -
+                SphotDropdownVisuals.popupOverlap,
+            width: size.width,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                decoration: SphotDropdownVisuals.popupDecoration,
+                clipBehavior: Clip.antiAlias,
+                padding: const EdgeInsets.only(
+                  top: SphotDropdownVisuals.popupContentInset,
+                  bottom: 5,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _marketOption('ADVERTISER_RADIUS', 'SPHOT Publicitaire'),
+                    Divider(
+                      height: 1,
+                      color: _blue.withOpacity(0.12),
+                    ),
+                    _marketOption('ADMIN', 'SPHOT Admin'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          ...SphotDropdownVisuals.joinedFieldEdges(position, size),
+        ],
+      ),
+    );
+    overlay.insert(_marketOverlay!);
+    setState(() => _marketMenuOpen = true);
+  }
+
+  Widget _marketField() {
+    return MouseRegion(
+      cursor: _busy ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      child: GestureDetector(
+        key: _marketFieldKey,
+        onTap: _busy ? null : _toggleMarketMenu,
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: 'Type de client',
+            labelStyle: const TextStyle(color: _blue),
+            floatingLabelBehavior: FloatingLabelBehavior.always,
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 15,
+            ),
+            enabledBorder: SphotDropdownVisuals.inputBorder(),
+            border: SphotDropdownVisuals.inputBorder(),
+            focusedBorder: SphotDropdownVisuals.inputBorder(width: 2),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _market == 'ADMIN' ? 'SPHOT Admin' : 'SPHOT Publicitaire',
+                  style: const TextStyle(
+                    color: _blue,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Icon(
+                _marketMenuOpen
+                    ? Icons.keyboard_arrow_up_rounded
+                    : Icons.keyboard_arrow_down_rounded,
+                color: _red,
+                size: 24,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _perform({required bool save}) async {
@@ -96,32 +263,7 @@ class _SuperAdminCustomerDiscountsDialogState
               'sans changer la grille tarifaire ni les factures passées.',
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _market,
-              decoration: const InputDecoration(
-                labelText: 'Type de client',
-                border: OutlineInputBorder(),
-              ),
-              items: const [
-                DropdownMenuItem(
-                  value: 'ADVERTISER_RADIUS',
-                  child: Text('SPHOT Publicitaire'),
-                ),
-                DropdownMenuItem(
-                  value: 'ADMIN',
-                  child: Text('SPHOT Admin'),
-                ),
-              ],
-              onChanged: _busy ? null : (value) {
-                if (value != null) {
-                  setState(() {
-                    _market = value;
-                    _message = null;
-                    _error = null;
-                  });
-                }
-              },
-            ),
+            _marketField(),
             const SizedBox(height: 12),
             TextField(
               controller: _uidController,
