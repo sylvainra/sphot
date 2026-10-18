@@ -1,49 +1,58 @@
 import 'package:latlong2/latlong.dart';
 
-/// Les cinq niveaux SPHOT sont utilisables dans TOUS les pays.
-/// Ils définissent des distances, pas des frontières administratives.
+/// Six rayons mondiaux indépendants des subdivisions administratives.
+/// Les montants HT ne sont PAS calculés à partir de ces distances.
 enum AdvertiserTerritoryLevel {
-  commune,
-  intercommunalite,
-  departement,
-  region,
-  national,
+  radius5km,
+  radius15km,
+  radius50km,
+  radius150km,
+  radius300km,
+  radius500km,
 }
 
 extension AdvertiserTerritoryLevelUi on AdvertiserTerritoryLevel {
-  String get label => switch (this) {
-        AdvertiserTerritoryLevel.commune => 'COMMUNE',
-        AdvertiserTerritoryLevel.intercommunalite => 'INTERCOMMUNALITÉ',
-        AdvertiserTerritoryLevel.departement => 'DÉPARTEMENT',
-        AdvertiserTerritoryLevel.region => 'RÉGION',
-        AdvertiserTerritoryLevel.national => 'NATIONAL',
-      };
-
-  String get storageKey => name;
-
-  /// Barème géographique indépendant des tarifs, identique mondialement.
-  /// Valeurs de travail à contrôler visuellement avant validation finale.
   double get radiusKm => switch (this) {
-        AdvertiserTerritoryLevel.commune => 5,
-        AdvertiserTerritoryLevel.intercommunalite => 20,
-        AdvertiserTerritoryLevel.departement => 100,
-        AdvertiserTerritoryLevel.region => 300,
-        AdvertiserTerritoryLevel.national => 1000,
+        AdvertiserTerritoryLevel.radius5km => 5,
+        AdvertiserTerritoryLevel.radius15km => 15,
+        AdvertiserTerritoryLevel.radius50km => 50,
+        AdvertiserTerritoryLevel.radius150km => 150,
+        AdvertiserTerritoryLevel.radius300km => 300,
+        AdvertiserTerritoryLevel.radius500km => 500,
       };
 
-  String get radiusLabel => '${radiusKm.toInt()} km';
+  String get label => '${radiusKm.toInt()} km';
+  String get radiusLabel => label;
 
-  /// Zoom indicatif permettant de voir un cercle de cette échelle.
+  String get storageKey => 'radius_${radiusKm.toInt()}km';
+
+  /// Le zoom change uniquement la présentation du cercle sur la carte.
   double get suggestedZoom => switch (this) {
-        AdvertiserTerritoryLevel.commune => 11.0,
-        AdvertiserTerritoryLevel.intercommunalite => 9.2,
-        AdvertiserTerritoryLevel.departement => 7.0,
-        AdvertiserTerritoryLevel.region => 5.4,
-        AdvertiserTerritoryLevel.national => 3.5,
+        AdvertiserTerritoryLevel.radius5km => 11.5,
+        AdvertiserTerritoryLevel.radius15km => 10.5,
+        AdvertiserTerritoryLevel.radius50km => 9.0,
+        AdvertiserTerritoryLevel.radius150km => 7.3,
+        AdvertiserTerritoryLevel.radius300km => 6.2,
+        AdvertiserTerritoryLevel.radius500km => 5.5,
       };
+
+  static AdvertiserTerritoryLevel? fromRadiusKm(num? value) {
+    if (value == null) return null;
+    for (final level in AdvertiserTerritoryLevel.values) {
+      if (level.radiusKm == value.toDouble()) return level;
+    }
+    return null;
+  }
+
+  static AdvertiserTerritoryLevel? fromStorageKey(String? value) {
+    for (final level in AdvertiserTerritoryLevel.values) {
+      if (level.storageKey == value) return level;
+    }
+    return null;
+  }
 }
 
-/// Un niveau géographique commercial, et non une division administrative.
+/// Choix d'une portée kilométrique centré sur la position du SPHOT.
 class AdvertiserTerritory {
   const AdvertiserTerritory({
     required this.level,
@@ -59,85 +68,48 @@ class AdvertiserTerritory {
 
   Map<String, Object> toFirestore() => {
         'level': level.storageKey,
-        'code': code,
-        'name': name,
+        'code': 'WORLD_${level.storageKey}',
+        'name': level.label,
         'radiusKm': radiusKm,
-        'coverageModel': 'worldwide_radius_v1',
+        'coverageModel': 'worldwide_radius_v2',
       };
 
   static AdvertiserTerritory? fromFirestore(Object? raw) {
     if (raw is! Map) return null;
-    final levelValue = raw['level']?.toString() ?? '';
-    final match = AdvertiserTerritoryLevel.values.where(
-      (level) => level.storageKey == levelValue,
-    );
-    if (match.isEmpty) return null;
-    // Les anciens documents territoriaux restent lisibles et non supprimés.
-    final level = match.first;
+    final storedLevel = raw['level']?.toString();
+    final model = raw['coverageModel']?.toString();
+
+    var level = AdvertiserTerritoryLevelUi.fromStorageKey(storedLevel);
+    if (level == null) {
+      // Les dossiers antérieurs restent inchangés dans Firestore.
+      // On ne transpose jamais arbitrairement un ancien territoire en km.
+      // Seuls les rayons historiques EXACTEMENT identiques sont relus.
+      final rawRadius = raw['radiusKm'];
+      if (rawRadius is num && model == 'worldwide_radius_v1') {
+        level = AdvertiserTerritoryLevelUi.fromRadiusKm(rawRadius);
+      }
+    }
+    if (level == null) return null;
+
     return AdvertiserTerritory(
       level: level,
-      code: raw['coverageModel'] == 'worldwide_radius_v1'
-          ? (raw['code']?.toString() ?? 'WORLD_${level.storageKey}')
-          : 'WORLD_${level.storageKey}',
-      name: 'Rayon de ${level.radiusLabel} autour du SPHOT',
+      code: 'WORLD_${level.storageKey}',
+      name: level.label,
     );
   }
 }
 
 class AdvertiserTerritoryOptions {
   const AdvertiserTerritoryOptions(this.options);
+
   final Map<AdvertiserTerritoryLevel, AdvertiserTerritory> options;
 
   AdvertiserTerritory? operator [](AdvertiserTerritoryLevel level) =>
       options[level];
 }
 
-/// Convertit la géométrie GeoJSON officielle en contours sur flutter_map.
-class AdvertiserTerritoryGeometry {
-  const AdvertiserTerritoryGeometry(this.polygons);
-  final List<List<LatLng>> polygons;
-
-  static AdvertiserTerritoryGeometry fromGeoJson(Object? raw) {
-    if (raw is! Map) return const AdvertiserTerritoryGeometry([]);
-    final geometry = raw['type'] == 'Feature' ? raw['geometry'] : raw;
-    if (geometry is! Map) return const AdvertiserTerritoryGeometry([]);
-
-    final type = geometry['type']?.toString();
-    final coordinates = geometry['coordinates'];
-    if (coordinates is! List) return const AdvertiserTerritoryGeometry([]);
-
-    final polygons = <List<LatLng>>[];
-    final List<dynamic> figures = type == 'Polygon'
-        ? [coordinates]
-        : type == 'MultiPolygon'
-            ? coordinates
-            : const [];
-
-    for (final figure in figures) {
-      if (figure is! List || figure.isEmpty) continue;
-      // L'anneau externe de chaque polygone : aucun rayon fictif.
-      final outerRing = figure.first;
-      if (outerRing is! List) continue;
-      final ring = <LatLng>[];
-      for (final point in outerRing) {
-        if (point is! List || point.length < 2) continue;
-        final lng = point[0];
-        final lat = point[1];
-        if (lat is num && lng is num &&
-            lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-          ring.add(LatLng(lat.toDouble(), lng.toDouble()));
-        }
-      }
-      if (ring.length >= 3) polygons.add(ring);
-    }
-    return AdvertiserTerritoryGeometry(polygons);
-  }
-}
-
-
-
-/// Les cinq rayons sont toujours disponibles, y compris hors de France.
-/// Aucun accès réseau ni dépendance à geo.api.gouv.fr pour ce choix.
+/// Choix identiques pour toutes les coordonnées, sans appel à une API
+/// française et sans filtrage par frontières nationales.
 class AdvertiserTerritoryService {
   const AdvertiserTerritoryService();
 
@@ -147,7 +119,7 @@ class AdvertiserTerritoryService {
         level: AdvertiserTerritory(
           level: level,
           code: 'WORLD_${level.storageKey}',
-          name: 'Rayon de ${level.radiusLabel} autour du SPHOT',
+          name: level.label,
         ),
     });
   }
