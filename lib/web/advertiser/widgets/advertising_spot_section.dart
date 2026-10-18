@@ -125,9 +125,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       final options = await _territoryService.resolve(position);
       if (!mounted || request != _territoryRequestNumber) return;
       final previous = _territory;
-      final selected = previous != null
-          ? options[previous.level]
-          : options[AdvertiserTerritoryLevel.radius5km];
+      final selected = previous != null ? options[previous.level] : null;
       setState(() {
         _territoryOptions = options;
         _territory = selected;
