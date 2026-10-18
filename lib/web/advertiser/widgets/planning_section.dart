@@ -21,6 +21,8 @@ class PlanningSection extends StatefulWidget {
     required this.costExclTax,
     this.pricingReference,
     this.pricingError,
+    this.pricingLoading = false,
+    this.onRefreshPricing,
     this.durationPrices = const {},
     this.discountPercent = 0,
     this.payableExclTaxCents = 0,
@@ -39,6 +41,8 @@ class PlanningSection extends StatefulWidget {
   final int costExclTax;
   final String? pricingReference;
   final String? pricingError;
+  final bool pricingLoading;
+  final VoidCallback? onRefreshPricing;
   final Map<String, int> durationPrices;
   final int discountPercent;
   final int payableExclTaxCents;
@@ -691,9 +695,11 @@ class _PlanningSectionState extends State<PlanningSection> {
               ),
               const SizedBox(height: 8),
               Text(
-                widget.costExclTax > 0
-                    ? '${widget.costExclTax} € HT'
-                    : 'TARIF PUBLIÉ NON DISPONIBLE',
+                widget.pricingLoading
+                    ? 'CHARGEMENT DES TARIFS…'
+                    : widget.costExclTax > 0
+                        ? '${widget.costExclTax} € HT'
+                        : 'TARIF PUBLIÉ NON DISPONIBLE',
                 style: const TextStyle(
                   color: WebColors.red,
                   fontSize: 25,
@@ -734,6 +740,14 @@ class _PlanningSectionState extends State<PlanningSection> {
                   widget.pricingError!,
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: WebColors.red),
+                ),
+              if (widget.onRefreshPricing != null)
+                TextButton.icon(
+                  onPressed: widget.pricingLoading
+                      ? null
+                      : widget.onRefreshPricing,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('ACTUALISER LES TARIFS PUBLIÉS'),
                 ),
               if (widget.durationPrices.isNotEmpty)
                 ExpansionTile(
