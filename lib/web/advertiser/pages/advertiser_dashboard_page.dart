@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -116,6 +117,17 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
 
   int _selectedIndex = 0;
   final MapController _mapController = MapController();
+
+  // À un zoom trop faible, flutter_map peut afficher deux fois
+  // les mêmes continents. La largeur d'un monde (256 * 2^zoom pixels)
+  // doit rester supérieure à celle de la fenêtre.
+  double _minimumWorldZoom(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    return math.max(
+      3.0,
+      math.log(math.max(width, 256.0) / 256.0) / math.ln2 + 0.5,
+    );
+  }
   final ScrollController _detailScrollController = ScrollController();
   LatLng? _advertisingPoint;
   double _advertisingRadiusKm = 0;
@@ -675,8 +687,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
           mapController: _mapController,
           options: MapOptions(
             initialCenter: const LatLng(20, 0),
-            initialZoom: 2.2,
-            minZoom: 2,
+            initialZoom: _minimumWorldZoom(context),
+            minZoom: _minimumWorldZoom(context),
             maxZoom: 18,
             onTap: canSelectApplicationPosition || canEditApprovedPosition
                 ? (_, point) => _setAdvertisingPoint(point, centerMap: false)
