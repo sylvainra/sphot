@@ -78,7 +78,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'SPHOT PUBLICITAIRE',
       Icons.location_on_outlined,
-      'Choisissez le territoire administratif de votre publicité depuis la position approuvée.',
+      'Choisissez une portée circulaire rouge parmi cinq niveaux, quel que soit le pays.',
     ),
     _AdvertiserSection(
       'DIFFUSION',
@@ -701,7 +701,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'SPHOT ouvre le monde au grand public. Choisissez un territoire administratif : commune, intercommunalité, département, région ou national. La diffusion est partagée équitablement entre les campagnes éligibles, sans exclusivité de zone ni de secteur. Le public peut accéder à votre site internet d’un simple clic.',
+                      'SPHOT ouvre le monde au grand public. Choisissez un des cinq rayons de diffusion centrés sur votre SPHOT, disponibles dans tous les pays. La diffusion est partagée équitablement entre les campagnes éligibles, sans exclusivité de zone ni de secteur. Le public peut accéder à votre site internet d’un simple clic.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFF4B5F97),
