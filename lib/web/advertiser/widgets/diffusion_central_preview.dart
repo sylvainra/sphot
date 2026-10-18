@@ -450,115 +450,180 @@ class _MapBottomNavigation extends StatelessWidget {
   }
 }
 
-class _PremiumPhonePreview extends StatelessWidget {
+/// Aperçu fonctionnel des six onglets publics : une publicité au bas de
+/// CHAQUE rubrique, pour tout type de SPHOT.
+class _PremiumPhonePreview extends StatefulWidget {
   const _PremiumPhonePreview({required this.data});
 
   final DiffusionPreviewData data;
 
   @override
+  State<_PremiumPhonePreview> createState() => _PremiumPhonePreviewState();
+}
+
+class _PremiumPhonePreviewState extends State<_PremiumPhonePreview> {
+  static const _sections = <(String, IconData, String)>[
+    (
+      'LIVE',
+      Icons.sensors_rounded,
+      'Informations opérationnelles du SPHOT.',
+    ),
+    (
+      'SIGNAUX',
+      Icons.flag_outlined,
+      'Signaux et consignes de baignade.',
+    ),
+    (
+      'MÉTÉO TERRESTRE',
+      Icons.wb_sunny_outlined,
+      'Conditions météorologiques terrestres.',
+    ),
+    (
+      'MÉTÉO MARINE',
+      Icons.water_rounded,
+      'Conditions météorologiques marines.',
+    ),
+    (
+      'DICTON & ÉPHÉMÉRIDE',
+      Icons.calendar_today_outlined,
+      'Dicton et informations du jour.',
+    ),
+    (
+      'INFOS',
+      Icons.info_outline_rounded,
+      'Informations et équipements du SPHOT.',
+    ),
+  ];
+
+  int _selectedSection = 0;
+
+  @override
   Widget build(BuildContext context) {
+    final selected = _sections[_selectedSection];
+
     return ColoredBox(
       color: const Color(0xFFF4F7FA),
       child: Column(
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(16, 26, 16, 12),
+            padding: const EdgeInsets.fromLTRB(15, 26, 15, 11),
             color: WebColors.blue,
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'PLAGE DES CONCHES',
+                  'VOLET D’UN SPHOT',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                SizedBox(height: 2),
+                SizedBox(height: 3),
                 Text(
-                  'LONGEVILLE-SUR-MER',
+                  'SIX RUBRIQUES · TOUS LES SPHOTS',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Colors.white70,
                     fontSize: 10,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],
             ),
           ),
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(12),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: const Color(0xFFDCE3EA)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF16A34A),
-                        borderRadius: BorderRadius.circular(10),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(9, 10, 9, 8),
+            child: Wrap(
+              spacing: 5,
+              runSpacing: 5,
+              children: [
+                for (var index = 0; index < _sections.length; index++)
+                  InkWell(
+                    onTap: () => setState(() => _selectedSection = index),
+                    borderRadius: BorderRadius.circular(7),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 7,
                       ),
-                      child: const Text(
-                        'BAIGNADE SURVEILLÉE',
-                        textAlign: TextAlign.center,
+                      decoration: BoxDecoration(
+                        color: _selectedSection == index
+                            ? WebColors.red
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(
+                          color: _selectedSection == index
+                              ? WebColors.red
+                              : const Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      child: Text(
+                        _sections[index].$1,
                         style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
+                          color: _selectedSection == index
+                              ? Colors.white
+                              : WebColors.blue,
+                          fontSize: 9,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    const _PremiumInfoLine(
-                      icon: Icons.flag_outlined,
-                      label: 'Drapeau vert',
-                    ),
-                    const _PremiumInfoLine(
-                      icon: Icons.schedule_outlined,
-                      label: 'Surveillance : 11h – 19h',
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 5, 10, 6),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(13),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFFDCE3EA)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(selected.$2, color: WebColors.blue, size: 28),
+                    const SizedBox(height: 8),
+                    Text(
+                      selected.$1,
+                      style: const TextStyle(
+                        color: WebColors.blue,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    _AdvertisingBanner(data: data),
-                    const SizedBox(height: 12),
+                    Text(
+                      selected.$3,
+                      style: const TextStyle(
+                        color: Color(0xFF4B5F97),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    const Divider(height: 14),
                     const Text(
-                      'PRÉVISIONS',
+                      'PUBLICITÉ AU BAS DE LA RUBRIQUE',
                       style: TextStyle(
-                        color: WebColors.blue,
-                        fontSize: 10,
+                        color: WebColors.red,
+                        fontSize: 9,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     const SizedBox(height: 7),
-                    const Row(
-                      children: [
-                        Expanded(
-                          child: _ForecastDay(day: 'LUN', value: '23°'),
-                        ),
-                        SizedBox(width: 5),
-                        Expanded(
-                          child: _ForecastDay(day: 'MAR', value: '24°'),
-                        ),
-                        SizedBox(width: 5),
-                        Expanded(
-                          child: _ForecastDay(day: 'MER', value: '22°'),
-                        ),
-                      ],
-                    ),
+                    _AdvertisingBanner(data: widget.data),
                   ],
                 ),
               ),
             ),
           ),
+          const SizedBox(height: 10),
         ],
       ),
     );
