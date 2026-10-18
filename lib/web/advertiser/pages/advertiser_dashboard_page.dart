@@ -83,8 +83,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'DIFFUSION',
       Icons.campaign_outlined,
-      'Choisissez votre diffusion entre la CARTE SPHOT, la FICHE SPHOT PREMIUM '
-          'ou le PACK VISIBILITÉ TOTALE.',
+      'Choisissez vos deux zones : CARTE SPHOT et FICHES SPHOT. '
+          'Les deux réunies constituent le PACK VISIBILITÉ TOTALE.'
     ),
     _AdvertiserSection(
       'PLANIFICATION',
