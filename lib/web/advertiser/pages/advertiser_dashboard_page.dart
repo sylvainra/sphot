@@ -146,6 +146,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   int _publishedDiscountPercent = 0;
   String? _publishedPricingReference;
   String? _publishedPricingError;
+  bool _pricingLoading = false;
   int _publishedPricingRequest = 0;
   Map<String, dynamic> _requestData = <String, dynamic>{};
   String _requestStatus = 'loading';
@@ -332,6 +333,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
       _publishedDiscountPercent = 0;
       _publishedPricingReference = null;
       _publishedPricingError = null;
+      _pricingLoading = true;
     });
 
     try {
@@ -363,14 +365,18 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             AdvertisingPricingConfig.durations[i]: quotes[i].amountExclTax,
         };
         _publishedPricingReference = quotes.first.pricingReference;
+        _pricingLoading = false;
       });
     } catch (error) {
       if (!mounted || ticket != _publishedPricingRequest) return;
       setState(() {
+        _pricingLoading = false;
         _publishedPricingError =
-            'Tarifs publiés indisponibles. Aucun prix historique utilisé.';
+            'La grille des 108 tarifs n’est pas disponible : vérifiez '
+            'sa publication par le Super Admin et la mise en service '
+            'du calcul tarifaire. Aucun ancien prix n’est réutilisé.';
       });
-      debugPrint('Tarifs annonceur publiés indisponibles : $error');
+      debugPrint('Grille des 108 tarifs indisponible : $error');
     }
   }
 
@@ -1146,6 +1152,10 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             ),
             pricingReference: _publishedPricingReference,
             pricingError: _publishedPricingError,
+            pricingLoading: _pricingLoading,
+            onRefreshPricing: () {
+              _loadPublishedPrices();
+            },
             durationPrices: _durationPrices,
             discountPercent: _publishedDiscountPercent,
             payableExclTaxCents: _payableCentsFor(
