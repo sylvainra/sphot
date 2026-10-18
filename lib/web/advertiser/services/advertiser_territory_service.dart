@@ -1,9 +1,7 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
-/// Les cinq échelons validés pour la publicité française.
+/// Les cinq niveaux SPHOT sont utilisables dans TOUS les pays.
+/// Ils définissent des distances, pas des frontières administratives.
 enum AdvertiserTerritoryLevel {
   commune,
   intercommunalite,
@@ -22,9 +20,30 @@ extension AdvertiserTerritoryLevelUi on AdvertiserTerritoryLevel {
       };
 
   String get storageKey => name;
+
+  /// Barème géographique indépendant des tarifs, identique mondialement.
+  /// Valeurs de travail à contrôler visuellement avant validation finale.
+  double get radiusKm => switch (this) {
+        AdvertiserTerritoryLevel.commune => 5,
+        AdvertiserTerritoryLevel.intercommunalite => 20,
+        AdvertiserTerritoryLevel.departement => 100,
+        AdvertiserTerritoryLevel.region => 300,
+        AdvertiserTerritoryLevel.national => 1000,
+      };
+
+  String get radiusLabel => '${radiusKm.toInt()} km';
+
+  /// Zoom indicatif permettant de voir un cercle de cette échelle.
+  double get suggestedZoom => switch (this) {
+        AdvertiserTerritoryLevel.commune => 11.0,
+        AdvertiserTerritoryLevel.intercommunalite => 9.2,
+        AdvertiserTerritoryLevel.departement => 7.0,
+        AdvertiserTerritoryLevel.region => 5.4,
+        AdvertiserTerritoryLevel.national => 3.5,
+      };
 }
 
-/// Une zone administrative reconnue, avec son code officiel.
+/// Un niveau géographique commercial, et non une division administrative.
 class AdvertiserTerritory {
   const AdvertiserTerritory({
     required this.level,
@@ -36,10 +55,14 @@ class AdvertiserTerritory {
   final String code;
   final String name;
 
-  Map<String, String> toFirestore() => {
+  double get radiusKm => level.radiusKm;
+
+  Map<String, Object> toFirestore() => {
         'level': level.storageKey,
         'code': code,
         'name': name,
+        'radiusKm': radiusKm,
+        'coverageModel': 'worldwide_radius_v1',
       };
 
   static AdvertiserTerritory? fromFirestore(Object? raw) {
@@ -49,18 +72,18 @@ class AdvertiserTerritory {
       (level) => level.storageKey == levelValue,
     );
     if (match.isEmpty) return null;
-    final code = raw['code']?.toString().trim() ?? '';
-    final name = raw['name']?.toString().trim() ?? '';
-    if (code.isEmpty || name.isEmpty) return null;
+    // Les anciens documents territoriaux restent lisibles et non supprimés.
+    final level = match.first;
     return AdvertiserTerritory(
-      level: match.first,
-      code: code,
-      name: name,
+      level: level,
+      code: raw['coverageModel'] == 'worldwide_radius_v1'
+          ? (raw['code']?.toString() ?? 'WORLD_${level.storageKey}')
+          : 'WORLD_${level.storageKey}',
+      name: 'Rayon de ${level.radiusLabel} autour du SPHOT',
     );
   }
 }
 
-/// Représente les différents territoires rattachés au même point.
 class AdvertiserTerritoryOptions {
   const AdvertiserTerritoryOptions(this.options);
   final Map<AdvertiserTerritoryLevel, AdvertiserTerritory> options;
@@ -111,124 +134,23 @@ class AdvertiserTerritoryGeometry {
   }
 }
 
-/// API publique de découpage administratif : aucun document Firebase modifié.
+
+
+/// Les cinq rayons sont toujours disponibles, y compris hors de France.
+/// Aucun accès réseau ni dépendance à geo.api.gouv.fr pour ce choix.
 class AdvertiserTerritoryService {
-  AdvertiserTerritoryService({http.Client? client})
-      : _client = client ?? http.Client();
-
-  final http.Client _client;
-
-  Future<Map<String, dynamic>> _read(Uri uri) async {
-    final response = await _client.get(uri).timeout(
-      const Duration(seconds: 12),
-    );
-    if (response.statusCode != 200) {
-      throw StateError('Découpage territorial indisponible (HTTP ${response.statusCode}).');
-    }
-    final decoded = jsonDecode(response.body);
-    if (decoded is! Map) {
-      throw const FormatException('Réponse territoriale incorrecte.');
-    }
-    return Map<String, dynamic>.from(decoded);
-  }
-
-  Future<String> _name(String kind, String code) async {
-    if (code.isEmpty) return '';
-    try {
-      final response =
-          await _read(Uri.https('geo.api.gouv.fr', '/$kind/$code'));
-      return response['nom']?.toString().trim() ?? '';
-    } catch (_) {
-      // Un niveau indisponible ne doit pas bloquer les autres territoires.
-      return '';
-    }
-  }
+  const AdvertiserTerritoryService();
 
   Future<AdvertiserTerritoryOptions> resolve(LatLng position) async {
-    final uri = Uri.https('geo.api.gouv.fr', '/communes', {
-      'lat': position.latitude.toString(),
-      'lon': position.longitude.toString(),
-      'fields': 'nom,code,codeEpci,codeDepartement,codeRegion',
-      'format': 'json',
+    return AdvertiserTerritoryOptions({
+      for (final level in AdvertiserTerritoryLevel.values)
+        level: AdvertiserTerritory(
+          level: level,
+          code: 'WORLD_${level.storageKey}',
+          name: 'Rayon de ${level.radiusLabel} autour du SPHOT',
+        ),
     });
-    final response = await _client.get(uri).timeout(
-      const Duration(seconds: 12),
-    );
-    if (response.statusCode != 200) {
-      throw StateError('Impossible de déterminer la commune.');
-    }
-    final decoded = jsonDecode(response.body);
-    if (decoded is! List || decoded.isEmpty || decoded.first is! Map) {
-      throw StateError('Aucune commune trouvée pour cet emplacement.');
-    }
-    final data = Map<String, dynamic>.from(decoded.first as Map);
-    final communeCode = data['code']?.toString() ?? '';
-    final communeName = data['nom']?.toString() ?? '';
-    final epciCode = data['codeEpci']?.toString() ?? '';
-    final departementCode = data['codeDepartement']?.toString() ?? '';
-    final regionCode = data['codeRegion']?.toString() ?? '';
-    if (communeCode.isEmpty || communeName.isEmpty) {
-      throw const FormatException('Code commune manquant.');
-    }
-
-    final names = await Future.wait([
-      _name('epcis', epciCode),
-      _name('departements', departementCode),
-      _name('regions', regionCode),
-    ]);
-    final items = <AdvertiserTerritoryLevel, AdvertiserTerritory>{
-      AdvertiserTerritoryLevel.commune: AdvertiserTerritory(
-        level: AdvertiserTerritoryLevel.commune,
-        code: communeCode,
-        name: communeName,
-      ),
-      if (epciCode.isNotEmpty && names[0].isNotEmpty)
-        AdvertiserTerritoryLevel.intercommunalite: AdvertiserTerritory(
-          level: AdvertiserTerritoryLevel.intercommunalite,
-          code: epciCode,
-          name: names[0],
-        ),
-      if (departementCode.isNotEmpty && names[1].isNotEmpty)
-        AdvertiserTerritoryLevel.departement: AdvertiserTerritory(
-          level: AdvertiserTerritoryLevel.departement,
-          code: departementCode,
-          name: names[1],
-        ),
-      if (regionCode.isNotEmpty && names[2].isNotEmpty)
-        AdvertiserTerritoryLevel.region: AdvertiserTerritory(
-          level: AdvertiserTerritoryLevel.region,
-          code: regionCode,
-          name: names[2],
-        ),
-      AdvertiserTerritoryLevel.national: const AdvertiserTerritory(
-        level: AdvertiserTerritoryLevel.national,
-        code: 'FR',
-        name: 'France',
-      ),
-    };
-    return AdvertiserTerritoryOptions(items);
   }
 
-  Future<AdvertiserTerritoryGeometry> geometry(
-    AdvertiserTerritory selection,
-  ) async {
-    if (selection.level == AdvertiserTerritoryLevel.national) {
-      return const AdvertiserTerritoryGeometry([]);
-    }
-    final collection = switch (selection.level) {
-      AdvertiserTerritoryLevel.commune => 'communes',
-      AdvertiserTerritoryLevel.intercommunalite => 'epcis',
-      AdvertiserTerritoryLevel.departement => 'departements',
-      AdvertiserTerritoryLevel.region => 'regions',
-      AdvertiserTerritoryLevel.national => 'regions',
-    };
-    final uri = Uri.https(
-      'geo.api.gouv.fr',
-      '/$collection/${selection.code}',
-      {'format': 'geojson', 'geometry': 'contour'},
-    );
-    return AdvertiserTerritoryGeometry.fromGeoJson(await _read(uri));
-  }
-
-  void dispose() => _client.close();
+  void dispose() {}
 }
