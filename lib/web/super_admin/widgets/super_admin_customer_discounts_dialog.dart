@@ -140,7 +140,7 @@ class _SuperAdminCustomerDiscountsDialogState
                     _marketOption('ADVERTISER_RADIUS', 'SPHOT Publicitaire'),
                     Divider(
                       height: 1,
-                      color: _blue.withOpacity(0.12),
+                      color: _blue.withValues(alpha: 0.12),
                     ),
                     _marketOption('ADMIN', 'SPHOT Admin'),
                   ],
