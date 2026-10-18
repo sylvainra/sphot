@@ -23,7 +23,7 @@ class _SuperAdminAdvertiserRadiusPricingTableState
   static const _blue = Color(0xFF1E3A8A);
   static const _red = Color(0xFFDC2626);
   static const _market = 'ADVERTISER_RADIUS';
-  static const _radii = ['5 km', '15 km', '50 km', '150 km', '300 km', '500 km'];
+  static const _radii = ['5 km', '15 km', '50 km', '150 km', '300 km', 'PAYS ENTIER'];
   static const _offers = ['CARTE SPHOT', 'FICHES SPHOT', 'PACK TOTAL'];
   static const _durations = [
     '1 semaine', '2 semaines', '1 mois', '2 mois', '6 mois', '1 an'
