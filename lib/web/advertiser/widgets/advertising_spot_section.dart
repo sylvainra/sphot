@@ -127,7 +127,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       final previous = _territory;
       final selected = previous != null
           ? options[previous.level]
-          : options[AdvertiserTerritoryLevel.commune];
+          : options[AdvertiserTerritoryLevel.radius5km];
       setState(() {
         _territoryOptions = options;
         _territory = selected;
@@ -140,7 +140,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
         _territoryOptions = null;
         _territoryLoading = false;
         _territoryError =
-            'Impossible de préparer les cinq rayons. Réessayez.';
+            'Impossible de préparer les six rayons. Réessayez.';
       });
     }
   }
@@ -518,7 +518,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     if (territory == null ||
         _territoryOptions?[territory.level] == null) {
       setState(() {
-        _error = 'Sélectionnez une des cinq portées de diffusion.';
+        _error = 'Sélectionnez une des six portées de diffusion.';
       });
       return;
     }
@@ -796,7 +796,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Cinq portées circulaires rouges, identiques dans tous les pays. '
+            'Six portées circulaires rouges, identiques dans tous les pays. '
             'Aucune exclusivité géographique ou sectorielle.',
             style: TextStyle(
               color: Color(0xFF4B5F97),
@@ -811,7 +811,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               children: [
                 Text(
                   _territoryError ??
-                      'Positionnez votre SPHOT pour afficher les cinq rayons.',
+                      'Positionnez votre SPHOT pour afficher les six rayons.',
                   style: const TextStyle(color: WebColors.red),
                 ),
                 if (widget.position != null)
@@ -848,7 +848,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                         ),
                       ),
                       child: Text(
-                        '${level.label} · ${level.radiusLabel}',
+                        level.label,
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ),
@@ -857,7 +857,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             if (current != null) ...[
               const SizedBox(height: 12),
               Text(
-                '${current.level.label} : ${current.level.radiusLabel}',
+                current.level.label,
                 style: const TextStyle(
                   color: WebColors.blue,
                   fontWeight: FontWeight.w800,
@@ -866,7 +866,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               const SizedBox(height: 6),
               Text(
                 'La zone rouge représente un rayon de '
-                    '${current.level.radiusLabel} autour du SPHOT, '
+                    '${current.level.label} autour du SPHOT, '
                     'quel que soit le pays.',
                 style: const TextStyle(
                   color: Color(0xFF4B5F97),
