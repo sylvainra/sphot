@@ -1,5 +1,4 @@
-import 'package:bathing_spots_app/web/super_admin/services/'
-    'advertiser_radius_pricing_import.dart';
+import 'package:bathing_spots_app/web/super_admin/services/advertiser_radius_pricing_import.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
