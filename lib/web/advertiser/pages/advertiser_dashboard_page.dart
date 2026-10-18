@@ -400,6 +400,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     final old = _advertisingTerritory;
     if (old?.level == territory.level && old?.code == territory.code) return;
     setState(() => _advertisingTerritory = territory);
+    // Synchronise les étapes Diffusion et Planification avec la sélection.
+    _setAdvertisingRadius(territory.radiusKm);
     _loadPublishedPrices();
     final center = _advertisingPoint;
     if (center != null) {
