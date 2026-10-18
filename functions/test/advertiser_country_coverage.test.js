@@ -74,3 +74,29 @@ test("Country campaign requires a validated coverage type and ISO code", () => {
     },
   }, {pays: "France"}), false);
 });
+
+test("French overseas SPHOTs share the national audience", () => {
+  const franceSpotCodes = [
+    "GUF", "GLP", "MTQ", "REU", "MYT", "PYF", "NCL", "SPM",
+    "WLF", "BLM", "MAF", "ATF",
+  ];
+  for (const countryIso3 of franceSpotCodes) {
+    assert.equal(countryCampaignCoversSpot(france, {
+      countryIso3,
+      sphotLat: 4,
+      sphotLng: -52,
+    }), true);
+  }
+  assert.equal(countryCampaignCoversSpot(france, {
+    pays: "Polynésie française",
+  }), true);
+  assert.equal(countryCampaignCoversSpot(france, {
+    pays: "La Réunion",
+  }), true);
+  assert.equal(countryCampaignCoversSpot(france, {
+    pays: "Guyane française",
+  }), true);
+  assert.equal(countryCampaignCoversSpot(france, {
+    countryIso3: "MUS",
+  }), false);
+});
