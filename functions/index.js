@@ -11572,3 +11572,12 @@ exports.deleteSauveteurMainCouranteEntry = onRequest(
 );
 
 /** Valide et consomme un passage unique vers le dashboard Super Admin. */
+
+/**
+ * Expose exclusivement les visuels des campagnes carte effectivement actives.
+ * Les dossiers adRequests restent privés dans Firestore.
+ */
+const {registerPublicMapAdvertisingEndpoint} =
+    require("./public_map_advertising");
+exports.getPublicMapAdvertisements =
+    registerPublicMapAdvertisingEndpoint({admin, onRequest});
