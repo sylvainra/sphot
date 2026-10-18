@@ -22,6 +22,8 @@ class QuoteOrderSection extends StatefulWidget {
     this.selectedTerritory,
     this.pricingReference,
     this.pricingError,
+    this.discountPercent = 0,
+    this.payableExclTaxCents = 0,
     required this.onEditStep,
     this.requestedScope = 'local',
   });
@@ -37,6 +39,8 @@ class QuoteOrderSection extends StatefulWidget {
   final AdvertiserTerritory? selectedTerritory;
   final String? pricingReference;
   final String? pricingError;
+  final int discountPercent;
+  final int payableExclTaxCents;
   final ValueChanged<DiffusionPreviewType> onDiffusionChanged;
   final ValueChanged<int> onEditStep;
   final String requestedScope;
@@ -273,8 +277,6 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
         child: CircularProgressIndicator(color: WebColors.red),
       );
     }
-    final vat = (widget.costExclTax * 0.20).round();
-    final total = widget.costExclTax + vat;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -341,14 +343,33 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              if (widget.costExclTax > 0)
-                Text(
-                  'TVA 20 % : $vat € • Total TTC : $total €',
-                  style: const TextStyle(
+              if (widget.costExclTax > 0) ...[
+                if (widget.discountPercent > 0) ...[
+                  Text(
+                    'REMISE CLIENT : -${widget.discountPercent} %',
+                    style: const TextStyle(
+                      color: WebColors.blue,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    'NET HT : ${(widget.payableExclTaxCents / 100).toStringAsFixed(2)} €',
+                    style: const TextStyle(
+                      color: WebColors.red,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+                const Text(
+                  'TVA et montant TTC déterminés par Odoo suivant '
+                  'le pays et la situation fiscale du client.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
                     color: Color(0xFF4B5F97),
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
+              ],
               if (widget.pricingReference != null)
                 Text(
                   widget.pricingReference!,
