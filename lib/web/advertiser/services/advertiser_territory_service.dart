@@ -134,8 +134,14 @@ class AdvertiserTerritoryService {
 
   Future<String> _name(String kind, String code) async {
     if (code.isEmpty) return '';
-    final response = await _read(Uri.https('geo.api.gouv.fr', '/$kind/$code'));
-    return response['nom']?.toString().trim() ?? '';
+    try {
+      final response =
+          await _read(Uri.https('geo.api.gouv.fr', '/$kind/$code'));
+      return response['nom']?.toString().trim() ?? '';
+    } catch (_) {
+      // Un niveau indisponible ne doit pas bloquer les autres territoires.
+      return '';
+    }
   }
 
   Future<AdvertiserTerritoryOptions> resolve(LatLng position) async {
