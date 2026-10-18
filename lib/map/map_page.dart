@@ -81,6 +81,9 @@ class _MapPageState extends State<MapPage> {
   // Le volet public natif est affiché dans la Stack de la carte, sans
   // barrière modale : les zones dégagées restent manipulables.
   SpotFlagState? _mobileDetailSpot;
+  // Sur le Web grand écran, le volet à droite appartient à la même Stack
+  // que FlutterMap : aucun barrier modal ne capte les gestes sur la carte.
+  SpotFlagState? _desktopDetailSpot;
   final ValueNotifier<double> _mobileDetailHeightFraction =
       ValueNotifier<double>(1.0);
   static const double _mobileDetailMinHeightFraction = 0.20;
@@ -1258,6 +1261,8 @@ SpotFlagState? _findBestSpotMatch(
     if (kIsWeb && screenWidth >= 900) {
       setState(() {
         _selectedPublicSpotId = spot.id;
+        _desktopDetailSpot = spot;
+        _mobileDetailSpot = null;
       });
 
       const selectedWebSpotZoom = 19.0;
@@ -1283,7 +1288,9 @@ SpotFlagState? _findBestSpotMatch(
         Future<void>.delayed(
           const Duration(milliseconds: 220),
           () {
-            if (!mounted || _selectedPublicSpotId != spot.id) return;
+            if (!mounted ||
+                _selectedPublicSpotId != spot.id ||
+                _isMovingMap) return;
             _mapController.move(
               selectedWebSpotCenter,
               selectedWebSpotZoom,
@@ -1292,60 +1299,8 @@ SpotFlagState? _findBestSpotMatch(
         ),
       );
 
-      await showGeneralDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        barrierLabel: 'Fermer la fiche publique',
-        barrierColor: Colors.black.withOpacity(0.08),
-        transitionDuration: const Duration(milliseconds: 320),
-        pageBuilder: (_, __, ___) {
-          return SafeArea(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: SizedBox(
-                width: panelWidth,
-                height: double.infinity,
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(22),
-                    bottomLeft: Radius.circular(22),
-                  ),
-                  child: PublicSpotDetailPage(spot: spot),
-                ),
-              ),
-            ),
-          );
-        },
-        transitionBuilder: (_, animation, __, child) {
-          final slideAnimation = Tween<Offset>(
-            begin: const Offset(1, 0),
-            end: Offset.zero,
-          ).animate(
-            CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInCubic,
-            ),
-          );
-
-          return SlideTransition(
-            position: slideAnimation,
-            child: child,
-          );
-        },
-      );
-
-      await _loadFavoriteSpotIds();
-
-      if (mounted) {
-        setState(() {
-          if (_selectedPublicSpotId == spot.id) {
-            _selectedPublicSpotId = null;
-          }
-          _mapTileRefreshVersion++;
-        });
-      }
-
+      // Le panneau est dessiné plus bas dans la Stack, au-dessus de la map.
+      // Il n'y a plus de route modale : la carte découverte reste manipulable.
       return;
     }
 
@@ -1354,6 +1309,7 @@ SpotFlagState? _findBestSpotMatch(
     setState(() {
       _selectedPublicSpotId = spot.id;
       _mobileDetailSpot = spot;
+      _desktopDetailSpot = null;
     });
     // Chaque nouveau SPHOT ouvre initialement son volet en totalité.
     _mobileDetailHeightFraction.value = 1.0;
@@ -1390,6 +1346,59 @@ SpotFlagState? _findBestSpotMatch(
     // Le volet mobile/Web étroit est déjà affiché par _buildMobileSpotPanel.
     // Ne jamais ouvrir de route modale qui bloquerait les gestes sur la carte.
     return;
+  }
+
+  void _closeDesktopSpotDetail() {
+    final closingSpot = _desktopDetailSpot;
+    if (closingSpot == null) return;
+
+    setState(() {
+      _desktopDetailSpot = null;
+      if (_selectedPublicSpotId == closingSpot.id) {
+        _selectedPublicSpotId = null;
+      }
+      _mapTileRefreshVersion++;
+    });
+    unawaited(_loadFavoriteSpotIds());
+  }
+
+  Widget _buildDesktopSpotPanel() {
+    final spot = _desktopDetailSpot;
+    if (spot == null) return const SizedBox.shrink();
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final panelWidth = min(500.0, screenWidth * 0.40);
+
+    // Le panneau ne capte les gestes que sur ses propres 500 px (max).
+    // Le clic, le déplacement, la rotation et le zoom sur le reste de
+    // FlutterMap ne ferment plus le volet.
+    return Positioned(
+      top: 0,
+      bottom: 0,
+      right: 0,
+      width: panelWidth,
+      child: SafeArea(
+        child: TweenAnimationBuilder<double>(
+          key: ValueKey('desktop_detail_${spot.id}'),
+          tween: Tween<double>(begin: 1.0, end: 0.0),
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+          builder: (context, fraction, child) => Transform.translate(
+            offset: Offset(panelWidth * fraction, 0),
+            child: child,
+          ),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(22),
+              bottomLeft: Radius.circular(22),
+            ),
+            child: PublicSpotDetailPage(
+              spot: spot,
+              onClose: _closeDesktopSpotDetail,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _closeMobileSpotDetail() {
@@ -2892,12 +2901,9 @@ final spots = allSpots
     )
     .toList();
 
-final selectedSpotId = _selectedPublicSpotId;
-// En mobile, conserver les autres marqueurs pour permettre de choisir un
-// nouveau SPHOT directement sur la portion de carte restée visible.
-final visibleSpots = selectedSpotId == null || _mobileDetailSpot != null
-    ? spots
-    : spots.where((spot) => spot.id == selectedSpotId).toList();
+// Garder tous les marqueurs accessibles, même avec un volet ouvert sur
+// desktop ou mobile. Cliquer sur un autre SPHOT remplace sa fiche à droite.
+final visibleSpots = spots;
 
 debugPrint('SPHOTS CHARGÉS : ${allSpots.length}');
 debugPrint('SPHOTS AFFICHÉS : ${visibleSpots.length}');
@@ -3140,6 +3146,10 @@ if (!(kIsWeb &&
   _buildBottomBar(),
 if (_mobileDetailSpot != null)
   _buildMobileSpotPanel(),
+if (kIsWeb &&
+    MediaQuery.sizeOf(context).width >= 900 &&
+    _desktopDetailSpot != null)
+  _buildDesktopSpotPanel(),
                 ],
               );
             },
