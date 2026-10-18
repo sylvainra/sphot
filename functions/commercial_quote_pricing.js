@@ -6,6 +6,10 @@ const MARKET_COLLECTION = "commercialPricingMarkets";
 const TERRITORIES = [
   "commune", "intercommunalite", "departement", "region", "national",
 ];
+const RADIUS_LEVELS = [
+  "radius_5km", "radius_15km", "radius_50km",
+  "radius_150km", "radius_300km", "radius_500km",
+];
 const OFFERS = ["map", "premium", "pack"];
 const DURATIONS = [
   "1 semaine", "2 semaines", "1 mois", "2 mois", "6 mois", "1 an",
@@ -76,23 +80,27 @@ function adminQuote(data, stations) {
 }
 
 function advertiserQuote(data, territory, offer, duration) {
-  const t = TERRITORIES.indexOf(territory);
+  const newRadiusMarket = data.type === "ADVERTISER_RADIUS";
+  const levels = newRadiusMarket ? RADIUS_LEVELS : TERRITORIES;
+  const t = levels.indexOf(territory);
   const o = OFFERS.indexOf(offer);
   const d = DURATIONS.indexOf(duration);
   if (t < 0 || o < 0 || d < 0) {
     throw quoteError(400, "Territoire, offre ou duree non pris en charge.");
   }
   const prices = data.publishedPrices;
+  const expectedKeys = levels.length * OFFERS.length * DURATIONS.length;
   if (!prices || Array.isArray(prices) || typeof prices !== "object" ||
-      Object.keys(prices).length !== 90) {
-    throw quoteError(503, "Les 90 tarifs publies sont indisponibles.");
+      Object.keys(prices).length !== expectedKeys) {
+    throw quoteError(503, "La grille publiee requiert " +
+        expectedKeys + " tarifs.");
   }
   const key = t + ":" + o + ":" + d;
   const amount = safePrice(prices[key]);
   return {
-    market: "ADVERTISER",
+    market: data.type,
     version: data.publishedVersion,
-    pricingReference: "FR_ADVERTISER-V" + data.publishedVersion,
+    pricingReference: "FR_" + data.type + "-V" + data.publishedVersion,
     country: "FR",
     currency: "EUR",
     territory,
@@ -126,10 +134,10 @@ function endpoint({admin, onRequest}) {
     try {
       const body = req.body || {};
       const market = body.market;
-      if (market !== "ADMIN" && market !== "ADVERTISER") {
+      if (!["ADMIN", "ADVERTISER", "ADVERTISER_RADIUS"].includes(market)) {
         throw quoteError(400, "Marche tarifaire inconnu.");
       }
-      const id = market === "ADMIN" ? "FR_ADMIN" : "FR_ADVERTISER";
+      const id = "FR_" + market;
       const snapshot = await admin.firestore()
           .collection(MARKET_COLLECTION).doc(id).get();
       const published = publishedState(snapshot, market);
