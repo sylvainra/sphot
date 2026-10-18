@@ -125,6 +125,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   final PublishedCommercialQuoteService _quoteService =
       const PublishedCommercialQuoteService();
   Map<String, int> _publishedPrices = <String, int>{};
+  Map<String, int> _publishedPayableCents = <String, int>{};
+  int _publishedDiscountPercent = 0;
   String? _publishedPricingReference;
   String? _publishedPricingError;
   int _publishedPricingRequest = 0;
@@ -309,6 +311,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     final ticket = ++_publishedPricingRequest;
     setState(() {
       _publishedPrices = <String, int>{};
+      _publishedPayableCents = <String, int>{};
+      _publishedDiscountPercent = 0;
       _publishedPricingReference = null;
       _publishedPricingError = null;
     });
@@ -327,7 +331,16 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
       if (versions.length != 1) {
         throw StateError('Versions tarifaires incompatibles.');
       }
+      if (quotes.map((q) => q.discountPercent).toSet().length != 1) {
+        throw StateError('La remise a changé pendant le calcul des tarifs.');
+      }
       setState(() {
+        _publishedPayableCents = {
+          for (var i = 0; i < quotes.length; i++)
+            AdvertisingPricingConfig.durations[i]:
+                quotes[i].payableExclTaxCents,
+        };
+        _publishedDiscountPercent = quotes.first.discountPercent;
         _publishedPrices = <String, int>{
           for (var i = 0; i < quotes.length; i++)
             AdvertisingPricingConfig.durations[i]: quotes[i].amountExclTax,
@@ -355,6 +368,9 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
         return 'map';
     }
   }
+
+  int _payableCentsFor(String durationLabel) =>
+      _publishedPayableCents[durationLabel] ?? 0;
 
   int _costFor({
     required String durationLabel,
@@ -1033,6 +1049,10 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             pricingReference: _publishedPricingReference,
             pricingError: _publishedPricingError,
             durationPrices: _durationPrices,
+            discountPercent: _publishedDiscountPercent,
+            payableExclTaxCents: _payableCentsFor(
+              _planningData.durationLabel ?? '1 semaine',
+            ),
             initialPlanning: _planningData,
             onPlanningChanged: _setPlanningData,
             requestedScope: _requestedScope,
@@ -1053,6 +1073,10 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             durationPrices: _durationPrices,
             pricingReference: _publishedPricingReference,
             pricingError: _publishedPricingError,
+            discountPercent: _publishedDiscountPercent,
+            payableExclTaxCents: _payableCentsFor(
+              _planningData.durationLabel ?? '1 semaine',
+            ),
             selectedTerritory: _advertisingTerritory,
             onRadiusChanged: _setAdvertisingRadius,
             onDiffusionChanged: _setDiffusionType,
