@@ -6689,7 +6689,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     // ADMINS
     // =========================
     for (final doc in _latestAdminDocs) {
-      final data = doc.data();
+      // L'ID du document reste disponible pour les anciens dossiers sans uid.
+      final data = <String, dynamic>{...doc.data(), '_docId': doc.id};
 
       final territoire = Map<String, dynamic>.from(data['territoire'] ?? {});
 
@@ -7122,7 +7123,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
                     final adminMarkers = <Marker>[
                       ...validAdmins.map(
-                        (doc) => _buildAdminMarker(doc.data()),
+                        (doc) => _buildAdminMarker({
+                          ...doc.data(),
+                          '_docId': doc.id,
+                        }),
                       ),
                     ];
 
