@@ -8,17 +8,23 @@
 const COLLECTION = "commercialCustomerDiscounts";
 const MARKETS = new Set(["ADMIN", "ADVERTISER_RADIUS"]);
 
+function invalid(message) {
+  const error = new Error(message);
+  error.status = 400;
+  return error;
+}
+
 function validateCustomer(market, uid) {
   if (!MARKETS.has(market) || typeof uid !== "string" ||
       !/^[a-zA-Z0-9_-]{6,128}$/.test(uid)) {
-    throw new Error("Marché ou identifiant client invalide.");
+    throw invalid("Marché ou identifiant client invalide.");
   }
   return market + "__" + uid;
 }
 
 function validatePercent(value) {
   if (!Number.isInteger(value) || value < 0 || value > 90) {
-    throw new Error("Remise invalide : nombre entier de 0 à 90 % requis.");
+    throw invalid("Remise invalide : nombre entier de 0 à 90 % requis.");
   }
   return value;
 }
