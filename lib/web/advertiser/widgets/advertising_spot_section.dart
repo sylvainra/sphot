@@ -125,7 +125,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       final options = await _territoryService.resolve(position);
       if (!mounted || request != _territoryRequestNumber) return;
       final previous = _territory;
-      final selected = previous != null ? options[previous.level] : null;
+      final option = previous != null ? options[previous.level] : null;
+      final selected = option != null && option.code == previous!.code
+          ? option
+          : null;
       setState(() {
         _territoryOptions = options;
         _territory = selected;
@@ -138,7 +141,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
         _territoryOptions = null;
         _territoryLoading = false;
         _territoryError =
-            'Impossible de préparer les six rayons. Réessayez.';
+            'Impossible de préparer les zones. Réessayez.';
       });
     }
   }
@@ -514,9 +517,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     final position = widget.position;
     final territory = _territory;
     if (territory == null ||
-        _territoryOptions?[territory.level] == null) {
+        _territoryOptions?[territory.level]?.code != territory.code) {
       setState(() {
-        _error = 'Sélectionnez une des six portées de diffusion.';
+        _error = 'Sélectionnez un des cinq rayons ou le pays entier.';
       });
       return;
     }
@@ -794,8 +797,8 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Six portées circulaires rouges, identiques dans tous les pays. '
-            'Aucune exclusivité géographique ou sectorielle.',
+            'Cinq rayons rouges ou le pays entier en rouge, '
+            'partout dans le monde. Aucune exclusivité.',
             style: TextStyle(
               color: Color(0xFF4B5F97),
               fontWeight: FontWeight.w700,
@@ -809,7 +812,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               children: [
                 Text(
                   _territoryError ??
-                      'Positionnez votre SPHOT pour afficher les six rayons.',
+                      'Positionnez votre SPHOT pour choisir sa zone.',
                   style: const TextStyle(color: WebColors.red),
                 ),
                 if (widget.position != null)
@@ -820,6 +823,15 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               ],
             )
           else ...[
+            if (options[AdvertiserTerritoryLevel.wholeCountry] == null)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'PAYS ENTIER indisponible pour cet emplacement : '
+                  'vérifiez la connexion et la position.',
+                  style: TextStyle(color: WebColors.red, fontSize: 12),
+                ),
+              ),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -855,7 +867,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             if (current != null) ...[
               const SizedBox(height: 12),
               Text(
-                current.level.label,
+                current.isWholeCountry
+                    ? 'PAYS ENTIER : ${current.name}'
+                    : current.level.label,
                 style: const TextStyle(
                   color: WebColors.blue,
                   fontWeight: FontWeight.w800,
@@ -863,9 +877,11 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               ),
               const SizedBox(height: 6),
               Text(
-                'La zone rouge représente un rayon de '
-                    '${current.level.label} autour du SPHOT, '
-                    'quel que soit le pays.',
+                current.isWholeCountry
+                    ? 'Le contour rouge représente ${current.name} '
+                        '(frontières cartographiques indicatives).'
+                    : 'La zone rouge représente un rayon de '
+                        '${current.level.label} autour du SPHOT.',
                 style: const TextStyle(
                   color: Color(0xFF4B5F97),
                   fontSize: 12,
