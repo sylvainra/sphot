@@ -15,6 +15,8 @@ class _SuperAdminAdsPageState extends State<SuperAdminAdsPage> {
 
   int _selectedTab = 0;
 
+  String _text(dynamic value) => (value ?? '').toString();
+
   String _zoneSummary(Map<String, dynamic> data) {
     final territory = data['advertisingTerritory'];
     if (territory is Map) {
@@ -22,8 +24,13 @@ class _SuperAdminAdsPageState extends State<SuperAdminAdsPage> {
         return 'PAYS ENTIER : ${territory['name'] ?? 'Pays'}';
       }
       final level = territory['level']?.toString() ?? '';
-      final match = RegExp(r'^radius_([0-9]+)km
-
+      final match = RegExp(r'^radius_([0-9]+)km$').firstMatch(level);
+      if (match != null) return '${match.group(1)} km';
+    }
+    final radius = _number(data['radiusKm']).toDouble();
+    if (radius > 0) return 'Rayon historique : $radius km';
+    return 'Zone non renseignée';
+  }
   num _number(dynamic value) {
     if (value is num) return value;
     return num.tryParse(_text(value).replaceAll(',', '.')) ?? 0;
