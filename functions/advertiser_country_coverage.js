@@ -21,10 +21,6 @@ function iso3(value) {
   return /^[A-Z]{3}$/.test(s) && s !== "XXX" ? s : "";
 }
 
-/**
- * @param {Object} spot Spot publié avec pays métier (non cartographique).
- * @return {string} ISO3, ou chaîne vide si données insuffisantes.
- */
 // Rattachement souverain pour les audiences commerciales françaises.
 // Les régimes fiscaux locaux, distincts selon le territoire, NE SONT
 // PAS inférés de ces codes ; ils restent du ressort d'Odoo.
@@ -40,6 +36,10 @@ const FRENCH_OVERSEAS_NAMES = new Set([
   "TERRES AUSTRALES ET ANTARCTIQUES FRANCAISES",
 ]);
 
+/**
+ * @param {Object} spot Spot publié avec pays métier (non cartographique).
+ * @return {string} ISO3, ou chaîne vide si données insuffisantes.
+ */
 function spotCountry(spot) {
   if (!spot || typeof spot !== "object") return "";
   const explicit = iso3(spot.countryIso3 || spot.paysIso3);
