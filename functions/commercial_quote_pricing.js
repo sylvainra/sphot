@@ -9,7 +9,7 @@ const TERRITORIES = [
 ];
 const RADIUS_LEVELS = [
   "radius_5km", "radius_15km", "radius_50km",
-  "radius_150km", "radius_300km", "radius_500km",
+  "radius_150km", "radius_300km", "country",
 ];
 const OFFERS = ["map", "premium", "pack"];
 const DURATIONS = [
