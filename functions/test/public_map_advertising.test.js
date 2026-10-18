@@ -7,6 +7,12 @@ const {
 } = require("../public_map_advertising");
 
 const now = Date.parse("2026-10-18T10:00:00Z");
+
+/**
+ * Construit une campagne publicitaire active pour les tests.
+ * @param {Object} overrides Champs à remplacer dans la campagne.
+ * @return {Object} Campagne de test.
+ */
 function active(overrides = {}) {
   return {
     status: "active",
