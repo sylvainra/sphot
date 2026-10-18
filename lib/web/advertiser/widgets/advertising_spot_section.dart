@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../models/advertising_pricing_config.dart';
+import '../services/advertiser_territory_service.dart';
 import '../../shared/web_colors.dart';
 import '../models/advertising_visual_data.dart';
 
@@ -25,6 +26,8 @@ class AdvertisingSpotSection extends StatefulWidget {
     required this.onVisualChanged,
     required this.onRadiusChanged,
     required this.onScopeChanged,
+    required this.onTerritoryChanged,
+    this.initialTerritory,
     this.approvedAssetsLocked = false,
     this.assetChangeMode = false,
     this.assetChangeRequestStatus = '',
@@ -42,6 +45,8 @@ class AdvertisingSpotSection extends StatefulWidget {
   final ValueChanged<AdvertisingVisualData> onVisualChanged;
   final ValueChanged<double> onRadiusChanged;
   final ValueChanged<String> onScopeChanged;
+  final ValueChanged<AdvertiserTerritory> onTerritoryChanged;
+  final AdvertiserTerritory? initialTerritory;
   final bool approvedAssetsLocked;
   final bool assetChangeMode;
   final String assetChangeRequestStatus;
@@ -61,6 +66,13 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   bool _assetChangeRequestedLocally = false;
   double _radiusKm = 0;
   String _scope = 'local';
+  AdvertiserTerritory? _territory;
+  AdvertiserTerritoryOptions? _territoryOptions;
+  final AdvertiserTerritoryService _territoryService =
+      AdvertiserTerritoryService();
+  bool _territoryLoading = false;
+  String? _territoryError;
+  int _territoryRequestNumber = 0;
   Uint8List? _bannerBytes;
   String? _bannerUrl;
   String? _bannerFileName;
@@ -89,8 +101,58 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     super.initState();
     _radiusKm = widget.initialRadiusKm;
     _scope = widget.requestedScope;
+    _territory = widget.initialTerritory;
     _restoreInitialVisual();
     _initialiseSpot();
+  }
+
+  @override
+  void dispose() {
+    _territoryRequestNumber++;
+    _territoryService.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadTerritories(LatLng position) async {
+    final request = ++_territoryRequestNumber;
+    if (mounted) {
+      setState(() {
+        _territoryLoading = true;
+        _territoryError = null;
+      });
+    }
+    try {
+      final options = await _territoryService.resolve(position);
+      if (!mounted || request != _territoryRequestNumber) return;
+      final previous = _territory;
+      final selected = previous != null &&
+              options[previous.level]?.code == previous.code
+          ? options[previous.level]!
+          : options[AdvertiserTerritoryLevel.commune];
+      setState(() {
+        _territoryOptions = options;
+        _territory = selected;
+        _territoryLoading = false;
+      });
+      if (selected != null) widget.onTerritoryChanged(selected);
+    } catch (_) {
+      if (!mounted || request != _territoryRequestNumber) return;
+      setState(() {
+        _territoryOptions = null;
+        _territoryLoading = false;
+        _territoryError =
+            'Impossible de charger les territoires officiels. Réessayez.';
+      });
+    }
+  }
+
+  void _selectTerritory(AdvertiserTerritory selected) {
+    setState(() {
+      _territory = selected;
+      _completed = false;
+      _error = null;
+    });
+    widget.onTerritoryChanged(selected);
   }
 
   void _restoreInitialVisual() {
@@ -119,6 +181,14 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       _scope = widget.requestedScope;
     }
     if (oldWidget.position == widget.position) return;
+    if (widget.position != null) {
+      _loadTerritories(widget.position!);
+    } else {
+      setState(() {
+        _territory = null;
+        _territoryOptions = null;
+      });
+    }
     if (_loadingSavedPosition) {
       _loadingSavedPosition = false;
       return;
@@ -142,6 +212,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           final approvedLocation = _map(approvedApplication['location']);
           final approvedVisual = _map(approvedApplication['visual']);
           final advertisingSpot = _map(data['advertisingSpot']);
+          _territory = AdvertiserTerritory.fromFirestore(
+                data['advertisingTerritory'],
+              ) ??
+              _territory;
           final applicantLocation = _map(data['applicantLocation']);
           final proposedVisual = _map(data['proposedVisual']);
           final legacyDiffusion = _map(data['diffusion']);
@@ -243,11 +317,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
 
     if (!mounted) return;
     setState(() => _loading = false);
+    if (widget.position != null) _loadTerritories(widget.position!);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _notifyVisual();
-      widget.onRadiusChanged(_radiusKm);
-      widget.onScopeChanged(_scope);
     });
   }
 
@@ -438,6 +511,14 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
 
   Future<void> _save() async {
     final position = widget.position;
+    final territory = _territory;
+    if (territory == null ||
+        _territoryOptions?[territory.level]?.code != territory.code) {
+      setState(() {
+        _error = 'Sélectionnez un territoire administratif valide.';
+      });
+      return;
+    }
     if (position == null) {
       setState(() {
         _error = 'Cliquez sur la carte pour positionner le SPHOT publicitaire.';
@@ -472,7 +553,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             .doc(requestId);
         if (widget.assetChangeMode) {
           await requestReference.set({
-            'requestedScope': _scope,
+            'advertisingTerritory': territory.toFirestore(),
             'applicantLocation': <String, Object?>{
               'latitude': position.latitude,
               'longitude': position.longitude,
@@ -495,20 +576,17 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
           await requestReference.update({
-            'advertisingSpot.radiusKm': _radiusKm,
-            'advertisingSpot.scope': _scope,
+            'advertisingTerritory': territory.toFirestore(),
           });
         } else {
           await requestReference.set({
             ...creationData,
             'uid': requestId,
-            'requestedScope': _scope,
+            'advertisingTerritory': territory.toFirestore(),
             'advertisingSpotCompleted': true,
             'advertisingSpot': <String, Object?>{
               'latitude': position.latitude,
               'longitude': position.longitude,
-              'radiusKm': _radiusKm,
-              'scope': _scope,
               'bannerUrl': bannerUrl,
               'bannerFileName': _bannerFileName,
               'bannerExtension': _bannerExtension,
@@ -683,7 +761,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     );
   }
 
-  Widget _buildRadiusCard() {
+  Widget _buildTerritoryCard() {
+    final options = _territoryOptions;
+    final current = _territory;
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(18),
@@ -696,171 +776,104 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.radar_rounded, color: WebColors.blue, size: 30),
-              SizedBox(width: 14),
+              Icon(Icons.public_outlined, color: WebColors.blue, size: 30),
+              SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'RAYON D’ACTION',
-                      style: TextStyle(
-                        color: WebColors.blue,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'ZONE EXCLUSIVE AUTOUR DE VOTRE SPHOT',
-                      style: TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'TERRITOIRE DE DIFFUSION',
+                  style: TextStyle(
+                    color: WebColors.blue,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: AdvertisingPricingConfig.radiusChoices.map((radius) {
-              final selected = _radiusKm == radius;
-              return OutlinedButton(
-                onPressed: () => _selectRadius(radius),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: selected ? WebColors.red : WebColors.blue,
-                  backgroundColor: selected
-                      ? WebColors.red.withOpacity(0.045)
-                      : Colors.white,
-                  side: BorderSide(
-                    color: selected ? WebColors.red : WebColors.blue,
-                    width: selected ? 2 : 1.3,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
-                child: Text(
-                  AdvertisingPricingConfig.radiusLabel(radius),
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-              );
-            }).toList(),
+          const SizedBox(height: 12),
+          const Text(
+            'Sélectionnez un territoire administratif. Aucun rayon ni '
+            'exclusivité territoriale ou sectorielle.',
+            style: TextStyle(
+              color: Color(0xFF4B5F97),
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 14),
-          Text(
-            'À PARTIR DE ${widget.startingPriceExclTax} € HT / SEMAINE',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: WebColors.red,
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReachCard() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFCBD5E1)),
-      ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'FAITES RAYONNER VOTRE SPHOT PUBLICITAIRE',
-            style: TextStyle(
-              color: WebColors.blue,
-              fontSize: 16,
-              height: 1.25,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          SizedBox(height: 9),
-          Text(
-            'Choisissez la zone dans laquelle votre SPHOT bénéficiera d’une présence publicitaire exclusive. Plus le rayon est étendu, plus votre SPHOT gagne en visibilité auprès des utilisateurs présents à proximité.',
-            style: TextStyle(
-              color: Color(0xFF4B5F97),
-              height: 1.4,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildApprovedScopeCard() {
-    final label = switch (_scope) {
-      'national' => 'NATIONALE',
-      'local_and_national' => 'LOCALE ET NATIONALE',
-      _ => 'LOCALE',
-    };
-    final description = switch (_scope) {
-      'national' => 'Votre SPHOT publicitaire bénéficie d’une diffusion nationale adaptée aux niveaux de zoom, sans choix de rayon local.',
-      'local_and_national' => 'Votre diffusion nationale est complétée par le rayon local configuré autour de votre SPHOT publicitaire.',
-      _ => 'Votre SPHOT publicitaire apparaît localement selon le rayon d’action sélectionné et le niveau de zoom.',
-    };
-    return _SpotCard(
-      icon: Icons.public_rounded,
-      title: 'PORTÉE DU SPHOT PUBLICITAIRE',
-      status: label,
-      statusColor: WebColors.red,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children:
-                const <String, String>{
-                  'local': 'LOCALE',
-                  'national': 'NATIONALE',
-                  'local_and_national': 'LOCALE ET NATIONALE',
-                }.entries.map((entry) {
-                  final selected = _scope == entry.key;
-                  return OutlinedButton(
-                    onPressed: () => _selectScope(entry.key),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: selected ? Colors.white : WebColors.blue,
-                      backgroundColor: selected ? WebColors.red : Colors.white,
-                      side: BorderSide(
-                        color: selected ? WebColors.red : WebColors.blue,
-                        width: selected ? 2 : 1.3,
+          if (_territoryLoading)
+            const Center(child: CircularProgressIndicator())
+          else if (options == null)
+            Column(
+              children: [
+                Text(
+                  _territoryError ??
+                      'Positionnez votre SPHOT sur la carte pour '
+                      'obtenir ses territoires officiels.',
+                  style: const TextStyle(color: WebColors.red),
+                ),
+                if (widget.position != null)
+                  TextButton(
+                    onPressed: () => _loadTerritories(widget.position!),
+                    child: const Text('RÉESSAYER'),
+                  ),
+              ],
+            )
+          else ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final level in AdvertiserTerritoryLevel.values)
+                  if (options[level] != null)
+                    OutlinedButton(
+                      onPressed: () => _selectTerritory(options[level]!),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: current?.level == level
+                            ? Colors.white
+                            : WebColors.blue,
+                        backgroundColor: current?.level == level
+                            ? WebColors.red
+                            : Colors.white,
+                        side: BorderSide(
+                          color: current?.level == level
+                              ? WebColors.red
+                              : WebColors.blue,
+                          width: 1.5,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(99),
+                        ),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(99),
+                      child: Text(
+                        level.label,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ),
-                    child: Text(
-                      entry.value,
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                  );
-                }).toList(),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            description,
-            style: const TextStyle(
-              color: Color(0xFF4B5F97),
-              height: 1.4,
-              fontWeight: FontWeight.w700,
+              ],
             ),
-          ),
+            if (current != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                '${current.level.label} : ${current.name}',
+                style: const TextStyle(
+                  color: WebColors.blue,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                current.level == AdvertiserTerritoryLevel.national
+                    ? 'Diffusion nationale, sans contour local.'
+                    : 'Le contour officiel du territoire sélectionné '
+                        'est affiché sur la carte.',
+                style: const TextStyle(
+                  color: Color(0xFF4B5F97),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ],
         ],
       ),
     );
@@ -909,7 +922,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             ],
           ),
         ),
-        _buildApprovedScopeCard(),
+        _buildTerritoryCard(),
         if (widget.approvedAssetsLocked)
           Padding(
             padding: const EdgeInsets.only(bottom: 14),
@@ -969,22 +982,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               ],
             ),
           ),
-        if (_scope != 'national') ...[
-          _buildReachCard(),
-          _buildRadiusCard(),
-        ] else
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Text(
-              'À PARTIR DE ${widget.startingPriceExclTax} € HT / SEMAINE — TARIF NATIONAL',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: WebColors.red,
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
+
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
