@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
-/// Contours Natural Earth 1:110m : carte indicative, pas frontière légale.
+/// Contours Natural Earth 1:50m : carte indicative, pas frontière légale.
 /// Source de données publique et mondiale (domaine public).
 /// Les frontières sont chargées une fois et réutilisées en mémoire.
 class AdvertiserCountryBoundary {
@@ -113,7 +113,7 @@ class AdvertiserCountryBoundaryService {
   static Future<List<AdvertiserCountryBoundary>>? _cachedWorld;
   static const sourceUrl =
       'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/'
-      'master/geojson/ne_110m_admin_0_countries.geojson';
+      'master/geojson/ne_50m_admin_0_countries.geojson';
 
   Future<List<AdvertiserCountryBoundary>> _download() async {
     final ownClient = _client ?? http.Client();
