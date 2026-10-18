@@ -19,6 +19,9 @@ class PlanningSection extends StatefulWidget {
     required this.hasDiffusionSelection,
     required this.developmentBypass,
     required this.costExclTax,
+    this.pricingReference,
+    this.pricingError,
+    this.durationPrices = const {},
     required this.initialPlanning,
     required this.onPlanningChanged,
     this.requestedScope = 'local',
@@ -32,6 +35,9 @@ class PlanningSection extends StatefulWidget {
   final bool hasDiffusionSelection;
   final bool developmentBypass;
   final int costExclTax;
+  final String? pricingReference;
+  final String? pricingError;
+  final Map<String, int> durationPrices;
   final PlanningData initialPlanning;
   final ValueChanged<PlanningData> onPlanningChanged;
   final String requestedScope;
@@ -690,6 +696,45 @@ class _PlanningSectionState extends State<PlanningSection> {
                   fontWeight: FontWeight.w900,
                 ),
               ),
+              const SizedBox(height: 6),
+              Text(
+                widget.pricingReference == null
+                    ? 'Référence tarifaire : en attente de publication'
+                    : 'Référence : ${widget.pricingReference}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: WebColors.blue,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (widget.pricingError != null)
+                Text(
+                  widget.pricingError!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: WebColors.red),
+                ),
+              if (widget.durationPrices.isNotEmpty)
+                ExpansionTile(
+                  title: const Text(
+                    'CONSULTER LES TARIFS PUBLIÉS',
+                    style: TextStyle(
+                      color: WebColors.blue,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  children: [
+                    for (final entry in widget.durationPrices.entries)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Expanded(child: Text(entry.key)),
+                            Text('${entry.value} € HT'),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
               const SizedBox(height: 4),
               Text(
                 'Du ${_formatDate(_startDate)} au ${_formatDate(_endDate)}',
