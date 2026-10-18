@@ -3,6 +3,7 @@
 
 // Preview en lecture seule : aucune ecriture dans les devis ou abonnements.
 const MARKET_COLLECTION = "commercialPricingMarkets";
+const discounts = require("./commercial_discounts");
 const TERRITORIES = [
   "commune", "intercommunalite", "departement", "region", "national",
 ];
@@ -121,7 +122,7 @@ function endpoint({admin, onRequest}) {
   }, async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
     res.set("Cache-Control", "no-store");
     if (req.method === "OPTIONS") {
       res.status(204).send("");
@@ -146,10 +147,32 @@ function endpoint({admin, onRequest}) {
         advertiserQuote(
             published, body.territory, body.offer, body.duration,
         );
+
+      // Aucun UID client transmis dans le corps n'est accepté :
+      // le client est identifié UNIQUEMENT par Firebase Auth.
+      const header = String(req.headers.authorization || "");
+      let percent = 0;
+      if (header) {
+        if (!header.startsWith("Bearer ")) {
+          throw quoteError(401, "Authentification incorrecte.");
+        }
+        let decoded;
+        try {
+          decoded = await admin.auth().verifyIdToken(header.slice(7));
+        } catch (_) {
+          throw quoteError(401, "Session client invalide.");
+        }
+        if (market === "ADMIN" || market === "ADVERTISER_RADIUS") {
+          percent = await discounts.readDiscount(admin, market, decoded.uid);
+        }
+      }
+      const reduction = discounts.computeDiscountCents(
+          quote.amountExclTax, percent);
       res.status(200).json({
         success: true,
         quote: {
           ...quote,
+          ...reduction,
           calculatedAt: new Date().toISOString(),
           previewOnly: true,
         },
