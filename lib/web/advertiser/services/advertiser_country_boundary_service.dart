@@ -142,7 +142,7 @@ class AdvertiserCountryBoundaryService {
     if (data is! Map || data['features'] is! List) {
       throw const FormatException('Catalogue GeoJSON mondial invalide.');
     }
-    final result = <AdvertiserCountryBoundary>[];
+    final byCountry = <String, AdvertiserCountryBoundary>{};
     for (final rawFeature in data['features'] as List) {
       if (rawFeature is! Map) continue;
       final properties = rawFeature['properties'];
@@ -185,16 +185,18 @@ class AdvertiserCountryBoundaryService {
         if (points.length >= 3) polygons.add(points);
       }
       if (polygons.isNotEmpty) {
-        result.add(AdvertiserCountryBoundary(
+        final existing = byCountry[iso3];
+        byCountry[iso3] = AdvertiserCountryBoundary(
           iso3: iso3,
-          name: name,
-          polygons: polygons,
-        ));
+          name: existing?.name ?? name,
+          // Toutes les composantes portant ce code pays restent couvertes.
+          polygons: [...?existing?.polygons, ...polygons],
+        );
       }
     }
-    if (result.isEmpty) {
+    if (byCountry.isEmpty) {
       throw const FormatException('Aucun pays exploitable dans le GeoJSON.');
     }
-    return result;
+    return byCountry.values.toList();
   }
 }
