@@ -34,7 +34,9 @@ class PublishedCommercialQuote {
     final amount = data['amountExclTax'];
     final reference = data['pricingReference'];
     final date = DateTime.tryParse(data['calculatedAt']?.toString() ?? '');
-    if ((market != 'ADMIN' && market != 'ADVERTISER') ||
+    if ((market != 'ADMIN' &&
+            market != 'ADVERTISER' &&
+            market != 'ADVERTISER_RADIUS') ||
         version is! int ||
         version <= 0 ||
         amount is! int ||
@@ -84,6 +86,21 @@ class PublishedCommercialQuoteService {
       _request({
         'market': 'ADVERTISER',
         'territory': territory,
+        'offer': offer,
+        'duration': duration,
+      });
+
+  /// Nouveau catalogue indépendant : 6 rayons × 3 offres × 6 durées.
+  /// Aucun prix n'est retourné tant qu'une version complète
+  /// n'a pas été explicitement publiée par le Super Admin.
+  Future<PublishedCommercialQuote> advertiserRadius({
+    required String radius,
+    required String offer,
+    required String duration,
+  }) =>
+      _request({
+        'market': 'ADVERTISER_RADIUS',
+        'territory': radius,
         'offer': offer,
         'duration': duration,
       });
