@@ -17,6 +17,7 @@ import '../models/advertising_visual_data.dart';
 import '../models/diffusion_preview_data.dart';
 import '../models/planning_data.dart';
 import '../services/advertiser_territory_service.dart';
+import '../services/advertiser_country_boundary_service.dart';
 import '../widgets/advertising_spot_section.dart';
 import '../widgets/advertiser_application_section.dart';
 import '../widgets/advertiser_legal_acceptance_section.dart';
@@ -78,7 +79,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'SPHOT PUBLICITAIRE',
       Icons.location_on_outlined,
-      'Choisissez une des six portées circulaires rouges, dans tous les pays.',
+      'Choisissez cinq rayons rouges ou le pays entier dans le monde.',
     ),
     _AdvertiserSection(
       'DIFFUSION',
@@ -119,6 +120,10 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   LatLng? _advertisingPoint;
   double _advertisingRadiusKm = 0;
   AdvertiserTerritory? _advertisingTerritory;
+  final AdvertiserCountryBoundaryService _countryBoundaries =
+      AdvertiserCountryBoundaryService();
+  List<List<LatLng>> _countryOutline = const [];
+  int _countryOutlineRequest = 0;
   AdvertisingVisualData _advertisingVisual = const AdvertisingVisualData();
   DiffusionPreviewData _diffusionPreview = const DiffusionPreviewData();
   PlanningData _planningData = const PlanningData();
@@ -393,7 +398,21 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   }
 
   void _setAdvertisingPoint(LatLng point, {required bool centerMap}) {
-    setState(() => _advertisingPoint = point);
+    final moved = _advertisingPoint != null &&
+        _advertisingPoint != point;
+    if (moved && _advertisingTerritory?.isWholeCountry == true) {
+      ++_countryOutlineRequest;
+      setState(() {
+        _advertisingPoint = point;
+        _advertisingTerritory = null;
+        _countryOutline = const [];
+        _publishedPrices = <String, int>{};
+        _publishedPayableCents = <String, int>{};
+        _publishedPricingReference = null;
+      });
+    } else {
+      setState(() => _advertisingPoint = point);
+    }
     if (!centerMap) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -421,18 +440,57 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     if (!mounted) return;
     final old = _advertisingTerritory;
     if (old?.level == territory.level && old?.code == territory.code) return;
-    setState(() => _advertisingTerritory = territory);
-    // Synchronise les étapes Diffusion et Planification avec la sélection.
+    ++_countryOutlineRequest;
+    setState(() {
+      _advertisingTerritory = territory;
+      _countryOutline = const [];
+    });
+    // Les cinq rayons restent indépendants du pays sélectionné.
     _setAdvertisingRadius(territory.radiusKm);
     _loadPublishedPrices();
+    if (territory.isWholeCountry) {
+      unawaited(_loadCountryOutline(territory, _countryOutlineRequest));
+      return;
+    }
     final center = _advertisingPoint;
     if (center != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _mapController.move(
-          center,
-          territory.level.suggestedZoom,
+        if (mounted) {
+          _mapController.move(center, territory.level.suggestedZoom);
+        }
+      });
+    }
+  }
+
+  Future<void> _loadCountryOutline(
+    AdvertiserTerritory territory,
+    int request,
+  ) async {
+    try {
+      final boundary = await _countryBoundaries.findByIso3(territory.code);
+      if (!mounted || request != _countryOutlineRequest ||
+          _advertisingTerritory?.code != territory.code) {
+        return;
+      }
+      if (boundary == null || boundary.allPoints.isEmpty) {
+        debugPrint('Frontière absente pour ${territory.code}');
+        return;
+      }
+      setState(() => _countryOutline = boundary.polygons);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || request != _countryOutlineRequest) return;
+        // Inclut les régions insulaires et les composantes discontinues.
+        _mapController.fitCamera(
+          CameraFit.coordinates(
+            coordinates: boundary.allPoints,
+            padding: const EdgeInsets.all(32),
+            maxZoom: 7,
+          ),
         );
       });
+    } catch (error) {
+      // Aucune frontière inventée si le service cartographique échoue.
+      debugPrint('Contour national indisponible : $error');
     }
   }
 
@@ -624,8 +682,23 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               userAgentPackageName: 'com.sphot.app',
             ),
             if (showApprovedRadius &&
+                _advertisingTerritory?.isWholeCountry == true &&
+                _countryOutline.isNotEmpty)
+              PolygonLayer(
+                polygons: [
+                  for (final ring in _countryOutline)
+                    Polygon(
+                      points: ring,
+                      color: WebColors.red.withOpacity(0.10),
+                      borderColor: WebColors.red,
+                      borderStrokeWidth: 2.2,
+                    ),
+                ],
+              ),
+            if (showApprovedRadius &&
                 _advertisingPoint != null &&
-                _advertisingTerritory != null)
+                _advertisingTerritory != null &&
+                !_advertisingTerritory!.isWholeCountry)
               CircleLayer(
                 circles: [
                   CircleMarker(
@@ -725,7 +798,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'SPHOT ouvre le monde au grand public. Choisissez un des cinq rayons de diffusion centrés sur votre SPHOT, disponibles dans tous les pays. La diffusion est partagée équitablement entre les campagnes éligibles, sans exclusivité de zone ni de secteur. Le public peut accéder à votre site internet d’un simple clic.',
+                      'SPHOT ouvre le monde au grand public. Choisissez cinq rayons de proximité ou le pays entier. Le contour national s’adapte au pays du SPHOT. La diffusion reste partagée équitablement, sans exclusivité. Le public accède à votre site d’un simple clic.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFF4B5F97),
