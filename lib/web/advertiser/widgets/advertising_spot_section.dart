@@ -601,6 +601,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                     : Image.network(
                         _bannerUrl!,
                         fit: BoxFit.contain,
+                        // Sur Web, l'URL Firebase Storage peut être affichée
+                        // par un élément HTML sans exiger CORS CanvasKit.
+                        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                         errorBuilder: (_, __, ___) => const Center(
                           child: Text(
                             'Le visuel ne peut pas être affiché.',
