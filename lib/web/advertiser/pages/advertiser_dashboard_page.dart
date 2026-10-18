@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../map/map_page.dart';
 import '../../../models/advertising_pricing_config.dart';
+import '../../../services/published_commercial_quote_service.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../../shared/web_colors.dart';
 import '../models/advertiser_request_status.dart';
@@ -77,7 +78,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'SPHOT PUBLICITAIRE',
       Icons.location_on_outlined,
-      'Configurez le rayon de votre SPHOT PUBLICITAIRE depuis la position et le visuel approuvés.',
+      'Choisissez le territoire administratif de votre publicité depuis la position approuvée.',
     ),
     _AdvertiserSection(
       'DIFFUSION',
@@ -88,7 +89,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'PLANIFICATION',
       Icons.calendar_month_outlined,
-      'Planifiez en exclusivité votre SPHOT PUBLICITAIRE.',
+      'Planifiez votre publicité sans exclusivité territoriale ni sectorielle.',
     ),
     _AdvertiserSection(
       'DEVIS & COMMANDE',
@@ -121,7 +122,12 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   AdvertisingVisualData _advertisingVisual = const AdvertisingVisualData();
   DiffusionPreviewData _diffusionPreview = const DiffusionPreviewData();
   PlanningData _planningData = const PlanningData();
-  Map<String, dynamic> _pricing = AdvertisingPricingConfig.defaults();
+  final PublishedCommercialQuoteService _quoteService =
+      const PublishedCommercialQuoteService();
+  Map<String, int> _publishedPrices = <String, int>{};
+  String? _publishedPricingReference;
+  String? _publishedPricingError;
+  int _publishedPricingRequest = 0;
   Map<String, dynamic> _requestData = <String, dynamic>{};
   String _requestStatus = 'loading';
   bool _requestReady = false;
@@ -190,7 +196,6 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   @override
   void initState() {
     super.initState();
-    _loadPricing();
     _listenToRequest();
   }
 
@@ -299,16 +304,44 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _restoredRequestAssets = true;
   }
 
-  Future<void> _loadPricing() async {
+  Future<void> _loadPublishedPrices() async {
+    final territory = _advertisingTerritory;
+    if (!mounted || territory == null) return;
+    final offer = _visibilityType;
+    final ticket = ++_publishedPricingRequest;
+    setState(() {
+      _publishedPrices = <String, int>{};
+      _publishedPricingReference = null;
+      _publishedPricingError = null;
+    });
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('settings')
-          .doc('advertisingPricing')
-          .get();
-      if (!mounted || snapshot.data() == null) return;
-      setState(() => _pricing = snapshot.data()!);
+      final quotes = await Future.wait([
+        for (final duration in AdvertisingPricingConfig.durations)
+          _quoteService.advertiser(
+            territory: territory.level.storageKey,
+            offer: offer,
+            duration: duration,
+          ),
+      ]);
+      if (!mounted || ticket != _publishedPricingRequest) return;
+      final versions = quotes.map((quote) => quote.pricingReference).toSet();
+      if (versions.length != 1) {
+        throw StateError('Versions tarifaires incompatibles.');
+      }
+      setState(() {
+        _publishedPrices = <String, int>{
+          for (var i = 0; i < quotes.length; i++)
+            AdvertisingPricingConfig.durations[i]: quotes[i].amountExclTax,
+        };
+        _publishedPricingReference = quotes.first.pricingReference;
+      });
     } catch (error) {
-      debugPrint('Chargement tarifs annonceur impossible : $error');
+      if (!mounted || ticket != _publishedPricingRequest) return;
+      setState(() {
+        _publishedPricingError =
+            'Tarifs publiés indisponibles. Aucun prix historique utilisé.';
+      });
+      debugPrint('Tarifs annonceur publiés indisponibles : $error');
     }
   }
 
@@ -329,19 +362,11 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     String? visibilityType,
     double? radiusKm,
   }) {
-    if (_usesNationalPricing) {
-      return AdvertisingPricingConfig.nationalPrice(
-        pricing: _pricing,
-        durationLabel: durationLabel,
-        visibilityType: visibilityType ?? _visibilityType,
-      );
+    // Aucun calcul fondé sur les rayons ou sur des tarifs non publiés.
+    if (visibilityType != null && visibilityType != _visibilityType) {
+      return 0;
     }
-    return AdvertisingPricingConfig.localPrice(
-      pricing: _pricing,
-      durationLabel: durationLabel,
-      visibilityType: visibilityType ?? _visibilityType,
-      radiusKm: radiusKm ?? _advertisingRadiusKm,
-    );
+    return _publishedPrices[durationLabel] ?? 0;
   }
 
   void _selectSection(int index) {
@@ -364,7 +389,9 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
 
   void _setDiffusionPreview(DiffusionPreviewData preview) {
     if (!mounted) return;
+    final offerChanged = _diffusionPreview.type != preview.type;
     setState(() => _diffusionPreview = preview);
+    if (offerChanged) _loadPublishedPrices();
   }
 
   void _setAdvertisingVisual(AdvertisingVisualData visual) {
@@ -384,6 +411,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
       _advertisingTerritoryGeometry =
           const AdvertiserTerritoryGeometry([]);
     });
+    _loadPublishedPrices();
     try {
       final geometry =
           await _advertiserTerritoryService.geometry(territory);
@@ -450,10 +478,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     );
   }
 
-  Map<String, int> get _durationPrices => {
-    for (final duration in AdvertisingPricingConfig.durations)
-      duration: _costFor(durationLabel: duration),
-  };
+  Map<String, int> get _durationPrices =>
+      Map<String, int>.unmodifiable(_publishedPrices);
 
   void _setPlanningData(PlanningData planning) {
     if (!mounted) return;
@@ -686,7 +712,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'FAITES RAYONNER VOTRE ACTIVITÉ PROFESSIONNELLE EN UN SPHOT PUBLICITAIRE EXCLUSIF !',
+                      'FAITES CONNAÎTRE VOTRE ACTIVITÉ PROFESSIONNELLE AVEC SPHOT !',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: WebColors.blue,
@@ -696,7 +722,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'SPHOT ouvre le monde au grand public. Selon le niveau de zoom, les SPHOTS PUBLICITAIRES LOCAUX apparaissent à l’échelle communale, tandis que les SPHOTS PUBLICITAIRES NATIONAUX bénéficient d’une visibilité à plus grande échelle, voire permanente lorsqu’aucune publicité locale n’est diffusée. En plus d’être diffusé en EXCLUSIVITÉ dans la catégorie choisie, selon le rayon géographique et la période définis, votre SPHOT PUBLICITAIRE redirige le grand public vers votre site internet d’un simple clic.',
+                      'SPHOT ouvre le monde au grand public. Choisissez un territoire administratif : commune, intercommunalité, département, région ou national. La diffusion est partagée équitablement entre les campagnes éligibles, sans exclusivité de zone ni de secteur. Le public peut accéder à votre site internet d’un simple clic.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFF4B5F97),
@@ -1035,6 +1061,9 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               durationLabel: _planningData.durationLabel ?? '1 semaine',
             ),
             durationPrices: _durationPrices,
+            pricingReference: _publishedPricingReference,
+            pricingError: _publishedPricingError,
+            selectedTerritory: _advertisingTerritory,
             onRadiusChanged: _setAdvertisingRadius,
             onDiffusionChanged: _setDiffusionType,
             requestedScope: _requestedScope,
