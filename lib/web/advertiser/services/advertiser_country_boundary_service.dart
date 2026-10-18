@@ -22,6 +22,30 @@ class AdvertiserCountryBoundary {
         for (final polygon in polygons) ...polygon,
       ];
 
+  /// Points utilisés UNIQUEMENT pour cadrer la carte.
+  /// Un pays peut inclure des territoires très éloignés (ex. France et
+  /// Guyane). Les inclure dans CameraFit décentre la zone consultée.
+  /// On cadre la composante contenant le SPHOT, ou la plus proche lorsque
+  /// le point est légèrement en mer sur une côte généralisée.
+  /// Tous les polygones restent affichés en rouge et restent accessibles
+  /// en déplaçant la carte.
+  List<LatLng> focusPointsNear(LatLng position) {
+    if (polygons.isEmpty) return const <LatLng>[];
+    for (final polygon in polygons) {
+      if (_insidePolygon(position, polygon)) return polygon;
+    }
+    var nearest = polygons.first;
+    var shortestDistance = _ringBoundaryKm(position, nearest);
+    for (final polygon in polygons.skip(1)) {
+      final distance = _ringBoundaryKm(position, polygon);
+      if (distance < shortestDistance) {
+        shortestDistance = distance;
+        nearest = polygon;
+      }
+    }
+    return nearest;
+  }
+
   /// Test de présence dans au moins une composante du pays.
   bool contains(LatLng point) =>
       polygons.any((polygon) => _insidePolygon(point, polygon));
@@ -49,11 +73,19 @@ class AdvertiserCountryBoundary {
   /// généralisation 1:110m ne correspond pas exactement à la côte réelle.
   double closestBoundaryKm(LatLng point) {
     var best = double.infinity;
+    for (final ring in polygons) {
+      final distance = _ringBoundaryKm(point, ring);
+      if (distance < best) best = distance;
+    }
+    return best;
+  }
+
+  static double _ringBoundaryKm(LatLng point, List<LatLng> ring) {
+    var best = double.infinity;
     final latFactor = 111.195;
     final lonFactor =
         latFactor * math.cos(point.latitude * math.pi / 180).abs();
-    for (final ring in polygons) {
-      for (var i = 0; i < ring.length; i++) {
+    for (var i = 0; i < ring.length; i++) {
         final a = ring[i];
         final b = ring[(i + 1) % ring.length];
         final x1 = (a.longitude - point.longitude) * lonFactor;
@@ -69,7 +101,6 @@ class AdvertiserCountryBoundary {
         final distance =
             math.sqrt(math.pow(x1 + dx * t, 2) + math.pow(y1 + dy * t, 2));
         if (distance < best) best = distance;
-      }
     }
     return best;
   }
