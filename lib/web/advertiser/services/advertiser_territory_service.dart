@@ -1,58 +1,62 @@
 import 'package:latlong2/latlong.dart';
 
-/// Six rayons mondiaux indépendants des subdivisions administratives.
-/// Les montants HT ne sont PAS calculés à partir de ces distances.
+import 'advertiser_country_boundary_service.dart';
+
+/// Cinq cercles universels, plus une couverture PAYS ENTIER.
+/// Aucun nom administratif français dans le sélecteur.
 enum AdvertiserTerritoryLevel {
   radius5km,
   radius15km,
   radius50km,
   radius150km,
   radius300km,
-  radius500km,
+  wholeCountry,
 }
 
 extension AdvertiserTerritoryLevelUi on AdvertiserTerritoryLevel {
+  bool get isCountry => this == AdvertiserTerritoryLevel.wholeCountry;
+
   double get radiusKm => switch (this) {
         AdvertiserTerritoryLevel.radius5km => 5,
         AdvertiserTerritoryLevel.radius15km => 15,
         AdvertiserTerritoryLevel.radius50km => 50,
         AdvertiserTerritoryLevel.radius150km => 150,
         AdvertiserTerritoryLevel.radius300km => 300,
-        AdvertiserTerritoryLevel.radius500km => 500,
+        AdvertiserTerritoryLevel.wholeCountry => 0,
       };
 
-  String get label => '${radiusKm.toInt()} km';
+  String get label => isCountry ? 'PAYS ENTIER' : '${radiusKm.toInt()} km';
   String get radiusLabel => label;
+  String get storageKey =>
+      isCountry ? 'country' : 'radius_${radiusKm.toInt()}km';
 
-  String get storageKey => 'radius_${radiusKm.toInt()}km';
-
-  /// Le zoom change uniquement la présentation du cercle sur la carte.
   double get suggestedZoom => switch (this) {
         AdvertiserTerritoryLevel.radius5km => 11.5,
         AdvertiserTerritoryLevel.radius15km => 10.5,
-        AdvertiserTerritoryLevel.radius50km => 9.0,
+        AdvertiserTerritoryLevel.radius50km => 9,
         AdvertiserTerritoryLevel.radius150km => 7.3,
         AdvertiserTerritoryLevel.radius300km => 6.2,
-        AdvertiserTerritoryLevel.radius500km => 5.5,
+        AdvertiserTerritoryLevel.wholeCountry => 4,
       };
 
-  static AdvertiserTerritoryLevel? fromRadiusKm(num? value) {
-    if (value == null) return null;
+  static AdvertiserTerritoryLevel? fromStorageKey(String? key) {
     for (final level in AdvertiserTerritoryLevel.values) {
-      if (level.radiusKm == value.toDouble()) return level;
+      if (level.storageKey == key) return level;
     }
     return null;
   }
 
-  static AdvertiserTerritoryLevel? fromStorageKey(String? value) {
+  static AdvertiserTerritoryLevel? fromRadiusKm(num? radius) {
+    if (radius == null) return null;
     for (final level in AdvertiserTerritoryLevel.values) {
-      if (level.storageKey == value) return level;
+      if (!level.isCountry && radius.toDouble() == level.radiusKm) {
+        return level;
+      }
     }
     return null;
   }
 }
 
-/// Choix d'une portée kilométrique centré sur la position du SPHOT.
 class AdvertiserTerritory {
   const AdvertiserTerritory({
     required this.level,
@@ -64,33 +68,57 @@ class AdvertiserTerritory {
   final String code;
   final String name;
 
+  bool get isWholeCountry => level.isCountry;
   double get radiusKm => level.radiusKm;
 
-  Map<String, Object> toFirestore() => {
-        'level': level.storageKey,
-        'code': 'WORLD_${level.storageKey}',
-        'name': level.label,
-        'radiusKm': radiusKm,
-        'coverageModel': 'worldwide_radius_v2',
-      };
+  Map<String, Object> toFirestore() => isWholeCountry
+      ? {
+          'level': 'country',
+          'code': code,
+          'name': name,
+          'countryIso3': code,
+          'coverageModel': 'country_whole_v1',
+          'boundarySource': 'Natural Earth (indicative 1:110m)',
+        }
+      : {
+          'level': level.storageKey,
+          'code': 'WORLD_${level.storageKey}',
+          'name': level.label,
+          'radiusKm': radiusKm,
+          'coverageModel': 'worldwide_radius_v2',
+        };
 
   static AdvertiserTerritory? fromFirestore(Object? raw) {
     if (raw is! Map) return null;
     final storedLevel = raw['level']?.toString();
     final model = raw['coverageModel']?.toString();
+    if (storedLevel == 'country') {
+      final code = (raw['countryIso3'] ?? raw['code'] ?? '')
+          .toString()
+          .toUpperCase();
+      final name = (raw['name'] ?? '').toString().trim();
+      if (model != 'country_whole_v1' ||
+          !RegExp(r'^[A-Z]{3}$').hasMatch(code) ||
+          name.isEmpty) {
+        return null;
+      }
+      return AdvertiserTerritory(
+        level: AdvertiserTerritoryLevel.wholeCountry,
+        code: code,
+        name: name,
+      );
+    }
 
     var level = AdvertiserTerritoryLevelUi.fromStorageKey(storedLevel);
-    if (level == null) {
-      // Les dossiers antérieurs restent inchangés dans Firestore.
-      // On ne transpose jamais arbitrairement un ancien territoire en km.
-      // Seuls les rayons historiques EXACTEMENT identiques sont relus.
+    if (level == null && model == 'worldwide_radius_v1') {
       final rawRadius = raw['radiusKm'];
-      if (rawRadius is num && model == 'worldwide_radius_v1') {
+      if (rawRadius is num) {
         level = AdvertiserTerritoryLevelUi.fromRadiusKm(rawRadius);
       }
     }
-    if (level == null) return null;
-
+    // Un ancien rayon de 500 km ne devient jamais un pays entier
+    // automatiquement : une nouvelle sélection explicite est exigée.
+    if (level == null || level.isCountry) return null;
     return AdvertiserTerritory(
       level: level,
       code: 'WORLD_${level.storageKey}',
@@ -101,27 +129,44 @@ class AdvertiserTerritory {
 
 class AdvertiserTerritoryOptions {
   const AdvertiserTerritoryOptions(this.options);
-
   final Map<AdvertiserTerritoryLevel, AdvertiserTerritory> options;
 
   AdvertiserTerritory? operator [](AdvertiserTerritoryLevel level) =>
       options[level];
 }
 
-/// Choix identiques pour toutes les coordonnées, sans appel à une API
-/// française et sans filtrage par frontières nationales.
 class AdvertiserTerritoryService {
-  const AdvertiserTerritoryService();
+  AdvertiserTerritoryService({AdvertiserCountryBoundaryService? countryService})
+      : _countryService =
+            countryService ?? AdvertiserCountryBoundaryService();
+
+  final AdvertiserCountryBoundaryService _countryService;
 
   Future<AdvertiserTerritoryOptions> resolve(LatLng position) async {
-    return AdvertiserTerritoryOptions({
+    final available = <AdvertiserTerritoryLevel, AdvertiserTerritory>{
       for (final level in AdvertiserTerritoryLevel.values)
-        level: AdvertiserTerritory(
-          level: level,
-          code: 'WORLD_${level.storageKey}',
-          name: level.label,
-        ),
-    });
+        if (!level.isCountry)
+          level: AdvertiserTerritory(
+            level: level,
+            code: 'WORLD_${level.storageKey}',
+            name: level.label,
+          ),
+    };
+    try {
+      final country = await _countryService.findAt(position);
+      if (country != null) {
+        available[AdvertiserTerritoryLevel.wholeCountry] =
+            AdvertiserTerritory(
+          level: AdvertiserTerritoryLevel.wholeCountry,
+          code: country.iso3,
+          name: country.name,
+        );
+      }
+    } catch (_) {
+      // Les cinq rayons demeurent accessibles en cas de panne réseau.
+      // Ne jamais inventer de pays en cas de frontière indisponible.
+    }
+    return AdvertiserTerritoryOptions(available);
   }
 
   void dispose() {}
