@@ -87,6 +87,38 @@ void main() {
     expect(france?.contains(const LatLng(4, -52)), isTrue);
   });
 
+  test('le cadrage de France évite la Guyane pour un SPHOT métropolitain', () async {
+    final boundary = await _fakeBoundaries().findByIso3('FRA');
+    expect(boundary, isNotNull);
+
+    final focus = boundary!.focusPointsNear(const LatLng(46.5, -1.5));
+    expect(focus, isNotEmpty);
+    expect(
+      focus.every((point) => point.latitude > 40 && point.longitude > -10),
+      isTrue,
+    );
+    // L'ensemble du pays (y compris les autres territoires) reste conservé.
+    expect(boundary.polygons, hasLength(2));
+  });
+
+  test('le cadrage suit la composante locale pour un SPHOT en Guyane', () async {
+    final boundary = await _fakeBoundaries().findByIso3('FRA');
+    final focus = boundary!.focusPointsNear(const LatLng(4, -52));
+    expect(focus, isNotEmpty);
+    expect(
+      focus.every((point) => point.latitude < 10 && point.longitude < -40),
+      isTrue,
+    );
+  });
+
+  test('SPHOT proche du littoral : cadre la composante la plus proche', () async {
+    final boundary = await _fakeBoundaries().findByIso3('FRA');
+    // Juste à l'ouest du contour simplifié métropolitain.
+    final focus = boundary!.focusPointsNear(const LatLng(46.5, -3.01));
+    expect(focus.first.latitude, 44);
+    expect(focus.first.longitude, -3);
+  });
+
   test('aucun pays n’est attribué arbitrairement en haute mer', () async {
     final service = AdvertiserTerritoryService(
       countryService: _fakeBoundaries(),
