@@ -67,8 +67,15 @@ Color _publicSpotTypeTextColor(SpotFlagState spot) {
 
 class PublicSpotDetailPage extends StatelessWidget {
   final SpotFlagState spot;
+  // Le volet Web est intégré à la carte : sa fermeture n'est plus un pop
+  // de route modale. Les utilisations plus anciennes gardent leur repli.
+  final VoidCallback? onClose;
 
-  const PublicSpotDetailPage({super.key, required this.spot});
+  const PublicSpotDetailPage({
+    super.key,
+    required this.spot,
+    this.onClose,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -170,7 +177,7 @@ class PublicSpotDetailPage extends StatelessWidget {
                   ),
                   IconButton(
                     tooltip: 'Fermer',
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: onClose ?? () => Navigator.of(context).pop(),
                     icon: const Icon(
                       Icons.close_rounded,
                       color: Color(0xFF53657A),
