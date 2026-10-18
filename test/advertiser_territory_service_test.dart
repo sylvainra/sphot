@@ -10,11 +10,17 @@ import 'package:latlong2/latlong.dart';
 Map<String, dynamic> _feature(
   String iso,
   String country,
-  List<List<num>> ring,
-) =>
+  List<List<num>> ring, [
+  String? sovereignIso3,
+]) =>
     {
       'type': 'Feature',
-      'properties': {'ADM0_A3': iso, 'ADMIN': country},
+      'properties': {
+        'ADM0_A3': iso,
+        'ADMIN': country,
+        if (sovereignIso3 != null) 'SOV_A3': sovereignIso3,
+        if (sovereignIso3 == 'FRA') 'SOVEREIGNT': 'France',
+      },
       'geometry': {
         'type': 'Polygon',
         'coordinates': [ring],
@@ -27,9 +33,9 @@ Map<String, dynamic> _world() => {
         _feature('FRA', 'France', [
           [-3, 44], [8, 44], [8, 52], [-3, 52], [-3, 44]
         ]),
-        _feature('FRA', 'France', [
+        _feature('GUF', 'French Guiana', [
           [-53, 3], [-51, 3], [-51, 5], [-53, 5], [-53, 3]
-        ]),
+        ], 'FRA'),
         _feature('BRA', 'Brazil', [
           [-75, -35], [-35, -35], [-35, 5], [-75, 5], [-75, -35]
         ]),
@@ -85,6 +91,10 @@ void main() {
     final france = await boundaries.findByIso3('FRA');
     expect(france?.polygons, hasLength(2));
     expect(france?.contains(const LatLng(4, -52)), isTrue);
+    // GUF et FRA constituent deux composantes du même pays commercial.
+    final guyane = await boundaries.findAt(const LatLng(4, -52));
+    expect(guyane?.iso3, 'FRA');
+    expect(guyane?.name, 'France');
   });
 
   test('le cadrage de France évite la Guyane pour un SPHOT métropolitain', () async {
