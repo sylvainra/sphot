@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import '../services/commercial_pricing_service.dart';
 import '../services/advertiser_radius_pricing_import.dart';
 
-/// Catalogue de 108 prix, SÉPARÉ du catalogue historique de 90 tarifs.
-/// Les montants ne sont jamais déduits des anciennes catégories.
+/// Grille de référence SPHOT Publicitaire validée le 18/10/2026.
+/// 108 montants HT éditables et publiés avec numéro de version.
 class SuperAdminAdvertiserRadiusPricingTable extends StatefulWidget {
   const SuperAdminAdvertiserRadiusPricingTable({
     super.key,
@@ -287,7 +287,7 @@ class _SuperAdminAdvertiserRadiusPricingTableState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'NOUVEAU CATALOGUE : 108 PRIX · 5 RAYONS + 1 PAYS × 3 OFFRES × 6 DURÉES',
+          'GRILLE DE RÉFÉRENCE : 108 PRIX · 5 RAYONS + PAYS × 3 OFFRES × 6 DURÉES',
           style: const TextStyle(
             color: _blue,
             fontSize: 16,
@@ -297,7 +297,7 @@ class _SuperAdminAdvertiserRadiusPricingTableState
         const SizedBox(height: 8),
         Text(
           _publishedVersion == 0
-              ? 'Aucune grille publiée. Ancien catalogue conservé.'
+              ? 'Aucune version publiée. Les 108 tarifs validés sont prêts à enregistrer.'
               : 'GRILLE PUBLIÉE : FR_ADVERTISER_RADIUS-V$_publishedVersion',
           style: const TextStyle(color: _red, fontWeight: FontWeight.w800),
         ),
