@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../../../models/advertising_pricing_config.dart';
+import '../services/advertiser_territory_service.dart';
 import '../../shared/web_colors.dart';
 import '../models/diffusion_preview_data.dart';
 import '../models/planning_data.dart';
@@ -19,6 +19,9 @@ class QuoteOrderSection extends StatefulWidget {
     required this.durationPrices,
     required this.onRadiusChanged,
     required this.onDiffusionChanged,
+    this.selectedTerritory,
+    this.pricingReference,
+    this.pricingError,
     required this.onEditStep,
     this.requestedScope = 'local',
   });
@@ -31,6 +34,9 @@ class QuoteOrderSection extends StatefulWidget {
   final int costExclTax;
   final Map<String, int> durationPrices;
   final ValueChanged<double> onRadiusChanged;
+  final AdvertiserTerritory? selectedTerritory;
+  final String? pricingReference;
+  final String? pricingError;
   final ValueChanged<DiffusionPreviewType> onDiffusionChanged;
   final ValueChanged<int> onEditStep;
   final String requestedScope;
@@ -196,29 +202,6 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
     );
   }
 
-  Widget _radiusChoices() {
-    return Wrap(
-      spacing: 7,
-      runSpacing: 7,
-      children: AdvertisingPricingConfig.radiusChoices.map((radius) {
-        final selected = widget.radiusKm == radius;
-        return ChoiceChip(
-          selected: selected,
-          onSelected: (_) => widget.onRadiusChanged(radius),
-          selectedColor: WebColors.red.withOpacity(0.12),
-          side: BorderSide(color: selected ? WebColors.red : WebColors.blue),
-          label: Text(
-            AdvertisingPricingConfig.radiusLabel(radius),
-            style: TextStyle(
-              color: selected ? WebColors.red : WebColors.blue,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
   Widget _diffusionChoices() {
     const values = <DiffusionPreviewType, String>{
       DiffusionPreviewType.map: 'CARTE',
@@ -309,14 +292,11 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
         ),
         _summaryCard(
           step: 2,
-          title: 'SPHOT PUBLICITAIRE ET RAYON',
-          value: widget.requestedScope == 'national'
-              ? 'Portée nationale'
-              : widget.requestedScope == 'local_and_national'
-              ? 'Portée nationale + ${AdvertisingPricingConfig.radiusLabel(widget.radiusKm)} en local'
-              : AdvertisingPricingConfig.radiusLabel(widget.radiusKm),
+          title: 'TERRITOIRE DE DIFFUSION',
+          value: widget.selectedTerritory == null
+              ? 'À sélectionner à l’étape SPHOT PUBLICITAIRE'
+              : '${widget.selectedTerritory!.level.label} • ${widget.selectedTerritory!.name}',
           icon: Icons.location_on_outlined,
-          child: widget.requestedScope == 'national' ? null : _radiusChoices(),
         ),
         _summaryCard(
           step: 3,
@@ -351,22 +331,40 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
               ),
               const SizedBox(height: 8),
               Text(
-                '${widget.costExclTax} € HT',
+                widget.costExclTax > 0
+                    ? '${widget.costExclTax} € HT'
+                    : 'TARIF PUBLIÉ INDISPONIBLE',
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: WebColors.red,
-                  fontSize: 28,
+                  fontSize: 23,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              Text(
-                'TVA 20 % : $vat € • Total TTC : $total €',
-                style: const TextStyle(
-                  color: Color(0xFF4B5F97),
-                  fontWeight: FontWeight.w800,
+              if (widget.costExclTax > 0)
+                Text(
+                  'TVA 20 % : $vat € • Total TTC : $total €',
+                  style: const TextStyle(
+                    color: Color(0xFF4B5F97),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
+              if (widget.pricingReference != null)
+                Text(
+                  widget.pricingReference!,
+                  style: const TextStyle(
+                    color: WebColors.blue,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              if (widget.pricingError != null)
+                Text(
+                  widget.pricingError!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: WebColors.red),
+                ),
               const SizedBox(height: 8),
-              _pricingGrid(),
+              if (widget.durationPrices.isNotEmpty) _pricingGrid(),
             ],
           ),
         ),
