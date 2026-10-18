@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// Apercu en lecture seule des grilles tarifaires PUBLIEES.
 /// Ne cree ni devis contractuel, ni commande, ni facture.
@@ -24,6 +25,14 @@ class PublishedCommercialQuote {
   final int amountExclTax;
   final Map<String, dynamic> details;
   final DateTime calculatedAt;
+
+  /// Montants fournis en centimes par le serveur, après éventuelle remise.
+  int get discountPercent => (details['discountPercent'] as num?)?.toInt() ?? 0;
+  int get payableExclTaxCents =>
+      (details['payableExclTaxCents'] as num?)?.toInt() ??
+      amountExclTax * 100;
+  int get discountAmountCents =>
+      (details['discountAmountCents'] as num?)?.toInt() ?? 0;
 
   factory PublishedCommercialQuote.fromResponse(Map<String, dynamic> data) {
     if (data['previewOnly'] != true) {
@@ -106,9 +115,14 @@ class PublishedCommercialQuoteService {
       });
 
   Future<PublishedCommercialQuote> _request(Map<String, dynamic> body) async {
+    final token = await FirebaseAuth.instance.currentUser?.getIdToken();
     final response = await http.post(
       Uri.parse(endpoint),
-      headers: const {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null && token.isNotEmpty)
+          'Authorization': 'Bearer $token',
+      },
       body: jsonEncode(body),
     ).timeout(const Duration(seconds: 20));
     final dynamic json = jsonDecode(response.body);
