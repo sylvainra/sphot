@@ -88,3 +88,34 @@ test("Only a published Firestore catalog can be quoted", () => {
     exists: true, data: () => ({...admin, publishedVersion: null}),
   }, "ADMIN"), (error) => error.httpStatus === 503);
 });
+
+test("ADVERTISER_RADIUS uses country-wide sixth tariff", () => {
+  const values = {};
+  for (let level = 0; level < 6; level++) {
+    for (let offer = 0; offer < 3; offer++) {
+      for (let duration = 0; duration < 6; duration++) {
+        values[level + ":" + offer + ":" + duration] =
+          100 + level * 100 + offer * 10 + duration;
+      }
+    }
+  }
+  const catalog = {
+    type: "ADVERTISER_RADIUS",
+    country: "FR",
+    currency: "EUR",
+    publishedVersion: 4,
+    publishedPrices: values,
+  };
+  const quote = advertiserQuote(catalog, "country", "pack", "1 an");
+  assert.equal(quote.tariffKey, "5:2:5");
+  assert.equal(quote.amountExclTax, 625);
+  assert.equal(quote.pricingReference, "FR_ADVERTISER_RADIUS-V4");
+  assert.equal(quote.market, "ADVERTISER_RADIUS");
+  assert.throws(() =>
+    advertiserQuote({...catalog, publishedPrices: advertiser.publishedPrices},
+        "country", "pack", "1 an"),
+  (error) => error.httpStatus === 503);
+  assert.throws(() =>
+    advertiserQuote(catalog, "radius_500km", "map", "1 semaine"),
+  (error) => error.httpStatus === 400);
+});
