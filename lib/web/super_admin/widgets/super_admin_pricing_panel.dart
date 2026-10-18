@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'super_admin_admin_pricing_table.dart';
 import 'super_admin_advertiser_pricing_table.dart';
+import 'super_admin_advertiser_radius_pricing_table.dart';
 
 /// Shell des catalogues tarifaires Firestore ADMIN et ANNONCEUR.
 /// Aucun prix de devis, abonnement ou renouvellement existant n'est modifie.
@@ -27,6 +28,7 @@ class _SuperAdminPricingPanelState extends State<SuperAdminPricingPanel> {
   static const _blue = Color(0xFF1E3A8A);
   static const _red = Color(0xFFDC2626);
   int _localTab = 0;
+  bool _radiusCatalog = true;
 
   int get _tab => widget.onTabChanged == null ? _localTab : widget.selectedTab;
 
@@ -88,13 +90,59 @@ class _SuperAdminPricingPanelState extends State<SuperAdminPricingPanel> {
                   index: _tab,
                   children: [
                     SuperAdminAdminPricingTable(sessionToken: widget.pricingSessionToken),
-                    SuperAdminAdvertiserPricingTable(sessionToken: widget.pricingSessionToken),
+                    Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _catalogButton(
+                                '6 RAYONS · 108 PRIX',
+                                true,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _catalogButton(
+                                'HISTORIQUE · 90 PRIX',
+                                false,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: _radiusCatalog
+                              ? SuperAdminAdvertiserRadiusPricingTable(
+                                  sessionToken: widget.pricingSessionToken,
+                                )
+                              : SuperAdminAdvertiserPricingTable(
+                                  sessionToken: widget.pricingSessionToken,
+                                ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _catalogButton(String label, bool isRadius) {
+    final selected = _radiusCatalog == isRadius;
+    return OutlinedButton(
+      onPressed: () => setState(() => _radiusCatalog = isRadius),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: selected ? _red : _blue,
+        backgroundColor: selected ? _red.withOpacity(0.08) : Colors.white,
+        side: BorderSide(color: selected ? _red : _blue),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.w800),
       ),
     );
   }
