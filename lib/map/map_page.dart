@@ -1376,21 +1376,25 @@ SpotFlagState? _findBestSpotMatch(
       bottom: 0,
       right: 0,
       width: panelWidth,
-      child: SafeArea(
-        child: TweenAnimationBuilder<double>(
-          key: ValueKey('desktop_detail_${spot.id}'),
-          tween: Tween<double>(begin: 1.0, end: 0.0),
-          duration: const Duration(milliseconds: 320),
-          curve: Curves.easeOutCubic,
-          builder: (context, fraction, child) => Transform.translate(
-            offset: Offset(panelWidth * fraction, 0),
-            child: child,
-          ),
-          child: ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(22),
-              bottomLeft: Radius.circular(22),
-            ),
+      // Le SafeArea du Scaffold inclut la hauteur de l'AppBar dans ce
+      // contexte Web. Ne pas l'appliquer au panneau de droite : il doit
+      // commencer tout en haut, comme l'ancienne fiche plein écran.
+      child: TweenAnimationBuilder<double>(
+        key: ValueKey('desktop_detail_${spot.id}'),
+        tween: Tween<double>(begin: 1.0, end: 0.0),
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        builder: (context, fraction, child) => Transform.translate(
+          offset: Offset(panelWidth * fraction, 0),
+          child: child,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          // La fiche elle-même possède un SafeArea : neutraliser ici
+          // l'inset supérieur provenant de la barre de la carte.
+          child: MediaQuery.removePadding(
+            context: context,
+            removeTop: true,
             child: PublicSpotDetailPage(
               spot: spot,
               onClose: _closeDesktopSpotDetail,
