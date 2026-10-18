@@ -308,23 +308,11 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
       _publishedPricingError = null;
     });
 
-    // Les 90 tarifs publiés actuels utilisent cinq ANCIENNES catégories
-    // administratives. Ne pas inventer une correspondance commerciale pour
-    // les six nouveaux rayons, ni afficher un prix trompeur.
-    if (territory.level.storageKey.startsWith('radius_')) {
-      if (!mounted || ticket != _publishedPricingRequest) return;
-      setState(() {
-        _publishedPricingError =
-            'Les tarifs des six nouveaux rayons ne sont pas encore publiés. '
-            'Le devis reste indisponible jusqu’à leur configuration.';
-      });
-      return;
-    }
     try {
       final quotes = await Future.wait([
         for (final duration in AdvertisingPricingConfig.durations)
-          _quoteService.advertiser(
-            territory: territory.level.storageKey,
+          _quoteService.advertiserRadius(
+            radius: territory.level.storageKey,
             offer: offer,
             duration: duration,
           ),
