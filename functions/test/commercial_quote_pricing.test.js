@@ -40,45 +40,62 @@ test("ADMIN rejects malformed published grids", () => {
   (error) => error.httpStatus === 503);
 });
 
-const prices = {};
-for (let t = 0; t < 5; t++) {
-  for (let o = 0; o < 3; o++) {
-    for (let d = 0; d < 6; d++) {
-      prices[t + ":" + o + ":" + d] = 10 + t * 1000 + o * 100 + d;
-    }
-  }
-}
+
+const {initialPrices} = require("../advertiser_radius_tariffs");
+const prices = initialPrices();
 const advertiser = {
-  type: "ADVERTISER", country: "FR", currency: "EUR",
-  publishedVersion: 3, publishedPrices: prices,
+  type: "ADVERTISER_RADIUS", country: "FR", currency: "EUR",
+  publishedVersion: 1, publishedPrices: prices,
 };
 
-test("ADVERTISER reads an exact published cell and version", () => {
-  const quote = advertiserQuote(
-      advertiser, "national", "pack", "1 an",
-  );
-  assert.equal(quote.amountExclTax, 4215);
-  assert.equal(quote.tariffKey, "4:2:5");
-  assert.equal(quote.pricingReference, "FR_ADVERTISER-V3");
-  assert.equal(quote.previewOnly, undefined);
-});
-
-test("ADVERTISER refuses unsupported territory, offer or duration", () => {
-  for (const choices of [
-    ["rayon_5km", "map", "1 mois"],
-    ["commune", "exclusive", "1 mois"],
-    ["commune", "map", "10 jours"],
-  ]) {
-    assert.throws(() => advertiserQuote(advertiser, ...choices),
-        (error) => error.httpStatus === 400);
+test("The 108 user-approved reference amounts are present", () => {
+  assert.equal(Object.keys(prices).length, 108);
+  const cases = [
+    ["radius_5km", "map", "1 semaine", 49],
+    ["radius_5km", "pack", "1 an", 2539],
+    ["radius_15km", "premium", "1 an", 3009],
+    ["radius_50km", "map", "1 mois", 399],
+    ["radius_150km", "pack", "6 mois", 5559],
+    ["radius_300km", "pack", "1 an", 10600],
+    ["country", "map", "1 an", 4900],
+    ["country", "premium", "1 an", 8900],
+    ["country", "pack", "1 an", 11900],
+  ];
+  for (const [territory, offer, duration, expected] of cases) {
+    const quote = advertiserQuote(advertiser, territory, offer, duration);
+    assert.equal(quote.amountExclTax, expected);
+    assert.equal(quote.market, "ADVERTISER_RADIUS");
+    assert.equal(quote.pricingReference, "FR_ADVERTISER_RADIUS-V1");
   }
 });
 
-test("ADVERTISER fails closed on incomplete catalog", () => {
-  assert.throws(() => advertiserQuote(
-      {...advertiser, publishedPrices: {"4:2:5": 11900}},
-      "national", "pack", "1 an",
-  ), (error) => error.httpStatus === 503);
+test("Legacy five-level offers and 500km are not quoted", () => {
+  for (const territory of [
+    "commune", "intercommunalite", "departement",
+    "region", "national", "radius_500km",
+  ]) {
+    assert.throws(() =>
+      advertiserQuote(advertiser, territory, "map", "1 semaine"),
+    (error) => error.httpStatus === 400);
+  }
+  assert.throws(() => advertiserQuote({
+    ...advertiser, type: "ADVERTISER",
+  }, "country", "map", "1 semaine"),
+  (error) => error.httpStatus === 503);
+});
+
+test("Incomplete 108-price catalogs cannot be quoted", () => {
+  const incomplete = {...prices};
+  delete incomplete["5:2:5"];
+  assert.throws(() =>
+    advertiserQuote({...advertiser, publishedPrices: incomplete},
+        "country", "pack", "1 an"),
+  (error) => error.httpStatus === 503);
+  const extra = {...prices, "6:0:0": 1};
+  assert.throws(() =>
+    advertiserQuote({...advertiser, publishedPrices: extra},
+        "country", "pack", "1 an"),
+  (error) => error.httpStatus === 503);
 });
 
 test("Only a published Firestore catalog can be quoted", () => {
@@ -89,33 +106,3 @@ test("Only a published Firestore catalog can be quoted", () => {
   }, "ADMIN"), (error) => error.httpStatus === 503);
 });
 
-test("ADVERTISER_RADIUS uses country-wide sixth tariff", () => {
-  const values = {};
-  for (let level = 0; level < 6; level++) {
-    for (let offer = 0; offer < 3; offer++) {
-      for (let duration = 0; duration < 6; duration++) {
-        values[level + ":" + offer + ":" + duration] =
-          100 + level * 100 + offer * 10 + duration;
-      }
-    }
-  }
-  const catalog = {
-    type: "ADVERTISER_RADIUS",
-    country: "FR",
-    currency: "EUR",
-    publishedVersion: 4,
-    publishedPrices: values,
-  };
-  const quote = advertiserQuote(catalog, "country", "pack", "1 an");
-  assert.equal(quote.tariffKey, "5:2:5");
-  assert.equal(quote.amountExclTax, 625);
-  assert.equal(quote.pricingReference, "FR_ADVERTISER_RADIUS-V4");
-  assert.equal(quote.market, "ADVERTISER_RADIUS");
-  assert.throws(() =>
-    advertiserQuote({...catalog, publishedPrices: advertiser.publishedPrices},
-        "country", "pack", "1 an"),
-  (error) => error.httpStatus === 503);
-  assert.throws(() =>
-    advertiserQuote(catalog, "radius_500km", "map", "1 semaine"),
-  (error) => error.httpStatus === 400);
-});
