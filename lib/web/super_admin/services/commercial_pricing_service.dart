@@ -87,6 +87,68 @@ class CommercialPricingService {
     );
   }
 
+  /// Remise commerciale individuelle, accordée uniquement par Super Admin.
+  /// Même dispositif pour les clients ADMIN et PUBLICITAIRE.
+  Future<int> customerDiscount({
+    required String market,
+    required String uid,
+  }) async {
+    final response = await _discountRequest(
+      action: 'getCustomerDiscount',
+      market: market,
+      uid: uid,
+    );
+    return (response['percent'] as num).toInt();
+  }
+
+  Future<int> setCustomerDiscount({
+    required String market,
+    required String uid,
+    required int percent,
+  }) async {
+    final response = await _discountRequest(
+      action: 'setCustomerDiscount',
+      market: market,
+      uid: uid,
+      percent: percent,
+    );
+    return (response['percent'] as num).toInt();
+  }
+
+  Future<Map<String, dynamic>> _discountRequest({
+    required String action,
+    required String market,
+    required String uid,
+    int? percent,
+  }) async {
+    if (sessionToken.isEmpty) {
+      throw StateError('Session Super Admin absente.');
+    }
+    final response = await http.post(
+      Uri.parse(_endpoint),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $sessionToken',
+      },
+      body: jsonEncode({
+        'market': market,
+        'action': action,
+        'customerMarket': market,
+        'customerUid': uid,
+        if (percent != null) 'percent': percent,
+      }),
+    ).timeout(const Duration(seconds: 25));
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map || decoded['success'] != true ||
+        response.statusCode != 200 || decoded['data'] is! Map) {
+      throw StateError(
+        decoded is Map ? decoded['error']?.toString() ??
+            'Remise non disponible.' : 'Réponse invalide.',
+      );
+    }
+    return Map<String, dynamic>.from(decoded['data'] as Map);
+  }
+
   Future<CommercialPricingState> load(String market) =>
       _post(market, 'load');
 
