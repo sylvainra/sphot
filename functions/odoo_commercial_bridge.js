@@ -1,3 +1,4 @@
+/* eslint-disable max-len, require-jsdoc, valid-jsdoc, indent, brace-style, operator-linebreak, object-curly-spacing, comma-dangle */
 "use strict";
 
 /**
