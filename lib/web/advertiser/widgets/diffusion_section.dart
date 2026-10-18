@@ -353,8 +353,8 @@ class _DiffusionSectionState extends State<DiffusionSection> {
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
           child: Text(
-            'La campagne est diffusée dans le territoire administratif '
-            'choisi à l’étape SPHOT PUBLICITAIRE, sans rayon ni exclusivité.',
+            'La campagne est diffusée dans le rayon rouge '
+            'choisi à l’étape SPHOT PUBLICITAIRE, sans exclusivité.',
             style: TextStyle(
               color: WebColors.blue,
               fontWeight: FontWeight.w700,
