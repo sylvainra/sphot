@@ -28,7 +28,7 @@ function active(overrides = {}) {
   };
 }
 
-test("projette uniquement les champs publics pour une publicité carte active", () => {
+test("ne renvoie que les champs publics des publicités actives", () => {
   const result = projectPublicMapAdvertisement("campaign1", active(), now);
   assert.ok(result);
   assert.equal(result.id, "campaign1");
@@ -57,7 +57,7 @@ test("rejette les campagnes absentes, désactivées, futures ou expirées", () =
   }), now), null);
 });
 
-test("ne publie ni campagne premium seule ni publicité sans image HTTPS", () => {
+test("écarte les campagnes Premium et les images sans HTTPS", () => {
   assert.equal(projectPublicMapAdvertisement("x", active({
     visibilityType: "premium",
   }), now), null);
