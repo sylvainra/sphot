@@ -22,20 +22,20 @@ void main() {
     expect(quote.version, 3);
   });
 
-  test('Lecture devis indicatif ANNONCEUR V3', () {
+  test('Lecture devis indicatif ANNONCEUR 108 tarifs V3', () {
     final quote = PublishedCommercialQuote.fromResponse({
       'previewOnly': true,
-      'market': 'ADVERTISER',
+      'market': 'ADVERTISER_RADIUS',
       'version': 3,
-      'pricingReference': 'FR_ADVERTISER-V3',
+      'pricingReference': 'FR_ADVERTISER_RADIUS-V3',
       'country': 'FR',
       'currency': 'EUR',
       'amountExclTax': 11900,
-      'tariffKey': '4:2:5',
+      'tariffKey': '5:2:5',
       'calculatedAt': calculatedAt,
     });
     expect(quote.amountExclTax, 11900);
-    expect(quote.details['tariffKey'], '4:2:5');
+    expect(quote.details['tariffKey'], '5:2:5');
   });
 
   test('Ne pas confondre grille publiée et version non conforme', () {
