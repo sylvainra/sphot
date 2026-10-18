@@ -174,6 +174,10 @@ const MATRIX = [
   ]
 ];
 
+/**
+ * Retourne une copie indépendante des 108 tarifs HT validés.
+ * @return {Object<string, number>} 108 cellules indexées par zone/offre/durée.
+ */
 function initialPrices() {
   const prices = {};
   for (let level = 0; level < LEVELS.length; level++) {
