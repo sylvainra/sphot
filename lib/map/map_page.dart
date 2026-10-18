@@ -68,6 +68,13 @@ class _MapPageState extends State<MapPage> {
   final MapController _mapController = MapController();
   late final Future<List<Map<String, dynamic>>>
       _publicAdvertisingSpotsFuture;
+  late final Future<List<Map<String, dynamic>>>
+      _publicMapAdvertisementsFuture;
+
+  // La bande publicitaire ne réinitialise jamais le flux des SPHOTS.
+  final ValueNotifier<int> _mapAdRotation = ValueNotifier<int>(0);
+  Timer? _mapAdRotationTimer;
+  LatLng _mapAdCenter = const LatLng(46.4006176, -1.5064563);
 
   SpotFilter _selectedFilter = SpotFilter.all;
 
@@ -138,6 +145,11 @@ void initState() {
   _speech = stt.SpeechToText();
   _publicAdvertisingSpotsFuture =
       _firestoreService.getPublicAdvertisingSpots();
+  _publicMapAdvertisementsFuture =
+      _firestoreService.getPublicMapAdvertisements();
+  _mapAdRotationTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+    if (mounted) _mapAdRotation.value += 1;
+  });
   unawaited(_loadFavoriteSpotIds());
 }
 
@@ -2614,6 +2626,50 @@ String _clusterIconPath(Color color) {
     );
   }
 
+/// Seules les campagnes CARTE ou PACK diffusées dans la zone courante
+/// peuvent remplacer l'encart d'invitation.
+bool _isPublicMapAdVisible(Map<String, dynamic> ad) {
+  final deadline = ad['campaignEndAt'];
+  if (deadline is! num ||
+      DateTime.now().millisecondsSinceEpoch >= deadline.toInt()) {
+    return false;
+  }
+
+  final scope = ad['broadcastType']?.toString() ?? '';
+  if (scope == 'national') return true;
+  if (scope != 'local') return false;
+
+  final latitude = (ad['centerLat'] as num?)?.toDouble();
+  final longitude = (ad['centerLng'] as num?)?.toDouble();
+  final radius = (ad['radiusKm'] as num?)?.toDouble();
+  if (latitude == null || longitude == null ||
+      radius == null || radius <= 0) {
+    return false;
+  }
+
+  final distanceKm = const Distance().as(
+    LengthUnit.Kilometer,
+    _mapAdCenter,
+    LatLng(latitude, longitude),
+  );
+  return distanceKm <= radius;
+}
+
+Future<void> _openMapAdDestination(String destinationUrl) async {
+  final uri = Uri.tryParse(destinationUrl.trim());
+  if (uri == null ||
+      (uri.scheme != 'https' && uri.scheme != 'http') ||
+      uri.host.isEmpty) {
+    return;
+  }
+
+  final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!opened && mounted) {
+    _showMapMessage('Impossible d’ouvrir le site de l’annonceur.');
+  }
+}
+
+/// Encarts des fiches SPHOT volontairement exclus de ce changement.
 Widget _buildAdBanner() {
   final screenWidth = MediaQuery.sizeOf(context).width;
   final isDesktopWebDetailOpen =
@@ -2621,99 +2677,189 @@ Widget _buildAdBanner() {
   final detailPanelWidth =
       isDesktopWebDetailOpen ? min(500.0, screenWidth * 0.40) : 0.0;
 
-  // Quand le panneau droit est ouvert, l'espace publicitaire garde son bord
-  // supérieur mais s'étend jusqu'en bas à la place du menu inférieur.
-  // Sa largeur s'arrête avant le panneau afin de ne jamais passer dessous.
+  // Géométrie validée du volet et de l'encart inchangée.
   final bannerBottom =
       isDesktopWebDetailOpen ? _desktopSelectedAdBottom : 58.0;
   final bannerHeight =
       isDesktopWebDetailOpen ? _desktopSelectedAdHeight : 90.0;
   final bannerRight = isDesktopWebDetailOpen ? detailPanelWidth + 8.0 : 8.0;
 
+  Widget emptyAdvertisingSpace() {
+    return GestureDetector(
+      onTap: () => unawaited(_openAdvertiserWebsite()),
+      child: Row(
+        children: [
+          const SizedBox(width: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: SizedBox(
+              width: 52,
+              height: 52,
+              child: AdaptiveAssetImage(
+                'data/icons/fire_red_icon.svg',
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Transform.translate(
+              offset: const Offset(-10, 0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'AJOUTE TON SPHOT PUBLICITAIRE ICI !',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black87,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Visuel : PNG, JPG ou WEBP\n1200 × 600 px - 2 Mo max',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.black54,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget occupiedAdvertisingSpace(Map<String, dynamic> ad) {
+    final bannerUrl = ad['bannerUrl']?.toString() ?? '';
+    final destinationUrl = ad['destinationUrl']?.toString() ?? '';
+    final advertiserName =
+        ad['advertiserName']?.toString().trim() ?? '';
+    final ctaWidth = screenWidth < 600 ? 80.0 : 88.0;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Material(
+            color: Colors.white.withOpacity(0.70),
+            child: InkWell(
+              onTap: destinationUrl.isEmpty
+                  ? null
+                  : () => unawaited(
+                        _openMapAdDestination(destinationUrl),
+                      ),
+              child: Semantics(
+                label: advertiserName.isEmpty
+                    ? 'Publicité'
+                    : 'Publicité : $advertiserName',
+                child: SizedBox(
+                  height: bannerHeight,
+                  child: Image.network(
+                    bannerUrl,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Center(
+                      child: Icon(
+                        Icons.image_not_supported_outlined,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Container(
+          width: ctaWidth,
+          height: bannerHeight,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.96),
+            border: Border(
+              left: BorderSide(color: Colors.black.withOpacity(0.17)),
+            ),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => unawaited(_openAdvertiserWebsite()),
+              child: Semantics(
+                button: true,
+                label: 'Votre SPHOT publicitaire ici',
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.add_circle_outline,
+                      color: Color(0xFFE53935),
+                      size: 19,
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'VOTRE\nSPHOT\nPUBLICITAIRE\nICI !',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: screenWidth < 600 ? 9.1 : 10.0,
+                        height: 1.13,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   return Positioned(
     left: 8,
     right: bannerRight,
     bottom: bannerBottom,
-    child: GestureDetector(
-      onTap: () {
-        unawaited(_openAdvertiserWebsite());
-      },
-      child: Container(
-        height: bannerHeight,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.22),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-          border: Border.all(
-            color: Colors.black.withOpacity(0.08),
-            width: 1,
+    child: Container(
+      height: bannerHeight,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.22),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
+        ],
+        border: Border.all(
+          color: Colors.black.withOpacity(0.08),
+          width: 1,
         ),
-        child: Row(
-          children: [
-            const SizedBox(width: 12),
-
-            ClipRRect(
-  borderRadius: BorderRadius.circular(10),
-  child: Container(
-    width: 52,
-    height: 52,
-    color: Colors.transparent,
-    child: AdaptiveAssetImage(
-
-      'data/icons/fire_red_icon.svg',
-      fit: BoxFit.contain,
-    ),
-  ),
-),
-
-            const SizedBox(width: 12),
-
-            Expanded(
-  child: Transform.translate(
-    offset: const Offset(-10, 0),
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'AJOUTE TON SPHOT PUBLICITAIRE ICI !',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
-            color: Colors.black87,
-            letterSpacing: 0.2,
-          ),
-        ),
-        const SizedBox(height: 6),
-
-const Text(
-  'Visuel : PNG, JPG ou WEBP\n1200 × 600 px - 2 Mo max',
-  textAlign: TextAlign.center,
-  style: TextStyle(
-    fontSize: 11,
-    color: Colors.black54,
-    fontWeight: FontWeight.w600,
-  ),
-),
-
-const SizedBox(height: 6),
-      ],
-    ),
-  ),
-),
-
-            
-          ],
-        ),
+      ),
+      child: ValueListenableBuilder<int>(
+        valueListenable: _mapAdRotation,
+        builder: (context, rotation, _) {
+          return FutureBuilder<List<Map<String, dynamic>>>(
+            future: _publicMapAdvertisementsFuture,
+            builder: (context, snapshot) {
+              final ads = (snapshot.data ?? const <Map<String, dynamic>>[])
+                  .where(_isPublicMapAdVisible)
+                  .toList();
+              if (ads.isEmpty) return emptyAdvertisingSpace();
+              return occupiedAdvertisingSpace(ads[rotation % ads.length]);
+            },
+          );
+        },
       ),
     ),
   );
@@ -2869,6 +3015,8 @@ Widget _buildBottomBar() {
   @override
 void dispose() {
   _mapMoveTimer?.cancel();
+  _mapAdRotationTimer?.cancel();
+  _mapAdRotation.dispose();
   _searchTimer?.cancel();
   _searchController.dispose();
   _searchFocusNode.dispose();
@@ -2961,6 +3109,8 @@ onTap: (_, __) {
 },
 
 onPositionChanged: (position, hasGesture) {
+  // L'éligibilité locale suit la zone consultée sur la carte.
+  _mapAdCenter = position.center;
   if ((_currentRotation - position.rotation).abs() > 0.5 || hasGesture) {
     setState(() {
       _currentRotation = position.rotation;
