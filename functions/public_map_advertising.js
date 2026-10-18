@@ -5,10 +5,19 @@
  * Aucun dossier annonceur, coordonnée de contact ni donnée de facturation
  * ne doit être renvoyé au navigateur.
  */
+/**
+ * @param {*} value Valeur brute.
+ * @return {string} Texte nettoyé.
+ */
 function text(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/**
+ * @param {*} value Adresse saisie.
+ * @param {boolean} httpsOnly Exiger HTTPS pour les images.
+ * @return {string} URL vérifiée ou chaîne vide.
+ */
 function validUrl(value, httpsOnly = false) {
   try {
     const url = new URL(text(value));
@@ -22,6 +31,10 @@ function validUrl(value, httpsOnly = false) {
   return "";
 }
 
+/**
+ * @param {*} value Date Firestore, JS ou chaîne.
+ * @return {number} Horodatage ou NaN.
+ */
 function milliseconds(value) {
   if (value && typeof value.toMillis === "function") {
     return value.toMillis();
@@ -31,6 +44,10 @@ function milliseconds(value) {
   return NaN;
 }
 
+/**
+ * @param {*} value Nombre brut.
+ * @return {number|null} Nombre fini ou null.
+ */
 function finiteNumber(value) {
   if (value === null || value === undefined || value === "") return null;
   const converted = Number(value);
