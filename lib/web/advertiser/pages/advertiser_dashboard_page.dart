@@ -15,6 +15,7 @@ import '../models/advertiser_request_status.dart';
 import '../models/advertising_visual_data.dart';
 import '../models/diffusion_preview_data.dart';
 import '../models/planning_data.dart';
+import '../services/advertiser_territory_service.dart';
 import '../widgets/advertising_spot_section.dart';
 import '../widgets/advertiser_application_section.dart';
 import '../widgets/advertiser_legal_acceptance_section.dart';
@@ -111,6 +112,12 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   final ScrollController _detailScrollController = ScrollController();
   LatLng? _advertisingPoint;
   double _advertisingRadiusKm = 0;
+  AdvertiserTerritory? _advertisingTerritory;
+  AdvertiserTerritoryGeometry _advertisingTerritoryGeometry =
+      const AdvertiserTerritoryGeometry([]);
+  final AdvertiserTerritoryService _advertiserTerritoryService =
+      AdvertiserTerritoryService();
+  int _geometryRequestNumber = 0;
   AdvertisingVisualData _advertisingVisual = const AdvertisingVisualData();
   DiffusionPreviewData _diffusionPreview = const DiffusionPreviewData();
   PlanningData _planningData = const PlanningData();
@@ -189,6 +196,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
 
   @override
   void dispose() {
+    _geometryRequestNumber++;
+    _advertiserTerritoryService.dispose();
     _requestSubscription?.cancel();
     _detailScrollController.dispose();
     super.dispose();
@@ -256,6 +265,11 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   }
 
   void _restoreRequestAssets(Map<String, dynamic> data) {
+    final restoredTerritory =
+        AdvertiserTerritory.fromFirestore(data['advertisingTerritory']);
+    if (restoredTerritory != null) {
+      _setAdvertisingTerritory(restoredTerritory);
+    }
     final approved = _map(data['approvedApplication']);
     final location = approved.isNotEmpty
         ? _map(approved['location'])
@@ -356,6 +370,40 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   void _setAdvertisingVisual(AdvertisingVisualData visual) {
     if (!mounted) return;
     setState(() => _advertisingVisual = visual);
+  }
+
+  Future<void> _setAdvertisingTerritory(
+    AdvertiserTerritory territory,
+  ) async {
+    if (!mounted) return;
+    final old = _advertisingTerritory;
+    if (old?.level == territory.level && old?.code == territory.code) return;
+    final requestNumber = ++_geometryRequestNumber;
+    setState(() {
+      _advertisingTerritory = territory;
+      _advertisingTerritoryGeometry =
+          const AdvertiserTerritoryGeometry([]);
+    });
+    try {
+      final geometry =
+          await _advertiserTerritoryService.geometry(territory);
+      if (!mounted || requestNumber != _geometryRequestNumber) return;
+      setState(() => _advertisingTerritoryGeometry = geometry);
+      final zoom = switch (territory.level) {
+        AdvertiserTerritoryLevel.commune => 12.0,
+        AdvertiserTerritoryLevel.intercommunalite => 10.5,
+        AdvertiserTerritoryLevel.departement => 9.0,
+        AdvertiserTerritoryLevel.region => 7.0,
+        AdvertiserTerritoryLevel.national => 5.0,
+      };
+      if (_advertisingPoint != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _mapController.move(_advertisingPoint!, zoom);
+        });
+      }
+    } catch (error) {
+      debugPrint('Contour du territoire indisponible : $error');
+    }
   }
 
   void _setAdvertisingRadius(double radiusKm) {
@@ -548,18 +596,17 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               userAgentPackageName: 'com.sphot.app',
             ),
             if (showApprovedRadius &&
-                _advertisingPoint != null &&
-                _advertisingRadiusKm > 0)
-              CircleLayer(
-                circles: [
-                  CircleMarker(
-                    point: _advertisingPoint!,
-                    radius: _advertisingRadiusKm * 1000,
-                    useRadiusInMeter: true,
-                    color: WebColors.red.withOpacity(0.14),
-                    borderColor: WebColors.red,
-                    borderStrokeWidth: 2,
-                  ),
+                _advertisingTerritoryGeometry.polygons.isNotEmpty)
+              PolygonLayer(
+                polygons: [
+                  for (final ring in
+                      _advertisingTerritoryGeometry.polygons)
+                    Polygon(
+                      points: ring,
+                      color: WebColors.red.withOpacity(0.10),
+                      borderColor: WebColors.red,
+                      borderStrokeWidth: 2.0,
+                    ),
                 ],
               ),
             if (_advertisingPoint != null)
@@ -939,6 +986,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             assetChangeMode: _assetChangeAuthorized,
             assetChangeRequestStatus: _assetChangeStatus,
             requestedScope: _requestedScope,
+            initialTerritory: _advertisingTerritory,
+            onTerritoryChanged: _setAdvertisingTerritory,
           ),
         ];
       case 2:
