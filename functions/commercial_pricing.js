@@ -6,6 +6,7 @@
 const commercialDiscounts = require("./commercial_discounts");
 const SESSION_COLLECTION = "superAdminPricingSessions";
 const MARKETS = "commercialPricingMarkets";
+const discounts = require("./commercial_discounts");
 const SESSION_MS = 2 * 60 * 60 * 1000;
 const seedAdmin = [499, 399, 299, 199];
 const advertiserMatrix = [
@@ -477,6 +478,19 @@ function endpoint({admin, crypto, onRequest}) {
           const type = body.market;
           marketId(type);
           let result;
+          if (body.action === "getCustomerDiscount") {
+            result = await discounts.getForSuperAdmin(
+                admin, body.customerMarket, body.customerUid);
+            response.status(200).json({success: true, data: result});
+            return;
+          }
+          if (body.action === "setCustomerDiscount") {
+            result = await discounts.setForSuperAdmin(
+                admin, body.customerMarket, body.customerUid,
+                body.percent, login);
+            response.status(200).json({success: true, data: result});
+            return;
+          }
           switch (body.action) {
             case "load":
               result = await load(admin, type); break;
