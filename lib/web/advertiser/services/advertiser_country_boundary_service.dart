@@ -179,14 +179,66 @@ class AdvertiserCountryBoundaryService {
       final properties = rawFeature['properties'];
       final geometry = rawFeature['geometry'];
       if (properties is! Map || geometry is! Map) continue;
-      final iso3 = (properties['ADM0_A3'] ??
+      // Natural Earth distingue le code administratif local (ex. GUF)
+      // du code de souveraineté (FRA). PAYS ENTIER doit conserver les
+      // territoires ultramarins et les composantes insulaires.
+      final sovereignCode = (properties['SOV_A3'] ?? '').toString()
+          .trim().toUpperCase();
+      final localCode = (properties['ADM0_A3'] ??
               properties['ISO_A3'] ??
-              '')
-          .toString()
-          .toUpperCase();
-      final name = (properties['ADMIN'] ?? properties['NAME'] ?? '')
-          .toString()
-          .trim();
+              '').toString().trim().toUpperCase();
+      final iso3 = RegExp(r'^[A-Z]{3}
+      if (!RegExp(r'^[A-Z]{3}$').hasMatch(iso3) || name.isEmpty) {
+        continue;
+      }
+      final polygons = <List<LatLng>>[];
+      final coordinates = geometry['coordinates'];
+      if (coordinates is! List) continue;
+      final figures = geometry['type'] == 'Polygon'
+          ? <dynamic>[coordinates]
+          : geometry['type'] == 'MultiPolygon'
+              ? coordinates
+              : <dynamic>[];
+      for (final figure in figures) {
+        if (figure is! List || figure.isEmpty) continue;
+        final exterior = figure.first;
+        if (exterior is! List) continue;
+        final points = <LatLng>[];
+        for (final rawPoint in exterior) {
+          if (rawPoint is! List || rawPoint.length < 2) continue;
+          final lng = rawPoint[0];
+          final lat = rawPoint[1];
+          if (lat is num && lng is num &&
+              lat >= -90 && lat <= 90 &&
+              lng >= -180 && lng <= 180) {
+            points.add(LatLng(lat.toDouble(), lng.toDouble()));
+          }
+        }
+        if (points.length >= 3) polygons.add(points);
+      }
+      if (polygons.isNotEmpty) {
+        final existing = byCountry[iso3];
+        byCountry[iso3] = AdvertiserCountryBoundary(
+          iso3: iso3,
+          name: existing?.name ?? name,
+          // Toutes les composantes portant ce code pays restent couvertes.
+          polygons: [...?existing?.polygons, ...polygons],
+        );
+      }
+    }
+    if (byCountry.isEmpty) {
+      throw const FormatException('Aucun pays exploitable dans le GeoJSON.');
+    }
+    return byCountry.values.toList();
+  }
+}
+).hasMatch(sovereignCode)
+          ? sovereignCode
+          : localCode;
+      final name = (properties['SOVEREIGNT'] ??
+              properties['ADMIN'] ??
+              properties['NAME'] ??
+              '').toString().trim();
       if (!RegExp(r'^[A-Z]{3}$').hasMatch(iso3) || name.isEmpty) {
         continue;
       }
