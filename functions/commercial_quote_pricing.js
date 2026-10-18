@@ -21,6 +21,9 @@ function safePrice(n) {
 }
 
 function publishedState(snapshot, type) {
+  if (!["ADMIN", "ADVERTISER_RADIUS"].includes(type)) {
+    throw quoteError(400, "Ancien marché tarifaire retiré.");
+  }
   if (!snapshot || !snapshot.exists) {
     throw quoteError(503, "Aucune grille publiee disponible.");
   }
