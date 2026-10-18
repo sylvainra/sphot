@@ -17,6 +17,5 @@ class PlanningData {
       durationLabel != null &&
       startDate != null &&
       endDate != null &&
-      exclusiveReservation &&
       availabilityConfirmed;
 }
