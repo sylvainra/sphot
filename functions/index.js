@@ -11618,6 +11618,16 @@ const {registerPublicMapAdvertisingEndpoint} =
 exports.getPublicMapAdvertisements =
     registerPublicMapAdvertisingEndpoint({admin, onRequest});
 
+// API séparée pour la nouvelle interface : Carte + Premium + Pack.
+// L'ancienne API continue de retourner uniquement Carte + Pack, ce qui
+// protège les versions déjà déployées de SPHOT.
+exports.getPublicAdvertisementsV2 =
+    registerPublicMapAdvertisingEndpoint({
+      admin,
+      onRequest,
+      includePremium: true,
+    });
+
 // Nouvelle synchronisation : aucun dossier et aucune campagne n'est modifié
 // tant que le Super Admin n'a pas approuvé une proposition.
 // À déployer explicitement et séparément après validation.
