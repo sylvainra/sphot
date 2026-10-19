@@ -356,47 +356,38 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   // Cette invitation reste visible sous une publicité active
   // et remplace uniquement l'annonce en l'absence de campagne éligible.
   Widget _buildEmptyAdvertisingSpace() {
+    // Même style compact rouge/orange que les autres boutons de la fiche.
+    // L'encart reste SOUS l'image publicitaire, jamais au-dessus.
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: _openAdvertiserWebsite,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(11),
         child: Container(
           width: double.infinity,
-          constraints: const BoxConstraints(minHeight: 52),
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 12,
-          ),
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.72),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.black.withOpacity(0.08),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.10),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
+            color: _sphotWarmSurface,
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: _sphotWarmRed, width: 1),
           ),
           alignment: Alignment.center,
           child: const Text(
             'CRÉER VOTRE SPHOT PUBLICITAIRE ICI!',
             textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-              color: Colors.black87,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: _sphotWarmRed,
             ),
           ),
         ),
       ),
     );
   }
-
 
   // Publicité Premium : uniquement les campagnes actives correspondant
   // à la position du SPHOT. Aucun accès direct aux dossiers privés.
