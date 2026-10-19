@@ -2688,15 +2688,23 @@ Widget _buildAdBanner() {
       isDesktopWebDetailOpen ? 64.0 : 58.0;
   final availableBannerWidth = screenWidth - 8.0 -
       (isDesktopWebDetailOpen ? detailPanelWidth + 8.0 : 8.0);
-  final invitationWidth = screenWidth < 600 ? 80.0 : 88.0;
-  // Encadrer la taille de l'annonce pour éviter qu'elle recouvre la carte.
-  // La bannière complète est conservée, sans recadrage ni étirement.
-  final bannerHeight = screenWidth < 600 ? 72.0 : 90.0;
-  final bannerTotalWidth = min(
-    availableBannerWidth,
-    bannerHeight * 6.0 + invitationWidth,
-  );
+  // Deux zones de clic indépendantes : annonceur + création d'annonce.
+  // Un emplacement plus haut sur Web, compact et lisible sur téléphone.
+  final isMobile = screenWidth < 600;
+  final invitationWidth = isMobile
+      ? 96.0
+      : (screenWidth < 900 ? 150.0 : 200.0);
+  final bannerHeight = isMobile
+      ? 64.0
+      : (screenWidth < 900
+          ? 105.0
+          : (isDesktopWebDetailOpen ? 132.0 : 152.0));
   final bannerRight = isDesktopWebDetailOpen ? detailPanelWidth + 8.0 : 8.0;
+  final imageWidth = max(
+    0.0,
+    min(availableBannerWidth - invitationWidth, bannerHeight * 6.0),
+  );
+  final bannerTotalWidth = imageWidth + invitationWidth;
 
   Widget emptyAdvertisingSpace() {
     return GestureDetector(
@@ -2760,30 +2768,29 @@ Widget _buildAdBanner() {
     final advertiserName =
         ad['advertiserName']?.toString().trim() ?? '';
 
-    return Material(
-      color: const Color(0xFF06314E),
-      child: InkWell(
-        onTap: destinationUrl.isEmpty
-            ? null
-            : () => unawaited(_openMapAdDestination(destinationUrl)),
-        child: Semantics(
-          label: advertiserName.isEmpty
-              ? 'Publicité'
-              : 'Publicité : $advertiserName',
-          child: Row(
-            children: [
-              // La largeur naturelle dépend du format du fichier.
-              // Un ancien visuel 2:1 n'est pas élargi artificiellement
-              // et un fichier 6:1 exploite l'espace panoramique.
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: bannerTotalWidth -
-                      (screenWidth < 600 ? 32.0 : 48.0),
-                ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Appuyer sur le visuel ouvre uniquement le site de l'annonceur.
+        SizedBox(
+          width: imageWidth,
+          height: bannerHeight,
+          child: Material(
+            color: const Color(0xFF073650),
+            child: InkWell(
+              onTap: destinationUrl.isEmpty
+                  ? null
+                  : () => unawaited(_openMapAdDestination(destinationUrl)),
+              child: Semantics(
+                button: destinationUrl.isNotEmpty,
+                label: advertiserName.isEmpty
+                    ? 'Visiter le site de l’annonceur'
+                    : 'Visiter le site de $advertiserName',
                 child: Image.network(
                   bannerUrl,
-                  height: bannerHeight,
                   fit: BoxFit.contain,
+                  width: imageWidth,
+                  height: bannerHeight,
                   webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                   errorBuilder: (_, __, ___) => const Center(
                     child: Icon(Icons.image_not_supported_outlined,
@@ -2791,58 +2798,62 @@ Widget _buildAdBanner() {
                   ),
                 ),
               ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 5),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      if (constraints.maxWidth < 85) {
-                        return const Center(
-                          child: Text(
-                            'PUB',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        );
-                      }
-                      return Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            advertiserName.isEmpty
-                                ? 'PUBLICITÉ'
-                                : advertiserName.toUpperCase(),
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 13,
-                            ),
-                          ),
-                          if (destinationUrl.isNotEmpty)
-                            const Text(
-                              'DÉCOUVRIR ›',
-                              style: TextStyle(
-                                color: Color(0xFFFFD54F),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                        ],
-                      );
-                    },
+            ),
+          ),
+        ),
+        // Bouton publicitaire visible et toujours séparé du visuel.
+        SizedBox(
+          width: invitationWidth,
+          height: bannerHeight,
+          child: Material(
+            color: const Color(0xFFFFA726),
+            child: InkWell(
+              onTap: () => unawaited(_openAdvertiserWebsite()),
+              child: Semantics(
+                button: true,
+                label: 'Créer mon SPHOT publicitaire',
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 3 : 10,
+                    vertical: isMobile ? 3 : 8,
+                  ),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      left: BorderSide(
+                        color: Color(0xFF073650), width: 2),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.add_circle_outline_rounded,
+                        color: const Color(0xFF082B46),
+                        size: isMobile ? 16 : 28,
+                      ),
+                      SizedBox(height: isMobile ? 2 : 7),
+                      Text(
+                        isMobile
+                            ? 'CRÉER MON\nSPHOT\nPUBLICITAIRE'
+                            : 'CRÉER MON\nSPHOT PUBLICITAIRE\nICI !',
+                        textAlign: TextAlign.center,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: isMobile ? 9.1 : 13.3,
+                          height: 1.12,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFF082B46),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 
