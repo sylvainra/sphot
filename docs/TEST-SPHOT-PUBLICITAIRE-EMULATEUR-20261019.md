@@ -34,6 +34,8 @@ Attendre `All emulators ready!`. Ne pas fermer cette fenêtre.
 ```powershell
 cd C:\Users\surfS\sphot
 $env:FIRESTORE_EMULATOR_HOST = '127.0.0.1:8085'
+# Site annoncé par le visuel Surf Shop Atlantique (modifiable).
+$env:SPHOT_TEST_DESTINATION_URL = 'https://www.surfshop-atlantique.fr'
 node functions/test/advertiser_campaign_emulator_smoke.js
 
 $visuel = Join-Path $env:USERPROFILE 'Downloads\SPHOT_SURF_SHOP_ATLANTIQUE_1800x300.jpg'
@@ -56,7 +58,7 @@ puis relancer le serveur local.
 
 ```powershell
 cd C:\Users\surfS\sphot
-flutter run -d chrome --web-port 51778 --dart-define="SPHOT_PUBLIC_ADS_URL=http://127.0.0.1:8099/advertisements?mode=pack"
+flutter run -d chrome --web-port 51778 --dart-define="SPHOT_PUBLIC_ADS_URL=http://127.0.0.1:8099/advertisements?mode=pack" --dart-define=SPHOT_ADS_EMULATOR=true
 ```
 
 Vérifier la carte, ouvrir LONGE 06, visiter les six rubriques et simuler
@@ -78,3 +80,16 @@ Firestore Emulator sont éphémères et disparaissent quand l'émulateur s'arrê
 Cette validation est une **préqualification du rendu** et de la chaîne de
 données simulée. Elle ne remplace pas le test authentifié du Super Admin ni le
 contrôle de la synchronisation et des emails sur un environnement déployé.
+
+## Critères supplémentaires de validation
+
+- Le bandeau panoramique doit être plus grand sur le site Web que sur mobile.
+- **Zone visuelle** : le clic ouvre `SPHOT_TEST_DESTINATION_URL` (site annonceur).
+- **Zone orange distincte « CRÉER MON SPHOT PUBLICITAIRE »** : le clic
+  ouvre le parcours de création SPHOT, jamais le site annonceur.
+- Les six encarts de la fiche utilisent le visuel de la campagne Pack, y
+  compris en mode mobile. `SPHOT_ADS_EMULATOR=true` autorise l'image HTTP
+  **uniquement** depuis l'adresse locale `127.0.0.1:8099/creative` ;
+  les images de production continuent d'exiger HTTPS.
+- Après un changement de fichier source, relancer le scénario test et
+  redémarrer Flutter pour rafraîchir les listes chargées au lancement.
