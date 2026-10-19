@@ -2773,6 +2773,13 @@ Widget _buildAdBanner() {
           final bannerUrl = wideWebBanner && panoramicBannerUrl.isNotEmpty
               ? panoramicBannerUrl
               : standardBannerUrl;
+          // Aperçu local uniquement : le visuel panoramique préparé pour
+          // la campagne de démonstration. Jamais utilisé en production.
+          // Les campagnes réelles doivent fournir webBannerUrl approuvé.
+          final demoWebPanorama = kDebugMode &&
+              wideWebBanner &&
+              panoramicBannerUrl.isEmpty &&
+              ad['id'] == 'test_bar_de_la_plage_20261019';
           final destinationUrl = ad['destinationUrl']?.toString() ?? '';
           final advertiserName =
               ad['advertiserName']?.toString().trim() ?? '';
@@ -2789,23 +2796,42 @@ Widget _buildAdBanner() {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.network(
-                        bannerUrl,
-                        width: double.infinity,
-                        height: bannerHeight,
-                        // Sans créatif panoramique spécifique, ne jamais
-                        // rogner les textes et le logo du visuel standard.
-                        fit: BoxFit.contain,
-                        alignment: Alignment.center,
-                        webHtmlElementStrategy:
-                            WebHtmlElementStrategy.prefer,
-                        errorBuilder: (_, __, ___) => const Center(
-                          child: Icon(
-                            Icons.image_not_supported_outlined,
-                            color: Colors.white,
+                      if (demoWebPanorama)
+                        Image.asset(
+                          'data/images/surf_shop_atlantique_web_1800x140.jpg',
+                          width: double.infinity,
+                          height: bannerHeight,
+                          // Le visuel Web est déjà recomposé au format
+                          // panoramique : ajustement léger sans texte coupé.
+                          fit: BoxFit.fill,
+                          errorBuilder: (_, __, ___) => Image.network(
+                            standardBannerUrl,
+                            fit: BoxFit.contain,
+                            webHtmlElementStrategy:
+                                WebHtmlElementStrategy.prefer,
+                          ),
+                        )
+                      else
+                        Image.network(
+                          bannerUrl,
+                          width: double.infinity,
+                          height: bannerHeight,
+                          // Ne pas rogner les textes d'une campagne
+                          // qui n'a pas encore de visuel Web approuvé.
+                          fit: panoramicBannerUrl.isNotEmpty &&
+                                  wideWebBanner
+                              ? BoxFit.fill
+                              : BoxFit.contain,
+                          alignment: Alignment.center,
+                          webHtmlElementStrategy:
+                              WebHtmlElementStrategy.prefer,
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
-                      ),
                       Positioned.fill(
                         child: Material(
                           type: MaterialType.transparency,
