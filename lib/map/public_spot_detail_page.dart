@@ -513,8 +513,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           ),
         ],
         const SizedBox(height: 12),
-        _buildAdvertisingSpace(),
-        const SizedBox(height: 10),
         _buildSpotActions(context, spot),
       ],
     );
@@ -811,8 +809,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         ],
 
         const SizedBox(height: 12),
-        _buildAdvertisingSpace(),
-        const SizedBox(height: 10),
         _buildSpotActions(context, spot),
       ],
     );
@@ -1226,8 +1222,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             child: _MobileMediaPlaceholder(),
           ),
         const SizedBox(height: 12),
-        _buildAdvertisingSpace(),
-        const SizedBox(height: 10),
         _buildSpotActions(context, spot),
       ],
     );
@@ -1271,8 +1265,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         const SizedBox(height: 10),
         const _BathingSignalsLegend(),
         const SizedBox(height: 12),
-        _buildAdvertisingSpace(),
-        const SizedBox(height: 10),
         _buildSpotActions(context, spot),
       ],
     );
@@ -1378,8 +1370,6 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           ),
         ],
         const SizedBox(height: 12),
-        _buildAdvertisingSpace(),
-        const SizedBox(height: 10),
         _buildSpotActions(context, spot),
       ],
     );
