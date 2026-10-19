@@ -10983,9 +10983,18 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
     async (event) => {
       const before = event.data.before.data() || {};
       const data = event.data.after.data() || {};
-      const previous = (before.assetChangeRequest || {}).status;
-      const status = (data.assetChangeRequest || {}).status;
-      if (data.status !== "approved" || previous === status) return;
+      const previousChange = before.assetChangeRequest || {};
+      const currentChange = data.assetChangeRequest || {};
+      const previous = previousChange.status;
+      const status = currentChange.status;
+      const syncStatus = currentChange.syncStatus;
+      const approvalSyncFinished = status === "approved" &&
+        previousChange.syncStatus !== syncStatus &&
+        ["applied", "unlinked", "no_active_campaign"].includes(syncStatus);
+      // L'email d'approbation attend la fin de synchronisation.
+      if (data.status !== "approved" ||
+          (status === "approved" ? !approvalSyncFinished :
+            previous === status)) return;
       const messages = {
         pending: "Votre demande de modification du visuel ou de la position " +
           "a été reçue. L'équipe SPHOT va l'examiner.",
@@ -10995,9 +11004,17 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
         submitted: "Votre proposition de modification du visuel ou de la " +
           "position a été reçue. Elle est en attente d'approbation " +
           "par l'équipe SPHOT.",
-        approved: "L'équipe SPHOT a approuvé votre modification du visuel " +
-          "ou de la position. Les éléments approuvés sont disponibles " +
-          "dans votre espace annonceur.",
+        changes_requested: "L'équipe SPHOT demande des ajustements à votre " +
+          "proposition. Vous pouvez déposer un nouveau visuel dans votre " +
+          "espace annonceur.",
+        approved: syncStatus === "applied" ?
+          "L'équipe SPHOT a approuvé votre modification du visuel ou de " +
+          "la position. La mise à jour de votre campagne active liée a été " +
+          "effectuée." :
+          "L'équipe SPHOT a approuvé votre modification du visuel ou de " +
+          "la position. Aucune campagne active liée n'a encore été mise " +
+          "à jour. L'équipe SPHOT doit vérifier le raccordement avant " +
+          "la diffusion du nouveau visuel.",
         rejected: "L'équipe SPHOT n'a pas approuvé votre modification. " +
           "Les éléments précédemment approuvés sont conservés.",
       };
@@ -11006,6 +11023,7 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
         pending: "DEMANDE DE MODIFICATION REÇUE",
         authorized: "MODIFICATION AUTORISÉE",
         submitted: "PROPOSITION À APPROUVER",
+        changes_requested: "AJUSTEMENTS DEMANDÉS",
         approved: "MODIFICATION APPROUVÉE",
         rejected: "MODIFICATION REFUSÉE",
       };
