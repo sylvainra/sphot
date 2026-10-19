@@ -44,7 +44,8 @@ function previewTestPack(request, campaign, requestId, now = Date.now()) {
   if (request.status !== "approved" ||
       request.diffusionCompleted !== true ||
       diffusion.visibilityType !== "pack") {
-    throw Object.assign(new Error("Dossier Pack non approuvé ou non confirmé."), {
+    throw Object.assign(
+        new Error("Dossier Pack non approuvé ou non confirmé."), {
       status: 409,
     });
   }
@@ -114,7 +115,9 @@ function registerAdvertiserTestPackActivation({
       async (request, response) => {
         const origin = txt(request.headers.origin);
         if (!allowedOrigin(origin)) {
-          response.status(403).json({success: false, error: "Origine refusée."});
+          response.status(403).json({
+            success: false, error: "Origine refusée.",
+          });
           return;
         }
         if (origin) {
@@ -150,7 +153,8 @@ function registerAdvertiserTestPackActivation({
           if (!requestId || !campaignId ||
               requestId.includes("/") || campaignId.includes("/") ||
               !["preview", "confirm"].includes(action)) {
-            throw Object.assign(new Error("Identifiants ou action invalides."), {
+            throw Object.assign(
+                new Error("Identifiants ou action invalides."), {
               status: 400,
             });
           }
