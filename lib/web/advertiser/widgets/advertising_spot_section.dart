@@ -947,63 +947,26 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           ),
         ),
         _buildTerritoryCard(),
-        if (widget.approvedAssetsLocked)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: _requestingAssetChange || _assetChangeRequested
-                      ? null
-                      : _requestAssetModification,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _assetChangeRequested
-                        ? Colors.white
-                        : WebColors.blue,
-                    disabledForegroundColor: _assetChangeRequested
-                        ? Colors.white
-                        : WebColors.blue,
-                    backgroundColor: _assetChangeRequested
-                        ? WebColors.red
-                        : Colors.white,
-                    disabledBackgroundColor: _assetChangeRequested
-                        ? WebColors.red
-                        : Colors.white,
-                    side: BorderSide(
-                      color: _assetChangeRequested
-                          ? WebColors.red
-                          : WebColors.blue,
-                      width: 1.5,
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                  ),
-                  icon: Icon(
-                    _assetChangeRequested
-                        ? Icons.check_circle_outline_rounded
-                        : Icons.edit_location_alt_outlined,
-                  ),
-                  label: Text(
-                    _assetChangeRequested
-                        ? 'MODIFICATION VISUELLE OU DE POSITION DEMANDÉE'
-                        : 'DEMANDER UNE MODIFICATION DU VISUEL OU DE LA POSITION',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-                if (_assetChangeRequested) ...[
-                  const SizedBox(height: 9),
-                  const Text(
-                    'Surveillez votre boîte mail, l’équipe SPHOT vous informera de la marche à suivre.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: WebColors.red,
-                      height: 1.35,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ],
+        if (widget.assetChangeRequestStatus == 'submitted')
+          const Padding(
+            padding: EdgeInsets.only(bottom: 14),
+            child: Text(
+              'Votre nouveau visuel ou votre nouvelle position est en attente '
+              'd’approbation. Les informations précédemment approuvées '
+              'restent en vigueur.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: WebColors.red, fontWeight: FontWeight.w800),
+            ),
+          ),
+        if (widget.assetChangeMode)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 14),
+            child: Text(
+              'Choisissez le nouveau visuel ou la nouvelle position, puis '
+              'soumettez-les au Super Admin. Votre publicité actuelle ne sera '
+              'pas remplacée avant son approbation.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: WebColors.blue, fontWeight: FontWeight.w700),
             ),
           ),
 
@@ -1046,6 +1009,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             label: Text(
               _saving
                   ? 'ENREGISTREMENT…'
+                  : widget.assetChangeMode
+                  ? (_completed
+                      ? 'PROPOSITION TRANSMISE POUR APPROBATION'
+                      : 'SOUMETTRE LA MODIFICATION À APPROBATION')
                   : _completed
                   ? 'SPHOT PUBLICITAIRE ENREGISTRÉ'
                   : 'ENREGISTRER LE SPHOT PUBLICITAIRE',
