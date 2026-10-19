@@ -2771,7 +2771,7 @@ Widget _buildAdBanner() {
                       // Le visuel au premier plan reste toujours entier.
                       if (kIsWeb && screenWidth >= 900)
                         Opacity(
-                          opacity: 0.30,
+                          opacity: 0.08,
                           child: Image.network(
                             bannerUrl,
                             fit: BoxFit.cover,
