@@ -47,13 +47,14 @@ class FirestoreService {
       final response = await http
           .get(
             Uri.parse(
-              // Option strictement locale, fournie au lancement Flutter.
-              // Sans --dart-define, l'API publique existante reste inchangée.
+              // Source remplaçable pour le test local (Emulator).
+              // En ligne, utiliser l'API v2 sans modifier le comportement
+              // de getPublicMapAdvertisements pour les anciennes applications.
               const String.fromEnvironment(
                 'SPHOT_PUBLIC_ADS_URL',
                 defaultValue:
                     'https://europe-west1-sphot-ab80b.cloudfunctions.net/'
-                    'getPublicMapAdvertisements',
+                    'getPublicAdvertisementsV2',
               ),
             ),
           )
