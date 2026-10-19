@@ -4,6 +4,11 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {approvedAssetPatch} = require("../advertiser_campaign_sync");
 
+/**
+ * Construit un dossier approuvé pour les tests de synchronisation.
+ * @param {Object} overrides Champs de dossier à remplacer.
+ * @return {Object} Dossier de test.
+ */
 function dossier(overrides = {}) {
   return {
     status: "approved",
@@ -16,8 +21,11 @@ function dossier(overrides = {}) {
   };
 }
 
-test("une approbation du visuel et de la position produit uniquement ces champs", () => {
-  const before = {status: "approved", assetChangeRequest: {status: "submitted"}};
+test("une approbation ne modifie que le visuel et la position", () => {
+  const before = {
+    status: "approved",
+    assetChangeRequest: {status: "submitted"},
+  };
   const patch = approvedAssetPatch(before, dossier());
   assert.deepEqual(patch, {
     bannerUrl: "https://storage.example.com/new-banner.jpg",
@@ -30,7 +38,10 @@ test("une approbation du visuel et de la position produit uniquement ces champs"
 });
 
 test("aucune synchronisation avant approbation ou en cas de refus", () => {
-  const submitted = {status: "approved", assetChangeRequest: {status: "submitted"}};
+  const submitted = {
+    status: "approved",
+    assetChangeRequest: {status: "submitted"},
+  };
   assert.equal(approvedAssetPatch(submitted, {
     ...dossier(),
     assetChangeRequest: {...dossier().assetChangeRequest, status: "submitted"},
@@ -45,7 +56,10 @@ test("aucune synchronisation avant approbation ou en cas de refus", () => {
 });
 
 test("rejette une image non HTTPS et une localisation impossible", () => {
-  const submitted = {status: "approved", assetChangeRequest: {status: "submitted"}};
+  const submitted = {
+    status: "approved",
+    assetChangeRequest: {status: "submitted"},
+  };
   assert.equal(approvedAssetPatch(submitted, dossier({
     assetChangeRequest: {
       ...dossier().assetChangeRequest,
@@ -60,8 +74,11 @@ test("rejette une image non HTTPS et une localisation impossible", () => {
   })), null);
 });
 
-test("compatibilité avec les propositions déjà soumises sous les champs historiques", () => {
-  const before = {status: "approved", assetChangeRequest: {status: "submitted"}};
+test("compatibilité avec les propositions historiques", () => {
+  const before = {
+    status: "approved",
+    assetChangeRequest: {status: "submitted"},
+  };
   const after = {
     status: "approved",
     assetChangeRequest: {status: "approved"},
@@ -75,8 +92,9 @@ test("compatibilité avec les propositions déjà soumises sous les champs histo
   });
 });
 
-test("une campagne active reliée est mise à jour sans modifier l'offre ni les dates", async () => {
-  const {registerAdvertiserCampaignSync} = require("../advertiser_campaign_sync");
+test("campagne active : préserver offre, prix et dates", async () => {
+  const {registerAdvertiserCampaignSync} =
+      require("../advertiser_campaign_sync");
   const timestamp = (millis) => ({toMillis: () => millis});
   const submittedAt = timestamp(1792410000000);
   const old = {
