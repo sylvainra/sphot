@@ -2683,9 +2683,13 @@ Widget _buildAdBanner() {
   final availableBannerWidth = screenWidth - 8.0 -
       (isDesktopWebDetailOpen ? detailPanelWidth + 8.0 : 8.0);
   final invitationWidth = screenWidth < 600 ? 80.0 : 88.0;
-  // Un même visuel panoramique 6:1, jamais recadré ni déformé.
-  final bannerHeight =
-      ((availableBannerWidth - invitationWidth) / 6.0).clamp(45.0, 260.0);
+  // Encadrer la taille de l'annonce pour éviter qu'elle recouvre la carte.
+  // La bannière complète est conservée, sans recadrage ni étirement.
+  final bannerHeight = screenWidth < 600 ? 50.0 : 90.0;
+  final bannerTotalWidth = min(
+    availableBannerWidth,
+    bannerHeight * 6.0 + invitationWidth,
+  );
   final bannerRight = isDesktopWebDetailOpen ? detailPanelWidth + 8.0 : 8.0;
 
   Widget emptyAdvertisingSpace() {
@@ -2831,7 +2835,7 @@ Widget _buildAdBanner() {
 
   return Positioned(
     left: 8,
-    right: bannerRight,
+    width: min(bannerTotalWidth, screenWidth - bannerRight - 8.0),
     bottom: bannerBottom,
     child: Container(
       height: bannerHeight,
