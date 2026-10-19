@@ -60,12 +60,23 @@ function previewTestPack(request, campaign, requestId, now = Date.now()) {
       status: 409,
     });
   }
-  if (!name || name.toLowerCase() !== campaignName.toLowerCase() ||
-      !banner || !approvedBanners.includes(banner)) {
+  // Ne jamais lier sur un nom différent : les noms homonymes sont
+  // seulement des candidats et l'association doit être confirmée.
+  if (!name || name.toLowerCase() !== campaignName.toLowerCase()) {
     throw Object.assign(new Error(
-        "Le nom ou le visuel ne correspondent pas : liaison refusée.",
+        "Nom annonceur différent : liaison refusée.",
     ), {status: 409});
   }
+  if (!banner || approvedBanners.length === 0) {
+    throw Object.assign(new Error(
+        "Un visuel est absent : contrôle impossible.",
+    ), {status: 409});
+  }
+  // Les URL Firebase et les URL d'une campagne de démonstration peuvent
+  // différer même quand le JPG est visuellement identique.
+  // L'écart est affiché au Super Admin et nécessite un accord explicite.
+  const visualMatch = approvedBanners.includes(banner);
+  const dossierBannerUrl = approvedBanners[0];
   const starts = ms(campaign.campaignStartDate);
   const ends = ms(campaign.campaignEndDate);
   if (!Number.isFinite(starts) || !Number.isFinite(ends) ||
@@ -78,6 +89,9 @@ function previewTestPack(request, campaign, requestId, now = Date.now()) {
     advertiserName: name,
     previousVisibilityType: "map",
     proposedVisibilityType: "pack",
+    visualMatch,
+    campaignBannerUrl: banner,
+    dossierBannerUrl,
     expiresAt: Math.min(ends, now + TEST_DURATION_MS),
   };
 }
@@ -191,6 +205,22 @@ function registerAdvertiserTestPackActivation({
             }
             const result = previewTestPack(
                 a.data(), b.data(), requestId, Date.now());
+            // Deux confirmations distinctes :
+            // 1. Le visuel de chaque document est resté inchangé.
+            // 2. Un écart éventuel a été reconnu par le Super Admin.
+            if (txt(body.confirmCampaignBannerUrl) !==
+                    result.campaignBannerUrl ||
+                txt(body.confirmDossierBannerUrl) !==
+                    result.dossierBannerUrl) {
+              throw Object.assign(new Error(
+                  "Visuel modifié depuis l'aperçu : recommencer le contrôle.",
+              ), {status: 409});
+            }
+            if (!result.visualMatch && body.confirmVisualMismatch !== true) {
+              throw Object.assign(new Error(
+                  "Images différentes : confirmation visuelle requise.",
+              ), {status: 409});
+            }
             const expiresAt = admin.firestore.Timestamp.fromMillis(
                 result.expiresAt);
             tx.update(campaignRef, {
@@ -209,6 +239,9 @@ function registerAdvertiserTestPackActivation({
               campaignId,
               previousVisibilityType: "map",
               visibilityType: "pack",
+              visualMatchAtApproval: result.visualMatch,
+              campaignBannerUrl: result.campaignBannerUrl,
+              dossierBannerUrl: result.dossierBannerUrl,
               approvedBy: login,
               expiresAt,
               activatedAt: admin.firestore.FieldValue.serverTimestamp(),
