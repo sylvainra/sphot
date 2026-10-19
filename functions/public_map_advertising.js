@@ -64,7 +64,8 @@ function finiteNumber(value) {
  * @param {number} now Date actuelle.
  * @return {Object} Campagne enrichie, champs publics seulement ensuite.
  */
-function campaignWithApprovedAdvertiser(campaign, advertiser, now = Date.now()) {
+function campaignWithApprovedAdvertiser(
+    campaign, advertiser, now = Date.now()) {
   if (!advertiser || advertiser.status !== "approved") return campaign;
   const application = advertiser.application || {};
   const approved = advertiser.approvedApplication || {};
