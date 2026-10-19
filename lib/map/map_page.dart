@@ -2770,7 +2770,7 @@ Widget _buildAdBanner() {
                   height: bannerHeight,
                   child: Image.network(
                     bannerUrl,
-                    fit: BoxFit.fill,
+                    fit: BoxFit.contain,
                     webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                     errorBuilder: (_, __, ___) => const Center(
                       child: Icon(
