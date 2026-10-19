@@ -118,6 +118,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   Map<String, dynamic>? _selectedAdvertiser;
 
+  // Diagnostic en lecture seule, indexé par dossier annonceur.
+  final Map<String, Future<List<Map<String, dynamic>>>>
+      _advertiserCampaignAuditFutures = {};
+
   bool _showLegalDocumentsPanel = false;
   bool _showPricingPanel = false;
   bool _showAnnualFinancialPanel = false;
@@ -3605,6 +3609,130 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     );
   }
 
+  // Contrôle administratif : comparer une demande avec SES campagnes.
+  // Le nom commercial n'est jamais utilisé pour établir cette association.
+  // Aucune écriture dans advertiserRequests ou adRequests.
+  Future<List<Map<String, dynamic>>> _readAdvertiserCampaignLinks(
+    String requestId,
+  ) async {
+    final collection = FirebaseFirestore.instance.collection('adRequests');
+    final linked = await collection
+        .where('advertiserRequestId', isEqualTo: requestId)
+        .limit(20)
+        .get();
+    final results = <String, Map<String, dynamic>>{
+      for (final doc in linked.docs)
+        doc.id: <String, dynamic>{'id': doc.id, ...doc.data()},
+    };
+    // Compatibilité des anciennes campagnes dont la clé est l'ID du dossier.
+    final directlyNamed = await collection.doc(requestId).get();
+    if (directlyNamed.exists) {
+      results[directlyNamed.id] = <String, dynamic>{
+        'id': directlyNamed.id,
+        ...?directlyNamed.data(),
+      };
+    }
+    return results.values.toList();
+  }
+
+  Widget _buildAdvertiserCampaignAudit(
+    Map<String, dynamic> advertiser,
+  ) {
+    final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
+    final diffusion = _advertiserMap(advertiser['diffusion']);
+    final requestedOffer = _cleanText(diffusion['visibilityType']);
+    if (requestId.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F6FB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: adminColor.withOpacity(0.20)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'DIAGNOSTIC DIFFUSION · LECTURE SEULE',
+                  style: TextStyle(
+                    color: adminColor,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Actualiser le contrôle',
+                onPressed: () => setState(() {
+                  _advertiserCampaignAuditFutures.remove(requestId);
+                }),
+                icon: const Icon(Icons.refresh_rounded, size: 19),
+              ),
+            ],
+          ),
+          Text(
+            'Formule enregistrée par l’annonceur : '
+            '${requestedOffer.isEmpty ? 'non renseignée' : requestedOffer}',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _advertiserCampaignAuditFutures.putIfAbsent(
+              requestId,
+              () => _readAdvertiserCampaignLinks(requestId),
+            ),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return const Text(
+                  'Lecture des campagnes impossible : vérifier les droits '
+                  'Super Admin Firestore.',
+                  style: TextStyle(color: redColor),
+                );
+              }
+              if (!snapshot.hasData) {
+                return const LinearProgressIndicator();
+              }
+              final campaigns = snapshot.data!;
+              if (campaigns.isEmpty) {
+                return const Text(
+                  'Aucune campagne reliée par identifiant à ce dossier. '
+                  'Ne pas associer une publicité sur la seule base du nom.',
+                  style: TextStyle(color: redColor),
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final campaign in campaigns) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      'Campagne ${_cleanText(campaign['id'])} · '
+                      'statut : ${_cleanText(campaign['status'])} · '
+                      'formule publiée : '
+                      '${_cleanText(campaign['visibilityType'])}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    if (requestedOffer.isNotEmpty &&
+                        _cleanText(campaign['visibilityType']) != requestedOffer)
+                      const Text(
+                        'Écart entre le dossier et la campagne : '
+                        'aucun changement automatique des droits de diffusion.',
+                        style: TextStyle(color: redColor, fontSize: 12),
+                      ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAdvertiserApplicationPanel() {
     final advertiser = _selectedAdvertiser;
     if (advertiser == null) return const SizedBox.shrink();
@@ -3695,6 +3823,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   ),
                 ],
               ),
+              const SizedBox(height: 14),
+              _buildAdvertiserCampaignAudit(advertiser),
               const SizedBox(height: 14),
               if (bannerUrl.isNotEmpty) ...[
                 AspectRatio(
