@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/flag_state.dart';
+import '../services/firestore_service.dart';
 import '../services/public_favorites_service.dart';
 import '../widgets/danger_pictogram.dart';
 import 'flag_marker.dart';
@@ -230,6 +232,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   bool _isSaved = false;
   late final List<GlobalKey> _pageTabKeys;
   late final ScrollController _contentScrollController;
+  late final Future<List<Map<String, dynamic>>> _premiumAdvertisementsFuture;
 
   static const List<(String, IconData)> _pages = [
     ('Live', Icons.sensors_rounded),
@@ -248,6 +251,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
       (_) => GlobalKey(),
     );
     _contentScrollController = ScrollController();
+    _premiumAdvertisementsFuture = FirestoreService().getPublicMapAdvertisements();
     _loadSavedState();
   }
 
@@ -349,7 +353,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     await Navigator.of(context).pushNamed('/advertiser');
   }
 
-  Widget _buildAdvertisingSpace() {
+  Widget _buildEmptyAdvertisingSpace() {
     return GestureDetector(
       onTap: _openAdvertiserWebsite,
       child: Container(
@@ -401,7 +405,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
                   const SizedBox(height: 5),
                   const Text(
                     'Visuel : PNG, JPG ou WEBP\n'
-                    '1200 × 600 px - 2 Mo max',
+                    '1800 × 300 px - 2 Mo max',
                     style: TextStyle(
                       fontSize: 10.5,
                       color: Colors.black54,
@@ -415,6 +419,107 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           ],
         ),
       ),
+    );
+  }
+
+
+  // Publicité Premium : uniquement les campagnes actives correspondant
+  // à la position du SPHOT. Aucun accès direct aux dossiers privés.
+  bool _isPremiumAdvertisementVisible(Map<String, dynamic> ad) {
+    final visibility = ad['visibilityType']?.toString() ?? '';
+    if (visibility != 'premium' && visibility != 'pack') return false;
+
+    final deadline = ad['campaignEndAt'];
+    if (deadline is! num ||
+        DateTime.now().millisecondsSinceEpoch >= deadline.toInt()) {
+      return false;
+    }
+    final bannerUrl = ad['bannerUrl']?.toString() ?? '';
+    if (!bannerUrl.startsWith('https://')) return false;
+
+    final scope = ad['broadcastType']?.toString() ?? '';
+    if (scope == 'national') return true;
+    if (scope != 'local') return false;
+
+    final latitude = (ad['centerLat'] as num?)?.toDouble();
+    final longitude = (ad['centerLng'] as num?)?.toDouble();
+    final radius = (ad['radiusKm'] as num?)?.toDouble();
+    if (latitude == null || longitude == null || radius == null ||
+        radius <= 0 || widget.spot.lat == 0 || widget.spot.lng == 0) {
+      return false;
+    }
+
+    return const Distance().as(
+      LengthUnit.Kilometer,
+      LatLng(widget.spot.lat, widget.spot.lng),
+      LatLng(latitude, longitude),
+    ) <= radius;
+  }
+
+  Widget _buildAdvertisingSpace() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _premiumAdvertisementsFuture,
+      builder: (context, snapshot) {
+        final ads = (snapshot.data ?? const <Map<String, dynamic>>[])
+            .where(_isPremiumAdvertisementVisible)
+            .toList();
+        if (ads.isEmpty) return _buildEmptyAdvertisingSpace();
+
+        final ad = ads[_selectedPage % ads.length];
+        final bannerUrl = ad['bannerUrl']?.toString() ?? '';
+        final destinationUrl = ad['destinationUrl']?.toString() ?? '';
+        final advertiserName = ad['advertiserName']?.toString() ?? '';
+
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: destinationUrl.isEmpty
+                ? null
+                : () => _openUrl(destinationUrl),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _sphotWarmBorder.withOpacity(0.45)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    advertiserName.isEmpty
+                        ? 'PUBLICITÉ'
+                        : 'PUBLICITÉ · ${advertiserName.toUpperCase()}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: _sphotWarmRed,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(7),
+                    child: AspectRatio(
+                      aspectRatio: 6,
+                      child: Image.network(
+                        bannerUrl,
+                        fit: BoxFit.contain,
+                        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                        errorBuilder: (_, __, ___) =>
+                            const Center(child: Icon(Icons.broken_image_outlined)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
