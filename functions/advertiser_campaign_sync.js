@@ -20,6 +20,20 @@ function isHttpsUrl(value) {
   }
 }
 
+function advertiserDestinationUrl(data) {
+  const raw = (data.application || {}).destinationUrl ||
+      data.destinationUrl ||
+      (data.approvedApplication || {}).destinationUrl;
+  const value = stringValue(raw);
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) && url.hostname ?
+      url.toString() : "";
+  } catch (_) {
+    return "";
+  }
+}
+
 function approvedAssetPatch(beforeData, afterData) {
   const before = beforeData || {};
   const after = afterData || {};
@@ -72,6 +86,7 @@ function registerAdvertiserCampaignSync({admin, onDocumentUpdated}) {
         const after = event.data.after.data() || {};
         const patch = approvedAssetPatch(before, after);
         if (!patch) return;
+        const destinationUrl = advertiserDestinationUrl(after);
 
         const requestId = event.params.requestId;
         const db = admin.firestore();
@@ -135,6 +150,12 @@ function registerAdvertiserCampaignSync({admin, onDocumentUpdated}) {
               lastApprovedAssetEventId: eventKey,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             };
+            if (destinationUrl) {
+              // Le clic sur le visuel renvoie au site renseigné par
+              // l'annonceur, pas à la page SPHOT par défaut.
+              change.destinationUrl = destinationUrl;
+              change.websiteUrl = destinationUrl;
+            }
             if (campaign.broadcastType === "local") {
               change.centerLat = patch.centerLat;
               change.centerLng = patch.centerLng;
@@ -148,6 +169,10 @@ function registerAdvertiserCampaignSync({admin, onDocumentUpdated}) {
               advertiserRequestId: requestId,
               previousBannerUrl: stringValue(campaign.bannerUrl),
               approvedBannerUrl: patch.bannerUrl,
+              previousDestinationUrl: stringValue(
+                  campaign.destinationUrl || campaign.websiteUrl),
+              approvedDestinationUrl: destinationUrl ||
+                  stringValue(campaign.destinationUrl || campaign.websiteUrl),
               previousCenterLat: campaign.centerLat ?? null,
               previousCenterLng: campaign.centerLng ?? null,
               approvedCenterLat: change.centerLat ?? null,
