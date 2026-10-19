@@ -2427,9 +2427,57 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           'approvedAt': FieldValue.serverTimestamp(),
         });
         if (isAssetApproval) {
+          // Appliquer seulement la proposition réellement examinée.
+          final visual = _advertiserMap(
+            assetChange['proposedVisual'] ?? advertiser['proposedVisual'],
+          );
+          final location = _advertiserMap(
+            assetChange['proposedLocation'] ?? advertiser['applicantLocation'],
+          );
+          final territory = _advertiserMap(
+            assetChange['proposedTerritory'] ?? advertiser['advertisingTerritory'],
+          );
+          final imageUrl = _cleanText(visual['url']);
+          if (!imageUrl.startsWith('https://')) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Impossible d’approuver : visuel proposé absent ou non sécurisé.'),
+                ),
+              );
+            }
+            return;
+          }
+
+          final approvedSpot = _advertiserMap(advertiser['advertisingSpot']);
           update.remove('approvalEmail');
+          update.remove('approvedAt');
+          update['approvedApplication'] = <String, Object?>{
+            'location': location,
+            'visual': visual,
+            'destinationUrl': advertiser['destinationUrl'] ?? '',
+            'approvedAt': FieldValue.serverTimestamp(),
+          };
+          update['advertisingSpot'] = <String, Object?>{
+            ...approvedSpot,
+            'bannerUrl': imageUrl,
+            'bannerFileName': visual['fileName'],
+            'bannerExtension': visual['extension'],
+            'bannerMimeType': visual['mimeType'],
+            'bannerFileSizeBytes': visual['fileSizeBytes'],
+            'bannerWidth': visual['width'],
+            'bannerHeight': visual['height'],
+            if (location['latitude'] is num)
+              'latitude': location['latitude'],
+            if (location['longitude'] is num)
+              'longitude': location['longitude'],
+          };
+          if (location.isNotEmpty) update['applicantLocation'] = location;
+          if (territory.isNotEmpty) update['advertisingTerritory'] = territory;
           update['assetChangeRequest'] = <String, Object?>{
             ...assetChange,
+            'proposedVisual': visual,
+            'proposedLocation': location,
             'status': 'approved',
             'reviewedAt': FieldValue.serverTimestamp(),
           };
@@ -2445,7 +2493,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           update['status'] = 'approved';
           update['assetChangeRequest'] = <String, Object?>{
             ...assetChange,
-            'status': 'authorized',
+            'status': 'changes_requested',
             'reason': reason,
             'reviewedAt': FieldValue.serverTimestamp(),
           };
@@ -2622,7 +2670,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     if (advertiser == null) return const SizedBox.shrink();
     final establishment = _advertiserMap(advertiser['establishment']);
     final application = _advertiserMap(advertiser['application']);
-    final proposedVisual = _advertiserMap(advertiser['proposedVisual']);
+    final assetProposal = _advertiserMap(advertiser['assetChangeRequest']);
+    final proposedVisual = _advertiserMap(
+      assetProposal['proposedVisual'] ?? advertiser['proposedVisual'],
+    );
     final registryPrecheck = _advertiserMap(advertiser['registryPrecheck']);
     final foreignProof = _advertiserMap(advertiser['foreignProof']);
     final legalAcceptance = _advertiserMap(advertiser['legalAcceptance']);
@@ -2652,7 +2703,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       advertiser['destinationUrl'] ?? application['destinationUrl'],
     );
     final modificationRequested =
-        status == 'changes_requested' || assetChangeStatus == 'authorized';
+        status == 'changes_requested' ||
+        assetChangeStatus == 'authorized' ||
+        assetChangeStatus == 'changes_requested';
     final requestRejected =
         status == 'rejected' || assetChangeStatus == 'rejected';
     final requestApproved =
@@ -2818,21 +2871,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   _cleanText(review['reason']),
                 ),
               const SizedBox(height: 20),
-              if (assetChangeStatus == 'pending') ...[
-                FilledButton.icon(
-                  onPressed: () => _authorizeAdvertiserAssetChange(advertiser),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: adminColor,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  icon: const Icon(Icons.edit_location_alt_outlined),
-                  label: const Text(
-                    'AUTORISER LA MODIFICATION',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ],
               FilledButton.icon(
                 onPressed: decisionMade
                     ? null
