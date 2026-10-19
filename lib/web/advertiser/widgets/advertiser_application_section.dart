@@ -245,7 +245,7 @@ class _AdvertiserApplicationSectionState
     final size = _bannerFileSizeBytes;
     if (width == null || height == null || size == null) return false;
     if (size > 2 * 1024 * 1024) return false;
-    if (width < 1200 || width > 1800 || height < 200 || height > 300 || width != height * 6) {
+    if (width != 1800 || height != 300) {
       return false;
     }
     return true;
@@ -260,7 +260,7 @@ class _AdvertiserApplicationSectionState
           ? 'Visuel publicitaire enregistré.'
           : 'Visuel compatible : $_bannerWidth × $_bannerHeight px.';
     }
-    return 'Visuel non conforme : ratio 6:1, de 1200 × 200 à 1800 × 300 px, 2 Mo maximum.';
+    return 'Visuel non conforme : dimensions requises : 1800 × 300 px, 2 Mo maximum.';
   }
 
   Future<String?> _uploadBanner(String requestId) async {
@@ -535,7 +535,7 @@ class _AdvertiserApplicationSectionState
     return _card(
       icon: Icons.image_outlined,
       title: 'VISUEL PUBLICITAIRE',
-      subtitle: 'FORMAT 6:1\n1200 × 200 à 1800 × 300 px\nMaxi 2 Mo',
+      subtitle: 'BANNIÈRE HORIZONTALE\n1800 × 300 px\nMaxi 2 Mo',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
