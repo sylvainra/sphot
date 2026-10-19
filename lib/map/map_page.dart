@@ -2767,6 +2767,11 @@ Widget _buildAdBanner() {
                   child: Image.network(
                     bannerUrl,
                     fit: BoxFit.contain,
+                    // Flutter Web : privilégier l'élément HTML pour les images
+                    // Firebase Storage lorsque CanvasKit rencontre un blocage
+                    // CORS. Sur Android/iOS, Image.network conserve son
+                    // chargement natif ; la géométrie reste inchangée.
+                    webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                     errorBuilder: (_, __, ___) => const Center(
                       child: Icon(
                         Icons.image_not_supported_outlined,
