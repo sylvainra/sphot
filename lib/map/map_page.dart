@@ -2679,7 +2679,7 @@ Widget _buildAdBanner() {
 
   // Géométrie validée du volet et de l'encart inchangée.
   final bannerBottom =
-      isDesktopWebDetailOpen ? _desktopSelectedAdBottom : 58.0;
+      isDesktopWebDetailOpen ? 64.0 : 58.0;
   final bannerHeight =
       isDesktopWebDetailOpen ? _desktopSelectedAdHeight : 90.0;
   final bannerRight = isDesktopWebDetailOpen ? detailPanelWidth + 8.0 : 8.0;
@@ -2764,25 +2764,36 @@ Widget _buildAdBanner() {
                     : 'Publicité : $advertiserName',
                 child: SizedBox(
                   height: bannerHeight,
-                  child: Image.network(
-                    bannerUrl,
-                    // Sur le Web grand écran, occuper toute la zone du
-                    // bandeau, y compris lorsqu'un volet droit est ouvert.
-                    // Sur les petits écrans et en natif, préserver l'image.
-                    fit: kIsWeb && screenWidth >= 900
-                        ? BoxFit.cover
-                        : BoxFit.contain,
-                    // Flutter Web : privilégier l'élément HTML pour les images
-                    // Firebase Storage lorsque CanvasKit rencontre un blocage
-                    // CORS. Sur Android/iOS, Image.network conserve son
-                    // chargement natif ; la géométrie reste inchangée.
-                    webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Icon(
-                        Icons.image_not_supported_outlined,
-                        color: Colors.black54,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Fond couvrant pour éviter les bandes vides sur PC.
+                      // Le visuel au premier plan reste toujours entier.
+                      if (kIsWeb && screenWidth >= 900)
+                        Opacity(
+                          opacity: 0.30,
+                          child: Image.network(
+                            bannerUrl,
+                            fit: BoxFit.cover,
+                            webHtmlElementStrategy:
+                                WebHtmlElementStrategy.prefer,
+                            errorBuilder: (_, __, ___) =>
+                                const SizedBox.shrink(),
+                          ),
+                        ),
+                      Image.network(
+                        bannerUrl,
+                        fit: BoxFit.contain,
+                        webHtmlElementStrategy:
+                            WebHtmlElementStrategy.prefer,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(
+                            Icons.image_not_supported_outlined,
+                            color: Colors.black54,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -2905,7 +2916,12 @@ Widget _buildBottomBar() {
 
   return Positioned(
     left: _mobileBottomMenuSideInset,
-    right: _mobileBottomMenuSideInset,
+    right: kIsWeb &&
+            MediaQuery.sizeOf(context).width >= 900 &&
+            _desktopDetailSpot != null
+        ? min(500.0, MediaQuery.sizeOf(context).width * 0.40) +
+            _mobileBottomMenuSideInset
+        : _mobileBottomMenuSideInset,
     bottom: _mobileBottomMenuBottom,
     child: Container(
       height: _mobileBottomMenuHeight,
@@ -3304,10 +3320,7 @@ _buildVerticalFilterMenu(),
 // dans l'espace de 6 px réservé entre le volet et le menu inférieur.
 if (_mobileDetailSpot == null)
   _buildAdBanner(),
-if (!(kIsWeb &&
-    MediaQuery.sizeOf(context).width >= 900 &&
-    _selectedPublicSpotId != null))
-  _buildBottomBar(),
+_buildBottomBar(),
 if (_mobileDetailSpot != null)
   _buildMobileSpotPanel(),
 if (kIsWeb &&
