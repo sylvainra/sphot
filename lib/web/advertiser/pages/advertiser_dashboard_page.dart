@@ -176,9 +176,13 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
         _approvedFlow;
   }
 
+  // Un annonceur approuvé peut préparer une nouvelle proposition directement.
+  // Seule une proposition déjà transmise bloque les modifications.
   bool get _assetChangeAuthorized {
+    if (!_approvedFlow) return false;
     final request = _map(_requestData['assetChangeRequest']);
-    return request['status']?.toString() == 'authorized';
+    final status = request['status']?.toString() ?? '';
+    return status != 'submitted' && status != 'pending';
   }
 
   String get _assetChangeStatus {
