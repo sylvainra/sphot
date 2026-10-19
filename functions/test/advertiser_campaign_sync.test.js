@@ -74,3 +74,85 @@ test("compatibilité avec les propositions déjà soumises sous les champs histo
     centerLng: -1.5,
   });
 });
+
+test("une campagne active reliée est mise à jour sans modifier l'offre ni les dates", async () => {
+  const {registerAdvertiserCampaignSync} = require("../advertiser_campaign_sync");
+  const timestamp = (millis) => ({toMillis: () => millis});
+  const submittedAt = timestamp(1792410000000);
+  const old = {
+    status: "approved",
+    assetChangeRequest: {status: "submitted", submittedAt},
+  };
+  const approved = {
+    status: "approved",
+    assetChangeRequest: {
+      ...dossier().assetChangeRequest,
+      submittedAt,
+    },
+  };
+  const requestRef = {path: "advertiserRequests/request-1"};
+  const historyWrites = [];
+  const updates = [];
+  const campaign = {
+    status: "active",
+    advertiserRequestId: "request-1",
+    visibilityType: "pack",
+    broadcastType: "local",
+    bannerUrl: "https://example.com/old.jpg",
+    centerLat: 46.2,
+    centerLng: -1.2,
+    campaignStartDate: "2026-10-19",
+    campaignEndDate: "2026-10-25",
+    totalPriceExclTax: 129,
+  };
+  const adRef = {
+    id: "campaign-1",
+    path: "adRequests/campaign-1",
+    collection: (name) => ({
+      doc: (id) => ({path: "adRequests/campaign-1/" + name + "/" + id}),
+    }),
+  };
+  const adDoc = {exists: true, id: "campaign-1", ref: adRef,
+    data: () => campaign};
+  const db = {
+    collection: () => ({
+      where: () => ({
+        limit: () => ({get: async () => ({docs: [adDoc]})}),
+      }),
+      doc: () => ({get: async () => ({exists: false})}),
+    }),
+    runTransaction: async (run) => run({
+      get: async (ref) => ref === requestRef ?
+        ({data: () => approved}) : adDoc,
+      update: (ref, values) => updates.push({ref, values}),
+      set: (ref, values) => historyWrites.push({ref, values}),
+    }),
+  };
+  const firestore = () => db;
+  firestore.FieldValue = {serverTimestamp: () => "server-time"};
+  const handler = registerAdvertiserCampaignSync({
+    admin: {firestore},
+    onDocumentUpdated: (_, fn) => fn,
+  });
+  await handler({
+    id: "unique-firebase-event",
+    params: {requestId: "request-1"},
+    data: {
+      before: {data: () => old},
+      after: {data: () => approved, ref: requestRef},
+    },
+  });
+  const adWrite = updates.find((item) => item.ref === adRef);
+  assert.ok(adWrite);
+  assert.equal(adWrite.values.bannerUrl,
+      "https://storage.example.com/new-banner.jpg");
+  assert.equal(adWrite.values.centerLat, 46.39);
+  assert.equal(adWrite.values.centerLng, -1.49);
+  for (const key of ["status", "visibilityType", "campaignStartDate",
+    "campaignEndDate", "totalPriceExclTax"]) {
+    assert.equal(Object.hasOwn(adWrite.values, key), false);
+  }
+  assert.equal(historyWrites.length, 1);
+  const resultWrite = updates.find((item) => item.ref === requestRef);
+  assert.equal(resultWrite.values["assetChangeRequest.syncStatus"], "applied");
+});
