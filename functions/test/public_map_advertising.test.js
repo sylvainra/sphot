@@ -4,6 +4,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   projectPublicMapAdvertisement,
+  campaignWithApprovedAdvertiser,
+  campaignsWithLinkedAdvertisers,
 } = require("../public_map_advertising");
 
 const now = Date.parse("2026-10-18T10:00:00Z");
@@ -180,3 +182,115 @@ test("API v1 conserve Carte et Pack ; v2 ajoute Premium", async () => {
   assert.deepEqual(await call(false), ["map", "pack"]);
   assert.deepEqual(await call(true), ["map", "pack", "premium"]);
 });
+
+
+test("le dossier approuvé fournit le bon site au Pack de test", () => {
+  const campaign = active({
+    visibilityType: "pack",
+    advertiserRequestId: "request-1",
+    destinationUrl: "https://sphot.app",
+    bannerUrl: "https://example.com/old-image.jpg",
+    testPack: {
+      previousVisibilityType: "map",
+      expiresAt: new Date(now + 3600000),
+    },
+  });
+  const dossier = {
+    status: "approved",
+    application: {
+      destinationUrl: "https://www.mairie-longevillesurmer.fr/",
+    },
+    approvedApplication: {
+      visual: {
+        url: "https://example.com/approved-1800x300.jpg",
+        webBannerUrl: "https://example.com/approved-1800x140.jpg",
+      },
+    },
+  };
+  const enriched = campaignWithApprovedAdvertiser(campaign, dossier, now);
+  const projected = projectPublicMapAdvertisement("campaign", enriched, now);
+  assert.equal(projected.destinationUrl,
+      "https://www.mairie-longevillesurmer.fr/");
+  assert.equal(projected.bannerUrl,
+      "https://example.com/approved-1800x300.jpg");
+  assert.equal(projected.webBannerUrl,
+      "https://example.com/approved-1800x140.jpg");
+  assert.equal(projected.visibilityType, "pack");
+});
+
+test("sans dossier approuvé, la campagne originale reste intacte", () => {
+  const campaign = active({
+    destinationUrl: "https://example.com/original",
+  });
+  const pending = {
+    status: "pending",
+    application: {destinationUrl: "https://example.com/unapproved"},
+    proposedVisual: {url: "https://example.com/new-image.jpg"},
+  };
+  const enriched = campaignWithApprovedAdvertiser(
+      campaign, pending, now);
+  assert.equal(enriched, campaign);
+  assert.equal(enriched.destinationUrl,
+      "https://example.com/original");
+});
+
+test("l'image non approuvée ne remplace jamais l'annonce active", () => {
+  const campaign = active({
+    visibilityType: "pack",
+    testPack: {
+      previousVisibilityType: "map",
+      expiresAt: new Date(now + 60000),
+    },
+  });
+  const advertiser = {
+    status: "approved",
+    proposedVisual: {url: "https://example.com/pending.jpg"},
+    application: {
+      destinationUrl: "https://www.mairie-longevillesurmer.fr/",
+    },
+  };
+  const enriched = campaignWithApprovedAdvertiser(
+      campaign, advertiser, now);
+  assert.equal(enriched.bannerUrl, campaign.bannerUrl);
+  assert.equal(enriched.destinationUrl,
+      "https://www.mairie-longevillesurmer.fr/");
+});
+
+test("la lecture enrichit uniquement une campagne liée par identifiant",
+    async () => {
+      const linked = active({
+        advertiserRequestId: "existing-request",
+      });
+      const unrelated = active({advertiserRequestId: ""});
+      const requested = [];
+      const db = {
+        collection: (name) => {
+          if (name !== "advertiserRequests") return {};
+          return {
+            doc: (id) => ({
+              get: async () => {
+                requested.push(id);
+                return {
+                  exists: true,
+                  data: () => ({
+                    status: "approved",
+                    application: {
+                      destinationUrl:
+                          "https://www.mairie-longevillesurmer.fr/",
+                    },
+                  }),
+                };
+              },
+            }),
+          };
+        },
+      };
+      const campaigns = await campaignsWithLinkedAdvertisers(db, [
+        {id: "linked", data: () => linked},
+        {id: "other", data: () => unrelated},
+      ], now);
+      assert.deepEqual(requested, ["existing-request"]);
+      assert.equal(campaigns[0].data.destinationUrl,
+          "https://www.mairie-longevillesurmer.fr/");
+      assert.equal(campaigns[1].data.destinationUrl, undefined);
+    });
