@@ -15,6 +15,8 @@ import 'dart:math' as math;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 import '../widgets/super_admin_admin_workflow_panel.dart';
 import '../widgets/super_admin_annual_financial_export_card.dart';
@@ -121,6 +123,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   // Diagnostic en lecture seule, indexé par dossier annonceur.
   final Map<String, Future<List<Map<String, dynamic>>>>
       _advertiserCampaignAuditFutures = {};
+  final Map<String, Future<List<Map<String, dynamic>>>>
+      _advertiserTestCandidatesFutures = {};
 
   bool _showLegalDocumentsPanel = false;
   bool _showPricingPanel = false;
@@ -3635,6 +3639,128 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     return results.values.toList();
   }
 
+  // Seules les campagnes de même nom sont proposées à l'examen.
+  // L'API serveur vérifie AUSSI l'égalité du visuel et les identifiants.
+  Future<List<Map<String, dynamic>>> _readAdvertiserTestCandidates(
+    Map<String, dynamic> advertiser,
+  ) async {
+    final establishment = _advertiserMap(advertiser['establishment']);
+    final name = _cleanText(
+      advertiser['advertiserName'] ?? establishment['businessName'],
+    );
+    if (name.isEmpty) return <Map<String, dynamic>>[];
+    final snapshot = await FirebaseFirestore.instance
+        .collection('adRequests')
+        .where('advertiserName', isEqualTo: name)
+        .limit(20)
+        .get();
+    return [
+      for (final doc in snapshot.docs)
+        if (doc.data()['status'] == 'active' &&
+            doc.data()['visibilityType'] == 'map')
+          {'id': doc.id, ...doc.data()},
+    ];
+  }
+
+  static const _testPackEndpoint =
+      'https://europe-west1-sphot-ab80b.cloudfunctions.net/'
+      'activateAdvertiserTestPack';
+
+  Future<Map<String, dynamic>> _requestPackTest(
+    String requestId,
+    String campaignId,
+    String action,
+  ) async {
+    if (widget.pricingSessionToken.isEmpty) {
+      throw StateError('Session Super Admin absente : reconnectez-vous.');
+    }
+    final response = await http.post(
+      Uri.parse(_testPackEndpoint),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${widget.pricingSessionToken}',
+      },
+      body: jsonEncode({
+        'requestId': requestId,
+        'campaignId': campaignId,
+        'action': action,
+        if (action == 'confirm') 'confirmation': 'ACTIVER PACK TEST',
+      }),
+    ).timeout(const Duration(seconds: 20));
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map || decoded['success'] != true) {
+      final error = decoded is Map ? decoded['error'] : null;
+      throw StateError(error?.toString() ?? 'Activation refusée.');
+    }
+    return Map<String, dynamic>.from(decoded['data'] as Map);
+  }
+
+  Future<void> _confirmAdvertiserTestPack(
+    Map<String, dynamic> advertiser,
+    Map<String, dynamic> campaign,
+  ) async {
+    final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
+    final campaignId = _cleanText(campaign['id']);
+    if (requestId.isEmpty || campaignId.isEmpty) return;
+    try {
+      // Phase 1 : prévalidation serveur, SANS ÉCRITURE.
+      final proposal = await _requestPackTest(
+        requestId, campaignId, 'preview',
+      );
+      if (!mounted) return;
+      final deadline = proposal['expiresAt'];
+      final expiry = deadline is num
+          ? DateTime.fromMillisecondsSinceEpoch(deadline.toInt())
+          : null;
+      final approved = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('CONFIRMATION PACK DE TEST'),
+          content: Text(
+            'Campagne : ${_cleanText(campaign['advertiserName'])}\n'
+            'Identifiant : $campaignId\n'
+            'Dossier : $requestId\n'
+            'Diffusion : CARTE → PACK TOTAL (7 emplacements)\n'
+            'Expiration du test : ${expiry?.toLocal() ?? 'non définie'}\n\n'
+            'ATTENTION : cette modification sera visible sur la carte '
+            'et dans les six rubriques publiques pendant le test. '
+            'Elle ne modifie ni le prix ni les dates commerciales. '
+            'Après expiration, l’API publique revient à Carte.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('ANNULER'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('ACTIVER PACK TEST'),
+            ),
+          ],
+        ),
+      );
+      if (approved != true || !mounted) return;
+
+      // Phase 2 : seul le serveur authentifié peut écrire.
+      await _requestPackTest(requestId, campaignId, 'confirm');
+      if (!mounted) return;
+      setState(() {
+        _advertiserCampaignAuditFutures.remove(requestId);
+        _advertiserTestCandidatesFutures.remove(requestId);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pack de test activé : contrôle actualisé.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Pack de test non activé : $error')),
+      );
+    }
+  }
+
   Widget _buildAdvertiserCampaignAudit(
     Map<String, dynamic> advertiser,
   ) {
@@ -3669,6 +3795,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 tooltip: 'Actualiser le contrôle',
                 onPressed: () => setState(() {
                   _advertiserCampaignAuditFutures.remove(requestId);
+                  _advertiserTestCandidatesFutures.remove(requestId);
                 }),
                 icon: const Icon(Icons.refresh_rounded, size: 19),
               ),
@@ -3698,10 +3825,66 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               }
               final campaigns = snapshot.data!;
               if (campaigns.isEmpty) {
-                return const Text(
-                  'Aucune campagne reliée par identifiant à ce dossier. '
-                  'Ne pas associer une publicité sur la seule base du nom.',
-                  style: TextStyle(color: redColor),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Aucune campagne reliée par identifiant à ce dossier. '
+                      'Vérifiez ci-dessous les campagnes candidates.',
+                      style: TextStyle(color: redColor),
+                    ),
+                    const SizedBox(height: 8),
+                    FutureBuilder<List<Map<String, dynamic>>>(
+                      future: _advertiserTestCandidatesFutures.putIfAbsent(
+                        requestId,
+                        () => _readAdvertiserTestCandidates(advertiser),
+                      ),
+                      builder: (context, candidatesSnapshot) {
+                        if (candidatesSnapshot.hasError) {
+                          return const Text('Candidats : lecture impossible.');
+                        }
+                        if (!candidatesSnapshot.hasData) {
+                          return const LinearProgressIndicator();
+                        }
+                        final candidates = candidatesSnapshot.data!;
+                        if (candidates.isEmpty) {
+                          return const Text(
+                            'Aucune campagne Carte active du même annonceur.'
+                          );
+                        }
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (final candidate in candidates) ...[
+                              Text(
+                                'Campagne candidate : '
+                                '${_cleanText(candidate['advertiserName'])} '
+                                '· ID : ${_cleanText(candidate['id'])} '
+                                '· Carte active',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              const SizedBox(height: 5),
+                              OutlinedButton(
+                                onPressed: widget.pricingSessionToken.isEmpty
+                                    ? null
+                                    : () => _confirmAdvertiserTestPack(
+                                        advertiser, candidate,
+                                      ),
+                                child: const Text('PRÉPARER PACK DE TEST'),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            if (widget.pricingSessionToken.isEmpty)
+                              const Text(
+                                'Session Super Admin non disponible : '
+                                'reconnectez-vous par le portail sécurisé.',
+                                style: TextStyle(color: redColor),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
                 );
               }
               return Column(
