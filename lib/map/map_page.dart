@@ -2691,7 +2691,7 @@ Widget _buildAdBanner() {
   final invitationWidth = screenWidth < 600 ? 80.0 : 88.0;
   // Encadrer la taille de l'annonce pour éviter qu'elle recouvre la carte.
   // La bannière complète est conservée, sans recadrage ni étirement.
-  final bannerHeight = screenWidth < 600 ? 50.0 : 90.0;
+  final bannerHeight = screenWidth < 600 ? 72.0 : 90.0;
   final bannerTotalWidth = min(
     availableBannerWidth,
     bannerHeight * 6.0 + invitationWidth,
