@@ -46,8 +46,8 @@ function previewTestPack(request, campaign, requestId, now = Date.now()) {
       diffusion.visibilityType !== "pack") {
     throw Object.assign(
         new Error("Dossier Pack non approuvé ou non confirmé."), {
-      status: 409,
-    });
+          status: 409,
+        });
   }
   if (campaign.status !== "active" || campaign.visibilityType !== "map") {
     throw Object.assign(new Error("La campagne doit être active et Carte."), {
@@ -155,8 +155,8 @@ function registerAdvertiserTestPackActivation({
               !["preview", "confirm"].includes(action)) {
             throw Object.assign(
                 new Error("Identifiants ou action invalides."), {
-              status: 400,
-            });
+                  status: 400,
+                });
           }
           const db = admin.firestore();
           const requestRef = db.collection("advertiserRequests").doc(requestId);
