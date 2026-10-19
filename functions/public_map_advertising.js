@@ -55,6 +55,79 @@ function finiteNumber(value) {
 }
 
 /**
+ * Recoupe une campagne liée à un dossier ANNONCEUR APPROUVÉ.
+ * Le site vient de la saisie annonceur, pas d'un ancien lien de test.
+ * Durant un Pack de test, l'image vient du visuel approuvé du dossier.
+ * Aucun changement de donnée privée ni de facturation.
+ * @param {Object} campaign Campagne existante.
+ * @param {Object} advertiser Dossier annonceur lié.
+ * @param {number} now Date actuelle.
+ * @return {Object} Campagne enrichie, champs publics seulement ensuite.
+ */
+function campaignWithApprovedAdvertiser(campaign, advertiser, now = Date.now()) {
+  if (!advertiser || advertiser.status !== "approved") return campaign;
+  const application = advertiser.application || {};
+  const approved = advertiser.approvedApplication || {};
+  const approvedVisual = approved.visual || {};
+  const site = validUrl(application.destinationUrl) ||
+      validUrl(advertiser.destinationUrl) ||
+      validUrl(approved.destinationUrl);
+  const testPack = campaign.testPack || {};
+  const expiresAt = milliseconds(testPack.expiresAt);
+  const packTestActive = campaign.visibilityType === "pack" &&
+      Number.isFinite(expiresAt) && now < expiresAt;
+
+  // Ne jamais utiliser proposedVisual : un visuel NON approuvé ne doit
+  // pas pouvoir remplacer une publicité déjà publiée.
+  const approvedBanner = packTestActive ?
+      validUrl(approvedVisual.url, true) : "";
+  const webBanner = validUrl(approvedVisual.webBannerUrl, true) ||
+      validUrl(campaign.webBannerUrl, true);
+
+  return {
+    ...campaign,
+    ...(site ? {destinationUrl: site} : {}),
+    ...(approvedBanner ? {bannerUrl: approvedBanner} : {}),
+    ...(webBanner ? {webBannerUrl: webBanner} : {}),
+  };
+}
+
+/**
+ * Prépare les campagnes publiques et leurs dossiers liés.
+ * Un défaut de lecture d'un dossier ne bloque pas les autres publicités.
+ * @param {Object} db Client Admin Firestore.
+ * @param {Array<Object>} docs Campagnes actives.
+ * @param {number} now Heure actuelle.
+ * @return {Promise<Array<Object>>} Campagnes prêtes à projeter.
+ */
+async function campaignsWithLinkedAdvertisers(db, docs, now) {
+  const requests = db.collection("advertiserRequests");
+  if (typeof requests.doc !== "function") {
+    return docs.map((doc) => ({
+      id: doc.id, data: doc.data(),
+    }));
+  }
+  return Promise.all(docs.map(async (doc) => {
+    const ad = doc.data();
+    const requestId = text(ad.advertiserRequestId);
+    if (!requestId || requestId.includes("/")) {
+      return {id: doc.id, data: ad};
+    }
+    try {
+      const request = await requests.doc(requestId).get();
+      if (!request.exists) return {id: doc.id, data: ad};
+      return {
+        id: doc.id,
+        data: campaignWithApprovedAdvertiser(ad, request.data(), now),
+      };
+    } catch (error) {
+      console.error("Lecture dossier publicitaire lié:", doc.id, error);
+      return {id: doc.id, data: ad};
+    }
+  }));
+}
+
+/**
  * @param {string} id Identifiant Firestore.
  * @param {Object} raw Dossier publicitaire privé.
  * @param {number} now Horodatage courant.
@@ -91,6 +164,8 @@ function projectPublicMapAdvertisement(id, raw, now = Date.now()) {
     id: text(id),
     advertiserName: text(ad.advertiserName),
     bannerUrl,
+    ...(validUrl(ad.webBannerUrl, true) ?
+      {webBannerUrl: validUrl(ad.webBannerUrl, true)} : {}),
     visibilityType: visibility,
     // L'URL déclarée par l'annonceur prévaut sur un lien hérité de campagne.
     destinationUrl: validUrl(ad.destinationUrl) || validUrl(ad.websiteUrl),
@@ -148,16 +223,19 @@ function registerPublicMapAdvertisingEndpoint({
         }
 
         try {
-          const snapshot = await admin.firestore()
+          const db = admin.firestore();
+          const snapshot = await db
               .collection("adRequests")
               .where("status", "==", "active")
               .limit(500)
               .get();
 
           const now = Date.now();
-          const advertisements = snapshot.docs
-              .map((doc) => projectPublicMapAdvertisement(
-                  doc.id, doc.data(), now))
+          const campaigns = await campaignsWithLinkedAdvertisers(
+              db, snapshot.docs, now);
+          const advertisements = campaigns
+              .map((item) => projectPublicMapAdvertisement(
+                  item.id, item.data, now))
               .filter((ad) => ad !== null &&
                   (includePremium ||
                       ad.visibilityType === "map" ||
@@ -175,5 +253,7 @@ function registerPublicMapAdvertisingEndpoint({
 
 module.exports = {
   projectPublicMapAdvertisement,
+  campaignWithApprovedAdvertiser,
+  campaignsWithLinkedAdvertisers,
   registerPublicMapAdvertisingEndpoint,
 };
