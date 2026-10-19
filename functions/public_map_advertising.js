@@ -115,7 +115,11 @@ function projectPublicMapAdvertisement(id, raw, now = Date.now()) {
  * @param {Object} dependencies Firebase Admin et constructeur HTTPS.
  * @return {Function} Fonction HTTPS Firebase.
  */
-function registerPublicMapAdvertisingEndpoint({admin, onRequest}) {
+function registerPublicMapAdvertisingEndpoint({
+  admin,
+  onRequest,
+  includePremium = false,
+}) {
   return onRequest(
       {
         region: "europe-west1",
@@ -147,7 +151,10 @@ function registerPublicMapAdvertisingEndpoint({admin, onRequest}) {
           const advertisements = snapshot.docs
               .map((doc) => projectPublicMapAdvertisement(
                   doc.id, doc.data(), now))
-              .filter((ad) => ad !== null)
+              .filter((ad) => ad !== null &&
+                  (includePremium ||
+                      ad.visibilityType === "map" ||
+                      ad.visibilityType === "pack"))
               .sort((a, b) => a.id.localeCompare(b.id));
 
           response.status(200).json({success: true, advertisements});
