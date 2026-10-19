@@ -2775,9 +2775,11 @@ Widget _buildAdBanner() {
               // La largeur naturelle dépend du format du fichier.
               // Un ancien visuel 2:1 n'est pas élargi artificiellement
               // et un fichier 6:1 exploite l'espace panoramique.
-              Flexible(
-                flex: 20,
-                fit: FlexFit.loose,
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: bannerTotalWidth -
+                      (screenWidth < 600 ? 32.0 : 48.0),
+                ),
                 child: Image.network(
                   bannerUrl,
                   height: bannerHeight,
