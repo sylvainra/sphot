@@ -2706,11 +2706,13 @@ Widget _buildAdBanner() {
         // Sans lui, afficher la totalité du visuel standard : ne jamais
         // appliquer BoxFit.cover à un JPG dont les textes sont en bordure.
         final wideWebBanner = kIsWeb && !isMobile;
+        // La zone de création reste volontairement courte : elle ne
+        // doit pas diminuer inutilement la surface publicitaire.
         final preferredCreationWidth = isMobile
-            ? 96.0
+            ? 76.0
             : wideWebBanner
-                ? (availableWidth * 0.105).clamp(118.0, 155.0)
-                : 140.0;
+                ? 92.0
+                : 96.0;
         final creationWidth = min(
           preferredCreationWidth,
           max(0.0, availableWidth - 90.0),
@@ -2733,7 +2735,7 @@ Widget _buildAdBanner() {
                 child: Container(
                   alignment: Alignment.center,
                   padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 4.0 : 10.0,
+                    horizontal: isMobile ? 3.0 : 5.0,
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
@@ -2752,7 +2754,7 @@ Widget _buildAdBanner() {
                       'CRÉER VOTRE\nSPHOT PUBLICITAIRE\nICI!',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: isMobile ? 12 : 15,
+                        fontSize: isMobile ? 10 : 11,
                         height: 1.15,
                         color: Colors.black87,
                         fontWeight: FontWeight.w900,
