@@ -353,70 +353,45 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
     await Navigator.of(context).pushNamed('/advertiser');
   }
 
+  // Cette invitation reste visible sous une publicité active
+  // et remplace uniquement l'annonce en l'absence de campagne éligible.
   Widget _buildEmptyAdvertisingSpace() {
-    return GestureDetector(
-      onTap: _openAdvertiserWebsite,
-      child: Container(
-        width: double.infinity,
-        height: 90,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.72),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: Colors.black.withOpacity(0.08),
-            width: 1,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _openAdvertiserWebsite,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 52),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 12,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.10),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.72),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.black.withOpacity(0.08),
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 52,
-              height: 52,
-              child: SvgPicture.asset(
-                'data/icons/fire_red_icon.svg',
-                fit: BoxFit.contain,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.10),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: const Text(
+            'CRÉER VOTRE SPHOT PUBLICITAIRE ICI!',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              color: Colors.black87,
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'AJOUTE TON SPHOT PUBLICITAIRE ICI !',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black87,
-                      letterSpacing: 0.1,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  const Text(
-                    'Visuel : PNG, JPG ou WEBP\n'
-                    '1800 × 300 px - 2 Mo max',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      color: Colors.black54,
-                      fontWeight: FontWeight.w600,
-                      height: 1.25,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -477,54 +452,56 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
         final destinationUrl = ad['destinationUrl']?.toString() ?? '';
         final advertiserName = ad['advertiserName']?.toString() ?? '';
 
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: destinationUrl.isEmpty
-                ? null
-                : () => _openUrl(destinationUrl),
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.white,
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Le visuel reste intégral (format 6:1), sans titre ajouté
+            // au-dessus : le titre unique de création est en DESSOUS.
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: destinationUrl.isEmpty
+                    ? null
+                    : () => _openUrl(destinationUrl),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _sphotWarmBorder.withOpacity(0.45)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    advertiserName.isEmpty
-                        ? 'PUBLICITÉ'
-                        : 'PUBLICITÉ · ${advertiserName.toUpperCase()}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      color: _sphotWarmRed,
+                child: Semantics(
+                  button: destinationUrl.isNotEmpty,
+                  label: advertiserName.isEmpty
+                      ? 'Consulter le site de l’annonceur'
+                      : 'Consulter le site de $advertiserName',
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.72),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _sphotWarmBorder.withOpacity(0.45),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(7),
-                    child: AspectRatio(
-                      aspectRatio: 6,
-                      child: Image.network(
-                        bannerUrl,
-                        fit: BoxFit.contain,
-                        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                        errorBuilder: (_, __, ___) =>
-                            const Center(child: Icon(Icons.broken_image_outlined)),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(7),
+                      child: AspectRatio(
+                        aspectRatio: 6,
+                        child: Image.network(
+                          bannerUrl,
+                          fit: BoxFit.contain,
+                          webHtmlElementStrategy:
+                              WebHtmlElementStrategy.prefer,
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(Icons.broken_image_outlined),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
-          ),
+            const SizedBox(height: 8),
+            _buildEmptyAdvertisingSpace(),
+          ],
         );
       },
     );
