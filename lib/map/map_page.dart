@@ -2677,173 +2677,131 @@ Future<void> _openMapAdDestination(String destinationUrl) async {
 
 /// Encarts des fiches SPHOT volontairement exclus de ce changement.
 Widget _buildAdBanner() {
-  final screenWidth = MediaQuery.sizeOf(context).width;
-  final isDesktopWebDetailOpen =
-      kIsWeb && screenWidth >= 900 && _selectedPublicSpotId != null;
+  final screenSize = MediaQuery.sizeOf(context);
+  final isMobile = screenSize.width < 600;
+  final isDesktopWeb = kIsWeb && !isMobile;
+  final detailPanelOpen = kIsWeb &&
+      screenSize.width >= 900 &&
+      _selectedPublicSpotId != null;
   final detailPanelWidth =
-      isDesktopWebDetailOpen ? min(500.0, screenWidth * 0.40) : 0.0;
+      detailPanelOpen ? min(500.0, screenSize.width * 0.40) : 0.0;
 
-  // Géométrie validée du volet et de l'encart inchangée.
-  final bannerBottom =
-      isDesktopWebDetailOpen ? 64.0 : 58.0;
-  final availableBannerWidth = screenWidth - 8.0 -
-      (isDesktopWebDetailOpen ? detailPanelWidth + 8.0 : 8.0);
-  // Deux zones de clic indépendantes : annonceur + création d'annonce.
-  // Un emplacement plus haut sur Web, compact et lisible sur téléphone.
-  final isMobile = screenWidth < 600;
-  final invitationWidth = isMobile
-      ? 96.0
-      : (screenWidth < 900 ? 150.0 : 200.0);
-  final bannerHeight = isMobile
-      ? 64.0
-      : (screenWidth < 900
-          ? 105.0
-          : (isDesktopWebDetailOpen ? 132.0 : 152.0));
-  final bannerRight = isDesktopWebDetailOpen ? detailPanelWidth + 8.0 : 8.0;
-  final imageWidth = max(
-    0.0,
-    min(availableBannerWidth - invitationWidth, bannerHeight * 6.0),
-  );
-  final bannerTotalWidth = imageWidth + invitationWidth;
+  // Le bandeau Web épouse exactement la largeur de la carte visible.
+  // En présence du volet SPHOT, il s'arrête à son bord.
+  // Sur mobile, les marges existantes sont conservées.
+  final horizontalInset = isDesktopWeb ? 0.0 : 8.0;
+  final bannerBottom = detailPanelOpen ? 64.0 : 58.0;
 
-  Widget emptyAdvertisingSpace() {
-    return GestureDetector(
-      onTap: () => unawaited(_openAdvertiserWebsite()),
-      child: Row(
-        children: [
-          const SizedBox(width: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: SizedBox(
-              width: 52,
-              height: 52,
-              child: AdaptiveAssetImage(
-                'data/icons/fire_red_icon.svg',
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Transform.translate(
-              offset: const Offset(-10, 0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'AJOUTE TON SPHOT PUBLICITAIRE ICI !',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black87,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Visuel : PNG, JPG ou WEBP\n1800 × 300 px - 2 Mo max',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.black54,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  return Positioned(
+    left: horizontalInset,
+    right: isDesktopWeb ? detailPanelWidth : horizontalInset,
+    bottom: bannerBottom,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
 
-  Widget occupiedAdvertisingSpace(Map<String, dynamic> ad) {
-    final bannerUrl = ad['bannerUrl']?.toString() ?? '';
-    final destinationUrl = ad['destinationUrl']?.toString() ?? '';
-    final advertiserName =
-        ad['advertiserName']?.toString().trim() ?? '';
+        // Le bouton fait partie de la largeur totale, sans largeur ajoutée
+        // par un Container parent : aucune somme ne peut déborder du Row.
+        final minCreationWidth = isMobile ? 88.0 : 160.0;
+        final preferredCreationWidth = isMobile
+            ? 96.0
+            : (availableWidth * 0.23).clamp(160.0, 430.0);
+        final creationWidth = min(
+          preferredCreationWidth,
+          max(0.0, availableWidth - 90.0),
+        );
+        final panoramicWidth = max(0.0, availableWidth - creationWidth);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Appuyer sur le visuel ouvre uniquement le site de l'annonceur.
-        SizedBox(
-          width: imageWidth,
-          height: bannerHeight,
-          child: Material(
-            color: const Color(0xFF073650),
-            child: InkWell(
-              onTap: destinationUrl.isEmpty
-                  ? null
-                  : () => unawaited(_openMapAdDestination(destinationUrl)),
-              child: Semantics(
-                button: destinationUrl.isNotEmpty,
-                label: advertiserName.isEmpty
-                    ? 'Visiter le site de l’annonceur'
-                    : 'Visiter le site de $advertiserName',
-                child: Image.network(
-                  bannerUrl,
-                  fit: BoxFit.contain,
-                  width: imageWidth,
-                  height: bannerHeight,
-                  webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                  errorBuilder: (_, __, ___) => const Center(
-                    child: Icon(Icons.image_not_supported_outlined,
-                        color: Colors.white),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        // Bouton publicitaire visible et toujours séparé du visuel.
-        SizedBox(
-          width: invitationWidth,
-          height: bannerHeight,
-          child: Material(
-            color: const Color(0xFFFFA726),
+        // Le visuel 1800 x 300 est affiché au ratio 6:1, sans recadrage.
+        // On évite qu'un écran particulièrement large rende le bandeau
+        // excessivement haut : le reste demeure de la carte transparente.
+        final maxHeight = max(64.0, screenSize.height * 0.28);
+        final bannerHeight = isMobile
+            ? max(52.0, panoramicWidth / 6.0)
+            : min(panoramicWidth / 6.0, maxHeight);
+        final transparentCreation = isDesktopWeb;
+
+        Widget createAdvertisingInvitation() {
+          return Material(
+            type: transparentCreation
+                ? MaterialType.transparency
+                : MaterialType.canvas,
+            color: transparentCreation
+                ? null
+                : const Color(0xFFFFA726),
             child: InkWell(
               onTap: () => unawaited(_openAdvertiserWebsite()),
               child: Semantics(
                 button: true,
-                label: 'Créer mon SPHOT publicitaire',
+                label: 'CRÉER MON SPHOT PUBLICITAIRE ICI !',
                 child: Container(
                   padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 3 : 10,
-                    vertical: isMobile ? 3 : 8,
+                    horizontal: isMobile ? 3.0 : 10.0,
+                    vertical: isMobile ? 2.0 : 7.0,
                   ),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     border: Border(
                       left: BorderSide(
-                        color: Color(0xFF073650), width: 2),
+                        color: transparentCreation
+                            ? Colors.white.withOpacity(0.85)
+                            : const Color(0xFF073650),
+                        width: transparentCreation ? 1.0 : 2.0,
+                      ),
                     ),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.add_circle_outline_rounded,
-                        color: const Color(0xFF082B46),
-                        size: isMobile ? 16 : 28,
-                      ),
-                      SizedBox(height: isMobile ? 2 : 7),
-                      Text(
-                        isMobile
-                            ? 'CRÉER MON\nSPHOT\nPUBLICITAIRE'
-                            : 'CRÉER MON\nSPHOT PUBLICITAIRE\nICI !',
-                        textAlign: TextAlign.center,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: isMobile ? 9.1 : 13.3,
-                          height: 1.12,
-                          fontWeight: FontWeight.w900,
-                          color: const Color(0xFF082B46),
+                      if (bannerHeight >= 100.0) ...[
+                        Icon(
+                          Icons.add_circle_outline_rounded,
+                          color: transparentCreation
+                              ? Colors.white
+                              : const Color(0xFF082B46),
+                          size: 24,
+                          shadows: transparentCreation
+                              ? const [
+                                  Shadow(
+                                    color: Colors.black,
+                                    blurRadius: 5,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.center,
+                          child: Text(
+                            isMobile
+                                ? 'CRÉER MON\nSPHOT\nPUBLICITAIRE ICI !'
+                                : 'CRÉER MON\nSPHOT PUBLICITAIRE\nICI !',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: isMobile ? 11 : 16,
+                              height: 1.12,
+                              fontWeight: FontWeight.w900,
+                              color: transparentCreation
+                                  ? Colors.white
+                                  : const Color(0xFF082B46),
+                              shadows: transparentCreation
+                                  ? const [
+                                      Shadow(
+                                        color: Colors.black,
+                                        blurRadius: 5,
+                                        offset: Offset(1, 1),
+                                      ),
+                                      Shadow(
+                                        color: Colors.black,
+                                        blurRadius: 5,
+                                        offset: Offset(-1, -1),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -2851,49 +2809,86 @@ Widget _buildAdBanner() {
                 ),
               ),
             ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  return Positioned(
-    left: 8,
-    width: min(bannerTotalWidth, screenWidth - bannerRight - 8.0),
-    bottom: bannerBottom,
-    child: Container(
-      height: bannerHeight,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.22),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.12),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-        border: Border.all(
-          color: Colors.black.withOpacity(0.08),
-          width: 1,
-        ),
-      ),
-      child: ValueListenableBuilder<int>(
-        valueListenable: _mapAdRotation,
-        builder: (context, rotation, _) {
-          return FutureBuilder<List<Map<String, dynamic>>>(
-            future: _publicMapAdvertisementsFuture,
-            builder: (context, snapshot) {
-              final ads = (snapshot.data ?? const <Map<String, dynamic>>[])
-                  .where(_isPublicMapAdVisible)
-                  .toList();
-              if (ads.isEmpty) return emptyAdvertisingSpace();
-              return occupiedAdvertisingSpace(ads[rotation % ads.length]);
-            },
           );
-        },
-      ),
+        }
+
+        Widget occupiedAdvertisingSpace(Map<String, dynamic> ad) {
+          final bannerUrl = ad['bannerUrl']?.toString() ?? '';
+          final destinationUrl = ad['destinationUrl']?.toString() ?? '';
+          final advertiserName =
+              ad['advertiserName']?.toString().trim() ?? '';
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Zone 1 : le visuel ouvre EXCLUSIVEMENT le site de l'annonceur.
+              Expanded(
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: InkWell(
+                    onTap: destinationUrl.isEmpty
+                        ? null
+                        : () => unawaited(
+                              _openMapAdDestination(destinationUrl),
+                            ),
+                    child: Semantics(
+                      button: destinationUrl.isNotEmpty,
+                      label: advertiserName.isEmpty
+                          ? 'Visiter le site de l’annonceur'
+                          : 'Visiter le site de $advertiserName',
+                      child: Image.network(
+                        bannerUrl,
+                        width: double.infinity,
+                        height: bannerHeight,
+                        fit: BoxFit.contain,
+                        webHtmlElementStrategy:
+                            WebHtmlElementStrategy.prefer,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(
+                            Icons.image_not_supported_outlined,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Zone 2 : carte transparente sur Web, distincte de l'annonce.
+              SizedBox(
+                width: creationWidth,
+                child: createAdvertisingInvitation(),
+              ),
+            ],
+          );
+        }
+
+        return SizedBox(
+          width: availableWidth,
+          height: bannerHeight,
+          child: ValueListenableBuilder<int>(
+            valueListenable: _mapAdRotation,
+            builder: (context, rotation, _) {
+              return FutureBuilder<List<Map<String, dynamic>>>(
+                future: _publicMapAdvertisementsFuture,
+                builder: (context, snapshot) {
+                  final ads =
+                      (snapshot.data ?? const <Map<String, dynamic>>[])
+                          .where(_isPublicMapAdVisible)
+                          .toList();
+                  if (ads.isEmpty) {
+                    // Sans annonce, la carte reste visible sous l'invitation.
+                    return createAdvertisingInvitation();
+                  }
+                  return occupiedAdvertisingSpace(
+                    ads[rotation % ads.length],
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
     ),
   );
 }
