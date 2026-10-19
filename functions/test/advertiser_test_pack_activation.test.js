@@ -125,9 +125,13 @@ test("La prévisualisation ne modifie rien ; confirmation écrit le seul droit P
     async () => {
       const updates = [];
       const histories = [];
-      const requestRef = {kind: "request"};
+      const requestRef = {
+        kind: "request",
+        get: async () => document(requestRef),
+      };
       const campaignRef = {
         kind: "campaign",
+        get: async () => document(campaignRef),
         collection: () => ({doc: () => ({kind: "history"})}),
       };
       const document = (ref) => ({
