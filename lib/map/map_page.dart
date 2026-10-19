@@ -2721,9 +2721,6 @@ Widget _buildAdBanner() {
         final bannerHeight = wideWebBanner
             ? min(118.0, panoramicWidth / 6.0)
             : max(52.0, panoramicWidth / 6.0);
-        // Le visuel 1800 x 300 d'origine occupe toute la largeur Web.
-        // Aucun recadrage ni étirement : ratio 6:1 conservé.
-        final occupiedWebBannerHeight = availableWidth / 6.0;
 
         // Invitation : visible sans campagne, et à droite sur l'application
         // mobile. Sur le Web, une campagne occupe la largeur totale.
@@ -2810,7 +2807,9 @@ Widget _buildAdBanner() {
               children: [
                 Image.network(
                   bannerUrl,
-                  fit: BoxFit.contain,
+                  // Site Web : tout le visuel occupe la largeur du bandeau
+                  // compact sans rognage, même si le format est plus allongé.
+                  fit: kIsWeb ? BoxFit.fill : BoxFit.contain,
                   alignment: Alignment.center,
                   webHtmlElementStrategy:
                       WebHtmlElementStrategy.prefer,
@@ -2874,9 +2873,7 @@ Widget _buildAdBanner() {
                   final hasAdvertisement = ads.isNotEmpty;
                   return SizedBox(
                     width: availableWidth,
-                    height: hasAdvertisement && kIsWeb
-                        ? occupiedWebBannerHeight
-                        : bannerHeight,
+                    height: bannerHeight,
                     child: hasAdvertisement
                         ? occupiedAdvertisingSpace(
                             ads[rotation % ads.length],
