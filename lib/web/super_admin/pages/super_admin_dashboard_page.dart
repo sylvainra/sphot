@@ -4103,8 +4103,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ],
               ),
               const SizedBox(height: 14),
-              _buildAdvertiserCampaignAudit(advertiser),
-              const SizedBox(height: 14),
               if (bannerUrl.isNotEmpty) ...[
                 AspectRatio(
                   aspectRatio: 2,
