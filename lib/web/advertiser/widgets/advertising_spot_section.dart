@@ -683,12 +683,24 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                     : Image.network(
                         _bannerUrl!,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Center(
-                          child: Text(
-                            'Le visuel ne peut pas être affiché.',
-                            style: TextStyle(color: WebColors.red),
-                          ),
-                        ),
+                        // Sur Flutter Web, autoriser l'affichage HTML des
+                        // images Firebase Storage lorsque CanvasKit est bloque
+                        // par les restrictions CORS.
+                        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                        errorBuilder: (context, error, stackTrace) {
+                          // Ne pas journaliser l'URL : elle peut contenir un
+                          // jeton d'acces Firebase Storage.
+                          debugPrint(
+                            'Apercu du visuel publicitaire impossible : '
+                            '${error.runtimeType}',
+                          );
+                          return const Center(
+                            child: Text(
+                              'Le visuel ne peut pas être affiché.',
+                              style: TextStyle(color: WebColors.red),
+                            ),
+                          );
+                        },
                       ),
               ),
             ),
