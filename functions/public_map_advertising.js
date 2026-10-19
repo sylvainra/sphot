@@ -85,7 +85,8 @@ function projectPublicMapAdvertisement(id, raw, now = Date.now()) {
     advertiserName: text(ad.advertiserName),
     bannerUrl,
     visibilityType: visibility,
-    destinationUrl: validUrl(ad.websiteUrl || ad.destinationUrl),
+    // L'URL déclarée par l'annonceur prévaut sur un lien hérité de campagne.
+    destinationUrl: validUrl(ad.destinationUrl) || validUrl(ad.websiteUrl),
     broadcastType: scope,
     campaignEndAt: endsAt,
   };
