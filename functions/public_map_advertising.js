@@ -64,7 +64,14 @@ function projectPublicMapAdvertisement(id, raw, now = Date.now()) {
   const ad = raw || {};
   if (text(ad.status).toLowerCase() !== "active") return null;
 
-  const visibility = text(ad.visibilityType).toLowerCase();
+  // Le Pack accordé seulement pour test revient automatiquement à
+  // l'ancienne offre Carte dans l'API publique après son expiration.
+  const testPack = ad.testPack || {};
+  const testExpires = milliseconds(testPack.expiresAt);
+  const testExpired = Number.isFinite(testExpires) && now >= testExpires;
+  const visibility = testExpired &&
+      text(testPack.previousVisibilityType) === "map" ?
+      "map" : text(ad.visibilityType).toLowerCase();
   if (!["map", "premium", "pack"].includes(visibility)) return null;
 
   const startsAt = milliseconds(ad.campaignStartDate);
