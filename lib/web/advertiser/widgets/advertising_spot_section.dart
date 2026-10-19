@@ -428,10 +428,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     if (_bannerUrl != null && _bannerBytes == null) return true;
     if (width == null || height == null || fileSize == null) return false;
     if (fileSize > 2 * 1024 * 1024) return false;
-    if (width < 900 || height < 450) return false;
-    if (width > 2400 || height > 1200) return false;
-    final ratio = width / height;
-    return ratio >= 1.85 && ratio <= 2.15;
+    return width == 1800 && height == 300;
   }
 
   String get _bannerQualityMessage {
@@ -447,10 +444,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     }
     if (_bannerWidth == null || _bannerHeight == null) return '';
     if (!_bannerIsValid) {
-      return 'Visuel non conforme : utilisez un format proche de 1200 × 600 px.';
+      return 'Visuel non conforme : utilisez un format 1800 × 300 px.';
     }
-    if (_bannerWidth == 1200 && _bannerHeight == 600) {
-      return 'Visuel conforme SPHOT : 1200 × 600 px.';
+    if (_bannerWidth == 1800 && _bannerHeight == 300) {
+      return 'Visuel conforme SPHOT : 1800 × 300 px.';
     }
     return 'Visuel compatible SPHOT : $_bannerWidth × $_bannerHeight px.';
   }
@@ -661,7 +658,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'FORMAT RECOMMANDÉ : 1200 × 600 PX',
+                      'FORMAT RECOMMANDÉ : 1800 × 300 PX',
                       style: TextStyle(
                         color: Color(0xFF6B7280),
                         fontWeight: FontWeight.w900,
@@ -677,7 +674,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: AspectRatio(
-                aspectRatio: 2,
+                aspectRatio: 6,
                 child: _bannerBytes != null
                     ? Image.memory(_bannerBytes!, fit: BoxFit.contain)
                     : Image.network(
