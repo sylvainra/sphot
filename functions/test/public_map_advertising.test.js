@@ -64,7 +64,7 @@ test("rejette les campagnes absentes, désactivées, futures ou expirées", () =
   }), now), null);
 });
 
-test("projette aussi les campagnes Premium sans changer la sécurité HTTPS", () => {
+test("projette Premium uniquement avec une image HTTPS", () => {
   const premium = projectPublicMapAdvertisement("x", active({
     visibilityType: "premium",
   }), now);
@@ -103,7 +103,7 @@ test("rejette les campagnes locales sans épicentre et rayon valides", () => {
   }), now), null);
 });
 
-test("le lien déclaré par l'annonceur prévaut sur l'ancien site de campagne", () => {
+test("le lien déclaré prévaut sur l'ancien site de campagne", () => {
   const result = projectPublicMapAdvertisement("x", active({
     websiteUrl: "https://sphot.app",
     destinationUrl: "https://www.surfshop-atlantique.fr",
@@ -145,16 +145,33 @@ test("API v1 conserve Carte et Pack ; v2 ajoute Premium", async () => {
     }),
   };
   const onRequest = (_, callback) => callback;
+  /**
+   * Interroge l'endpoint public avec une réponse simulée.
+   * @param {boolean} includePremium Inclure les campagnes Premium.
+   * @return {Promise<string[]>} Types de diffusion retournés.
+   */
   async function call(includePremium) {
     const handler = registerPublicMapAdvertisingEndpoint({
       admin, onRequest, includePremium,
     });
     const response = {
       headers: {},
-      set(key, value) {this.headers[key] = value; return this;},
-      status(code) {this.statusCode = code; return this;},
-      json(data) {this.body = data; return this;},
-      send(data) {this.body = data; return this;},
+      set(key, value) {
+        this.headers[key] = value;
+        return this;
+      },
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(data) {
+        this.body = data;
+        return this;
+      },
+      send(data) {
+        this.body = data;
+        return this;
+      },
     };
     await handler({method: "GET"}, response);
     assert.equal(response.statusCode, 200);
