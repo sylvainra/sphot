@@ -7,10 +7,20 @@
  */
 const crypto = require("crypto");
 
+/**
+ * Nettoie une valeur texte.
+ * @param {*} value Valeur brute.
+ * @return {string} Valeur normalisée.
+ */
 function stringValue(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/**
+ * Vérifie si une adresse d'image utilise HTTPS.
+ * @param {string} value URL à vérifier.
+ * @return {boolean} Vrai pour une adresse HTTPS valide.
+ */
 function isHttpsUrl(value) {
   try {
     const parsed = new URL(stringValue(value));
@@ -20,6 +30,11 @@ function isHttpsUrl(value) {
   }
 }
 
+/**
+ * Retrouve le site Internet déclaré par l'annonceur.
+ * @param {Object} data Dossier annonceur approuvé.
+ * @return {string} URL autorisée, ou chaîne vide.
+ */
 function advertiserDestinationUrl(data) {
   const raw = (data.application || {}).destinationUrl ||
       data.destinationUrl ||
@@ -34,6 +49,12 @@ function advertiserDestinationUrl(data) {
   }
 }
 
+/**
+ * Prépare les seuls champs publicitaires après approbation.
+ * @param {Object} beforeData Dossier avant approbation.
+ * @param {Object} afterData Dossier après approbation.
+ * @return {Object|null} Modification prête, sinon null.
+ */
 function approvedAssetPatch(beforeData, afterData) {
   const before = beforeData || {};
   const after = afterData || {};
@@ -63,6 +84,12 @@ function approvedAssetPatch(beforeData, afterData) {
   return {bannerUrl, centerLat: latitude, centerLng: longitude};
 }
 
+/**
+ * Compare les identifiants temporels de soumission.
+ * @param {*} left Horodatage initial.
+ * @param {*} right Horodatage mis à jour.
+ * @return {boolean} Vrai si la soumission est identique.
+ */
 function sameSubmission(left, right) {
   if (!left || !right) return false;
   if (typeof left.toMillis === "function" &&
@@ -72,6 +99,11 @@ function sameSubmission(left, right) {
   return left === right;
 }
 
+/**
+ * Crée le déclencheur Firestore de synchronisation après approbation.
+ * @param {Object} dependencies Dépendances Firebase.
+ * @return {Function} Déclencheur Firestore.
+ */
 function registerAdvertiserCampaignSync({admin, onDocumentUpdated}) {
   return onDocumentUpdated(
       {
