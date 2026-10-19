@@ -428,8 +428,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     if (_bannerUrl != null && _bannerBytes == null) return true;
     if (width == null || height == null || fileSize == null) return false;
     if (fileSize > 2 * 1024 * 1024) return false;
-    return width >= 1200 && width <= 1800 &&
-        height >= 200 && height <= 300 && width == height * 6;
+    return width == 1800 && height == 300;
   }
 
   String get _bannerQualityMessage {
@@ -445,7 +444,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     }
     if (_bannerWidth == null || _bannerHeight == null) return '';
     if (!_bannerIsValid) {
-      return 'Visuel non conforme : utilisez le ratio 6:1 (1200 × 200 à 1800 × 300 px).';
+      return 'Visuel non conforme : dimensions requises : 1800 × 300 px.';
     }
     if (_bannerWidth == 1800 && _bannerHeight == 300) {
       return 'Visuel conforme SPHOT : 1800 × 300 px.';
@@ -659,7 +658,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'FORMAT 6:1 : DE 1200 × 200 À 1800 × 300 PX',
+                      'BANNIÈRE HORIZONTALE : 1800 × 300 PX',
                       style: TextStyle(
                         color: Color(0xFF6B7280),
                         fontWeight: FontWeight.w900,
