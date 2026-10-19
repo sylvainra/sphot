@@ -2629,6 +2629,12 @@ String _clusterIconPath(Color color) {
 /// Seules les campagnes CARTE ou PACK diffusées dans la zone courante
 /// peuvent remplacer l'encart d'invitation.
 bool _isPublicMapAdVisible(Map<String, dynamic> ad) {
+  // L'ancienne API n'exposait pas visibilityType : compatibilité conservée.
+  // La nouvelle API exclut explicitement les campagnes Premium de la carte.
+  final visibility = ad['visibilityType']?.toString() ?? '';
+  if (visibility.isNotEmpty && visibility != 'map' && visibility != 'pack') {
+    return false;
+  }
   final deadline = ad['campaignEndAt'];
   if (deadline is! num ||
       DateTime.now().millisecondsSinceEpoch >= deadline.toInt()) {
