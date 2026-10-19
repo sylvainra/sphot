@@ -2675,26 +2675,26 @@ Future<void> _openMapAdDestination(String destinationUrl) async {
   }
 }
 
-/// Encarts des fiches SPHOT volontairement exclus de ce changement.
+/// Bandeau et zone de création alignés sur le menu inférieur.
 Widget _buildAdBanner() {
   final screenSize = MediaQuery.sizeOf(context);
   final isMobile = screenSize.width < 600;
-  final isFullWidthWeb = kIsWeb;
   final detailPanelOpen = kIsWeb &&
       screenSize.width >= 900 &&
-      _selectedPublicSpotId != null;
+      _desktopDetailSpot != null;
   final detailPanelWidth =
       detailPanelOpen ? min(500.0, screenSize.width * 0.40) : 0.0;
 
-  // Le bandeau Web épouse exactement la largeur de la carte visible.
-  // En présence du volet SPHOT, il s'arrête à son bord.
-  // Sur mobile, les marges existantes sont conservées.
-  final horizontalInset = isFullWidthWeb ? 0.0 : 8.0;
-  final bannerBottom = detailPanelOpen ? 64.0 : 58.0;
+  // Même géométrie horizontale que _buildBottomBar dans tous les cas.
+  // La zone de création fait partie de la largeur totale.
+  final inset = _mobileBottomMenuSideInset;
+  const gapAboveMenu = 6.0;
+  final bannerBottom = _mobileBottomMenuBottom +
+      _mobileBottomMenuHeight + gapAboveMenu;
 
   return Positioned(
-    left: horizontalInset,
-    right: isFullWidthWeb ? detailPanelWidth : horizontalInset,
+    left: inset,
+    right: detailPanelWidth + inset,
     bottom: bannerBottom,
     child: LayoutBuilder(
       builder: (context, constraints) {
@@ -2702,14 +2702,13 @@ Widget _buildAdBanner() {
 
         // Le bouton fait partie de la largeur totale, sans largeur ajoutée
         // par un Container parent : aucune somme ne peut déborder du Row.
-        // Sur le Web grand écran : emplacement plus bas et création courte.
-        // L'annonceur occupe toute la largeur restante. Le recadrage
-        // vertical est limité au bandeau Web, avec l'accord du demandeur.
-        // Le visuel original 1800 x 300 et les fiches SPHOT ne sont pas touchés.
-        final cropWebBanner = kIsWeb && !isMobile;
+        // Un bandeau Web panoramique distinct peut être fourni.
+        // Sans lui, afficher la totalité du visuel standard : ne jamais
+        // appliquer BoxFit.cover à un JPG dont les textes sont en bordure.
+        final wideWebBanner = kIsWeb && !isMobile;
         final preferredCreationWidth = isMobile
             ? 96.0
-            : cropWebBanner
+            : wideWebBanner
                 ? (availableWidth * 0.105).clamp(118.0, 155.0)
                 : 140.0;
         final creationWidth = min(
@@ -2717,7 +2716,7 @@ Widget _buildAdBanner() {
           max(0.0, availableWidth - 90.0),
         );
         final panoramicWidth = max(0.0, availableWidth - creationWidth);
-        final bannerHeight = cropWebBanner
+        final bannerHeight = wideWebBanner
             ? min(118.0, panoramicWidth / 6.0)
             : max(52.0, panoramicWidth / 6.0);
 
@@ -2767,7 +2766,11 @@ Widget _buildAdBanner() {
         }
 
         Widget occupiedAdvertisingSpace(Map<String, dynamic> ad) {
-          final bannerUrl = ad['bannerUrl']?.toString() ?? '';
+          final standardBannerUrl = ad['bannerUrl']?.toString() ?? '';
+          final panoramicBannerUrl = ad['webBannerUrl']?.toString() ?? '';
+          final bannerUrl = wideWebBanner && panoramicBannerUrl.isNotEmpty
+              ? panoramicBannerUrl
+              : standardBannerUrl;
           final destinationUrl = ad['destinationUrl']?.toString() ?? '';
           final advertiserName =
               ad['advertiserName']?.toString().trim() ?? '';
@@ -2778,7 +2781,7 @@ Widget _buildAdBanner() {
               // Zone 1 : le visuel ouvre EXCLUSIVEMENT le site de l'annonceur.
               Expanded(
                 child: Material(
-                  type: MaterialType.transparency,
+                  color: const Color(0xFF063551),
                   child: InkWell(
                     onTap: destinationUrl.isEmpty
                         ? null
@@ -2794,10 +2797,10 @@ Widget _buildAdBanner() {
                         bannerUrl,
                         width: double.infinity,
                         height: bannerHeight,
-                        // Web large : remplir toute la largeur, avec
-                        // recadrage vertical central (jamais d'étirement).
-                        // Mobile : toujours montrer le visuel entier.
-                        fit: cropWebBanner ? BoxFit.cover : BoxFit.contain,
+                        // Ne déformer ni couper un slogan ou un logo :
+                        // source panoramique Web dédiée si disponible,
+                        // sinon image standard entière sur fond assorti.
+                        fit: BoxFit.contain,
                         alignment: Alignment.center,
                         webHtmlElementStrategy:
                             WebHtmlElementStrategy.prefer,
@@ -2821,10 +2824,12 @@ Widget _buildAdBanner() {
           );
         }
 
-        return SizedBox(
-          width: availableWidth,
-          height: bannerHeight,
-          child: ValueListenableBuilder<int>(
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: SizedBox(
+            width: availableWidth,
+            height: bannerHeight,
+            child: ValueListenableBuilder<int>(
             valueListenable: _mapAdRotation,
             builder: (context, rotation, _) {
               return FutureBuilder<List<Map<String, dynamic>>>(
@@ -2844,6 +2849,7 @@ Widget _buildAdBanner() {
                 },
               );
             },
+            ),
           ),
         );
       },
