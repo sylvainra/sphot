@@ -2680,8 +2680,12 @@ Widget _buildAdBanner() {
   // Géométrie validée du volet et de l'encart inchangée.
   final bannerBottom =
       isDesktopWebDetailOpen ? 64.0 : 58.0;
+  final availableBannerWidth = screenWidth - 8.0 -
+      (isDesktopWebDetailOpen ? detailPanelWidth + 8.0 : 8.0);
+  final invitationWidth = screenWidth < 600 ? 80.0 : 88.0;
+  // Un même visuel panoramique 6:1, jamais recadré ni déformé.
   final bannerHeight =
-      isDesktopWebDetailOpen ? _desktopSelectedAdHeight : 90.0;
+      ((availableBannerWidth - invitationWidth) / 6.0).clamp(45.0, 260.0);
   final bannerRight = isDesktopWebDetailOpen ? detailPanelWidth + 8.0 : 8.0;
 
   Widget emptyAdvertisingSpace() {
@@ -2722,7 +2726,7 @@ Widget _buildAdBanner() {
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'Visuel : PNG, JPG ou WEBP\n1200 × 600 px - 2 Mo max',
+                    'Visuel : PNG, JPG ou WEBP\n1800 × 300 px - 2 Mo max',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 11,
@@ -2764,36 +2768,16 @@ Widget _buildAdBanner() {
                     : 'Publicité : $advertiserName',
                 child: SizedBox(
                   height: bannerHeight,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Fond couvrant pour éviter les bandes vides sur PC.
-                      // Le visuel au premier plan reste toujours entier.
-                      if (kIsWeb && screenWidth >= 900)
-                        Opacity(
-                          opacity: 0.08,
-                          child: Image.network(
-                            bannerUrl,
-                            fit: BoxFit.cover,
-                            webHtmlElementStrategy:
-                                WebHtmlElementStrategy.prefer,
-                            errorBuilder: (_, __, ___) =>
-                                const SizedBox.shrink(),
-                          ),
-                        ),
-                      Image.network(
-                        bannerUrl,
-                        fit: BoxFit.contain,
-                        webHtmlElementStrategy:
-                            WebHtmlElementStrategy.prefer,
-                        errorBuilder: (_, __, ___) => const Center(
-                          child: Icon(
-                            Icons.image_not_supported_outlined,
-                            color: Colors.black54,
-                          ),
-                        ),
+                  child: Image.network(
+                    bannerUrl,
+                    fit: BoxFit.fill,
+                    webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                    errorBuilder: (_, __, ___) => const Center(
+                      child: Icon(
+                        Icons.image_not_supported_outlined,
+                        color: Colors.black54,
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
