@@ -85,6 +85,7 @@ test("une campagne active reliée est mise à jour sans modifier l'offre ni les 
   };
   const approved = {
     status: "approved",
+    application: {destinationUrl: "https://shop.example.org/"},
     assetChangeRequest: {
       ...dossier().assetChangeRequest,
       submittedAt,
@@ -148,6 +149,8 @@ test("une campagne active reliée est mise à jour sans modifier l'offre ni les 
       "https://storage.example.com/new-banner.jpg");
   assert.equal(adWrite.values.centerLat, 46.39);
   assert.equal(adWrite.values.centerLng, -1.49);
+  assert.equal(adWrite.values.destinationUrl, "https://shop.example.org/");
+  assert.equal(adWrite.values.websiteUrl, "https://shop.example.org/");
   for (const key of ["status", "visibilityType", "campaignStartDate",
     "campaignEndDate", "totalPriceExclTax"]) {
     assert.equal(Object.hasOwn(adWrite.values, key), false);
