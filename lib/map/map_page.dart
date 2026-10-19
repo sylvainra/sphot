@@ -2766,7 +2766,12 @@ Widget _buildAdBanner() {
                   height: bannerHeight,
                   child: Image.network(
                     bannerUrl,
-                    fit: BoxFit.contain,
+                    // Sur le Web grand écran, occuper toute la zone du
+                    // bandeau, y compris lorsqu'un volet droit est ouvert.
+                    // Sur les petits écrans et en natif, préserver l'image.
+                    fit: kIsWeb && screenWidth >= 900
+                        ? BoxFit.cover
+                        : BoxFit.contain,
                     // Flutter Web : privilégier l'élément HTML pour les images
                     // Firebase Storage lorsque CanvasKit rencontre un blocage
                     // CORS. Sur Android/iOS, Image.network conserve son
