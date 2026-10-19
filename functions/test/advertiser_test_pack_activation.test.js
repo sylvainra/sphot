@@ -107,9 +107,17 @@ test("Sans session, l'API de confirmation refuse sans écrire", async () => {
     checkSuperAdminSession: async () => "super-admin",
   });
   const response = {
-    set() {return this;},
-    status(code) {this.code = code; return this;},
-    json(body) {this.body = body; return this;},
+    set() {
+      return this;
+    },
+    status(code) {
+      this.code = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      return this;
+    },
   };
   await handler({
     method: "POST",
@@ -164,9 +172,17 @@ test("Prévisualisation sans écriture et confirmation limitée au Pack",
         checkSuperAdminSession: async () => "super-admin",
       });
       const response = {
-        set() {return this;},
-        status(code) {this.code = code; return this;},
-        json(body) {this.body = body; return this;},
+        set() {
+          return this;
+        },
+        status(code) {
+          this.code = code;
+          return this;
+        },
+        json(body) {
+          this.body = body;
+          return this;
+        },
       };
       const base = {
         method: "POST",
