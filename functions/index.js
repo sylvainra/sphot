@@ -11599,3 +11599,11 @@ const {registerPublicMapAdvertisingEndpoint} =
     require("./public_map_advertising");
 exports.getPublicMapAdvertisements =
     registerPublicMapAdvertisingEndpoint({admin, onRequest});
+
+// Nouvelle synchronisation : aucun dossier et aucune campagne n'est modifié
+// tant que le Super Admin n'a pas approuvé une proposition.
+// À déployer explicitement et séparément après validation.
+const {registerAdvertiserCampaignSync} =
+    require("./advertiser_campaign_sync");
+exports.syncApprovedAdvertiserAssets =
+    registerAdvertiserCampaignSync({admin, onDocumentUpdated});
