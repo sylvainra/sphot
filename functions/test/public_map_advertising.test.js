@@ -118,3 +118,48 @@ test("n'expose pas les URL de destination dangereuses", () => {
   assert.ok(result);
   assert.equal(result.destinationUrl, "");
 });
+
+
+test("API v1 conserve Carte et Pack ; v2 ajoute Premium", async () => {
+  const {registerPublicMapAdvertisingEndpoint} =
+      require("../public_map_advertising");
+  const start = new Date(Date.now() - 3600000);
+  const end = new Date(Date.now() + 3600000);
+  const rows = ["map", "premium", "pack"].map((visibilityType) => ({
+    id: visibilityType,
+    data: () => active({
+      visibilityType,
+      campaignStartDate: start,
+      campaignEndDate: end,
+    }),
+  }));
+  const admin = {
+    firestore: () => ({
+      collection: () => ({
+        where: () => ({
+          limit: () => ({
+            get: async () => ({docs: rows}),
+          }),
+        }),
+      }),
+    }),
+  };
+  const onRequest = (_, callback) => callback;
+  async function call(includePremium) {
+    const handler = registerPublicMapAdvertisingEndpoint({
+      admin, onRequest, includePremium,
+    });
+    const response = {
+      headers: {},
+      set(key, value) {this.headers[key] = value; return this;},
+      status(code) {this.statusCode = code; return this;},
+      json(data) {this.body = data; return this;},
+      send(data) {this.body = data; return this;},
+    };
+    await handler({method: "GET"}, response);
+    assert.equal(response.statusCode, 200);
+    return response.body.advertisements.map((ad) => ad.visibilityType);
+  }
+  assert.deepEqual(await call(false), ["map", "pack"]);
+  assert.deepEqual(await call(true), ["map", "pack", "premium"]);
+});
