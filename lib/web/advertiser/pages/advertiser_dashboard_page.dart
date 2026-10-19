@@ -182,7 +182,9 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     if (!_approvedFlow) return false;
     final request = _map(_requestData['assetChangeRequest']);
     final status = request['status']?.toString() ?? '';
-    return status != 'submitted' && status != 'pending';
+    // Les anciennes demandes « pending » peuvent elles aussi être complétées
+    // directement, sans autorisation préalable du Super Admin.
+    return status != 'submitted';
   }
 
   String get _assetChangeStatus {
