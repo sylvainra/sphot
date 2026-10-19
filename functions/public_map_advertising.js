@@ -65,7 +65,7 @@ function projectPublicMapAdvertisement(id, raw, now = Date.now()) {
   if (text(ad.status).toLowerCase() !== "active") return null;
 
   const visibility = text(ad.visibilityType).toLowerCase();
-  if (visibility !== "map" && visibility !== "pack") return null;
+  if (!["map", "premium", "pack"].includes(visibility)) return null;
 
   const startsAt = milliseconds(ad.campaignStartDate);
   const endsAt = milliseconds(ad.campaignEndDate);
@@ -84,6 +84,7 @@ function projectPublicMapAdvertisement(id, raw, now = Date.now()) {
     id: text(id),
     advertiserName: text(ad.advertiserName),
     bannerUrl,
+    visibilityType: visibility,
     destinationUrl: validUrl(ad.websiteUrl || ad.destinationUrl),
     broadcastType: scope,
     campaignEndAt: endsAt,
