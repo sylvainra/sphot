@@ -20,6 +20,9 @@ const modes = ["map", "premium", "pack"];
 const oldBanner = "https://placehold.co/1800x300/274472/ffffff/png?text=ANCIEN+VISUEL";
 const testBanner = process.env.SPHOT_TEST_BANNER_URL ||
     "https://placehold.co/1800x300/004d7a/ffffff/png?text=SPHOT+VISUEL+APPROUVE";
+const testDestination = process.env.SPHOT_TEST_DESTINATION_URL ||
+    "https://www.surfshop-atlantique.fr";
+const advertiserName = "SURF SHOP ATLANTIQUE · TEST EMULATEUR";
 
 async function run() {
   const host = process.env.FIRESTORE_EMULATOR_HOST || "";
@@ -29,6 +32,9 @@ async function run() {
   }
   if (!testBanner.startsWith("https://")) {
     throw new Error("SPHOT_TEST_BANNER_URL doit commencer par https://");
+  }
+  if (!/^https?:\/\/[^\s/]+/i.test(testDestination)) {
+    throw new Error("SPHOT_TEST_DESTINATION_URL doit etre une adresse web valide.");
   }
   if (admin.apps.length === 0) admin.initializeApp({projectId});
   const db = admin.firestore();
@@ -42,7 +48,7 @@ async function run() {
   const campaigns = db.collection("adRequests");
   const initialRequest = {
     status: "approved",
-    advertiserName: "BAR DE LA PLAGE · TEST EMULATEUR",
+    advertiserName: advertiserName,
     advertisingSpot: {latitude: center.centerLat,
       longitude: center.centerLng, bannerUrl: oldBanner},
     assetChangeRequest: {status: "idle"},
@@ -53,7 +59,7 @@ async function run() {
     await campaigns.doc("demo-sphot-" + mode).set({
       status: "active",
       advertiserRequestId: requestId,
-      advertiserName: "BAR DE LA PLAGE · TEST EMULATEUR",
+      advertiserName: advertiserName,
       visibilityType: mode,
       broadcastType: "local",
       ...center,
@@ -61,7 +67,8 @@ async function run() {
       campaignStartDate: start,
       campaignEndDate: end,
       bannerUrl: oldBanner,
-      destinationUrl: "https://sphot.app",
+      destinationUrl: testDestination,
+      websiteUrl: testDestination,
       totalPriceExclTax: 129,
     });
   }
@@ -123,6 +130,7 @@ async function run() {
     assert.equal(current.visibilityType, mode);
     assert.equal(current.radiusKm, 5);
     assert.equal(current.totalPriceExclTax, 129);
+    assert.equal(current.destinationUrl, testDestination);
     assert.equal(current.campaignStartDate.toMillis(), start.toMillis());
     assert.equal(current.campaignEndDate.toMillis(), end.toMillis());
     assert.equal(current.centerLat, center.centerLat + 0.001);
@@ -132,6 +140,7 @@ async function run() {
     assert.ok(projected, mode + " doit etre diffusable.");
     assert.equal(projected.visibilityType, mode);
     assert.equal(projected.bannerUrl, testBanner);
+    assert.equal(projected.destinationUrl, testDestination);
     assert.equal("totalPriceExclTax" in projected, false);
     const history = await ad.ref.collection("approvedAssetChanges").get();
     assert.equal(history.size, 1, "Un seul document historique.");
