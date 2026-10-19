@@ -2718,7 +2718,7 @@ Widget _buildAdBanner() {
         );
         final panoramicWidth = max(0.0, availableWidth - creationWidth);
         final bannerHeight = cropWebBanner
-            ? min(118.0, max(56.0, panoramicWidth / 6.0))
+            ? min(118.0, panoramicWidth / 6.0)
             : max(52.0, panoramicWidth / 6.0);
 
         // Même fond clair que l'encart de création sans campagne.
