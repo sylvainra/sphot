@@ -11635,3 +11635,13 @@ const {registerAdvertiserCampaignSync} =
     require("./advertiser_campaign_sync");
 exports.syncApprovedAdvertiserAssets =
     registerAdvertiserCampaignSync({admin, onDocumentUpdated});
+
+// Activation Pack temporaire après choix explicite de la campagne et
+// confirmation par une session Super Admin déjà authentifiée.
+// Aucun droit commercial n'est modifié automatiquement par la lecture.
+const {registerAdvertiserTestPackActivation} =
+    require("./advertiser_test_pack_activation");
+exports.activateAdvertiserTestPack = registerAdvertiserTestPackActivation({
+  admin, crypto, onRequest,
+  checkSuperAdminSession: commercialPricing.checkSession,
+});
