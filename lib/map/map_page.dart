@@ -2722,8 +2722,8 @@ Widget _buildAdBanner() {
             ? min(118.0, panoramicWidth / 6.0)
             : max(52.0, panoramicWidth / 6.0);
 
-        // Invitation : visible sans campagne et maintenue à droite
-        // de chaque publicité sur le Web comme sur mobile.
+        // Même fond clair que l'encart de création sans campagne.
+        // Aucun pictogramme ni sous-texte dans cette zone cliquable.
         Widget createAdvertisingInvitation({
           bool hasAdvertisement = false,
         }) {
@@ -2754,29 +2754,17 @@ Widget _buildAdBanner() {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.center,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AdaptiveAssetImage(
-                          'data/icons/fire_red_icon.svg',
-                          width: isMobile ? 16 : 22,
-                          height: isMobile ? 20 : 28,
-                          fit: BoxFit.contain,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          hasAdvertisement
-                              ? 'Votre\nSPHOT\nPUBLICITAIRE\nici!'
-                              : 'CRÉER VOTRE\nSPHOT PUBLICITAIRE\nICI!',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: isMobile ? 10 : 11,
-                            height: 1.15,
-                            color: Colors.black87,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      hasAdvertisement
+                          ? 'Votre\nSPHOT\nPUBLICITAIRE\nici!'
+                          : 'CRÉER VOTRE\nSPHOT PUBLICITAIRE\nICI!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: isMobile ? 10 : 11,
+                        height: 1.15,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ),
@@ -2788,69 +2776,96 @@ Widget _buildAdBanner() {
         Widget occupiedAdvertisingSpace(Map<String, dynamic> ad) {
           final standardBannerUrl = ad['bannerUrl']?.toString() ?? '';
           final panoramicBannerUrl = ad['webBannerUrl']?.toString() ?? '';
-          // L'image originale publiée prime sur l'ancienne déclinaison
-          // panoramique ; celle-ci n'est qu'un secours si l'original manque.
-          final bannerUrl = standardBannerUrl.isNotEmpty
-              ? standardBannerUrl
-              : panoramicBannerUrl;
+          final bannerUrl = wideWebBanner && panoramicBannerUrl.isNotEmpty
+              ? panoramicBannerUrl
+              : standardBannerUrl;
+          // Aperçu local uniquement : le visuel panoramique préparé pour
+          // la campagne de démonstration. Jamais utilisé en production.
+          // Les campagnes réelles doivent fournir webBannerUrl approuvé.
+          final demoWebPanorama = kDebugMode &&
+              wideWebBanner &&
+              panoramicBannerUrl.isEmpty &&
+              ad['id'] == 'test_bar_de_la_plage_20261019';
           final destinationUrl = ad['destinationUrl']?.toString() ?? '';
           final advertiserName =
               ad['advertiserName']?.toString().trim() ?? '';
 
-          // Toujours utiliser le fichier publicitaire réellement publié.
-          // En particulier, aucun asset local ne remplace le visuel original
-          // lors des essais Web.
-          final adVisual = ColoredBox(
-            color: const Color(0xFF063551),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.network(
-                  bannerUrl,
-                  // Site Web : tout le visuel occupe la largeur du bandeau
-                  // compact sans rognage, même si le format est plus allongé.
-                  fit: kIsWeb ? BoxFit.fill : BoxFit.contain,
-                  alignment: Alignment.center,
-                  webHtmlElementStrategy:
-                      WebHtmlElementStrategy.prefer,
-                  errorBuilder: (_, __, ___) => const Center(
-                    child: Icon(
-                      Icons.image_not_supported_outlined,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: Material(
-                    type: MaterialType.transparency,
-                    child: InkWell(
-                      onTap: destinationUrl.isEmpty
-                          ? null
-                          : () => unawaited(
-                              _openMapAdDestination(destinationUrl),
-                            ),
-                      child: Semantics(
-                        button: destinationUrl.isNotEmpty,
-                        label: advertiserName.isEmpty
-                            ? 'Visiter le site de l’annonceur'
-                            : 'Visiter le site de $advertiserName',
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-
-          // Zone de création conservée à droite sur Web et mobile ;
-          // sa largeur est réduite uniquement sur l'application mobile.
           return Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(child: adVisual),
+              // Zone 1 : toute l'image ouvre exclusivement le site
+              // approuvé. La couche Flutter au-dessus du rendu HTML garantit
+              // que le clic reste accessible dans Chrome et sur mobile.
+              Expanded(
+                child: ColoredBox(
+                  color: const Color(0xFF063551),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (demoWebPanorama)
+                        Image.asset(
+                          'data/images/surf_shop_atlantique_web_1800x140.jpg',
+                          width: double.infinity,
+                          height: bannerHeight,
+                          // Le visuel Web est déjà recomposé au format
+                          // panoramique : ajustement léger sans texte coupé.
+                          fit: BoxFit.fill,
+                          errorBuilder: (_, __, ___) => Image.network(
+                            standardBannerUrl,
+                            fit: BoxFit.contain,
+                            webHtmlElementStrategy:
+                                WebHtmlElementStrategy.prefer,
+                          ),
+                        )
+                      else
+                        Image.network(
+                          bannerUrl,
+                          width: double.infinity,
+                          height: bannerHeight,
+                          // Ne pas rogner les textes d'une campagne
+                          // qui n'a pas encore de visuel Web approuvé.
+                          fit: panoramicBannerUrl.isNotEmpty &&
+                                  wideWebBanner
+                              ? BoxFit.fill
+                              : BoxFit.contain,
+                          alignment: Alignment.center,
+                          webHtmlElementStrategy:
+                              WebHtmlElementStrategy.prefer,
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      Positioned.fill(
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: InkWell(
+                            onTap: destinationUrl.isEmpty
+                                ? null
+                                : () => unawaited(
+                                    _openMapAdDestination(destinationUrl),
+                                  ),
+                            child: Semantics(
+                              button: destinationUrl.isNotEmpty,
+                              label: advertiserName.isEmpty
+                                  ? 'Visiter le site de l’annonceur'
+                                  : 'Visiter le site de $advertiserName',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Zone 2 : carte transparente sur Web, distincte de l'annonce.
               SizedBox(
                 width: creationWidth,
-                child: createAdvertisingInvitation(hasAdvertisement: true),
+                child: createAdvertisingInvitation(
+                  hasAdvertisement: true,
+                ),
               ),
             ],
           );
@@ -2858,29 +2873,30 @@ Widget _buildAdBanner() {
 
         return ClipRRect(
           borderRadius: BorderRadius.circular(18),
-          child: ValueListenableBuilder<int>(
-            valueListenable: _mapAdRotation,
-            builder: (context, rotation, _) {
-              return FutureBuilder<List<Map<String, dynamic>>>(
-                future: _publicMapAdvertisementsFuture,
-                builder: (context, snapshot) {
-                  final ads =
-                      (snapshot.data ?? const <Map<String, dynamic>>[])
-                          .where(_isPublicMapAdVisible)
-                          .toList();
-                  final hasAdvertisement = ads.isNotEmpty;
-                  return SizedBox(
-                    width: availableWidth,
-                    height: bannerHeight,
-                    child: hasAdvertisement
-                        ? occupiedAdvertisingSpace(
-                            ads[rotation % ads.length],
-                          )
-                        : createAdvertisingInvitation(),
-                  );
-                },
-              );
-            },
+          child: SizedBox(
+            width: availableWidth,
+            height: bannerHeight,
+            child: ValueListenableBuilder<int>(
+              valueListenable: _mapAdRotation,
+              builder: (context, rotation, _) {
+                return FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _publicMapAdvertisementsFuture,
+                  builder: (context, snapshot) {
+                    final ads =
+                        (snapshot.data ?? const <Map<String, dynamic>>[])
+                            .where(_isPublicMapAdVisible)
+                            .toList();
+                    if (ads.isEmpty) {
+                      // Sans annonce, afficher la zone d'invitation.
+                      return createAdvertisingInvitation();
+                    }
+                    return occupiedAdvertisingSpace(
+                      ads[rotation % ads.length],
+                    );
+                  },
+                );
+              },
+            ),
           ),
         );
       },
