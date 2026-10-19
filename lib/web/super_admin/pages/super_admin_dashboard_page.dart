@@ -3669,8 +3669,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   Future<Map<String, dynamic>> _requestPackTest(
     String requestId,
     String campaignId,
-    String action,
-  ) async {
+    String action, {
+    String? confirmCampaignBannerUrl,
+    String? confirmDossierBannerUrl,
+    bool confirmVisualMismatch = false,
+  }) async {
     if (widget.pricingSessionToken.isEmpty) {
       throw StateError('Session Super Admin absente : reconnectez-vous.');
     }
@@ -3684,7 +3687,12 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         'requestId': requestId,
         'campaignId': campaignId,
         'action': action,
-        if (action == 'confirm') 'confirmation': 'ACTIVER PACK TEST',
+        if (action == 'confirm') ...{
+          'confirmation': 'ACTIVER PACK TEST',
+          'confirmCampaignBannerUrl': confirmCampaignBannerUrl ?? '',
+          'confirmDossierBannerUrl': confirmDossierBannerUrl ?? '',
+          'confirmVisualMismatch': confirmVisualMismatch,
+        },
       }),
     ).timeout(const Duration(seconds: 20));
     final decoded = jsonDecode(response.body);
@@ -3712,37 +3720,125 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       final expiry = deadline is num
           ? DateTime.fromMillisecondsSinceEpoch(deadline.toInt())
           : null;
+      final visualMatch = proposal['visualMatch'] == true;
+      final campaignImage = _cleanText(proposal['campaignBannerUrl']);
+      final dossierImage = _cleanText(proposal['dossierBannerUrl']);
+
+      // La comparaison se fait sur LES DEUX visuels réellement lus
+      // depuis Firestore. Si les URL diffèrent, la validation est manuelle.
+      var visualConfirmed = false;
       final approved = await showDialog<bool>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('CONFIRMATION PACK DE TEST'),
-          content: Text(
-            'Campagne : ${_cleanText(campaign['advertiserName'])}\n'
-            'Identifiant : $campaignId\n'
-            'Dossier : $requestId\n'
-            'Diffusion : CARTE → PACK TOTAL (7 emplacements)\n'
-            'Expiration du test : ${expiry?.toLocal() ?? 'non définie'}\n\n'
-            'ATTENTION : cette modification sera visible sur la carte '
-            'et dans les six rubriques publiques pendant le test. '
-            'Elle ne modifie ni le prix ni les dates commerciales. '
-            'Après expiration, l’API publique revient à Carte.',
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: const Text('CONFIRMATION PACK DE TEST'),
+            content: SizedBox(
+              width: 480,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Annonceur : ${_cleanText(campaign['advertiserName'])}\n'
+                      'Campagne : $campaignId\n'
+                      'Dossier : $requestId\n'
+                      'Diffusion : CARTE → PACK TOTAL (7 emplacements)\n'
+                      'Fin du test : ${expiry?.toLocal() ?? 'non définie'}',
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'VISUEL DU DOSSIER ANNONCEUR',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Image.network(
+                      dossierImage,
+                      height: 80,
+                      width: double.infinity,
+                      fit: BoxFit.contain,
+                      webHtmlElementStrategy:
+                          WebHtmlElementStrategy.prefer,
+                      errorBuilder: (_, __, ___) => const Text(
+                        'Impossible de charger le visuel du dossier.',
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'VISUEL ACTUELLEMENT DIFFUSÉ SUR LA CARTE',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Image.network(
+                      campaignImage,
+                      height: 80,
+                      width: double.infinity,
+                      fit: BoxFit.contain,
+                      webHtmlElementStrategy:
+                          WebHtmlElementStrategy.prefer,
+                      errorBuilder: (_, __, ___) => const Text(
+                        'Impossible de charger le visuel de la campagne.',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (!visualMatch) ...[
+                      const Text(
+                        'Les adresses des deux images sont différentes. '
+                        'Vérifiez visuellement leur correspondance. '
+                        'La campagne gardera son image actuelle.',
+                        style: TextStyle(color: redColor),
+                      ),
+                      CheckboxListTile(
+                        value: visualConfirmed,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            visualConfirmed = value == true;
+                          });
+                        },
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: const Text(
+                          'J’ai comparé les deux images et je confirme '
+                          'qu’elles correspondent à ce dossier de test.',
+                        ),
+                      ),
+                    ],
+                    const Text(
+                      'Le Pack sera visible publiquement pendant le test. '
+                      'Aucun prix, date ni visuel ne sera modifié. '
+                      'Après expiration, l’API publique reviendra à Carte.',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('ANNULER'),
+              ),
+              ElevatedButton(
+                onPressed: !visualMatch && !visualConfirmed
+                    ? null
+                    : () => Navigator.of(dialogContext).pop(true),
+                child: const Text('ACTIVER PACK TEST'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('ANNULER'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('ACTIVER PACK TEST'),
-            ),
-          ],
         ),
       );
       if (approved != true || !mounted) return;
 
-      // Phase 2 : seul le serveur authentifié peut écrire.
-      await _requestPackTest(requestId, campaignId, 'confirm');
+      // Phase 2 : seul le serveur authentifié peut écrire. Les deux URL
+      // doivent toujours correspondre exactement à l'aperçu validé.
+      await _requestPackTest(
+        requestId,
+        campaignId,
+        'confirm',
+        confirmCampaignBannerUrl: campaignImage,
+        confirmDossierBannerUrl: dossierImage,
+        confirmVisualMismatch: !visualMatch && visualConfirmed,
+      );
       if (!mounted) return;
       setState(() {
         _advertiserCampaignAuditFutures.remove(requestId);
