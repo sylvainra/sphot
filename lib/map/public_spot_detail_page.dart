@@ -355,7 +355,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
 
   // Cette invitation reste visible sous une publicité active
   // et remplace uniquement l'annonce en l'absence de campagne éligible.
-  Widget _buildEmptyAdvertisingSpace() {
+  Widget _buildEmptyAdvertisingSpace({bool hasAdvertisement = false}) {
     // Même style compact rouge/orange que les autres boutons de la fiche.
     // L'encart reste SOUS l'image publicitaire, jamais au-dessus.
     return Material(
@@ -373,12 +373,14 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
             border: Border.all(color: _sphotWarmRed, width: 1),
           ),
           alignment: Alignment.center,
-          child: const Text(
-            'CRÉER VOTRE SPHOT PUBLICITAIRE ICI!',
+          child: Text(
+            hasAdvertisement
+                ? 'Votre SPHOT PUBLICITAIRE ici!'
+                : 'CRÉER VOTRE SPHOT PUBLICITAIRE ICI!',
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w800,
               color: _sphotWarmRed,
@@ -497,7 +499,7 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
               ),
             ),
             const SizedBox(height: 8),
-            _buildEmptyAdvertisingSpace(),
+            _buildEmptyAdvertisingSpace(hasAdvertisement: true),
           ],
         );
       },
