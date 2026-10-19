@@ -2841,25 +2841,25 @@ Widget _buildAdBanner() {
             width: availableWidth,
             height: bannerHeight,
             child: ValueListenableBuilder<int>(
-            valueListenable: _mapAdRotation,
-            builder: (context, rotation, _) {
-              return FutureBuilder<List<Map<String, dynamic>>>(
-                future: _publicMapAdvertisementsFuture,
-                builder: (context, snapshot) {
-                  final ads =
-                      (snapshot.data ?? const <Map<String, dynamic>>[])
-                          .where(_isPublicMapAdVisible)
-                          .toList();
-                  if (ads.isEmpty) {
-                    // Sans annonce, la carte reste visible sous l'invitation.
-                    return createAdvertisingInvitation();
-                  }
-                  return occupiedAdvertisingSpace(
-                    ads[rotation % ads.length],
-                  );
-                },
-              );
-            },
+              valueListenable: _mapAdRotation,
+              builder: (context, rotation, _) {
+                return FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _publicMapAdvertisementsFuture,
+                  builder: (context, snapshot) {
+                    final ads =
+                        (snapshot.data ?? const <Map<String, dynamic>>[])
+                            .where(_isPublicMapAdVisible)
+                            .toList();
+                    if (ads.isEmpty) {
+                      // Sans annonce, afficher la zone d'invitation.
+                      return createAdvertisingInvitation();
+                    }
+                    return occupiedAdvertisingSpace(
+                      ads[rotation % ads.length],
+                    );
+                  },
+                );
+              },
             ),
           ),
         );
