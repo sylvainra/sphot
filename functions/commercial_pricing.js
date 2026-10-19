@@ -532,4 +532,4 @@ function scheduler({admin, onSchedule}) {
         }
       });
 }
-module.exports = {issueSession, endpoint, scheduler, validate, defaultState};
+module.exports = {issueSession, checkSession, endpoint, scheduler, validate, defaultState};
