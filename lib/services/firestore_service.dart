@@ -40,6 +40,35 @@ class FirestoreService {
     }
   }
 
+  /// Ne reçoit que les campagnes de carte publiques et actives.
+  /// Aucun accès direct à la collection privée adRequests.
+  Future<List<Map<String, dynamic>>> getPublicMapAdvertisements() async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://europe-west1-sphot-ab80b.cloudfunctions.net/'
+              'getPublicMapAdvertisements',
+            ),
+          )
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return const [];
+
+      final payload = jsonDecode(response.body);
+      if (payload is! Map || payload['advertisements'] is! List) {
+        return const [];
+      }
+
+      return (payload['advertisements'] as List)
+          .whereType<Map>()
+          .map((ad) => Map<String, dynamic>.from(ad))
+          .toList();
+    } catch (_) {
+      // Une panne du service publicitaire ne bloque jamais la carte SPHOT.
+      return const [];
+    }
+  }
+
   Future<void> recordPublicClick({
     required String territoireId,
     required String targetId,
