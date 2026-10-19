@@ -2679,7 +2679,7 @@ Future<void> _openMapAdDestination(String destinationUrl) async {
 Widget _buildAdBanner() {
   final screenSize = MediaQuery.sizeOf(context);
   final isMobile = screenSize.width < 600;
-  final isDesktopWeb = kIsWeb && !isMobile;
+  final isFullWidthWeb = kIsWeb;
   final detailPanelOpen = kIsWeb &&
       screenSize.width >= 900 &&
       _selectedPublicSpotId != null;
@@ -2689,12 +2689,12 @@ Widget _buildAdBanner() {
   // Le bandeau Web épouse exactement la largeur de la carte visible.
   // En présence du volet SPHOT, il s'arrête à son bord.
   // Sur mobile, les marges existantes sont conservées.
-  final horizontalInset = isDesktopWeb ? 0.0 : 8.0;
+  final horizontalInset = isFullWidthWeb ? 0.0 : 8.0;
   final bannerBottom = detailPanelOpen ? 64.0 : 58.0;
 
   return Positioned(
     left: horizontalInset,
-    right: isDesktopWeb ? detailPanelWidth : horizontalInset,
+    right: isFullWidthWeb ? detailPanelWidth : horizontalInset,
     bottom: bannerBottom,
     child: LayoutBuilder(
       builder: (context, constraints) {
@@ -2702,24 +2702,27 @@ Widget _buildAdBanner() {
 
         // Le bouton fait partie de la largeur totale, sans largeur ajoutée
         // par un Container parent : aucune somme ne peut déborder du Row.
-        final minCreationWidth = isMobile ? 88.0 : 160.0;
         final preferredCreationWidth = isMobile
             ? 96.0
             : (availableWidth * 0.23).clamp(160.0, 430.0);
-        final creationWidth = min(
-          preferredCreationWidth,
-          max(0.0, availableWidth - 90.0),
-        );
-        final panoramicWidth = max(0.0, availableWidth - creationWidth);
-
-        // Le visuel 1800 x 300 est affiché au ratio 6:1, sans recadrage.
-        // On évite qu'un écran particulièrement large rende le bandeau
-        // excessivement haut : le reste demeure de la carte transparente.
+        // Image + invitation occupent ENSEMBLE toute la largeur du Row.
+        // Si la hauteur du panoramique doit être limitée, l'espace restant
+        // devient une zone de création TRANSPARENTE, jamais un bloc vide.
         final maxHeight = max(64.0, screenSize.height * 0.28);
+        final maxImageWidth = isMobile
+            ? availableWidth
+            : maxHeight * 6.0;
+        final panoramicWidth = min(
+          max(0.0, availableWidth - preferredCreationWidth),
+          maxImageWidth,
+        );
+        final creationWidth = max(0.0, availableWidth - panoramicWidth);
         final bannerHeight = isMobile
             ? max(52.0, panoramicWidth / 6.0)
-            : min(panoramicWidth / 6.0, maxHeight);
-        final transparentCreation = isDesktopWeb;
+            : panoramicWidth / 6.0;
+        // Une page Web reste transparente même en mode téléphone.
+        // L'application native conserve son bandeau compact.
+        final transparentCreation = kIsWeb;
 
         Widget createAdvertisingInvitation() {
           return Material(
