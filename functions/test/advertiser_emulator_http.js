@@ -5,6 +5,8 @@
  * Lit Firestore Emulator et applique la meme projection que la Cloud Function.
  */
 const http = require("node:http");
+const fs = require("node:fs");
+const pathModule = require("node:path");
 const admin = require("firebase-admin");
 const {projectPublicMapAdvertisement} =
     require("../public_map_advertising");
@@ -17,6 +19,16 @@ if (!/^(127\.0\.0\.1|localhost):\d+$/.test(host)) {
 
 const port = 8099;
 const projectId = "demo-sphot-publicitaire";
+const localCreativeFile = process.env.SPHOT_TEST_BANNER_FILE || "";
+if (localCreativeFile && !fs.existsSync(localCreativeFile)) {
+  throw new Error("Visuel local introuvable : " + localCreativeFile);
+}
+const creativeExt = pathModule.extname(localCreativeFile).toLowerCase();
+const creativeTypes = {".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+  ".png": "image/png", ".webp": "image/webp"};
+if (localCreativeFile && !creativeTypes[creativeExt]) {
+  throw new Error("Utiliser un visuel JPG, PNG ou WEBP.");
+}
 if (admin.apps.length === 0) admin.initializeApp({projectId});
 const db = admin.firestore();
 
@@ -37,6 +49,12 @@ http.createServer(async (req, res) => {
   }
 
   const path = new URL(req.url, "http://localhost:" + port);
+  if (path.pathname === "/creative" && localCreativeFile) {
+    res.setHeader("Content-Type", creativeTypes[creativeExt]);
+    res.writeHead(200);
+    fs.createReadStream(localCreativeFile).pipe(res);
+    return;
+  }
   if (path.pathname === "/health") {
     res.writeHead(200);
     res.end(JSON.stringify({ok: true, firebase: "emulator-only"}));
@@ -60,7 +78,13 @@ http.createServer(async (req, res) => {
     const advertisements = snapshot.docs.map((doc) =>
       projectPublicMapAdvertisement(doc.id, doc.data()))
         .filter((ad) => ad && (mode === "all" ||
-          ad.visibilityType === mode));
+          ad.visibilityType === mode))
+        .map((ad) => localCreativeFile ? {
+          ...ad,
+          // Remplacement LOCAL du visuel pour le navigateur de test.
+          // Le service public a d'abord valide l'URL HTTPS d'origine.
+          bannerUrl: "http://127.0.0.1:" + port + "/creative",
+        } : ad);
     res.writeHead(200);
     res.end(JSON.stringify({success: true, advertisements}));
   } catch (error) {
@@ -72,4 +96,5 @@ http.createServer(async (req, res) => {
   console.log("SPHOT TEST ADS API: http://127.0.0.1:" + port +
       "/advertisements?mode=pack");
   console.log("Aucune connexion a la production Firebase.");
+  if (localCreativeFile) console.log("Visuel local : " + localCreativeFile);
 });
