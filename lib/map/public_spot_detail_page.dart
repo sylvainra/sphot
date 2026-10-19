@@ -435,7 +435,14 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
       return false;
     }
     final bannerUrl = ad['bannerUrl']?.toString() ?? '';
-    if (!bannerUrl.startsWith('https://')) return false;
+    // En production, les visuels publicitaires doivent être en HTTPS.
+    // L'émulateur de test peut servir temporairement une image locale HTTP.
+    const isLocalAdsTest =
+        bool.fromEnvironment('SPHOT_ADS_EMULATOR', defaultValue: false);
+    final localBanner = isLocalAdsTest &&
+        (bannerUrl.startsWith('http://127.0.0.1:8099/creative') ||
+         bannerUrl.startsWith('http://localhost:8099/creative'));
+    if (!bannerUrl.startsWith('https://') && !localBanner) return false;
 
     final scope = ad['broadcastType']?.toString() ?? '';
     if (scope == 'national') return true;
