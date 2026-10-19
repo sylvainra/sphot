@@ -2724,90 +2724,44 @@ Widget _buildAdBanner() {
         // L'application native conserve son bandeau compact.
         final transparentCreation = kIsWeb;
 
+        // Même fond clair que l'encart de création sans campagne.
+        // Aucun pictogramme ni sous-texte dans cette zone cliquable.
         Widget createAdvertisingInvitation() {
           return Material(
-            type: transparentCreation
-                ? MaterialType.transparency
-                : MaterialType.canvas,
-            color: transparentCreation
-                ? null
-                : const Color(0xFFFFA726),
+            color: Colors.transparent,
             child: InkWell(
               onTap: () => unawaited(_openAdvertiserWebsite()),
               child: Semantics(
                 button: true,
-                label: 'CRÉER MON SPHOT PUBLICITAIRE ICI !',
+                label: 'CRÉER VOTRE SPHOT PUBLICITAIRE ICI!',
                 child: Container(
+                  alignment: Alignment.center,
                   padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 3.0 : 10.0,
-                    vertical: isMobile ? 2.0 : 7.0,
+                    horizontal: isMobile ? 4.0 : 10.0,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.72),
                     border: Border(
                       left: BorderSide(
-                        color: transparentCreation
-                            ? Colors.white.withOpacity(0.85)
-                            : const Color(0xFF073650),
-                        width: transparentCreation ? 1.0 : 2.0,
+                        color: Colors.black.withOpacity(0.08),
+                        width: 1,
                       ),
                     ),
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (bannerHeight >= 100.0) ...[
-                        Icon(
-                          Icons.add_circle_outline_rounded,
-                          color: transparentCreation
-                              ? Colors.white
-                              : const Color(0xFF082B46),
-                          size: 24,
-                          shadows: transparentCreation
-                              ? const [
-                                  Shadow(
-                                    color: Colors.black,
-                                    blurRadius: 5,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        const SizedBox(height: 6),
-                      ],
-                      Flexible(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.center,
-                          child: Text(
-                            isMobile
-                                ? 'CRÉER MON\nSPHOT\nPUBLICITAIRE ICI !'
-                                : 'CRÉER MON\nSPHOT PUBLICITAIRE\nICI !',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: isMobile ? 11 : 16,
-                              height: 1.12,
-                              fontWeight: FontWeight.w900,
-                              color: transparentCreation
-                                  ? Colors.white
-                                  : const Color(0xFF082B46),
-                              shadows: transparentCreation
-                                  ? const [
-                                      Shadow(
-                                        color: Colors.black,
-                                        blurRadius: 5,
-                                        offset: Offset(1, 1),
-                                      ),
-                                      Shadow(
-                                        color: Colors.black,
-                                        blurRadius: 5,
-                                        offset: Offset(-1, -1),
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                          ),
-                        ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.center,
+                    child: Text(
+                      'CRÉER VOTRE\nSPHOT PUBLICITAIRE\nICI!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: isMobile ? 12 : 15,
+                        height: 1.15,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w900,
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
