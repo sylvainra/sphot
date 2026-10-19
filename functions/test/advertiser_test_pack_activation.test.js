@@ -61,9 +61,15 @@ test("Pack refusé si le dossier n'est pas confirmé ou approuvé", () => {
       campagne(), "request1", NOW));
 });
 
-test("Pack refusé si la campagne porte un autre visuel ou dossier", () => {
-  assert.throws(() => previewTestPack(
+test("Deux URL de visuels différentes exigent un contrôle explicite", () => {
+  const preview = previewTestPack(
       dossier(), campagne({bannerUrl: "https://example.com/other.jpg"}),
+      "request1", NOW);
+  assert.equal(preview.visualMatch, false);
+  assert.equal(preview.campaignBannerUrl, "https://example.com/other.jpg");
+  assert.equal(preview.dossierBannerUrl, "https://example.com/surf-shop.jpg");
+  assert.throws(() => previewTestPack(
+      dossier(), campagne({advertiserName: "AUTRE SOCIÉTÉ"}),
       "request1", NOW));
   assert.throws(() => previewTestPack(
       dossier(), campagne({advertiserRequestId: "someone-else"}),
@@ -202,15 +208,80 @@ test("Prévisualisation sans écriture et confirmation limitée au Pack",
         campaignId: "campaign-1",
         action: "confirm",
         confirmation: "ACTIVER PACK TEST",
+        confirmCampaignBannerUrl: "https://example.com/surf-shop.jpg",
+        confirmDossierBannerUrl: "https://example.com/surf-shop.jpg",
       }}, response);
       assert.equal(response.code, 200);
       assert.equal(updates.length, 1);
       assert.equal(histories.length, 1);
       assert.equal(updates[0].fields.visibilityType, "pack");
+      assert.equal(histories[0].fields.visualMatchAtApproval, true);
       assert.equal(updates[0].fields.advertiserRequestId, "dossier-1");
       assert.equal(updates[0].fields.testPack.previousVisibilityType, "map");
       assert.equal(
           Object.hasOwn(updates[0].fields, "campaignEndDate"), false);
       assert.equal(
           Object.hasOwn(updates[0].fields, "totalPriceExclTax"), false);
+    });
+
+test("URL différente : confirmation implicite interdite sur le serveur",
+    async () => {
+      const campaignBanner = "https://example.com/banner-test.jpg";
+      const entries = {
+        request: dossier(),
+        campaign: campagne({
+          bannerUrl: campaignBanner,
+          campaignStartDate: new Date(Date.now() - 3600000),
+          campaignEndDate: new Date(Date.now() + 3600000),
+        }),
+      };
+      let writes = 0;
+      const ref = (kind) => ({
+        get: async () => ({exists: true, data: () => entries[kind]}),
+      });
+      const admin = {
+        firestore: () => ({
+          collection: (name) => ({
+            doc: () => ref(name === "adRequests" ? "campaign" : "request"),
+          }),
+          runTransaction: async (callback) => callback({
+            get: async (item) => item.get(),
+            update: () => writes++,
+            set: () => writes++,
+          }),
+        }),
+      };
+      const handler = registerAdvertiserTestPackActivation({
+        admin, crypto: {},
+        onRequest: (_, callback) => callback,
+        checkSuperAdminSession: async () => "super-admin",
+      });
+      const response = {
+        set() {
+          return this;
+        },
+        status(code) {
+          this.code = code;
+          return this;
+        },
+        json(body) {
+          this.body = body;
+          return this;
+        },
+      };
+      await handler({
+        method: "POST",
+        headers: {authorization: "Bearer session-test"},
+        body: {
+          action: "confirm",
+          confirmation: "ACTIVER PACK TEST",
+          requestId: "dossier-1",
+          campaignId: "campaign-1",
+          confirmCampaignBannerUrl: campaignBanner,
+          confirmDossierBannerUrl: "https://example.com/surf-shop.jpg",
+          confirmVisualMismatch: false,
+        },
+      }, response);
+      assert.equal(response.code, 409);
+      assert.equal(writes, 0);
     });
