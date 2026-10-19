@@ -2778,28 +2778,21 @@ Widget _buildAdBanner() {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Zone 1 : le visuel ouvre EXCLUSIVEMENT le site de l'annonceur.
+              // Zone 1 : toute l'image ouvre exclusivement le site
+              // approuvé. La couche Flutter au-dessus du rendu HTML garantit
+              // que le clic reste accessible dans Chrome et sur mobile.
               Expanded(
-                child: Material(
+                child: ColoredBox(
                   color: const Color(0xFF063551),
-                  child: InkWell(
-                    onTap: destinationUrl.isEmpty
-                        ? null
-                        : () => unawaited(
-                              _openMapAdDestination(destinationUrl),
-                            ),
-                    child: Semantics(
-                      button: destinationUrl.isNotEmpty,
-                      label: advertiserName.isEmpty
-                          ? 'Visiter le site de l’annonceur'
-                          : 'Visiter le site de $advertiserName',
-                      child: Image.network(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.network(
                         bannerUrl,
                         width: double.infinity,
                         height: bannerHeight,
-                        // Ne déformer ni couper un slogan ou un logo :
-                        // source panoramique Web dédiée si disponible,
-                        // sinon image standard entière sur fond assorti.
+                        // Sans créatif panoramique spécifique, ne jamais
+                        // rogner les textes et le logo du visuel standard.
                         fit: BoxFit.contain,
                         alignment: Alignment.center,
                         webHtmlElementStrategy:
@@ -2811,7 +2804,25 @@ Widget _buildAdBanner() {
                           ),
                         ),
                       ),
-                    ),
+                      Positioned.fill(
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: InkWell(
+                            onTap: destinationUrl.isEmpty
+                                ? null
+                                : () => unawaited(
+                                    _openMapAdDestination(destinationUrl),
+                                  ),
+                            child: Semantics(
+                              button: destinationUrl.isNotEmpty,
+                              label: advertiserName.isEmpty
+                                  ? 'Visiter le site de l’annonceur'
+                                  : 'Visiter le site de $advertiserName',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
