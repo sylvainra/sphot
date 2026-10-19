@@ -24,6 +24,10 @@ const testDestination = process.env.SPHOT_TEST_DESTINATION_URL ||
     "https://www.surfshop-atlantique.fr";
 const advertiserName = "SURF SHOP ATLANTIQUE · TEST EMULATEUR";
 
+/**
+ * Vérifie le circuit de modification via Firestore Emulator.
+ * @return {Promise<void>} Promesse de fin du scénario.
+ */
 async function run() {
   const host = process.env.FIRESTORE_EMULATOR_HOST || "";
   if (!/^(127\.0\.0\.1|localhost):\d+$/.test(host)) {
@@ -34,7 +38,9 @@ async function run() {
     throw new Error("SPHOT_TEST_BANNER_URL doit commencer par https://");
   }
   if (!/^https?:\/\/[^\s/]+/i.test(testDestination)) {
-    throw new Error("SPHOT_TEST_DESTINATION_URL doit etre une adresse web valide.");
+    throw new Error(
+        "SPHOT_TEST_DESTINATION_URL doit etre une adresse web valide.",
+    );
   }
   if (admin.apps.length === 0) admin.initializeApp({projectId});
   const db = admin.firestore();
