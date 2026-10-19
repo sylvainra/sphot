@@ -11047,6 +11047,7 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
         if (!claimed) continue;
         try {
           let text;
+          let html;
           if (target.kind === "team") {
             text = "Suivi d'une modification annonceur.\n\n" +
               "Dossier : " + event.params.requestId + "\n" +
@@ -11056,13 +11057,10 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
               "Consultez le dossier dans votre espace SPHOT pour " +
               "examiner la demande ou retrouver la décision.";
           } else {
-            let url = "https://sphot.app/#/professional-login" +
+            // Tous les emails annonceur pointent vers le même accès
+            // authentifié : aucun jeton personnel dans le lien du mail.
+            const url = "https://sphot.app/#/professional-login" +
               "?audience=advertiser";
-            if (status === "authorized") {
-              url = await advertiserRequestAccessUrl(
-                  event.data.after.ref, recipient,
-              );
-            }
             const reason = cleanValue(
                 (data.assetChangeRequest || {}).reason, "",
             );
@@ -11070,12 +11068,23 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
               messages[status] + (reason ? "\n\nMotif : " + reason : "") +
               "\n\nAccéder à votre espace : " + url +
               "\n\nL'équipe SPHOT";
+            html = "<p>" + escapeHtml(buildAdvertiserGreeting(data)) +
+              "</p><p>" + escapeHtml(messages[status]) + "</p>" +
+              (reason ? "<p><strong>Motif :</strong> " +
+                escapeHtml(reason) + "</p>" : "") +
+              '<p style="margin:28px 0;text-align:center">' +
+              '<a href="' + url + '" style="background:#253f90;' +
+              'color:#ffffff;padding:14px 24px;border-radius:8px;' +
+              'font-weight:bold;text-decoration:none;display:inline-block">' +
+              "ACCÉDER À MON ESPACE SPHOT PUBLICITAIRE</a></p>" +
+              "<p>L'équipe SPHOT</p>";
           }
           const result = await sendSphotMail(transporter, {
             from: MAIL_FROM,
             to: target.email,
             subject: "SPHOT - " + labels[status],
             text: text,
+            ...(html ? {html} : {}),
 
           });
           await ledger.set({
