@@ -2759,83 +2759,88 @@ Widget _buildAdBanner() {
     final destinationUrl = ad['destinationUrl']?.toString() ?? '';
     final advertiserName =
         ad['advertiserName']?.toString().trim() ?? '';
-    final ctaWidth = screenWidth < 600 ? 80.0 : 88.0;
 
-    return Row(
-      children: [
-        Expanded(
-          child: Material(
-            color: Colors.white.withOpacity(0.70),
-            child: InkWell(
-              onTap: destinationUrl.isEmpty
-                  ? null
-                  : () => unawaited(
-                        _openMapAdDestination(destinationUrl),
-                      ),
-              child: Semantics(
-                label: advertiserName.isEmpty
-                    ? 'Publicité'
-                    : 'Publicité : $advertiserName',
-                child: SizedBox(
+    return Material(
+      color: const Color(0xFF06314E),
+      child: InkWell(
+        onTap: destinationUrl.isEmpty
+            ? null
+            : () => unawaited(_openMapAdDestination(destinationUrl)),
+        child: Semantics(
+          label: advertiserName.isEmpty
+              ? 'Publicité'
+              : 'Publicité : $advertiserName',
+          child: Row(
+            children: [
+              // La largeur naturelle dépend du format du fichier.
+              // Un ancien visuel 2:1 n'est pas élargi artificiellement
+              // et un fichier 6:1 exploite l'espace panoramique.
+              Flexible(
+                flex: 20,
+                fit: FlexFit.loose,
+                child: Image.network(
+                  bannerUrl,
                   height: bannerHeight,
-                  child: Image.network(
-                    bannerUrl,
-                    fit: BoxFit.contain,
-                    webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Icon(
-                        Icons.image_not_supported_outlined,
-                        color: Colors.black54,
-                      ),
-                    ),
+                  fit: BoxFit.contain,
+                  webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                  errorBuilder: (_, __, ___) => const Center(
+                    child: Icon(Icons.image_not_supported_outlined,
+                        color: Colors.white),
                   ),
                 ),
               ),
-            ),
-          ),
-        ),
-        Container(
-          width: ctaWidth,
-          height: bannerHeight,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.96),
-            border: Border(
-              left: BorderSide(color: Colors.black.withOpacity(0.17)),
-            ),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => unawaited(_openAdvertiserWebsite()),
-              child: Semantics(
-                button: true,
-                label: 'Votre SPHOT publicitaire ici',
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.add_circle_outline,
-                      color: Color(0xFFE53935),
-                      size: 19,
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      'VOTRE\nSPHOT\nPUBLICITAIRE\nICI !',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: screenWidth < 600 ? 9.1 : 10.0,
-                        height: 1.13,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ],
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth < 85) {
+                        return const Center(
+                          child: Text(
+                            'PUB',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        );
+                      }
+                      return Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            advertiserName.isEmpty
+                                ? 'PUBLICITÉ'
+                                : advertiserName.toUpperCase(),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13,
+                            ),
+                          ),
+                          if (destinationUrl.isNotEmpty)
+                            const Text(
+                              'DÉCOUVRIR ›',
+                              style: TextStyle(
+                                color: Color(0xFFFFD54F),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 
