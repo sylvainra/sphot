@@ -11090,10 +11090,10 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
               "</p><p>" + escapeHtml(messages[status]) + "</p>" +
               (reason ? "<p><strong>Motif :</strong> " +
                 escapeHtml(reason) + "</p>" : "") +
-              '<p style="margin:28px 0;text-align:center">' +
-              '<a href="' + url + '" style="background:#253f90;' +
-              'color:#ffffff;padding:14px 24px;border-radius:8px;' +
-              'font-weight:bold;text-decoration:none;display:inline-block">' +
+              "<p style=\"margin:28px 0;text-align:center\">" +
+              "<a href=\"" + url + "\" style=\"background:#253f90;" +
+              "color:#ffffff;padding:14px 24px;border-radius:8px;" +
+              "font-weight:bold;text-decoration:none;display:inline-block\">" +
               "ACCÉDER À MON ESPACE SPHOT PUBLICITAIRE</a></p>" +
               "<p>L'équipe SPHOT</p>";
           }
