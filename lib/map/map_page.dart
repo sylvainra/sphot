@@ -2709,7 +2709,7 @@ Widget _buildAdBanner() {
         // La zone de création reste volontairement courte : elle ne
         // doit pas diminuer inutilement la surface publicitaire.
         final preferredCreationWidth = isMobile
-            ? 76.0
+            ? 60.0
             : wideWebBanner
                 ? 92.0
                 : 96.0;
@@ -2724,14 +2724,18 @@ Widget _buildAdBanner() {
 
         // Même fond clair que l'encart de création sans campagne.
         // Aucun pictogramme ni sous-texte dans cette zone cliquable.
-        Widget createAdvertisingInvitation() {
+        Widget createAdvertisingInvitation({
+          bool hasAdvertisement = false,
+        }) {
           return Material(
             color: Colors.transparent,
             child: InkWell(
               onTap: () => unawaited(_openAdvertiserWebsite()),
               child: Semantics(
                 button: true,
-                label: 'CRÉER VOTRE SPHOT PUBLICITAIRE ICI!',
+                label: hasAdvertisement
+                    ? 'Votre SPHOT PUBLICITAIRE ici!'
+                    : 'CRÉER VOTRE SPHOT PUBLICITAIRE ICI!',
                 child: Container(
                   alignment: Alignment.center,
                   padding: EdgeInsets.symmetric(
@@ -2751,7 +2755,9 @@ Widget _buildAdBanner() {
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.center,
                     child: Text(
-                      'CRÉER VOTRE\nSPHOT PUBLICITAIRE\nICI!',
+                      hasAdvertisement
+                          ? 'Votre\nSPHOT\nPUBLICITAIRE\nici!'
+                          : 'CRÉER VOTRE\nSPHOT PUBLICITAIRE\nICI!',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: isMobile ? 10 : 11,
@@ -2857,7 +2863,9 @@ Widget _buildAdBanner() {
               // Zone 2 : carte transparente sur Web, distincte de l'annonce.
               SizedBox(
                 width: creationWidth,
-                child: createAdvertisingInvitation(),
+                child: createAdvertisingInvitation(
+                  hasAdvertisement: true,
+                ),
               ),
             ],
           );
