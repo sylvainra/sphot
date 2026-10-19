@@ -103,6 +103,14 @@ test("rejette les campagnes locales sans épicentre et rayon valides", () => {
   }), now), null);
 });
 
+test("le lien déclaré par l'annonceur prévaut sur l'ancien site de campagne", () => {
+  const result = projectPublicMapAdvertisement("x", active({
+    websiteUrl: "https://sphot.app",
+    destinationUrl: "https://www.surfshop-atlantique.fr",
+  }), now);
+  assert.equal(result.destinationUrl, "https://www.surfshop-atlantique.fr/");
+});
+
 test("n'expose pas les URL de destination dangereuses", () => {
   const result = projectPublicMapAdvertisement("x", active({
     websiteUrl: "javascript:alert(1)",
