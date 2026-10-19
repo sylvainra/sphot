@@ -2702,27 +2702,24 @@ Widget _buildAdBanner() {
 
         // Le bouton fait partie de la largeur totale, sans largeur ajoutée
         // par un Container parent : aucune somme ne peut déborder du Row.
+        // Sur le Web grand écran : emplacement plus bas et création courte.
+        // L'annonceur occupe toute la largeur restante. Le recadrage
+        // vertical est limité au bandeau Web, avec l'accord du demandeur.
+        // Le visuel original 1800 x 300 et les fiches SPHOT ne sont pas touchés.
+        final cropWebBanner = kIsWeb && !isMobile;
         final preferredCreationWidth = isMobile
             ? 96.0
-            : (availableWidth * 0.23).clamp(160.0, 430.0);
-        // Image + invitation occupent ENSEMBLE toute la largeur du Row.
-        // Si la hauteur du panoramique doit être limitée, l'espace restant
-        // devient une zone de création TRANSPARENTE, jamais un bloc vide.
-        final maxHeight = max(64.0, screenSize.height * 0.28);
-        final maxImageWidth = isMobile
-            ? availableWidth
-            : maxHeight * 6.0;
-        final panoramicWidth = min(
-          max(0.0, availableWidth - preferredCreationWidth),
-          maxImageWidth,
+            : cropWebBanner
+                ? (availableWidth * 0.105).clamp(118.0, 155.0)
+                : 140.0;
+        final creationWidth = min(
+          preferredCreationWidth,
+          max(0.0, availableWidth - 90.0),
         );
-        final creationWidth = max(0.0, availableWidth - panoramicWidth);
-        final bannerHeight = isMobile
-            ? max(52.0, panoramicWidth / 6.0)
-            : panoramicWidth / 6.0;
-        // Une page Web reste transparente même en mode téléphone.
-        // L'application native conserve son bandeau compact.
-        final transparentCreation = kIsWeb;
+        final panoramicWidth = max(0.0, availableWidth - creationWidth);
+        final bannerHeight = cropWebBanner
+            ? min(118.0, max(56.0, panoramicWidth / 6.0))
+            : max(52.0, panoramicWidth / 6.0);
 
         // Même fond clair que l'encart de création sans campagne.
         // Aucun pictogramme ni sous-texte dans cette zone cliquable.
@@ -2797,7 +2794,11 @@ Widget _buildAdBanner() {
                         bannerUrl,
                         width: double.infinity,
                         height: bannerHeight,
-                        fit: BoxFit.contain,
+                        // Web large : remplir toute la largeur, avec
+                        // recadrage vertical central (jamais d'étirement).
+                        // Mobile : toujours montrer le visuel entier.
+                        fit: cropWebBanner ? BoxFit.cover : BoxFit.contain,
+                        alignment: Alignment.center,
                         webHtmlElementStrategy:
                             WebHtmlElementStrategy.prefer,
                         errorBuilder: (_, __, ___) => const Center(
