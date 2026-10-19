@@ -447,45 +447,51 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Le visuel reste intégral (format 6:1), sans titre ajouté
-            // au-dessus : le titre unique de création est en DESSOUS.
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: destinationUrl.isEmpty
-                    ? null
-                    : () => _openUrl(destinationUrl),
+            // Le visuel complet reste AU-DESSUS du bouton de création.
+            // Le calque InkWell assure le clic même avec une image HTML.
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: _sphotWarmSurface,
                 borderRadius: BorderRadius.circular(12),
-                child: Semantics(
-                  button: destinationUrl.isNotEmpty,
-                  label: advertiserName.isEmpty
-                      ? 'Consulter le site de l’annonceur'
-                      : 'Consulter le site de $advertiserName',
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.72),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _sphotWarmBorder.withOpacity(0.45),
+                border: Border.all(
+                  color: _sphotWarmBorder.withOpacity(0.45),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(7),
+                child: AspectRatio(
+                  aspectRatio: 6,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.network(
+                        bannerUrl,
+                        fit: BoxFit.contain,
+                        webHtmlElementStrategy:
+                            WebHtmlElementStrategy.prefer,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(Icons.broken_image_outlined),
+                        ),
                       ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(7),
-                      child: AspectRatio(
-                        aspectRatio: 6,
-                        child: Image.network(
-                          bannerUrl,
-                          fit: BoxFit.contain,
-                          webHtmlElementStrategy:
-                              WebHtmlElementStrategy.prefer,
-                          errorBuilder: (_, __, ___) => const Center(
-                            child: Icon(Icons.broken_image_outlined),
+                      Positioned.fill(
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: InkWell(
+                            onTap: destinationUrl.isEmpty
+                                ? null
+                                : () => _openUrl(destinationUrl),
+                            child: Semantics(
+                              button: destinationUrl.isNotEmpty,
+                              label: advertiserName.isEmpty
+                                  ? 'Consulter le site de l’annonceur'
+                                  : 'Consulter le site de $advertiserName',
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
