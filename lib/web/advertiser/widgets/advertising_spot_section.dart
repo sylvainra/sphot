@@ -62,8 +62,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   bool _completed = false;
   bool _requestExists = false;
   bool _loadingSavedPosition = false;
-  bool _requestingAssetChange = false;
-  bool _assetChangeRequestedLocally = false;
   double _radiusKm = 0;
   String _scope = 'local';
   AdvertiserTerritory? _territory;
@@ -87,13 +85,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     final value = widget.requestId?.trim() ?? '';
     if (value.isNotEmpty) return value;
     return widget.user?.uid;
-  }
-
-  bool get _assetChangeRequested {
-    final status = widget.assetChangeRequestStatus.toLowerCase();
-    return _assetChangeRequestedLocally ||
-        status == 'pending' ||
-        status == 'submitted';
   }
 
   @override
@@ -170,12 +161,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   @override
   void didUpdateWidget(covariant AdvertisingSpotSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.assetChangeRequestStatus != widget.assetChangeRequestStatus) {
-      final status = widget.assetChangeRequestStatus.toLowerCase();
-      if (status != 'pending' && status != 'submitted') {
-        _assetChangeRequestedLocally = false;
-      }
-    }
     if (oldWidget.requestedScope != widget.requestedScope &&
         _scope != widget.requestedScope) {
       _scope = widget.requestedScope;
@@ -476,38 +461,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       SettableMetadata(contentType: _bannerMimeType ?? 'image/jpeg'),
     );
     return reference.getDownloadURL();
-  }
-
-  Future<void> _requestAssetModification() async {
-    final requestId = _requestId;
-    if (requestId == null || _requestingAssetChange || _assetChangeRequested) {
-      return;
-    }
-    setState(() {
-      _requestingAssetChange = true;
-      _error = null;
-    });
-    try {
-      await FirebaseFirestore.instance
-          .collection('advertiserRequests')
-          .doc(requestId)
-          .set({
-            'assetChangeRequest': <String, Object?>{
-              'status': 'pending',
-              'requestedAt': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            },
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-      if (!mounted) return;
-      setState(() => _assetChangeRequestedLocally = true);
-    } catch (error) {
-      if (mounted) {
-        setState(() => _error = 'La demande de modification a échoué.');
-      }
-    } finally {
-      if (mounted) setState(() => _requestingAssetChange = false);
-    }
   }
 
   Future<void> _save() async {
