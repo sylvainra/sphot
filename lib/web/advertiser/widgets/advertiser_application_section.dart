@@ -245,11 +245,10 @@ class _AdvertiserApplicationSectionState
     final size = _bannerFileSizeBytes;
     if (width == null || height == null || size == null) return false;
     if (size > 2 * 1024 * 1024) return false;
-    if (width < 900 || height < 450 || width > 2400 || height > 1200) {
+    if (width != 1800 || height != 300) {
       return false;
     }
-    final ratio = width / height;
-    return ratio >= 1.85 && ratio <= 2.15;
+    return true;
   }
 
   String get _visualMessage {
@@ -261,7 +260,7 @@ class _AdvertiserApplicationSectionState
           ? 'Visuel publicitaire enregistré.'
           : 'Visuel compatible : $_bannerWidth × $_bannerHeight px.';
     }
-    return 'Visuel non conforme : format proche de 1200 × 600 px, 2 Mo maximum.';
+    return 'Visuel non conforme : dimensions requises : 1800 × 300 px, 2 Mo maximum.';
   }
 
   Future<String?> _uploadBanner(String requestId) async {
@@ -536,13 +535,13 @@ class _AdvertiserApplicationSectionState
     return _card(
       icon: Icons.image_outlined,
       title: 'VISUEL PUBLICITAIRE',
-      subtitle: 'FORMAT RECOMMANDÉ\n1200 × 600 px\nMaxi 2 Mo',
+      subtitle: 'BANNIÈRE HORIZONTALE\n1800 × 300 px\nMaxi 2 Mo',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (preview != null) ...[
             AspectRatio(
-              aspectRatio: 2,
+              aspectRatio: 6,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: ColoredBox(

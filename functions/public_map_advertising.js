@@ -65,7 +65,7 @@ function projectPublicMapAdvertisement(id, raw, now = Date.now()) {
   if (text(ad.status).toLowerCase() !== "active") return null;
 
   const visibility = text(ad.visibilityType).toLowerCase();
-  if (visibility !== "map" && visibility !== "pack") return null;
+  if (!["map", "premium", "pack"].includes(visibility)) return null;
 
   const startsAt = milliseconds(ad.campaignStartDate);
   const endsAt = milliseconds(ad.campaignEndDate);
@@ -84,7 +84,9 @@ function projectPublicMapAdvertisement(id, raw, now = Date.now()) {
     id: text(id),
     advertiserName: text(ad.advertiserName),
     bannerUrl,
-    destinationUrl: validUrl(ad.websiteUrl || ad.destinationUrl),
+    visibilityType: visibility,
+    // L'URL déclarée par l'annonceur prévaut sur un lien hérité de campagne.
+    destinationUrl: validUrl(ad.destinationUrl) || validUrl(ad.websiteUrl),
     broadcastType: scope,
     campaignEndAt: endsAt,
   };
@@ -113,7 +115,11 @@ function projectPublicMapAdvertisement(id, raw, now = Date.now()) {
  * @param {Object} dependencies Firebase Admin et constructeur HTTPS.
  * @return {Function} Fonction HTTPS Firebase.
  */
-function registerPublicMapAdvertisingEndpoint({admin, onRequest}) {
+function registerPublicMapAdvertisingEndpoint({
+  admin,
+  onRequest,
+  includePremium = false,
+}) {
   return onRequest(
       {
         region: "europe-west1",
@@ -145,7 +151,10 @@ function registerPublicMapAdvertisingEndpoint({admin, onRequest}) {
           const advertisements = snapshot.docs
               .map((doc) => projectPublicMapAdvertisement(
                   doc.id, doc.data(), now))
-              .filter((ad) => ad !== null)
+              .filter((ad) => ad !== null &&
+                  (includePremium ||
+                      ad.visibilityType === "map" ||
+                      ad.visibilityType === "pack"))
               .sort((a, b) => a.id.localeCompare(b.id));
 
           response.status(200).json({success: true, advertisements});

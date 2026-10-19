@@ -62,8 +62,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   bool _completed = false;
   bool _requestExists = false;
   bool _loadingSavedPosition = false;
-  bool _requestingAssetChange = false;
-  bool _assetChangeRequestedLocally = false;
   double _radiusKm = 0;
   String _scope = 'local';
   AdvertiserTerritory? _territory;
@@ -87,13 +85,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     final value = widget.requestId?.trim() ?? '';
     if (value.isNotEmpty) return value;
     return widget.user?.uid;
-  }
-
-  bool get _assetChangeRequested {
-    final status = widget.assetChangeRequestStatus.toLowerCase();
-    return _assetChangeRequestedLocally ||
-        status == 'pending' ||
-        status == 'submitted';
   }
 
   @override
@@ -170,12 +161,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   @override
   void didUpdateWidget(covariant AdvertisingSpotSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.assetChangeRequestStatus != widget.assetChangeRequestStatus) {
-      final status = widget.assetChangeRequestStatus.toLowerCase();
-      if (status != 'pending' && status != 'submitted') {
-        _assetChangeRequestedLocally = false;
-      }
-    }
     if (oldWidget.requestedScope != widget.requestedScope &&
         _scope != widget.requestedScope) {
       _scope = widget.requestedScope;
@@ -428,10 +413,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     if (_bannerUrl != null && _bannerBytes == null) return true;
     if (width == null || height == null || fileSize == null) return false;
     if (fileSize > 2 * 1024 * 1024) return false;
-    if (width < 900 || height < 450) return false;
-    if (width > 2400 || height > 1200) return false;
-    final ratio = width / height;
-    return ratio >= 1.85 && ratio <= 2.15;
+    return width == 1800 && height == 300;
   }
 
   String get _bannerQualityMessage {
@@ -447,10 +429,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     }
     if (_bannerWidth == null || _bannerHeight == null) return '';
     if (!_bannerIsValid) {
-      return 'Visuel non conforme : utilisez un format proche de 1200 × 600 px.';
+      return 'Visuel non conforme : dimensions requises : 1800 × 300 px.';
     }
-    if (_bannerWidth == 1200 && _bannerHeight == 600) {
-      return 'Visuel conforme SPHOT : 1200 × 600 px.';
+    if (_bannerWidth == 1800 && _bannerHeight == 300) {
+      return 'Visuel conforme SPHOT : 1800 × 300 px.';
     }
     return 'Visuel compatible SPHOT : $_bannerWidth × $_bannerHeight px.';
   }
@@ -481,39 +463,8 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
     return reference.getDownloadURL();
   }
 
-  Future<void> _requestAssetModification() async {
-    final requestId = _requestId;
-    if (requestId == null || _requestingAssetChange || _assetChangeRequested) {
-      return;
-    }
-    setState(() {
-      _requestingAssetChange = true;
-      _error = null;
-    });
-    try {
-      await FirebaseFirestore.instance
-          .collection('advertiserRequests')
-          .doc(requestId)
-          .set({
-            'assetChangeRequest': <String, Object?>{
-              'status': 'pending',
-              'requestedAt': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            },
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-      if (!mounted) return;
-      setState(() => _assetChangeRequestedLocally = true);
-    } catch (error) {
-      if (mounted) {
-        setState(() => _error = 'La demande de modification a échoué.');
-      }
-    } finally {
-      if (mounted) setState(() => _requestingAssetChange = false);
-    }
-  }
-
   Future<void> _save() async {
+    if (widget.approvedAssetsLocked) return;
     final position = widget.position;
     final territory = _territory;
     if (territory == null ||
@@ -556,32 +507,30 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             .collection('advertiserRequests')
             .doc(requestId);
         if (widget.assetChangeMode) {
+          // La proposition reste isolée jusqu'à la décision du Super Admin.
+          // Ne modifier ni le visuel ni la position actuellement approuvés.
           await requestReference.set({
-            'advertisingTerritory': territory.toFirestore(),
-            'applicantLocation': <String, Object?>{
-              'latitude': position.latitude,
-              'longitude': position.longitude,
-              'selectedAt': FieldValue.serverTimestamp(),
-            },
-            'proposedVisual': <String, Object?>{
-              'url': bannerUrl,
-              'fileName': _bannerFileName,
-              'extension': _bannerExtension,
-              'mimeType': _bannerMimeType,
-              'fileSizeBytes': _bannerFileSizeBytes,
-              'width': _bannerWidth,
-              'height': _bannerHeight,
-            },
             'assetChangeRequest': <String, Object?>{
               'status': 'submitted',
+              'proposedLocation': <String, Object?>{
+                'latitude': position.latitude,
+                'longitude': position.longitude,
+              },
+              'proposedTerritory': territory.toFirestore(),
+              'proposedVisual': <String, Object?>{
+                'url': bannerUrl,
+                'fileName': _bannerFileName,
+                'extension': _bannerExtension,
+                'mimeType': _bannerMimeType,
+                'fileSizeBytes': _bannerFileSizeBytes,
+                'width': _bannerWidth,
+                'height': _bannerHeight,
+              },
               'submittedAt': FieldValue.serverTimestamp(),
               'updatedAt': FieldValue.serverTimestamp(),
             },
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
-          await requestReference.update({
-            'advertisingTerritory': territory.toFirestore(),
-          });
         } else {
           await requestReference.set({
             ...creationData,
@@ -661,7 +610,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'FORMAT RECOMMANDÉ : 1200 × 600 PX',
+                      'BANNIÈRE HORIZONTALE : 1800 × 300 PX',
                       style: TextStyle(
                         color: Color(0xFF6B7280),
                         fontWeight: FontWeight.w900,
@@ -677,7 +626,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: AspectRatio(
-                aspectRatio: 2,
+                aspectRatio: 6,
                 child: _bannerBytes != null
                     ? Image.memory(_bannerBytes!, fit: BoxFit.contain)
                     : Image.network(
@@ -950,63 +899,26 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           ),
         ),
         _buildTerritoryCard(),
-        if (widget.approvedAssetsLocked)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: _requestingAssetChange || _assetChangeRequested
-                      ? null
-                      : _requestAssetModification,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _assetChangeRequested
-                        ? Colors.white
-                        : WebColors.blue,
-                    disabledForegroundColor: _assetChangeRequested
-                        ? Colors.white
-                        : WebColors.blue,
-                    backgroundColor: _assetChangeRequested
-                        ? WebColors.red
-                        : Colors.white,
-                    disabledBackgroundColor: _assetChangeRequested
-                        ? WebColors.red
-                        : Colors.white,
-                    side: BorderSide(
-                      color: _assetChangeRequested
-                          ? WebColors.red
-                          : WebColors.blue,
-                      width: 1.5,
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                  ),
-                  icon: Icon(
-                    _assetChangeRequested
-                        ? Icons.check_circle_outline_rounded
-                        : Icons.edit_location_alt_outlined,
-                  ),
-                  label: Text(
-                    _assetChangeRequested
-                        ? 'MODIFICATION VISUELLE OU DE POSITION DEMANDÉE'
-                        : 'DEMANDER UNE MODIFICATION DU VISUEL OU DE LA POSITION',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-                if (_assetChangeRequested) ...[
-                  const SizedBox(height: 9),
-                  const Text(
-                    'Surveillez votre boîte mail, l’équipe SPHOT vous informera de la marche à suivre.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: WebColors.red,
-                      height: 1.35,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ],
+        if (widget.assetChangeRequestStatus == 'submitted')
+          const Padding(
+            padding: EdgeInsets.only(bottom: 14),
+            child: Text(
+              'Votre nouveau visuel ou votre nouvelle position est en attente '
+              'd’approbation. Les informations précédemment approuvées '
+              'restent en vigueur.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: WebColors.red, fontWeight: FontWeight.w800),
+            ),
+          ),
+        if (widget.assetChangeMode)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 14),
+            child: Text(
+              'Choisissez le nouveau visuel ou la nouvelle position, puis '
+              'soumettez-les au Super Admin. Votre publicité actuelle ne sera '
+              'pas remplacée avant son approbation.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: WebColors.blue, fontWeight: FontWeight.w700),
             ),
           ),
 
@@ -1024,7 +936,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
         SizedBox(
           height: 48,
           child: FilledButton.icon(
-            onPressed: _saving ? null : _save,
+            onPressed: _saving || widget.approvedAssetsLocked ? null : _save,
             style: FilledButton.styleFrom(
               backgroundColor: _completed ? WebColors.red : WebColors.blue,
               foregroundColor: Colors.white,
@@ -1049,6 +961,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             label: Text(
               _saving
                   ? 'ENREGISTREMENT…'
+                  : widget.assetChangeMode
+                  ? (_completed
+                      ? 'PROPOSITION TRANSMISE POUR APPROBATION'
+                      : 'SOUMETTRE LA MODIFICATION À APPROBATION')
                   : _completed
                   ? 'SPHOT PUBLICITAIRE ENREGISTRÉ'
                   : 'ENREGISTRER LE SPHOT PUBLICITAIRE',

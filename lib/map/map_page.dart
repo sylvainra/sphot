@@ -2629,6 +2629,12 @@ String _clusterIconPath(Color color) {
 /// Seules les campagnes CARTE ou PACK diffusées dans la zone courante
 /// peuvent remplacer l'encart d'invitation.
 bool _isPublicMapAdVisible(Map<String, dynamic> ad) {
+  // L'ancienne API n'exposait pas visibilityType : compatibilité conservée.
+  // La nouvelle API exclut explicitement les campagnes Premium de la carte.
+  final visibility = ad['visibilityType']?.toString() ?? '';
+  if (visibility.isNotEmpty && visibility != 'map' && visibility != 'pack') {
+    return false;
+  }
   final deadline = ad['campaignEndAt'];
   if (deadline is! num ||
       DateTime.now().millisecondsSinceEpoch >= deadline.toInt()) {
@@ -2671,196 +2677,176 @@ Future<void> _openMapAdDestination(String destinationUrl) async {
 
 /// Encarts des fiches SPHOT volontairement exclus de ce changement.
 Widget _buildAdBanner() {
-  final screenWidth = MediaQuery.sizeOf(context).width;
-  final isDesktopWebDetailOpen =
-      kIsWeb && screenWidth >= 900 && _selectedPublicSpotId != null;
+  final screenSize = MediaQuery.sizeOf(context);
+  final isMobile = screenSize.width < 600;
+  final isFullWidthWeb = kIsWeb;
+  final detailPanelOpen = kIsWeb &&
+      screenSize.width >= 900 &&
+      _selectedPublicSpotId != null;
   final detailPanelWidth =
-      isDesktopWebDetailOpen ? min(500.0, screenWidth * 0.40) : 0.0;
+      detailPanelOpen ? min(500.0, screenSize.width * 0.40) : 0.0;
 
-  // Géométrie validée du volet et de l'encart inchangée.
-  final bannerBottom =
-      isDesktopWebDetailOpen ? _desktopSelectedAdBottom : 58.0;
-  final bannerHeight =
-      isDesktopWebDetailOpen ? _desktopSelectedAdHeight : 90.0;
-  final bannerRight = isDesktopWebDetailOpen ? detailPanelWidth + 8.0 : 8.0;
+  // Le bandeau Web épouse exactement la largeur de la carte visible.
+  // En présence du volet SPHOT, il s'arrête à son bord.
+  // Sur mobile, les marges existantes sont conservées.
+  final horizontalInset = isFullWidthWeb ? 0.0 : 8.0;
+  final bannerBottom = detailPanelOpen ? 64.0 : 58.0;
 
-  Widget emptyAdvertisingSpace() {
-    return GestureDetector(
-      onTap: () => unawaited(_openAdvertiserWebsite()),
-      child: Row(
-        children: [
-          const SizedBox(width: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: SizedBox(
-              width: 52,
-              height: 52,
-              child: AdaptiveAssetImage(
-                'data/icons/fire_red_icon.svg',
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Transform.translate(
-              offset: const Offset(-10, 0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'AJOUTE TON SPHOT PUBLICITAIRE ICI !',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black87,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Visuel : PNG, JPG ou WEBP\n1200 × 600 px - 2 Mo max',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.black54,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  return Positioned(
+    left: horizontalInset,
+    right: isFullWidthWeb ? detailPanelWidth : horizontalInset,
+    bottom: bannerBottom,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
 
-  Widget occupiedAdvertisingSpace(Map<String, dynamic> ad) {
-    final bannerUrl = ad['bannerUrl']?.toString() ?? '';
-    final destinationUrl = ad['destinationUrl']?.toString() ?? '';
-    final advertiserName =
-        ad['advertiserName']?.toString().trim() ?? '';
-    final ctaWidth = screenWidth < 600 ? 80.0 : 88.0;
+        // Le bouton fait partie de la largeur totale, sans largeur ajoutée
+        // par un Container parent : aucune somme ne peut déborder du Row.
+        // Sur le Web grand écran : emplacement plus bas et création courte.
+        // L'annonceur occupe toute la largeur restante. Le recadrage
+        // vertical est limité au bandeau Web, avec l'accord du demandeur.
+        // Le visuel original 1800 x 300 et les fiches SPHOT ne sont pas touchés.
+        final cropWebBanner = kIsWeb && !isMobile;
+        final preferredCreationWidth = isMobile
+            ? 96.0
+            : cropWebBanner
+                ? (availableWidth * 0.105).clamp(118.0, 155.0)
+                : 140.0;
+        final creationWidth = min(
+          preferredCreationWidth,
+          max(0.0, availableWidth - 90.0),
+        );
+        final panoramicWidth = max(0.0, availableWidth - creationWidth);
+        final bannerHeight = cropWebBanner
+            ? min(118.0, panoramicWidth / 6.0)
+            : max(52.0, panoramicWidth / 6.0);
 
-    return Row(
-      children: [
-        Expanded(
-          child: Material(
-            color: Colors.white.withOpacity(0.70),
-            child: InkWell(
-              onTap: destinationUrl.isEmpty
-                  ? null
-                  : () => unawaited(
-                        _openMapAdDestination(destinationUrl),
-                      ),
-              child: Semantics(
-                label: advertiserName.isEmpty
-                    ? 'Publicité'
-                    : 'Publicité : $advertiserName',
-                child: SizedBox(
-                  height: bannerHeight,
-                  child: Image.network(
-                    bannerUrl,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Icon(
-                        Icons.image_not_supported_outlined,
-                        color: Colors.black54,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        Container(
-          width: ctaWidth,
-          height: bannerHeight,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.96),
-            border: Border(
-              left: BorderSide(color: Colors.black.withOpacity(0.17)),
-            ),
-          ),
-          child: Material(
+        // Même fond clair que l'encart de création sans campagne.
+        // Aucun pictogramme ni sous-texte dans cette zone cliquable.
+        Widget createAdvertisingInvitation() {
+          return Material(
             color: Colors.transparent,
             child: InkWell(
               onTap: () => unawaited(_openAdvertiserWebsite()),
               child: Semantics(
                 button: true,
-                label: 'Votre SPHOT publicitaire ici',
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.add_circle_outline,
-                      color: Color(0xFFE53935),
-                      size: 19,
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      'VOTRE\nSPHOT\nPUBLICITAIRE\nICI !',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: screenWidth < 600 ? 9.1 : 10.0,
-                        height: 1.13,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black87,
+                label: 'CRÉER VOTRE SPHOT PUBLICITAIRE ICI!',
+                child: Container(
+                  alignment: Alignment.center,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 4.0 : 10.0,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.72),
+                    border: Border(
+                      left: BorderSide(
+                        color: Colors.black.withOpacity(0.08),
+                        width: 1,
                       ),
                     ),
-                  ],
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.center,
+                    child: Text(
+                      'CRÉER VOTRE\nSPHOT PUBLICITAIRE\nICI!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: isMobile ? 12 : 15,
+                        height: 1.15,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  return Positioned(
-    left: 8,
-    right: bannerRight,
-    bottom: bannerBottom,
-    child: Container(
-      height: bannerHeight,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.22),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.12),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-        border: Border.all(
-          color: Colors.black.withOpacity(0.08),
-          width: 1,
-        ),
-      ),
-      child: ValueListenableBuilder<int>(
-        valueListenable: _mapAdRotation,
-        builder: (context, rotation, _) {
-          return FutureBuilder<List<Map<String, dynamic>>>(
-            future: _publicMapAdvertisementsFuture,
-            builder: (context, snapshot) {
-              final ads = (snapshot.data ?? const <Map<String, dynamic>>[])
-                  .where(_isPublicMapAdVisible)
-                  .toList();
-              if (ads.isEmpty) return emptyAdvertisingSpace();
-              return occupiedAdvertisingSpace(ads[rotation % ads.length]);
-            },
           );
-        },
-      ),
+        }
+
+        Widget occupiedAdvertisingSpace(Map<String, dynamic> ad) {
+          final bannerUrl = ad['bannerUrl']?.toString() ?? '';
+          final destinationUrl = ad['destinationUrl']?.toString() ?? '';
+          final advertiserName =
+              ad['advertiserName']?.toString().trim() ?? '';
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Zone 1 : le visuel ouvre EXCLUSIVEMENT le site de l'annonceur.
+              Expanded(
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: InkWell(
+                    onTap: destinationUrl.isEmpty
+                        ? null
+                        : () => unawaited(
+                              _openMapAdDestination(destinationUrl),
+                            ),
+                    child: Semantics(
+                      button: destinationUrl.isNotEmpty,
+                      label: advertiserName.isEmpty
+                          ? 'Visiter le site de l’annonceur'
+                          : 'Visiter le site de $advertiserName',
+                      child: Image.network(
+                        bannerUrl,
+                        width: double.infinity,
+                        height: bannerHeight,
+                        // Web large : remplir toute la largeur, avec
+                        // recadrage vertical central (jamais d'étirement).
+                        // Mobile : toujours montrer le visuel entier.
+                        fit: cropWebBanner ? BoxFit.cover : BoxFit.contain,
+                        alignment: Alignment.center,
+                        webHtmlElementStrategy:
+                            WebHtmlElementStrategy.prefer,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(
+                            Icons.image_not_supported_outlined,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Zone 2 : carte transparente sur Web, distincte de l'annonce.
+              SizedBox(
+                width: creationWidth,
+                child: createAdvertisingInvitation(),
+              ),
+            ],
+          );
+        }
+
+        return SizedBox(
+          width: availableWidth,
+          height: bannerHeight,
+          child: ValueListenableBuilder<int>(
+            valueListenable: _mapAdRotation,
+            builder: (context, rotation, _) {
+              return FutureBuilder<List<Map<String, dynamic>>>(
+                future: _publicMapAdvertisementsFuture,
+                builder: (context, snapshot) {
+                  final ads =
+                      (snapshot.data ?? const <Map<String, dynamic>>[])
+                          .where(_isPublicMapAdVisible)
+                          .toList();
+                  if (ads.isEmpty) {
+                    // Sans annonce, la carte reste visible sous l'invitation.
+                    return createAdvertisingInvitation();
+                  }
+                  return occupiedAdvertisingSpace(
+                    ads[rotation % ads.length],
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
     ),
   );
 }
@@ -2895,7 +2881,12 @@ Widget _buildBottomBar() {
 
   return Positioned(
     left: _mobileBottomMenuSideInset,
-    right: _mobileBottomMenuSideInset,
+    right: kIsWeb &&
+            MediaQuery.sizeOf(context).width >= 900 &&
+            _desktopDetailSpot != null
+        ? min(500.0, MediaQuery.sizeOf(context).width * 0.40) +
+            _mobileBottomMenuSideInset
+        : _mobileBottomMenuSideInset,
     bottom: _mobileBottomMenuBottom,
     child: Container(
       height: _mobileBottomMenuHeight,
@@ -3294,10 +3285,7 @@ _buildVerticalFilterMenu(),
 // dans l'espace de 6 px réservé entre le volet et le menu inférieur.
 if (_mobileDetailSpot == null)
   _buildAdBanner(),
-if (!(kIsWeb &&
-    MediaQuery.sizeOf(context).width >= 900 &&
-    _selectedPublicSpotId != null))
-  _buildBottomBar(),
+_buildBottomBar(),
 if (_mobileDetailSpot != null)
   _buildMobileSpotPanel(),
 if (kIsWeb &&

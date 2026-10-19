@@ -10983,9 +10983,18 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
     async (event) => {
       const before = event.data.before.data() || {};
       const data = event.data.after.data() || {};
-      const previous = (before.assetChangeRequest || {}).status;
-      const status = (data.assetChangeRequest || {}).status;
-      if (data.status !== "approved" || previous === status) return;
+      const previousChange = before.assetChangeRequest || {};
+      const currentChange = data.assetChangeRequest || {};
+      const previous = previousChange.status;
+      const status = currentChange.status;
+      const syncStatus = currentChange.syncStatus;
+      const approvalSyncFinished = status === "approved" &&
+        previousChange.syncStatus !== syncStatus &&
+        ["applied", "unlinked", "no_active_campaign"].includes(syncStatus);
+      // L'email d'approbation attend la fin de synchronisation.
+      if (data.status !== "approved" ||
+          (status === "approved" ? !approvalSyncFinished :
+            previous === status)) return;
       const messages = {
         pending: "Votre demande de modification du visuel ou de la position " +
           "a été reçue. L'équipe SPHOT va l'examiner.",
@@ -10995,9 +11004,17 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
         submitted: "Votre proposition de modification du visuel ou de la " +
           "position a été reçue. Elle est en attente d'approbation " +
           "par l'équipe SPHOT.",
-        approved: "L'équipe SPHOT a approuvé votre modification du visuel " +
-          "ou de la position. Les éléments approuvés sont disponibles " +
-          "dans votre espace annonceur.",
+        changes_requested: "L'équipe SPHOT demande des ajustements à votre " +
+          "proposition. Vous pouvez déposer un nouveau visuel dans votre " +
+          "espace annonceur.",
+        approved: syncStatus === "applied" ?
+          "L'équipe SPHOT a approuvé votre modification du visuel ou de " +
+          "la position. La mise à jour de votre campagne active liée a été " +
+          "effectuée." :
+          "L'équipe SPHOT a approuvé votre modification du visuel ou de " +
+          "la position. Aucune campagne active liée n'a encore été mise " +
+          "à jour. L'équipe SPHOT doit vérifier le raccordement avant " +
+          "la diffusion du nouveau visuel.",
         rejected: "L'équipe SPHOT n'a pas approuvé votre modification. " +
           "Les éléments précédemment approuvés sont conservés.",
       };
@@ -11006,6 +11023,7 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
         pending: "DEMANDE DE MODIFICATION REÇUE",
         authorized: "MODIFICATION AUTORISÉE",
         submitted: "PROPOSITION À APPROUVER",
+        changes_requested: "AJUSTEMENTS DEMANDÉS",
         approved: "MODIFICATION APPROUVÉE",
         rejected: "MODIFICATION REFUSÉE",
       };
@@ -11047,6 +11065,7 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
         if (!claimed) continue;
         try {
           let text;
+          let html;
           if (target.kind === "team") {
             text = "Suivi d'une modification annonceur.\n\n" +
               "Dossier : " + event.params.requestId + "\n" +
@@ -11056,13 +11075,10 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
               "Consultez le dossier dans votre espace SPHOT pour " +
               "examiner la demande ou retrouver la décision.";
           } else {
-            let url = "https://sphot.app/#/professional-login" +
+            // Tous les emails annonceur pointent vers le même accès
+            // authentifié : aucun jeton personnel dans le lien du mail.
+            const url = "https://sphot.app/#/professional-login" +
               "?audience=advertiser";
-            if (status === "authorized") {
-              url = await advertiserRequestAccessUrl(
-                  event.data.after.ref, recipient,
-              );
-            }
             const reason = cleanValue(
                 (data.assetChangeRequest || {}).reason, "",
             );
@@ -11070,12 +11086,23 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
               messages[status] + (reason ? "\n\nMotif : " + reason : "") +
               "\n\nAccéder à votre espace : " + url +
               "\n\nL'équipe SPHOT";
+            html = "<p>" + escapeHtml(buildAdvertiserGreeting(data)) +
+              "</p><p>" + escapeHtml(messages[status]) + "</p>" +
+              (reason ? "<p><strong>Motif :</strong> " +
+                escapeHtml(reason) + "</p>" : "") +
+              "<p style=\"margin:28px 0;text-align:center\">" +
+              "<a href=\"" + url + "\" style=\"background:#253f90;" +
+              "color:#ffffff;padding:14px 24px;border-radius:8px;" +
+              "font-weight:bold;text-decoration:none;display:inline-block\">" +
+              "ACCÉDER À MON ESPACE SPHOT PUBLICITAIRE</a></p>" +
+              "<p>L'équipe SPHOT</p>";
           }
           const result = await sendSphotMail(transporter, {
             from: MAIL_FROM,
             to: target.email,
             subject: "SPHOT - " + labels[status],
             text: text,
+            ...(html ? {html} : {}),
 
           });
           await ledger.set({
@@ -11590,3 +11617,21 @@ const {registerPublicMapAdvertisingEndpoint} =
     require("./public_map_advertising");
 exports.getPublicMapAdvertisements =
     registerPublicMapAdvertisingEndpoint({admin, onRequest});
+
+// API séparée pour la nouvelle interface : Carte + Premium + Pack.
+// L'ancienne API continue de retourner uniquement Carte + Pack, ce qui
+// protège les versions déjà déployées de SPHOT.
+exports.getPublicAdvertisementsV2 =
+    registerPublicMapAdvertisingEndpoint({
+      admin,
+      onRequest,
+      includePremium: true,
+    });
+
+// Nouvelle synchronisation : aucun dossier et aucune campagne n'est modifié
+// tant que le Super Admin n'a pas approuvé une proposition.
+// À déployer explicitement et séparément après validation.
+const {registerAdvertiserCampaignSync} =
+    require("./advertiser_campaign_sync");
+exports.syncApprovedAdvertiserAssets =
+    registerAdvertiserCampaignSync({admin, onDocumentUpdated});
