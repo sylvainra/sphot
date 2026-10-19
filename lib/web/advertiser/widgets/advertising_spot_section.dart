@@ -511,6 +511,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   }
 
   Future<void> _save() async {
+    if (widget.approvedAssetsLocked) return;
     final position = widget.position;
     final territory = _territory;
     if (territory == null ||
@@ -984,7 +985,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
         SizedBox(
           height: 48,
           child: FilledButton.icon(
-            onPressed: _saving ? null : _save,
+            onPressed: _saving || widget.approvedAssetsLocked ? null : _save,
             style: FilledButton.styleFrom(
               backgroundColor: _completed ? WebColors.red : WebColors.blue,
               foregroundColor: Colors.white,
