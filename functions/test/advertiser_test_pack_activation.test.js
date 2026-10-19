@@ -121,7 +121,7 @@ test("Sans session, l'API de confirmation refuse sans écrire", async () => {
 });
 
 
-test("La prévisualisation ne modifie rien ; confirmation écrit le seul droit Pack",
+test("Prévisualisation sans écriture et confirmation limitée au Pack",
     async () => {
       const updates = [];
       const histories = [];
