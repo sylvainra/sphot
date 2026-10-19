@@ -2722,8 +2722,8 @@ Widget _buildAdBanner() {
             ? min(118.0, panoramicWidth / 6.0)
             : max(52.0, panoramicWidth / 6.0);
 
-        // Invitation : visible sans campagne, et à droite sur l'application
-        // mobile. Sur le Web, une campagne occupe la largeur totale.
+        // Invitation : visible sans campagne et maintenue à droite
+        // de chaque publicité sur le Web comme sur mobile.
         Widget createAdvertisingInvitation({
           bool hasAdvertisement = false,
         }) {
@@ -2842,10 +2842,8 @@ Widget _buildAdBanner() {
             ),
           );
 
-          // Site Web : tout le visuel, y compris l'ancienne zone de création.
-          if (kIsWeb) return adVisual;
-
-          // Application : conserver la zone de création compacte et cliquable.
+          // Zone de création conservée à droite sur Web et mobile ;
+          // sa largeur est réduite uniquement sur l'application mobile.
           return Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
