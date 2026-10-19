@@ -119,3 +119,78 @@ test("Sans session, l'API de confirmation refuse sans écrire", async () => {
   assert.equal(response.code, 401);
   assert.equal(writes, 0);
 });
+
+
+test("La prévisualisation ne modifie rien ; confirmation écrit le seul droit Pack",
+    async () => {
+      const updates = [];
+      const histories = [];
+      const requestRef = {kind: "request"};
+      const campaignRef = {
+        kind: "campaign",
+        collection: () => ({doc: () => ({kind: "history"})}),
+      };
+      const document = (ref) => ({
+        exists: true,
+        data: () => ref.kind === "request" ? dossier() : campagne({
+          campaignStartDate: new Date(Date.now() - 3600000),
+          campaignEndDate: new Date(Date.now() + 3600000),
+        }),
+      });
+      const firestore = () => ({
+        collection: (name) => ({
+          doc: () => name === "adRequests" ? campaignRef : requestRef,
+        }),
+        runTransaction: async (callback) => callback({
+          get: async (ref) => document(ref),
+          update: (ref, fields) => updates.push({ref, fields}),
+          set: (ref, fields) => histories.push({ref, fields}),
+        }),
+      });
+      firestore.Timestamp = {
+        fromMillis: (timestamp) => new Date(timestamp),
+      };
+      firestore.FieldValue = {
+        serverTimestamp: () => new Date(),
+      };
+      const handler = registerAdvertiserTestPackActivation({
+        admin: {firestore},
+        crypto: {},
+        onRequest: (_, callback) => callback,
+        checkSuperAdminSession: async () => "super-admin",
+      });
+      const response = {
+        set() {return this;},
+        status(code) {this.code = code; return this;},
+        json(body) {this.body = body; return this;},
+      };
+      const base = {
+        method: "POST",
+        headers: {
+          origin: "http://localhost:51778",
+          authorization: "Bearer test-session",
+        },
+      };
+      await handler({...base, body: {
+        requestId: "dossier-1", campaignId: "campaign-1", action: "preview",
+      }}, response);
+      assert.equal(response.code, 200);
+      assert.equal(updates.length, 0);
+      assert.equal(histories.length, 0);
+      await handler({...base, body: {
+        requestId: "dossier-1",
+        campaignId: "campaign-1",
+        action: "confirm",
+        confirmation: "ACTIVER PACK TEST",
+      }}, response);
+      assert.equal(response.code, 200);
+      assert.equal(updates.length, 1);
+      assert.equal(histories.length, 1);
+      assert.equal(updates[0].fields.visibilityType, "pack");
+      assert.equal(updates[0].fields.advertiserRequestId, "dossier-1");
+      assert.equal(updates[0].fields.testPack.previousVisibilityType, "map");
+      assert.equal(
+          Object.hasOwn(updates[0].fields, "campaignEndDate"), false);
+      assert.equal(
+          Object.hasOwn(updates[0].fields, "totalPriceExclTax"), false);
+    });
