@@ -42,6 +42,7 @@ test("ne renvoie que les champs publics des publicités actives", () => {
   assert.equal(result.radiusKm, 10);
   assert.equal(result.bannerUrl, "https://example.com/banner.webp");
   assert.equal(result.destinationUrl, "https://example.com/");
+  assert.equal(result.visibilityType, "map");
   for (const privateKey of ["email", "phone", "siret", "totalPriceExclTax"]) {
     assert.equal(Object.hasOwn(result, privateKey), false);
   }
@@ -63,10 +64,12 @@ test("rejette les campagnes absentes, désactivées, futures ou expirées", () =
   }), now), null);
 });
 
-test("écarte les campagnes Premium et les images sans HTTPS", () => {
-  assert.equal(projectPublicMapAdvertisement("x", active({
+test("projette aussi les campagnes Premium sans changer la sécurité HTTPS", () => {
+  const premium = projectPublicMapAdvertisement("x", active({
     visibilityType: "premium",
-  }), now), null);
+  }), now);
+  assert.ok(premium);
+  assert.equal(premium.visibilityType, "premium");
   assert.equal(projectPublicMapAdvertisement("x", active({
     bannerUrl: "http://example.com/banner.webp",
   }), now), null);
