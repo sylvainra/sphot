@@ -116,13 +116,19 @@ function registerAdvertiserCampaignSync({admin, onDocumentUpdated}) {
           }
 
           let updated = 0;
+          let alreadyApplied = 0;
           for (const doc of docs) {
             if (!doc.exists) continue;
             const campaign = doc.data() || {};
             if (campaign.status !== "active") continue;
+            if (campaign.advertiserRequestId &&
+                campaign.advertiserRequestId !== requestId) continue;
             if (doc.id !== requestId &&
                 campaign.advertiserRequestId !== requestId) continue;
-            if (campaign.lastApprovedAssetEventId === eventKey) continue;
+            if (campaign.lastApprovedAssetEventId === eventKey) {
+              alreadyApplied++;
+              continue;
+            }
 
             const change = {
               bannerUrl: patch.bannerUrl,
@@ -152,9 +158,9 @@ function registerAdvertiserCampaignSync({admin, onDocumentUpdated}) {
           }
 
           tx.update(requestsRef, {
-            "assetChangeRequest.syncStatus": updated > 0 ?
+            "assetChangeRequest.syncStatus": updated + alreadyApplied > 0 ?
               "applied" : (refs.length > 0 ? "no_active_campaign" : "unlinked"),
-            "assetChangeRequest.syncedCampaignCount": updated,
+            "assetChangeRequest.syncedCampaignCount": updated + alreadyApplied,
             "assetChangeRequest.lastSyncAt":
               admin.firestore.FieldValue.serverTimestamp(),
           });
