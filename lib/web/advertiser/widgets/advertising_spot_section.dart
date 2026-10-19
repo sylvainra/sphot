@@ -507,32 +507,30 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             .collection('advertiserRequests')
             .doc(requestId);
         if (widget.assetChangeMode) {
+          // La proposition reste isolée jusqu'à la décision du Super Admin.
+          // Ne modifier ni le visuel ni la position actuellement approuvés.
           await requestReference.set({
-            'advertisingTerritory': territory.toFirestore(),
-            'applicantLocation': <String, Object?>{
-              'latitude': position.latitude,
-              'longitude': position.longitude,
-              'selectedAt': FieldValue.serverTimestamp(),
-            },
-            'proposedVisual': <String, Object?>{
-              'url': bannerUrl,
-              'fileName': _bannerFileName,
-              'extension': _bannerExtension,
-              'mimeType': _bannerMimeType,
-              'fileSizeBytes': _bannerFileSizeBytes,
-              'width': _bannerWidth,
-              'height': _bannerHeight,
-            },
             'assetChangeRequest': <String, Object?>{
               'status': 'submitted',
+              'proposedLocation': <String, Object?>{
+                'latitude': position.latitude,
+                'longitude': position.longitude,
+              },
+              'proposedTerritory': territory.toFirestore(),
+              'proposedVisual': <String, Object?>{
+                'url': bannerUrl,
+                'fileName': _bannerFileName,
+                'extension': _bannerExtension,
+                'mimeType': _bannerMimeType,
+                'fileSizeBytes': _bannerFileSizeBytes,
+                'width': _bannerWidth,
+                'height': _bannerHeight,
+              },
               'submittedAt': FieldValue.serverTimestamp(),
               'updatedAt': FieldValue.serverTimestamp(),
             },
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
-          await requestReference.update({
-            'advertisingTerritory': territory.toFirestore(),
-          });
         } else {
           await requestReference.set({
             ...creationData,
