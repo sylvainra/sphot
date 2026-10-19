@@ -2791,9 +2791,11 @@ Widget _buildAdBanner() {
         Widget occupiedAdvertisingSpace(Map<String, dynamic> ad) {
           final standardBannerUrl = ad['bannerUrl']?.toString() ?? '';
           final panoramicBannerUrl = ad['webBannerUrl']?.toString() ?? '';
-          final bannerUrl = wideWebBanner && panoramicBannerUrl.isNotEmpty
-              ? panoramicBannerUrl
-              : standardBannerUrl;
+          // L'image originale publiée prime sur l'ancienne déclinaison
+          // panoramique ; celle-ci n'est qu'un secours si l'original manque.
+          final bannerUrl = standardBannerUrl.isNotEmpty
+              ? standardBannerUrl
+              : panoramicBannerUrl;
           final destinationUrl = ad['destinationUrl']?.toString() ?? '';
           final advertiserName =
               ad['advertiserName']?.toString().trim() ?? '';
