@@ -2788,16 +2788,12 @@ Widget _buildAdBanner() {
         Widget occupiedAdvertisingSpace(Map<String, dynamic> ad) {
           final standardBannerUrl = ad['bannerUrl']?.toString() ?? '';
           final panoramicBannerUrl = ad['webBannerUrl']?.toString() ?? '';
-          final bannerUrl = wideWebBanner && panoramicBannerUrl.isNotEmpty
-              ? panoramicBannerUrl
-              : standardBannerUrl;
-          // Aperçu local uniquement : le visuel panoramique préparé pour
-          // la campagne de démonstration. Jamais utilisé en production.
-          // Les campagnes réelles doivent fournir webBannerUrl approuvé.
-          final demoWebPanorama = kDebugMode &&
-              wideWebBanner &&
-              panoramicBannerUrl.isEmpty &&
-              ad['id'] == 'test_bar_de_la_plage_20261019';
+          // Le visuel 1800 x 300 soumis par l'annonceur fait foi,
+          // sur le Web comme sur mobile. Un ancien webBannerUrl n'est
+          // consulté qu'en secours pour les données historiques.
+          final bannerUrl = standardBannerUrl.isNotEmpty
+              ? standardBannerUrl
+              : panoramicBannerUrl;
           final destinationUrl = ad['destinationUrl']?.toString() ?? '';
           final advertiserName =
               ad['advertiserName']?.toString().trim() ?? '';
@@ -2815,9 +2811,7 @@ Widget _buildAdBanner() {
                     fit: StackFit.expand,
                     children: [
                       Image.network(
-                          // Afficher la création d'origine pendant la démo,
-                          // sans substituer le recadrage local 1800x140.
-                          demoWebPanorama ? standardBannerUrl : bannerUrl,
+                          bannerUrl,
                           width: double.infinity,
                           height: bannerHeight,
                           // Le visuel complet est compressé dans le bandeau
