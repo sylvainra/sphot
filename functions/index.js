@@ -14,6 +14,8 @@ const commercialQuotePricing = require("./commercial_quote_pricing");
 const {spotCountry} = require("./advertiser_country_coverage");
 const {registerAdminQuotePortalEndpoint} =
     require("./admin_quote_portal_endpoint");
+const {registerAdvertiserRenewalEndpoint} =
+    require("./advertiser_renewal_endpoint");
 const {assignAuthorizedAdminQuoteNumber} =
     require("./admin_quote_numbering");
 const {getDownloadURL} = require("firebase-admin/storage");
@@ -33,6 +35,11 @@ if (process.env.SPHOT_ENABLE_ADMIN_QUOTE_PORTAL === "true") {
   exports.adminQuotePortal =
       registerAdminQuotePortalEndpoint({admin, onRequest});
 }
+
+// Expiration vérifiée côté serveur ; préparation seulement, sans activation
+// ni modification du rayon contractuel tant que le paiement est indisponible.
+exports.advertiserRenewalEligibility =
+    registerAdvertiserRenewalEndpoint({admin, onRequest});
 
 const SMTP_USER = "admin@sphot.app";
 const MAIL_FROM = "\"SPHOT\" <no-reply@sphot.app>";
