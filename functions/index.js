@@ -18,8 +18,10 @@ const {assignAuthorizedAdminQuoteNumber} =
     require("./admin_quote_numbering");
 const {getDownloadURL} = require("firebase-admin/storage");
 const nodemailer = require("nodemailer");
-const {shouldNotifyAdvertiserAssetChange} =
-    require("./advertiser_asset_change_email_trigger");
+const {
+  shouldNotifyAdvertiserAssetChange,
+  advertiserAssetChangeNotificationId,
+} = require("./advertiser_asset_change_email_trigger");
 const PDFDocument = require("pdfkit");
 
 admin.initializeApp();
@@ -11040,8 +11042,13 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
         auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
       });
       for (const target of recipients) {
+        // Grouper les retries de la même proposition approuvée :
+        // un nouvel event Firestore ne doit pas doubler le même email.
+        const notificationId = advertiserAssetChangeNotificationId(
+            status, currentChange, event.id, event.params.requestId,
+        );
         const key = crypto.createHash("sha256")
-            .update(event.id + ":" + target.kind).digest("hex");
+            .update(notificationId + ":" + target.kind).digest("hex");
         const ledger = event.data.after.ref
             .collection("assetChangeNotifications").doc(key);
         const claimed = await admin.firestore().runTransaction(async (tx) => {
