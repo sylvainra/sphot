@@ -21,6 +21,7 @@ import 'package:http/http.dart' as http;
 import '../widgets/super_admin_admin_workflow_panel.dart';
 import '../widgets/super_admin_annual_financial_export_card.dart';
 import '../widgets/sphot_dropdown_visuals.dart';
+import '../widgets/super_admin_advertiser_cgv_editor.dart';
 import '../widgets/advertiser_asset_comparison.dart';
 
 enum DashboardSpotFilter {
@@ -5632,6 +5633,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 subtitle: 'Notice d’information RGPD',
                 chapters: _documentChapters['RGPD'] ?? [],
               ),
+
+              const SizedBox(height: 12),
+              const SuperAdminAdvertiserCgvEditor(),
 
               const SizedBox(height: 12),
 
