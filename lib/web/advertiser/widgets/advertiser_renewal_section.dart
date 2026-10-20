@@ -76,8 +76,11 @@ class _AdvertiserRenewalSectionState extends State<AdvertiserRenewalSection> {
       body: jsonEncode({
         'action': action,
         'requestId': uid,
-        if (selected != null)
+        if (selected != null) ...{
           'territory': {'level': selected.storageKey},
+          'offer': _offer,
+          'duration': _duration,
+        },
       }),
     ).timeout(const Duration(seconds: 25));
     final dynamic raw = jsonDecode(response.body);
