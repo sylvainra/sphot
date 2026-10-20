@@ -12,7 +12,6 @@ import '../../../models/advertising_pricing_config.dart';
 import '../services/advertiser_territory_service.dart';
 import '../../shared/web_colors.dart';
 import '../models/advertising_visual_data.dart';
-import 'advertiser_cgv_policy.dart';
 
 class AdvertisingSpotSection extends StatefulWidget {
   const AdvertisingSpotSection({
@@ -69,22 +68,8 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   String _scope = 'local';
   AdvertiserTerritory? _territory;
   AdvertiserTerritory? _approvedTerritory;
-  Map<String, dynamic> _activeRadiusRequest = {};
   LatLng? _approvedPosition;
   String? _approvedVisualUrl;
-  bool _radiusTermsAccepted = false;
-
-  bool get _radiusRequestPending =>
-      <String>{'waiting_period_end', 'approved_pending_payment'}
-          .contains(_activeRadiusRequest['status']);
-
-  bool get _radiusChanged {
-    if (!widget.assetChangeMode) return false;
-    final approved = _approvedTerritory;
-    final proposed = _territory;
-    if (approved == null || proposed == null) return false;
-    return approved.level != proposed.level || approved.code != proposed.code;
-  }
   AdvertiserTerritoryOptions? _territoryOptions;
   final AdvertiserTerritoryService _territoryService =
       AdvertiserTerritoryService();
@@ -160,7 +145,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   void _selectTerritory(AdvertiserTerritory selected) {
     setState(() {
       _territory = selected;
-      _radiusTermsAccepted = false;
       _completed = false;
       _error = null;
     });
@@ -182,26 +166,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   @override
   void didUpdateWidget(covariant AdvertisingSpotSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final newRadiusStatus =
-        widget.radiusChangeRequest['status']?.toString() ?? '';
-    final oldRadiusStatus =
-        oldWidget.radiusChangeRequest['status']?.toString() ?? '';
-    if (newRadiusStatus != oldRadiusStatus) {
-      _activeRadiusRequest = _map(widget.radiusChangeRequest);
-      if (newRadiusStatus == 'waiting_period_end' ||
-          newRadiusStatus == 'rejected' ||
-          newRadiusStatus == 'approved_pending_payment') {
-        // Ne conserver dans la sélection aucun rayon refusé ou non payé.
-        _territory = _approvedTerritory;
-        _radiusTermsAccepted = false;
-        final approved = _approvedTerritory;
-        if (approved != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) widget.onTerritoryChanged(approved);
-          });
-        }
-      }
-    }
     if (oldWidget.requestedScope != widget.requestedScope &&
         _scope != widget.requestedScope) {
       _scope = widget.requestedScope;
@@ -242,7 +206,6 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           _approvedTerritory = AdvertiserTerritory.fromFirestore(
             data['advertisingTerritory'],
           );
-          _activeRadiusRequest = _map(data['radiusChangeRequest']);
           final approvedLocation = _map(approvedApplication['location']);
           final approvedVisual = _map(approvedApplication['visual']);
           final advertisingSpot = _map(data['advertisingSpot']);
@@ -534,10 +497,14 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       return;
     }
 
-    if (_radiusChanged && !_radiusTermsAccepted) {
+    if (widget.assetChangeMode &&
+        _approvedTerritory != null &&
+        (territory.level != _approvedTerritory!.level ||
+         territory.code != _approvedTerritory!.code)) {
       setState(() {
-        _error = 'Confirmez les conditions de report et de tarification '
-            'du changement de rayon avant de soumettre.';
+        _error = 'Le rayon contractuel est verrouillé. '
+            'Il pourra être choisi à nouveau lors de la prochaine '
+            'souscription, au tarif correspondant.';
       });
       return;
     }
@@ -562,8 +529,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             .collection('advertiserRequests')
             .doc(requestId);
         if (widget.assetChangeMode) {
-          // La période payée conserve la zone actuelle. Séparer la
-          // proposition de rayon des visuels/positions examinables de suite.
+          // Visuel et position seulement. La zone reste contractuelle.
           final approved = _approvedPosition;
           final locationChanged = approved != null &&
               ((approved.latitude - position.latitude).abs() > 0.000001 ||
@@ -571,17 +537,13 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           final visualChanged = _bannerBytes != null ||
               (_approvedVisualUrl != null &&
                _approvedVisualUrl != bannerUrl);
-          final assetsChanged = visualChanged || locationChanged;
-          final radiusChanged = _radiusChanged;
-
-          if (!assetsChanged && !radiusChanged) {
-            throw StateError('Aucun changement à soumettre.');
+          if (!visualChanged && !locationChanged) {
+            throw StateError(
+              'Aucune modification de visuel ou de position à soumettre.',
+            );
           }
-          final changes = <String, Object?>{
-            'updatedAt': FieldValue.serverTimestamp(),
-          };
-          if (assetsChanged) {
-            changes['assetChangeRequest'] = <String, Object?>{
+          await requestReference.set({
+            'assetChangeRequest': <String, Object?>{
               'status': 'submitted',
               'proposedLocation': <String, Object?>{
                 'latitude': position.latitude,
@@ -598,60 +560,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               },
               'submittedAt': FieldValue.serverTimestamp(),
               'updatedAt': FieldValue.serverTimestamp(),
-            };
-          }
-          if (radiusChanged) {
-            // Vérifier le dossier à nouveau juste avant la soumission :
-            // le rayon contractuel ou la demande peuvent avoir changé
-            // depuis le chargement de ce formulaire.
-            final latest = (await requestReference.get()).data() ?? {};
-            final liveTerritory = AdvertiserTerritory.fromFirestore(
-              latest['advertisingTerritory'],
-            );
-            final liveRequest = _map(latest['radiusChangeRequest']);
-            if (liveTerritory == null ||
-                liveTerritory.level != _approvedTerritory?.level ||
-                liveTerritory.code != _approvedTerritory?.code) {
-              throw StateError(
-                'Le rayon contractuel a changé. Actualisez la page.',
-              );
-            }
-            if (<String>{'waiting_period_end', 'approved_pending_payment'}
-                .contains(liveRequest['status'])) {
-              throw StateError(
-                'Une demande de rayon est déjà en attente de traitement.',
-              );
-            }
-            final cgvSnapshot = await FirebaseFirestore.instance
-                .collection('legalDocuments')
-                .doc(AdvertiserCgvPolicy.documentId).get();
-            final cgvVersion = (cgvSnapshot.data()?['version'] ??
-                AdvertiserCgvPolicy.defaultVersion).toString();
-            changes['radiusChangeRequest'] = <String, Object?>{
-              'status': 'waiting_period_end',
-              'previousTerritory': _approvedTerritory!.toFirestore(),
-              'proposedTerritory': territory.toFirestore(),
-              'priceAcknowledged': true,
-              'noticeVersion': '2026-10-20',
-              'cgvVersionAccepted': cgvVersion,
-              'acceptedAt': FieldValue.serverTimestamp(),
-              'submittedAt': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            };
-          }
-          await requestReference.set(changes, SetOptions(merge: true));
-          if (radiusChanged) {
-            _activeRadiusRequest = {
-              'status': 'waiting_period_end',
-              'previousTerritory': _approvedTerritory?.toFirestore(),
-              'proposedTerritory': territory.toFirestore(),
-            };
-            // Une sélection proposée ne devient pas le rayon diffusé.
-            _territory = _approvedTerritory;
-            if (_approvedTerritory != null) {
-              widget.onTerritoryChanged(_approvedTerritory!);
-            }
-          }
+            },
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
         } else {
           await requestReference.set({
             ...creationData,
@@ -925,10 +836,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                 for (final level in AdvertiserTerritoryLevel.values)
                   if (options[level] != null)
                     OutlinedButton(
-                      onPressed:
-                          widget.approvedAssetsLocked || _radiusRequestPending
-                              ? null
-                              : () => _selectTerritory(options[level]!),
+                      onPressed: widget.assetChangeMode ||
+                              widget.approvedAssetsLocked
+                          ? null
+                          : () => _selectTerritory(options[level]!),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: current?.level == level
                             ? Colors.white
@@ -978,35 +889,22 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               ),
             ],
           ],
-          if (_radiusChanged && widget.assetChangeMode &&
-              !_radiusRequestPending) ...[
-            const SizedBox(height: 14),
-            const Text(
-              'IMPORTANT — Un changement de rayon, en hausse ou en baisse, '
-              'reste sans effet jusqu’à la fin de la période publicitaire '
-              'déjà engagée. Après l’échéance, il nécessite un nouvel accord '
-              'commercial et le paiement correspondant. La zone actuelle '
-              'et son tarif restent inchangés.',
-              style: TextStyle(
-                color: WebColors.red,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
+          if (widget.assetChangeMode || widget.approvedAssetsLocked)
+            const Padding(
+              padding: EdgeInsets.only(top: 14),
+              child: Text(
+                'RAYON CONTRACTUEL VERROUILLÉ — Aucun changement '
+                'pendant la période publicitaire engagée. Un nouveau '
+                'rayon pourra être choisi pour la prochaine souscription, '
+                'après expiration et au nouveau tarif. '
+                'Aucune approbation du Super Admin n’est nécessaire.',
+                style: TextStyle(
+                  color: WebColors.blue,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
               ),
             ),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
-              value: _radiusTermsAccepted,
-              onChanged: (value) => setState(
-                () => _radiusTermsAccepted = value ?? false,
-              ),
-              title: const Text(
-                'Je reconnais le report du nouveau rayon après la période '
-                'en cours et son nouveau tarif pour la période suivante.',
-                style: TextStyle(fontSize: 12),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -1056,44 +954,13 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           ),
         ),
         _buildTerritoryCard(),
-        if (_activeRadiusRequest['status'] == 'waiting_period_end')
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Text(
-              'RAYON ACTUEL : ' +
-              (_approvedTerritory?.level.label ?? 'Non renseigné') +
-              ' — RAYON DEMANDÉ : ' +
-              (AdvertiserTerritory.fromFirestore(
-                _activeRadiusRequest['proposedTerritory'],
-              )?.level.label ?? 'Non renseigné') +
-              ' — EN ATTENTE DE FIN DE PÉRIODE. '
-              'La zone actuellement payée reste inchangée.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: WebColors.red, fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        if (_activeRadiusRequest['status'] == 'rejected')
-          const Padding(
-            padding: EdgeInsets.only(bottom: 14),
-            child: Text(
-              'Changement de rayon refusé. '
-              'Le rayon contractuel demeure inchangé.',
-              style: TextStyle(
-                color: WebColors.red, fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
         if (widget.assetChangeRequestStatus == 'submitted')
           const Padding(
             padding: EdgeInsets.only(bottom: 14),
             child: Text(
               'Votre proposition de modification du visuel et/ou de la '
               'position est en attente d’approbation. '
-              'Toute demande de rayon est traitée séparément '
-              'à l’échéance contractuelle. Le contenu déjà approuvé '
-              'reste en vigueur.',
+              'Les informations précédemment approuvées restent en vigueur.',
               textAlign: TextAlign.center,
               style: TextStyle(color: WebColors.red, fontWeight: FontWeight.w800),
             ),
@@ -1102,10 +969,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           const Padding(
             padding: EdgeInsets.only(bottom: 14),
             child: Text(
-              'Proposez une modification du visuel et/ou de la position '
-              'et/ou du rayon d’action. Le rayon est traité séparément '
-              'et n’est pas applicable avant l’échéance contractuelle '
-              'et les nouvelles conditions commerciales.',
+              'Proposez un nouveau visuel et/ou une nouvelle position, '
+              'puis transmettez-les au Super Admin. '
+              'Le rayon contractuel est verrouillé.',
               textAlign: TextAlign.center,
               style: TextStyle(color: WebColors.blue, fontWeight: FontWeight.w700),
             ),
