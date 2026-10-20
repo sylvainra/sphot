@@ -11021,6 +11021,9 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
           "ne sera diffusé qu'après acceptation du nouveau devis " +
           "et confirmation du paiement. Votre ancienne zone reste " +
           "inchangée jusqu'à cette activation.",
+        radius_rejected: "L'équipe SPHOT n'a pas approuvé votre " +
+          "modification du rayon d'action. Votre rayon contractuel et " +
+          "son tarif demeurent inchangés.",
         changes_requested: "L'équipe SPHOT demande des ajustements à votre " +
           "proposition. Vous pouvez déposer un nouveau visuel dans votre " +
           "espace annonceur.",
@@ -11044,6 +11047,7 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
         submitted: "PROPOSITION À APPROUVER",
         radius_waiting: "PROPOSITION DE RAYON REÇUE",
         radius_approved_pending_payment: "RAYON AUTORISÉ POUR RENOUVELLEMENT",
+        radius_rejected: "MODIFICATION DU RAYON REFUSÉE",
         changes_requested: "AJUSTEMENTS DEMANDÉS",
         approved: "MODIFICATION APPROUVÉE",
         rejected: "MODIFICATION REFUSÉE",
