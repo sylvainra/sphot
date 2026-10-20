@@ -23,9 +23,11 @@ Sur la carte, `lib/map/map_page.dart` lit l'URL de campagne `bannerUrl`, identiq
 
 Les URL historiques déjà enregistrées ne prouvent pas à elles seules leur conformité : l'import initial contrôle les nouveaux fichiers, mais une URL rechargée peut être considérée comme valide en l'absence des métadonnées. Ajouter un contrôle serveur avant toute nouvelle garantie contractuelle universelle.
 
-## Suite commerciale — à traiter séparément
+## Aperçu commercial — implémenté, validation visuelle en attente (20/10/2026)
 
-Les aperçus de diffusion du portail SPHOT PUBLICITAIRE (`lib/web/advertiser/widgets/diffusion_central_preview.dart`) ne reflètent pas encore fidèlement la géométrie finale du bandeau de la carte :
+Le fichier `lib/web/advertiser/widgets/diffusion_central_preview.dart` a été modifié afin d'afficher les octets du visuel chargé ou son URL enregistrée. La maquette Carte reproduit un bandeau mobile compact avec une zone distincte (Fire rouge + texte) à droite. La maquette Fiches reproduit le bandeau 6:1 et son bouton distinct en dessous. Les six onglets et l'agrandissement restent en place. **La compilation sur PC et la validation visuelle de l'utilisateur restent nécessaires.**
+
+Objectifs à vérifier lors des essais :
 - reproduire le même visuel que celui effectivement soumis pour la campagne ;
 - montrer les bonnes dimensions visuelles des emplacements Carte et Fiches dans les maquettes, Web et mobile ;
 - inclure explicitement la zone attenante **Votre SPHOT PUBLICITAIRE ici!** et son Fire rouge dans l'aperçu Carte, pour éviter toute surprise après achat ;
