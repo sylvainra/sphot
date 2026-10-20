@@ -4539,6 +4539,12 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final proposedTerritory = _advertiserMap(
       radiusChange['proposedTerritory'],
     );
+    // Les propositions antérieures à la séparation du rayon étaient
+    // enregistrées dans assetChangeRequest : affichage historique uniquement,
+    // sans approbation implicite ni modification des campagnes.
+    final legacyProposedTerritory = _advertiserMap(
+      assetChange['proposedTerritory'],
+    );
     final approvedApplication = _advertiserMap(advertiser['approvedApplication']);
     final approvedVisual = _advertiserMap(approvedApplication['visual']);
     final approvedSpot = _advertiserMap(advertiser['advertisingSpot']);
@@ -4628,9 +4634,25 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   proposedLocation: newPoint,
                   previousTerritory: previousTerritory,
                   proposedTerritory: radiusStatus == 'waiting_period_end'
-                      ? proposedTerritory : previousTerritory,
+                      ? proposedTerritory
+                      : legacyProposedTerritory.isNotEmpty
+                          ? legacyProposedTerritory : previousTerritory,
                   onEnlarge: _showAdvertiserVisual,
                 ),
+                if (legacyProposedTerritory.isNotEmpty &&
+                    radiusStatus.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Ancienne proposition de rayon détectée. '
+                      'Elle ne sera pas appliquée avec le visuel ou '
+                      'la position. Une nouvelle demande de rayon '
+                      'avec acceptation des conditions tarifaires '
+                      'est nécessaire.',
+                      style: TextStyle(
+                        color: redColor, fontWeight: FontWeight.w800),
+                    ),
+                  ),
                 const SizedBox(height: 14),
               ] else if (bannerUrl.isNotEmpty) ...[
                 AspectRatio(
