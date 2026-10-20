@@ -31,7 +31,6 @@ class AdvertisingSpotSection extends StatefulWidget {
     this.approvedAssetsLocked = false,
     this.assetChangeMode = false,
     this.assetChangeRequestStatus = '',
-    this.radiusChangeRequest = const {},
     this.requestedScope = 'local',
   });
 
@@ -51,7 +50,6 @@ class AdvertisingSpotSection extends StatefulWidget {
   final bool approvedAssetsLocked;
   final bool assetChangeMode;
   final String assetChangeRequestStatus;
-  final Map<String, dynamic> radiusChangeRequest;
   final String requestedScope;
 
   @override
