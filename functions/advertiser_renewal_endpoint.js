@@ -14,6 +14,11 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 const localOrigin = /^http:\/\/(localhost|127\.0\.0\.1):[0-9]{2,5}$/;
 
+/**
+ * Endpoint authentifié de préparation de la prochaine souscription.
+ * @param {Object} deps Firebase Admin et constructeur HTTP.
+ * @return {Function} Cloud Function HTTP.
+ */
 function registerAdvertiserRenewalEndpoint({admin, onRequest}) {
   return onRequest({
     region: "europe-west1",
