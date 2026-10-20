@@ -3555,288 +3555,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     }
   }
 
-  final Map<String, Future<List<Map<String, dynamic>>>>
-      _radiusReviewLinksFutures = {};
-
-  DateTime? _radiusCampaignEnd(Object? raw) {
-    if (raw is Timestamp) return raw.toDate();
-    if (raw is DateTime) return raw;
-    if (raw is String) return DateTime.tryParse(raw);
-    return null;
-  }
-
-  String _radiusDateLabel(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}/'
-        '${date.month.toString().padLeft(2, '0')}/${date.year}';
-  }
-
-  bool _radiusPeriodFinished(List<Map<String, dynamic>> campaigns) {
-    if (campaigns.isEmpty) return false;
-    final now = DateTime.now();
-    return campaigns.every((campaign) {
-      final end = _radiusCampaignEnd(campaign['campaignEndDate']);
-      // La diffusion publique cesse à campaignEndDate, même si le statut
-      // administratif du dossier est resté "active".
-      return end != null && !end.isAfter(now);
-    });
-  }
-
-  Future<void> _reviewAdvertiserRadiusChange(
-      Map<String, dynamic> advertiser) async {
-    final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
-    if (requestId.isEmpty) return;
-    try {
-      // Ne jamais se fier au seul affichage calculé avant le clic.
-      final campaigns = await _readAdvertiserCampaignLinks(requestId);
-      if (!_radiusPeriodFinished(campaigns)) {
-        throw StateError('La période publicitaire n’est pas terminée ou '
-            'l’échéance de la campagne n’est pas vérifiable.');
-      }
-      final ref = FirebaseFirestore.instance
-          .collection('advertiserRequests').doc(requestId);
-      final fresh = await ref.get();
-      final data = fresh.data() ?? <String, dynamic>{};
-      final request = _advertiserMap(data['radiusChangeRequest']);
-      if (request['status'] != 'waiting_period_end') {
-        throw StateError('Cette demande de rayon n’est plus en attente.');
-      }
-      final entry = <String, dynamic>{
-        'decision': 'approved_pending_payment',
-        'previousTerritory': _advertiserMap(request['previousTerritory']),
-        'proposedTerritory': _advertiserMap(request['proposedTerritory']),
-        'submittedAt': request['submittedAt'],
-        'decidedAt': Timestamp.now(),
-        'decidedBy': 'super_admin',
-      };
-      await ref.set({
-        'radiusChangeRequest': <String, Object?>{
-          ...request,
-          'status': 'approved_pending_payment',
-          'commercialStatus': 'pending_new_quote_and_payment',
-          'reviewedAt': FieldValue.serverTimestamp(),
-        },
-        'radiusChangeHistory': FieldValue.arrayUnion([entry]),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      if (!mounted) return;
-      setState(() {
-        _selectedAdvertiser = {
-          ...advertiser,
-          'radiusChangeRequest': {
-            ...request,
-            'status': 'approved_pending_payment',
-            'commercialStatus': 'pending_new_quote_and_payment',
-          },
-          'radiusChangeHistory': [
-            if (advertiser['radiusChangeHistory'] is List)
-              ...(advertiser['radiusChangeHistory'] as List),
-            entry,
-          ],
-        };
-      });
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Rayon non approuvé : $error')),
-      );
-    }
-  }
-
-  Future<void> _rejectAdvertiserRadiusChange(
-      Map<String, dynamic> advertiser) async {
-    final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
-    if (requestId.isEmpty) return;
-    final reason = await _askAdvertiserReviewReason(
-      title: 'REFUSER LE CHANGEMENT DE RAYON',
-    );
-    if (reason == null) return;
-    try {
-      final reference = FirebaseFirestore.instance
-          .collection('advertiserRequests').doc(requestId);
-      final snapshot = await reference.get();
-      final existing = _advertiserMap(
-        snapshot.data()?['radiusChangeRequest'],
-      );
-      if (existing['status'] != 'waiting_period_end') {
-        throw StateError('Cette demande de rayon n’est plus en attente.');
-      }
-      final entry = <String, dynamic>{
-        'decision': 'rejected',
-        'previousTerritory': _advertiserMap(
-          existing['previousTerritory'],
-        ),
-        'proposedTerritory': _advertiserMap(
-          existing['proposedTerritory'],
-        ),
-        'reason': reason,
-        'submittedAt': existing['submittedAt'],
-        'decidedAt': Timestamp.now(),
-        'decidedBy': 'super_admin',
-      };
-      await reference.set({
-        'radiusChangeRequest': <String, Object?>{
-          ...existing,
-          'status': 'rejected',
-          'reason': reason,
-          'reviewedAt': FieldValue.serverTimestamp(),
-        },
-        'radiusChangeHistory': FieldValue.arrayUnion([entry]),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      if (!mounted) return;
-      setState(() {
-        _selectedAdvertiser = {
-          ...advertiser,
-          'radiusChangeRequest': {
-            ...existing,
-            'status': 'rejected',
-            'reason': reason,
-          },
-          'radiusChangeHistory': [
-            if (advertiser['radiusChangeHistory'] is List)
-              ...(advertiser['radiusChangeHistory'] as List),
-            entry,
-          ],
-        };
-      });
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Refus de rayon non enregistré : $error')),
-      );
-    }
-  }
-
-  Widget _buildAdvertiserRadiusChangePanel(
-      Map<String, dynamic> advertiser) {
-    final request = _advertiserMap(advertiser['radiusChangeRequest']);
-    final status = _cleanText(request['status']);
-    final oldZone = _advertiserMap(request['previousTerritory']);
-    final newZone = _advertiserMap(request['proposedTerritory']);
-    final history = (advertiser['radiusChangeHistory'] as List?) ?? const [];
-    final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
-    final links = _radiusReviewLinksFutures.putIfAbsent(
-      requestId, () => _readAdvertiserCampaignLinks(requestId));
-    return Container(
-      margin: const EdgeInsets.only(top: 15, bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3F6FB),
-        border: Border.all(color: adminColor),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text('MODIFICATION DU RAYON — AVANT / APRÈS',
-              style: TextStyle(
-                color: adminColor, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 9),
-          Text('AVANT : ${AdvertiserAssetComparison.territoryLabel(oldZone)}'),
-          Text('APRÈS : ${AdvertiserAssetComparison.territoryLabel(newZone)}'),
-          const SizedBox(height: 8),
-          if (history.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            const Text('HISTORIQUE DES DEMANDES DE RAYON',
-                style: TextStyle(
-                    color: adminColor, fontWeight: FontWeight.w800)),
-            for (final raw in history.reversed)
-              if (raw is Map)
-                Padding(
-                  padding: const EdgeInsets.only(top: 5),
-                  child: Text(
-                    AdvertiserAssetComparison.territoryLabel(
-                      _advertiserMap(raw['previousTerritory']),
-                    ) + ' → ' +
-                    AdvertiserAssetComparison.territoryLabel(
-                      _advertiserMap(raw['proposedTerritory']),
-                    ) + ' — ' + _cleanText(raw['decision']),
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                ),
-          ],
-          if (status == 'rejected')
-            Text(
-              'CHANGEMENT DE RAYON REFUSÉ. '
-              'Le rayon contractuel reste inchangé.'
-              '${_cleanText(request['reason']).isEmpty ? '' :
-                  ' Motif : ' + _cleanText(request['reason'])}',
-              style: const TextStyle(
-                  color: redColor, fontWeight: FontWeight.w800),
-            ),
-          if (status == 'approved_pending_payment')
-            const Text('ACCORD POUR UNE NOUVELLE PÉRIODE : '
-                'nouveau devis et paiement requis. '
-                'Aucun changement de diffusion à ce stade.',
-                style: TextStyle(color: redColor,
-                    fontWeight: FontWeight.w800))
-          else if (status == 'waiting_period_end') ...[
-            const Text('EN ATTENTE DE FIN DE PÉRIODE',
-                style: TextStyle(color: redColor,
-                    fontWeight: FontWeight.w900)),
-            FutureBuilder<List<Map<String, dynamic>>>(
-              future: links,
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Text('Vérification de la période en cours…');
-                }
-                final campaigns = snapshot.data!;
-                final finished = _radiusPeriodFinished(campaigns);
-                final dates = [
-                  for (final campaign in campaigns)
-                    if (_radiusCampaignEnd(campaign['campaignEndDate']) != null)
-                      _radiusCampaignEnd(campaign['campaignEndDate'])!,
-                ];
-                dates.sort();
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(dates.isEmpty
-                        ? 'Échéance contractuelle non vérifiable.'
-                        : 'Fin de la dernière période liée : '
-                          '${_radiusDateLabel(dates.last)}'),
-                    const SizedBox(height: 8),
-                    if (!finished)
-                      const Text(
-                        'Approbation verrouillée avant la dernière '
-                        'échéance contractuelle ou si cette date est inconnue.',
-                        style: TextStyle(fontSize: 12, color: redColor),
-                      ),
-                    TextButton.icon(
-                      onPressed: () => setState(() {
-                        _radiusReviewLinksFutures.remove(requestId);
-                      }),
-                      icon: const Icon(Icons.refresh_rounded, size: 16),
-                      label: const Text('ACTUALISER LES ÉCHÉANCES'),
-                    ),
-                    OutlinedButton(
-                      onPressed: finished
-                          ? () => _reviewAdvertiserRadiusChange(advertiser)
-                          : null,
-                      child: const Text('AUTORISER POUR LA PROCHAINE PÉRIODE'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () =>
-                          _rejectAdvertiserRadiusChange(advertiser),
-                      icon: const Icon(Icons.close_rounded),
-                      label: const Text('REFUSER LE CHANGEMENT DE RAYON'),
-                    ),
-                    const Text(
-                      'Cette autorisation ne modifie ni le rayon actif '
-                      'ni la tarification : un nouveau devis et le paiement '
-                      'doivent précéder la future activation.',
-                      style: TextStyle(fontSize: 11),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Future<void> _openAdvertiserWebsite(String rawUrl) async {
     final value = rawUrl.trim();
     if (value.isEmpty) return;
@@ -4004,6 +3722,172 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           ),
         ),
       ),
+    );
+  }
+
+
+  // Dernière décision visible hors des rubriques repliables : aucune
+  // modification du dossier, uniquement les valeurs Firestore existantes.
+  Widget _buildAdvertiserLatestChange(
+    Map<String, dynamic> advertiser, {
+    required Map<String, dynamic> assetChange,
+    required Map<String, dynamic> radiusChange,
+    required String previousBanner,
+    required LatLng? oldPoint,
+    required LatLng? newPoint,
+    required Map<String, dynamic> previousTerritory,
+    required Map<String, dynamic> proposedTerritory,
+  }) {
+    final assetStatus =
+        _cleanText(assetChange['status']).toLowerCase();
+    final radiusStatus =
+        _cleanText(radiusChange['status']).toLowerCase();
+
+    DateTime? dateOf(Map<String, dynamic> change) {
+      final raw = change['reviewedAt'] ?? change['submittedAt'];
+      if (raw is Timestamp) return raw.toDate();
+      if (raw is DateTime) return raw;
+      return null;
+    }
+
+    final assetDate = dateOf(assetChange);
+    final radiusDate = dateOf(radiusChange);
+    final latestIsRadius = radiusStatus.isNotEmpty &&
+        assetStatus != 'submitted' &&
+        (assetStatus.isEmpty ||
+            (radiusDate != null &&
+                (assetDate == null ||
+                    !radiusDate.isBefore(assetDate))));
+    final latestStatus =
+        latestIsRadius ? radiusStatus : assetStatus;
+    if (latestStatus.isEmpty) return const SizedBox.shrink();
+
+    final label = latestIsRadius
+        ? switch (latestStatus) {
+            'rejected' => 'CHANGEMENT DE RAYON REFUSÉ',
+            'waiting_period_end' => 'DEMANDE DE RAYON HISTORIQUE',
+            'approved_pending_payment' =>
+              'RAYON EN ATTENTE DE CONDITIONS COMMERCIALES',
+            _ => latestStatus.toUpperCase(),
+          }
+        : switch (latestStatus) {
+            'approved' => 'MODIFICATION APPROUVÉE',
+            'rejected' => 'MODIFICATION REFUSÉE',
+            'changes_requested' => 'MODIFICATION DEMANDÉE',
+            'submitted' => 'PROPOSITION EN ATTENTE D’APPROBATION',
+            'authorized' => 'MODIFICATION AUTORISÉE',
+            _ => latestStatus.toUpperCase(),
+          };
+    final latest = latestIsRadius ? radiusChange : assetChange;
+    final review = _advertiserMap(advertiser['review']);
+    final reason = _cleanText(latest['reason'] ??
+        (latestIsRadius ? null : review['reason']));
+    final proposedVisual =
+        _advertiserMap(assetChange['proposedVisual']);
+    final legacyTerritory =
+        _advertiserMap(assetChange['proposedTerritory']);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F6FB),
+        border: Border.all(color: adminColor.withOpacity(0.40)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'DERNIÈRE MODIFICATION',
+            style: TextStyle(
+              color: adminColor, fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: latestStatus == 'rejected' ? redColor : adminColor,
+              fontSize: 12, fontWeight: FontWeight.w800,
+            ),
+          ),
+          if (latestIsRadius) ...[
+            const SizedBox(height: 7),
+            Text(
+              'AVANT : ${AdvertiserAssetComparison.territoryLabel('
+              'previousTerritory)}',
+            ),
+            Text(
+              'APRÈS : ${AdvertiserAssetComparison.territoryLabel('
+              'proposedTerritory)}',
+            ),
+          ],
+          if (reason.isNotEmpty) ...[
+            const SizedBox(height: 7),
+            Text('Motif : $reason',
+                style: const TextStyle(fontSize: 12)),
+          ],
+          if (!latestIsRadius && assetStatus == 'submitted') ...[
+            const SizedBox(height: 12),
+            AdvertiserAssetComparison(
+              previousVisualUrl: previousBanner,
+              proposedVisualUrl:
+                  _cleanText(proposedVisual['url']),
+              previousLocation: oldPoint,
+              proposedLocation: newPoint,
+              previousTerritory: previousTerritory,
+              proposedTerritory: legacyTerritory.isNotEmpty
+                  ? legacyTerritory : previousTerritory,
+              onEnlarge: _showAdvertiserVisual,
+            ),
+            if (legacyTerritory.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Ancienne proposition de rayon : aucune activation '
+                'avec le visuel ou la position. Le rayon contractuel '
+                'reste inchangé.',
+                style: TextStyle(color: redColor,
+                    fontWeight: FontWeight.w700, fontSize: 12),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdvertiserRadiusHistory(Map<String, dynamic> advertiser) {
+    final raw = advertiser['radiusChangeHistory'];
+    if (raw is! List || raw.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'ANCIENNES DEMANDES DE RAYON',
+          style: TextStyle(
+            color: adminColor, fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (final item in raw.reversed)
+          if (item is Map)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                '${AdvertiserAssetComparison.territoryLabel('
+                '_advertiserMap(item['previousTerritory']))} → '
+                '${AdvertiserAssetComparison.territoryLabel('
+                '_advertiserMap(item['proposedTerritory']))} '
+                '— ${_cleanText(item['decision'])}'
+                '${_cleanText(item['reason']).isEmpty ? '' :
+                  ' — Motif : ' + _cleanText(item['reason'])}',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+      ],
     );
   }
 
