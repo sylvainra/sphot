@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../shared/web_colors.dart';
+import 'advertiser_cgv_policy.dart';
 
 class AdvertiserLegalAcceptanceSection extends StatefulWidget {
   const AdvertiserLegalAcceptanceSection({
@@ -27,10 +28,12 @@ class _AdvertiserLegalAcceptanceSectionState
   final ExpansionTileController _cguController = ExpansionTileController();
   final ExpansionTileController _privacyController = ExpansionTileController();
   final ExpansionTileController _rgpdController = ExpansionTileController();
+  final ExpansionTileController _cgvController = ExpansionTileController();
 
   Map<String, dynamic>? _cguDocument;
   Map<String, dynamic>? _privacyDocument;
   Map<String, dynamic>? _rgpdDocument;
+  Map<String, dynamic>? _cgvDocument;
 
   bool _loading = true;
   bool _submitting = false;
@@ -38,6 +41,8 @@ class _AdvertiserLegalAcceptanceSectionState
   bool _cguAccepted = false;
   bool _privacyAccepted = false;
   bool _rgpdAccepted = false;
+  bool _cgvAccepted = false;
+  String _cgvVersion = AdvertiserCgvPolicy.defaultVersion;
   bool _representativeAccepted = false;
   String _version = '1.0';
   String _legalPackPath = '';
@@ -55,6 +60,7 @@ class _AdvertiserLegalAcceptanceSectionState
       _cguAccepted &&
       _privacyAccepted &&
       _rgpdAccepted &&
+      _cgvAccepted &&
       _representativeAccepted &&
       !_locked &&
       !_submitting;
@@ -100,6 +106,11 @@ class _AdvertiserLegalAcceptanceSectionState
       final cgu = await _loadLegalDocument('cgu');
       final privacy = await _loadLegalDocument('privacyPolicy');
       final rgpd = await _loadLegalDocument('rgpdNotice');
+      final cgvSnapshot = await firestore.collection('legalDocuments')
+          .doc(AdvertiserCgvPolicy.documentId).get();
+      final cgvData = cgvSnapshot.data() ?? AdvertiserCgvPolicy.initialDocument;
+      final cgvVersion = (cgvData['version'] ??
+          AdvertiserCgvPolicy.defaultVersion).toString();
 
       Map<String, dynamic> request = {};
       if (requestId.isNotEmpty) {
@@ -131,11 +142,15 @@ class _AdvertiserLegalAcceptanceSectionState
         _cguDocument = cgu;
         _privacyDocument = privacy;
         _rgpdDocument = rgpd;
+        _cgvDocument = cgvData;
+        _cgvVersion = cgvVersion;
         _applicationCompleted = request['applicationCompleted'] == true;
         _cguAccepted = restoreAcceptance && acceptedDocuments['cgu'] == true;
         _privacyAccepted =
             restoreAcceptance && acceptedDocuments['privacy'] == true;
         _rgpdAccepted = restoreAcceptance && acceptedDocuments['rgpd'] == true;
+        _cgvAccepted = acceptedDocuments['advertiserCgv'] == true &&
+            acceptedDocuments['advertiserCgvVersion'] == cgvVersion;
         _representativeAccepted =
             restoreAcceptance &&
             legalAcceptance['representativeDeclaration'] == true;
@@ -196,6 +211,8 @@ class _AdvertiserLegalAcceptanceSectionState
           'cgu': true,
           'privacy': true,
           'rgpd': true,
+          'advertiserCgv': true,
+          'advertiserCgvVersion': _cgvVersion,
           'version': _version,
           'acceptedAt': FieldValue.serverTimestamp(),
         },
@@ -203,10 +220,12 @@ class _AdvertiserLegalAcceptanceSectionState
           'version': _version,
           'packPath': _legalPackPath,
           'representativeDeclaration': true,
+          'advertiserCgvVersion': _cgvVersion,
           'documents': <String, Object?>{
             'cgu': true,
             'privacy': true,
             'rgpd': true,
+            'advertiserCgv': true,
           },
           'acceptedAt': FieldValue.serverTimestamp(),
         },
@@ -228,6 +247,7 @@ class _AdvertiserLegalAcceptanceSectionState
       _cguController.collapse();
       _privacyController.collapse();
       _rgpdController.collapse();
+      _cgvController.collapse();
       setState(() {
         _submitting = false;
         _success = 'Votre demande a été transmise à l’équipe SPHOT.';
@@ -281,6 +301,7 @@ class _AdvertiserLegalAcceptanceSectionState
     required bool accepted,
     required String acceptanceText,
     required ExpansionTileController controller,
+    String? documentVersion,
     required ValueChanged<bool?> onChanged,
   }) {
     final chapters = List<Map<String, dynamic>>.from(
@@ -366,7 +387,7 @@ class _AdvertiserLegalAcceptanceSectionState
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Version SPHOT $_version',
+                'Version SPHOT ${documentVersion ?? _version}',
                 style: const TextStyle(
                   color: WebColors.red,
                   fontSize: 13,
@@ -439,6 +460,20 @@ class _AdvertiserLegalAcceptanceSectionState
           onChanged: (value) {
             setState(() => _rgpdAccepted = value ?? false);
           },
+        ),
+        _legalDocument(
+          title: 'Conditions Générales de Vente — SPHOT PUBLICITAIRE',
+          document: _cgvDocument,
+          accepted: _cgvAccepted,
+          documentVersion: _cgvVersion,
+          acceptanceText:
+              'J’ai lu et j’accepte les CGV applicables à '
+              'SPHOT PUBLICITAIRE, notamment le report et la '
+              'tarification des changements de rayon.',
+          controller: _cgvController,
+          onChanged: (value) => setState(() {
+            _cgvAccepted = value ?? false;
+          }),
         ),
         _acceptanceLine(
           value: _representativeAccepted,
