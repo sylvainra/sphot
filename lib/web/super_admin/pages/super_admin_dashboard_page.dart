@@ -3726,8 +3726,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   }
 
 
-  // Dernière décision visible hors des rubriques repliables : aucune
-  // modification du dossier, uniquement les valeurs Firestore existantes.
+  // Dernière décision visible sans ouvrir les rubriques repliables.
   Widget _buildAdvertiserLatestChange(
     Map<String, dynamic> advertiser, {
     required Map<String, dynamic> assetChange,
@@ -3743,56 +3742,58 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final radiusStatus =
         _cleanText(radiusChange['status']).toLowerCase();
 
-    DateTime? dateOf(Map<String, dynamic> change) {
-      final raw = change['reviewedAt'] ?? change['submittedAt'];
+    DateTime? decisionDate(Map<String, dynamic> entry) {
+      final raw = entry['reviewedAt'] ?? entry['submittedAt'];
       if (raw is Timestamp) return raw.toDate();
       if (raw is DateTime) return raw;
       return null;
     }
 
-    final assetDate = dateOf(assetChange);
-    final radiusDate = dateOf(radiusChange);
+    final assetDate = decisionDate(assetChange);
+    final radiusDate = decisionDate(radiusChange);
+    // Les anciennes demandes de rayon restent consultables, sans bouton.
     final latestIsRadius = radiusStatus.isNotEmpty &&
         assetStatus != 'submitted' &&
         (assetStatus.isEmpty ||
             (radiusDate != null &&
-                (assetDate == null ||
-                    !radiusDate.isBefore(assetDate))));
-    final latestStatus =
-        latestIsRadius ? radiusStatus : assetStatus;
+                (assetDate == null || !radiusDate.isBefore(assetDate))));
+    final latestStatus = latestIsRadius ? radiusStatus : assetStatus;
     if (latestStatus.isEmpty) return const SizedBox.shrink();
 
-    final label = latestIsRadius
+    final title = latestIsRadius
         ? switch (latestStatus) {
             'rejected' => 'CHANGEMENT DE RAYON REFUSÉ',
-            'waiting_period_end' => 'DEMANDE DE RAYON HISTORIQUE',
-            'approved_pending_payment' =>
-              'RAYON EN ATTENTE DE CONDITIONS COMMERCIALES',
+            'waiting_period_end' => 'ANCIENNE DEMANDE DE RAYON EN ATTENTE',
+            'approved_pending_payment' => 'ANCIENNE DEMANDE DE RAYON',
             _ => latestStatus.toUpperCase(),
           }
         : switch (latestStatus) {
             'approved' => 'MODIFICATION APPROUVÉE',
             'rejected' => 'MODIFICATION REFUSÉE',
-            'changes_requested' => 'MODIFICATION DEMANDÉE',
+            'changes_requested' => 'AJUSTEMENTS DEMANDÉS',
             'submitted' => 'PROPOSITION EN ATTENTE D’APPROBATION',
             'authorized' => 'MODIFICATION AUTORISÉE',
             _ => latestStatus.toUpperCase(),
           };
     final latest = latestIsRadius ? radiusChange : assetChange;
     final review = _advertiserMap(advertiser['review']);
-    final reason = _cleanText(latest['reason'] ??
-        (latestIsRadius ? null : review['reason']));
-    final proposedVisual =
-        _advertiserMap(assetChange['proposedVisual']);
-    final legacyTerritory =
-        _advertiserMap(assetChange['proposedTerritory']);
+    final reason = _cleanText(
+      latest['reason'] ?? (latestIsRadius ? null : review['reason']),
+    );
+    final proposedVisual = _advertiserMap(assetChange['proposedVisual']);
+    final oldRadius = _advertiserMap(
+      radiusChange['previousTerritory'],
+    );
+    final newRadius = _advertiserMap(
+      radiusChange['proposedTerritory'],
+    );
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFF3F6FB),
-        border: Border.all(color: adminColor.withOpacity(0.40)),
+        border: Border.all(color: adminColor.withOpacity(0.4)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -3807,7 +3808,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            label,
+            title,
             style: TextStyle(
               color: latestStatus == 'rejected' ? redColor : adminColor,
               fontSize: 12, fontWeight: FontWeight.w800,
@@ -3816,18 +3817,24 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           if (latestIsRadius) ...[
             const SizedBox(height: 7),
             Text(
-              'AVANT : ${AdvertiserAssetComparison.territoryLabel('
-              'previousTerritory)}',
+              'AVANT : ${AdvertiserAssetComparison.territoryLabel(oldRadius)}',
             ),
             Text(
-              'APRÈS : ${AdvertiserAssetComparison.territoryLabel('
-              'proposedTerritory)}',
+              'APRÈS : ${AdvertiserAssetComparison.territoryLabel(newRadius)}',
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Ancien dossier conservé pour historique. '
+              'Le rayon contractuel reste inchangé.',
+              style: TextStyle(fontSize: 11),
             ),
           ],
           if (reason.isNotEmpty) ...[
             const SizedBox(height: 7),
-            Text('Motif : $reason',
-                style: const TextStyle(fontSize: 12)),
+            Text(
+              'Motif : $reason',
+              style: const TextStyle(fontSize: 12),
+            ),
           ],
           if (!latestIsRadius && assetStatus == 'submitted') ...[
             const SizedBox(height: 12),
@@ -3837,27 +3844,18 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   _cleanText(proposedVisual['url']),
               previousLocation: oldPoint,
               proposedLocation: newPoint,
+              // Ne pas proposer de validation de rayon avec celle du visuel.
               previousTerritory: previousTerritory,
-              proposedTerritory: legacyTerritory.isNotEmpty
-                  ? legacyTerritory : previousTerritory,
+              proposedTerritory: previousTerritory,
               onEnlarge: _showAdvertiserVisual,
             ),
-            if (legacyTerritory.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Ancienne proposition de rayon : aucune activation '
-                'avec le visuel ou la position. Le rayon contractuel '
-                'reste inchangé.',
-                style: TextStyle(color: redColor,
-                    fontWeight: FontWeight.w700, fontSize: 12),
-              ),
-            ],
           ],
         ],
       ),
     );
   }
 
+  // Historique des demandes de rayon existantes : lecture seule.
   Widget _buildAdvertiserRadiusHistory(Map<String, dynamic> advertiser) {
     final raw = advertiser['radiusChangeHistory'];
     if (raw is! List || raw.isEmpty) return const SizedBox.shrink();
@@ -3877,13 +3875,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                '${AdvertiserAssetComparison.territoryLabel('
-                '_advertiserMap(item['previousTerritory']))} → '
-                '${AdvertiserAssetComparison.territoryLabel('
-                '_advertiserMap(item['proposedTerritory']))} '
-                '— ${_cleanText(item['decision'])}'
+                '${AdvertiserAssetComparison.territoryLabel(_advertiserMap(item['previousTerritory']))} → '
+                '${AdvertiserAssetComparison.territoryLabel(_advertiserMap(item['proposedTerritory']))}'
+                ' — ${_cleanText(item['decision'])}'
                 '${_cleanText(item['reason']).isEmpty ? '' :
-                  ' — Motif : ' + _cleanText(item['reason'])}',
+                    ' — Motif : ' + _cleanText(item['reason'])}',
                 style: const TextStyle(fontSize: 12),
               ),
             ),
