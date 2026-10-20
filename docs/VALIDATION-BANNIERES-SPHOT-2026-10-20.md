@@ -81,3 +81,34 @@ Le commit GitHub et la validation des captures ne constituent **pas** un déploi
 - La vue comparative utilise `WebHtmlElementStrategy.prefer`, comme la fenêtre d'agrandissement dont l'affichage est confirmé, afin de remédier au message « Visuel inaccessible ».
 - Un seul fichier Flutter modifié : `lib/web/super_admin/widgets/advertiser_asset_comparison.dart`. Pas de changement des positions, décisions, emails, synchronisations ni données Firestore.
 - Commit du correctif : `904a4d4`. Compilation Flutter, test Chrome et publication Hosting à confirmer sur le PC avant de les marquer validés.
+
+## Rayon et CGV publicitaires — 20/10/2026
+
+Décisions explicites de l'utilisateur :
+- Une modification de rayon/zone, vers un rayon plus grand ou plus petit, ne peut être approuvée avant l'expiration de la période payée en cours.
+- Visuel et position restent approuvables séparément, sans attendre la fin de période, même en cas de demande mixte.
+- Après l'échéance, le nouveau rayon nécessite une nouvelle tarification, une acceptation commerciale et un paiement. Pas de prorata/révision rétroactive.
+- Les CGV propres au SPHOT PUBLICITAIRE doivent figurer distinctement avec CGU, confidentialité et RGPD ; acceptation et version traçables.
+- Adapter les emails de réception et d'approbation, l'interface annonceur et le Super Admin.
+
+Implémentation conservatrice sur `main` :
+- `assetChangeRequest` garde la proposition de visuel/position.
+- `radiusChangeRequest` reçoit séparément `previousTerritory`, `proposedTerritory`, `status: waiting_period_end`, `submittedAt`, `priceAcknowledged`, `noticeVersion`, `cgvVersionAccepted` et `acceptedAt`. Aucune écriture immédiate de `advertisingTerritory` ni de `adRequests.radiusKm`.
+- Super Admin : comparaison avant/après du rayon, consultation des fins de campagne liées au dossier par `advertiserRequestId`, bouton d'autorisation désactivé tant que la dernière échéance n'est pas échue ou vérifiable. Le contrôle est refait avant l'écriture. À l'échéance, état `approved_pending_payment` : **accord administratif pour une prochaine souscription, sans activation géographique**.
+- E-mails : même fonction `sendAdvertiserAssetChangeEmail` avec textes adaptés, une notification pour une demande mixte, et messages dédiés pour les transitions de rayon en attente puis en attente de paiement. Pas de prétention d'activation anticipée.
+- CGV spécifiques : contenu initial version 1.0 dans `advertiser_cgv_policy.dart`, document Firestore optionnel `legalDocuments/advertiserCgv` dans l'éditeur Super Admin ; publication et versions successives archivées dans le document, sans toucher aux versions communes. L'inscription annonceur accepte les CGV séparément et enregistre leur version. Les demandeurs déjà approuvés reconnaissent l'article spécifique au moment d'une proposition de rayon.
+- La clause approuvée couvre **le changement de rayon** ; une révision juridique des autres clauses commerciales générales reste nécessaire avant de présenter cet ensemble comme des CGV complètes.
+
+**Limite commerciale volontaire** : aucun changement de zone dans une campagne active, et aucune activation automatique du nouveau rayon avant raccordement aux nouveaux devis/paiements de la période suivante (Odoo/Stripe). `approved_pending_payment` n'est donc PAS un état « diffusé ». Prévoir ce raccordement et des tests de non-régression avant la mise en exploitation des renouvellements.
+
+**Vérifications à réaliser sur le PC avant tout déploiement** :
+```powershell
+git pull --ff-only origin main
+node --test functions/test/advertiser_radius_change_email_trigger.test.js
+node --test functions/test/advertiser_asset_change_email_trigger.test.js
+node --test functions/test/advertiser_campaign_sync.test.js
+npm --prefix functions run lint
+flutter analyze lib/web/advertiser/widgets/advertising_spot_section.dart lib/web/advertiser/widgets/advertiser_legal_acceptance_section.dart lib/web/super_admin/pages/super_admin_dashboard_page.dart lib/web/super_admin/widgets/advertiser_asset_comparison.dart lib/web/super_admin/widgets/super_admin_advertiser_cgv_editor.dart
+flutter build web --release -t lib/main.dart
+```
+Publier ensuite **uniquement si les tests sont réussis** : Hosting et la seule fonction d'email modifiée `sendAdvertiserAssetChangeEmail`. Ne pas redéployer `syncApprovedAdvertiserAssets` (inchangée).
