@@ -717,9 +717,10 @@ class _MapAdvertisingPreview extends StatelessWidget {
         final creationWidth = 46.0.clamp(
           0.0,
           (availableWidth - 90.0).clamp(0.0, availableWidth),
-        );
+        ).toDouble();
         final visualWidth = availableWidth - creationWidth;
-        final bannerHeight = (visualWidth / 6.0).clamp(52.0, double.infinity);
+        final bannerHeight =
+            (visualWidth / 6.0).clamp(52.0, double.infinity).toDouble();
 
         return SizedBox(
           height: bannerHeight,
