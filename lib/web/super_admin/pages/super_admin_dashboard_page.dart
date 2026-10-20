@@ -3383,9 +3383,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           final location = _advertiserMap(
             assetChange['proposedLocation'] ?? advertiser['applicantLocation'],
           );
-          final territory = _advertiserMap(
-            assetChange['proposedTerritory'] ?? advertiser['advertisingTerritory'],
-          );
           final imageUrl = _cleanText(visual['url']);
           if (!imageUrl.startsWith('https://')) {
             if (mounted) {
@@ -3422,7 +3419,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               'longitude': location['longitude'],
           };
           if (location.isNotEmpty) update['applicantLocation'] = location;
-          if (territory.isNotEmpty) update['advertisingTerritory'] = territory;
           update['assetChangeRequest'] = <String, Object?>{
             ...assetChange,
             'proposedVisual': visual,
@@ -3553,6 +3549,175 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       debugPrint('Autorisation annonceur impossible : $error');
       debugPrintStack(stackTrace: stackTrace);
     }
+  }
+
+  final Map<String, Future<List<Map<String, dynamic>>>>
+      _radiusReviewLinksFutures = {};
+
+  DateTime? _radiusCampaignEnd(Object? raw) {
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    if (raw is String) return DateTime.tryParse(raw);
+    return null;
+  }
+
+  String _radiusDateLabel(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  bool _radiusPeriodFinished(List<Map<String, dynamic>> campaigns) {
+    if (campaigns.isEmpty) return false;
+    final now = DateTime.now();
+    return campaigns.every((campaign) {
+      final status = _cleanText(campaign['status']).toLowerCase();
+      final end = _radiusCampaignEnd(campaign['campaignEndDate']);
+      // Ne pas considérer une campagne encore publiée comme expirée.
+      return status != 'active' && end != null && !end.isAfter(now);
+    });
+  }
+
+  Future<void> _reviewAdvertiserRadiusChange(
+      Map<String, dynamic> advertiser) async {
+    final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
+    if (requestId.isEmpty) return;
+    try {
+      // Ne jamais se fier au seul affichage calculé avant le clic.
+      final campaigns = await _readAdvertiserCampaignLinks(requestId);
+      if (!_radiusPeriodFinished(campaigns)) {
+        throw StateError('La période publicitaire n’est pas terminée ou '
+            'l’échéance de la campagne n’est pas vérifiable.');
+      }
+      final ref = FirebaseFirestore.instance
+          .collection('advertiserRequests').doc(requestId);
+      final fresh = await ref.get();
+      final data = fresh.data() ?? <String, dynamic>{};
+      final request = _advertiserMap(data['radiusChangeRequest']);
+      if (request['status'] != 'waiting_period_end') {
+        throw StateError('Cette demande de rayon n’est plus en attente.');
+      }
+      final entry = <String, dynamic>{
+        'decision': 'approved_pending_payment',
+        'previousTerritory': _advertiserMap(request['previousTerritory']),
+        'proposedTerritory': _advertiserMap(request['proposedTerritory']),
+        'submittedAt': request['submittedAt'],
+        'decidedAt': Timestamp.now(),
+        'decidedBy': 'super_admin',
+      };
+      await ref.set({
+        'radiusChangeRequest': <String, Object?>{
+          ...request,
+          'status': 'approved_pending_payment',
+          'commercialStatus': 'pending_new_quote_and_payment',
+          'reviewedAt': FieldValue.serverTimestamp(),
+        },
+        'radiusChangeHistory': FieldValue.arrayUnion([entry]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      if (!mounted) return;
+      setState(() {
+        _selectedAdvertiser = {
+          ...advertiser,
+          'radiusChangeRequest': {
+            ...request,
+            'status': 'approved_pending_payment',
+            'commercialStatus': 'pending_new_quote_and_payment',
+          },
+        };
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Rayon non approuvé : $error')),
+      );
+    }
+  }
+
+  Widget _buildAdvertiserRadiusChangePanel(
+      Map<String, dynamic> advertiser) {
+    final request = _advertiserMap(advertiser['radiusChangeRequest']);
+    final status = _cleanText(request['status']);
+    final oldZone = _advertiserMap(request['previousTerritory']);
+    final newZone = _advertiserMap(request['proposedTerritory']);
+    final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
+    final links = _radiusReviewLinksFutures.putIfAbsent(
+      requestId, () => _readAdvertiserCampaignLinks(requestId));
+    return Container(
+      margin: const EdgeInsets.only(top: 15, bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F6FB),
+        border: Border.all(color: adminColor),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('MODIFICATION DU RAYON — AVANT / APRÈS',
+              style: TextStyle(
+                color: adminColor, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 9),
+          Text('AVANT : ${AdvertiserAssetComparison.territoryLabel(oldZone)}'),
+          Text('APRÈS : ${AdvertiserAssetComparison.territoryLabel(newZone)}'),
+          const SizedBox(height: 8),
+          if (status == 'approved_pending_payment')
+            const Text('ACCORD POUR UNE NOUVELLE PÉRIODE : '
+                'nouveau devis et paiement requis. '
+                'Aucun changement de diffusion à ce stade.',
+                style: TextStyle(color: redColor,
+                    fontWeight: FontWeight.w800))
+          else if (status == 'waiting_period_end') ...[
+            const Text('EN ATTENTE DE FIN DE PÉRIODE',
+                style: TextStyle(color: redColor,
+                    fontWeight: FontWeight.w900)),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: links,
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Text('Vérification de la période en cours…');
+                }
+                final campaigns = snapshot.data!;
+                final finished = _radiusPeriodFinished(campaigns);
+                final dates = [
+                  for (final campaign in campaigns)
+                    if (_radiusCampaignEnd(campaign['campaignEndDate']) != null)
+                      _radiusCampaignEnd(campaign['campaignEndDate'])!,
+                ];
+                dates.sort();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(dates.isEmpty
+                        ? 'Échéance contractuelle non vérifiable.'
+                        : 'Fin de la dernière période liée : '
+                          '${_radiusDateLabel(dates.last)}'),
+                    const SizedBox(height: 8),
+                    if (!finished)
+                      const Text(
+                        'Approbation verrouillée tant qu’une campagne '
+                        'reste active ou que sa date de fin est inconnue.',
+                        style: TextStyle(fontSize: 12, color: redColor),
+                      ),
+                    OutlinedButton(
+                      onPressed: finished
+                          ? () => _reviewAdvertiserRadiusChange(advertiser)
+                          : null,
+                      child: const Text('AUTORISER POUR LA PROCHAINE PÉRIODE'),
+                    ),
+                    const Text(
+                      'Cette autorisation ne modifie ni le rayon actif '
+                      'ni la tarification : un nouveau devis et le paiement '
+                      'doivent précéder la future activation.',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Future<void> _openAdvertiserWebsite(String rawUrl) async {
@@ -4249,6 +4414,14 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final review = _advertiserMap(advertiser['review']);
     final assetChange = _advertiserMap(advertiser['assetChangeRequest']);
     final assetChangeStatus = _cleanText(assetChange['status']).toLowerCase();
+    final radiusChange = _advertiserMap(advertiser['radiusChangeRequest']);
+    final radiusStatus = _cleanText(radiusChange['status']).toLowerCase();
+    final previousTerritory = _advertiserMap(
+      advertiser['advertisingTerritory'],
+    );
+    final proposedTerritory = _advertiserMap(
+      radiusChange['proposedTerritory'],
+    );
     final approvedApplication = _advertiserMap(advertiser['approvedApplication']);
     final approvedVisual = _advertiserMap(approvedApplication['visual']);
     final approvedSpot = _advertiserMap(advertiser['advertisingSpot']);
@@ -4336,6 +4509,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   ),
                   previousLocation: oldPoint,
                   proposedLocation: newPoint,
+                  previousTerritory: previousTerritory,
+                  proposedTerritory: radiusStatus == 'waiting_period_end'
+                      ? proposedTerritory : previousTerritory,
                   onEnlarge: _showAdvertiserVisual,
                 ),
                 const SizedBox(height: 14),
@@ -4443,6 +4619,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               ),
               _advertiserRequestInfoLine('Adresse', address),
               _advertiserWebsiteLine(websiteUrl),
+              if (radiusStatus.isNotEmpty)
+                _buildAdvertiserRadiusChangePanel(advertiser),
               if (assetChangeStatus.isNotEmpty)
                 _advertiserRequestInfoLine(
                   'Modification visuel / position',
