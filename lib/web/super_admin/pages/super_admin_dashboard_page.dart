@@ -1994,9 +1994,12 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
       case DashboardAdvertiserFilter.pending:
         final assetChange = _advertiserMap(data['assetChangeRequest']);
+        final radiusChange = _advertiserMap(data['radiusChangeRequest']);
         return status == 'pending' ||
             assetChange['status'] == 'pending' ||
-            assetChange['status'] == 'submitted';
+            assetChange['status'] == 'submitted' ||
+            radiusChange['status'] == 'waiting_period_end' ||
+            radiusChange['status'] == 'approved_pending_payment';
 
       case DashboardAdvertiserFilter.all:
         return true;
