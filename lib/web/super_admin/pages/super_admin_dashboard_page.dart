@@ -3627,6 +3627,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             'status': 'approved_pending_payment',
             'commercialStatus': 'pending_new_quote_and_payment',
           },
+          'radiusChangeHistory': [
+            if (advertiser['radiusChangeHistory'] is List)
+              ...(advertiser['radiusChangeHistory'] as List),
+            entry,
+          ],
         };
       });
     } catch (error) {
@@ -3643,6 +3648,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final status = _cleanText(request['status']);
     final oldZone = _advertiserMap(request['previousTerritory']);
     final newZone = _advertiserMap(request['proposedTerritory']);
+    final history = (advertiser['radiusChangeHistory'] as List?) ?? const [];
     final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
     final links = _radiusReviewLinksFutures.putIfAbsent(
       requestId, () => _readAdvertiserCampaignLinks(requestId));
@@ -3664,6 +3670,25 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           Text('AVANT : ${AdvertiserAssetComparison.territoryLabel(oldZone)}'),
           Text('APRÈS : ${AdvertiserAssetComparison.territoryLabel(newZone)}'),
           const SizedBox(height: 8),
+          if (history.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            const Text('HISTORIQUE DES DEMANDES DE RAYON',
+                style: TextStyle(
+                    color: adminColor, fontWeight: FontWeight.w800)),
+            for (final raw in history.reversed)
+              if (raw is Map)
+                Padding(
+                  padding: const EdgeInsets.only(top: 5),
+                  child: Text(
+                    '${AdvertiserAssetComparison.territoryLabel('
+                    '_advertiserMap(raw['previousTerritory']))} → '
+                    '${AdvertiserAssetComparison.territoryLabel('
+                    '_advertiserMap(raw['proposedTerritory']))} '
+                    '— ${_cleanText(raw['decision'])}',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                ),
+          ],
           if (status == 'approved_pending_payment')
             const Text('ACCORD POUR UNE NOUVELLE PÉRIODE : '
                 'nouveau devis et paiement requis. '
