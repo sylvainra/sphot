@@ -112,3 +112,23 @@ flutter analyze lib/web/advertiser/widgets/advertising_spot_section.dart lib/web
 flutter build web --release -t lib/main.dart
 ```
 Publier ensuite **uniquement si les tests sont réussis** : Hosting et la seule fonction d'email modifiée `sendAdvertiserAssetChangeEmail`. Ne pas redéployer `syncApprovedAdvertiserAssets` (inchangée).
+
+## Correction des essais de rayon — 20/10/2026
+
+**Signalement utilisateur après essai Chrome :**
+- Les emails « PROPOSITION À APPROUVER » et « MODIFICATION APPROUVÉE » portent encore l'ancien texte : `sendAdvertiserAssetChangeEmail` est mis à jour sur `main` mais la Cloud Function en production n'a PAS encore été redéployée.
+- La carte du dashboard annonceur suivait la sélection locale du rayon, même si celui-ci n'était pas approuvé ou était refusé. Ce n'est pas une preuve de modification de `adRequests`.
+- L'ancienne interface Super Admin ne permettait pas un refus **distinct** du rayon.
+- Certaines demandes historiques contiennent `assetChangeRequest.proposedTerritory` plutôt que `radiusChangeRequest.proposedTerritory`.
+
+**Corrections enregistrées sur `main` :**
+- La carte affiche exclusivement la zone contractuelle `advertiserRequests.advertisingTerritory` et la localisation approuvée; une proposition de position est représentée séparément en bleu. Une sélection de rayon non validée n'agrandit jamais le cercle rouge actif.
+- Après une proposition de rayon, la sélection revient au contrat actif. Formulaire bloqué pour une seconde modification de rayon tant que la première est en attente.
+- Écoute du statut de la demande de rayon depuis les instantanés Firestore jusqu'au refus, sans nécessiter de rouvrir la page. Vérification du rayon contractuel avant la nouvelle soumission.
+- Le Super Admin possède un bouton indépendant `REFUSER LE CHANGEMENT DE RAYON`, avec motif et historisation ; aucune mise à jour de `advertisingTerritory` ou de `adRequests.radiusKm`.
+- La comparaison Super Admin affiche aussi les anciens `assetChangeRequest.proposedTerritory` pour information, mais ne les transforme **pas** en approbation du rayon (nouvelle soumission et acceptation tarifaire nécessaires).
+- Les emails comprennent la demande, l'approbation d'actifs, l'accord conditionné au paiement et le **refus explicite du rayon**. Le circuit Node conserve ses protections contre les doubles envois.
+
+**Validation restante obligatoire :** tests Node, lint, analyse et build Flutter local, essais Chrome (nouvelle demande de rayon, refus, autre demande, demande mixte). Puis déploiement ciblé `functions:sendAdvertiserAssetChangeEmail` et vérification des nouveaux mails, et Hosting uniquement après confirmation UI. Ne pas considérer les emails en production à jour avant ce déploiement.
+
+**Attention aux données de test héritées :** si `advertisingTerritory` ou `adRequests.radiusKm` ont déjà été écrasés par une ancienne version, aucune migration/correction automatique des données de production n'est autorisée ici ; vérifier les documents et l'historique avant correction manuelle ciblée.
