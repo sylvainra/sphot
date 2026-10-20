@@ -2709,7 +2709,7 @@ Widget _buildAdBanner() {
         // La zone de création reste volontairement courte : elle ne
         // doit pas diminuer inutilement la surface publicitaire.
         final preferredCreationWidth = isMobile
-            ? 60.0
+            ? 46.0
             : wideWebBanner
                 ? 92.0
                 : 96.0;
@@ -2719,11 +2719,11 @@ Widget _buildAdBanner() {
         );
         final panoramicWidth = max(0.0, availableWidth - creationWidth);
         final bannerHeight = wideWebBanner
-            ? min(118.0, panoramicWidth / 6.0)
+            ? min(300.0, panoramicWidth / 6.0)
             : max(52.0, panoramicWidth / 6.0);
 
         // Même fond clair que l'encart de création sans campagne.
-        // Aucun pictogramme ni sous-texte dans cette zone cliquable.
+        // Le Fire rouge est restauré sans changer la navigation.
         Widget createAdvertisingInvitation({
           bool hasAdvertisement = false,
         }) {
@@ -2739,8 +2739,8 @@ Widget _buildAdBanner() {
                 child: Container(
                   alignment: Alignment.center,
                   padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 3.0 : 5.0,
-                    vertical: 4,
+                    horizontal: isMobile ? 2.0 : 5.0,
+                    vertical: isMobile ? 2.0 : 4.0,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.72),
@@ -2754,17 +2754,29 @@ Widget _buildAdBanner() {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.center,
-                    child: Text(
-                      hasAdvertisement
-                          ? 'Votre\nSPHOT\nPUBLICITAIRE\nici!'
-                          : 'CRÉER VOTRE\nSPHOT PUBLICITAIRE\nICI!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: isMobile ? 10 : 11,
-                        height: 1.15,
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SvgPicture.asset(
+                          'data/icons/fire_red_icon.svg',
+                          width: isMobile ? 19 : 28,
+                          height: isMobile ? 24 : 36,
+                          fit: BoxFit.contain,
+                        ),
+                        SizedBox(height: isMobile ? 2 : 4),
+                        Text(
+                          hasAdvertisement
+                              ? 'Votre\nSPHOT\nPUBLICITAIRE\nici!'
+                              : 'CRÉER VOTRE\nSPHOT PUBLICITAIRE\nICI!',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: isMobile ? 9 : 11,
+                            height: 1.1,
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -2802,32 +2814,13 @@ Widget _buildAdBanner() {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      if (demoWebPanorama)
-                        Image.asset(
-                          'data/images/surf_shop_atlantique_web_1800x140.jpg',
+                      Image.network(
+                          // Afficher la création d'origine pendant la démo,
+                          // sans substituer le recadrage local 1800x140.
+                          demoWebPanorama ? standardBannerUrl : bannerUrl,
                           width: double.infinity,
                           height: bannerHeight,
-                          // Le visuel Web est déjà recomposé au format
-                          // panoramique : ajustement léger sans texte coupé.
-                          fit: BoxFit.fill,
-                          errorBuilder: (_, __, ___) => Image.network(
-                            standardBannerUrl,
-                            fit: BoxFit.contain,
-                            webHtmlElementStrategy:
-                                WebHtmlElementStrategy.prefer,
-                          ),
-                        )
-                      else
-                        Image.network(
-                          bannerUrl,
-                          width: double.infinity,
-                          height: bannerHeight,
-                          // Ne pas rogner les textes d'une campagne
-                          // qui n'a pas encore de visuel Web approuvé.
-                          fit: panoramicBannerUrl.isNotEmpty &&
-                                  wideWebBanner
-                              ? BoxFit.fill
-                              : BoxFit.contain,
+                          fit: BoxFit.contain,
                           alignment: Alignment.center,
                           webHtmlElementStrategy:
                               WebHtmlElementStrategy.prefer,
