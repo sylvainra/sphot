@@ -35,6 +35,19 @@ test("radius may be authorized only for future paid period", () => {
   ), "radius_approved_pending_payment");
 });
 
+test("refused radius sends one clear refusal email", () => {
+  assert.equal(advertiserChangeEmailStatus(
+      {radiusChangeRequest: {status: "waiting_period_end"}},
+      {radiusChangeRequest: {status: "rejected"}},
+      false,
+  ), "radius_rejected");
+});
+
+test("refused radius is not renotified on unrelated updates", () => {
+  const request = {radiusChangeRequest: {status: "rejected"}};
+  assert.equal(advertiserChangeEmailStatus(request, request, false), null);
+});
+
 test("no automatic email for untouched proposal", () => {
   assert.equal(advertiserChangeEmailStatus({}, {}, false), null);
 });
