@@ -2719,7 +2719,7 @@ Widget _buildAdBanner() {
         );
         final panoramicWidth = max(0.0, availableWidth - creationWidth);
         final bannerHeight = wideWebBanner
-            ? min(300.0, panoramicWidth / 6.0)
+            ? min(118.0, panoramicWidth / 6.0)
             : max(52.0, panoramicWidth / 6.0);
 
         // Même fond clair que l'encart de création sans campagne.
@@ -2820,7 +2820,9 @@ Widget _buildAdBanner() {
                           demoWebPanorama ? standardBannerUrl : bannerUrl,
                           width: double.infinity,
                           height: bannerHeight,
-                          fit: BoxFit.contain,
+                          // Le visuel complet est compressé dans le bandeau
+                          // Web compact, sans aucune découpe verticale.
+                          fit: wideWebBanner ? BoxFit.fill : BoxFit.contain,
                           alignment: Alignment.center,
                           webHtmlElementStrategy:
                               WebHtmlElementStrategy.prefer,
