@@ -22,6 +22,8 @@ const {
   shouldNotifyAdvertiserAssetChange,
   advertiserAssetChangeNotificationId,
 } = require("./advertiser_asset_change_email_trigger");
+const {advertiserChangeEmailStatus} =
+    require("./advertiser_radius_change_email_trigger");
 const PDFDocument = require("pdfkit");
 
 admin.initializeApp();
@@ -10988,20 +10990,13 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
       const before = event.data.before.data() || {};
       const data = event.data.after.data() || {};
       const currentChange = data.assetChangeRequest || {};
-      const radiusBefore = before.radiusChangeRequest || {};
       const radiusChange = data.radiusChangeRequest || {};
       const assetEvent = shouldNotifyAdvertiserAssetChange(before, data);
-      const radiusSubmitted =
-        radiusChange.status === "waiting_period_end" &&
-        radiusBefore.status !== radiusChange.status;
-      const radiusApproved =
-        radiusChange.status === "approved_pending_payment" &&
-        radiusBefore.status !== radiusChange.status;
-      if (!assetEvent && !radiusSubmitted && !radiusApproved) return;
-      // Une soumission mixte donne un seul email : les événements de rayon
-      // et de visuel/position sont enregistrés dans la même opération.
-      const status = assetEvent ? currentChange.status :
-        radiusApproved ? "radius_approved_pending_payment" : "radius_waiting";
+      // Priorité au mail de proposition visuel/position pour une demande mixte.
+      const status = advertiserChangeEmailStatus(
+          before, data, assetEvent,
+      );
+      if (!status) return;
       const syncStatus = currentChange.syncStatus;
       const pendingRadius = radiusChange.status === "waiting_period_end";
       const messages = {
