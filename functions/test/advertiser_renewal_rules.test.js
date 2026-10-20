@@ -8,6 +8,11 @@ const {evaluateRenewal, validateRenewalTerritory} =
 const start = Date.parse("2026-10-19T00:00:00+02:00");
 const end = Date.parse("2026-10-20T23:59:00+02:00");
 
+/**
+ * Campagne de test délimitée par une période contractuelle.
+ * @param {Object} overrides Champs remplacés pour un scénario.
+ * @return {Object} Campagne.
+ */
 function campaign(overrides = {}) {
   return {
     status: "active",
