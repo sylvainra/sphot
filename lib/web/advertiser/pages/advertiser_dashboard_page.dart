@@ -22,6 +22,7 @@ import '../services/advertiser_country_boundary_service.dart';
 import '../widgets/advertising_spot_section.dart';
 import '../widgets/advertiser_application_section.dart';
 import '../widgets/advertiser_legal_acceptance_section.dart';
+import '../widgets/advertiser_renewal_section.dart';
 import '../widgets/diffusion_central_preview.dart';
 import '../widgets/diffusion_section.dart';
 import '../widgets/establishment_section.dart';
@@ -112,6 +113,12 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
       'STATISTIQUES',
       Icons.query_stats_outlined,
       'Affichages, clics et fréquentation de la campagne.',
+    ),
+    _AdvertiserSection(
+      'RENOUVELLEMENT',
+      Icons.event_repeat_outlined,
+      'Après expiration, choisissez le rayon et le tarif de la '
+          'prochaine souscription, sans changer votre campagne précédente.',
     ),
   ];
 
@@ -1288,6 +1295,14 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             title: 'ARCHIVAGE',
             description: 'Les documents finalisés seront conservés sans écrasement et corrigés par avoir ou facture rectificative.',
             status: 'À RACCORDER',
+          ),
+        ];
+      case 8:
+        return [
+          AdvertiserRenewalSection(
+            requestId: _requestId,
+            contractTerritory: _effectiveAdvertiserTerritory,
+            offer: _visibilityType,
           ),
         ];
       default:
