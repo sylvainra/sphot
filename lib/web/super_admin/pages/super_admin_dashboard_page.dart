@@ -4440,22 +4440,14 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       proposedVisual['url'] ?? advertiser['bannerUrl'],
     );
     final status = _cleanText(advertiser['status']).toLowerCase();
-    final review = _advertiserMap(advertiser['review']);
     final assetChange = _advertiserMap(advertiser['assetChangeRequest']);
     final assetChangeStatus = _cleanText(assetChange['status']).toLowerCase();
     final radiusChange = _advertiserMap(advertiser['radiusChangeRequest']);
-    final radiusStatus = _cleanText(radiusChange['status']).toLowerCase();
     final previousTerritory = _advertiserMap(
       advertiser['advertisingTerritory'],
     );
     final proposedTerritory = _advertiserMap(
       radiusChange['proposedTerritory'],
-    );
-    // Les propositions antérieures à la séparation du rayon étaient
-    // enregistrées dans assetChangeRequest : affichage historique uniquement,
-    // sans approbation implicite ni modification des campagnes.
-    final legacyProposedTerritory = _advertiserMap(
-      assetChange['proposedTerritory'],
     );
     final approvedApplication = _advertiserMap(advertiser['approvedApplication']);
     final approvedVisual = _advertiserMap(approvedApplication['visual']);
