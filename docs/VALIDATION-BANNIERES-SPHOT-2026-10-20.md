@@ -23,9 +23,9 @@ Sur la carte, `lib/map/map_page.dart` lit l'URL de campagne `bannerUrl`, identiq
 
 Les URL historiques déjà enregistrées ne prouvent pas à elles seules leur conformité : l'import initial contrôle les nouveaux fichiers, mais une URL rechargée peut être considérée comme valide en l'absence des métadonnées. Ajouter un contrôle serveur avant toute nouvelle garantie contractuelle universelle.
 
-## Aperçu commercial — implémenté, validation visuelle en attente (20/10/2026)
+## Aperçu commercial — validé visuellement (20/10/2026)
 
-Le fichier `lib/web/advertiser/widgets/diffusion_central_preview.dart` a été modifié afin d'afficher les octets du visuel chargé ou son URL enregistrée. La maquette Carte reproduit un bandeau mobile compact avec une zone distincte (Fire rouge + texte) à droite. La maquette Fiches reproduit le bandeau 6:1 et son bouton distinct en dessous. Les six onglets et l'agrandissement restent en place. **La compilation sur PC et la validation visuelle de l'utilisateur restent nécessaires.**
+Le fichier `lib/web/advertiser/widgets/diffusion_central_preview.dart` affiche les octets du visuel chargé à l'étape 2 ou son URL enregistrée. La maquette Carte reproduit un bandeau mobile compact avec une zone distincte (Fire rouge + texte exact) à droite. La maquette Fiches reproduit le bandeau 6:1 et son bouton distinct en dessous. Les six onglets et l'agrandissement restent en place. **Validation explicite utilisateur : capture de l'étape 3 « DIFFUSION » du 20/10/2026, rendu jugé « entièrement satisfaisant » et confirmé/validé pour enregistrement et publication.** Le même visuel importé est utilisé dans les deux aperçus ; aucune image Surf Shop Atlantique n'est codée en dur. Aucun changement supplémentaire de géométrie autorisé sans une nouvelle validation.
 
 Objectifs à vérifier lors des essais :
 - reproduire le même visuel que celui effectivement soumis pour la campagne ;
@@ -33,6 +33,12 @@ Objectifs à vérifier lors des essais :
 - inclure explicitement la zone attenante **Votre SPHOT PUBLICITAIRE ici!** et son Fire rouge dans l'aperçu Carte, pour éviter toute surprise après achat ;
 - prévisualiser les éventuelles déformations dues au format compact, sans recadrer ni cacher de texte ;
 - soumettre les adaptations d'interface à validation avant modification structurelle.
+
+## Livraison de l'étape 3 et retrait futur du test
+
+- Référence fonctionnelle validée avant ce constat : `095601dabb32ee02ee83e430a61b118b9df8a477` (code de l'aperçu et note en attente de validation).
+- La validation visuelle est confirmée le 20/10/2026 ; il faut encore synchroniser le PC, analyser le fichier modifié, reconstruire `build/web` et publier cette nouvelle compilation sur Firebase Hosting `sphot-ab80b`. Ne pas confondre le précédent déploiement réussi de la carte avec ce nouveau déploiement de l'étape 3.
+- La campagne démonstrateur « Surf Shop Atlantique » est destinée à être retirée **dans une opération Firestore séparée** après identification de sa référence exacte et contrôle des éventuels liens ; ne supprimer ni une campagne réelle, ni le site Hosting `sphot-advertiser-test`, ni les éléments partagés sans inventaire.
 
 ## Nettoyage / suivi du déploiement
 
