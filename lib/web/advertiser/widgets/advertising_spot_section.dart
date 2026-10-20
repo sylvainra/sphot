@@ -888,10 +888,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                 for (final level in AdvertiserTerritoryLevel.values)
                   if (options[level] != null)
                     OutlinedButton(
-                      onPressed: widget.assetChangeMode &&
-                              _radiusRequestPending
-                          ? null
-                          : () => _selectTerritory(options[level]!),
+                      onPressed:
+                          widget.approvedAssetsLocked || _radiusRequestPending
+                              ? null
+                              : () => _selectTerritory(options[level]!),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: current?.level == level
                             ? Colors.white
