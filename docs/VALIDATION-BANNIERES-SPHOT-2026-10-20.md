@@ -151,3 +151,21 @@ Agencement du volet droit Super Admin demandé explicitement :
 5. Les trois boutons APPROUVER / DEMANDER UNE MODIFICATION / REFUSER existants et leurs conditions de disponibilité sont conservés en bas du volet.
 
 **Avant validation** : récupération de `main`, `flutter analyze` sur fichiers modifiés, `flutter build web --release -t lib/main.dart`, test manuel `flutter run -d chrome -t lib/main.dart` et vérification du circuit visuel/position. Ne pas prétendre avoir exécuté Flutter ou effectué Hosting/Firebase depuis GitHub. Conserver `main` comme seul référentiel, vérifier les non-régressions avant tout autre push et déploiement.
+
+## Validation visuelle finale du volet SPHOT PUBLICITAIRE — 20/10/2026
+
+**Validation explicite de l'utilisateur après test sur Chrome de `main`**, avec capture du volet droit « BAR DE LA PLAGE ».
+
+Éléments vérifiés visuellement et acceptés dans leur disposition actuelle :
+- En-tête « BAR DE LA PLAGE » avec icône et fermeture.
+- Bannière « SURF SHOP ATLANTIQUE » en haut du volet et bouton « AGRANDIR LE VISUEL ».
+- Menu repliable « ADMINISTRATION », directement sous le visuel.
+- Encadré visible « DERNIÈRE MODIFICATION » : dans ce cas de test historique, « CHANGEMENT DE RAYON REFUSÉ », comparaison 15 km → 5 km et motif du refus. **Il s'agit d'un dossier historique affiché en lecture seule, non d'un droit d'approuver à nouveau le rayon.**
+- Menu repliable « HISTORIQUE DES MODIFICATIONS », placé après le dernier événement.
+- Les trois commandes existantes sont conservées au bas du volet : APPROUVER LA DEMANDE, DEMANDER UNE MODIFICATION et REFUSER LA DEMANDE, avec leur état actuel (sur le dossier photographié, « DEMANDE REFUSÉE »).
+
+**Statut : mise en page VALIDÉE — ne pas réorganiser de nouveau sans demande explicite.**
+
+Référence du code Flutter `main` validé : `c35471e67c076d117f4c599d496f0c51f8906f7c` (avant ajout de ce compte-rendu documentaire). Aucun code d'interface n'est changé par l'enregistrement de la validation.
+
+Le test visuel du volet ne constitue pas une validation du futur renouvellement payant, de la publication des CGV dans Firestore ou de la mise en production de la nouvelle version Web. À contrôler séparément.
