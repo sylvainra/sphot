@@ -132,3 +132,22 @@ Publier ensuite **uniquement si les tests sont réussis** : Hosting et la seule 
 **Validation restante obligatoire :** tests Node, lint, analyse et build Flutter local, essais Chrome (nouvelle demande de rayon, refus, autre demande, demande mixte). Puis déploiement ciblé `functions:sendAdvertiserAssetChangeEmail` et vérification des nouveaux mails, et Hosting uniquement après confirmation UI. Ne pas considérer les emails en production à jour avant ce déploiement.
 
 **Attention aux données de test héritées :** si `advertisingTerritory` ou `adRequests.radiusKm` ont déjà été écrasés par une ancienne version, aucune migration/correction automatique des données de production n'est autorisée ici ; vérifier les documents et l'historique avant correction manuelle ciblée.
+
+## Décisions définitives et organisation Super Admin — 20/10/2026
+
+Décision de simplification validée par l'utilisateur :
+- Modification de **visuel** et/ou **position** : circuit Super Admin existant conservé, comparateur avant/après, trois boutons actuels, emails historiques « PROPOSITION À APPROUVER » et « MODIFICATION APPROUVÉE » conservés sans nouveau texte.
+- **Rayon / zone de diffusion** : fixé pendant la période publicitaire payée, aucune demande de rayon ni notification ni approbation/refus Super Admin. Le choix d'un autre rayon relève uniquement d'une **nouvelle souscription après l'échéance**, avec le tarif applicable et activation seulement après paiement. Une ancienne demande de rayon reste en lecture seule pour audit, sans action.
+- `functions/index.js` : fonction d'email restaurée à son état validé après suppression du traitement des statuts de rayon. Les deux fichiers Node devenus inutiles de notification de rayon ont été supprimés.
+- `advertising_spot_section.dart` : impossible de sélectionner ou soumettre un autre rayon depuis la modification d'une campagne approuvée ; seules les données `assetChangeRequest` liées au visuel et à la position sont écrites. Le choix initial d'une zone reste possible avant souscription.
+- Clause CGV annonceur adaptée : verrouillage du rayon pendant toute période payée et possibilité de nouveau choix uniquement lors de la nouvelle souscription ; aucun visa du Super Admin. Le document `legalDocuments/advertiserCgv` déjà présent dans Firestore **n'est pas modifié automatiquement** : publication de la nouvelle clause et incrément de version à effectuer/contrôler depuis le Super Admin avant mise en production.
+- Raccordement automatique d'une **nouvelle souscription payée** à l'activation du nouveau rayon : ne pas déclarer opérationnel sans tests de renouvellement et de paiement ; l'éditeur de campagne en cours n'offre volontairement plus ce changement.
+
+Agencement du volet droit Super Admin demandé explicitement :
+1. En-tête annonceur, visuel actuel en pleine largeur, bouton AGRANDIR.
+2. Accordéon **ADMINISTRATION** replié initialement : toutes les informations de contact, structure, registre, documents acceptés, adresse et site.
+3. Carte **DERNIÈRE MODIFICATION** affichée hors accordéon si statut existant, avec motif et décision ; si proposition visuel/position `submitted`, la comparaison AVANT/APRÈS reste visible ici.
+4. Accordéon **HISTORIQUE DES MODIFICATIONS** replié initialement, reprenant sans supprimer les anciens dossiers visuel/position et les anciennes demandes de rayon (lecture seule).
+5. Les trois boutons APPROUVER / DEMANDER UNE MODIFICATION / REFUSER existants et leurs conditions de disponibilité sont conservés en bas du volet.
+
+**Avant validation** : récupération de `main`, `flutter analyze` sur fichiers modifiés, `flutter build web --release -t lib/main.dart`, test manuel `flutter run -d chrome -t lib/main.dart` et vérification du circuit visuel/position. Ne pas prétendre avoir exécuté Flutter ou effectué Hosting/Firebase depuis GitHub. Conserver `main` comme seul référentiel, vérifier les non-régressions avant tout autre push et déploiement.
