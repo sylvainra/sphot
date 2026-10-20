@@ -1175,6 +1175,9 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             approvedAssetsLocked: !_assetChangeAuthorized,
             assetChangeMode: _assetChangeAuthorized,
             assetChangeRequestStatus: _assetChangeStatus,
+            radiusChangeRequest: _map(
+              _requestData['radiusChangeRequest'],
+            ),
             requestedScope: _requestedScope,
             initialTerritory: _advertisingTerritory,
             onTerritoryChanged: _setAdvertisingTerritory,
