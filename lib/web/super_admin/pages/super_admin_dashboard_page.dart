@@ -3680,11 +3680,12 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 Padding(
                   padding: const EdgeInsets.only(top: 5),
                   child: Text(
-                    '${AdvertiserAssetComparison.territoryLabel('
-                    '_advertiserMap(raw['previousTerritory']))} → '
-                    '${AdvertiserAssetComparison.territoryLabel('
-                    '_advertiserMap(raw['proposedTerritory']))} '
-                    '— ${_cleanText(raw['decision'])}',
+                    AdvertiserAssetComparison.territoryLabel(
+                      _advertiserMap(raw['previousTerritory']),
+                    ) + ' → ' +
+                    AdvertiserAssetComparison.territoryLabel(
+                      _advertiserMap(raw['proposedTerritory']),
+                    ) + ' — ' + _cleanText(raw['decision']),
                     style: const TextStyle(fontSize: 11),
                   ),
                 ),
