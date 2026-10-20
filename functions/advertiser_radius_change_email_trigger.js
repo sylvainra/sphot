@@ -23,6 +23,10 @@ function advertiserChangeEmailStatus(before, after, assetEvent) {
       newRadius.status === "approved_pending_payment") {
     return "radius_approved_pending_payment";
   }
+  if (oldRadius.status !== newRadius.status &&
+      newRadius.status === "rejected") {
+    return "radius_rejected";
+  }
   return null;
 }
 
