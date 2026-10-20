@@ -3642,6 +3642,71 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     }
   }
 
+  Future<void> _rejectAdvertiserRadiusChange(
+      Map<String, dynamic> advertiser) async {
+    final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
+    if (requestId.isEmpty) return;
+    final reason = await _askAdvertiserReviewReason(
+      title: 'REFUSER LE CHANGEMENT DE RAYON',
+    );
+    if (reason == null) return;
+    try {
+      final reference = FirebaseFirestore.instance
+          .collection('advertiserRequests').doc(requestId);
+      final snapshot = await reference.get();
+      final existing = _advertiserMap(
+        snapshot.data()?['radiusChangeRequest'],
+      );
+      if (existing['status'] != 'waiting_period_end') {
+        throw StateError('Cette demande de rayon n’est plus en attente.');
+      }
+      final entry = <String, dynamic>{
+        'decision': 'rejected',
+        'previousTerritory': _advertiserMap(
+          existing['previousTerritory'],
+        ),
+        'proposedTerritory': _advertiserMap(
+          existing['proposedTerritory'],
+        ),
+        'reason': reason,
+        'submittedAt': existing['submittedAt'],
+        'decidedAt': Timestamp.now(),
+        'decidedBy': 'super_admin',
+      };
+      await reference.set({
+        'radiusChangeRequest': <String, Object?>{
+          ...existing,
+          'status': 'rejected',
+          'reason': reason,
+          'reviewedAt': FieldValue.serverTimestamp(),
+        },
+        'radiusChangeHistory': FieldValue.arrayUnion([entry]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      if (!mounted) return;
+      setState(() {
+        _selectedAdvertiser = {
+          ...advertiser,
+          'radiusChangeRequest': {
+            ...existing,
+            'status': 'rejected',
+            'reason': reason,
+          },
+          'radiusChangeHistory': [
+            if (advertiser['radiusChangeHistory'] is List)
+              ...(advertiser['radiusChangeHistory'] as List),
+            entry,
+          ],
+        };
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Refus de rayon non enregistré : $error')),
+      );
+    }
+  }
+
   Widget _buildAdvertiserRadiusChangePanel(
       Map<String, dynamic> advertiser) {
     final request = _advertiserMap(advertiser['radiusChangeRequest']);
@@ -3690,6 +3755,15 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   ),
                 ),
           ],
+          if (status == 'rejected')
+            Text(
+              'CHANGEMENT DE RAYON REFUSÉ. '
+              'Le rayon contractuel reste inchangé.'
+              '${_cleanText(request['reason']).isEmpty ? '' :
+                  ' Motif : ' + _cleanText(request['reason'])}',
+              style: const TextStyle(
+                  color: redColor, fontWeight: FontWeight.w800),
+            ),
           if (status == 'approved_pending_payment')
             const Text('ACCORD POUR UNE NOUVELLE PÉRIODE : '
                 'nouveau devis et paiement requis. '
@@ -3740,6 +3814,12 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                           ? () => _reviewAdvertiserRadiusChange(advertiser)
                           : null,
                       child: const Text('AUTORISER POUR LA PROCHAINE PÉRIODE'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () =>
+                          _rejectAdvertiserRadiusChange(advertiser),
+                      icon: const Icon(Icons.close_rounded),
+                      label: const Text('REFUSER LE CHANGEMENT DE RAYON'),
                     ),
                     const Text(
                       'Cette autorisation ne modifie ni le rayon actif '
