@@ -65,6 +65,19 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   double _radiusKm = 0;
   String _scope = 'local';
   AdvertiserTerritory? _territory;
+  AdvertiserTerritory? _approvedTerritory;
+  Map<String, dynamic> _activeRadiusRequest = {};
+  LatLng? _approvedPosition;
+  String? _approvedVisualUrl;
+  bool _radiusTermsAccepted = false;
+
+  bool get _radiusChanged {
+    if (!widget.assetChangeMode) return false;
+    final approved = _approvedTerritory;
+    final proposed = _territory;
+    if (approved == null || proposed == null) return false;
+    return approved.level != proposed.level || approved.code != proposed.code;
+  }
   AdvertiserTerritoryOptions? _territoryOptions;
   final AdvertiserTerritoryService _territoryService =
       AdvertiserTerritoryService();
@@ -140,6 +153,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   void _selectTerritory(AdvertiserTerritory selected) {
     setState(() {
       _territory = selected;
+      _radiusTermsAccepted = false;
       _completed = false;
       _error = null;
     });
@@ -198,6 +212,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
 
         if (data != null) {
           final approvedApplication = _map(data['approvedApplication']);
+          _approvedTerritory = AdvertiserTerritory.fromFirestore(
+            data['advertisingTerritory'],
+          );
+          _activeRadiusRequest = _map(data['radiusChangeRequest']);
           final approvedLocation = _map(approvedApplication['location']);
           final approvedVisual = _map(approvedApplication['visual']);
           final advertisingSpot = _map(data['advertisingSpot']);
@@ -239,6 +257,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             _radiusKm = savedRadius;
           }
           if (latitude != null && longitude != null) {
+            _approvedPosition = LatLng(latitude, longitude);
             final savedPoint = LatLng(latitude, longitude);
             _loadingSavedPosition = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -252,6 +271,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                 proposedVisual['url'] ??
                 legacyDiffusion['bannerUrl'],
           );
+          _approvedVisualUrl = savedBannerUrl;
           if (savedBannerUrl != null) {
             _bannerUrl = savedBannerUrl;
             _bannerBytes = null;
@@ -487,6 +507,14 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       return;
     }
 
+    if (_radiusChanged && !_radiusTermsAccepted) {
+      setState(() {
+        _error = 'Confirmez les conditions de report et de tarification '
+            'du changement de rayon avant de soumettre.';
+      });
+      return;
+    }
+
     setState(() {
       _saving = true;
       _error = null;
@@ -507,16 +535,31 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             .collection('advertiserRequests')
             .doc(requestId);
         if (widget.assetChangeMode) {
-          // La proposition reste isolée jusqu'à la décision du Super Admin.
-          // Ne modifier ni le visuel ni la position actuellement approuvés.
-          await requestReference.set({
-            'assetChangeRequest': <String, Object?>{
+          // La période payée conserve la zone actuelle. Séparer la
+          // proposition de rayon des visuels/positions examinables de suite.
+          final approved = _approvedPosition;
+          final locationChanged = approved != null &&
+              ((approved.latitude - position.latitude).abs() > 0.000001 ||
+               (approved.longitude - position.longitude).abs() > 0.000001);
+          final visualChanged = _bannerBytes != null ||
+              (_approvedVisualUrl != null &&
+               _approvedVisualUrl != bannerUrl);
+          final assetsChanged = visualChanged || locationChanged;
+          final radiusChanged = _radiusChanged;
+
+          if (!assetsChanged && !radiusChanged) {
+            throw StateError('Aucun changement à soumettre.');
+          }
+          final changes = <String, Object?>{
+            'updatedAt': FieldValue.serverTimestamp(),
+          };
+          if (assetsChanged) {
+            changes['assetChangeRequest'] = <String, Object?>{
               'status': 'submitted',
               'proposedLocation': <String, Object?>{
                 'latitude': position.latitude,
                 'longitude': position.longitude,
               },
-              'proposedTerritory': territory.toFirestore(),
               'proposedVisual': <String, Object?>{
                 'url': bannerUrl,
                 'fileName': _bannerFileName,
@@ -528,9 +571,26 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               },
               'submittedAt': FieldValue.serverTimestamp(),
               'updatedAt': FieldValue.serverTimestamp(),
-            },
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+            };
+          }
+          if (radiusChanged) {
+            if (<String>{'waiting_period_end', 'approved_pending_payment'}
+                .contains(_activeRadiusRequest['status'])) {
+              throw StateError(
+                'Une demande de rayon est déjà en attente de traitement.',
+              );
+            }
+            changes['radiusChangeRequest'] = <String, Object?>{
+              'status': 'waiting_period_end',
+              'previousTerritory': _approvedTerritory!.toFirestore(),
+              'proposedTerritory': territory.toFirestore(),
+              'priceAcknowledged': true,
+              'noticeVersion': '2026-10-20',
+              'submittedAt': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            };
+          }
+          await requestReference.set(changes, SetOptions(merge: true));
         } else {
           await requestReference.set({
             ...creationData,
@@ -849,6 +909,34 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                 ),
               ),
             ],
+          ],
+          if (_radiusChanged && widget.assetChangeMode) ...[
+            const SizedBox(height: 14),
+            const Text(
+              'IMPORTANT — Un changement de rayon, en hausse ou en baisse, '
+              'reste sans effet jusqu’à la fin de la période publicitaire '
+              'déjà engagée. Après l’échéance, il nécessite un nouvel accord '
+              'commercial et le paiement correspondant. La zone actuelle '
+              'et son tarif restent inchangés.',
+              style: TextStyle(
+                color: WebColors.red,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              value: _radiusTermsAccepted,
+              onChanged: (value) => setState(
+                () => _radiusTermsAccepted = value ?? false,
+              ),
+              title: const Text(
+                'Je reconnais le report du nouveau rayon après la période '
+                'en cours et son nouveau tarif pour la période suivante.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ),
           ],
         ],
       ),
