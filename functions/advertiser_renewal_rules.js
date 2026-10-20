@@ -24,7 +24,7 @@ function timestampMs(value) {
 /**
  * @param {Array<Object>} campaigns Campagnes liées au dossier authentifié.
  * @param {number} now Instant serveur.
- * @return {{eligible:boolean, reason:string, endAt:number|null}}
+ * @return {Object} Éligibilité, motif et date de fin.
  */
 function evaluateRenewal(campaigns, now = Date.now()) {
   const relevant = campaigns.filter((item) =>
