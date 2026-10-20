@@ -12,6 +12,7 @@ import '../../../models/advertising_pricing_config.dart';
 import '../services/advertiser_territory_service.dart';
 import '../../shared/web_colors.dart';
 import '../models/advertising_visual_data.dart';
+import 'advertiser_cgv_policy.dart';
 
 class AdvertisingSpotSection extends StatefulWidget {
   const AdvertisingSpotSection({
@@ -580,12 +581,19 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                 'Une demande de rayon est déjà en attente de traitement.',
               );
             }
+            final cgvSnapshot = await FirebaseFirestore.instance
+                .collection('legalDocuments')
+                .doc(AdvertiserCgvPolicy.documentId).get();
+            final cgvVersion = (cgvSnapshot.data()?['version'] ??
+                AdvertiserCgvPolicy.defaultVersion).toString();
             changes['radiusChangeRequest'] = <String, Object?>{
               'status': 'waiting_period_end',
               'previousTerritory': _approvedTerritory!.toFirestore(),
               'proposedTerritory': territory.toFirestore(),
               'priceAcknowledged': true,
               'noticeVersion': '2026-10-20',
+              'cgvVersionAccepted': cgvVersion,
+              'acceptedAt': FieldValue.serverTimestamp(),
               'submittedAt': FieldValue.serverTimestamp(),
               'updatedAt': FieldValue.serverTimestamp(),
             };
