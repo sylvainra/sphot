@@ -2,6 +2,9 @@
 
 const {evaluateRenewal, validateRenewalTerritory} =
     require("./advertiser_renewal_rules");
+const {advertiserQuote, publishedState} =
+    require("./commercial_quote_pricing");
+const discounts = require("./commercial_discounts");
 
 const ALLOWED_ORIGINS = new Set([
   "https://sphot.app",
@@ -112,6 +115,25 @@ function registerAdvertiserRenewalEndpoint({admin, onRequest}) {
         res.status(400).json({error: "TERRITORY_INVALID"});
         return;
       }
+      // Prix RE-CALCULÉ côté serveur et figé dans un brouillon, jamais
+      // fourni par le navigateur. Aucun devis/commande/paiement n'est créé.
+      const priceDoc = await db.collection("commercialPricingMarkets")
+          .doc("FR_ADVERTISER_RADIUS").get();
+      const published = publishedState(priceDoc, "ADVERTISER_RADIUS");
+      const offer = String(body.offer || "");
+      const duration = String(body.duration || "");
+      let quote;
+      try {
+        quote = advertiserQuote(published, territory.level,
+            offer, duration);
+      } catch (_) {
+        res.status(400).json({error: "PRICE_SELECTION_INVALID"});
+        return;
+      }
+      const percent = await discounts.readDiscount(
+          admin, "ADVERTISER_RADIUS", uid);
+      const reduction = discounts.computeDiscountCents(
+          quote.amountExclTax, percent);
       // DRAFT SEULEMENT. Aucune écriture dans advertisingTerritory,
       // adRequests, planning, devis, factures ni statut de paiement.
       await requestRef.set({
@@ -119,6 +141,16 @@ function registerAdvertiserRenewalEndpoint({admin, onRequest}) {
           status: "awaiting_commercial_checkout",
           proposedTerritory: territory,
           originalTerritory: advertiser.advertisingTerritory || null,
+          visibilityType: offer,
+          durationLabel: duration,
+          tariff: {
+            pricingReference: quote.pricingReference,
+            amountExclTax: quote.amountExclTax,
+            discountPercent: percent,
+            payableExclTaxCents: reduction.payableExclTaxCents,
+            currency: "EUR",
+            indicativeOnly: true,
+          },
           eligibleAt: admin.firestore.Timestamp.fromMillis(evaluation.endAt),
           preparedAt: admin.firestore.FieldValue.serverTimestamp(),
           paymentStatus: "not_started",
@@ -129,6 +161,8 @@ function registerAdvertiserRenewalEndpoint({admin, onRequest}) {
         ...response,
         draftStatus: "awaiting_commercial_checkout",
         territory,
+        pricingReference: quote.pricingReference,
+        payableExclTaxCents: reduction.payableExclTaxCents,
       });
     } catch (error) {
       console.error("advertiserRenewalEligibility:", error);
