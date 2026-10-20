@@ -32,6 +32,7 @@ class AdvertisingSpotSection extends StatefulWidget {
     this.approvedAssetsLocked = false,
     this.assetChangeMode = false,
     this.assetChangeRequestStatus = '',
+    this.radiusChangeRequest = const {},
     this.requestedScope = 'local',
   });
 
@@ -51,6 +52,7 @@ class AdvertisingSpotSection extends StatefulWidget {
   final bool approvedAssetsLocked;
   final bool assetChangeMode;
   final String assetChangeRequestStatus;
+  final Map<String, dynamic> radiusChangeRequest;
   final String requestedScope;
 
   @override
@@ -180,6 +182,26 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   @override
   void didUpdateWidget(covariant AdvertisingSpotSection oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final newRadiusStatus =
+        widget.radiusChangeRequest['status']?.toString() ?? '';
+    final oldRadiusStatus =
+        oldWidget.radiusChangeRequest['status']?.toString() ?? '';
+    if (newRadiusStatus != oldRadiusStatus) {
+      _activeRadiusRequest = _map(widget.radiusChangeRequest);
+      if (newRadiusStatus == 'waiting_period_end' ||
+          newRadiusStatus == 'rejected' ||
+          newRadiusStatus == 'approved_pending_payment') {
+        // Ne conserver dans la sélection aucun rayon refusé ou non payé.
+        _territory = _approvedTerritory;
+        _radiusTermsAccepted = false;
+        final approved = _approvedTerritory;
+        if (approved != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) widget.onTerritoryChanged(approved);
+          });
+        }
+      }
+    }
     if (oldWidget.requestedScope != widget.requestedScope &&
         _scope != widget.requestedScope) {
       _scope = widget.requestedScope;
