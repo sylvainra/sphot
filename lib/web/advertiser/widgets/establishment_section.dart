@@ -83,7 +83,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   String _registryStatus = 'unverified';
   String _registryMessage = '';
   String _activityCode = '';
-  bool _checkingRegistry = false;
   PlatformFile? _selectedProof;
   Map<String, dynamic> _savedForeignProof = {};
 
@@ -242,47 +241,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
 
   void _markAsModified([Object? _]) {
     if (_completed) setState(() => _completed = false);
-  }
-
-  Future<void> _verifySiret() async {
-    if (widget.readOnly) return;
-    FocusScope.of(context).unfocus();
-    setState(() {
-      _checkingRegistry = true;
-      _registryMessage = '';
-    });
-    try {
-      final company = await const CompanyRegistryService().findBySiret(
-        _siretController.text,
-      );
-      if (!mounted) return;
-      setState(() {
-        _siretController.text = company.siret;
-        _sirenController.text = company.siren;
-        _legalNameController.text = forceUpperCase(company.legalName);
-        if (company.businessName.isNotEmpty) {
-          _businessNameController.text = forceUpperCase(company.businessName);
-        }
-        _addressController.text = company.address;
-        _postalCodeController.text = company.postalCode;
-        _cityController.text = forceUpperCase(company.city);
-        _countryController.text = 'FRANCE';
-        _activityCode = company.activityCode;
-        _registryStatus = company.isActive ? 'verified' : 'manual_review';
-        _registryMessage = company.isActive
-            ? 'SIRET vérifié dans le registre officiel.'
-            : 'Établissement déclaré fermé : contrôle manuel obligatoire.';
-        _completed = false;
-      });
-    } on CompanyRegistryException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _registryStatus = 'manual_review';
-        _registryMessage = error.message;
-      });
-    } finally {
-      if (mounted) setState(() => _checkingRegistry = false);
-    }
   }
 
   Future<void> _pickForeignProof() async {
@@ -1047,38 +1005,6 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                           keyboardType: TextInputType.number,
                           digitsOnly: true,
                           maxLength: 14,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 14),
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: FilledButton.icon(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: WebColors.blue,
-                                foregroundColor: Colors.white,
-                                textStyle: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              onPressed: widget.readOnly || _checkingRegistry
-                                  ? null
-                                  : _verifySiret,
-                              icon: _checkingRegistry
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.verified_outlined),
-                              label: const Text('VÉRIFIER ET PRÉREMPLIR'),
-                            ),
-                          ),
                         ),
                         if (_registryMessage.isNotEmpty)
                           Padding(
