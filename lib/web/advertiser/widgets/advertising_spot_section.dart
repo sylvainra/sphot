@@ -894,8 +894,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                 'RAYON CONTRACTUEL VERROUILLÉ — Aucun changement '
                 'pendant la période publicitaire engagée. Un nouveau '
                 'rayon pourra être choisi pour la prochaine souscription, '
-                'après expiration et au nouveau tarif. '
-                'Aucune approbation du Super Admin n’est nécessaire.',
+                'après expiration et au nouveau tarif.',
                 style: TextStyle(
                   color: WebColors.blue,
                   fontWeight: FontWeight.w800,

@@ -61,8 +61,8 @@ class _DiffusionSectionState extends State<DiffusionSection> {
       value: 'premium',
       label: 'FICHES SPHOT',
       description:
-          'Votre publicité apparaît en bas de chacune des 6 rubriques '
-          'du volet de chaque SPHOT concerné (6 emplacements).',
+          'Votre publicité apparaît en bas de chacune des rubriques '
+          'du volet de chaque SPHOT concerné (de 1 à 6 emplacements).',
       usesFireIcon: true,
     ),
   ];
@@ -228,9 +228,9 @@ class _DiffusionSectionState extends State<DiffusionSection> {
 
   String get _selectedOfferLabel => switch (_previewType) {
         DiffusionPreviewType.map => 'CARTE SPHOT · 1 emplacement',
-        DiffusionPreviewType.premium => 'FICHES SPHOT · 6 emplacements',
+        DiffusionPreviewType.premium => 'FICHES SPHOT - 1 à 6 emplacements',
         DiffusionPreviewType.pack =>
-          'PACK VISIBILITÉ TOTALE · 7 emplacements',
+          'PACK VISIBILITÉ TOTALE - 7 emplacements maxi',
         null => 'Choisissez une ou deux zones de diffusion',
       };
 
@@ -331,7 +331,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'TYPE DE VISIBILITÉ',
+                          'ZONES DE VISIBILITÉ',
                           style: TextStyle(
                             color: WebColors.blue,
                             fontSize: 16,
@@ -340,7 +340,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'SÉLECTIONNEZ UNE OU DEUX ZONES',
+                          'SÉLECTIONNEZ VOTRE ZONE DE DIFFUSION',
                           style: TextStyle(
                             color: Color(0xFF6B7280),
                             fontWeight: FontWeight.w900,
@@ -362,41 +362,43 @@ class _DiffusionSectionState extends State<DiffusionSection> {
                   ),
                 ),
               ),
-              const SizedBox(height: 5),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 11,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF6F9FD),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFCBD5E1)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _previewType == null
-                          ? Icons.touch_app_outlined
-                          : Icons.check_circle_outline_rounded,
-                      color: _previewType == null
-                          ? WebColors.blue
-                          : WebColors.red,
+              // Un récapitulatif s'affiche uniquement après un choix.
+              // Les 3 états existants (Carte, Fiches, Pack) sont préservés.
+              if (_previewType != null) ...[
+                const SizedBox(height: 5),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 11,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF6F9FD),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFCBD5E1),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _selectedOfferLabel,
-                        style: const TextStyle(
-                          color: WebColors.blue,
-                          fontWeight: FontWeight.w900,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        color: WebColors.red,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _selectedOfferLabel,
+                          style: const TextStyle(
+                            color: WebColors.blue,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
