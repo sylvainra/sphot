@@ -591,6 +591,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             };
           }
           await requestReference.set(changes, SetOptions(merge: true));
+          if (radiusChanged) {
+            _activeRadiusRequest = {'status': 'waiting_period_end'};
+          }
         } else {
           await requestReference.set({
             ...creationData,
@@ -625,7 +628,11 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       _notifyVisual();
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = 'L’enregistrement a échoué. Réessayez.');
+      setState(() {
+        _error = error is StateError
+            ? error.message
+            : 'L’enregistrement a échoué. Réessayez.';
+      });
       debugPrint('Enregistrement SPHOT publicitaire impossible : $error');
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -987,6 +994,17 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           ),
         ),
         _buildTerritoryCard(),
+        if (_activeRadiusRequest['status'] == 'waiting_period_end')
+          const Padding(
+            padding: EdgeInsets.only(bottom: 14),
+            child: Text(
+              'Votre demande de rayon d’action reste en attente de '
+              'fin de période. La zone actuellement payée est inchangée.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: WebColors.red, fontWeight: FontWeight.w800),
+            ),
+          ),
         if (widget.assetChangeRequestStatus == 'submitted')
           const Padding(
             padding: EdgeInsets.only(bottom: 14),
