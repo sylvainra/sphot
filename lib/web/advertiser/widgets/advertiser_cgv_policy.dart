@@ -8,27 +8,23 @@ class AdvertiserCgvPolicy {
   static const title = 'CGV — SPHOT PUBLICITAIRE';
   static const radiusArticleTitle = 'Modification du rayon de diffusion';
 
-  // Article approuvé pour les changements de zone / rayon.
+  // Clause contractuelle propre aux campagnes publicitaires.
   static const radiusArticle =
-      'Le rayon d’action ou la zone géographique de diffusion sélectionné '
-      'lors de la souscription d’une campagne publicitaire est applicable '
-      'pour toute la durée contractuelle de cette campagne.\n\n'
-      'L’annonceur peut demander une modification de ce rayon, à la hausse '
-      'comme à la baisse, pendant la période de diffusion en cours.\n\n'
-      'Toutefois, cette modification ne peut être approuvée ni prendre effet '
-      'avant l’expiration de la période contractuelle en cours. Jusqu’à cette '
-      'échéance, le rayon initialement souscrit et ses conditions tarifaires '
-      'demeurent inchangés.\n\n'
-      'À l’expiration de cette période, la modification pourra être examinée '
-      'par SPHOT et fera l’objet d’une tarification correspondant au nouveau '
-      'rayon sélectionné et aux conditions commerciales applicables à la '
-      'nouvelle période de diffusion.\n\n'
-      'La prise d’effet du nouveau rayon est subordonnée à son approbation, '
-      'à l’acceptation des nouvelles conditions commerciales et à la '
-      'régularisation du paiement applicable.\n\n'
-      'Aucune augmentation ou diminution de rayon ne donne lieu à une '
-      'modification rétroactive du prix de la période contractuelle '
-      'déjà engagée.';
+      'Le rayon d’action ou la zone géographique de diffusion est choisi '
+      'au moment de la souscription de la campagne publicitaire et demeure '
+      'fixe pendant toute sa période contractuelle payée.\n\n'
+      'Aucune augmentation, diminution ou autre modification du rayon '
+      'ne peut être demandée ou appliquée pendant cette période. '
+      'Les conditions tarifaires souscrites restent inchangées.\n\n'
+      'À l’issue de la période contractuelle, l’annonceur peut sélectionner '
+      'librement un nouveau rayon pour une nouvelle souscription. '
+      'Le tarif correspondant à la nouvelle zone et à la durée '
+      'choisie lui est présenté avant sa commande.\n\n'
+      'Le nouveau rayon ne prend effet qu’après confirmation de '
+      'la nouvelle souscription et du paiement associé. '
+      'Ce changement ne requiert aucune approbation du Super Admin.\n\n'
+      'Aucune modification de rayon ne donne lieu à un recalcul '
+      'ou à un remboursement rétroactif de la période déjà engagée.';
 
   static Map<String, dynamic> get initialDocument => {
     'title': title,
