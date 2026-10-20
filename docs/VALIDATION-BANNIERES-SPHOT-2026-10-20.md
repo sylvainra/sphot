@@ -40,6 +40,14 @@ Objectifs à vérifier lors des essais :
 - La validation visuelle est confirmée le 20/10/2026 ; il faut encore synchroniser le PC, analyser le fichier modifié, reconstruire `build/web` et publier cette nouvelle compilation sur Firebase Hosting `sphot-ab80b`. Ne pas confondre le précédent déploiement réussi de la carte avec ce nouveau déploiement de l'étape 3.
 - La campagne démonstrateur « Surf Shop Atlantique » est destinée à être retirée **dans une opération Firestore séparée** après identification de sa référence exacte et contrôle des éventuels liens ; ne supprimer ni une campagne réelle, ni le site Hosting `sphot-advertiser-test`, ni les éléments partagés sans inventaire.
 
+## Notification d'approbation du changement de visuel — correctif à tester
+
+- Le 20/10/2026, l'utilisateur a validé visuellement l'email « PROPOSITION À APPROUVER », bouton d'accès bleu opérationnel après le déploiement ciblé de `sendAdvertiserAssetChangeEmail`.
+- L'email « MODIFICATION APPROUVÉE » était absent lors d'une approbation suivante, alors que le Super Admin affichait le statut approuvé.
+- Cause de code corrigée : la notification ne repose plus uniquement sur un changement de `assetChangeRequest.syncStatus`, qui peut rester `applied` entre deux propositions. Elle se déclenche à la mise à jour de `lastSyncAt` pour une proposition approuvée, après la synchronisation, et garde une clé d'envoi stable par proposition (`submittedAt`) pour les reprises Firebase.
+- Modules concernés : `functions/index.js`, `functions/advertiser_asset_change_email_trigger.js` et son fichier de tests `functions/test/advertiser_asset_change_email_trigger.test.js`. Aucun changement aux textes, au bouton HTML, à la carte, aux tarifs ou aux données Firestore.
+- **11 tests unitaires Node exécutés avec succès en environnement isolé.** Le lint du dépôt, le déploiement Firebase de la fonction d'email, la présence du synchroniseur `syncApprovedAdvertiserAssets` et l'envoi réel d'un nouvel email « MODIFICATION APPROUVÉE » restent à vérifier sur le PC. Une ancienne approbation ne rejoue pas son événement automatiquement.
+
 ## Nettoyage / suivi du déploiement
 
 Suppressions du dépôt : cache local `.firebase/hosting.YnVpbGRcd2Vi.cache`, fichier de configuration d'émulateur publicitaire isolé, règles d'émulateur dédiées, deux scripts d'essai local isolé et ancien mode d'emploi associé. `.firebase/` est ignoré par Git ; les tests unitaires utiles à la projection publique sont conservés dans `functions/test/`.
