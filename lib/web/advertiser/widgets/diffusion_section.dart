@@ -228,9 +228,9 @@ class _DiffusionSectionState extends State<DiffusionSection> {
 
   String get _selectedOfferLabel => switch (_previewType) {
         DiffusionPreviewType.map => 'CARTE SPHOT · 1 emplacement',
-        DiffusionPreviewType.premium => 'FICHES SPHOT · 6 emplacements',
+        DiffusionPreviewType.premium => 'FICHES SPHOT - 1 à 6 emplacements',
         DiffusionPreviewType.pack =>
-          'PACK VISIBILITÉ TOTALE · 7 emplacements',
+          'PACK VISIBILITÉ TOTALE - 7 emplacements maxi',
         null => 'Choisissez une ou deux zones de diffusion',
       };
 
