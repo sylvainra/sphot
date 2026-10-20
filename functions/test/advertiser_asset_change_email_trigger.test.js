@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   shouldNotifyAdvertiserAssetChange,
+  advertiserAssetChangeNotificationId,
 } = require("../advertiser_asset_change_email_trigger");
 
 const document = (
@@ -65,4 +66,25 @@ test("nonapproved accounts are ignored", () => {
   assert.equal(shouldNotifyAdvertiserAssetChange(
       document("submitted"), document("approved", "applied", time(200),
           "pending")), false);
+});
+
+test("same approved proposal has one notification key across retries", () => {
+  const change = {submittedAt: time(170)};
+  assert.equal(advertiserAssetChangeNotificationId(
+      "approved", change, "event-one", "advertiser-1"),
+  advertiserAssetChangeNotificationId(
+      "approved", change, "event-two", "advertiser-1"));
+});
+
+test("later proposal gets a different notification key", () => {
+  assert.notEqual(advertiserAssetChangeNotificationId(
+      "approved", {submittedAt: time(170)}, "event-one", "advertiser-1"),
+  advertiserAssetChangeNotificationId(
+      "approved", {submittedAt: time(180)}, "event-two", "advertiser-1"));
+});
+
+test("nonapproved notifications retain their event key", () => {
+  assert.equal(advertiserAssetChangeNotificationId(
+      "submitted", {submittedAt: time(170)}, "event-one", "advertiser-1"),
+  "event-one");
 });
