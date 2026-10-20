@@ -42,4 +42,25 @@ function shouldNotifyAdvertiserAssetChange(before, after) {
   return afterAt !== "" && afterAt !== beforeAt;
 }
 
-module.exports = {shouldNotifyAdvertiserAssetChange};
+/**
+ * Keep one claim key when Firebase retries the same approved proposal.
+ * The next submittedAt represents a different modification.
+ * @param {string} status Status of the current proposal.
+ * @param {Object} change Asset change request data.
+ * @param {string} eventId Firestore event identifier.
+ * @param {string} requestId Advertiser request ID.
+ * @return {string} Stable notification ID.
+ */
+function advertiserAssetChangeNotificationId(
+    status, change, eventId, requestId,
+) {
+  if (status !== "approved") return eventId;
+  const version = timestampKey((change || {}).submittedAt) ||
+      timestampKey((change || {}).reviewedAt);
+  return version ? `${requestId}:approved:${version}` : eventId;
+}
+
+module.exports = {
+  shouldNotifyAdvertiserAssetChange,
+  advertiserAssetChangeNotificationId,
+};
