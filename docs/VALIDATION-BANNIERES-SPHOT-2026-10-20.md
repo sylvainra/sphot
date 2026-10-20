@@ -55,3 +55,13 @@ Suppressions du dépôt : cache local `.firebase/hosting.YnVpbGRcd2Vi.cache`, fi
 Ne pas confondre suppression de fichiers de test versionnés et suppression d'un site Firebase, d'un projet Firebase, de Firestore ou de Storage : aucune donnée distante ne doit être détruite sans inventaire et validation explicite.
 
 Le commit GitHub et la validation des captures ne constituent **pas** un déploiement Firebase Hosting. Procédure de déploiement à effectuer sur le PC après synchronisation de `main` : vérification Flutter, build Web de production, puis `firebase deploy --only hosting --project sphot-ab80b`, avec confirmation du site cible. Ne pas déployer les Cloud Functions pour cet ajustement UI.
+
+## Validation Super Admin — 20/10/2026
+
+- Utilisateur : les emails annonceur « PROPOSITION À APPROUVER » et « MODIFICATION APPROUVÉE » sont reçus et fonctionnels après déploiement des deux fonctions `sendAdvertiserAssetChangeEmail` et `syncApprovedAdvertiserAssets`.
+- Interface comparative avant approbation expressément validée : deux visuels « AVANT » / « APRÈS » agrandissables, deux positions et leur distance sur une carte à deux repères ; mention explicite si un élément reste inchangé.
+- Implémentation sur `main` dans `lib/web/super_admin/widgets/advertiser_asset_comparison.dart` et `lib/web/super_admin/pages/super_admin_dashboard_page.dart`. L'interface n'est affichée qu'avec une proposition `assetChangeRequest.status == submitted`.
+- Lors de l'approbation, création atomique d'une entrée historique `advertiserRequests/{id}/assetChangeHistory/{autoId}` avec visuels et positions précédents/proposés, soumission et décision. Aucun écrasement des anciennes entrées.
+- Le circuit emails, les offres commerciales, la carte publique et les fonctions Cloud ne sont pas modifiés par ce lot comparatif.
+- **À vérifier sur le PC avant publication** : `flutter analyze` ciblé, `flutter build web --release -t lib/main.dart`, test pratique de comparaison, puis `firebase deploy --only hosting --project sphot-ab80b`. Ne pas déclarer la publication effective avant preuve du terminal.
+
