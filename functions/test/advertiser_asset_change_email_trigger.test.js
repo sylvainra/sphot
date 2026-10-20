@@ -6,7 +6,9 @@ const {
   shouldNotifyAdvertiserAssetChange,
 } = require("../advertiser_asset_change_email_trigger");
 
-const document = (status, syncStatus, lastSyncAt, requestStatus = "approved") => ({
+const document = (
+    status, syncStatus, lastSyncAt, requestStatus = "approved",
+) => ({
   status: requestStatus,
   assetChangeRequest: {status, syncStatus, lastSyncAt},
 });
@@ -29,7 +31,7 @@ test("first campaign sync completion sends approval email", () => {
       document("approved", "applied", time(200))), true);
 });
 
-test("second approval sends when applied stays applied but sync advances", () => {
+test("second approval triggers despite an unchanged sync status", () => {
   assert.equal(shouldNotifyAdvertiserAssetChange(
       document("approved", "applied", time(100)),
       document("approved", "applied", time(200))), true);
