@@ -18,6 +18,8 @@ const {assignAuthorizedAdminQuoteNumber} =
     require("./admin_quote_numbering");
 const {getDownloadURL} = require("firebase-admin/storage");
 const nodemailer = require("nodemailer");
+const {shouldNotifyAdvertiserAssetChange} =
+    require("./advertiser_asset_change_email_trigger");
 const PDFDocument = require("pdfkit");
 
 admin.initializeApp();
@@ -10983,18 +10985,13 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
     async (event) => {
       const before = event.data.before.data() || {};
       const data = event.data.after.data() || {};
-      const previousChange = before.assetChangeRequest || {};
       const currentChange = data.assetChangeRequest || {};
-      const previous = previousChange.status;
       const status = currentChange.status;
       const syncStatus = currentChange.syncStatus;
-      const approvalSyncFinished = status === "approved" &&
-        previousChange.syncStatus !== syncStatus &&
-        ["applied", "unlinked", "no_active_campaign"].includes(syncStatus);
-      // L'email d'approbation attend la fin de synchronisation.
-      if (data.status !== "approved" ||
-          (status === "approved" ? !approvalSyncFinished :
-            previous === status)) return;
+      // Pour un accord, attendre la synchronisation effective de cette
+      // proposition, même si syncStatus valait déjà "applied" auparavant.
+      // Les transitions non approuvées gardent leur comportement antérieur.
+      if (!shouldNotifyAdvertiserAssetChange(before, data)) return;
       const messages = {
         pending: "Votre demande de modification du visuel ou de la position " +
           "a été reçue. L'équipe SPHOT va l'examiner.",
