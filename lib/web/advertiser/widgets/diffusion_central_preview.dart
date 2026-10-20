@@ -391,7 +391,7 @@ class _MapPhonePreview extends StatelessWidget {
           left: 10,
           right: 10,
           bottom: 54,
-          child: _AdvertisingBanner(data: data, panoramic: true),
+          child: _MapAdvertisingPreview(data: data),
         ),
         const Positioned(
           left: 8,
@@ -617,7 +617,7 @@ class _PremiumPhonePreviewState extends State<_PremiumPhonePreview> {
                       ),
                     ),
                     const SizedBox(height: 7),
-                    _AdvertisingBanner(data: widget.data),
+                    _SheetAdvertisingPreview(data: widget.data),
                   ],
                 ),
               ),
@@ -701,40 +701,191 @@ class _ForecastDay extends StatelessWidget {
   }
 }
 
-class _AdvertisingBanner extends StatelessWidget {
-  const _AdvertisingBanner({required this.data, this.panoramic = false});
+/// Reproduction du bandeau de la carte SPHOT sur un téléphone (360 px).
+/// Le visuel annonceur reste entier et le bouton de création est séparé.
+/// Les dimensions reflètent _buildAdBanner() dans lib/map/map_page.dart.
+class _MapAdvertisingPreview extends StatelessWidget {
+  const _MapAdvertisingPreview({required this.data});
 
   final DiffusionPreviewData data;
-  final bool panoramic;
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: panoramic ? 3 : 2,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(11),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.94),
-            border: Border.all(color: WebColors.red, width: 1.4),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final creationWidth = 46.0.clamp(
+          0.0,
+          (availableWidth - 90.0).clamp(0.0, availableWidth),
+        );
+        final visualWidth = availableWidth - creationWidth;
+        final bannerHeight = (visualWidth / 6.0).clamp(52.0, double.infinity);
+
+        return SizedBox(
+          height: bannerHeight,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(11),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: ColoredBox(
+                    color: const Color(0xFF063551),
+                    child: _AdvertisingVisual(
+                      data: data,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: creationWidth,
+                  child: const _MapAdvertisingInvitation(),
+                ),
+              ],
+            ),
           ),
-          child: _bannerContent(panoramic ? BoxFit.fill : BoxFit.contain),
+        );
+      },
+    );
+  }
+}
+
+class _MapAdvertisingInvitation extends StatelessWidget {
+  const _MapAdvertisingInvitation();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.72),
+        border: Border(
+          left: BorderSide(
+            color: Colors.black.withOpacity(0.08),
+            width: 1,
+          ),
+        ),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SvgPicture.asset(
+              'data/icons/fire_red_icon.svg',
+              width: 19,
+              height: 24,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'Votre\nSPHOT\nPUBLICITAIRE\nici!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 9,
+                height: 1.1,
+                color: Colors.black87,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+}
 
-  Widget _bannerContent(BoxFit fit) {
+/// La fiche SPHOT réelle affiche une image 6:1 puis, en dessous,
+/// un bouton de création distinct (sans marker dans cette zone).
+/// Garder cette géométrie dans les six onglets de la prévisualisation.
+class _SheetAdvertisingPreview extends StatelessWidget {
+  const _SheetAdvertisingPreview({required this.data});
+
+  final DiffusionPreviewData data;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFAF5),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFFFB36B)),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(7),
+            child: AspectRatio(
+              aspectRatio: 6,
+              child: _AdvertisingVisual(
+                data: data,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 29,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFAF5),
+            border: Border.all(color: WebColors.red, width: 1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Text(
+            'Votre SPHOT PUBLICITAIRE ici!',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: WebColors.red,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Toujours utiliser les octets importés à l'étape précédente ou leur URL
+/// Firebase enregistrée. Ne jamais afficher une image de démonstration
+/// en lieu et place du visuel soumis par l'annonceur.
+class _AdvertisingVisual extends StatelessWidget {
+  const _AdvertisingVisual({required this.data, required this.fit});
+
+  final DiffusionPreviewData data;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
     final bytes = data.bannerBytes;
     if (bytes != null) {
-      return Image.memory(bytes, fit: fit);
+      return Image.memory(
+        bytes,
+        width: double.infinity,
+        height: double.infinity,
+        fit: fit,
+        alignment: Alignment.center,
+      );
     }
 
     final bannerUrl = data.bannerUrl?.trim() ?? '';
     if (bannerUrl.isNotEmpty) {
       return Image.network(
         bannerUrl,
+        width: double.infinity,
+        height: double.infinity,
         fit: fit,
+        alignment: Alignment.center,
+        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
         errorBuilder: (_, __, ___) => _BannerPlaceholder(data: data),
       );
     }
