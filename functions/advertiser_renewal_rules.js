@@ -6,6 +6,11 @@
  */
 const INACTIVE = new Set(["deleted", "cancelled", "canceled", "rejected"]);
 
+/**
+ * Convertit les timestamps Firestore et dates en millisecondes.
+ * @param {unknown} value Date, timestamp ou texte ISO.
+ * @return {number} Instant ou NaN si absent.
+ */
 function timestampMs(value) {
   if (value && typeof value.toMillis === "function") return value.toMillis();
   if (value && typeof value.seconds === "number") {
@@ -52,6 +57,11 @@ const RADIUS = Object.freeze({
   radius_300km: 300,
 });
 
+/**
+ * Canonise un rayon demandé : ne jamais accepter un rayon libre du client.
+ * @param {Object} value Proposition reçue.
+ * @return {Object} Zone canonique.
+ */
 function validateRenewalTerritory(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("TERRITORY_INVALID");
