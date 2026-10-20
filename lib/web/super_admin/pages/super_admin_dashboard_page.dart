@@ -3465,49 +3465,57 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         }
       }
 
-      if (isAssetApproval) {
-        // Historique immuable de la décision : avant/après reste consultable
-        // même après remplacement des informations approuvées.
-        final approvedApplication = _advertiserMap(
-          advertiser['approvedApplication'],
-        );
+      Map<String, dynamic>? decisionHistoryEntry;
+      if (isAssetReview) {
+        // Conserver l'avant/après à chaque décision, sans écraser
+        // l'historique existant ni écrire dans une sous-collection non
+        // autorisée par les règles Firestore du dossier annonceur.
+        final approvedApplication =
+            _advertiserMap(advertiser['approvedApplication']);
+        final approvedVisual = _advertiserMap(approvedApplication['visual']);
         final previousSpot = _advertiserMap(advertiser['advertisingSpot']);
-        final previousVisual = _advertiserMap(
-          approvedApplication['visual'],
+        final approvedLocation = _advertiserMap(approvedApplication['location']);
+        final currentLocation = approvedLocation.isNotEmpty
+            ? approvedLocation
+            : <String, dynamic>{
+                'latitude': previousSpot['latitude'],
+                'longitude': previousSpot['longitude'],
+              };
+        final proposedVisual = _advertiserMap(
+          assetChange['proposedVisual'] ?? advertiser['proposedVisual'],
         );
-        final previousLocation = _advertiserMap(
-          approvedApplication['location'],
+        final proposedLocation = _advertiserMap(
+          assetChange['proposedLocation'] ?? advertiser['applicantLocation'],
         );
-        final batch = FirebaseFirestore.instance.batch();
-        batch.set(reference, update, SetOptions(merge: true));
-        batch.set(reference.collection('assetChangeHistory').doc(), {
-          'decision': 'approved',
-          'previousVisual': previousVisual.isNotEmpty
-              ? previousVisual
-              : {'url': previousSpot['bannerUrl']},
-          'previousLocation': previousLocation.isNotEmpty
-              ? previousLocation
-              : {
-                  'latitude': previousSpot['latitude'],
-                  'longitude': previousSpot['longitude'],
-                },
-          'proposedVisual': _advertiserMap(
-            assetChange['proposedVisual'] ?? advertiser['proposedVisual'],
-          ),
-          'proposedLocation': _advertiserMap(
-            assetChange['proposedLocation'] ?? advertiser['applicantLocation'],
-          ),
+        decisionHistoryEntry = <String, dynamic>{
+          'decision': decision,
           'submittedAt': assetChange['submittedAt'],
-          'decidedAt': FieldValue.serverTimestamp(),
+          'decidedAt': Timestamp.now(),
           'decidedBy': 'super_admin',
-        });
-        await batch.commit();
-      } else {
-        await reference.set(update, SetOptions(merge: true));
+          'previousVisualUrl': _cleanText(
+            approvedVisual['url'] ?? previousSpot['bannerUrl'],
+          ),
+          'previousLocation': currentLocation,
+          'proposedVisualUrl': _cleanText(proposedVisual['url']),
+          'proposedLocation': proposedLocation,
+          'reason': reason,
+        };
+        update['assetChangeHistory'] =
+            FieldValue.arrayUnion([decisionHistoryEntry]);
       }
+      await reference.set(update, SetOptions(merge: true));
       if (!mounted) return;
       setState(() {
-        _selectedAdvertiser = {...advertiser, ...update};
+        _selectedAdvertiser = {
+          ...advertiser,
+          ...update,
+          if (decisionHistoryEntry != null)
+            'assetChangeHistory': [
+              if (advertiser['assetChangeHistory'] is List)
+                ...(advertiser['assetChangeHistory'] as List),
+              decisionHistoryEntry,
+            ],
+        };
       });
     } catch (error, stackTrace) {
       debugPrint('Mise à jour annonceur impossible : $error');
@@ -3650,6 +3658,167 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           ),
         );
       },
+    );
+  }
+
+  LatLng? _advertiserHistoryPoint(Map<String, dynamic> coordinates) {
+    final lat = coordinates['latitude'];
+    final lng = coordinates['longitude'];
+    if (lat is! num || lng is! num) return null;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return LatLng(lat.toDouble(), lng.toDouble());
+  }
+
+  void _showAdvertiserAssetHistory(Map<String, dynamic> entry) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.all(22),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 620, maxHeight: 760),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.all(14),
+                      child: Text(
+                        'HISTORIQUE - COMPARAISON AVANT / APRÈS',
+                        style: TextStyle(
+                          color: adminColor,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+                  child: AdvertiserAssetComparison(
+                    previousVisualUrl:
+                        _cleanText(entry['previousVisualUrl']),
+                    proposedVisualUrl:
+                        _cleanText(entry['proposedVisualUrl']),
+                    previousLocation: _advertiserHistoryPoint(
+                      _advertiserMap(entry['previousLocation']),
+                    ),
+                    proposedLocation: _advertiserHistoryPoint(
+                      _advertiserMap(entry['proposedLocation']),
+                    ),
+                    onEnlarge: _showAdvertiserVisual,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdvertiserAssetHistory(Map<String, dynamic> advertiser) {
+    final raw = advertiser['assetChangeHistory'];
+    if (raw is! List || raw.isEmpty) return const SizedBox.shrink();
+    final entries = raw
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList()
+        .reversed;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'HISTORIQUE DES MODIFICATIONS PUBLICITAIRES',
+            style: TextStyle(
+              color: adminColor,
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final entry in entries) ...[
+            Builder(
+              builder: (context) {
+                final decision = _cleanText(entry['decision']);
+                final label = switch (decision) {
+                  'approved' => 'MODIFICATION APPROUVÉE',
+                  'rejected' => 'MODIFICATION REFUSÉE',
+                  'changes_requested' => 'AJUSTEMENTS DEMANDÉS',
+                  _ => decision.toUpperCase(),
+                };
+                final rawDate = entry['decidedAt'];
+                final date = rawDate is Timestamp
+                    ? rawDate.toDate().toLocal()
+                    : null;
+                final dateLabel = date == null
+                    ? 'Date non renseignée'
+                    : '${date.day.toString().padLeft(2, '0')}/'
+                      '${date.month.toString().padLeft(2, '0')}/'
+                      '${date.year} '
+                      '${date.hour.toString().padLeft(2, '0')}:'
+                      '${date.minute.toString().padLeft(2, '0')}';
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F6FB),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: adminColor.withOpacity(0.16),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          color: adminColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        dateLabel,
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      if (_cleanText(entry['reason']).isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Motif : ${_cleanText(entry['reason'])}',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                        ),
+                      OutlinedButton.icon(
+                        onPressed: () => _showAdvertiserAssetHistory(entry),
+                        icon: const Icon(Icons.compare_outlined, size: 16),
+                        label: const Text(
+                          'CONSULTER AVANT / APRÈS',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -4284,6 +4453,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   'Motif',
                   _cleanText(review['reason']),
                 ),
+              _buildAdvertiserAssetHistory(advertiser),
               const SizedBox(height: 20),
               FilledButton.icon(
                 onPressed: decisionMade
