@@ -48,3 +48,5 @@ app.*.map.json
 tools/import_spots/node_modules/
 
 tools/import_spots/serviceAccountKey.json
+# Firebase Hosting local deployment cache (generated, never commit)
+.firebase/
