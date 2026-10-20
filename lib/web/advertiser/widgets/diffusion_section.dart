@@ -362,6 +362,43 @@ class _DiffusionSectionState extends State<DiffusionSection> {
                   ),
                 ),
               ),
+              // Un récapitulatif s'affiche uniquement après un choix.
+              // Les 3 états existants (Carte, Fiches, Pack) sont préservés.
+              if (_previewType != null) ...[
+                const SizedBox(height: 5),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 11,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF6F9FD),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFCBD5E1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        color: WebColors.red,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _selectedOfferLabel,
+                          style: const TextStyle(
+                            color: WebColors.blue,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
