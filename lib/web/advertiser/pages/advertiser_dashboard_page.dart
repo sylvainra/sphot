@@ -81,13 +81,14 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'SPHOT PUBLICITAIRE',
       Icons.location_on_outlined,
-      'Choisissez cinq rayons rouges ou le pays entier dans le monde.',
+      'Choisissez votre rayon d’action, de la proximité locale '
+          'jusqu’au pays entier.',
     ),
     _AdvertiserSection(
       'DIFFUSION',
       Icons.campaign_outlined,
-      'Choisissez vos deux zones : CARTE SPHOT et FICHES SPHOT. '
-          'Les deux réunies constituent le PACK VISIBILITÉ TOTALE.'
+      'Choisissez votre zone de SPHOT PUBLICITAIRE : la CARTE SPHOT, '
+          'les FICHES SPHOT ou le PACK VISIBILITÉ TOTALE !'
     ),
     _AdvertiserSection(
       'PLANIFICATION',
@@ -734,6 +735,12 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
         _advertisingTerritory?.level == effectiveTerritory?.level &&
         _advertisingTerritory?.code == effectiveTerritory?.code;
 
+    // Un seul repère : le Fire rouge suit la position choisie,
+    // tandis que le cercle montre la zone contractuelle inchangée.
+    final markerPoint = canEditApprovedPosition && _advertisingPoint != null
+        ? _advertisingPoint
+        : (showApprovedRadius ? effectivePoint : _advertisingPoint);
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -783,14 +790,11 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                   ),
                 ],
               ),
-            if ((showApprovedRadius ? effectivePoint : _advertisingPoint)
-                != null)
+            if (markerPoint != null)
               MarkerLayer(
                 markers: [
                   Marker(
-                    point: showApprovedRadius
-                        ? effectivePoint!
-                        : _advertisingPoint!,
+                    point: markerPoint,
                     width: 60,
                     height: 60,
                     alignment: Alignment.center,
@@ -803,25 +807,6 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                       ),
                     ),
                   ),
-                  if (showApprovedRadius &&
-                      canEditApprovedPosition &&
-                      _advertisingPoint != null &&
-                      effectivePoint != null &&
-                      const Distance().as(
-                        LengthUnit.Meter,
-                        _advertisingPoint!,
-                        effectivePoint,
-                      ) > 1)
-                    Marker(
-                      point: _advertisingPoint!,
-                      width: 40,
-                      height: 40,
-                      child: const Icon(
-                        Icons.place_outlined,
-                        color: WebColors.blue,
-                        size: 36,
-                      ),
-                    ),
                 ],
               ),
           ],
@@ -845,8 +830,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                   ),
                   child: Text(
                     canEditApprovedPosition
-                        ? 'ZONE ACTUELLE EN ROUGE — NOUVELLE POSITION '
-                            'PROPOSÉE EN BLEU'
+                        ? 'ZONE ACTUELLE EN ROUGE'
                         : 'CLIQUEZ SUR LA CARTE POUR POSITIONNER VOTRE ENTREPRISE',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
@@ -883,7 +867,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'FAITES CONNAÎTRE VOTRE ACTIVITÉ PROFESSIONNELLE AVEC SPHOT !',
+                      'FAITES RAYONNER VOTRE ACTIVITÉ PROFESSIONNELLE AVEC SPHOT !',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: WebColors.blue,
@@ -893,7 +877,10 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'SPHOT ouvre le monde au grand public. Choisissez cinq rayons de proximité ou le pays entier. Le contour national s’adapte au pays du SPHOT. La diffusion reste partagée équitablement, sans exclusivité. Le public accède à votre site d’un simple clic.',
+                      'SPHOT ouvre le monde au grand public. Choisissez votre rayon '
+                      'd’action, de la proximité locale jusqu’au pays entier. '
+                      'La diffusion reste partagée équitablement, sans '
+                      'exclusivité. Le public accède à votre site d’un simple clic.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFF4B5F97),
