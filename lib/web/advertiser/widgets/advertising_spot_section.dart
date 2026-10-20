@@ -601,8 +601,23 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             };
           }
           if (radiusChanged) {
+            // Vérifier le dossier à nouveau juste avant la soumission :
+            // le rayon contractuel ou la demande peuvent avoir changé
+            // depuis le chargement de ce formulaire.
+            final latest = (await requestReference.get()).data() ?? {};
+            final liveTerritory = AdvertiserTerritory.fromFirestore(
+              latest['advertisingTerritory'],
+            );
+            final liveRequest = _map(latest['radiusChangeRequest']);
+            if (liveTerritory == null ||
+                liveTerritory.level != _approvedTerritory?.level ||
+                liveTerritory.code != _approvedTerritory?.code) {
+              throw StateError(
+                'Le rayon contractuel a changé. Actualisez la page.',
+              );
+            }
             if (<String>{'waiting_period_end', 'approved_pending_payment'}
-                .contains(_activeRadiusRequest['status'])) {
+                .contains(liveRequest['status'])) {
               throw StateError(
                 'Une demande de rayon est déjà en attente de traitement.',
               );
