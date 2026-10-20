@@ -40,13 +40,13 @@ Objectifs à vérifier lors des essais :
 - La validation visuelle est confirmée le 20/10/2026 ; il faut encore synchroniser le PC, analyser le fichier modifié, reconstruire `build/web` et publier cette nouvelle compilation sur Firebase Hosting `sphot-ab80b`. Ne pas confondre le précédent déploiement réussi de la carte avec ce nouveau déploiement de l'étape 3.
 - La campagne démonstrateur « Surf Shop Atlantique » est destinée à être retirée **dans une opération Firestore séparée** après identification de sa référence exacte et contrôle des éventuels liens ; ne supprimer ni une campagne réelle, ni le site Hosting `sphot-advertiser-test`, ni les éléments partagés sans inventaire.
 
-## Notification d'approbation du changement de visuel — correctif à tester
+## Notification d'approbation du changement de visuel — validée
 
 - Le 20/10/2026, l'utilisateur a validé visuellement l'email « PROPOSITION À APPROUVER », bouton d'accès bleu opérationnel après le déploiement ciblé de `sendAdvertiserAssetChangeEmail`.
 - L'email « MODIFICATION APPROUVÉE » était absent lors d'une approbation suivante, alors que le Super Admin affichait le statut approuvé.
 - Cause de code corrigée : la notification ne repose plus uniquement sur un changement de `assetChangeRequest.syncStatus`, qui peut rester `applied` entre deux propositions. Elle se déclenche à la mise à jour de `lastSyncAt` pour une proposition approuvée, après la synchronisation, et garde une clé d'envoi stable par proposition (`submittedAt`) pour les reprises Firebase.
 - Modules concernés : `functions/index.js`, `functions/advertiser_asset_change_email_trigger.js` et son fichier de tests `functions/test/advertiser_asset_change_email_trigger.test.js`. Aucun changement aux textes, au bouton HTML, à la carte, aux tarifs ou aux données Firestore.
-- **11 tests unitaires Node exécutés avec succès en environnement isolé.** Le lint du dépôt, le déploiement Firebase de la fonction d'email, la présence du synchroniseur `syncApprovedAdvertiserAssets` et l'envoi réel d'un nouvel email « MODIFICATION APPROUVÉE » restent à vérifier sur le PC. Une ancienne approbation ne rejoue pas son événement automatiquement.
+- L'utilisateur a confirmé le 20/10/2026 que les deux emails arrivent et sont fonctionnels après le déploiement Firebase réussi de `sendAdvertiserAssetChangeEmail` et la création de `syncApprovedAdvertiserAssets` en `europe-west1`. Le déploiement a passé ESLint. Les anciennes décisions ne génèrent pas rétroactivement un message.
 
 ## Nettoyage / suivi du déploiement
 
@@ -61,7 +61,15 @@ Le commit GitHub et la validation des captures ne constituent **pas** un déploi
 - Utilisateur : les emails annonceur « PROPOSITION À APPROUVER » et « MODIFICATION APPROUVÉE » sont reçus et fonctionnels après déploiement des deux fonctions `sendAdvertiserAssetChangeEmail` et `syncApprovedAdvertiserAssets`.
 - Interface comparative avant approbation expressément validée : deux visuels « AVANT » / « APRÈS » agrandissables, deux positions et leur distance sur une carte à deux repères ; mention explicite si un élément reste inchangé.
 - Implémentation sur `main` dans `lib/web/super_admin/widgets/advertiser_asset_comparison.dart` et `lib/web/super_admin/pages/super_admin_dashboard_page.dart`. L'interface n'est affichée qu'avec une proposition `assetChangeRequest.status == submitted`.
-- Lors de l'approbation, création atomique d'une entrée historique `advertiserRequests/{id}/assetChangeHistory/{autoId}` avec visuels et positions précédents/proposés, soumission et décision. Aucun écrasement des anciennes entrées.
+- Lors de **chaque décision sur une proposition soumise** (approbation, refus, demande d'ajustements), conservation dans `advertiserRequests/{id}.assetChangeHistory` par `FieldValue.arrayUnion` de la décision, du motif, de la date, des URL des visuels et des positions avant/après. Historique consultable dans le volet Super Admin par « CONSULTER AVANT / APRÈS ». L'écriture se fait dans le document du dossier déjà utilisé par l'interface ; aucune sous-collection supplémentaire n'est requise. Les données antérieures à cette fonctionnalité ne sont pas reconstituées artificiellement.
 - Le circuit emails, les offres commerciales, la carte publique et les fonctions Cloud ne sont pas modifiés par ce lot comparatif.
-- **À vérifier sur le PC avant publication** : `flutter analyze` ciblé, `flutter build web --release -t lib/main.dart`, test pratique de comparaison, puis `firebase deploy --only hosting --project sphot-ab80b`. Ne pas déclarer la publication effective avant preuve du terminal.
+- **À vérifier sur le PC avant publication** : `flutter analyze` ciblé sur le nouveau widget et le dashboard, `flutter build web --release -t lib/main.dart`, puis `firebase deploy --only hosting --project sphot-ab80b`. Vérifier la comparaison sur une nouvelle proposition avant toute approbation réelle et l'historique après une décision. Ne pas déclarer la publication effective avant preuve du terminal.
 
+
+## Consolidation finale avant publication Web — 20/10/2026
+
+- Référence de départ `main` confirmée sur le PC : `e1d0016`, état de travail propre avant ce lot.
+- Une seule présentation de comparaison conservée : `advertiser_asset_comparison.dart`. Le composant concurrent inutilisé a été retiré.
+- La carte comparative cadre les deux positions, distingue bleu/vert et indique les éléments inchangés uniquement lorsque les valeurs réelles sont disponibles.
+- Agrandissement d'un visuel ancien ou nouveau sous un titre neutre.
+- Aucune modification supplémentaire des fonctions Firebase déjà validées ; **publication Hosting à effectuer depuis le PC**, pas depuis ce document.
