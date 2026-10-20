@@ -21,6 +21,7 @@ import 'package:http/http.dart' as http;
 import '../widgets/super_admin_admin_workflow_panel.dart';
 import '../widgets/super_admin_annual_financial_export_card.dart';
 import '../widgets/sphot_dropdown_visuals.dart';
+import '../widgets/advertiser_asset_comparison.dart';
 
 enum DashboardSpotFilter {
   none,
@@ -3464,7 +3465,46 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         }
       }
 
-      await reference.set(update, SetOptions(merge: true));
+      if (isAssetApproval) {
+        // Historique immuable de la décision : avant/après reste consultable
+        // même après remplacement des informations approuvées.
+        final approvedApplication = _advertiserMap(
+          advertiser['approvedApplication'],
+        );
+        final previousSpot = _advertiserMap(advertiser['advertisingSpot']);
+        final previousVisual = _advertiserMap(
+          approvedApplication['visual'],
+        );
+        final previousLocation = _advertiserMap(
+          approvedApplication['location'],
+        );
+        final batch = FirebaseFirestore.instance.batch();
+        batch.set(reference, update, SetOptions(merge: true));
+        batch.set(reference.collection('assetChangeHistory').doc(), {
+          'decision': 'approved',
+          'previousVisual': previousVisual.isNotEmpty
+              ? previousVisual
+              : {'url': previousSpot['bannerUrl']},
+          'previousLocation': previousLocation.isNotEmpty
+              ? previousLocation
+              : {
+                  'latitude': previousSpot['latitude'],
+                  'longitude': previousSpot['longitude'],
+                },
+          'proposedVisual': _advertiserMap(
+            assetChange['proposedVisual'] ?? advertiser['proposedVisual'],
+          ),
+          'proposedLocation': _advertiserMap(
+            assetChange['proposedLocation'] ?? advertiser['applicantLocation'],
+          ),
+          'submittedAt': assetChange['submittedAt'],
+          'decidedAt': FieldValue.serverTimestamp(),
+          'decidedBy': 'super_admin',
+        });
+        await batch.commit();
+      } else {
+        await reference.set(update, SetOptions(merge: true));
+      }
       if (!mounted) return;
       setState(() {
         _selectedAdvertiser = {...advertiser, ...update};
@@ -4040,6 +4080,22 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final review = _advertiserMap(advertiser['review']);
     final assetChange = _advertiserMap(advertiser['assetChangeRequest']);
     final assetChangeStatus = _cleanText(assetChange['status']).toLowerCase();
+    final approvedApplication = _advertiserMap(advertiser['approvedApplication']);
+    final approvedVisual = _advertiserMap(approvedApplication['visual']);
+    final approvedSpot = _advertiserMap(advertiser['advertisingSpot']);
+    final approvedLocation = _advertiserMap(approvedApplication['location']);
+    final proposedLocation = _advertiserMap(assetChange['proposedLocation']);
+    final previousBanner = _cleanText(
+      approvedVisual['url'] ?? approvedSpot['bannerUrl'],
+    );
+    LatLng? point(Map<String, dynamic> coordinates) {
+      final lat = coordinates['latitude'];
+      final lng = coordinates['longitude'];
+      if (lat is! num || lng is! num) return null;
+      return LatLng(lat.toDouble(), lng.toDouble());
+    }
+    final oldPoint = point(approvedLocation) ?? point(approvedSpot);
+    final newPoint = point(proposedLocation);
     final address = [
       establishment['address'],
       establishment['postalCode'],
@@ -4103,7 +4159,18 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ],
               ),
               const SizedBox(height: 14),
-              if (bannerUrl.isNotEmpty) ...[
+              if (assetChangeStatus == 'submitted') ...[
+                AdvertiserAssetComparison(
+                  previousVisualUrl: previousBanner,
+                  proposedVisualUrl: _cleanText(
+                    _advertiserMap(assetChange['proposedVisual'])['url'],
+                  ),
+                  previousLocation: oldPoint,
+                  proposedLocation: newPoint,
+                  onEnlarge: _showAdvertiserVisual,
+                ),
+                const SizedBox(height: 14),
+              ] else if (bannerUrl.isNotEmpty) ...[
                 AspectRatio(
                   aspectRatio: 2,
                   child: ClipRRect(
