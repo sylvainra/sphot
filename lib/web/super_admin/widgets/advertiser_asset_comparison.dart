@@ -33,35 +33,57 @@ class AdvertiserAssetComparison extends StatelessWidget {
   }
 
   Widget _visual(String title, String url) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(title, style: const TextStyle(
-            fontSize: 12, fontWeight: FontWeight.w900,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
             color: Color(0xFF1E3A8A),
-          )),
-          const SizedBox(height: 8),
-          Container(
-            height: 86,
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFD9E2EC)),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: url.isEmpty
-                ? const Center(child: Text('Indisponible',
-                    style: TextStyle(fontSize: 12)))
-                : Image.network(url, fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) =>
-                        const Center(child: Text('Visuel inaccessible'))),
           ),
-          const SizedBox(height: 5),
-          OutlinedButton(
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          height: 128,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFD9E2EC)),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: url.isEmpty
+              ? const Center(
+                  child: Text(
+                    'Indisponible',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                )
+              : Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  // Même mode Web que le dialogue d'agrandissement :
+                  // évite les échecs de chargement de certains visuels.
+                  webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                  errorBuilder: (_, __, ___) => const Center(
+                    child: Text('Visuel inaccessible'),
+                  ),
+                ),
+        ),
+        const SizedBox(height: 7),
+        Align(
+          alignment: Alignment.centerRight,
+          child: OutlinedButton.icon(
             onPressed: url.isEmpty ? null : () => onEnlarge(url),
-            child: const Text('AGRANDIR', style: TextStyle(fontSize: 11)),
+            icon: const Icon(Icons.open_in_full_rounded, size: 15),
+            label: const Text(
+              'AGRANDIR LE VISUEL',
+              style: TextStyle(fontSize: 11),
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -118,11 +140,9 @@ class AdvertiserAssetComparison extends StatelessWidget {
           const SizedBox(height: 12),
           const Text('VISUELS', style: TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 7),
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _visual('AVANT — ACTUEL', previousVisualUrl),
-            const SizedBox(width: 9),
-            _visual('APRÈS — PROPOSÉ', proposedVisualUrl),
-          ]),
+          _visual('AVANT — ACTUEL', previousVisualUrl),
+          const SizedBox(height: 16),
+          _visual('APRÈS — PROPOSÉ', proposedVisualUrl),
           if (_sameVisual)
             const Text('Visuel inchangé',
                 style: TextStyle(color: Color(0xFF15803D))),
