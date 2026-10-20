@@ -47,6 +47,7 @@ class _AdvertiserRenewalSectionState extends State<AdvertiserRenewalSection> {
   bool _prepared = false;
   String? _error;
   String? _endLabel;
+  String? _eligibilityReason;
   AdvertiserTerritoryLevel? _selected;
   String _duration = AdvertisingPricingConfig.durations.first;
   String _offer = 'map';
@@ -109,6 +110,7 @@ class _AdvertiserRenewalSectionState extends State<AdvertiserRenewalSection> {
       final date = end?.toLocal();
       setState(() {
         _eligible = data['eligible'] == true;
+        _eligibilityReason = data['reason']?.toString();
         _endLabel = date == null ? null :
             '${date.day.toString().padLeft(2, '0')}/'
             '${date.month.toString().padLeft(2, '0')}/'
@@ -121,6 +123,7 @@ class _AdvertiserRenewalSectionState extends State<AdvertiserRenewalSection> {
       if (!mounted) return;
       setState(() {
         _eligible = false; // Verrouillage en cas d'erreur.
+        _eligibilityReason = 'verification_failed';
         _loading = false;
         _error = e.toString();
       });
@@ -216,11 +219,17 @@ class _AdvertiserRenewalSectionState extends State<AdvertiserRenewalSection> {
       if (_loading)
         const Center(child: CircularProgressIndicator())
       else if (!_eligible) ...[
-        const Text(
-          'RAYON VERROUILLÉ — La sélection d’un nouveau rayon '
-          'sera possible seulement après l’expiration de toutes les '
-          'campagnes rattachées au dossier.',
-          style: TextStyle(
+        Text(
+          _eligibilityReason == 'no_linked_campaign'
+              ? 'Impossible de retrouver une campagne de diffusion liée '
+                'à votre dossier. Le rayon reste verrouillé.'
+              : _eligibilityReason == 'invalid_campaign_period'
+                  ? 'Date contractuelle non vérifiable. '
+                    'Le rayon reste verrouillé par sécurité.'
+                  : 'RAYON VERROUILLÉ — La sélection d’un nouveau rayon '
+                    'sera possible seulement après l’expiration de toutes '
+                    'les campagnes liées au dossier.',
+          style: const TextStyle(
               color: WebColors.red, fontWeight: FontWeight.w800),
         ),
       ] else ...[
