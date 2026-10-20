@@ -72,6 +72,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
   String? _approvedVisualUrl;
   bool _radiusTermsAccepted = false;
 
+  bool get _radiusRequestPending =>
+      <String>{'waiting_period_end', 'approved_pending_payment'}
+          .contains(_activeRadiusRequest['status']);
+
   bool get _radiusChanged {
     if (!widget.assetChangeMode) return false;
     final approved = _approvedTerritory;
@@ -600,7 +604,16 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           }
           await requestReference.set(changes, SetOptions(merge: true));
           if (radiusChanged) {
-            _activeRadiusRequest = {'status': 'waiting_period_end'};
+            _activeRadiusRequest = {
+              'status': 'waiting_period_end',
+              'previousTerritory': _approvedTerritory?.toFirestore(),
+              'proposedTerritory': territory.toFirestore(),
+            };
+            // Une sélection proposée ne devient pas le rayon diffusé.
+            _territory = _approvedTerritory;
+            if (_approvedTerritory != null) {
+              widget.onTerritoryChanged(_approvedTerritory!);
+            }
           }
         } else {
           await requestReference.set({
@@ -875,7 +888,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                 for (final level in AdvertiserTerritoryLevel.values)
                   if (options[level] != null)
                     OutlinedButton(
-                      onPressed: () => _selectTerritory(options[level]!),
+                      onPressed: widget.assetChangeMode &&
+                              _radiusRequestPending
+                          ? null
+                          : () => _selectTerritory(options[level]!),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: current?.level == level
                             ? Colors.white
@@ -925,7 +941,8 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               ),
             ],
           ],
-          if (_radiusChanged && widget.assetChangeMode) ...[
+          if (_radiusChanged && widget.assetChangeMode &&
+              !_radiusRequestPending) ...[
             const SizedBox(height: 14),
             const Text(
               'IMPORTANT — Un changement de rayon, en hausse ou en baisse, '
@@ -1003,23 +1020,43 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
         ),
         _buildTerritoryCard(),
         if (_activeRadiusRequest['status'] == 'waiting_period_end')
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Text(
+              'RAYON ACTUEL : ' +
+              (_approvedTerritory?.level.label ?? 'Non renseigné') +
+              ' — RAYON DEMANDÉ : ' +
+              (AdvertiserTerritory.fromFirestore(
+                _activeRadiusRequest['proposedTerritory'],
+              )?.level.label ?? 'Non renseigné') +
+              ' — EN ATTENTE DE FIN DE PÉRIODE. '
+              'La zone actuellement payée reste inchangée.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: WebColors.red, fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        if (_activeRadiusRequest['status'] == 'rejected')
           const Padding(
             padding: EdgeInsets.only(bottom: 14),
             child: Text(
-              'Votre demande de rayon d’action reste en attente de '
-              'fin de période. La zone actuellement payée est inchangée.',
-              textAlign: TextAlign.center,
+              'Changement de rayon refusé. '
+              'Le rayon contractuel demeure inchangé.',
               style: TextStyle(
-                color: WebColors.red, fontWeight: FontWeight.w800),
+                color: WebColors.red, fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         if (widget.assetChangeRequestStatus == 'submitted')
           const Padding(
             padding: EdgeInsets.only(bottom: 14),
             child: Text(
-              'Votre nouveau visuel ou votre nouvelle position est en attente '
-              'd’approbation. Les informations précédemment approuvées '
-              'restent en vigueur.',
+              'Votre proposition de modification du visuel et/ou de la '
+              'position est en attente d’approbation. '
+              'Toute demande de rayon est traitée séparément '
+              'à l’échéance contractuelle. Le contenu déjà approuvé '
+              'reste en vigueur.',
               textAlign: TextAlign.center,
               style: TextStyle(color: WebColors.red, fontWeight: FontWeight.w800),
             ),
@@ -1028,9 +1065,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           const Padding(
             padding: EdgeInsets.only(bottom: 14),
             child: Text(
-              'Choisissez le nouveau visuel ou la nouvelle position, puis '
-              'soumettez-les au Super Admin. Votre publicité actuelle ne sera '
-              'pas remplacée avant son approbation.',
+              'Proposez une modification du visuel et/ou de la position '
+              'et/ou du rayon d’action. Le rayon est traité séparément '
+              'et n’est pas applicable avant l’échéance contractuelle '
+              'et les nouvelles conditions commerciales.',
               textAlign: TextAlign.center,
               style: TextStyle(color: WebColors.blue, fontWeight: FontWeight.w700),
             ),
