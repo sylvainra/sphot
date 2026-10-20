@@ -686,6 +686,26 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     );
   }
 
+  AdvertiserTerritory? get _effectiveAdvertiserTerritory =>
+      AdvertiserTerritory.fromFirestore(
+        _requestData['advertisingTerritory'],
+      );
+
+  // La carte "campagne approuvée" ne doit jamais exploiter la sélection
+  // locale de l'annonceur : une demande de rayon n'est pas une diffusion.
+  LatLng? get _effectiveAdvertiserPoint {
+    final approved = _map(_requestData['approvedApplication']);
+    final approvedLocation = _map(approved['location']);
+    final spot = _map(_requestData['advertisingSpot']);
+    final lat = _double(approvedLocation['latitude'] ?? spot['latitude']);
+    final lng = _double(approvedLocation['longitude'] ?? spot['longitude']);
+    if (lat == null || lng == null || lat < -90 || lat > 90 ||
+        lng < -180 || lng > 180) {
+      return null;
+    }
+    return LatLng(lat, lng);
+  }
+
   Widget _buildMap({required double mapWidth}) {
     if (_approvedFlow &&
         _selectedIndex == 2 &&
@@ -698,6 +718,14 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     final canEditApprovedPosition =
         _approvedFlow && _selectedIndex == 1 && _assetChangeAuthorized;
     final showApprovedRadius = _approvedFlow && _selectedIndex == 1;
+    final effectiveTerritory =
+        showApprovedRadius ? _effectiveAdvertiserTerritory : null;
+    final effectivePoint =
+        showApprovedRadius ? _effectiveAdvertiserPoint : null;
+    final effectiveCountryOutline = effectiveTerritory?.isWholeCountry ==
+            true &&
+        _advertisingTerritory?.level == effectiveTerritory?.level &&
+        _advertisingTerritory?.code == effectiveTerritory?.code;
 
     return Stack(
       fit: StackFit.expand,
@@ -719,7 +747,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
               userAgentPackageName: 'com.sphot.app',
             ),
             if (showApprovedRadius &&
-                _advertisingTerritory?.isWholeCountry == true &&
+                effectiveCountryOutline &&
                 _countryOutline.isNotEmpty)
               PolygonLayer(
                 polygons: [
@@ -733,14 +761,14 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                 ],
               ),
             if (showApprovedRadius &&
-                _advertisingPoint != null &&
-                _advertisingTerritory != null &&
-                !_advertisingTerritory!.isWholeCountry)
+                effectivePoint != null &&
+                effectiveTerritory != null &&
+                !effectiveTerritory.isWholeCountry)
               CircleLayer(
                 circles: [
                   CircleMarker(
-                    point: _advertisingPoint!,
-                    radius: _advertisingTerritory!.radiusKm * 1000,
+                    point: effectivePoint,
+                    radius: effectiveTerritory.radiusKm * 1000,
                     useRadiusInMeter: true,
                     color: WebColors.red.withOpacity(0.10),
                     borderColor: WebColors.red,
@@ -748,11 +776,14 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                   ),
                 ],
               ),
-            if (_advertisingPoint != null)
+            if ((showApprovedRadius ? effectivePoint : _advertisingPoint)
+                != null)
               MarkerLayer(
                 markers: [
                   Marker(
-                    point: _advertisingPoint!,
+                    point: showApprovedRadius
+                        ? effectivePoint!
+                        : _advertisingPoint!,
                     width: 60,
                     height: 60,
                     alignment: Alignment.center,
@@ -765,6 +796,25 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                       ),
                     ),
                   ),
+                  if (showApprovedRadius &&
+                      canEditApprovedPosition &&
+                      _advertisingPoint != null &&
+                      effectivePoint != null &&
+                      const Distance().as(
+                        LengthUnit.Meter,
+                        _advertisingPoint!,
+                        effectivePoint,
+                      ) > 1)
+                    Marker(
+                      point: _advertisingPoint!,
+                      width: 40,
+                      height: 40,
+                      child: const Icon(
+                        Icons.place_outlined,
+                        color: WebColors.blue,
+                        size: 36,
+                      ),
+                    ),
                 ],
               ),
           ],
@@ -788,7 +838,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                   ),
                   child: Text(
                     canEditApprovedPosition
-                        ? 'CLIQUEZ SUR LA CARTE POUR PROPOSER UNE NOUVELLE POSITION'
+                        ? 'ZONE ACTUELLE EN ROUGE — NOUVELLE POSITION '
+                            'PROPOSÉE EN BLEU'
                         : 'CLIQUEZ SUR LA CARTE POUR POSITIONNER VOTRE ENTREPRISE',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
