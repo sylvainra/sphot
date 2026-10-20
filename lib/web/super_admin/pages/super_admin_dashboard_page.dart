@@ -4633,7 +4633,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   previousLocation: oldPoint,
                   proposedLocation: newPoint,
                   previousTerritory: previousTerritory,
-                  proposedTerritory: radiusStatus == 'waiting_period_end'
+                  proposedTerritory: proposedTerritory.isNotEmpty
                       ? proposedTerritory
                       : legacyProposedTerritory.isNotEmpty
                           ? legacyProposedTerritory : previousTerritory,
