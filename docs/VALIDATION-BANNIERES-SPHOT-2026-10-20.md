@@ -73,3 +73,11 @@ Le commit GitHub et la validation des captures ne constituent **pas** un déploi
 - La carte comparative cadre les deux positions, distingue bleu/vert et indique les éléments inchangés uniquement lorsque les valeurs réelles sont disponibles.
 - Agrandissement d'un visuel ancien ou nouveau sous un titre neutre.
 - Aucune modification supplémentaire des fonctions Firebase déjà validées ; **publication Hosting à effectuer depuis le PC**, pas depuis ce document.
+
+## Ajustement des aperçus visuels — 20/10/2026
+
+- Retour du test Chrome sur `main` : la comparaison des positions et la carte sont validées par l'utilisateur ; seuls les aperçus des deux visuels réclament un ajustement.
+- Les deux visuels sont désormais affichés l'un sous l'autre, chacun sur toute la largeur disponible, avec son bouton d'agrandissement.
+- La vue comparative utilise `WebHtmlElementStrategy.prefer`, comme la fenêtre d'agrandissement dont l'affichage est confirmé, afin de remédier au message « Visuel inaccessible ».
+- Un seul fichier Flutter modifié : `lib/web/super_admin/widgets/advertiser_asset_comparison.dart`. Pas de changement des positions, décisions, emails, synchronisations ni données Firestore.
+- Commit du correctif : `904a4d4`. Compilation Flutter, test Chrome et publication Hosting à confirmer sur le PC avant de les marquer validés.
