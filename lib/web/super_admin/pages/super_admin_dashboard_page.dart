@@ -3629,7 +3629,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     children: [
                       const Expanded(
                         child: Text(
-                          'VISUEL PROPOSÉ PAR L’ANNONCEUR',
+                          'VISUEL PUBLICITAIRE - FORMAT ORIGINAL',
                           style: TextStyle(
                             color: adminColor,
                             fontWeight: FontWeight.w900,
