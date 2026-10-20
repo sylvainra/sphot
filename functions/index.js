@@ -10988,32 +10988,57 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
       const before = event.data.before.data() || {};
       const data = event.data.after.data() || {};
       const currentChange = data.assetChangeRequest || {};
-      const status = currentChange.status;
+      const radiusBefore = before.radiusChangeRequest || {};
+      const radiusChange = data.radiusChangeRequest || {};
+      const assetEvent = shouldNotifyAdvertiserAssetChange(before, data);
+      const radiusSubmitted =
+        radiusChange.status === "waiting_period_end" &&
+        radiusBefore.status !== radiusChange.status;
+      const radiusApproved =
+        radiusChange.status === "approved_pending_payment" &&
+        radiusBefore.status !== radiusChange.status;
+      if (!assetEvent && !radiusSubmitted && !radiusApproved) return;
+      // Une soumission mixte donne un seul email : les événements de rayon
+      // et de visuel/position sont enregistrés dans la même opération.
+      const status = assetEvent ? currentChange.status :
+        radiusApproved ? "radius_approved_pending_payment" : "radius_waiting";
       const syncStatus = currentChange.syncStatus;
-      // Pour un accord, attendre la synchronisation effective de cette
-      // proposition, même si syncStatus valait déjà "applied" auparavant.
-      // Les transitions non approuvées gardent leur comportement antérieur.
-      if (!shouldNotifyAdvertiserAssetChange(before, data)) return;
+      const pendingRadius = radiusChange.status === "waiting_period_end";
       const messages = {
         pending: "Votre demande de modification du visuel ou de la position " +
           "a été reçue. L'équipe SPHOT va l'examiner.",
         authorized: "L'équipe SPHOT vous autorise à proposer un nouveau " +
           "visuel ou une nouvelle position. Transmettez vos modifications " +
           "pour approbation.",
-        submitted: "Votre proposition de modification du visuel ou de la " +
-          "position a été reçue. Elle est en attente d'approbation " +
-          "par l'équipe SPHOT.",
+        submitted: "Votre proposition de modification du visuel et/ou de " +
+          "la position et/ou du rayon d'action a été reçue. " +
+          "Le visuel et la position peuvent être examinés immédiatement. " +
+          "Toute demande de rayon reste en attente de la fin de la période " +
+          "contractuelle et d'une nouvelle régularisation commerciale.",
+        radius_waiting: "Votre proposition de modification du visuel et/ou " +
+          "de la position et/ou du rayon d'action a été reçue. " +
+          "Le rayon actuel et le tarif en cours restent inchangés. " +
+          "Le nouveau rayon ne pourra être approuvé qu'après l'échéance " +
+          "de la campagne et fera l'objet d'une nouvelle tarification.",
+        radius_approved_pending_payment:
+          "Votre changement de rayon a été examiné après échéance et " +
+          "autorisé pour une nouvelle période. Le nouveau rayon " +
+          "ne sera diffusé qu'après acceptation du nouveau devis " +
+          "et confirmation du paiement. Votre ancienne zone reste " +
+          "inchangée jusqu'à cette activation.",
         changes_requested: "L'équipe SPHOT demande des ajustements à votre " +
           "proposition. Vous pouvez déposer un nouveau visuel dans votre " +
           "espace annonceur.",
         approved: syncStatus === "applied" ?
-          "L'équipe SPHOT a approuvé votre modification du visuel ou de " +
-          "la position. La mise à jour de votre campagne active liée a été " +
-          "effectuée." :
-          "L'équipe SPHOT a approuvé votre modification du visuel ou de " +
-          "la position. Aucune campagne active liée n'a encore été mise " +
-          "à jour. L'équipe SPHOT doit vérifier le raccordement avant " +
-          "la diffusion du nouveau visuel.",
+          "L'équipe SPHOT a approuvé votre modification du visuel et/ou " +
+          "de la position. La campagne active liée a été mise à jour. " +
+          (pendingRadius ? "Votre changement de rayon d'action reste " +
+          "en attente de l'échéance et du nouveau tarif." : "") :
+          "L'équipe SPHOT a approuvé votre modification du visuel et/ou " +
+          "de la position. Aucune campagne active liée n'a encore été " +
+          "mise à jour. L'équipe SPHOT doit vérifier le raccordement " +
+          "avant diffusion." + (pendingRadius ? " Le changement de rayon " +
+          "reste soumis à l'échéance et au nouveau tarif." : ""),
         rejected: "L'équipe SPHOT n'a pas approuvé votre modification. " +
           "Les éléments précédemment approuvés sont conservés.",
       };
@@ -11022,6 +11047,8 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
         pending: "DEMANDE DE MODIFICATION REÇUE",
         authorized: "MODIFICATION AUTORISÉE",
         submitted: "PROPOSITION À APPROUVER",
+        radius_waiting: "PROPOSITION DE RAYON REÇUE",
+        radius_approved_pending_payment: "RAYON AUTORISÉ POUR RENOUVELLEMENT",
         changes_requested: "AJUSTEMENTS DEMANDÉS",
         approved: "MODIFICATION APPROUVÉE",
         rejected: "MODIFICATION REFUSÉE",
@@ -11084,7 +11111,9 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
             const url = "https://sphot.app/#/professional-login" +
               "?audience=advertiser";
             const reason = cleanValue(
-                (data.assetChangeRequest || {}).reason, "",
+                status.startsWith("radius_") ?
+                  radiusChange.reason :
+                  (data.assetChangeRequest || {}).reason, "",
             );
             text = buildAdvertiserGreeting(data) + "\n\n" +
               messages[status] + (reason ? "\n\nMotif : " + reason : "") +
