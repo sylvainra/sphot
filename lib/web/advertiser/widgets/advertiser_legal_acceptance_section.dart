@@ -468,8 +468,9 @@ class _AdvertiserLegalAcceptanceSectionState
           documentVersion: _cgvVersion,
           acceptanceText:
               'J’ai lu et j’accepte les CGV applicables à '
-              'SPHOT PUBLICITAIRE, notamment le report et la '
-              'tarification des changements de rayon.',
+              'SPHOT PUBLICITAIRE, notamment le verrouillage du rayon '
+              'pendant la période payée et sa sélection lors d’une '
+              'nouvelle souscription.',
           controller: _cgvController,
           onChanged: (value) => setState(() {
             _cgvAccepted = value ?? false;
