@@ -3702,6 +3702,13 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         'échéance contractuelle ou si cette date est inconnue.',
                         style: TextStyle(fontSize: 12, color: redColor),
                       ),
+                    TextButton.icon(
+                      onPressed: () => setState(() {
+                        _radiusReviewLinksFutures.remove(requestId);
+                      }),
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('ACTUALISER LES ÉCHÉANCES'),
+                    ),
                     OutlinedButton(
                       onPressed: finished
                           ? () => _reviewAdvertiserRadiusChange(advertiser)
