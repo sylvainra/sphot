@@ -4383,6 +4383,38 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     );
   }
 
+  Widget _advertiserDetailExpansion({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F7FB),
+        border: Border.all(color: adminColor.withOpacity(0.35)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ExpansionTile(
+        initiallyExpanded: false,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        iconColor: adminColor,
+        collapsedIconColor: adminColor,
+        leading: Icon(icon, color: adminColor, size: 21),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: adminColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        children: children,
+      ),
+    );
+  }
+
   Widget _buildAdvertiserApplicationPanel() {
     final advertiser = _selectedAdvertiser;
     if (advertiser == null) return const SizedBox.shrink();
@@ -4504,43 +4536,15 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ],
               ),
               const SizedBox(height: 14),
-              if (assetChangeStatus == 'submitted') ...[
-                AdvertiserAssetComparison(
-                  previousVisualUrl: previousBanner,
-                  proposedVisualUrl: _cleanText(
-                    _advertiserMap(assetChange['proposedVisual'])['url'],
-                  ),
-                  previousLocation: oldPoint,
-                  proposedLocation: newPoint,
-                  previousTerritory: previousTerritory,
-                  proposedTerritory: proposedTerritory.isNotEmpty
-                      ? proposedTerritory
-                      : legacyProposedTerritory.isNotEmpty
-                          ? legacyProposedTerritory : previousTerritory,
-                  onEnlarge: _showAdvertiserVisual,
-                ),
-                if (legacyProposedTerritory.isNotEmpty &&
-                    radiusStatus.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text(
-                      'Ancienne proposition de rayon détectée. '
-                      'Elle ne sera pas appliquée avec le visuel ou '
-                      'la position. Une nouvelle demande de rayon '
-                      'avec acceptation des conditions tarifaires '
-                      'est nécessaire.',
-                      style: TextStyle(
-                        color: redColor, fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                const SizedBox(height: 14),
-              ] else if (bannerUrl.isNotEmpty) ...[
+              if ((previousBanner.isNotEmpty
+                  ? previousBanner : bannerUrl).isNotEmpty) ...[
                 AspectRatio(
                   aspectRatio: 2,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(14),
                     child: Image.network(
-                      bannerUrl,
+                      previousBanner.isNotEmpty
+                          ? previousBanner : bannerUrl,
                       fit: BoxFit.contain,
                       webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
                     ),
@@ -4548,7 +4552,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
-                  onPressed: () => _showAdvertiserVisual(bannerUrl),
+                  onPressed: () => _showAdvertiserVisual(
+                    previousBanner.isNotEmpty
+                        ? previousBanner : bannerUrl,
+                  ),
                   icon: const Icon(Icons.open_in_full_rounded),
                   label: const Text('AGRANDIR LE VISUEL'),
                   style: OutlinedButton.styleFrom(
@@ -4556,8 +4563,12 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     side: const BorderSide(color: adminColor),
                   ),
                 ),
-                const SizedBox(height: 14),
               ],
+              const SizedBox(height: 14),
+              _advertiserDetailExpansion(
+                title: 'ADMINISTRATION',
+                icon: Icons.badge_outlined,
+                children: [
               _advertiserRequestInfoLine(
                 'Civilité',
                 _cleanText(
@@ -4638,19 +4649,34 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               ),
               _advertiserRequestInfoLine('Adresse', address),
               _advertiserWebsiteLine(websiteUrl),
-              if (radiusStatus.isNotEmpty)
-                _buildAdvertiserRadiusChangePanel(advertiser),
-              if (assetChangeStatus.isNotEmpty)
-                _advertiserRequestInfoLine(
-                  'Modification visuel / position',
-                  assetChangeStatus,
-                ),
-              if (_cleanText(review['reason']).isNotEmpty)
-                _advertiserRequestInfoLine(
-                  'Motif',
-                  _cleanText(review['reason']),
-                ),
-              _buildAdvertiserAssetHistory(advertiser),
+                ],
+              ),
+              _buildAdvertiserLatestChange(
+                advertiser,
+                assetChange: assetChange,
+                radiusChange: radiusChange,
+                previousBanner: previousBanner,
+                oldPoint: oldPoint,
+                newPoint: newPoint,
+                previousTerritory: previousTerritory,
+                proposedTerritory: proposedTerritory,
+              ),
+              _advertiserDetailExpansion(
+                title: 'HISTORIQUE DES MODIFICATIONS',
+                icon: Icons.history_rounded,
+                children: [
+                  _buildAdvertiserAssetHistory(advertiser),
+                  _buildAdvertiserRadiusHistory(advertiser),
+                  if ((advertiser['assetChangeHistory'] is! List ||
+                          (advertiser['assetChangeHistory'] as List).isEmpty) &&
+                      (advertiser['radiusChangeHistory'] is! List ||
+                          (advertiser['radiusChangeHistory'] as List).isEmpty))
+                    const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text('Aucune modification enregistrée.'),
+                    ),
+                ],
+              ),
               const SizedBox(height: 20),
               FilledButton.icon(
                 onPressed: decisionMade
