@@ -3571,10 +3571,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     if (campaigns.isEmpty) return false;
     final now = DateTime.now();
     return campaigns.every((campaign) {
-      final status = _cleanText(campaign['status']).toLowerCase();
       final end = _radiusCampaignEnd(campaign['campaignEndDate']);
-      // Ne pas considérer une campagne encore publiée comme expirée.
-      return status != 'active' && end != null && !end.isAfter(now);
+      // La diffusion publique cesse à campaignEndDate, même si le statut
+      // administratif du dossier est resté "active".
+      return end != null && !end.isAfter(now);
     });
   }
 
@@ -3695,8 +3695,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     const SizedBox(height: 8),
                     if (!finished)
                       const Text(
-                        'Approbation verrouillée tant qu’une campagne '
-                        'reste active ou que sa date de fin est inconnue.',
+                        'Approbation verrouillée avant la dernière '
+                        'échéance contractuelle ou si cette date est inconnue.',
                         style: TextStyle(fontSize: 12, color: redColor),
                       ),
                     OutlinedButton(
