@@ -169,3 +169,28 @@ Agencement du volet droit Super Admin demandé explicitement :
 Référence du code Flutter `main` validé : `c35471e67c076d117f4c599d496f0c51f8906f7c` (avant ajout de ce compte-rendu documentaire). Aucun code d'interface n'est changé par l'enregistrement de la validation.
 
 Le test visuel du volet ne constitue pas une validation du futur renouvellement payant, de la publication des CGV dans Firestore ou de la mise en production de la nouvelle version Web. À contrôler séparément.
+
+## Préparation du renouvellement après expiration — 20/10/2026
+
+Demande de l'utilisateur : préparer dès aujourd'hui le déverrouillage, à partir du 21/10/2026, du choix d'un **nouveau rayon de 15 km** pour la campagne de test « BAR DE LA PLAGE », dont la campagne Firestore `adRequests/test_bar_de_la_plage_20261019` se termine le 20/10/2026 à 23:59 (UTC+2). Tous les dossiers annonceurs actuellement saisis sont des tests, à nettoyer après validation des parcours ; ne rien supprimer encore.
+
+**Implémentation sur `main`, sans changement de diffusion ni de facturation :**
+- Nouvelle Cloud Function HTTPS `advertiserRenewalEligibility` (europe-west1), explicite à déployer séparément. Autorisation stricte par Firebase Auth (`role: ANNONCEUR` et `advertiserRequestId` signé dans les custom claims), jamais par un UID issu librement du navigateur.
+- Lecture côté serveur des campagnes de `adRequests` liées au dossier ; décision à partir de la **dernière `campaignEndDate` réelle**, et non de `advertiserRequests.planning.campaignEndDate`, du statut `active` obsolète ou de la date du PC. Dates manquantes, campagnes encore en cours ou identité non vérifiable : refus.
+- Onglet 9 **RENOUVELLEMENT** dans le tableau de bord de l'annonceur approuvé ; accessible pour consulter l'échéance. Le choix d'un nouveau rayon reste verrouillé jusqu'à la fin de toutes ses campagnes liées. Après fin, l'annonceur peut sélectionner un des cinq rayons (5/15/50/150/300 km), une visibilité et une durée.
+- Tarifs indicatifs issus de la **grille publiée** par le service commercial SPHOT. Le bouton `PRÉPARER LA NOUVELLE SOUSCRIPTION` déclenche un second contrôle serveur de l'expiration et un recalcul indépendant du prix et de la remise. Il crée ou remplace seulement `advertiserRequests/{id}.renewalDraft`, état `awaiting_commercial_checkout`, `paymentStatus: not_started`, `subscriptionActivated: false`, avec ancienne et future zone, offre, durée, instant d'éligibilité et référence/prix publiés.
+- Aucun changement de `advertisingTerritory`, `adRequests.radiusKm`, du visuel approuvé, du statut actif ni de la période actuelle. Aucune notification d'approbation de rayon, aucun passage au Super Admin.
+- **Choix PAYS ENTIER** non encore proposé dans ce brouillon, car il nécessite une validation du pays de diffusion ; laisser le choix original intact pour la souscription initiale.
+- **Raccordement complet encore absent** : la validation Odoo d'une commande, le paiement Stripe, la création d'une nouvelle campagne payée et le passage de `renewalDraft` au statut activé. Ne pas indiquer au public qu'une nouvelle souscription est déjà commandée ou payée. Ce lot autorise la **préparation** seulement, de façon sûre.
+
+Tests à effectuer avant déploiement :
+```powershell
+git switch main
+git pull --ff-only origin main
+git rev-parse --short HEAD
+node --test functions/test/advertiser_renewal_rules.test.js functions/test/advertiser_asset_change_email_trigger.test.js functions/test/advertiser_campaign_sync.test.js
+npm --prefix functions run lint
+flutter analyze lib/web/advertiser/pages/advertiser_dashboard_page.dart lib/web/advertiser/widgets/advertiser_renewal_section.dart
+flutter build web --release -t lib/main.dart
+```
+Si les tests/compilation passent, déployer **uniquement** `functions:advertiserRenewalEligibility` avec `$env:FUNCTIONS_DISCOVERY_TIMEOUT = "60"`, puis tester `flutter run -d chrome -t lib/main.dart`. Vérifier l'échéance avant minuit, puis demain déverrouillage, devis indicatif 15 km et création du seul brouillon Firestore. L'ancien rayon 5 km et la campagne ne doivent pas être modifiés.
