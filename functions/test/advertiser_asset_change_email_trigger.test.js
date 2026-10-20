@@ -15,6 +15,23 @@ const document = (
 });
 const time = (seconds) => ({seconds, nanoseconds: 100});
 
+test("un brouillon de renouvellement ne déclenche pas de mail visuel", () => {
+  const previous = {
+    status: "approved",
+    assetChangeRequest: {status: "approved", syncStatus: "applied"},
+  };
+  const current = {
+    ...previous,
+    renewalDraft: {
+      status: "awaiting_commercial_checkout",
+      proposedTerritory: {level: "radius_15km"},
+    },
+  };
+  assert.equal(
+      shouldNotifyAdvertiserAssetChange(previous, current), false,
+  );
+});
+
 test("proposal submitted email remains available", () => {
   assert.equal(shouldNotifyAdvertiserAssetChange(
       document("authorized"), document("submitted")), true);
