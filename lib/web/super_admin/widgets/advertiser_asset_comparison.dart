@@ -19,10 +19,11 @@ class AdvertiserAssetComparison extends StatelessWidget {
   final LatLng? proposedLocation;
   final ValueChanged<String> onEnlarge;
 
-  bool get _sameVisual => previousVisualUrl == proposedVisualUrl;
+  bool get _sameVisual =>
+      previousVisualUrl.isNotEmpty && previousVisualUrl == proposedVisualUrl;
   bool get _samePosition {
     if (previousLocation == null || proposedLocation == null) {
-      return previousLocation == null && proposedLocation == null;
+      return false;
     }
     return const Distance().as(
           LengthUnit.Meter,
@@ -142,8 +143,18 @@ class AdvertiserAssetComparison extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: SizedBox(height: 200, child: FlutterMap(
-                options: MapOptions(initialCenter: center,
-                    initialZoom: zoom, minZoom: 2, maxZoom: 18),
+                options: MapOptions(
+                  initialCenter: center,
+                  initialZoom: zoom,
+                  initialCameraFit: a != null && b != null && !_samePosition
+                      ? CameraFit.bounds(
+                          bounds: LatLngBounds.fromPoints([a, b]),
+                          padding: const EdgeInsets.all(52),
+                        )
+                      : null,
+                  minZoom: 2,
+                  maxZoom: 18,
+                ),
                 children: [
                   TileLayer(
                     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -153,7 +164,8 @@ class AdvertiserAssetComparison extends StatelessWidget {
                     if (a != null) Marker(point: a, width: 42, height: 42,
                         child: const Icon(Icons.location_pin,
                             color: Color(0xFF1E3A8A), size: 36)),
-                    if (b != null) Marker(point: b, width: 42, height: 42,
+                    if (b != null && !_samePosition)
+                      Marker(point: b, width: 42, height: 42,
                         child: const Icon(Icons.location_pin,
                             color: Color(0xFF15803D), size: 36)),
                   ]),
@@ -161,8 +173,10 @@ class AdvertiserAssetComparison extends StatelessWidget {
               )),
             ),
             const SizedBox(height: 5),
-            const Text('Bleu : avant   ·   Vert : après',
-                style: TextStyle(fontSize: 11)),
+            Text(_samePosition
+                ? 'Bleu : position inchangée'
+                : 'Bleu : avant   ·   Vert : après',
+                style: const TextStyle(fontSize: 11)),
           ],
         ],
       ),
