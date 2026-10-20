@@ -54,10 +54,9 @@ function registerAdvertiserRenewalEndpoint({admin, onRequest}) {
       return;
     }
 
-    let uid;
+    let decoded;
     try {
-      const decoded = await admin.auth().verifyIdToken(match[1], true);
-      uid = decoded.uid;
+      decoded = await admin.auth().verifyIdToken(match[1], true);
     } catch (_) {
       res.status(401).json({error: "AUTH_INVALID"});
       return;
@@ -68,18 +67,20 @@ function registerAdvertiserRenewalEndpoint({admin, onRequest}) {
       res.status(400).json({error: "REQUEST_INVALID"});
       return;
     }
+    // Le token annonceur a un UID Firebase technique, différent du
+    // document Firestore. La revendication est signée par Firebase Admin.
+    if (decoded.role !== "ANNONCEUR" ||
+        decoded.advertiserRequestId !== requestId) {
+      res.status(403).json({error: "NOT_OWNER"});
+      return;
+    }
     const db = admin.firestore();
     try {
       const requestRef = db.collection("advertiserRequests").doc(requestId);
       const doc = await requestRef.get();
       const advertiser = doc.data() || {};
-      const owner = [
-        requestId,
-        String(advertiser.uid || ""),
-        String(advertiser.ownerUid || ""),
-      ];
-      if (!doc.exists || !owner.includes(uid)) {
-        res.status(403).json({error: "NOT_OWNER"});
+      if (!doc.exists) {
+        res.status(404).json({error: "REQUEST_NOT_FOUND"});
         return;
       }
       if (String(advertiser.status || "") !== "approved") {
@@ -136,7 +137,7 @@ function registerAdvertiserRenewalEndpoint({admin, onRequest}) {
         return;
       }
       const percent = await discounts.readDiscount(
-          admin, "ADVERTISER_RADIUS", uid);
+          admin, "ADVERTISER_RADIUS", decoded.uid);
       const reduction = discounts.computeDiscountCents(
           quote.amountExclTax, percent);
       // DRAFT SEULEMENT. Aucune écriture dans advertisingTerritory,
