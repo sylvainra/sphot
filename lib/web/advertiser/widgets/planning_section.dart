@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -66,11 +66,11 @@ class _PlanningSectionState extends State<PlanningSection> {
   late DateTime _startDate;
   late DateTime _endDate;
   late DateTime _displayedMonth;
-  List<DateTimeRange> _reservedPeriods = const [];
+
   bool _loading = true;
   bool _saving = false;
   bool _saved = false;
-  bool _reservationsLoaded = false;
+
   String? _error;
 
   @override
@@ -88,18 +88,7 @@ class _PlanningSectionState extends State<PlanningSection> {
     _load();
   }
 
-  @override
-  void didUpdateWidget(covariant PlanningSection oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.advertisingPosition != widget.advertisingPosition ||
-        oldWidget.radiusKm != widget.radiusKm ||
-        oldWidget.requestedScope != widget.requestedScope ||
-        oldWidget.activityType != widget.activityType) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _refreshReservations();
-      });
-    }
-  }
+
 
   DateTime _dateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
@@ -184,56 +173,11 @@ class _PlanningSectionState extends State<PlanningSection> {
     return '${months[value.month - 1]} ${value.year}';
   }
 
-  bool _periodsOverlap(
-    DateTime firstStart,
-    DateTime firstEnd,
-    DateTime secondStart,
-    DateTime secondEnd,
-  ) {
-    return !firstEnd.isBefore(secondStart) && !secondEnd.isBefore(firstStart);
-  }
-
   bool _isSameDay(DateTime first, DateTime second) =>
       first.year == second.year &&
       first.month == second.month &&
       first.day == second.day;
 
-  bool _isReserved(DateTime day) => _reservedPeriods.any(
-    (period) =>
-        !day.isBefore(_dateOnly(period.start)) &&
-        !day.isAfter(_dateOnly(period.end)),
-  );
-
-  bool _hasConflict(DateTime start, DateTime end) => _reservedPeriods.any(
-    (period) => _periodsOverlap(
-      start,
-      end,
-      _dateOnly(period.start),
-      _dateOnly(period.end),
-    ),
-  );
-
-  double _distanceKm(LatLng first, LatLng second) {
-    const earthRadiusKm = 6371.0;
-    final latitudeDelta = (second.latitude - first.latitude) * math.pi / 180;
-    final longitudeDelta = (second.longitude - first.longitude) * math.pi / 180;
-    final firstLatitude = first.latitude * math.pi / 180;
-    final secondLatitude = second.latitude * math.pi / 180;
-    final haversine =
-        math.sin(latitudeDelta / 2) * math.sin(latitudeDelta / 2) +
-        math.cos(firstLatitude) *
-            math.cos(secondLatitude) *
-            math.sin(longitudeDelta / 2) *
-            math.sin(longitudeDelta / 2);
-    final bounded = haversine.clamp(0.0, 1.0).toDouble();
-    return earthRadiusKm *
-        2 *
-        math.atan2(math.sqrt(bounded), math.sqrt(1 - bounded));
-  }
-
-  // Plusieurs annonceurs peuvent diffuser simultanément sur un territoire.
-  // La planification ne réserve plus de zone ni de catégorie d’activité.
-  Future<List<DateTimeRange>> _fetchReservedPeriods() async => const [];
 
   Future<void> _load() async {
     final requestId = _requestId;
@@ -259,13 +203,7 @@ class _PlanningSectionState extends State<PlanningSection> {
         _error = 'Impossible de charger la planification enregistrée.';
       }
     }
-    try {
-      _reservedPeriods = await _fetchReservedPeriods();
-      _reservationsLoaded = true;
-    } catch (error) {
-      debugPrint('Chargement réservations publicitaires impossible : $error');
-      _error = 'Impossible de charger le calendrier des réservations.';
-    }
+
     if (!mounted) return;
     setState(() => _loading = false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -273,31 +211,10 @@ class _PlanningSectionState extends State<PlanningSection> {
     });
   }
 
-  Future<void> _refreshReservations() async {
-    setState(() {
-      _reservationsLoaded = false;
-      _saved = false;
-      _error = null;
-    });
-    try {
-      final periods = await _fetchReservedPeriods();
-      if (!mounted) return;
-      setState(() {
-        _reservedPeriods = periods;
-        _reservationsLoaded = true;
-        if (_hasConflict(_startDate, _endDate)) {
-          _error = 'La période sélectionnée contient déjà des dates réservées.';
-        }
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _error = 'Impossible d’actualiser les réservations.');
-    }
-    _notifyPlanning();
-  }
+  bool get _datesAreValid =>
+      !_startDate.isBefore(_dateOnly(DateTime.now())) &&
+      _endDate.isAfter(_startDate);
 
-  bool get _selectionIsAvailable =>
-      _reservationsLoaded && !_hasConflict(_startDate, _endDate);
 
   void _notifyPlanning() {
     widget.onPlanningChanged(
@@ -306,7 +223,7 @@ class _PlanningSectionState extends State<PlanningSection> {
         startDate: _startDate,
         endDate: _endDate,
         exclusiveReservation: false,
-        availabilityConfirmed: _selectionIsAvailable,
+        availabilityConfirmed: _datesAreValid,
       ),
     );
   }
@@ -317,24 +234,15 @@ class _PlanningSectionState extends State<PlanningSection> {
       _durationLabel = value;
       _endDate = newEnd;
       _saved = false;
-      _error = _hasConflict(_startDate, newEnd)
-          ? 'Cette durée traverse une période déjà réservée.'
-          : null;
+      _error = null;
     });
     _notifyPlanning();
   }
 
   void _selectStartDate(DateTime value) {
     final today = _dateOnly(DateTime.now());
-    if (value.isBefore(today) || _isReserved(value)) return;
+    if (value.isBefore(today)) return;
     final newEnd = _calculateEndDate(value, _durationLabel);
-    if (_hasConflict(value, newEnd)) {
-      setState(() {
-        _error =
-            'Cette période contient une ou plusieurs dates déjà réservées.';
-      });
-      return;
-    }
     setState(() {
       _startDate = value;
       _endDate = newEnd;
@@ -357,17 +265,12 @@ class _PlanningSectionState extends State<PlanningSection> {
       });
       return;
     }
-    setState(() => _saving = true);
-    await _refreshReservations();
-    if (!mounted) return;
-    if (!_selectionIsAvailable) {
-      setState(() {
-        _saving = false;
-        _error =
-            'Cette période n’est plus disponible. Choisissez d’autres dates.';
-      });
+    if (!_datesAreValid) {
+      setState(() => _error =
+          'Choisissez une date de début actuelle ou future.');
       return;
     }
+    setState(() => _saving = true);
     try {
       final requestId = _requestId;
       if (requestId != null) {
@@ -381,8 +284,7 @@ class _PlanningSectionState extends State<PlanningSection> {
                 'durationLabel': _durationLabel,
                 'campaignStartDate': Timestamp.fromDate(_startDate),
                 'campaignEndDate': Timestamp.fromDate(_endDate),
-                'exclusiveReservation': false,
-                'availabilityStatus': 'available',
+
                 'confirmedAt': FieldValue.serverTimestamp(),
               },
               'updatedAt': FieldValue.serverTimestamp(),
@@ -489,10 +391,10 @@ class _PlanningSectionState extends State<PlanningSection> {
                 _displayedMonth.month,
                 dayNumber,
               );
-              final reserved = _isReserved(day);
+
               final selected =
                   !day.isBefore(_startDate) && !day.isAfter(_endDate);
-              final disabled = day.isBefore(today) || reserved;
+              final disabled = day.isBefore(today);
               return Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(2),
@@ -503,17 +405,13 @@ class _PlanningSectionState extends State<PlanningSection> {
                       height: 38,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: reserved
-                            ? WebColors.red.withOpacity(0.18)
-                            : selected
+                        color: selected
                             ? WebColors.blue.withOpacity(0.13)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(9),
                         border: Border.all(
                           color: _isSameDay(day, _startDate)
                               ? WebColors.blue
-                              : reserved
-                              ? WebColors.red
                               : Colors.transparent,
                           width: 1.5,
                         ),
@@ -522,9 +420,7 @@ class _PlanningSectionState extends State<PlanningSection> {
                         '$dayNumber',
                         style: TextStyle(
                           color: disabled
-                              ? reserved
-                                    ? WebColors.red
-                                    : const Color(0xFFB0B7C3)
+                              ? const Color(0xFFB0B7C3)
                               : WebColors.blue,
                           fontWeight: FontWeight.w900,
                         ),
@@ -541,7 +437,7 @@ class _PlanningSectionState extends State<PlanningSection> {
           runSpacing: 6,
           alignment: WrapAlignment.center,
           children: [
-            _CalendarLegend(color: WebColors.red, label: 'Déjà réservé'),
+
             _CalendarLegend(color: WebColors.blue, label: 'Votre période'),
           ],
         ),
@@ -586,7 +482,7 @@ class _PlanningSectionState extends State<PlanningSection> {
                     Text(
                       'La diffusion respecte les dates et la zone géographique choisie. '
                           'Plusieurs annonceurs peuvent diffuser simultanément. '
-                          'Les publicités alternent équitablement, sans exclusivité.',
+                          'Les SPHOTS PUBLICITAIRES alternent équitablement, sans exclusivité.',
                       style: const TextStyle(
                         color: Color(0xFF4B5F97),
                         height: 1.4,
@@ -625,7 +521,7 @@ class _PlanningSectionState extends State<PlanningSection> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Choisissez une durée puis sélectionnez le premier jour disponible dans le calendrier.',
+                'Choisissez une durée puis sélectionnez la date de début souhaitée dans le calendrier.',
                 style: TextStyle(
                   color: Color(0xFF4B5F97),
                   height: 1.4,

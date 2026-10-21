@@ -33,22 +33,13 @@ class DiffusionCentralPreview extends StatelessWidget {
               children: [
                 const SizedBox(height: 18),
                 const Text(
-                  'APERÇU DE VOTRE PUBLICITÉ',
+                  'APERÇU DE VOTRE SPHOT PUBLICITAIRE',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: WebColors.blue,
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.4,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  _previewSubtitle(data.type),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(0xFF4B5F97),
-                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -63,7 +54,7 @@ class DiffusionCentralPreview extends StatelessWidget {
                           if (data.type == DiffusionPreviewType.map || isPack)
                             _PreviewColumn(
                               label: 'CARTE SPHOT',
-                              detail: 'EMPLACEMENT DÉFINI',
+                              detail: '1 EMPLACEMENT',
                               phoneWidth: phoneWidth,
                               child: _MapPhonePreview(data: data),
                             ),
@@ -71,8 +62,8 @@ class DiffusionCentralPreview extends StatelessWidget {
                           if (data.type == DiffusionPreviewType.premium ||
                               isPack)
                             _PreviewColumn(
-                              label: 'FICHES SPHOT · 6 RUBRIQUES',
-                              detail: 'BANDEAU AU BAS DES 6 RUBRIQUES',
+                              label: 'FICHES SPHOT : 6 RUBRIQUES MAXI',
+                              detail: '6 EMPLACEMENTS MAXI',
                               phoneWidth: phoneWidth,
                               child: _PremiumPhonePreview(data: data),
                             ),
@@ -89,17 +80,6 @@ class DiffusionCentralPreview extends StatelessWidget {
     );
   }
 
-  static String _previewSubtitle(DiffusionPreviewType? type) {
-    return switch (type) {
-      DiffusionPreviewType.map =>
-        'Visualisez l’emplacement réservé sur la carte principale.',
-      DiffusionPreviewType.premium =>
-        'Visualisez la publicité au bas des six rubriques des volets SPHOT.',
-      DiffusionPreviewType.pack =>
-        'Visualisez les 7 emplacements : carte et six rubriques des volets.',
-      null => '',
-    };
-  }
 }
 
 class _PreviewColumn extends StatelessWidget {

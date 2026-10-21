@@ -504,7 +504,7 @@ class _AdvertiserApplicationSectionState
         height: 30,
         fit: BoxFit.contain,
       ),
-      title: 'POSITION DE VOTRE ENTREPRISE',
+      title: 'POSITION DE VOTRE ACTIVITÉ COMMERCIALE',
       subtitle: widget.position == null
           ? 'AUCUNE POSITION'
           : 'POSITION DÉFINIE',
@@ -512,7 +512,9 @@ class _AdvertiserApplicationSectionState
           ? const Color(0xFF6B7280)
           : WebColors.red,
       child: Text(
-        _locked ? 'La position de votre entreprise est en cours de contrôle.' : 'Déplacez et zoomez la carte, puis cliquez à l’emplacement exact de votre entreprise ; votre SPHOT PUBLICITAIRE sera ainsi défini.',
+        _locked
+            ? 'L’emplacement déclaré doit correspondre à votre activité commerciale. Tout déplacement ultérieur de votre SPHOT PUBLICITAIRE nécessitera l’accord de l’équipe SPHOT.'
+            : 'Cliquez sur la carte à l’emplacement réel de votre activité commerciale. Vous restez responsable de cette déclaration. Tout déplacement ultérieur devra être approuvé par l’équipe SPHOT.',
         style: const TextStyle(
           color: Color(0xFF4B5F97),
           fontWeight: FontWeight.w700,

@@ -31,6 +31,11 @@ class AdvertisingSpotSection extends StatefulWidget {
     this.approvedAssetsLocked = false,
     this.assetChangeMode = false,
     this.assetChangeRequestStatus = '',
+    this.approvedSpotConfigured = false,
+    this.relocationActive = false,
+    this.onStartRelocation,
+    this.onCancelRelocation,
+    this.onStartVisualChange,
     this.requestedScope = 'local',
   });
 
@@ -50,6 +55,11 @@ class AdvertisingSpotSection extends StatefulWidget {
   final bool approvedAssetsLocked;
   final bool assetChangeMode;
   final String assetChangeRequestStatus;
+  final bool approvedSpotConfigured;
+  final bool relocationActive;
+  final VoidCallback? onStartRelocation;
+  final VoidCallback? onCancelRelocation;
+  final VoidCallback? onStartVisualChange;
   final String requestedScope;
 
   @override
@@ -495,7 +505,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
       return;
     }
 
-    if (widget.assetChangeMode &&
+    if ((widget.assetChangeMode || widget.approvedSpotConfigured) &&
         _approvedTerritory != null &&
         (territory.level != _approvedTerritory!.level ||
          territory.code != _approvedTerritory!.code)) {
@@ -527,7 +537,8 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             .collection('advertiserRequests')
             .doc(requestId);
         if (widget.assetChangeMode) {
-          // Visuel et position seulement. La zone reste contractuelle.
+          // Seuls les changements explicites de position ou de visuel sont
+          // soumis à approbation. Le rayon demeure contractuel.
           final approved = _approvedPosition;
           final locationChanged = approved != null &&
               ((approved.latitude - position.latitude).abs() > 0.000001 ||
@@ -535,6 +546,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           final visualChanged = _bannerBytes != null ||
               (_approvedVisualUrl != null &&
                _approvedVisualUrl != bannerUrl);
+          if (locationChanged && !widget.relocationActive) {
+            throw StateError('Utilisez le bouton de déplacement pour proposer une nouvelle position.');
+          }
           if (!visualChanged && !locationChanged) {
             throw StateError(
               'Aucune modification de visuel ou de position à soumettre.',
@@ -562,6 +576,11 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
         } else {
+          final initial = _approvedPosition;
+          if (initial != null &&
+              const Distance().as(LengthUnit.Meter, initial, position) > 1) {
+            throw StateError('Le déplacement de ce SPHOT exige une demande explicite à l’équipe SPHOT.');
+          }
           await requestReference.set({
             ...creationData,
             'uid': requestId,
@@ -692,7 +711,10 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           OutlinedButton.icon(
             onPressed: _saving || widget.approvedAssetsLocked
                 ? null
-                : _pickBanner,
+                : () {
+                    widget.onStartVisualChange?.call();
+                    _pickBanner();
+                  },
             style: OutlinedButton.styleFrom(
               foregroundColor: WebColors.blue,
               side: const BorderSide(color: WebColors.blue, width: 1.5),
@@ -835,7 +857,8 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
                   if (options[level] != null)
                     OutlinedButton(
                       onPressed: widget.assetChangeMode ||
-                              widget.approvedAssetsLocked
+                              widget.approvedAssetsLocked ||
+                              widget.approvedSpotConfigured
                           ? null
                           : () => _selectTerritory(options[level]!),
                       style: OutlinedButton.styleFrom(
@@ -887,7 +910,7 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
               ),
             ],
           ],
-          if (widget.assetChangeMode || widget.approvedAssetsLocked)
+          if (widget.assetChangeMode || widget.approvedAssetsLocked || widget.approvedSpotConfigured)
             const Padding(
               padding: EdgeInsets.only(top: 14),
               child: Text(
@@ -938,15 +961,29 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                widget.approvedAssetsLocked
-                    ? 'Position validée par SPHOT. Demandez une modification pour proposer un nouvel emplacement.'
-                    : 'Déplacez et zoomez la carte, puis cliquez à l’emplacement exact de votre SPHOT publicitaire.',
+                widget.relocationActive
+                    ? 'Cliquez sur la carte pour proposer un déplacement. La position actuelle reste en vigueur jusqu’à l’approbation de l’équipe SPHOT.'
+                    : 'Votre SPHOT PUBLICITAIRE est situé à l’emplacement déclaré lors de sa création. Son déplacement nécessite une demande et l’approbation de l’équipe SPHOT.',
                 style: const TextStyle(
                   color: Color(0xFF4B5F97),
                   height: 1.4,
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              if (widget.assetChangeRequestStatus != 'submitted') ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: widget.relocationActive
+                      ? widget.onCancelRelocation
+                      : widget.onStartRelocation,
+                  icon: Icon(widget.relocationActive
+                      ? Icons.close_rounded
+                      : Icons.edit_location_alt_outlined),
+                  label: Text(widget.relocationActive
+                      ? 'ANNULER LE DÉPLACEMENT'
+                      : 'DÉPLACER VOTRE SPHOT PUBLICITAIRE'),
+                ),
+              ],
             ],
           ),
         ),
@@ -955,8 +992,8 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           const Padding(
             padding: EdgeInsets.only(bottom: 14),
             child: Text(
-              'Votre proposition de modification du visuel et/ou de la '
-              'position est en attente d’approbation. '
+              'Votre demande de modification du visuel ou de déplacement '
+              'est en attente d’approbation. '
               'Les informations précédemment approuvées restent en vigueur.',
               textAlign: TextAlign.center,
               style: TextStyle(color: WebColors.red, fontWeight: FontWeight.w800),
@@ -966,9 +1003,9 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
           const Padding(
             padding: EdgeInsets.only(bottom: 14),
             child: Text(
-              'Proposez un nouveau visuel et/ou une nouvelle position, '
-              'puis transmettez-les au Super Admin. '
-              'Le rayon contractuel est verrouillé.',
+              'La modification du visuel ou le déplacement proposé devra '
+              'être approuvé par l’équipe SPHOT. '
+              'Le rayon choisi n’est pas soumis à approbation.',
               textAlign: TextAlign.center,
               style: TextStyle(color: WebColors.blue, fontWeight: FontWeight.w700),
             ),

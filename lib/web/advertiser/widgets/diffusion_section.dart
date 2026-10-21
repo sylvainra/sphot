@@ -53,7 +53,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
       value: 'map',
       label: 'CARTE SPHOT',
       description:
-          'Votre publicité apparaît dans l’encart de la carte principale '
+          'Votre SPHOT PUBLICITAIRE apparaît en bas de la carte principale '
           '(1 emplacement).',
       icon: Icons.map_outlined,
     ),
@@ -61,7 +61,7 @@ class _DiffusionSectionState extends State<DiffusionSection> {
       value: 'premium',
       label: 'FICHES SPHOT',
       description:
-          'Votre publicité apparaît en bas de chacune des rubriques '
+          'Votre SPHOT PUBLICITAIRE apparaît en bas de chacune des rubriques '
           'du volet de chaque SPHOT concerné (de 1 à 6 emplacements).',
       usesFireIcon: true,
     ),

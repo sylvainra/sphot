@@ -63,7 +63,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'LOCALISATION & DEMANDE',
       Icons.fact_check_outlined,
-      'Positionnez votre entreprise et enregistrez votre visuel.',
+      'Positionnez votre activité commerciale et enregistrez votre visuel.',
     ),
     _AdvertiserSection(
       'VALIDATIONS JURIDIQUES',
@@ -87,13 +87,15 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     _AdvertiserSection(
       'DIFFUSION',
       Icons.campaign_outlined,
-      'Choisissez votre zone de SPHOT PUBLICITAIRE : la CARTE SPHOT, '
-          'les FICHES SPHOT ou le PACK VISIBILITÉ TOTALE !'
+      'Choisissez votre zone de SPHOT PUBLICITAIRE :\n'
+          'CARTE SPHOT\n'
+          'FICHES SPHOT\n'
+          'ou le PACK VISIBILITÉ TOTALE !'
     ),
     _AdvertiserSection(
       'PLANIFICATION',
       Icons.calendar_month_outlined,
-      'Planifiez votre publicité sans exclusivité territoriale ni sectorielle.',
+      'Planifiez votre SPHOT PUBLICITAIRE.',
     ),
     _AdvertiserSection(
       'DEVIS & COMMANDE',
@@ -164,6 +166,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   _requestSubscription;
   bool _restoredRequestAssets = false;
   String? _requestedScopeOverride;
+  bool _relocationRequested = false;
+  bool _visualChangeRequested = false;
 
   String? get _requestId {
     final explicitId = widget.advertiserRequestId?.trim() ?? '';
@@ -184,16 +188,15 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
         _approvedFlow;
   }
 
-  // Un annonceur approuvé peut préparer une nouvelle proposition directement.
-  // Seule une proposition déjà transmise bloque les modifications.
-  bool get _assetChangeAuthorized {
-    if (!_approvedFlow) return false;
-    final request = _map(_requestData['assetChangeRequest']);
-    final status = request['status']?.toString() ?? '';
-    // Les anciennes demandes « pending » peuvent elles aussi être complétées
-    // directement, sans autorisation préalable du Super Admin.
-    return status != 'submitted';
-  }
+  // Une proposition de déplacement ou de changement de visuel doit être
+  // demandée explicitement. Le rayon initial, lui, est librement choisi.
+  bool get _assetChangeAuthorized =>
+      _approvedFlow && _assetChangeStatus != 'submitted' &&
+      (_relocationRequested || _visualChangeRequested);
+
+  bool get _canMoveApprovedPoint =>
+      _approvedFlow && _relocationRequested &&
+      _assetChangeStatus != 'submitted';
 
   String get _assetChangeStatus {
     final request = _map(_requestData['assetChangeRequest']);
@@ -267,6 +270,10 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                   : null;
               _requestData = data;
               _requestStatus = status;
+              if (_map(data['assetChangeRequest'])['status'] == 'submitted') {
+                _relocationRequested = false;
+                _visualChangeRequested = false;
+              }
               if (_selectedIndex >= _sections.length) _selectedIndex = 0;
             });
             if (!_restoredRequestAssets) _restoreRequestAssets(data);
@@ -432,7 +439,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   void _setAdvertisingPoint(LatLng point, {required bool centerMap}) {
     final moved = _advertisingPoint != null &&
         _advertisingPoint != point;
-    if (moved && _advertisingTerritory?.isWholeCountry == true) {
+    if (moved && !_canMoveApprovedPoint &&
+        _advertisingTerritory?.isWholeCountry == true) {
       ++_countryOutlineRequest;
       setState(() {
         _advertisingPoint = point;
@@ -724,7 +732,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     final canSelectApplicationPosition =
         !_approvedFlow && _selectedIndex == 1 && !_applicationLocked;
     final canEditApprovedPosition =
-        _approvedFlow && _selectedIndex == 1 && _assetChangeAuthorized;
+        _approvedFlow && _selectedIndex == 1 && _canMoveApprovedPoint;
     final showApprovedRadius = _approvedFlow && _selectedIndex == 1;
     final effectiveTerritory =
         showApprovedRadius ? _effectiveAdvertiserTerritory : null;
@@ -831,7 +839,7 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                   child: Text(
                     canEditApprovedPosition
                         ? 'ZONE ACTUELLE EN ROUGE'
-                        : 'CLIQUEZ SUR LA CARTE POUR POSITIONNER VOTRE ENTREPRISE',
+                        : 'CLIQUEZ SUR LA CARTE POUR POSITIONNER VOTRE ACTIVITÉ COMMERCIALE',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: WebColors.blue,
@@ -890,6 +898,16 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                     ),
                     if (!_approvedFlow &&
                         _requestStatus.toLowerCase() != 'pending') ...[
+                      const SizedBox(height: 14),
+                      const Text(
+                        'L’emplacement déclaré doit correspondre à votre activité commerciale réelle. Tout déplacement ultérieur devra être approuvé par l’équipe SPHOT. Vous restez responsable des informations fournies : SPHOT contrôle la conformité du visuel publicitaire, sans certifier vos déclarations ni votre SIRET.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: WebColors.blue,
+                          height: 1.4,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 14),
                       const Text(
                         'Dans un premier temps, nous vous invitons à remplir une demande de renseignements préalables. Si votre demande est acceptée par l’équipe SPHOT, vous pourrez accéder à la conception de votre SPHOT PUBLICITAIRE.',
@@ -1166,9 +1184,27 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
             onVisualChanged: _setAdvertisingVisual,
             onRadiusChanged: _setAdvertisingRadius,
             onScopeChanged: _setRequestedScope,
-            approvedAssetsLocked: !_assetChangeAuthorized,
+            approvedAssetsLocked: _assetChangeStatus == 'submitted',
             assetChangeMode: _assetChangeAuthorized,
             assetChangeRequestStatus: _assetChangeStatus,
+            approvedSpotConfigured:
+                _requestData['advertisingSpotCompleted'] == true,
+            relocationActive: _relocationRequested,
+            onStartRelocation: () {
+              if (_assetChangeStatus == 'submitted') return;
+              setState(() => _relocationRequested = true);
+            },
+            onCancelRelocation: () {
+              final original = _effectiveAdvertiserPoint;
+              if (original != null) {
+                _setAdvertisingPoint(original, centerMap: true);
+              }
+              setState(() => _relocationRequested = false);
+            },
+            onStartVisualChange: () {
+              if (_assetChangeStatus == 'submitted') return;
+              setState(() => _visualChangeRequested = true);
+            },
             requestedScope: _requestedScope,
             initialTerritory: _advertisingTerritory,
             onTerritoryChanged: _setAdvertisingTerritory,
