@@ -8,6 +8,7 @@ import '../../../models/advertising_pricing_config.dart';
 import '../../shared/web_colors.dart';
 import '../models/advertising_visual_data.dart';
 import '../models/diffusion_preview_data.dart';
+import '../services/advertiser_phase_two_write_service.dart';
 
 class DiffusionSection extends StatefulWidget {
   const DiffusionSection({
@@ -249,8 +250,6 @@ class _DiffusionSectionState extends State<DiffusionSection> {
       return;
     }
 
-    final selectedLabel = _selectedOfferLabel;
-
     setState(() {
       _saving = true;
       _error = null;
@@ -258,30 +257,15 @@ class _DiffusionSectionState extends State<DiffusionSection> {
 
     try {
       final requestId = _requestId;
-      if (requestId != null) {
-        final creationData = _requestExists
-            ? <String, Object?>{}
-            : <String, Object?>{
-                'status': 'approved',
-                'createdAt': FieldValue.serverTimestamp(),
-              };
-
-        await FirebaseFirestore.instance
-            .collection('advertiserRequests')
-            .doc(requestId)
-            .set({
-              ...creationData,
-              'uid': requestId,
-              'diffusionCompleted': true,
-              'diffusion': <String, Object?>{
-                'visibilityType': selectedValue,
-                'visibilityLabel': selectedLabel,
-                'confirmedAt': FieldValue.serverTimestamp(),
-              },
-              'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-        _requestExists = true;
+      if (requestId == null || requestId.isEmpty) {
+        throw StateError('Dossier annonceur introuvable.');
       }
+      await AdvertiserPhaseTwoWriteService.save(
+        requestId: requestId,
+        action: 'saveDiffusion',
+        payload: <String, Object?>{'visibilityType': selectedValue},
+      );
+      _requestExists = true;
 
       if (!mounted) return;
       setState(() => _completed = true);

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'firebase_options.dart';
 import 'map/map_page.dart';
@@ -310,8 +311,30 @@ class _SuperAdminSessionGateState extends State<_SuperAdminSessionGate> {
 
       final data = jsonDecode(response.body);
       if (data is Map<String, dynamic> && data['success'] == true) {
+        final pricingToken = data['pricingSessionToken']?.toString() ?? '';
+        if (pricingToken.isEmpty) return;
+        final firebaseToken = data['firebaseToken']?.toString() ?? '';
+        if (firebaseToken.isNotEmpty) {
+          final credential = await FirebaseAuth.instance.signInWithCustomToken(
+            firebaseToken,
+          );
+          // Les claims doivent provenir du serveur Super Admin et expirer.
+          final tokenResult = await credential.user?.getIdTokenResult(true);
+          final claims = tokenResult?.claims ?? const <String, dynamic>{};
+          final expiry = claims['sphotSaSessionExpiresAt'];
+          final expiryMillis = expiry is num ? expiry.toInt() : 0;
+          if (claims['role'] != 'SPHOT_SUPER_ADMIN' ||
+              claims['sphotSuperAdmin'] != true ||
+              expiryMillis <= DateTime.now().millisecondsSinceEpoch) {
+            throw StateError('Identite Firebase Super Admin non valide.');
+          }
+        } else {
+          // Compatibilite temporaire avec la fonction deja publiee.
+          // Ne pas activer les regles Firestore restrictives avant son deploy.
+          debugPrint('Super Admin : fonction Firebase pas encore mise a jour.');
+        }
+        _pricingSessionToken = pricingToken;
         _authorized = true;
-        _pricingSessionToken = data['pricingSessionToken']?.toString() ?? '';
       }
     } catch (error, stackTrace) {
       debugPrint('Ouverture session Super Admin impossible : $error');

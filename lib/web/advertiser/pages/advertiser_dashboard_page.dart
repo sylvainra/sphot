@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/advertiser_phase_one_draft.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -181,11 +182,94 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     return widget.approvedAccess || isAdvertiserRequestApproved(_requestStatus);
   }
 
-  bool get _applicationLocked {
-    return !_requestReady ||
+  bool get _localPhaseOneDraft =>
+    !widget.existingRequestOnly &&
+    _requestStatus == 'draft' &&
+    _requestData.isEmpty &&
+    !_approvedFlow;
+
+bool get _applicationLocked {
+  return !_requestReady ||
         _requestLoadError != null ||
         isAdvertiserApplicationLocked(_requestStatus) ||
         _approvedFlow;
+  }
+
+  // PHASE 1 : en correction, absence de rubriques autorisées = lecture seule.
+  // Les corrections ne réactivent jamais la création d'un nouveau brouillon.
+  bool get _isPhaseOneCorrection =>
+      !_approvedFlow && _requestStatus == 'changes_requested';
+
+  Set<String> get _authorizedCorrectionScopes {
+    if (!_isPhaseOneCorrection) return const <String>{};
+    final request = _map(_requestData['correctionRequest']);
+    if ((request['status'] ?? '').toString() != 'changes_requested') {
+      return const <String>{};
+    }
+    final scopes = request['scopes'];
+    if (scopes is! List) return const <String>{};
+    return scopes.map((item) => item.toString()).toSet();
+  }
+
+  bool _canEditPhaseOneScope(String scope) =>
+      !_isPhaseOneCorrection || _authorizedCorrectionScopes.contains(scope);
+
+  bool get _canEditPhaseOneApplication =>
+      _canEditPhaseOneScope('location') ||
+      _canEditPhaseOneScope('visual') ||
+      _canEditPhaseOneScope('destination');
+
+  Widget _buildPhaseOneCorrectionNotice() {
+    const titles = <String, String>{
+      'identity': 'Identité et coordonnées',
+      'establishment': 'Entreprise et justificatifs',
+      'location': 'Emplacement sur la carte',
+      'visual': 'Visuel publicitaire',
+      'destination': 'Lien de destination',
+      'legal': 'Validations juridiques',
+    };
+    final request = _map(_requestData['correctionRequest']);
+    final reason = (request['reason'] ?? '').toString().trim();
+    final scopes = _authorizedCorrectionScopes;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        border: Border.all(color: WebColors.red, width: 1.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'CORRECTIONS DEMANDÉES PAR L’ÉQUIPE SPHOT',
+            style: TextStyle(
+              color: WebColors.red,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            scopes.isEmpty
+                ? 'Aucune rubrique autorisée. Contactez l’équipe SPHOT.'
+                : 'Rubriques modifiables : ${titles.entries.where((item) => scopes.contains(item.key)).map((item) => item.value).join(' • ')}',
+            style: const TextStyle(color: WebColors.blue),
+          ),
+          if (reason.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text('Motif : $reason',
+                style: const TextStyle(color: WebColors.blue)),
+          ],
+          const SizedBox(height: 5),
+          const Text(
+            'Les autres rubriques sont verrouillées. Enregistrez vos '
+            'corrections, puis retransmettez le dossier à l’étape 3.',
+            style: TextStyle(color: WebColors.blue, fontSize: 12),
+          ),
+        ],
+      ),
+    );
   }
 
   // Une proposition de déplacement ou de changement de visuel doit être
@@ -216,12 +300,20 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
 
   String get _activityType {
     final establishment = _map(_requestData['establishment']);
-    final activity = establishment['activityType']?.toString().trim() ?? '';
-    if (activity == 'Autre') {
-      final other = establishment['activityTypeOther']?.toString().trim() ?? '';
-      return other.isEmpty ? activity : other;
+    final raw = establishment['activityTypes'];
+    final activities = raw is List
+        ? raw.map((item) => item.toString().trim())
+            .where((item) => item.isNotEmpty).toList()
+        : <String>[];
+    if (activities.isEmpty) {
+      final legacy = establishment['activityType']?.toString().trim() ?? '';
+      if (legacy.isNotEmpty) activities.add(legacy);
     }
-    return activity;
+    final other = establishment['activityTypeOther']?.toString().trim() ?? '';
+    return activities.map((item) {
+      if (item == 'Autre' && other.isNotEmpty) return 'Autre — $other';
+      return item;
+    }).join(' • ');
   }
 
   bool get _usesNationalPricing =>
@@ -239,7 +331,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
   @override
   void dispose() {
     _requestSubscription?.cancel();
-    _detailScrollController.dispose();
+AdvertiserPhaseOneDraft.discard(_requestId);
+_detailScrollController.dispose();
     super.dispose();
   }
 
@@ -730,7 +823,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     }
 
     final canSelectApplicationPosition =
-        !_approvedFlow && _selectedIndex == 1 && !_applicationLocked;
+        !_approvedFlow && _selectedIndex == 1 && !_applicationLocked &&
+        _canEditPhaseOneScope('location');
     final canEditApprovedPosition =
         _approvedFlow && _selectedIndex == 1 && _canMoveApprovedPoint;
     final showApprovedRadius = _approvedFlow && _selectedIndex == 1;
@@ -1078,6 +1172,8 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                       ),
                     ),
                     const SizedBox(height: 20),
+                    if (_isPhaseOneCorrection)
+                      _buildPhaseOneCorrectionNotice(),
                     ..._buildSectionContent(_selectedIndex),
                   ],
                 ),
@@ -1107,23 +1203,31 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
         case 0:
           return [
             IdentityProfessionalSection(
-              key: ValueKey('identity-$_requestStatus'),
-              user: widget.user,
-              requestId: _requestId,
-              readOnly: _applicationLocked,
+  key: ValueKey('identity-$_requestStatus'),
+  user: widget.user,
+  requestId: _requestId,
+  readOnly: _applicationLocked ||
+      !_canEditPhaseOneScope('identity'),
+  draftOnly: _localPhaseOneDraft,
             ),
             const SizedBox(height: 8),
             EstablishmentSection(
-              key: ValueKey('establishment-$_requestStatus'),
-              user: widget.user,
-              requestId: _requestId,
-              readOnly: _applicationLocked,
+  key: ValueKey('establishment-$_requestStatus'),
+  user: widget.user,
+  requestId: _requestId,
+  readOnly: _applicationLocked ||
+      !_canEditPhaseOneScope('establishment'),
+  draftOnly: _localPhaseOneDraft,
             ),
           ];
         case 1:
           return [
             AdvertiserApplicationSection(
-              readOnly: _applicationLocked,
+  readOnly: _applicationLocked || !_canEditPhaseOneApplication,
+  draftOnly: _localPhaseOneDraft,
+  canEditLocation: _canEditPhaseOneScope('location'),
+  canEditVisual: _canEditPhaseOneScope('visual'),
+  canEditDestination: _canEditPhaseOneScope('destination'),
               user: widget.user,
               requestId: _requestId,
               position: _advertisingPoint,
@@ -1141,7 +1245,10 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
         default:
           return [
             AdvertiserLegalAcceptanceSection(
-              readOnly: _applicationLocked,
+  readOnly: _applicationLocked ||
+      (_isPhaseOneCorrection && _authorizedCorrectionScopes.isEmpty),
+  draftOnly: _localPhaseOneDraft,
+  canEditLegal: _canEditPhaseOneScope('legal'),
               key: ValueKey<String>(
                 'advertiser-legal-${_requestId ?? 'unknown'}',
               ),

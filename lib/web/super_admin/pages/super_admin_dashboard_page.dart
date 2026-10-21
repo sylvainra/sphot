@@ -1261,6 +1261,24 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     );
   }
 
+  String _advertiserActivitySummary(Map<String, dynamic> establishment) {
+    final raw = establishment['activityTypes'];
+    final activities = raw is List
+        ? raw.map((item) => item.toString().trim())
+            .where((item) => item.isNotEmpty).toList()
+        : <String>[];
+    if (activities.isEmpty) {
+      final legacy = _cleanText(establishment['activityType']);
+      if (legacy.isNotEmpty) activities.add(legacy);
+    }
+    if (activities.isEmpty) return 'Non renseignée';
+    final other = _cleanText(establishment['activityTypeOther']);
+    return activities.map((item) {
+      if (item == 'Autre' && other.isNotEmpty) return 'Autre — $other';
+      return item;
+    }).join(' • ');
+  }
+
   Widget _advertiserRequestInfoLine(String label, String value) {
     return LayoutBuilder(
       builder: (context, constraints) => _spotInfoLine(
@@ -3319,6 +3337,103 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     return result;
   }
 
+  // PHASE 1 : chaque demande de correction doit préciser les rubriques
+  // autorisées, en plus du motif communiqué à l'annonceur.
+  Future<Map<String, Object?>?> _askAdvertiserCorrectionScopes() async {
+    const choices = <String, String>{
+      'identity': 'Identité et coordonnées du demandeur',
+      'establishment': 'Entreprise et justificatifs',
+      'location': 'Emplacement sur la carte',
+      'visual': 'Visuel publicitaire',
+      'destination': 'Lien de destination',
+      'legal': 'Validations juridiques',
+    };
+    final controller = TextEditingController();
+    final selected = <String>{};
+    final result = await showDialog<Map<String, Object?>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text(
+            'DEMANDER DES CORRECTIONS CIBLÉES',
+            style: TextStyle(color: adminColor, fontWeight: FontWeight.w900),
+          ),
+          content: SizedBox(
+            width: 540,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Cochez uniquement les rubriques que l’annonceur devra '
+                    'pouvoir modifier. Plusieurs choix sont possibles.',
+                    style: TextStyle(color: adminColor),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final choice in choices.entries)
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: Text(
+                        choice.value,
+                        style: const TextStyle(
+                          color: adminColor,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      value: selected.contains(choice.key),
+                      activeColor: redColor,
+                      onChanged: (checked) => setDialogState(() {
+                        if (checked == true) {
+                          selected.add(choice.key);
+                        } else {
+                          selected.remove(choice.key);
+                        }
+                      }),
+                    ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: controller,
+                    minLines: 3,
+                    maxLines: 6,
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'Motif précis communiqué à l’annonceur *',
+                      alignLabelWithHint: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('ANNULER'),
+            ),
+            FilledButton(
+              onPressed: selected.isEmpty || controller.text.trim().isEmpty
+                  ? null
+                  : () => Navigator.of(dialogContext).pop({
+                      'reason': controller.text.trim(),
+                      'scopes': <String>[
+                        for (final choice in choices.keys)
+                          if (selected.contains(choice)) choice,
+                      ],
+                    }),
+              style: FilledButton.styleFrom(backgroundColor: adminColor),
+              child: const Text('CONFIRMER LES CORRECTIONS'),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
   Future<void> _reviewAdvertiserRequest(
     Map<String, dynamic> advertiser, {
     required String decision,
@@ -3326,8 +3441,22 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
     if (requestId.isEmpty) return;
 
+    // Les demandes de la PHASE 2 conservent leur ancien dialogue et leurs
+    // propres historiques. Seules les corrections de candidature PHASE 1
+    // nécessitent une sélection de rubriques.
+    final originalStatus = _cleanText(advertiser['status']).toLowerCase();
+    final originalAssetChange = _advertiserMap(advertiser['assetChangeRequest']);
+    final phaseTwoAssetReview = originalStatus == 'approved' &&
+        originalAssetChange['status'] == 'submitted';
     String reason = '';
-    if (decision != 'approved') {
+    List<String> correctionScopes = const <String>[];
+    if (decision == 'changes_requested' && !phaseTwoAssetReview) {
+      final result = await _askAdvertiserCorrectionScopes();
+      if (result == null) return;
+      reason = (result['reason'] ?? '').toString().trim();
+      correctionScopes = List<String>.from(result['scopes'] as List);
+      if (reason.isEmpty || correctionScopes.isEmpty) return;
+    } else if (decision != 'approved') {
       final result = await _askAdvertiserReviewReason(
         title: decision == 'changes_requested'
             ? 'DEMANDER UNE MODIFICATION'
@@ -3337,190 +3466,72 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       reason = result;
     }
 
-    final reference = FirebaseFirestore.instance
-        .collection('advertiserRequests')
-        .doc(requestId);
-    final recipient = _cleanText(
-      advertiser['contactEmail'] ?? advertiser['email'],
-    );
-    final assetChange = _advertiserMap(advertiser['assetChangeRequest']);
-    final isAssetApproval =
-        decision == 'approved' &&
-        _cleanText(advertiser['status']).toLowerCase() == 'approved' &&
-        assetChange['status'] == 'submitted';
-    final isAssetReview =
-        _cleanText(advertiser['status']).toLowerCase() == 'approved' &&
-        assetChange['status'] == 'submitted';
-
     try {
-      final update = <String, Object?>{
-        'status': decision,
-        'review': <String, Object?>{
-          'status': decision,
-          'reason': reason,
-          'reviewedBy': 'super_admin',
-          'reviewedAt': FieldValue.serverTimestamp(),
-        },
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-
-      if (decision == 'approved') {
-        update.addAll({
-          'approvedApplication': <String, Object?>{
-            'location': _advertiserMap(advertiser['applicantLocation']),
-            'visual': _advertiserMap(advertiser['proposedVisual']),
-            'destinationUrl': advertiser['destinationUrl'] ?? '',
-            'approvedAt': FieldValue.serverTimestamp(),
-          },
-          'approvalEmail': <String, Object?>{
-            'status': 'pending',
-            'recipient': recipient,
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-          'approvedAt': FieldValue.serverTimestamp(),
-        });
-        if (isAssetApproval) {
-          // Appliquer seulement la proposition réellement examinée.
-          final visual = _advertiserMap(
-            assetChange['proposedVisual'] ?? advertiser['proposedVisual'],
-          );
-          final location = _advertiserMap(
-            assetChange['proposedLocation'] ?? advertiser['applicantLocation'],
-          );
-          final imageUrl = _cleanText(visual['url']);
-          if (!imageUrl.startsWith('https://')) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Impossible d’approuver : visuel proposé absent ou non sécurisé.'),
-                ),
-              );
-            }
-            return;
-          }
-
-          final approvedSpot = _advertiserMap(advertiser['advertisingSpot']);
-          update.remove('approvalEmail');
-          update.remove('approvedAt');
-          update['approvedApplication'] = <String, Object?>{
-            'location': location,
-            'visual': visual,
-            'destinationUrl': advertiser['destinationUrl'] ?? '',
-            'approvedAt': FieldValue.serverTimestamp(),
-          };
-          update['advertisingSpot'] = <String, Object?>{
-            ...approvedSpot,
-            'bannerUrl': imageUrl,
-            'bannerFileName': visual['fileName'],
-            'bannerExtension': visual['extension'],
-            'bannerMimeType': visual['mimeType'],
-            'bannerFileSizeBytes': visual['fileSizeBytes'],
-            'bannerWidth': visual['width'],
-            'bannerHeight': visual['height'],
-            if (location['latitude'] is num)
-              'latitude': location['latitude'],
-            if (location['longitude'] is num)
-              'longitude': location['longitude'],
-          };
-          if (location.isNotEmpty) update['applicantLocation'] = location;
-          update['assetChangeRequest'] = <String, Object?>{
-            ...assetChange,
-            'proposedVisual': visual,
-            'proposedLocation': location,
-            'status': 'approved',
-            'reviewedAt': FieldValue.serverTimestamp(),
-          };
-        }
-      } else if (decision == 'changes_requested') {
-        update['changeRequestEmail'] = <String, Object?>{
-          'status': 'pending',
-          'recipient': recipient,
-          'reason': reason,
-          'updatedAt': FieldValue.serverTimestamp(),
-        };
-        if (isAssetReview) {
-          update['status'] = 'approved';
-          update['assetChangeRequest'] = <String, Object?>{
-            ...assetChange,
-            'status': 'changes_requested',
-            'reason': reason,
-            'reviewedAt': FieldValue.serverTimestamp(),
-          };
-        }
-      } else {
-        update['rejectionEmail'] = <String, Object?>{
-          'status': 'pending',
-          'recipient': recipient,
-          'reason': reason,
-          'updatedAt': FieldValue.serverTimestamp(),
-        };
-        if (isAssetReview) {
-          update['status'] = 'approved';
-          update['assetChangeRequest'] = <String, Object?>{
-            ...assetChange,
-            'status': 'rejected',
-            'reason': reason,
-            'reviewedAt': FieldValue.serverTimestamp(),
-          };
-        }
-      }
-
-      Map<String, dynamic>? decisionHistoryEntry;
-      if (isAssetReview) {
-        // Conserver l'avant/après à chaque décision, sans écraser
-        // l'historique existant ni écrire dans une sous-collection non
-        // autorisée par les règles Firestore du dossier annonceur.
-        final approvedApplication =
-            _advertiserMap(advertiser['approvedApplication']);
-        final approvedVisual = _advertiserMap(approvedApplication['visual']);
-        final previousSpot = _advertiserMap(advertiser['advertisingSpot']);
-        final approvedLocation = _advertiserMap(approvedApplication['location']);
-        final currentLocation = approvedLocation.isNotEmpty
-            ? approvedLocation
-            : <String, dynamic>{
-                'latitude': previousSpot['latitude'],
-                'longitude': previousSpot['longitude'],
-              };
-        final proposedVisual = _advertiserMap(
-          assetChange['proposedVisual'] ?? advertiser['proposedVisual'],
-        );
-        final proposedLocation = _advertiserMap(
-          assetChange['proposedLocation'] ?? advertiser['applicantLocation'],
-        );
-        decisionHistoryEntry = <String, dynamic>{
-          'decision': decision,
-          'submittedAt': assetChange['submittedAt'],
-          'decidedAt': Timestamp.now(),
-          'decidedBy': 'super_admin',
-          'previousVisualUrl': _cleanText(
-            approvedVisual['url'] ?? previousSpot['bannerUrl'],
-          ),
-          'previousLocation': currentLocation,
-          'proposedVisualUrl': _cleanText(proposedVisual['url']),
-          'proposedLocation': proposedLocation,
-          'reason': reason,
-        };
-        update['assetChangeHistory'] =
-            FieldValue.arrayUnion([decisionHistoryEntry]);
-      }
-      await reference.set(update, SetOptions(merge: true));
-      if (!mounted) return;
-      setState(() {
-        _selectedAdvertiser = {
-          ...advertiser,
-          ...update,
-          if (decisionHistoryEntry != null)
-            'assetChangeHistory': [
-              if (advertiser['assetChangeHistory'] is List)
-                ...(advertiser['assetChangeHistory'] as List),
-              decisionHistoryEntry,
-            ],
-        };
+      await _postAdvertiserReview(<String, Object?>{
+        'action': 'review',
+        'requestId': requestId,
+        'decision': decision,
+        'reason': reason,
+        if (correctionScopes.isNotEmpty) 'scopes': correctionScopes,
       });
+      await _refreshAdvertiserAfterReview(requestId);
     } catch (error, stackTrace) {
-      debugPrint('Mise à jour annonceur impossible : $error');
+      debugPrint('Décision annonceur impossible : $error');
       debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Décision non enregistrée : $error'),
+      ));
     }
+  }
+
+  static const String _reviewAdvertiserDecisionEndpoint =
+      'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+      'reviewAdvertiserDecision';
+
+  Future<void> _postAdvertiserReview(Map<String, Object?> payload) async {
+    final session = widget.pricingSessionToken.trim();
+    if (session.isEmpty) {
+      throw StateError('Session Super Admin absente. Reconnectez-vous.');
+    }
+    final response = await http.post(
+      Uri.parse(_reviewAdvertiserDecisionEndpoint),
+      headers: <String, String>{
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $session',
+      },
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 25));
+    Map<String, dynamic> data = <String, dynamic>{};
+    try {
+      final value = jsonDecode(response.body);
+      if (value is Map) data = Map<String, dynamic>.from(value);
+    } catch (_) {
+      // Réponse non JSON : conserver le code HTTP dans le message d'erreur.
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300 ||
+        data['success'] != true) {
+      throw StateError(
+        (data['error'] ?? 'Serveur indisponible (${response.statusCode}).')
+            .toString(),
+      );
+    }
+  }
+
+  Future<void> _refreshAdvertiserAfterReview(String requestId) async {
+    // Relire la version certifiée par le serveur ; aucune décision ne doit
+    // être recalculée par le navigateur depuis un ancien état en mémoire.
+    final snapshot = await FirebaseFirestore.instance
+        .collection('advertiserRequests')
+        .doc(requestId)
+        .get();
+    if (!mounted || !snapshot.exists) return;
+    setState(() {
+      _selectedAdvertiser = <String, dynamic>{
+        ...?snapshot.data(),
+        'id': requestId,
+      };
+    });
   }
 
   Future<void> _authorizeAdvertiserAssetChange(
@@ -3528,30 +3539,19 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   ) async {
     final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
     if (requestId.isEmpty) return;
-    final assetChange = _advertiserMap(advertiser['assetChangeRequest']);
     try {
-      await FirebaseFirestore.instance
-          .collection('advertiserRequests')
-          .doc(requestId)
-          .set({
-            'assetChangeRequest': <String, Object?>{
-              ...assetChange,
-              'status': 'authorized',
-              'authorizedAt': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            },
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-      if (!mounted) return;
-      setState(() {
-        _selectedAdvertiser = {
-          ...advertiser,
-          'assetChangeRequest': {...assetChange, 'status': 'authorized'},
-        };
+      await _postAdvertiserReview(<String, Object?>{
+        'action': 'authorizeAsset',
+        'requestId': requestId,
       });
+      await _refreshAdvertiserAfterReview(requestId);
     } catch (error, stackTrace) {
       debugPrint('Autorisation annonceur impossible : $error');
       debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Autorisation non enregistrée : $error'),
+      ));
     }
   }
 
@@ -3884,6 +3884,112 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               ),
             ),
       ],
+    );
+  }
+
+  /// Chronologie administrative de la candidature, distincte des changements
+  /// de visuel et de rayon d'une campagne déjà approuvée.
+  Widget _buildAdvertiserPhaseOneHistory(Map<String, dynamic> advertiser) {
+    final raw = advertiser['applicationHistory'];
+    if (raw is! List || raw.isEmpty) return const SizedBox.shrink();
+    final entries = raw
+        .whereType<Map>()
+        .map((entry) => Map<String, dynamic>.from(entry))
+        .toList()
+      ..sort((left, right) {
+        final a = left['occurredAt'];
+        final b = right['occurredAt'];
+        if (a is! Timestamp || b is! Timestamp) return 0;
+        return a.compareTo(b);
+      });
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'HISTORIQUE ADMINISTRATIF — PHASE 1',
+            style: TextStyle(
+              color: adminColor,
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final entry in entries) ...[
+            Builder(builder: (context) {
+              final event = _cleanText(entry['event']);
+              final label = switch (event) {
+                'submitted' => 'Candidature transmise',
+                'resubmitted' => 'Corrections retransmises',
+                'changes_requested' => 'Corrections demandées',
+                'approved' => 'Candidature approuvée',
+                'rejected' => 'Candidature refusée',
+                _ => event.isEmpty ? 'Événement administratif' : event,
+              };
+              final rawDate = entry['occurredAt'];
+              final date = rawDate is Timestamp
+                  ? rawDate.toDate().toLocal()
+                  : null;
+              final when = date == null
+                  ? 'Date non renseignée'
+                  : '${date.day.toString().padLeft(2, '0')}/'
+                    '${date.month.toString().padLeft(2, '0')}/'
+                    '${date.year} '
+                    '${date.hour.toString().padLeft(2, '0')}:'
+                    '${date.minute.toString().padLeft(2, '0')}';
+              final reason = _cleanText(entry['reason']);
+              const scopesLabels = <String, String>{
+                'identity': 'Identité',
+                'establishment': 'Entreprise / justificatifs',
+                'location': 'Emplacement',
+                'visual': 'Visuel',
+                'destination': 'Lien de destination',
+                'legal': 'Validations juridiques',
+              };
+              final rawScopes = entry['correctionScopes'];
+              final scopesText = rawScopes is List
+                  ? rawScopes
+                      .map((scope) => scopesLabels[scope.toString()] ?? scope.toString())
+                      .join(' • ')
+                  : '';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$when — $label',
+                      style: const TextStyle(
+                        color: adminColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (scopesText.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3, left: 8),
+                        child: Text(
+                          'Rubriques à corriger : $scopesText',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    if (reason.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3, left: 8),
+                        child: Text(
+                          'Motif : $reason',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
     );
   }
 
@@ -4591,7 +4697,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               ),
               _advertiserRequestInfoLine(
                 'Activité',
-                _cleanText(establishment['activityType'] ?? 'Non renseignée'),
+                _advertiserActivitySummary(establishment),
               ),
               _advertiserRequestInfoLine(
                 'SIRET',
@@ -4657,9 +4763,12 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 title: 'HISTORIQUE DES MODIFICATIONS',
                 icon: Icons.history_rounded,
                 children: [
+                  _buildAdvertiserPhaseOneHistory(advertiser),
                   _buildAdvertiserAssetHistory(advertiser),
                   _buildAdvertiserRadiusHistory(advertiser),
-                  if ((advertiser['assetChangeHistory'] is! List ||
+                  if ((advertiser['applicationHistory'] is! List ||
+                          (advertiser['applicationHistory'] as List).isEmpty) &&
+                      (advertiser['assetChangeHistory'] is! List ||
                           (advertiser['assetChangeHistory'] as List).isEmpty) &&
                       (advertiser['radiusChangeHistory'] is! List ||
                           (advertiser['radiusChangeHistory'] as List).isEmpty))

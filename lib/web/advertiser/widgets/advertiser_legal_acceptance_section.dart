@@ -1,8 +1,13 @@
+import 'dart:convert';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../shared/web_colors.dart';
 import 'advertiser_cgv_policy.dart';
+import '../models/advertiser_phase_one_draft.dart';
 
 class AdvertiserLegalAcceptanceSection extends StatefulWidget {
   const AdvertiserLegalAcceptanceSection({
@@ -11,12 +16,16 @@ class AdvertiserLegalAcceptanceSection extends StatefulWidget {
     required this.requestStatus,
     this.onSubmitted,
     this.readOnly = false,
+    this.draftOnly = false,
+    this.canEditLegal = true,
   });
 
   final String? requestId;
   final String requestStatus;
   final VoidCallback? onSubmitted;
   final bool readOnly;
+  final bool draftOnly;
+  final bool canEditLegal;
 
   @override
   State<AdvertiserLegalAcceptanceSection> createState() =>
@@ -44,6 +53,7 @@ class _AdvertiserLegalAcceptanceSectionState
   bool _cgvAccepted = false;
   String _cgvVersion = AdvertiserCgvPolicy.defaultVersion;
   bool _representativeAccepted = false;
+  bool _previousLegalAccepted = false;
   String _version = '1.0';
   String _legalPackPath = '';
   String? _error;
@@ -55,13 +65,17 @@ class _AdvertiserLegalAcceptanceSectionState
         (status != 'draft' && status != 'changes_requested');
   }
 
+  bool get _isCorrection =>
+      widget.requestStatus.toLowerCase() == 'changes_requested';
+  bool get _acceptanceLocked =>
+      _locked || (_isCorrection && !widget.canEditLegal);
+
   bool get _canSubmit =>
       _applicationCompleted &&
-      _cguAccepted &&
-      _privacyAccepted &&
-      _rgpdAccepted &&
-      _cgvAccepted &&
-      _representativeAccepted &&
+      ((_isCorrection && !widget.canEditLegal)
+          ? _previousLegalAccepted
+          : (_cguAccepted && _privacyAccepted && _rgpdAccepted &&
+              _cgvAccepted && _representativeAccepted)) &&
       !_locked &&
       !_submitting;
 
@@ -114,12 +128,13 @@ class _AdvertiserLegalAcceptanceSectionState
 
       Map<String, dynamic> request = {};
       if (requestId.isNotEmpty) {
-        final snapshot = await firestore
-            .collection('advertiserRequests')
-            .doc(requestId)
-            .get();
-        request = snapshot.data() ?? <String, dynamic>{};
-      }
+  request = widget.draftOnly
+      ? AdvertiserPhaseOneDraft.forRequest(requestId).data
+      : (await firestore
+          .collection('advertiserRequests')
+          .doc(requestId)
+          .get()).data() ?? <String, dynamic>{};
+}
 
       final acceptedDocuments = _map(request['acceptedDocuments']);
       final legalAcceptance = _map(request['legalAcceptance']);
@@ -145,6 +160,11 @@ class _AdvertiserLegalAcceptanceSectionState
         _cgvDocument = cgvData;
         _cgvVersion = cgvVersion;
         _applicationCompleted = request['applicationCompleted'] == true;
+        _previousLegalAccepted = acceptedDocuments['cgu'] == true &&
+            acceptedDocuments['privacy'] == true &&
+            acceptedDocuments['rgpd'] == true &&
+            acceptedDocuments['advertiserCgv'] == true &&
+            legalAcceptance['representativeDeclaration'] == true;
         _cguAccepted = restoreAcceptance && acceptedDocuments['cgu'] == true;
         _privacyAccepted =
             restoreAcceptance && acceptedDocuments['privacy'] == true;
@@ -189,8 +209,9 @@ class _AdvertiserLegalAcceptanceSectionState
       final reference = FirebaseFirestore.instance
           .collection('advertiserRequests')
           .doc(requestId);
-      final snapshot = await reference.get();
-      final data = snapshot.data() ?? <String, dynamic>{};
+      final data = widget.draftOnly
+    ? AdvertiserPhaseOneDraft.forRequest(requestId).data
+    : (await reference.get()).data() ?? <String, dynamic>{};
 
       if (data['profileCompleted'] != true ||
           data['establishmentCompleted'] != true ||
@@ -204,7 +225,7 @@ class _AdvertiserLegalAcceptanceSectionState
           .toString()
           .trim();
 
-      await reference.set({
+      final legalSubmission = <String, Object?>{
         'status': 'pending',
         'legalAcceptanceCompleted': true,
         'acceptedDocuments': <String, Object?>{
@@ -241,10 +262,78 @@ class _AdvertiserLegalAcceptanceSectionState
         },
         'submittedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
+if (widget.draftOnly) {
+  await AdvertiserPhaseOneDraft.forRequest(requestId).transmit(
+    requestId: requestId,
+    legalData: legalSubmission,
+  );
+} else {
+  // Une correction est refermée exclusivement par le serveur. Le client
+  // n'écrit plus lui-même le statut, la décision ni l'historique.
+  final currentStatus = (data['status'] ?? '').toString().toLowerCase();
+  if (currentStatus != 'changes_requested') {
+    throw const _LegalSubmissionException(
+      'Cette demande n’est pas ouverte à la correction.',
+    );
+  }
+  final correctionInfo = _map(data['correctionRequest']);
+  final rawScopes = correctionInfo['scopes'];
+  final allowedScopes = rawScopes is List
+      ? rawScopes.map((item) => item.toString()).toSet()
+      : <String>{};
+  if ((correctionInfo['status'] ?? '').toString() != 'changes_requested' ||
+      allowedScopes.isEmpty) {
+    throw const _LegalSubmissionException(
+      'Aucune correction autorisée : contactez l’équipe SPHOT.',
+    );
+  }
+  final legalRequested = allowedScopes.contains('legal');
+  if (legalRequested && !widget.canEditLegal) {
+    throw const _LegalSubmissionException(
+      'La validation juridique n’est pas autorisée.',
+    );
+  }
+  final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+  if (idToken == null || idToken.isEmpty) {
+    throw const _LegalSubmissionException(
+      'Votre session a expiré. Ouvrez de nouveau le lien de correction.',
+    );
+  }
+  final response = await http.post(
+    Uri.parse(
+      'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+      'resubmitAdvertiserCorrection',
+    ),
+    headers: <String, String>{
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $idToken',
+    },
+    body: jsonEncode(<String, Object?>{
+      'requestId': requestId,
+      'legalAcceptance': legalRequested,
+      if (legalRequested) ...{
+        'legalVersion': _version,
+        'advertiserCgvVersion': _cgvVersion,
+      },
+    }),
+  );
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    String message = 'La retransmission a échoué. Réessayez.';
+    try {
+      final result = jsonDecode(response.body);
+      if (result is Map && result['error'] is String) {
+        message = result['error'] as String;
+      }
+    } catch (_) {
+      // Réponse serveur indisponible ou mal formée.
+    }
+    throw _LegalSubmissionException(message);
+  }
+}
 
-      if (!mounted) return;
-      _cguController.collapse();
+if (!mounted) return;
+_cguController.collapse();
       _privacyController.collapse();
       _rgpdController.collapse();
       _cgvController.collapse();
@@ -276,7 +365,7 @@ class _AdvertiserLegalAcceptanceSectionState
   }) {
     return CheckboxListTile(
       value: value,
-      onChanged: _locked ? null : onChanged,
+      onChanged: _acceptanceLocked ? null : onChanged,
       activeColor: WebColors.blue,
       checkColor: Colors.white,
       controlAffinity: ListTileControlAffinity.leading,
@@ -418,9 +507,13 @@ class _AdvertiserLegalAcceptanceSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Consultez puis acceptez les documents applicables avant de '
-          'transmettre votre demande de SPHOT PUBLICITAIRE.',
+        Text(
+          _isCorrection
+              ? 'Vérifiez vos corrections, puis retransmettez votre demande. '
+                  'Les validations juridiques ne peuvent être modifiées '
+                  'que si le Super Admin l’a autorisé.'
+              : 'Consultez puis acceptez les documents applicables avant de '
+                  'transmettre votre demande de SPHOT PUBLICITAIRE.',
           style: TextStyle(
             color: WebColors.blue,
             fontSize: 15,

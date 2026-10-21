@@ -10,6 +10,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../models/advertising_pricing_config.dart';
 import '../services/advertiser_territory_service.dart';
+import '../services/advertiser_phase_two_write_service.dart';
 import '../../shared/web_colors.dart';
 import '../models/advertising_visual_data.dart';
 
@@ -524,86 +525,61 @@ class _AdvertisingSpotSectionState extends State<AdvertisingSpotSection> {
 
     try {
       final requestId = _requestId;
-      var bannerUrl = _bannerUrl;
-      if (requestId != null) {
-        bannerUrl = await _uploadBanner(requestId);
-        final creationData = _requestExists
-            ? <String, Object?>{}
-            : <String, Object?>{
-                'status': 'draft',
-                'createdAt': FieldValue.serverTimestamp(),
-              };
-        final requestReference = FirebaseFirestore.instance
-            .collection('advertiserRequests')
-            .doc(requestId);
-        if (widget.assetChangeMode) {
-          // Seuls les changements explicites de position ou de visuel sont
-          // soumis à approbation. Le rayon demeure contractuel.
-          final approved = _approvedPosition;
-          final locationChanged = approved != null &&
-              ((approved.latitude - position.latitude).abs() > 0.000001 ||
-               (approved.longitude - position.longitude).abs() > 0.000001);
-          final visualChanged = _bannerBytes != null ||
-              (_approvedVisualUrl != null &&
-               _approvedVisualUrl != bannerUrl);
-          if (locationChanged && !widget.relocationActive) {
-            throw StateError('Utilisez le bouton de déplacement pour proposer une nouvelle position.');
-          }
-          if (!visualChanged && !locationChanged) {
-            throw StateError(
-              'Aucune modification de visuel ou de position à soumettre.',
-            );
-          }
-          await requestReference.set({
-            'assetChangeRequest': <String, Object?>{
-              'status': 'submitted',
-              'proposedLocation': <String, Object?>{
-                'latitude': position.latitude,
-                'longitude': position.longitude,
-              },
-              'proposedVisual': <String, Object?>{
-                'url': bannerUrl,
-                'fileName': _bannerFileName,
-                'extension': _bannerExtension,
-                'mimeType': _bannerMimeType,
-                'fileSizeBytes': _bannerFileSizeBytes,
-                'width': _bannerWidth,
-                'height': _bannerHeight,
-              },
-              'submittedAt': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            },
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        } else {
-          final initial = _approvedPosition;
-          if (initial != null &&
-              const Distance().as(LengthUnit.Meter, initial, position) > 1) {
-            throw StateError('Le déplacement de ce SPHOT exige une demande explicite à l’équipe SPHOT.');
-          }
-          await requestReference.set({
-            ...creationData,
-            'uid': requestId,
-            'advertisingTerritory': territory.toFirestore(),
-            'advertisingSpotCompleted': true,
-            'advertisingSpot': <String, Object?>{
-              'latitude': position.latitude,
-              'longitude': position.longitude,
-              'bannerUrl': bannerUrl,
-              'bannerFileName': _bannerFileName,
-              'bannerExtension': _bannerExtension,
-              'bannerMimeType': _bannerMimeType,
-              'bannerFileSizeBytes': _bannerFileSizeBytes,
-              'bannerWidth': _bannerWidth,
-              'bannerHeight': _bannerHeight,
-              'confirmedAt': FieldValue.serverTimestamp(),
-            },
-            'diffusion': <String, Object?>{'radiusKm': FieldValue.delete()},
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        }
-        _requestExists = true;
+      if (requestId == null || requestId.isEmpty) {
+        throw StateError('Dossier annonceur introuvable.');
       }
+      final bannerUrl = await _uploadBanner(requestId);
+      if (widget.assetChangeMode) {
+        final approved = _approvedPosition;
+        final locationChanged = approved != null &&
+            ((approved.latitude - position.latitude).abs() > 0.000001 ||
+             (approved.longitude - position.longitude).abs() > 0.000001);
+        final visualChanged = _bannerBytes != null ||
+            (_approvedVisualUrl != null &&
+             _approvedVisualUrl != bannerUrl);
+        if (locationChanged && !widget.relocationActive) {
+          throw StateError('Utilisez le bouton de dÃ©placement avant de proposer un nouvel emplacement.');
+        }
+        if (!visualChanged && !locationChanged) {
+          throw StateError('Aucune modification Ã  soumettre.');
+        }
+        await AdvertiserPhaseTwoWriteService.save(
+          requestId: requestId,
+          action: 'submitAssetChange',
+          payload: <String, Object?>{
+            'position': {'latitude': position.latitude,
+                         'longitude': position.longitude},
+            'visual': <String, Object?>{
+              'url': bannerUrl, 'fileName': _bannerFileName,
+              'extension': _bannerExtension, 'mimeType': _bannerMimeType,
+              'fileSizeBytes': _bannerFileSizeBytes,
+              'width': _bannerWidth, 'height': _bannerHeight,
+            },
+          },
+        );
+      } else {
+        final approved = _approvedPosition;
+        if (approved != null &&
+            const Distance().as(LengthUnit.Meter, approved, position) > 1) {
+          throw StateError('Le dÃ©placement exige une demande explicite.');
+        }
+        await AdvertiserPhaseTwoWriteService.save(
+          requestId: requestId,
+          action: 'saveSpot',
+          payload: <String, Object?>{
+            'position': {'latitude': position.latitude,
+                         'longitude': position.longitude},
+            'territory': territory.toFirestore(),
+            'visual': <String, Object?>{
+              'url': bannerUrl, 'fileName': _bannerFileName,
+              'extension': _bannerExtension, 'mimeType': _bannerMimeType,
+              'fileSizeBytes': _bannerFileSizeBytes,
+              'width': _bannerWidth, 'height': _bannerHeight,
+            },
+          },
+        );
+      }
+      _requestExists = true;
 
       if (!mounted) return;
       setState(() {

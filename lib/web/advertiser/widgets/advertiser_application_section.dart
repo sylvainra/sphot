@@ -10,6 +10,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../shared/web_colors.dart';
 import '../models/advertising_visual_data.dart';
+import '../models/advertiser_phase_one_draft.dart';
 
 class AdvertiserApplicationSection extends StatefulWidget {
   const AdvertiserApplicationSection({
@@ -23,6 +24,10 @@ class AdvertiserApplicationSection extends StatefulWidget {
     required this.onVisualChanged,
     this.onSubmitted,
     this.readOnly = false,
+    this.draftOnly = false,
+    this.canEditLocation = true,
+    this.canEditVisual = true,
+    this.canEditDestination = true,
   });
 
   final User? user;
@@ -35,6 +40,10 @@ class AdvertiserApplicationSection extends StatefulWidget {
   final ValueChanged<AdvertisingVisualData> onVisualChanged;
   final VoidCallback? onSubmitted;
   final bool readOnly;
+  final bool draftOnly;
+  final bool canEditLocation;
+  final bool canEditVisual;
+  final bool canEditDestination;
 
   @override
   State<AdvertiserApplicationSection> createState() =>
@@ -64,6 +73,10 @@ class _AdvertiserApplicationSectionState
         _submitted ||
         (status != 'draft' && status != 'changes_requested');
   }
+
+  bool get _canEditLocation => !_locked && widget.canEditLocation;
+  bool get _canEditVisual => !_locked && widget.canEditVisual;
+  bool get _canEditDestination => !_locked && widget.canEditDestination;
 
   bool get _requestTransmitted {
     final status = widget.requestStatus.toLowerCase();
@@ -110,15 +123,17 @@ class _AdvertiserApplicationSectionState
     final requestId = widget.requestId;
     if (requestId != null && requestId.isNotEmpty) {
       try {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('advertiserRequests')
-            .doc(requestId)
-            .get();
-        final data = snapshot.data();
+        final data = widget.draftOnly
+    ? AdvertiserPhaseOneDraft.forRequest(requestId).data
+    : (await FirebaseFirestore.instance
+        .collection('advertiserRequests')
+        .doc(requestId)
+        .get()).data();
         if (data != null) {
           final application = _map(data['application']);
           if (data['applicationCompleted'] == true &&
-              widget.requestStatus.toLowerCase() == 'draft') {
+              widget.requestStatus.toLowerCase() == 'draft' &&
+    !widget.draftOnly) {
             _submitted = true;
           }
           final location = _map(data['applicantLocation']);
@@ -201,7 +216,7 @@ class _AdvertiserApplicationSectionState
   }
 
   Future<void> _pickBanner() async {
-    if (_locked) return;
+    if (!_canEditVisual) return;
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (picked == null) return;
 
@@ -316,10 +331,11 @@ class _AdvertiserApplicationSectionState
 
     try {
       final reference = FirebaseFirestore.instance
-          .collection('advertiserRequests')
-          .doc(requestId);
-      final snapshot = await reference.get();
-      final data = snapshot.data() ?? <String, dynamic>{};
+    .collection('advertiserRequests')
+    .doc(requestId);
+final data = widget.draftOnly
+    ? AdvertiserPhaseOneDraft.forRequest(requestId).data
+    : (await reference.get()).data() ?? <String, dynamic>{};
       if (data['profileCompleted'] != true ||
           data['establishmentCompleted'] != true) {
         throw const _ApplicationException(
@@ -327,11 +343,38 @@ class _AdvertiserApplicationSectionState
         );
       }
 
-      final bannerUrl = await _uploadBanner(requestId);
+      // Correction : ne jamais modifier un champ non autorisé ni remettre
+      // le statut à « draft ». Le serveur devra également vérifier ces
+      // autorisations (étape sécurité avant déploiement).
+      final correction = !widget.draftOnly &&
+          widget.requestStatus.toLowerCase() == 'changes_requested';
+      final correctionInfo = _map(data['correctionRequest']);
+      final rawScopes = correctionInfo['scopes'];
+      final allowedScopes = rawScopes is List
+          ? rawScopes.map((item) => item.toString()).toSet()
+          : <String>{};
+      final updateLocation = correction && widget.canEditLocation &&
+          allowedScopes.contains('location');
+      final updateVisual = correction && widget.canEditVisual &&
+          allowedScopes.contains('visual');
+      final updateDestination = correction && widget.canEditDestination &&
+          allowedScopes.contains('destination');
+      if (correction &&
+          ((data['status'] ?? '').toString() != 'changes_requested' ||
+              (correctionInfo['status'] ?? '').toString() !=
+                  'changes_requested' ||
+              !(updateLocation || updateVisual || updateDestination))) {
+        throw const _ApplicationException(
+          'Rubriques non autorisées ou demande de correction expirée.',
+        );
+      }
+      final bannerUrl = widget.draftOnly || (correction && !updateVisual)
+          ? _bannerUrl
+          : await _uploadBanner(requestId);
       final normalizedDestination = destination.contains('://')
           ? destination
           : 'https://$destination';
-      await reference.set({
+      final applicationData = <String, Object?>{
         'uid': requestId,
         'status': 'draft',
         'requestedScope': FieldValue.delete(),
@@ -359,11 +402,35 @@ class _AdvertiserApplicationSectionState
         },
         'applicationCompleted': true,
         'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
+if (widget.draftOnly) {
+  final draft = AdvertiserPhaseOneDraft.forRequest(requestId);
+  draft.merge(applicationData);
+  draft.visualBytes = _bannerBytes;
+  draft.visualExtension = _bannerExtension;
+  draft.visualMimeType = _bannerMimeType;
+} else if (correction) {
+  final restrictedUpdate = <String, Object?>{
+    'updatedAt': FieldValue.serverTimestamp(),
+    if (updateLocation)
+      'applicantLocation': applicationData['applicantLocation'],
+    if (updateVisual) ...{
+      'proposedVisual': applicationData['proposedVisual'],
+      'bannerUrl': bannerUrl,
+    },
+    if (updateDestination) ...{
+      'destinationUrl': normalizedDestination,
+      'application': applicationData['application'],
+    },
+  };
+  await reference.set(restrictedUpdate, SetOptions(merge: true));
+} else {
+  await reference.set(applicationData, SetOptions(merge: true));
+}
 
-      if (!mounted) return;
-      setState(() {
-        _bannerUrl = bannerUrl;
+if (!mounted) return;
+setState(() {
+  _bannerUrl = bannerUrl;
         _submitted = true;
         _success =
             'Informations enregistrées. Validez maintenant les documents '
@@ -512,7 +579,7 @@ class _AdvertiserApplicationSectionState
           ? const Color(0xFF6B7280)
           : WebColors.red,
       child: Text(
-        _locked
+        !_canEditLocation
             ? 'L’emplacement déclaré doit correspondre à votre activité commerciale. Tout déplacement ultérieur de votre SPHOT PUBLICITAIRE nécessitera l’accord de l’équipe SPHOT.'
             : 'Cliquez sur la carte à l’emplacement réel de votre activité commerciale. Vous restez responsable de cette déclaration. Tout déplacement ultérieur devra être approuvé par l’équipe SPHOT.',
         style: const TextStyle(
@@ -555,7 +622,7 @@ class _AdvertiserApplicationSectionState
             const SizedBox(height: 12),
           ],
           FilledButton.icon(
-            onPressed: _locked || _submitting ? null : _pickBanner,
+            onPressed: !_canEditVisual || _submitting ? null : _pickBanner,
             style: FilledButton.styleFrom(
               backgroundColor: _bannerIsValid ? WebColors.red : WebColors.blue,
               foregroundColor: Colors.white,
@@ -616,7 +683,7 @@ class _AdvertiserApplicationSectionState
           subtitle: 'PAGE OU SITE OUVERT APRÈS LE CLIC',
           child: TextField(
             controller: _destinationController,
-            readOnly: _locked,
+            readOnly: !_canEditDestination,
             keyboardType: TextInputType.url,
             style: const TextStyle(
               color: WebColors.blue,

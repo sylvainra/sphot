@@ -7698,9 +7698,25 @@ exports.consumeSuperAdminWebSession = onRequest(
         const pricingSessionToken = await commercialPricing.issueSession(
             admin, crypto, accepted,
         );
+        // La session web existante reste l'unique point d'entree.
+        // L'identite Firebase Super Admin porte une expiration de 2 h.
+        const expiresAt = Date.now() + 2 * 60 * 60 * 1000;
+        const firebaseUid = "sphot-super-admin-" +
+            crypto.createHash("sha256")
+                .update(String(accepted))
+                .digest("hex").slice(0, 32);
+        const firebaseToken = await admin.auth().createCustomToken(
+            firebaseUid,
+            {
+              role: "SPHOT_SUPER_ADMIN",
+              sphotSuperAdmin: true,
+              sphotSaSessionExpiresAt: expiresAt,
+            },
+        );
         response.status(200).json({
           success: true,
           pricingSessionToken,
+          firebaseToken,
         });
       } catch (error) {
         console.error(
@@ -10502,7 +10518,8 @@ exports.sendAdvertiserReviewEmail = onDocumentUpdated(
           "",
       ).toLowerCase();
       const fieldName = status === "changes_requested" ||
-          assetChangeStatus === "authorized" ?
+          assetChangeStatus === "authorized" ||
+          assetChangeStatus === "changes_requested" ?
         "changeRequestEmail" :
         status === "rejected" || assetChangeStatus === "rejected" ?
           "rejectionEmail" : "";
@@ -10560,7 +10577,8 @@ exports.sendAdvertiserReviewEmail = onDocumentUpdated(
       });
       const greeting = buildAdvertiserGreeting(afterData);
       const isCorrection = status === "changes_requested" ||
-        assetChangeStatus === "authorized";
+        assetChangeStatus === "authorized" ||
+        assetChangeStatus === "changes_requested";
       try {
         const applicantUrl = isCorrection ?
           await advertiserRequestAccessUrl(requestReference, recipient) :
@@ -10730,7 +10748,8 @@ exports.redeemAdvertiserCorrectionAccess = onRequest(
         ).toLowerCase();
         const accessible = status === "pending" ||
           status === "changes_requested" ||
-          assetStatus === "authorized";
+          assetStatus === "authorized" ||
+          assetStatus === "changes_requested";
         const hashesMatch = storedHash.length === suppliedHash.length &&
           crypto.timingSafeEqual(
               Buffer.from(storedHash, "utf8"),
@@ -10747,7 +10766,8 @@ exports.redeemAdvertiserCorrectionAccess = onRequest(
         }
 
         modificationRequested = status === "changes_requested" ||
-          assetStatus === "authorized";
+          assetStatus === "authorized" ||
+          assetStatus === "changes_requested";
         const firebaseToken = await admin.auth().createCustomToken(requestId, {
           role: "advertiser_candidate",
           advertiserRequestId: requestId,
@@ -11035,11 +11055,11 @@ exports.sendAdvertiserAssetChangeEmail = onDocumentUpdated(
       };
       const recipient = cleanValue(data.contactEmail || data.email, "");
       // Les décisions détaillées sont déjà envoyées par le circuit existant.
-      const existingReview = status === "authorized" ?
-        data.changeRequestEmail : status === "rejected" ?
-          data.rejectionEmail : null;
+      const existingReview = ["authorized", "changes_requested"]
+          .includes(status) ? data.changeRequestEmail :
+        status === "rejected" ? data.rejectionEmail : null;
       const reviewQueued = existingReview &&
-        existingReview.status === "pending";
+        ["pending", "sending", "sent"].includes(existingReview.status);
       const recipients = [{kind: "team", email: SMTP_USER}];
       if (recipient && !reviewQueued) {
         recipients.push({kind: "advertiser", email: recipient});
@@ -11653,6 +11673,30 @@ exports.syncApprovedAdvertiserAssets =
 const {registerAdvertiserTestPackActivation} =
     require("./advertiser_test_pack_activation");
 exports.activateAdvertiserTestPack = registerAdvertiserTestPackActivation({
+  admin, crypto, onRequest,
+  checkSuperAdminSession: commercialPricing.checkSession,
+});
+
+// PHASE 1 : seule cette fonction peut refermer une correction et horodater
+// sa retransmission. Le dossier original et les historiques sont conserves.
+const {registerAdvertiserCorrectionResubmit} =
+    require("./advertiser_correction_resubmit");
+exports.resubmitAdvertiserCorrection = registerAdvertiserCorrectionResubmit({
+  admin, onRequest,
+});
+
+// Enregistrements commerciaux PHASE 2 : auteur et statut verifies serveur.
+const {registerAdvertiserPhaseTwoWrite} =
+    require("./advertiser_phase_two_write");
+exports.saveAdvertiserPhaseTwo = registerAdvertiserPhaseTwoWrite({
+  admin, onRequest,
+});
+
+// Seules les décisions authentifiées côté serveur peuvent écrire les
+// historiques administratifs de PHASE 1 et de révision d'actifs PHASE 2.
+const {registerAdvertiserReviewDecision} =
+    require("./advertiser_review_decision");
+exports.reviewAdvertiserDecision = registerAdvertiserReviewDecision({
   admin, crypto, onRequest,
   checkSuperAdminSession: commercialPricing.checkSession,
 });

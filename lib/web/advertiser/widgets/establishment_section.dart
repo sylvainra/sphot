@@ -11,6 +11,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../shared/text_input_formatters.dart';
 import '../../shared/web_colors.dart';
 import '../../../services/company_registry_service.dart';
+import '../models/advertiser_phase_one_draft.dart';
 
 class EstablishmentSection extends StatefulWidget {
   const EstablishmentSection({
@@ -18,13 +19,15 @@ class EstablishmentSection extends StatefulWidget {
     required this.user,
     this.requestId,
     this.readOnly = false,
-    this.onSaved,
+this.draftOnly = false,
+this.onSaved,
   });
 
   final User? user;
   final String? requestId;
   final bool readOnly;
-  final VoidCallback? onSaved;
+final bool draftOnly;
+final VoidCallback? onSaved;
 
   @override
   State<EstablishmentSection> createState() => _EstablishmentSectionState();
@@ -86,7 +89,20 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   PlatformFile? _selectedProof;
   Map<String, dynamic> _savedForeignProof = {};
 
-  String? _activityType;
+  final Set<String> _selectedActivityTypes = <String>{};
+  String? get _activityType =>
+      _selectedActivityTypes.isEmpty ? null : _selectedActivityTypes.first;
+
+  String get _activitySummary {
+    if (_selectedActivityTypes.isEmpty) return 'Sélectionnez une ou plusieurs activités';
+    return _activityTypes.where(_selectedActivityTypes.contains).map((item) {
+      if (item == 'Autre' && _otherActivityController.text.trim().isNotEmpty) {
+        return 'Autre — ${_otherActivityController.text.trim()}';
+      }
+      return item;
+    }).join(' • ');
+  }
+
   final _activityFieldKey = GlobalKey();
   OverlayEntry? _activityOverlay;
   String? _activityError;
@@ -136,12 +152,16 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     final requestId = _requestId;
     if (requestId != null) {
       try {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('advertiserRequests')
-            .doc(requestId)
-            .get();
-        final data = snapshot.data();
-        _requestExists = snapshot.exists;
+        final data = widget.draftOnly
+    ? AdvertiserPhaseOneDraft.forRequest(requestId).data
+    : (await FirebaseFirestore.instance
+        .collection('advertiserRequests')
+        .doc(requestId)
+        .get()).data();
+_requestExists = !widget.draftOnly && data != null;
+if (widget.draftOnly) {
+  _selectedProof = AdvertiserPhaseOneDraft.forRequest(requestId).foreignProofFile;
+}
 
         if (data != null) {
           final rawEstablishment = data['establishment'];
@@ -178,9 +198,19 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
             establishment['publicEmail'],
             data['publicEmail'],
           );
-          final savedActivity = _read(establishment['activityType']);
-          if (_activityTypes.contains(savedActivity)) {
-            _activityType = savedActivity;
+          final savedActivities = establishment['activityTypes'];
+          if (savedActivities is List) {
+            for (final item in savedActivities) {
+              if (item is String && _activityTypes.contains(item)) {
+                _selectedActivityTypes.add(item);
+              }
+            }
+          }
+          if (_selectedActivityTypes.isEmpty) {
+            final savedActivity = _read(establishment['activityType']);
+            if (_activityTypes.contains(savedActivity)) {
+              _selectedActivityTypes.add(savedActivity);
+            }
           }
           _otherActivityController.text = _read(
             establishment['activityTypeOther'],
@@ -379,7 +409,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                             itemCount: _activityTypes.length,
                             itemBuilder: (context, index) {
                               final choice = _activityTypes[index];
-                              final selected = _activityType == choice;
+                              final selected = _selectedActivityTypes.contains(choice);
                               final showOtherField =
                                   choice == 'Autre' && selected;
 
@@ -389,21 +419,18 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                                   InkWell(
                                     onTap: () {
                                       setState(() {
-                                        _activityType = choice;
+                                        if (selected) {
+                                          _selectedActivityTypes.remove(choice);
+                                          if (choice == 'Autre') _otherActivityController.clear();
+                                        } else {
+                                          _selectedActivityTypes.add(choice);
+                                        }
                                         _activityError = null;
                                         _completed = false;
-                                        if (choice != 'Autre') {
-                                          _otherActivityController.clear();
-                                        }
                                       });
-                                      fieldState.didChange(choice);
+                                      fieldState.didChange(_activityType);
                                       overlaySetState(() {});
-
-                                      if (choice == 'Autre') {
-                                        scrollToOtherField();
-                                      } else {
-                                        _closeActivityMenu();
-                                      }
+                                      if (choice == 'Autre' && !selected) scrollToOtherField();
                                     },
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
@@ -422,12 +449,13 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                                               ),
                                             ),
                                           ),
-                                          if (selected)
-                                            const Icon(
-                                              Icons.check_rounded,
-                                              color: WebColors.red,
-                                              size: 20,
-                                            ),
+                                          Icon(
+                                            selected
+                                                ? Icons.check_box_rounded
+                                                : Icons.check_box_outline_blank_rounded,
+                                            color: selected ? WebColors.red : WebColors.blue,
+                                            size: 22,
+                                          ),
                                         ],
                                       ),
                                     ),
@@ -513,7 +541,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     );
 
     Overlay.of(context, rootOverlay: true).insert(_activityOverlay!);
-    if (_activityType == 'Autre') scrollToOtherField();
+    if (_selectedActivityTypes.contains('Autre')) scrollToOtherField();
   }
 
   void _closeCountryMenu() {
@@ -752,7 +780,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     FocusScope.of(context).unfocus();
     final formIsValid = _formKey.currentState?.validate() ?? false;
     final otherActivityIsValid =
-        _activityType != 'Autre' ||
+        !_selectedActivityTypes.contains('Autre') ||
         _otherActivityController.text.trim().isNotEmpty;
     final foreignProofIsValid =
         _isFrenchRegistration ||
@@ -792,8 +820,14 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
 
       if (requestId != null) {
         final foreignProof = _isFrenchRegistration
-            ? <String, Object?>{}
-            : await _uploadForeignProof(requestId);
+    ? <String, Object?>{}
+    : widget.draftOnly
+        ? <String, Object?>{}
+        : await _uploadForeignProof(requestId);
+if (widget.draftOnly) {
+  final draft = AdvertiserPhaseOneDraft.forRequest(requestId);
+  draft.foreignProofFile = _isFrenchRegistration ? null : _selectedProof;
+}
         final creationData = _requestExists
             ? <String, Object?>{}
             : <String, Object?>{
@@ -801,10 +835,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                 'createdAt': FieldValue.serverTimestamp(),
               };
 
-        await FirebaseFirestore.instance
-            .collection('advertiserRequests')
-            .doc(requestId)
-            .set({
+        final establishmentData = <String, Object?>{
               ...creationData,
               'uid': requestId,
               'organisation': legalName,
@@ -841,7 +872,8 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                 'legalName': legalName,
                 'businessName': businessName,
                 'activityType': _activityType,
-                'activityTypeOther': _activityType == 'Autre'
+                'activityTypes': _activityTypes.where(_selectedActivityTypes.contains).toList(growable: false),
+                'activityTypeOther': _selectedActivityTypes.contains('Autre')
                     ? _otherActivityController.text.trim()
                     : '',
                 'siret': siret,
@@ -856,8 +888,16 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                 'updatedAt': FieldValue.serverTimestamp(),
               },
               'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-        _requestExists = true;
+            };
+if (widget.draftOnly) {
+  AdvertiserPhaseOneDraft.forRequest(requestId).merge(establishmentData);
+} else {
+  await FirebaseFirestore.instance
+      .collection('advertiserRequests')
+      .doc(requestId)
+      .set(establishmentData, SetOptions(merge: true));
+  _requestExists = true;
+}
       }
 
       if (!mounted) return;
@@ -1041,7 +1081,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                       FormField<String>(
                         initialValue: _activityType,
                         validator: (value) => value == null
-                            ? 'Sélectionnez un type d’activité'
+                            ? 'Sélectionnez au moins une activité'
                             : null,
                         builder: (fieldState) => Padding(
                           padding: const EdgeInsets.only(bottom: 12),
@@ -1052,21 +1092,18 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                                 : () => _openActivityMenu(fieldState),
                             child: InputDecorator(
                               decoration: _activityFieldDecoration(
-                                'Type d’activité *',
-                              ).copyWith(errorText: fieldState.errorText),
+                                 'Types d’activité *',
+                               ).copyWith(
+                                 errorText: fieldState.errorText,
+                                 helperText: 'Plusieurs choix possibles',
+                               ),
                               child: Row(
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      _activityType == null
-                                          ? 'Sélectionnez une activité'
-                                          : _activityType == 'Autre' &&
-                                                _otherActivityController.text
-                                                    .trim()
-                                                    .isNotEmpty
-                                          ? 'Autre — ${_otherActivityController.text.trim()}'
-                                          : _activityType!,
-                                      overflow: TextOverflow.ellipsis,
+                                       _activitySummary,
+                                       maxLines: 2,
+                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: _activityType == null
                                             ? const Color(0xFF4B5F97)

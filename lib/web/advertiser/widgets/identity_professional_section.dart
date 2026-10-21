@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../shared/text_input_formatters.dart';
 import '../../shared/web_colors.dart';
+import '../models/advertiser_phase_one_draft.dart';
 
 class IdentityProfessionalSection extends StatefulWidget {
   const IdentityProfessionalSection({
@@ -12,13 +13,15 @@ class IdentityProfessionalSection extends StatefulWidget {
     required this.user,
     this.requestId,
     this.readOnly = false,
-    this.onSaved,
+this.draftOnly = false,
+this.onSaved,
   });
 
   final User? user;
   final String? requestId;
   final bool readOnly;
-  final VoidCallback? onSaved;
+final bool draftOnly;
+final VoidCallback? onSaved;
 
   @override
   State<IdentityProfessionalSection> createState() =>
@@ -76,12 +79,13 @@ class _IdentityProfessionalSectionState
       _prefillDisplayName(user?.displayName);
 
       try {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('advertiserRequests')
-            .doc(requestId)
-            .get();
-        final data = snapshot.data();
-        _requestExists = snapshot.exists;
+        final data = widget.draftOnly
+    ? AdvertiserPhaseOneDraft.forRequest(requestId).data
+    : (await FirebaseFirestore.instance
+        .collection('advertiserRequests')
+        .doc(requestId)
+        .get()).data();
+_requestExists = !widget.draftOnly && data != null;
 
         if (data != null) {
           final storedCivility = _textValue(
@@ -180,10 +184,7 @@ class _IdentityProfessionalSectionState
                 'createdAt': FieldValue.serverTimestamp(),
               };
 
-        await FirebaseFirestore.instance
-            .collection('advertiserRequests')
-            .doc(requestId)
-            .set({
+        final profileData = <String, Object?>{
               ...creationData,
               'uid': requestId,
               'email': user?.email ?? contactEmail,
@@ -198,8 +199,16 @@ class _IdentityProfessionalSectionState
               'contactEmail': contactEmail,
               'profileCompleted': true,
               'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-        _requestExists = true;
+            };
+if (widget.draftOnly) {
+  AdvertiserPhaseOneDraft.forRequest(requestId).merge(profileData);
+} else {
+  await FirebaseFirestore.instance
+      .collection('advertiserRequests')
+      .doc(requestId)
+      .set(profileData, SetOptions(merge: true));
+  _requestExists = true;
+}
       }
 
       if (!mounted) return;

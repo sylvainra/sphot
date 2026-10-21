@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../models/advertising_pricing_config.dart';
 import '../../shared/web_colors.dart';
 import '../models/planning_data.dart';
+import '../services/advertiser_phase_two_write_service.dart';
 
 class PlanningSection extends StatefulWidget {
   const PlanningSection({
@@ -273,23 +274,20 @@ class _PlanningSectionState extends State<PlanningSection> {
     setState(() => _saving = true);
     try {
       final requestId = _requestId;
-      if (requestId != null) {
-        await FirebaseFirestore.instance
-            .collection('advertiserRequests')
-            .doc(requestId)
-            .set({
-              'uid': requestId,
-              'planningCompleted': true,
-              'planning': <String, Object?>{
-                'durationLabel': _durationLabel,
-                'campaignStartDate': Timestamp.fromDate(_startDate),
-                'campaignEndDate': Timestamp.fromDate(_endDate),
-
-                'confirmedAt': FieldValue.serverTimestamp(),
-              },
-              'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
+      if (requestId == null || requestId.isEmpty) {
+        throw StateError('Dossier annonceur introuvable.');
       }
+      final date = '${_startDate.year.toString().padLeft(4, '0')}-'
+          '${_startDate.month.toString().padLeft(2, '0')}-'
+          '${_startDate.day.toString().padLeft(2, '0')}';
+      await AdvertiserPhaseTwoWriteService.save(
+        requestId: requestId,
+        action: 'savePlanning',
+        payload: <String, Object?>{
+          'durationLabel': _durationLabel,
+          'startDate': date,
+        },
+      );
       if (!mounted) return;
       setState(() => _saved = true);
       _notifyPlanning();
