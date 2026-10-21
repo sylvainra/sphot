@@ -885,10 +885,13 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'SPHOT ouvre le monde au grand public. Choisissez votre rayon '
-                      'd’action, de la proximité locale jusqu’au pays entier. '
-                      'La diffusion reste partagée équitablement, sans '
-                      'exclusivité. Le public accède à votre site d’un simple clic.',
+                      'SPHOT propose au monde entier de connaître les SPHOTS '
+                      'de baignade surveillés ou non. Profitez-en pour faire '
+                      'connaître votre activité professionnelle en choisissant '
+                      'votre rayon d’action, de la proximité locale jusqu’au '
+                      'pays entier. La diffusion reste partagée équitablement, '
+                      'sans exclusivité. Le public accède à votre site d’un '
+                      'simple clic.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Color(0xFF4B5F97),
