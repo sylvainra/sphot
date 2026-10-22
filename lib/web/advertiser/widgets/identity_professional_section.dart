@@ -42,9 +42,7 @@ class _IdentityProfessionalSectionState
   final _phoneController = TextEditingController();
   final _professionalEmailController = TextEditingController();
   String? _civility;
-  final _civilityLink = LayerLink();
-  final _civilityKey = GlobalKey();
-  OverlayEntry? _civilityOverlay;
+  bool _civilityExpanded = false;
 
   bool _loading = true;
   bool _saving = false;
@@ -276,108 +274,22 @@ if (widget.draftOnly) {
   }
 
   void _closeCivilityMenu() {
-    _civilityOverlay?.remove();
-    _civilityOverlay = null;
+    _civilityExpanded = false;
   }
 
-  void _openCivilityMenu(FormFieldState<String> field) {
+  void _openCivilityMenu() {
     if (!_canEdit('contactCivility')) return;
-    if (_civilityOverlay != null) {
-      _closeCivilityMenu();
-      return;
-    }
-    final box = _civilityKey.currentContext?.findRenderObject();
-    if (box is! RenderBox) return;
-    final width = box.size.width;
-    _civilityOverlay = OverlayEntry(
-      builder: (_) => Stack(
-        children: [
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _closeCivilityMenu,
-            ),
-          ),
-          CompositedTransformFollower(
-            link: _civilityLink,
-            showWhenUnlinked: false,
-            targetAnchor: Alignment.bottomLeft,
-            followerAnchor: Alignment.topLeft,
-            offset: const Offset(0, -12),
-            child: SizedBox(
-              width: width,
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.97),
-                    border: const Border(
-                      left: BorderSide(color: WebColors.blue, width: 1.4),
-                      right: BorderSide(color: WebColors.blue, width: 1.4),
-                      bottom: BorderSide(color: WebColors.blue, width: 1.4),
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(10),
-                      bottomRight: Radius.circular(10),
-                    ),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 8,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (final choice in ['Monsieur', 'Madame'])
-                        InkWell(
-                          onTap: () {
-                            field.didChange(choice);
-                            setState(() {
-                              _civility = choice;
-                              _completed = false;
-                            });
-                            _closeCivilityMenu();
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    choice,
-                                    style: const TextStyle(
-                                      color: WebColors.blue,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                                if (_civility == choice)
-                                  const Icon(
-                                    Icons.check_rounded,
-                                    color: WebColors.red,
-                                    size: 20,
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-    Overlay.of(context, rootOverlay: true).insert(_civilityOverlay!);
+    setState(() => _civilityExpanded = !_civilityExpanded);
+  }
+
+  void _selectCivility(FormFieldState<String> field, String choice) {
+    if (!_canEdit('contactCivility')) return;
+    field.didChange(choice);
+    setState(() {
+      _civility = choice;
+      _completed = false;
+      _civilityExpanded = false;
+    });
   }
 
   @override
@@ -421,58 +333,109 @@ if (widget.draftOnly) {
                   child: FormField<String>(
                     initialValue: _civility,
                     validator: _requiredWhenEditable('contactCivility'),
-                    builder: (field) => CompositedTransformTarget(
-                      link: _civilityLink,
-                      child: GestureDetector(
-                        key: _civilityKey,
-                        onTap: !_canEdit('contactCivility')
-                            ? null
-                            : () => _openCivilityMenu(field),
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: 'Civilité *',
-                            labelStyle: const TextStyle(color: WebColors.blue),
-                            errorText: field.errorText,
-                            filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 16,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: WebColors.blue,
-                                width: 1.6,
+                    builder: (field) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        GestureDetector(
+                          onTap: _canEdit('contactCivility')
+                              ? _openCivilityMenu
+                              : null,
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'Civilité *',
+                              labelStyle: const TextStyle(color: WebColors.blue),
+                              errorText: field.errorText,
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 16,
                               ),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: WebColors.blue,
-                                width: 1.6,
-                              ),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  _civility ?? 'Sélectionnez une civilité',
-                                  style: const TextStyle(
-                                    color: WebColors.blue,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: WebColors.blue,
+                                  width: 1.6,
                                 ),
                               ),
-                              const Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                color: WebColors.red,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: WebColors.blue,
+                                  width: 1.6,
+                                ),
                               ),
-                            ],
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _civility ?? 'Sélectionnez une civilité',
+                                    style: const TextStyle(
+                                      color: WebColors.blue,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  _canEdit('contactCivility')
+                                      ? (_civilityExpanded
+                                          ? Icons.keyboard_arrow_up_rounded
+                                          : Icons.keyboard_arrow_down_rounded)
+                                      : Icons.lock_outline,
+                                  color: WebColors.red,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
+                        if (_civilityExpanded && _canEdit('contactCivility'))
+                          Container(
+                            margin: const EdgeInsets.only(top: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              border: Border.all(
+                                color: WebColors.blue,
+                                width: 1.4,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                for (final choice in const ['Monsieur', 'Madame'])
+                                  InkWell(
+                                    onTap: () => _selectCivility(field, choice),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 12,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              choice,
+                                              style: const TextStyle(
+                                                color: WebColors.blue,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ),
+                                          if (_civility == choice)
+                                            const Icon(
+                                              Icons.check_rounded,
+                                              color: WebColors.red,
+                                              size: 20,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
