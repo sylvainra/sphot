@@ -13,6 +13,11 @@ const fv = {
 const timestamp = {now: () => "NOW"};
 const requestId = "advertiser123";
 
+/**
+ * Prépare un dossier en attente de corrections ciblées.
+ * @param {string[]} fields Champs autorisés.
+ * @return {Object} Dossier simulé.
+ */
 function correction(fields) {
   return {
     status: "changes_requested",
