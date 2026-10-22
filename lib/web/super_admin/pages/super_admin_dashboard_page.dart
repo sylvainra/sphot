@@ -3339,7 +3339,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   // PHASE 1 : chaque demande de correction doit préciser les rubriques
   // autorisées, en plus du motif communiqué à l'annonceur.
-  Future<Map<String, Object?>?> _askAdvertiserCorrectionScopes() async {
+  Future<bool> _askAdvertiserCorrectionScopes({
+    required String requestId,
+  }) async {
     const groups = <String, Map<String, String>>{
       'IDENTITÉ DU RESPONSABLE': <String, String>{
         'identity.contactCivility': 'Civilité',
@@ -3375,7 +3377,9 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     };
     final controller = TextEditingController();
     final selected = <String>{};
-    final result = await showDialog<Map<String, Object?>>(
+    bool submitting = false;
+    String? submissionError;
+    final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
@@ -3441,39 +3445,90 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                       border: OutlineInputBorder(),
                     ),
                   ),
+                  if (submissionError != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      submissionError!,
+                      style: const TextStyle(
+                        color: redColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  if (submitting) ...[
+                    const SizedBox(height: 12),
+                    const LinearProgressIndicator(color: adminColor),
+                    const SizedBox(height: 6),
+                    const Text('Enregistrement de la demande…'),
+                  ],
                 ],
               ),
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
+              onPressed: submitting
+                  ? null
+                  : () => Navigator.of(dialogContext).pop(false),
               child: const Text('ANNULER'),
             ),
             FilledButton(
-              onPressed: selected.isEmpty || controller.text.trim().isEmpty
+              onPressed: submitting ||
+                      selected.isEmpty ||
+                      controller.text.trim().isEmpty
                   ? null
-                  : () => Navigator.of(dialogContext).pop({
-                      'reason': controller.text.trim(),
-                      'fields': <String>[
+                  : () async {
+                      // La fenêtre reste ouverte jusqu'à confirmation
+                      // effective de l'écriture côté serveur.
+                      final fields = <String>[
                         for (final group in groups.values)
                           for (final field in group.keys)
                             if (selected.contains(field)) field,
-                      ],
-                      'scopes': selected
+                      ];
+                      final scopes = fields
                           .map((field) => field.split('.').first)
                           .toSet()
-                          .toList(),
-                    }),
+                          .toList();
+                      setDialogState(() {
+                        submitting = true;
+                        submissionError = null;
+                      });
+                      try {
+                        await _postAdvertiserReview(<String, Object?>{
+                          'action': 'review',
+                          'requestId': requestId,
+                          'decision': 'changes_requested',
+                          'reason': controller.text.trim(),
+                          'scopes': scopes,
+                          'fields': fields,
+                        });
+                        if (!dialogContext.mounted) return;
+                        Navigator.of(dialogContext).pop(true);
+                      } catch (error, stackTrace) {
+                        debugPrint('Corrections annonceur non enregistrées : '
+                            '$error');
+                        debugPrintStack(stackTrace: stackTrace);
+                        if (!dialogContext.mounted) return;
+                        setDialogState(() {
+                          submitting = false;
+                          submissionError =
+                              'Demande non enregistrée : $error';
+                        });
+                      }
+                    },
               style: FilledButton.styleFrom(backgroundColor: adminColor),
-              child: const Text('CONFIRMER LES CORRECTIONS'),
+              child: Text(
+                submitting
+                    ? 'ENREGISTREMENT…'
+                    : 'CONFIRMER LES CORRECTIONS',
+              ),
             ),
           ],
         ),
       ),
     );
     controller.dispose();
-    return result;
+    return result == true;
   }
 
   Future<void> _reviewAdvertiserRequest(
@@ -3490,18 +3545,28 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final originalAssetChange = _advertiserMap(advertiser['assetChangeRequest']);
     final phaseTwoAssetReview = originalStatus == 'approved' &&
         originalAssetChange['status'] == 'submitted';
-    String reason = '';
-    List<String> correctionScopes = const <String>[];
-    List<String> correctionFields = const <String>[];
     if (decision == 'changes_requested' && !phaseTwoAssetReview) {
-      final result = await _askAdvertiserCorrectionScopes();
-      if (result == null) return;
-      reason = (result['reason'] ?? '').toString().trim();
-      correctionScopes = List<String>.from(result['scopes'] as List);
-      correctionFields = List<String>.from(result['fields'] as List);
-      if (reason.isEmpty || correctionFields.isEmpty ||
-          correctionScopes.isEmpty) return;
-    } else if (decision != 'approved') {
+      final saved = await _askAdvertiserCorrectionScopes(
+        requestId: requestId,
+      );
+      if (!saved) return;
+      try {
+        await _refreshAdvertiserAfterReview(requestId);
+      } catch (error, stackTrace) {
+        // La décision a déjà été confirmée par le serveur :
+        // ne jamais la renvoyer à cause d'un échec de rafraîchissement.
+        debugPrint('Actualisation du dossier annonceur impossible : $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Demande de corrections enregistrée.'),
+      ));
+      return;
+    }
+
+    String reason = '';
+    if (decision != 'approved') {
       final result = await _askAdvertiserReviewReason(
         title: decision == 'changes_requested'
             ? 'DEMANDER UNE MODIFICATION'
@@ -3517,8 +3582,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         'requestId': requestId,
         'decision': decision,
         'reason': reason,
-        if (correctionScopes.isNotEmpty) 'scopes': correctionScopes,
-        if (correctionFields.isNotEmpty) 'fields': correctionFields,
       });
       await _refreshAdvertiserAfterReview(requestId);
     } catch (error, stackTrace) {
