@@ -189,6 +189,11 @@ function buildDecisionUpdate(data, command, fv, Timestamp) {
     updated.rejectionEmail = {
       status: "pending", recipient, reason, updatedAt: now,
     };
+    // Opt-in pour les nouveaux refus PHASE 1 : la purge attend le mail envoyé.
+    // Aucun dossier historique ni annonceur approuvé n'est ciblé.
+    if (!isAssetReview) {
+      updated.purgeAfterRejectionEmail = true;
+    }
     if (isAssetReview) {
       updated.assetChangeRequest = {
         ...asset, status: "rejected", reason, reviewedAt: now,

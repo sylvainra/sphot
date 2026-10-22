@@ -39,12 +39,13 @@ function assetReview() {
 const decide = (data, command) =>
   buildDecisionUpdate(data, command, FieldValue, Timestamp);
 
-test("PHASE 1: refus conserve motif et historique, sans champs client", () => {
+test("PHASE 1: refus déclenche mail puis purge du nouveau dossier", () => {
   const patch = decide(pending(), {
     decision: "rejected", reason: "Dossier incomplet",
   });
   assert.equal(patch.status, "rejected");
   assert.equal(patch.rejectionEmail.status, "pending");
+  assert.equal(patch.purgeAfterRejectionEmail, true);
   assert.equal(patch.applicationHistory.arrayUnion[0].event, "rejected");
   assert.equal(patch.applicationHistory.arrayUnion[0].actor, "super_admin");
 });
@@ -70,6 +71,7 @@ test("PHASE 1: approbation, email en attente et historique", () => {
   const patch = decide(pending(), {decision: "approved"});
   assert.equal(patch.status, "approved");
   assert.equal(patch.approvalEmail.status, "pending");
+  assert.equal(patch.purgeAfterRejectionEmail, undefined);
   assert.equal(patch.applicationHistory.arrayUnion[0].event, "approved");
 });
 
@@ -90,6 +92,7 @@ test("PHASE 2: refus garde statut du dossier approuvé", () => {
   assert.equal(patch.status, "approved");
   assert.equal(patch.assetChangeRequest.status, "rejected");
   assert.equal(patch.rejectionEmail.status, "pending");
+  assert.equal(patch.purgeAfterRejectionEmail, undefined);
   assert.equal(patch.assetChangeHistory.arrayUnion[0].decision, "rejected");
 });
 

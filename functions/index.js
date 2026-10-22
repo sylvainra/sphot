@@ -11706,3 +11706,11 @@ exports.reviewAdvertiserDecision = registerAdvertiserReviewDecision({
   admin, crypto, onRequest,
   checkSuperAdminSession: commercialPricing.checkSession,
 });
+
+// Un refus initial récent est purgé après confirmation d'envoi du mail.
+// N'agit pas sur les refus historiques ni sur les révisions d'actifs approuvés.
+const {registerAdvertiserRefusalCleanup} =
+    require("./advertiser_refusal_cleanup");
+exports.cleanupRejectedAdvertiserRequest = registerAdvertiserRefusalCleanup({
+  admin, onDocumentUpdated,
+});
