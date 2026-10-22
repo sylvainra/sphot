@@ -11679,6 +11679,12 @@ exports.activateAdvertiserTestPack = registerAdvertiserTestPackActivation({
 
 // PHASE 1 : seule cette fonction peut refermer une correction et horodater
 // sa retransmission. Le dossier original et les historiques sont conserves.
+const {registerAdvertiserCorrectionFields} =
+    require("./advertiser_correction_fields");
+exports.saveAdvertiserCorrectionFields = registerAdvertiserCorrectionFields({
+  admin, onRequest,
+});
+
 const {registerAdvertiserCorrectionResubmit} =
     require("./advertiser_correction_resubmit");
 exports.resubmitAdvertiserCorrection = registerAdvertiserCorrectionResubmit({
