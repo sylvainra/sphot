@@ -139,7 +139,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   void dispose() {
     _closeCountryMenu();
     _otherCountryController.dispose();
-    _closeActivityMenu();
+    _closeActivityMenu(repaint: false);
     _siretController.removeListener(_updateSiren);
     _legalNameController.dispose();
     _businessNameController.dispose();
@@ -332,8 +332,13 @@ if (widget.draftOnly) {
     };
   }
 
-  void _closeActivityMenu() {
-    _activitiesExpanded = false;
+  void _closeActivityMenu({bool repaint = true}) {
+    if (!_activitiesExpanded) return;
+    if (repaint && mounted) {
+      setState(() => _activitiesExpanded = false);
+    } else {
+      _activitiesExpanded = false;
+    }
   }
 
   void _openActivityMenu() {
@@ -1061,7 +1066,7 @@ if (widget.draftOnly) {
                         _EstablishmentField(
                           controller: _sirenController,
                           label: 'SIREN calculé depuis le SIRET',
-                          validator: _requiredValidator,
+                          validator: _canEdit('siret') ? _requiredValidator : null,
                           onChanged: _markAsModified,
                           readOnly: true,
                         ),
@@ -1189,7 +1194,8 @@ if (widget.draftOnly) {
                         _EstablishmentField(
                           controller: _countryController,
                           label: 'Pays *',
-                          validator: _requiredValidator,
+                          validator: _canEdit('registrationMode')
+                              ? _requiredValidator : null,
                           onChanged: _markAsModified,
                           readOnly: true,
                         ),
