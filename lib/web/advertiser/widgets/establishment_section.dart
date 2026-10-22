@@ -11,6 +11,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../shared/text_input_formatters.dart';
 import '../../shared/web_colors.dart';
 import '../../../services/company_registry_service.dart';
+import '../models/advertiser_phase_one_draft.dart';
+import '../services/advertiser_correction_fields_service.dart';
 
 class EstablishmentSection extends StatefulWidget {
   const EstablishmentSection({
@@ -18,13 +20,19 @@ class EstablishmentSection extends StatefulWidget {
     required this.user,
     this.requestId,
     this.readOnly = false,
-    this.onSaved,
+    this.isCorrection = false,
+    this.correctionFields = const <String>{},
+this.draftOnly = false,
+this.onSaved,
   });
 
   final User? user;
   final String? requestId;
   final bool readOnly;
-  final VoidCallback? onSaved;
+  final bool isCorrection;
+  final Set<String> correctionFields;
+final bool draftOnly;
+final VoidCallback? onSaved;
 
   @override
   State<EstablishmentSection> createState() => _EstablishmentSectionState();
@@ -86,15 +94,34 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   PlatformFile? _selectedProof;
   Map<String, dynamic> _savedForeignProof = {};
 
-  String? _activityType;
-  final _activityFieldKey = GlobalKey();
-  OverlayEntry? _activityOverlay;
+  final Set<String> _selectedActivityTypes = <String>{};
+  String? get _activityType =>
+      _selectedActivityTypes.isEmpty ? null : _selectedActivityTypes.first;
+
+  String get _activitySummary {
+    if (_selectedActivityTypes.isEmpty) return 'Sélectionnez une ou plusieurs activités';
+    return _activityTypes.where(_selectedActivityTypes.contains).map((item) {
+      if (item == 'Autre' && _otherActivityController.text.trim().isNotEmpty) {
+        return 'Autre — ${_otherActivityController.text.trim()}';
+      }
+      return item;
+    }).join('\n');
+  }
+
+  // Menu multisélection ancré au formulaire, sans OverlayEntry ni popup.
+  bool _activitiesExpanded = false;
+  final ScrollController _activityScrollController = ScrollController();
   String? _activityError;
   bool _loading = true;
   bool _saving = false;
   bool _completed = false;
   bool _requestExists = false;
   String? _error;
+
+  bool _canEdit(String field) =>
+      !widget.readOnly &&
+      (!widget.isCorrection ||
+          widget.correctionFields.contains('establishment.$field'));
 
   String? get _requestId {
     final value = widget.requestId?.trim() ?? '';
@@ -113,7 +140,8 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   void dispose() {
     _closeCountryMenu();
     _otherCountryController.dispose();
-    _closeActivityMenu();
+    _closeActivityMenu(repaint: false);
+    _activityScrollController.dispose();
     _siretController.removeListener(_updateSiren);
     _legalNameController.dispose();
     _businessNameController.dispose();
@@ -136,12 +164,16 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     final requestId = _requestId;
     if (requestId != null) {
       try {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('advertiserRequests')
-            .doc(requestId)
-            .get();
-        final data = snapshot.data();
-        _requestExists = snapshot.exists;
+        final data = widget.draftOnly
+    ? AdvertiserPhaseOneDraft.forRequest(requestId).data
+    : (await FirebaseFirestore.instance
+        .collection('advertiserRequests')
+        .doc(requestId)
+        .get()).data();
+_requestExists = !widget.draftOnly && data != null;
+if (widget.draftOnly) {
+  _selectedProof = AdvertiserPhaseOneDraft.forRequest(requestId).foreignProofFile;
+}
 
         if (data != null) {
           final rawEstablishment = data['establishment'];
@@ -178,9 +210,19 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
             establishment['publicEmail'],
             data['publicEmail'],
           );
-          final savedActivity = _read(establishment['activityType']);
-          if (_activityTypes.contains(savedActivity)) {
-            _activityType = savedActivity;
+          final savedActivities = establishment['activityTypes'];
+          if (savedActivities is List) {
+            for (final item in savedActivities) {
+              if (item is String && _activityTypes.contains(item)) {
+                _selectedActivityTypes.add(item);
+              }
+            }
+          }
+          if (_selectedActivityTypes.isEmpty) {
+            final savedActivity = _read(establishment['activityType']);
+            if (_activityTypes.contains(savedActivity)) {
+              _selectedActivityTypes.add(savedActivity);
+            }
           }
           _otherActivityController.text = _read(
             establishment['activityTypeOther'],
@@ -292,228 +334,110 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     };
   }
 
-  void _closeActivityMenu() {
-    _activityOverlay?.remove();
-    _activityOverlay = null;
+  void _closeActivityMenu({bool repaint = true}) {
+    if (!_activitiesExpanded) return;
+    if (repaint && mounted) {
+      setState(() => _activitiesExpanded = false);
+    } else {
+      _activitiesExpanded = false;
+    }
   }
 
-  void _openActivityMenu(FormFieldState<String> fieldState) {
+  void _openActivityMenu() {
+    if (!_canEdit('activityTypes')) return;
     _closeCountryMenu();
-    _closeActivityMenu();
+    setState(() => _activitiesExpanded = !_activitiesExpanded);
+  }
 
-    final renderObject = _activityFieldKey.currentContext?.findRenderObject();
-    if (renderObject is! RenderBox) return;
-
-    final position = renderObject.localToGlobal(Offset.zero);
-    final size = renderObject.size;
-    final scrollController = ScrollController();
-
-    void scrollToOtherField() {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!scrollController.hasClients) return;
-        scrollController.animateTo(
-          scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
-      });
+  Widget _buildActivityMultiSelect(FormFieldState<String> fieldState) {
+    if (!_activitiesExpanded || !_canEdit('activityTypes')) {
+      return const SizedBox.shrink();
     }
-
-    _activityOverlay = OverlayEntry(
-      builder: (overlayContext) {
-        return StatefulBuilder(
-          builder: (overlayContext, overlaySetState) {
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _closeActivityMenu,
-                    child: const ColoredBox(color: Colors.transparent),
+    return Container(
+      margin: const EdgeInsets.only(top: 2, bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: WebColors.blue, width: 1.4),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      constraints: const BoxConstraints(maxHeight: 345),
+      child: Scrollbar(
+        controller: _activityScrollController,
+        thumbVisibility: true,
+        child: ListView(
+          controller: _activityScrollController,
+          shrinkWrap: true,
+          primary: false,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          children: [
+            for (final choice in _activityTypes) ...[
+              InkWell(
+                onTap: () {
+                  if (!_canEdit('activityTypes')) return;
+                  setState(() {
+                    if (_selectedActivityTypes.contains(choice)) {
+                      _selectedActivityTypes.remove(choice);
+                      // Conserver la précision « Autre » en cas de clic
+                      // accidentel ; ne pas effacer une valeur déjà saisie.
+                    } else {
+                      _selectedActivityTypes.add(choice);
+                    }
+                    _activityError = null;
+                    _completed = false;
+                  });
+                  fieldState.didChange(_activityType);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          choice,
+                          style: const TextStyle(
+                            color: WebColors.blue,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        _selectedActivityTypes.contains(choice)
+                            ? Icons.check_box_rounded
+                            : Icons.check_box_outline_blank_rounded,
+                        color: _selectedActivityTypes.contains(choice)
+                            ? WebColors.red
+                            : WebColors.blue,
+                      ),
+                    ],
                   ),
                 ),
-                Positioned(
-                  left: position.dx,
-                  top: position.dy + size.height - 12,
-                  width: size.width,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: Container(
-                      constraints: const BoxConstraints(maxHeight: 330),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.97),
-                        border: const Border(
-                          left: BorderSide(color: WebColors.blue, width: 1.4),
-                          right: BorderSide(color: WebColors.blue, width: 1.4),
-                          bottom: BorderSide(color: WebColors.blue, width: 1.4),
-                        ),
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(10),
-                          bottomRight: Radius.circular(10),
-                        ),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 8,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: ScrollbarTheme(
-                        data: const ScrollbarThemeData(
-                          thumbColor: MaterialStatePropertyAll(WebColors.blue),
-                          thumbVisibility: MaterialStatePropertyAll(true),
-                          thickness: MaterialStatePropertyAll(9),
-                          radius: Radius.circular(10),
-                        ),
-                        child: Scrollbar(
-                          controller: scrollController,
-                          thumbVisibility: true,
-                          thickness: 9,
-                          radius: const Radius.circular(10),
-                          child: ListView.builder(
-                            controller: scrollController,
-                            primary: false,
-                            padding: EdgeInsets.zero,
-                            shrinkWrap: true,
-                            itemCount: _activityTypes.length,
-                            itemBuilder: (context, index) {
-                              final choice = _activityTypes[index];
-                              final selected = _activityType == choice;
-                              final showOtherField =
-                                  choice == 'Autre' && selected;
-
-                              return Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  InkWell(
-                                    onTap: () {
-                                      setState(() {
-                                        _activityType = choice;
-                                        _activityError = null;
-                                        _completed = false;
-                                        if (choice != 'Autre') {
-                                          _otherActivityController.clear();
-                                        }
-                                      });
-                                      fieldState.didChange(choice);
-                                      overlaySetState(() {});
-
-                                      if (choice == 'Autre') {
-                                        scrollToOtherField();
-                                      } else {
-                                        _closeActivityMenu();
-                                      }
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 14,
-                                        vertical: 10,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              choice,
-                                              style: const TextStyle(
-                                                color: WebColors.blue,
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w800,
-                                              ),
-                                            ),
-                                          ),
-                                          if (selected)
-                                            const Icon(
-                                              Icons.check_rounded,
-                                              color: WebColors.red,
-                                              size: 20,
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  if (showOtherField)
-                                    Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        14,
-                                        0,
-                                        16,
-                                        10,
-                                      ),
-                                      child: TextField(
-                                        controller: _otherActivityController,
-                                        autofocus: true,
-                                        style: const TextStyle(
-                                          color: WebColors.blue,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                        textCapitalization:
-                                            TextCapitalization.sentences,
-                                        onChanged: (value) {
-                                          setState(() {
-                                            _activityError = null;
-                                            _completed = false;
-                                          });
-                                          overlaySetState(() {});
-                                        },
-                                        onSubmitted: (_) =>
-                                            _closeActivityMenu(),
-                                        decoration: InputDecoration(
-                                          labelText: 'Précisez :',
-                                          errorText: _activityError,
-                                          labelStyle: const TextStyle(
-                                            color: WebColors.blue,
-                                          ),
-                                          isDense: true,
-                                          filled: true,
-                                          fillColor: WebColors.blue.withOpacity(
-                                            0.035,
-                                          ),
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                horizontal: 12,
-                                                vertical: 10,
-                                              ),
-                                          enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                            borderSide: BorderSide(
-                                              color: WebColors.blue.withOpacity(
-                                                0.55,
-                                              ),
-                                            ),
-                                          ),
-                                          focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                            borderSide: const BorderSide(
-                                              color: WebColors.blue,
-                                              width: 1.7,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                      ),
+              ),
+              if (choice == 'Autre' &&
+                  _selectedActivityTypes.contains('Autre'))
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                  child: TextField(
+                    controller: _otherActivityController,
+                    onChanged: (_) => setState(() {
+                      _activityError = null;
+                      _completed = false;
+                    }),
+                    decoration: InputDecoration(
+                      labelText: 'Précisez l’autre activité',
+                      errorText: _activityError,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
                     ),
                   ),
                 ),
-              ],
-            );
-          },
-        );
-      },
+            ],
+          ],
+        ),
+      ),
     );
-
-    Overlay.of(context, rootOverlay: true).insert(_activityOverlay!);
-    if (_activityType == 'Autre') scrollToOtherField();
   }
 
   void _closeCountryMenu() {
@@ -752,9 +676,11 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     FocusScope.of(context).unfocus();
     final formIsValid = _formKey.currentState?.validate() ?? false;
     final otherActivityIsValid =
-        _activityType != 'Autre' ||
+        (widget.isCorrection && !_canEdit('activityTypes')) ||
+        !_selectedActivityTypes.contains('Autre') ||
         _otherActivityController.text.trim().isNotEmpty;
     final foreignProofIsValid =
+        (widget.isCorrection && !_canEdit('foreignProof')) ||
         _isFrenchRegistration ||
         _selectedProof != null ||
         (_savedForeignProof['url']?.toString().trim().isNotEmpty ?? false);
@@ -792,8 +718,15 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
 
       if (requestId != null) {
         final foreignProof = _isFrenchRegistration
-            ? <String, Object?>{}
-            : await _uploadForeignProof(requestId);
+    ? <String, Object?>{}
+    : widget.draftOnly ||
+            (widget.isCorrection && !_canEdit('foreignProof'))
+        ? <String, Object?>{}
+        : await _uploadForeignProof(requestId);
+if (widget.draftOnly) {
+  final draft = AdvertiserPhaseOneDraft.forRequest(requestId);
+  draft.foreignProofFile = _isFrenchRegistration ? null : _selectedProof;
+}
         final creationData = _requestExists
             ? <String, Object?>{}
             : <String, Object?>{
@@ -801,10 +734,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                 'createdAt': FieldValue.serverTimestamp(),
               };
 
-        await FirebaseFirestore.instance
-            .collection('advertiserRequests')
-            .doc(requestId)
-            .set({
+        final establishmentData = <String, Object?>{
               ...creationData,
               'uid': requestId,
               'organisation': legalName,
@@ -841,7 +771,8 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                 'legalName': legalName,
                 'businessName': businessName,
                 'activityType': _activityType,
-                'activityTypeOther': _activityType == 'Autre'
+                'activityTypes': _activityTypes.where(_selectedActivityTypes.contains).toList(growable: false),
+                'activityTypeOther': _selectedActivityTypes.contains('Autre')
                     ? _otherActivityController.text.trim()
                     : '',
                 'siret': siret,
@@ -856,8 +787,54 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                 'updatedAt': FieldValue.serverTimestamp(),
               },
               'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-        _requestExists = true;
+            };
+if (widget.draftOnly) {
+  AdvertiserPhaseOneDraft.forRequest(requestId).merge(establishmentData);
+} else if (widget.isCorrection) {
+  final corrections = <String, Object?>{};
+  void addIfAllowed(String field, Object? value) {
+    final key = 'establishment.$field';
+    if (widget.correctionFields.contains(key)) corrections[key] = value;
+  }
+  addIfAllowed('registrationMode', registrationMode);
+  addIfAllowed('siret', siret);
+  addIfAllowed('legalName', legalName);
+  addIfAllowed('businessName', businessName);
+  addIfAllowed('activityTypes', <String, Object?>{
+    'types': _activityTypes.where(_selectedActivityTypes.contains).toList(),
+    'other': _selectedActivityTypes.contains('Autre')
+        ? _otherActivityController.text.trim() : '',
+  });
+  addIfAllowed('registrationCountryCode', _foreignCountryCode);
+  addIfAllowed('foreignRegistrationNumber',
+      _foreignRegistrationController.text.trim());
+  addIfAllowed('foreignRegistrationAuthority',
+      _foreignAuthorityController.text.trim());
+  if (widget.correctionFields.contains('establishment.foreignProof') &&
+      !_isFrenchRegistration && foreignProof['url'] != null) {
+    addIfAllowed('foreignProof', <String, Object?>{
+      'url': foreignProof['url'],
+      'fileName': foreignProof['fileName'],
+      'extension': foreignProof['extension'],
+      'fileSizeBytes': foreignProof['fileSizeBytes'],
+    });
+  }
+  addIfAllowed('address', _addressController.text.trim());
+  addIfAllowed('addressComplement',
+      _addressComplementController.text.trim());
+  addIfAllowed('postalCode', _postalCodeController.text.trim());
+  addIfAllowed('city', city);
+  await AdvertiserCorrectionFieldsService.save(
+    requestId: requestId, fields: corrections,
+  );
+  _requestExists = true;
+} else {
+  await FirebaseFirestore.instance
+      .collection('advertiserRequests')
+      .doc(requestId)
+      .set(establishmentData, SetOptions(merge: true));
+  _requestExists = true;
+}
       }
 
       if (!mounted) return;
@@ -871,6 +848,9 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
       if (mounted) setState(() => _saving = false);
     }
   }
+
+  String? Function(String?) _requiredWhenEditable(String field) =>
+      (value) => _canEdit(field) ? _requiredValidator(value) : null;
 
   String? _requiredValidator(String? value) {
     if (value == null || value.trim().isEmpty) return 'Champ obligatoire';
@@ -905,7 +885,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!widget.readOnly)
+        if (_canEdit('registrationMode'))
           Padding(
             padding: const EdgeInsets.only(top: 8, bottom: 18),
             child: Row(
@@ -993,10 +973,10 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                     children: [
                       if (_isFrenchRegistration) ...[
                         _EstablishmentField(
-                          readOnly: widget.readOnly,
+                          readOnly: !_canEdit('siret'),
                           controller: _siretController,
                           label: 'SIRET *',
-                          validator: _siretValidator,
+                          validator: (value) => _canEdit('siret') ? _siretValidator(value) : null,
                           onChanged: (value) {
                             _registryStatus = 'unverified';
                             _registryMessage = '';
@@ -1021,75 +1001,79 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                           ),
                       ],
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
+                        readOnly: !_canEdit('legalName'),
                         controller: _legalNameController,
                         label: 'Raison sociale *',
-                        validator: _requiredValidator,
+                        validator: _requiredWhenEditable('legalName'),
                         onChanged: _markAsModified,
                         textCapitalization: TextCapitalization.characters,
                         inputFormatters: const [UpperCaseTextInputFormatter()],
                       ),
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
+                        readOnly: !_canEdit('businessName'),
                         controller: _businessNameController,
                         label: 'Nom commercial / marque *',
-                        validator: _requiredValidator,
+                        validator: _requiredWhenEditable('businessName'),
                         onChanged: _markAsModified,
                         textCapitalization: TextCapitalization.characters,
                         inputFormatters: const [UpperCaseTextInputFormatter()],
                       ),
                       FormField<String>(
                         initialValue: _activityType,
-                        validator: (value) => value == null
-                            ? 'Sélectionnez un type d’activité'
-                            : null,
-                        builder: (fieldState) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: GestureDetector(
-                            key: _activityFieldKey,
-                            onTap: widget.readOnly
+                        validator: (value) =>
+                            !_canEdit('activityTypes') || value != null
                                 ? null
-                                : () => _openActivityMenu(fieldState),
-                            child: InputDecorator(
-                              decoration: _activityFieldDecoration(
-                                'Type d’activité *',
-                              ).copyWith(errorText: fieldState.errorText),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      _activityType == null
-                                          ? 'Sélectionnez une activité'
-                                          : _activityType == 'Autre' &&
-                                                _otherActivityController.text
-                                                    .trim()
-                                                    .isNotEmpty
-                                          ? 'Autre — ${_otherActivityController.text.trim()}'
-                                          : _activityType!,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: _activityType == null
-                                            ? const Color(0xFF4B5F97)
-                                            : WebColors.blue,
-                                        fontWeight: FontWeight.w700,
+                                : 'Sélectionnez au moins une activité',
+                        builder: (fieldState) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: GestureDetector(
+                                onTap: _canEdit('activityTypes')
+                                    ? _openActivityMenu
+                                    : null,
+                                child: InputDecorator(
+                                  decoration: _activityFieldDecoration(
+                                    'Types d’activité *',
+                                  ).copyWith(
+                                    errorText: fieldState.errorText,
+                                    helperText: 'Plusieurs choix possibles',
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          _activitySummary,
+                                          softWrap: true,
+                                          style: TextStyle(
+                                            color: _activityType == null
+                                                ? const Color(0xFF4B5F97)
+                                                : WebColors.blue,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      Icon(
+                                        _canEdit('activityTypes')
+                                            ? Icons.keyboard_arrow_down_rounded
+                                            : Icons.lock_outline,
+                                        color: WebColors.red,
+                                      ),
+                                    ],
                                   ),
-                                  const Icon(
-                                    Icons.keyboard_arrow_down_rounded,
-                                    color: WebColors.red,
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
+                            _buildActivityMultiSelect(fieldState),
+                          ],
                         ),
                       ),
                       if (_isFrenchRegistration) ...[
                         _EstablishmentField(
                           controller: _sirenController,
                           label: 'SIREN calculé depuis le SIRET',
-                          validator: _requiredValidator,
+                          validator: _canEdit('siret') ? _requiredValidator : null,
                           onChanged: _markAsModified,
                           readOnly: true,
                         ),
@@ -1097,13 +1081,16 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                         FormField<String>(
                           initialValue: _foreignCountryCode,
                           validator: (_) =>
+                              _canEdit('registrationCountryCode') &&
                               _foreignCountryCode == 'OTHER' &&
                                   _otherCountryController.text.trim().isEmpty
                               ? 'Précisez le pays d’immatriculation'
                               : null,
                           builder: (fieldState) => GestureDetector(
                             key: _countryFieldKey,
-                            onTap: () => _openCountryMenu(fieldState),
+                            onTap: !_canEdit('registrationCountryCode')
+                                ? null
+                                : () => _openCountryMenu(fieldState),
                             child: InputDecorator(
                               decoration: _activityFieldDecoration(
                                 'Pays d’immatriculation *',
@@ -1135,21 +1122,22 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                         ),
                         const SizedBox(height: 12),
                         _EstablishmentField(
-                          readOnly: widget.readOnly,
+                          readOnly: !_canEdit('foreignRegistrationNumber'),
                           controller: _foreignRegistrationController,
                           label: 'Numéro d’enregistrement national *',
-                          validator: _requiredValidator,
+                          validator: _requiredWhenEditable('foreignRegistrationNumber'),
                           onChanged: _markAsModified,
                         ),
                         _EstablishmentField(
-                          readOnly: widget.readOnly,
+                          readOnly: !_canEdit('foreignRegistrationAuthority'),
                           controller: _foreignAuthorityController,
                           label: 'Registre ou autorité (EIN, ABN/ACN, CIPC…) *',
-                          validator: _requiredValidator,
+                          validator: _requiredWhenEditable('foreignRegistrationAuthority'),
                           onChanged: _markAsModified,
                         ),
                         OutlinedButton.icon(
-                          onPressed: widget.readOnly ? null : _pickForeignProof,
+                          onPressed: _canEdit('foreignProof')
+                              ? _pickForeignProof : null,
                           icon: const Icon(Icons.upload_file_outlined),
                           label: Text(
                             _selectedProof?.name ??
@@ -1181,30 +1169,30 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                   child: Column(
                     children: [
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
+                        readOnly: !_canEdit('address'),
                         controller: _addressController,
                         label: 'Adresse *',
-                        validator: _requiredValidator,
+                        validator: _requiredWhenEditable('address'),
                         onChanged: _markAsModified,
                       ),
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
+                        readOnly: !_canEdit('addressComplement'),
                         controller: _addressComplementController,
                         label: 'Complément d’adresse',
                         onChanged: _markAsModified,
                       ),
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
+                        readOnly: !_canEdit('postalCode'),
                         controller: _postalCodeController,
                         label: 'Code postal *',
-                        validator: _requiredValidator,
+                        validator: _requiredWhenEditable('postalCode'),
                         onChanged: _markAsModified,
                       ),
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
+                        readOnly: !_canEdit('city'),
                         controller: _cityController,
                         label: 'Ville *',
-                        validator: _requiredValidator,
+                        validator: _requiredWhenEditable('city'),
                         onChanged: _markAsModified,
                         textCapitalization: TextCapitalization.characters,
                         inputFormatters: const [UpperCaseTextInputFormatter()],
@@ -1213,7 +1201,8 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
                         _EstablishmentField(
                           controller: _countryController,
                           label: 'Pays *',
-                          validator: _requiredValidator,
+                          validator: _canEdit('registrationMode')
+                              ? _requiredValidator : null,
                           onChanged: _markAsModified,
                           readOnly: true,
                         ),
