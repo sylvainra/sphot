@@ -149,6 +149,14 @@ function registerAdvertiserCorrectionResubmit({admin, onRequest}) {
             } else if (data.legalAcceptanceCompleted !== true) {
               return "legal_mismatch";
             }
+            // Une retransmission est un nouvel événement de réception :
+            // réarmer l'email déjà envoyé lors du dépôt initial.
+            change.acknowledgementEmail = {
+              status: "pending",
+              recipient: String(data.contactEmail || data.email || "")
+                  .trim().toLowerCase(),
+              updatedAt: FieldValue.serverTimestamp(),
+            };
             transaction.update(ref, change);
             return "updated";
           });

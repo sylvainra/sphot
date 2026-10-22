@@ -20,6 +20,7 @@ function setup(overrides = {}, claims = {}) {
     establishmentCompleted: true,
     applicationCompleted: true,
     legalAcceptanceCompleted: true,
+    contactEmail: "advertiser@example.com",
     ...overrides,
   };
   const writes = [];
@@ -94,7 +95,11 @@ test(TEST_RETRANSMISSION, async () => {
   assert.equal(update["correctionRequest.status"], "resubmitted");
   assert.equal(update.applicationHistory.append.event, "resubmitted");
   assert.equal(update.applicationHistory.append.actor, "advertiser");
-  assert.equal(Object.hasOwn(update, "acknowledgementEmail"), false);
+  assert.deepEqual(update.acknowledgementEmail, {
+    status: "pending",
+    recipient: "advertiser@example.com",
+    updatedAt: "SERVER_TIME",
+  });
 });
 
 test("autre demandeur refuse", async () => {
@@ -159,4 +164,19 @@ test("liste de rubriques invalide refusee", async () => {
   }});
   assert.equal((await call()).code, 409);
   assert.equal(writes.length, 0);
+});
+
+
+test("retransmission rearme le mail deja envoye", async () => {
+  const {call, writes} = setup({
+    contactEmail: "NOUVEAU@EXAMPLE.COM",
+    acknowledgementEmail: {status: "sent", messageId: "ancien-id"},
+  });
+  const result = await call();
+  assert.equal(result.code, 200);
+  assert.deepEqual(writes[0].update.acknowledgementEmail, {
+    status: "pending",
+    recipient: "nouveau@example.com",
+    updatedAt: "SERVER_TIME",
+  });
 });
