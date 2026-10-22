@@ -2,6 +2,8 @@
 
 // Decisions Super Admin PHASE 1 et revue des propositions visuelles PHASE 2.
 // Aucune donnee de decision / d'historique n'est acceptee depuis le navigateur.
+const {FIELD_SCOPES} = require("./advertiser_correction_fields");
+
 const CORRECTION_SCOPES = new Set([
   "identity", "establishment", "location", "visual", "destination", "legal",
 ]);
@@ -62,7 +64,18 @@ function buildDecisionUpdate(data, command, fv, Timestamp) {
       reason.length > 2000)) {
     throw refusal(400, "Motif obligatoire (2000 caractères maximum).");
   }
+  const fields = command.fields === undefined ? [] : command.fields;
+  if (!Array.isArray(fields) || new Set(fields).size !== fields.length ||
+      fields.some((field) => !Object.hasOwn(FIELD_SCOPES, field))) {
+    throw refusal(400, "Champs de correction invalides.");
+  }
   const scopes = command.scopes === undefined ? [] : command.scopes;
+  const derivedScopes = [...new Set(
+      fields.map((field) => FIELD_SCOPES[field]))];
+  if (fields.length > 0 && (derivedScopes.length !== scopes.length ||
+      derivedScopes.some((scope) => !scopes.includes(scope)))) {
+    throw refusal(400, "Rubriques et champs incohérents.");
+  }
   if (!Array.isArray(scopes) || scopes.some((s) =>
     typeof s !== "string" || !CORRECTION_SCOPES.has(s)) ||
     new Set(scopes).size !== scopes.length) {
@@ -93,6 +106,7 @@ function buildDecisionUpdate(data, command, fv, Timestamp) {
       reviewedBy: "super_admin",
       reviewedAt: now,
       ...(scopes.length > 0 ? {correctionScopes: scopes} : {}),
+      ...(fields.length > 0 ? {correctionFields: fields} : {}),
     };
   }
   if (decision === "approved") {
@@ -158,6 +172,7 @@ function buildDecisionUpdate(data, command, fv, Timestamp) {
     updated.changeRequestEmail = {
       status: "pending", recipient, reason,
       ...(scopes.length > 0 ? {correctionScopes: scopes} : {}),
+      ...(fields.length > 0 ? {correctionFields: fields} : {}),
       updatedAt: now,
     };
     if (isAssetReview) {
@@ -167,7 +182,7 @@ function buildDecisionUpdate(data, command, fv, Timestamp) {
       };
     } else {
       updated.correctionRequest = {
-        status: "changes_requested", scopes, reason, requestedAt: now,
+        status: "changes_requested", scopes, fields, reason, requestedAt: now,
       };
     }
   } else {
@@ -202,6 +217,7 @@ function buildDecisionUpdate(data, command, fv, Timestamp) {
     updated.applicationHistory = fv.arrayUnion({
       event: decision, actor: "super_admin", occurredAt: Timestamp.now(),
       reason, ...(scopes.length > 0 ? {correctionScopes: scopes} : {}),
+      ...(fields.length > 0 ? {correctionFields: fields} : {}),
     });
   }
   return updated;
@@ -233,7 +249,7 @@ function registerAdvertiserReviewDecision({
         }
         const body = req.body || {};
         if (Object.keys(body).some((key) =>
-          !["requestId", "action", "decision", "reason", "scopes"]
+          !["requestId", "action", "decision", "reason", "scopes", "fields"]
               .includes(key))) {
           res.status(400).json({success: false,
             error: "Champs non autorisés."});

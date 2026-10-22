@@ -122,6 +122,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   Map<String, dynamic>? _selectedAdvertiser;
 
+  // Retour d'erreur intégré au dossier : jamais de snackbar flottante.
+  String? _advertiserReviewError;
+  String? _advertiserReviewErrorRequestId;
+
   // Diagnostic en lecture seule, indexé par dossier annonceur.
   final Map<String, Future<List<Map<String, dynamic>>>>
       _advertiserCampaignAuditFutures = {};
@@ -1276,7 +1280,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     return activities.map((item) {
       if (item == 'Autre' && other.isNotEmpty) return 'Autre — $other';
       return item;
-    }).join(' • ');
+    }).join('\n');
   }
 
   Widget _advertiserRequestInfoLine(String label, String value) {
@@ -3339,18 +3343,47 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   // PHASE 1 : chaque demande de correction doit préciser les rubriques
   // autorisées, en plus du motif communiqué à l'annonceur.
-  Future<Map<String, Object?>?> _askAdvertiserCorrectionScopes() async {
-    const choices = <String, String>{
-      'identity': 'Identité et coordonnées du demandeur',
-      'establishment': 'Entreprise et justificatifs',
-      'location': 'Emplacement sur la carte',
-      'visual': 'Visuel publicitaire',
-      'destination': 'Lien de destination',
-      'legal': 'Validations juridiques',
+  Future<bool> _askAdvertiserCorrectionScopes({
+    required String requestId,
+  }) async {
+    const groups = <String, Map<String, String>>{
+      'IDENTITÉ DU RESPONSABLE': <String, String>{
+        'identity.contactCivility': 'Civilité',
+        'identity.contactLastName': 'Nom',
+        'identity.contactFirstName': 'Prénom',
+        'identity.contactFunction': 'Fonction',
+        'identity.contactPhone': 'Téléphone professionnel',
+        'identity.contactEmail': 'Email professionnel',
+      },
+      'ENTREPRISE': <String, String>{
+        'establishment.registrationMode': 'Entreprise française / étrangère',
+        'establishment.siret': 'SIRET et SIREN calculé',
+        'establishment.legalName': 'Raison sociale',
+        'establishment.businessName': 'Nom commercial / marque',
+        'establishment.activityTypes': 'Types d’activités et précision « Autre »',
+        'establishment.registrationCountryCode': 'Pays d’immatriculation',
+        'establishment.foreignRegistrationNumber': 'N° d’enregistrement étranger',
+        'establishment.foreignRegistrationAuthority': 'Registre / autorité',
+        'establishment.foreignProof': 'Justificatif officiel',
+      },
+      'ADRESSE': <String, String>{
+        'establishment.address': 'Adresse',
+        'establishment.addressComplement': 'Complément d’adresse',
+        'establishment.postalCode': 'Code postal',
+        'establishment.city': 'Ville',
+      },
+      'DIFFUSION DE LA DEMANDE': <String, String>{
+        'location': 'Emplacement sur la carte',
+        'visual': 'Visuel publicitaire',
+        'destination': 'Lien de destination',
+        'legal': 'Validations juridiques',
+      },
     };
     final controller = TextEditingController();
     final selected = <String>{};
-    final result = await showDialog<Map<String, Object?>>(
+    bool submitting = false;
+    String? submissionError;
+    final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
@@ -3359,39 +3392,51 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             style: TextStyle(color: adminColor, fontWeight: FontWeight.w900),
           ),
           content: SizedBox(
-            width: 540,
+            width: 570,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Cochez uniquement les rubriques que l’annonceur devra '
-                    'pouvoir modifier. Plusieurs choix sont possibles.',
+                    'Sélectionnez exclusivement les champs que l’annonceur '
+                    'pourra corriger. Tous les autres resteront verrouillés.',
                     style: TextStyle(color: adminColor),
                   ),
-                  const SizedBox(height: 12),
-                  for (final choice in choices.entries)
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: Text(
-                        choice.value,
+                  const SizedBox(height: 14),
+                  for (final group in groups.entries) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 9, bottom: 3),
+                      child: Text(
+                        group.key,
                         style: const TextStyle(
                           color: adminColor,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
-                      value: selected.contains(choice.key),
-                      activeColor: redColor,
-                      onChanged: (checked) => setDialogState(() {
-                        if (checked == true) {
-                          selected.add(choice.key);
-                        } else {
-                          selected.remove(choice.key);
-                        }
-                      }),
                     ),
+                    for (final field in group.value.entries)
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(
+                          field.value,
+                          style: const TextStyle(
+                            color: adminColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        value: selected.contains(field.key),
+                        activeColor: redColor,
+                        onChanged: (checked) => setDialogState(() {
+                          if (checked == true) {
+                            selected.add(field.key);
+                          } else {
+                            selected.remove(field.key);
+                          }
+                        }),
+                      ),
+                  ],
                   const SizedBox(height: 14),
                   TextField(
                     controller: controller,
@@ -3404,34 +3449,90 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                       border: OutlineInputBorder(),
                     ),
                   ),
+                  if (submissionError != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      submissionError!,
+                      style: const TextStyle(
+                        color: redColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  if (submitting) ...[
+                    const SizedBox(height: 12),
+                    const LinearProgressIndicator(color: adminColor),
+                    const SizedBox(height: 6),
+                    const Text('Enregistrement de la demande…'),
+                  ],
                 ],
               ),
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
+              onPressed: submitting
+                  ? null
+                  : () => Navigator.of(dialogContext).pop(false),
               child: const Text('ANNULER'),
             ),
             FilledButton(
-              onPressed: selected.isEmpty || controller.text.trim().isEmpty
+              onPressed: submitting ||
+                      selected.isEmpty ||
+                      controller.text.trim().isEmpty
                   ? null
-                  : () => Navigator.of(dialogContext).pop({
-                      'reason': controller.text.trim(),
-                      'scopes': <String>[
-                        for (final choice in choices.keys)
-                          if (selected.contains(choice)) choice,
-                      ],
-                    }),
+                  : () async {
+                      // La fenêtre reste ouverte jusqu'à confirmation
+                      // effective de l'écriture côté serveur.
+                      final fields = <String>[
+                        for (final group in groups.values)
+                          for (final field in group.keys)
+                            if (selected.contains(field)) field,
+                      ];
+                      final scopes = fields
+                          .map((field) => field.split('.').first)
+                          .toSet()
+                          .toList();
+                      setDialogState(() {
+                        submitting = true;
+                        submissionError = null;
+                      });
+                      try {
+                        await _postAdvertiserReview(<String, Object?>{
+                          'action': 'review',
+                          'requestId': requestId,
+                          'decision': 'changes_requested',
+                          'reason': controller.text.trim(),
+                          'scopes': scopes,
+                          'fields': fields,
+                        });
+                        if (!dialogContext.mounted) return;
+                        Navigator.of(dialogContext).pop(true);
+                      } catch (error, stackTrace) {
+                        debugPrint('Corrections annonceur non enregistrées : '
+                            '$error');
+                        debugPrintStack(stackTrace: stackTrace);
+                        if (!dialogContext.mounted) return;
+                        setDialogState(() {
+                          submitting = false;
+                          submissionError =
+                              'Demande non enregistrée : $error';
+                        });
+                      }
+                    },
               style: FilledButton.styleFrom(backgroundColor: adminColor),
-              child: const Text('CONFIRMER LES CORRECTIONS'),
+              child: Text(
+                submitting
+                    ? 'ENREGISTREMENT…'
+                    : 'CONFIRMER LES CORRECTIONS',
+              ),
             ),
           ],
         ),
       ),
     );
     controller.dispose();
-    return result;
+    return result == true;
   }
 
   Future<void> _reviewAdvertiserRequest(
@@ -3440,6 +3541,12 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   }) async {
     final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
     if (requestId.isEmpty) return;
+    if (mounted) {
+      setState(() {
+        _advertiserReviewError = null;
+        _advertiserReviewErrorRequestId = null;
+      });
+    }
 
     // Les demandes de la PHASE 2 conservent leur ancien dialogue et leurs
     // propres historiques. Seules les corrections de candidature PHASE 1
@@ -3448,15 +3555,30 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     final originalAssetChange = _advertiserMap(advertiser['assetChangeRequest']);
     final phaseTwoAssetReview = originalStatus == 'approved' &&
         originalAssetChange['status'] == 'submitted';
-    String reason = '';
-    List<String> correctionScopes = const <String>[];
     if (decision == 'changes_requested' && !phaseTwoAssetReview) {
-      final result = await _askAdvertiserCorrectionScopes();
-      if (result == null) return;
-      reason = (result['reason'] ?? '').toString().trim();
-      correctionScopes = List<String>.from(result['scopes'] as List);
-      if (reason.isEmpty || correctionScopes.isEmpty) return;
-    } else if (decision != 'approved') {
+      final saved = await _askAdvertiserCorrectionScopes(
+        requestId: requestId,
+      );
+      if (!saved) return;
+      try {
+        await _refreshAdvertiserAfterReview(requestId);
+      } catch (error, stackTrace) {
+        // La décision a déjà été confirmée par le serveur :
+        // ne jamais la renvoyer à cause d'un échec de rafraîchissement.
+        debugPrint('Actualisation du dossier annonceur impossible : $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+      if (!mounted) return;
+      setState(() {
+        _advertiserReviewError = null;
+        _advertiserReviewErrorRequestId = null;
+      });
+      // Le nouvel état du dossier et son historique confirment la décision.
+      return;
+    }
+
+    String reason = '';
+    if (decision != 'approved') {
       final result = await _askAdvertiserReviewReason(
         title: decision == 'changes_requested'
             ? 'DEMANDER UNE MODIFICATION'
@@ -3472,16 +3594,16 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         'requestId': requestId,
         'decision': decision,
         'reason': reason,
-        if (correctionScopes.isNotEmpty) 'scopes': correctionScopes,
       });
       await _refreshAdvertiserAfterReview(requestId);
     } catch (error, stackTrace) {
       debugPrint('Décision annonceur impossible : $error');
       debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Décision non enregistrée : $error'),
-      ));
+      setState(() {
+        _advertiserReviewError = 'Décision non enregistrée : $error';
+        _advertiserReviewErrorRequestId = requestId;
+      });
     }
   }
 
@@ -3549,9 +3671,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       debugPrint('Autorisation annonceur impossible : $error');
       debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Autorisation non enregistrée : $error'),
-      ));
+      setState(() {
+        _advertiserReviewError = 'Autorisation non enregistrée : $error';
+        _advertiserReviewErrorRequestId = requestId;
+      });
     }
   }
 
@@ -4778,6 +4901,26 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     ),
                 ],
               ),
+              if (_advertiserReviewError != null &&
+                  _advertiserReviewErrorRequestId ==
+                      _cleanText(advertiser['id'] ?? advertiser['uid'])) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF4F4),
+                    border: Border.all(color: redColor),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Text(
+                    _advertiserReviewError!,
+                    style: const TextStyle(
+                      color: redColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               FilledButton.icon(
                 onPressed: decisionMade
