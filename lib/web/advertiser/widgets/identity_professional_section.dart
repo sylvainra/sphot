@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 
 import '../../shared/text_input_formatters.dart';
 import '../../shared/web_colors.dart';
+import '../models/advertiser_phase_one_draft.dart';
+import '../services/advertiser_correction_fields_service.dart';
 
 class IdentityProfessionalSection extends StatefulWidget {
   const IdentityProfessionalSection({
@@ -12,13 +14,19 @@ class IdentityProfessionalSection extends StatefulWidget {
     required this.user,
     this.requestId,
     this.readOnly = false,
-    this.onSaved,
+    this.isCorrection = false,
+    this.correctionFields = const <String>{},
+this.draftOnly = false,
+this.onSaved,
   });
 
   final User? user;
   final String? requestId;
   final bool readOnly;
-  final VoidCallback? onSaved;
+  final bool isCorrection;
+  final Set<String> correctionFields;
+final bool draftOnly;
+final VoidCallback? onSaved;
 
   @override
   State<IdentityProfessionalSection> createState() =>
@@ -43,6 +51,10 @@ class _IdentityProfessionalSectionState
   bool _completed = false;
   bool _requestExists = false;
   String? _error;
+
+  bool _canEdit(String field) =>
+      !widget.readOnly &&
+      (!widget.isCorrection || widget.correctionFields.contains('identity.$field'));
 
   String? get _requestId {
     final value = widget.requestId?.trim() ?? '';
@@ -76,12 +88,13 @@ class _IdentityProfessionalSectionState
       _prefillDisplayName(user?.displayName);
 
       try {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('advertiserRequests')
-            .doc(requestId)
-            .get();
-        final data = snapshot.data();
-        _requestExists = snapshot.exists;
+        final data = widget.draftOnly
+    ? AdvertiserPhaseOneDraft.forRequest(requestId).data
+    : (await FirebaseFirestore.instance
+        .collection('advertiserRequests')
+        .doc(requestId)
+        .get()).data();
+_requestExists = !widget.draftOnly && data != null;
 
         if (data != null) {
           final storedCivility = _textValue(
@@ -160,7 +173,10 @@ class _IdentityProfessionalSectionState
     try {
       final user = widget.user;
       final requestId = _requestId;
-      final civility = _civility!.trim();
+      final civility = (_civility ?? '').trim();
+      if (_canEdit('contactCivility') && civility.isEmpty) {
+        throw StateError('Civilité obligatoire.');
+      }
       final lastName = forceUpperCase(_lastNameController.text.trim());
       final firstName = capitalizeFirstLetter(_firstNameController.text.trim());
       final contactFunction = capitalizeFirstLetter(
@@ -180,10 +196,7 @@ class _IdentityProfessionalSectionState
                 'createdAt': FieldValue.serverTimestamp(),
               };
 
-        await FirebaseFirestore.instance
-            .collection('advertiserRequests')
-            .doc(requestId)
-            .set({
+        final profileData = <String, Object?>{
               ...creationData,
               'uid': requestId,
               'email': user?.email ?? contactEmail,
@@ -198,8 +211,30 @@ class _IdentityProfessionalSectionState
               'contactEmail': contactEmail,
               'profileCompleted': true,
               'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-        _requestExists = true;
+            };
+if (widget.draftOnly) {
+  AdvertiserPhaseOneDraft.forRequest(requestId).merge(profileData);
+} else if (widget.isCorrection) {
+  final fields = <String, Object?>{
+    for (final field in widget.correctionFields)
+      if (field == 'identity.contactCivility') field: civility
+      else if (field == 'identity.contactLastName') field: lastName
+      else if (field == 'identity.contactFirstName') field: firstName
+      else if (field == 'identity.contactFunction') field: contactFunction
+      else if (field == 'identity.contactPhone') field: _phoneController.text.trim()
+      else if (field == 'identity.contactEmail') field: contactEmail,
+  };
+  await AdvertiserCorrectionFieldsService.save(
+    requestId: requestId, fields: fields,
+  );
+  _requestExists = true;
+} else {
+  await FirebaseFirestore.instance
+      .collection('advertiserRequests')
+      .doc(requestId)
+      .set(profileData, SetOptions(merge: true));
+  _requestExists = true;
+}
       }
 
       if (!mounted) return;
@@ -213,6 +248,12 @@ class _IdentityProfessionalSectionState
       if (mounted) setState(() => _saving = false);
     }
   }
+
+  String? Function(String?) _requiredWhenEditable(String field) =>
+      (value) => _canEdit(field) ? _requiredValidator(value) : null;
+
+  String? Function(String?) _emailWhenEditable() =>
+      (value) => _canEdit('contactEmail') ? _emailValidator(value) : null;
 
   String? _requiredValidator(String? value) {
     if (value == null || value.trim().isEmpty) {
@@ -240,7 +281,7 @@ class _IdentityProfessionalSectionState
   }
 
   void _openCivilityMenu(FormFieldState<String> field) {
-    if (widget.readOnly) return;
+    if (!_canEdit('contactCivility')) return;
     if (_civilityOverlay != null) {
       _closeCivilityMenu();
       return;
@@ -384,12 +425,13 @@ class _IdentityProfessionalSectionState
                   padding: const EdgeInsets.only(bottom: 12),
                   child: FormField<String>(
                     initialValue: _civility,
-                    validator: _requiredValidator,
+                    validator: _requiredWhenEditable('contactCivility'),
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     builder: (field) => CompositedTransformTarget(
                       link: _civilityLink,
                       child: GestureDetector(
                         key: _civilityKey,
-                        onTap: widget.readOnly
+                        onTap: !_canEdit('contactCivility')
                             ? null
                             : () => _openCivilityMenu(field),
                         child: InputDecorator(
@@ -443,18 +485,18 @@ class _IdentityProfessionalSectionState
                 _ProfileField(
                   controller: _lastNameController,
                   label: 'Nom *',
-                  validator: _requiredValidator,
+                  validator: _requiredWhenEditable('contactLastName'),
                   onChanged: _profileChanged,
-                  readOnly: widget.readOnly,
+                  readOnly: !_canEdit('contactLastName'),
                   textCapitalization: TextCapitalization.characters,
                   inputFormatters: const [UpperCaseTextInputFormatter()],
                 ),
                 _ProfileField(
                   controller: _firstNameController,
                   label: 'Prénom *',
-                  validator: _requiredValidator,
+                  validator: _requiredWhenEditable('contactFirstName'),
                   onChanged: _profileChanged,
-                  readOnly: widget.readOnly,
+                  readOnly: !_canEdit('contactFirstName'),
                   textCapitalization: TextCapitalization.sentences,
                   inputFormatters: const [
                     FirstLetterUpperCaseTextInputFormatter(),
@@ -463,9 +505,9 @@ class _IdentityProfessionalSectionState
                 _ProfileField(
                   controller: _functionController,
                   label: 'Fonction *',
-                  validator: _requiredValidator,
+                  validator: _requiredWhenEditable('contactFunction'),
                   onChanged: _profileChanged,
-                  readOnly: widget.readOnly,
+                  readOnly: !_canEdit('contactFunction'),
                   textCapitalization: TextCapitalization.sentences,
                   inputFormatters: const [
                     FirstLetterUpperCaseTextInputFormatter(),
@@ -476,17 +518,17 @@ class _IdentityProfessionalSectionState
                   label: 'Téléphone professionnel *',
                   keyboardType: TextInputType.phone,
                   inputFormatters: const [_PhoneNumberInputFormatter()],
-                  validator: _requiredValidator,
+                  validator: _requiredWhenEditable('contactPhone'),
                   onChanged: _profileChanged,
-                  readOnly: widget.readOnly,
+                  readOnly: !_canEdit('contactPhone'),
                 ),
                 _ProfileField(
                   controller: _professionalEmailController,
                   label: 'Email professionnel *',
                   keyboardType: TextInputType.emailAddress,
-                  validator: _emailValidator,
+                  validator: _emailWhenEditable(),
                   onChanged: _profileChanged,
-                  readOnly: widget.readOnly,
+                  readOnly: !_canEdit('contactEmail'),
                 ),
                 if (!widget.readOnly) const SizedBox(height: 4),
                 if (!widget.readOnly)
