@@ -1020,50 +1020,52 @@ if (widget.draftOnly) {
                       ),
                       FormField<String>(
                         initialValue: _activityType,
-                        validator: (value) => !_canEdit('activityTypes') || value != null
-                            ? null
-                            : 'Sélectionnez au moins une activité',
+                        validator: (value) =>
+                            !_canEdit('activityTypes') || value != null
+                                ? null
+                                : 'Sélectionnez au moins une activité',
                         builder: (fieldState) => Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                          Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: GestureDetector(
-                            onTap: !_canEdit('activityTypes')
-                                ? null
-                                : _openActivityMenu,
-                            child: InputDecorator(
-                              decoration: _activityFieldDecoration(
-                                 'Types d’activité *',
-                               ).copyWith(
-                                 errorText: fieldState.errorText,
-                                 helperText: 'Plusieurs choix possibles',
-                               ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                       _activitySummary,
-                                       softWrap: true,
-                                      style: TextStyle(
-                                        color: _activityType == null
-                                            ? const Color(0xFF4B5F97)
-                                            : WebColors.blue,
-                                        fontWeight: FontWeight.w700,
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: GestureDetector(
+                                onTap: _canEdit('activityTypes')
+                                    ? _openActivityMenu
+                                    : null,
+                                child: InputDecorator(
+                                  decoration: _activityFieldDecoration(
+                                    'Types d’activité *',
+                                  ).copyWith(
+                                    errorText: fieldState.errorText,
+                                    helperText: 'Plusieurs choix possibles',
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          _activitySummary,
+                                          softWrap: true,
+                                          style: TextStyle(
+                                            color: _activityType == null
+                                                ? const Color(0xFF4B5F97)
+                                                : WebColors.blue,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      Icon(
+                                        _canEdit('activityTypes')
+                                            ? Icons.keyboard_arrow_down_rounded
+                                            : Icons.lock_outline,
+                                        color: WebColors.red,
+                                      ),
+                                    ],
                                   ),
-                                  Icon(
-                                    _canEdit('activityTypes')
-                                        ? Icons.keyboard_arrow_down_rounded
-                                        : Icons.lock_outline,
-                                    color: WebColors.red,
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                          _buildActivityMultiSelect(fieldState),
+                            _buildActivityMultiSelect(fieldState),
                           ],
                         ),
                       ),
