@@ -6,7 +6,10 @@
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const STORAGE_BUCKET = "sphot-ab80b.firebasestorage.app";
 
-/** @return {boolean} Refus initial prêt à être supprimé. */
+/**
+ * @param {Object} data Données du dossier annonceur.
+ * @return {boolean} Refus initial prêt à être supprimé.
+ */
 function eligibleForCleanup(data) {
   return data && data.status === "rejected" &&
     data.purgeAfterRejectionEmail === true &&
