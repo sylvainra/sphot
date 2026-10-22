@@ -122,7 +122,10 @@ test("endpoint: refus si session Super Admin invalide", async () => {
   let resStatus;
   let resBody;
   const handler = registerAdvertiserReviewDecision({
-    admin: {}, crypto: {}, onRequest: (_, callback) => callback,
+    admin: {}, crypto: {}, onRequest: (options, callback) => {
+      assert.equal(options.memory, "512MiB");
+      return callback;
+    },
     checkSuperAdminSession: async () => {
       throw new Error("expired");
     },

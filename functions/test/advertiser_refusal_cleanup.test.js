@@ -170,6 +170,7 @@ test("le trigger attend la confirmation du mail de refus", async () => {
     onDocumentUpdated: (options, action) => {
       assert.equal(options.document, "advertiserRequests/{requestId}");
       assert.equal(options.retry, true);
+      assert.equal(options.memory, "512MiB");
       callback = action;
       return action;
     },

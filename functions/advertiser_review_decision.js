@@ -237,7 +237,7 @@ function registerAdvertiserReviewDecision({
   admin, crypto, onRequest, checkSuperAdminSession,
 }) {
   return onRequest(
-      {region: "us-central1", cors: true, cpu: 1, memory: "256MiB"},
+      {region: "us-central1", cors: true, cpu: 1, memory: "512MiB"},
       async (req, res) => {
         if (req.method !== "POST") {
           res.status(405).json({success: false, error: "Méthode refusée."});

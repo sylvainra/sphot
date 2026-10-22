@@ -90,7 +90,7 @@ function registerAdvertiserRefusalCleanup({admin, onDocumentUpdated}) {
     region: "europe-west1",
     retry: true,
     cpu: 1,
-    memory: "256MiB",
+    memory: "512MiB",
   }, async (event) => {
     const after = event.data && event.data.after &&
       event.data.after.data();
