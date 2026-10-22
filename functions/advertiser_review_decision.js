@@ -70,7 +70,8 @@ function buildDecisionUpdate(data, command, fv, Timestamp) {
     throw refusal(400, "Champs de correction invalides.");
   }
   const scopes = command.scopes === undefined ? [] : command.scopes;
-  const derivedScopes = [...new Set(fields.map((field) => FIELD_SCOPES[field]))];
+  const derivedScopes = [...new Set(
+      fields.map((field) => FIELD_SCOPES[field]))];
   if (fields.length > 0 && (derivedScopes.length !== scopes.length ||
       derivedScopes.some((scope) => !scopes.includes(scope)))) {
     throw refusal(400, "Rubriques et champs incohérents.");
