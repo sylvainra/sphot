@@ -122,6 +122,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   Map<String, dynamic>? _selectedAdvertiser;
 
+  // Retour d'erreur intégré au dossier : jamais de snackbar flottante.
+  String? _advertiserReviewError;
+  String? _advertiserReviewErrorRequestId;
+
   // Diagnostic en lecture seule, indexé par dossier annonceur.
   final Map<String, Future<List<Map<String, dynamic>>>>
       _advertiserCampaignAuditFutures = {};
@@ -3537,6 +3541,12 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   }) async {
     final requestId = _cleanText(advertiser['id'] ?? advertiser['uid']);
     if (requestId.isEmpty) return;
+    if (mounted) {
+      setState(() {
+        _advertiserReviewError = null;
+        _advertiserReviewErrorRequestId = null;
+      });
+    }
 
     // Les demandes de la PHASE 2 conservent leur ancien dialogue et leurs
     // propres historiques. Seules les corrections de candidature PHASE 1
@@ -3559,9 +3569,11 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         debugPrintStack(stackTrace: stackTrace);
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Demande de corrections enregistrée.'),
-      ));
+      setState(() {
+        _advertiserReviewError = null;
+        _advertiserReviewErrorRequestId = null;
+      });
+      // Le nouvel état du dossier et son historique confirment la décision.
       return;
     }
 
@@ -3588,9 +3600,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       debugPrint('Décision annonceur impossible : $error');
       debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Décision non enregistrée : $error'),
-      ));
+      setState(() {
+        _advertiserReviewError = 'Décision non enregistrée : $error';
+        _advertiserReviewErrorRequestId = requestId;
+      });
     }
   }
 
@@ -3658,9 +3671,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       debugPrint('Autorisation annonceur impossible : $error');
       debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Autorisation non enregistrée : $error'),
-      ));
+      setState(() {
+        _advertiserReviewError = 'Autorisation non enregistrée : $error';
+        _advertiserReviewErrorRequestId = requestId;
+      });
     }
   }
 
@@ -4887,6 +4901,26 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     ),
                 ],
               ),
+              if (_advertiserReviewError != null &&
+                  _advertiserReviewErrorRequestId ==
+                      _cleanText(advertiser['id'] ?? advertiser['uid'])) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF4F4),
+                    border: Border.all(color: redColor),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Text(
+                    _advertiserReviewError!,
+                    style: const TextStyle(
+                      color: redColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               FilledButton.icon(
                 onPressed: decisionMade
