@@ -247,6 +247,13 @@ class _IdentityProfessionalSectionState
     }
     final box = _civilityKey.currentContext?.findRenderObject();
     if (box is! RenderBox) return;
+    final rootOverlay = Overlay.of(context, rootOverlay: true);
+    final overlayBox = rootOverlay.context.findRenderObject();
+    if (overlayBox is! RenderBox) return;
+    final position = box.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
     final width = box.size.width;
     _civilityOverlay = OverlayEntry(
       builder: (_) => Stack(
@@ -257,12 +264,10 @@ class _IdentityProfessionalSectionState
               onTap: _closeCivilityMenu,
             ),
           ),
-          CompositedTransformFollower(
-            link: _civilityLink,
-            showWhenUnlinked: false,
-            targetAnchor: Alignment.bottomLeft,
-            followerAnchor: Alignment.topLeft,
-            offset: const Offset(0, -12),
+          Positioned(
+            left: position.dx,
+            top: position.dy + box.size.height - 12,
+            width: width,
             child: SizedBox(
               width: width,
               child: Material(
@@ -336,7 +341,7 @@ class _IdentityProfessionalSectionState
         ],
       ),
     );
-    Overlay.of(context, rootOverlay: true).insert(_civilityOverlay!);
+    rootOverlay.insert(_civilityOverlay!);
   }
 
   @override
@@ -380,6 +385,7 @@ class _IdentityProfessionalSectionState
                   child: FormField<String>(
                     initialValue: _civility,
                     validator: _requiredValidator,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     builder: (field) => CompositedTransformTarget(
                       link: _civilityLink,
                       child: GestureDetector(
