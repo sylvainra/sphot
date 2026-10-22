@@ -1276,7 +1276,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     return activities.map((item) {
       if (item == 'Autre' && other.isNotEmpty) return 'Autre — $other';
       return item;
-    }).join(' • ');
+    }).join('\n');
   }
 
   Widget _advertiserRequestInfoLine(String label, String value) {
