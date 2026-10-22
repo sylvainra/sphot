@@ -313,7 +313,7 @@ bool get _applicationLocked {
     return activities.map((item) {
       if (item == 'Autre' && other.isNotEmpty) return 'Autre — $other';
       return item;
-    }).join(' • ');
+    }).join('\n');
   }
 
   bool get _usesNationalPricing =>
