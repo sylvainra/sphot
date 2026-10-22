@@ -385,7 +385,6 @@ class _IdentityProfessionalSectionState
                   child: FormField<String>(
                     initialValue: _civility,
                     validator: _requiredValidator,
-                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     builder: (field) => CompositedTransformTarget(
                       link: _civilityLink,
                       child: GestureDetector(
