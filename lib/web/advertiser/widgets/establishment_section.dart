@@ -12,6 +12,7 @@ import '../../shared/text_input_formatters.dart';
 import '../../shared/web_colors.dart';
 import '../../../services/company_registry_service.dart';
 import '../models/advertiser_phase_one_draft.dart';
+import '../services/advertiser_correction_fields_service.dart';
 
 class EstablishmentSection extends StatefulWidget {
   const EstablishmentSection({
@@ -19,6 +20,8 @@ class EstablishmentSection extends StatefulWidget {
     required this.user,
     this.requestId,
     this.readOnly = false,
+    this.isCorrection = false,
+    this.correctionFields = const <String>{},
 this.draftOnly = false,
 this.onSaved,
   });
@@ -26,6 +29,8 @@ this.onSaved,
   final User? user;
   final String? requestId;
   final bool readOnly;
+  final bool isCorrection;
+  final Set<String> correctionFields;
 final bool draftOnly;
 final VoidCallback? onSaved;
 
@@ -111,6 +116,11 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   bool _completed = false;
   bool _requestExists = false;
   String? _error;
+
+  bool _canEdit(String field) =>
+      !widget.readOnly &&
+      (!widget.isCorrection ||
+          widget.correctionFields.contains('establishment.$field'));
 
   String? get _requestId {
     final value = widget.requestId?.trim() ?? '';
@@ -891,6 +901,44 @@ if (widget.draftOnly) {
             };
 if (widget.draftOnly) {
   AdvertiserPhaseOneDraft.forRequest(requestId).merge(establishmentData);
+} else if (widget.isCorrection) {
+  final corrections = <String, Object?>{};
+  void addIfAllowed(String field, Object? value) {
+    final key = 'establishment.$field';
+    if (widget.correctionFields.contains(key)) corrections[key] = value;
+  }
+  addIfAllowed('registrationMode', registrationMode);
+  addIfAllowed('siret', siret);
+  addIfAllowed('legalName', legalName);
+  addIfAllowed('businessName', businessName);
+  addIfAllowed('activityTypes', <String, Object?>{
+    'types': _activityTypes.where(_selectedActivityTypes.contains).toList(),
+    'other': _selectedActivityTypes.contains('Autre')
+        ? _otherActivityController.text.trim() : '',
+  });
+  addIfAllowed('registrationCountryCode', _foreignCountryCode);
+  addIfAllowed('foreignRegistrationNumber',
+      _foreignRegistrationController.text.trim());
+  addIfAllowed('foreignRegistrationAuthority',
+      _foreignAuthorityController.text.trim());
+  if (widget.correctionFields.contains('establishment.foreignProof') &&
+      !_isFrenchRegistration && foreignProof['url'] != null) {
+    addIfAllowed('foreignProof', <String, Object?>{
+      'url': foreignProof['url'],
+      'fileName': foreignProof['fileName'],
+      'extension': foreignProof['extension'],
+      'fileSizeBytes': foreignProof['fileSizeBytes'],
+    });
+  }
+  addIfAllowed('address', _addressController.text.trim());
+  addIfAllowed('addressComplement',
+      _addressComplementController.text.trim());
+  addIfAllowed('postalCode', _postalCodeController.text.trim());
+  addIfAllowed('city', city);
+  await AdvertiserCorrectionFieldsService.save(
+    requestId: requestId, fields: corrections,
+  );
+  _requestExists = true;
 } else {
   await FirebaseFirestore.instance
       .collection('advertiserRequests')
@@ -945,7 +993,7 @@ if (widget.draftOnly) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!widget.readOnly)
+        if (_canEdit('registrationMode'))
           Padding(
             padding: const EdgeInsets.only(top: 8, bottom: 18),
             child: Row(
@@ -1033,7 +1081,7 @@ if (widget.draftOnly) {
                     children: [
                       if (_isFrenchRegistration) ...[
                         _EstablishmentField(
-                          readOnly: widget.readOnly,
+                          readOnly: !_canEdit('siret'),
                           controller: _siretController,
                           label: 'SIRET *',
                           validator: _siretValidator,
@@ -1061,7 +1109,7 @@ if (widget.draftOnly) {
                           ),
                       ],
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
+                        readOnly: !_canEdit('legalName'),
                         controller: _legalNameController,
                         label: 'Raison sociale *',
                         validator: _requiredValidator,
@@ -1070,7 +1118,7 @@ if (widget.draftOnly) {
                         inputFormatters: const [UpperCaseTextInputFormatter()],
                       ),
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
+                        readOnly: !_canEdit('businessName'),
                         controller: _businessNameController,
                         label: 'Nom commercial / marque *',
                         validator: _requiredValidator,
@@ -1087,7 +1135,7 @@ if (widget.draftOnly) {
                           padding: const EdgeInsets.only(bottom: 12),
                           child: GestureDetector(
                             key: _activityFieldKey,
-                            onTap: widget.readOnly
+                            onTap: !_canEdit('activityTypes')
                                 ? null
                                 : () => _openActivityMenu(fieldState),
                             child: InputDecorator(
@@ -1111,8 +1159,10 @@ if (widget.draftOnly) {
                                       ),
                                     ),
                                   ),
-                                  const Icon(
-                                    Icons.keyboard_arrow_down_rounded,
+                                  Icon(
+                                    _canEdit('activityTypes')
+                                        ? Icons.keyboard_arrow_down_rounded
+                                        : Icons.lock_outline,
                                     color: WebColors.red,
                                   ),
                                 ],
@@ -1139,7 +1189,9 @@ if (widget.draftOnly) {
                               : null,
                           builder: (fieldState) => GestureDetector(
                             key: _countryFieldKey,
-                            onTap: () => _openCountryMenu(fieldState),
+                            onTap: !_canEdit('registrationCountryCode')
+                                ? null
+                                : () => _openCountryMenu(fieldState),
                             child: InputDecorator(
                               decoration: _activityFieldDecoration(
                                 'Pays d’immatriculation *',
@@ -1171,21 +1223,22 @@ if (widget.draftOnly) {
                         ),
                         const SizedBox(height: 12),
                         _EstablishmentField(
-                          readOnly: widget.readOnly,
+                          readOnly: !_canEdit('foreignRegistrationNumber'),
                           controller: _foreignRegistrationController,
                           label: 'Numéro d’enregistrement national *',
                           validator: _requiredValidator,
                           onChanged: _markAsModified,
                         ),
                         _EstablishmentField(
-                          readOnly: widget.readOnly,
+                          readOnly: !_canEdit('foreignRegistrationAuthority'),
                           controller: _foreignAuthorityController,
                           label: 'Registre ou autorité (EIN, ABN/ACN, CIPC…) *',
                           validator: _requiredValidator,
                           onChanged: _markAsModified,
                         ),
                         OutlinedButton.icon(
-                          onPressed: widget.readOnly ? null : _pickForeignProof,
+                          onPressed: _canEdit('foreignProof')
+                              ? _pickForeignProof : null,
                           icon: const Icon(Icons.upload_file_outlined),
                           label: Text(
                             _selectedProof?.name ??
@@ -1217,27 +1270,27 @@ if (widget.draftOnly) {
                   child: Column(
                     children: [
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
+                        readOnly: !_canEdit('address'),
                         controller: _addressController,
                         label: 'Adresse *',
                         validator: _requiredValidator,
                         onChanged: _markAsModified,
                       ),
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
+                        readOnly: !_canEdit('addressComplement'),
                         controller: _addressComplementController,
                         label: 'Complément d’adresse',
                         onChanged: _markAsModified,
                       ),
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
+                        readOnly: !_canEdit('postalCode'),
                         controller: _postalCodeController,
                         label: 'Code postal *',
                         validator: _requiredValidator,
                         onChanged: _markAsModified,
                       ),
                       _EstablishmentField(
-                        readOnly: widget.readOnly,
+                        readOnly: !_canEdit('city'),
                         controller: _cityController,
                         label: 'Ville *',
                         validator: _requiredValidator,
