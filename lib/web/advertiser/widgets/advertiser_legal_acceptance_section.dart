@@ -555,7 +555,7 @@ _cguController.collapse();
           },
         ),
         _legalDocument(
-          title: 'Conditions Générales de Vente — SPHOT PUBLICITAIRE',
+          title: 'Conditions Générales de Ventes',
           document: _cgvDocument,
           accepted: _cgvAccepted,
           documentVersion: _cgvVersion,
