@@ -100,7 +100,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
         return 'Autre — ${_otherActivityController.text.trim()}';
       }
       return item;
-    }).join(' • ');
+    }).join('\n');
   }
 
   final _activityFieldKey = GlobalKey();
@@ -1102,8 +1102,7 @@ if (widget.draftOnly) {
                                   Expanded(
                                     child: Text(
                                        _activitySummary,
-                                       maxLines: 2,
-                                       overflow: TextOverflow.ellipsis,
+                                       softWrap: true,
                                       style: TextStyle(
                                         color: _activityType == null
                                             ? const Color(0xFF4B5F97)
