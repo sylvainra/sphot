@@ -3340,13 +3340,38 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   // PHASE 1 : chaque demande de correction doit préciser les rubriques
   // autorisées, en plus du motif communiqué à l'annonceur.
   Future<Map<String, Object?>?> _askAdvertiserCorrectionScopes() async {
-    const choices = <String, String>{
-      'identity': 'Identité et coordonnées du demandeur',
-      'establishment': 'Entreprise et justificatifs',
-      'location': 'Emplacement sur la carte',
-      'visual': 'Visuel publicitaire',
-      'destination': 'Lien de destination',
-      'legal': 'Validations juridiques',
+    const groups = <String, Map<String, String>>{
+      'IDENTITÉ DU RESPONSABLE': <String, String>{
+        'identity.contactCivility': 'Civilité',
+        'identity.contactLastName': 'Nom',
+        'identity.contactFirstName': 'Prénom',
+        'identity.contactFunction': 'Fonction',
+        'identity.contactPhone': 'Téléphone professionnel',
+        'identity.contactEmail': 'Email professionnel',
+      },
+      'ENTREPRISE': <String, String>{
+        'establishment.registrationMode': 'Entreprise française / étrangère',
+        'establishment.siret': 'SIRET et SIREN calculé',
+        'establishment.legalName': 'Raison sociale',
+        'establishment.businessName': 'Nom commercial / marque',
+        'establishment.activityTypes': 'Types d’activités et précision « Autre »',
+        'establishment.registrationCountryCode': 'Pays d’immatriculation',
+        'establishment.foreignRegistrationNumber': 'N° d’enregistrement étranger',
+        'establishment.foreignRegistrationAuthority': 'Registre / autorité',
+        'establishment.foreignProof': 'Justificatif officiel',
+      },
+      'ADRESSE': <String, String>{
+        'establishment.address': 'Adresse',
+        'establishment.addressComplement': 'Complément d’adresse',
+        'establishment.postalCode': 'Code postal',
+        'establishment.city': 'Ville',
+      },
+      'DIFFUSION DE LA DEMANDE': <String, String>{
+        'location': 'Emplacement sur la carte',
+        'visual': 'Visuel publicitaire',
+        'destination': 'Lien de destination',
+        'legal': 'Validations juridiques',
+      },
     };
     final controller = TextEditingController();
     final selected = <String>{};
@@ -3359,39 +3384,51 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
             style: TextStyle(color: adminColor, fontWeight: FontWeight.w900),
           ),
           content: SizedBox(
-            width: 540,
+            width: 570,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Cochez uniquement les rubriques que l’annonceur devra '
-                    'pouvoir modifier. Plusieurs choix sont possibles.',
+                    'Sélectionnez exclusivement les champs que l’annonceur '
+                    'pourra corriger. Tous les autres resteront verrouillés.',
                     style: TextStyle(color: adminColor),
                   ),
-                  const SizedBox(height: 12),
-                  for (final choice in choices.entries)
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: Text(
-                        choice.value,
+                  const SizedBox(height: 14),
+                  for (final group in groups.entries) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 9, bottom: 3),
+                      child: Text(
+                        group.key,
                         style: const TextStyle(
                           color: adminColor,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
-                      value: selected.contains(choice.key),
-                      activeColor: redColor,
-                      onChanged: (checked) => setDialogState(() {
-                        if (checked == true) {
-                          selected.add(choice.key);
-                        } else {
-                          selected.remove(choice.key);
-                        }
-                      }),
                     ),
+                    for (final field in group.value.entries)
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(
+                          field.value,
+                          style: const TextStyle(
+                            color: adminColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        value: selected.contains(field.key),
+                        activeColor: redColor,
+                        onChanged: (checked) => setDialogState(() {
+                          if (checked == true) {
+                            selected.add(field.key);
+                          } else {
+                            selected.remove(field.key);
+                          }
+                        }),
+                      ),
+                  ],
                   const SizedBox(height: 14),
                   TextField(
                     controller: controller,
@@ -3418,10 +3455,15 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   ? null
                   : () => Navigator.of(dialogContext).pop({
                       'reason': controller.text.trim(),
-                      'scopes': <String>[
-                        for (final choice in choices.keys)
-                          if (selected.contains(choice)) choice,
+                      'fields': <String>[
+                        for (final group in groups.values)
+                          for (final field in group.keys)
+                            if (selected.contains(field)) field,
                       ],
+                      'scopes': selected
+                          .map((field) => field.split('.').first)
+                          .toSet()
+                          .toList(),
                     }),
               style: FilledButton.styleFrom(backgroundColor: adminColor),
               child: const Text('CONFIRMER LES CORRECTIONS'),
@@ -3450,12 +3492,15 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         originalAssetChange['status'] == 'submitted';
     String reason = '';
     List<String> correctionScopes = const <String>[];
+    List<String> correctionFields = const <String>[];
     if (decision == 'changes_requested' && !phaseTwoAssetReview) {
       final result = await _askAdvertiserCorrectionScopes();
       if (result == null) return;
       reason = (result['reason'] ?? '').toString().trim();
       correctionScopes = List<String>.from(result['scopes'] as List);
-      if (reason.isEmpty || correctionScopes.isEmpty) return;
+      correctionFields = List<String>.from(result['fields'] as List);
+      if (reason.isEmpty || correctionFields.isEmpty ||
+          correctionScopes.isEmpty) return;
     } else if (decision != 'approved') {
       final result = await _askAdvertiserReviewReason(
         title: decision == 'changes_requested'
@@ -3473,6 +3518,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         'decision': decision,
         'reason': reason,
         if (correctionScopes.isNotEmpty) 'scopes': correctionScopes,
+        if (correctionFields.isNotEmpty) 'fields': correctionFields,
       });
       await _refreshAdvertiserAfterReview(requestId);
     } catch (error, stackTrace) {
