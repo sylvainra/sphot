@@ -173,7 +173,10 @@ _requestExists = !widget.draftOnly && data != null;
     try {
       final user = widget.user;
       final requestId = _requestId;
-      final civility = _civility!.trim();
+      final civility = (_civility ?? '').trim();
+      if (_canEdit('contactCivility') && civility.isEmpty) {
+        throw StateError('Civilité obligatoire.');
+      }
       final lastName = forceUpperCase(_lastNameController.text.trim());
       final firstName = capitalizeFirstLetter(_firstNameController.text.trim());
       final contactFunction = capitalizeFirstLetter(
@@ -245,6 +248,12 @@ if (widget.draftOnly) {
       if (mounted) setState(() => _saving = false);
     }
   }
+
+  String? Function(String?) _requiredWhenEditable(String field) =>
+      (value) => _canEdit(field) ? _requiredValidator(value) : null;
+
+  String? Function(String?) _emailWhenEditable() =>
+      (value) => _canEdit('contactEmail') ? _emailValidator(value) : null;
 
   String? _requiredValidator(String? value) {
     if (value == null || value.trim().isEmpty) {
@@ -411,7 +420,7 @@ if (widget.draftOnly) {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: FormField<String>(
                     initialValue: _civility,
-                    validator: _requiredValidator,
+                    validator: _requiredWhenEditable('contactCivility'),
                     builder: (field) => CompositedTransformTarget(
                       link: _civilityLink,
                       child: GestureDetector(
@@ -470,7 +479,7 @@ if (widget.draftOnly) {
                 _ProfileField(
                   controller: _lastNameController,
                   label: 'Nom *',
-                  validator: _requiredValidator,
+                  validator: _requiredWhenEditable('contactLastName'),
                   onChanged: _profileChanged,
                   readOnly: !_canEdit('contactLastName'),
                   textCapitalization: TextCapitalization.characters,
@@ -479,7 +488,7 @@ if (widget.draftOnly) {
                 _ProfileField(
                   controller: _firstNameController,
                   label: 'Prénom *',
-                  validator: _requiredValidator,
+                  validator: _requiredWhenEditable('contactFirstName'),
                   onChanged: _profileChanged,
                   readOnly: !_canEdit('contactFirstName'),
                   textCapitalization: TextCapitalization.sentences,
@@ -490,7 +499,7 @@ if (widget.draftOnly) {
                 _ProfileField(
                   controller: _functionController,
                   label: 'Fonction *',
-                  validator: _requiredValidator,
+                  validator: _requiredWhenEditable('contactFunction'),
                   onChanged: _profileChanged,
                   readOnly: !_canEdit('contactFunction'),
                   textCapitalization: TextCapitalization.sentences,
@@ -503,7 +512,7 @@ if (widget.draftOnly) {
                   label: 'Téléphone professionnel *',
                   keyboardType: TextInputType.phone,
                   inputFormatters: const [_PhoneNumberInputFormatter()],
-                  validator: _requiredValidator,
+                  validator: _requiredWhenEditable('contactPhone'),
                   onChanged: _profileChanged,
                   readOnly: !_canEdit('contactPhone'),
                 ),
@@ -511,7 +520,7 @@ if (widget.draftOnly) {
                   controller: _professionalEmailController,
                   label: 'Email professionnel *',
                   keyboardType: TextInputType.emailAddress,
-                  validator: _emailValidator,
+                  validator: _emailWhenEditable(),
                   onChanged: _profileChanged,
                   readOnly: !_canEdit('contactEmail'),
                 ),
