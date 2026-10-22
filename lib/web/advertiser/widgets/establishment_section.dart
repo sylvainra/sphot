@@ -110,6 +110,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
 
   // Menu multisélection ancré au formulaire, sans OverlayEntry ni popup.
   bool _activitiesExpanded = false;
+  final ScrollController _activityScrollController = ScrollController();
   String? _activityError;
   bool _loading = true;
   bool _saving = false;
@@ -140,6 +141,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     _closeCountryMenu();
     _otherCountryController.dispose();
     _closeActivityMenu(repaint: false);
+    _activityScrollController.dispose();
     _siretController.removeListener(_updateSiren);
     _legalNameController.dispose();
     _businessNameController.dispose();
@@ -360,7 +362,10 @@ if (widget.draftOnly) {
       ),
       constraints: const BoxConstraints(maxHeight: 345),
       child: Scrollbar(
+        controller: _activityScrollController,
+        thumbVisibility: true,
         child: ListView(
+          controller: _activityScrollController,
           shrinkWrap: true,
           primary: false,
           padding: const EdgeInsets.symmetric(vertical: 4),
