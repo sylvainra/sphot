@@ -318,7 +318,7 @@ class _AdvertiserApplicationSectionState
       setState(() => _error = 'Ajoutez un visuel publicitaire conforme.');
       return;
     }
-    if (destination.isEmpty || !_destinationIsValid(destination)) {
+    if (destination.isNotEmpty && !_destinationIsValid(destination)) {
       setState(() => _error = 'Renseignez une adresse de destination valide.');
       return;
     }
@@ -371,9 +371,11 @@ final data = widget.draftOnly
       final bannerUrl = widget.draftOnly || (correction && !updateVisual)
           ? _bannerUrl
           : await _uploadBanner(requestId);
-      final normalizedDestination = destination.contains('://')
-          ? destination
-          : 'https://$destination';
+      final normalizedDestination = destination.isEmpty
+          ? ''
+          : destination.contains('://')
+              ? destination
+              : 'https://$destination';
       final applicationData = <String, Object?>{
         'uid': requestId,
         'status': 'draft',
@@ -680,7 +682,7 @@ setState(() {
         _card(
           icon: Icons.link_rounded,
           title: 'DESTINATION DU SPHOT PUBLICITAIRE',
-          subtitle: 'PAGE OU SITE OUVERT APRÈS LE CLIC',
+          subtitle: 'LIEN VERS UNE PAGE OU UN SITE — FACULTATIF',
           child: TextField(
             controller: _destinationController,
             readOnly: !_canEditDestination,

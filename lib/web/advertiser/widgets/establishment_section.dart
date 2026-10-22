@@ -84,6 +84,8 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   final _otherCountryController = TextEditingController();
   final _countryFieldKey = GlobalKey();
   OverlayEntry? _countryOverlay;
+  final _activityFieldKey = GlobalKey();
+  OverlayEntry? _activityOverlay;
   String? _countryError;
 
   bool _isFrenchRegistration = true;
@@ -108,8 +110,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     }).join('\n');
   }
 
-  // Menu multisélection ancré au formulaire, sans OverlayEntry ni popup.
-  bool _activitiesExpanded = false;
+  // Menu multisélection déroulant, harmonisé avec celui des pays.
   final ScrollController _activityScrollController = ScrollController();
   String? _activityError;
   bool _loading = true;
@@ -140,7 +141,7 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
   void dispose() {
     _closeCountryMenu();
     _otherCountryController.dispose();
-    _closeActivityMenu(repaint: false);
+    _closeActivityMenu();
     _activityScrollController.dispose();
     _siretController.removeListener(_updateSiren);
     _legalNameController.dispose();
@@ -334,107 +335,166 @@ if (widget.draftOnly) {
     };
   }
 
-  void _closeActivityMenu({bool repaint = true}) {
-    if (!_activitiesExpanded) return;
-    if (repaint && mounted) {
-      setState(() => _activitiesExpanded = false);
-    } else {
-      _activitiesExpanded = false;
-    }
+  void _closeActivityMenu() {
+    _activityOverlay?.remove();
+    _activityOverlay = null;
   }
 
-  void _openActivityMenu() {
+  void _openActivityMenu(FormFieldState<String> fieldState) {
     if (!_canEdit('activityTypes')) return;
+    if (_activityOverlay != null) {
+      _closeActivityMenu();
+      return;
+    }
     _closeCountryMenu();
-    setState(() => _activitiesExpanded = !_activitiesExpanded);
+
+    final renderObject = _activityFieldKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox) return;
+    final rootOverlay = Overlay.of(context, rootOverlay: true);
+    final overlayBox = rootOverlay.context.findRenderObject();
+    if (overlayBox is! RenderBox) return;
+    final position = renderObject.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+    final size = renderObject.size;
+
+    _activityOverlay = OverlayEntry(
+      builder: (overlayContext) => StatefulBuilder(
+        builder: (overlayContext, overlaySetState) => Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _closeActivityMenu,
+                child: const ColoredBox(color: Colors.transparent),
+              ),
+            ),
+            Positioned(
+              left: position.dx,
+              top: position.dy + size.height - 12,
+              width: size.width,
+              child: Material(
+                color: Colors.transparent,
+                child: _buildActivityMultiSelect(fieldState, overlaySetState),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    rootOverlay.insert(_activityOverlay!);
   }
 
-  Widget _buildActivityMultiSelect(FormFieldState<String> fieldState) {
-    if (!_activitiesExpanded || !_canEdit('activityTypes')) {
-      return const SizedBox.shrink();
-    }
+  Widget _buildActivityMultiSelect(
+    FormFieldState<String> fieldState,
+    StateSetter overlaySetState,
+  ) {
     return Container(
-      margin: const EdgeInsets.only(top: 2, bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: WebColors.blue, width: 1.4),
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.white.withOpacity(0.97),
+        border: const Border(
+          left: BorderSide(color: WebColors.blue, width: 1.4),
+          right: BorderSide(color: WebColors.blue, width: 1.4),
+          bottom: BorderSide(color: WebColors.blue, width: 1.4),
+        ),
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(10),
+          bottomRight: Radius.circular(10),
+        ),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
+        ],
       ),
       constraints: const BoxConstraints(maxHeight: 345),
-      child: Scrollbar(
-        controller: _activityScrollController,
-        thumbVisibility: true,
-        child: ListView(
+      child: ScrollbarTheme(
+        data: const ScrollbarThemeData(
+          thumbColor: MaterialStatePropertyAll(WebColors.blue),
+          thumbVisibility: MaterialStatePropertyAll(true),
+          thickness: MaterialStatePropertyAll(9),
+          radius: Radius.circular(10),
+        ),
+        child: Scrollbar(
           controller: _activityScrollController,
-          shrinkWrap: true,
-          primary: false,
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          children: [
-            for (final choice in _activityTypes) ...[
-              InkWell(
-                onTap: () {
-                  if (!_canEdit('activityTypes')) return;
-                  setState(() {
-                    if (_selectedActivityTypes.contains(choice)) {
-                      _selectedActivityTypes.remove(choice);
-                      // Conserver la précision « Autre » en cas de clic
-                      // accidentel ; ne pas effacer une valeur déjà saisie.
-                    } else {
-                      _selectedActivityTypes.add(choice);
-                    }
-                    _activityError = null;
-                    _completed = false;
-                  });
-                  fieldState.didChange(_activityType);
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 9,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          choice,
-                          style: const TextStyle(
-                            color: WebColors.blue,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        _selectedActivityTypes.contains(choice)
-                            ? Icons.check_box_rounded
-                            : Icons.check_box_outline_blank_rounded,
-                        color: _selectedActivityTypes.contains(choice)
-                            ? WebColors.red
-                            : WebColors.blue,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (choice == 'Autre' &&
-                  _selectedActivityTypes.contains('Autre'))
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-                  child: TextField(
-                    controller: _otherActivityController,
-                    onChanged: (_) => setState(() {
+          thumbVisibility: true,
+          thickness: 9,
+          radius: const Radius.circular(10),
+          child: ListView(
+            controller: _activityScrollController,
+            shrinkWrap: true,
+            primary: false,
+            padding: EdgeInsets.zero,
+            children: [
+              for (final choice in _activityTypes) ...[
+                InkWell(
+                  onTap: () {
+                    if (!_canEdit('activityTypes')) return;
+                    setState(() {
+                      if (_selectedActivityTypes.contains(choice)) {
+                        _selectedActivityTypes.remove(choice);
+                        // Conserver la précision « Autre » en cas de clic
+                        // accidentel ; ne pas effacer une valeur déjà saisie.
+                      } else {
+                        _selectedActivityTypes.add(choice);
+                      }
                       _activityError = null;
                       _completed = false;
-                    }),
-                    decoration: InputDecoration(
-                      labelText: 'Précisez l’autre activité',
-                      errorText: _activityError,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
+                    });
+                    fieldState.didChange(_activityType);
+                    overlaySetState(() {});
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 9,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            choice,
+                            style: const TextStyle(
+                              color: WebColors.blue,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          _selectedActivityTypes.contains(choice)
+                              ? Icons.check_box_rounded
+                              : Icons.check_box_outline_blank_rounded,
+                          color: _selectedActivityTypes.contains(choice)
+                              ? WebColors.red
+                              : WebColors.blue,
+                        ),
+                      ],
                     ),
                   ),
                 ),
+                if (choice == 'Autre' &&
+                    _selectedActivityTypes.contains('Autre'))
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                    child: TextField(
+                      controller: _otherActivityController,
+                      onChanged: (_) {
+                        setState(() {
+                          _activityError = null;
+                          _completed = false;
+                        });
+                        overlaySetState(() {});
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Précisez l’autre activité',
+                        errorText: _activityError,
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -1024,49 +1084,41 @@ if (widget.draftOnly) {
                             !_canEdit('activityTypes') || value != null
                                 ? null
                                 : 'Sélectionnez au moins une activité',
-                        builder: (fieldState) => Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: GestureDetector(
-                                onTap: _canEdit('activityTypes')
-                                    ? _openActivityMenu
-                                    : null,
-                                child: InputDecorator(
-                                  decoration: _activityFieldDecoration(
-                                    'Types d’activité *',
-                                  ).copyWith(
-                                    errorText: fieldState.errorText,
-                                    helperText: 'Plusieurs choix possibles',
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          _activitySummary,
-                                          softWrap: true,
-                                          style: TextStyle(
-                                            color: _activityType == null
-                                                ? const Color(0xFF4B5F97)
-                                                : WebColors.blue,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
+                        builder: (fieldState) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: GestureDetector(
+                            key: _activityFieldKey,
+                            onTap: _canEdit('activityTypes')
+                                ? () => _openActivityMenu(fieldState)
+                                : null,
+                            child: InputDecorator(
+                              decoration: _activityFieldDecoration(
+                                'Types d’activité *',
+                              ).copyWith(errorText: fieldState.errorText),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _activitySummary,
+                                      softWrap: true,
+                                      style: TextStyle(
+                                        color: _activityType == null
+                                            ? const Color(0xFF4B5F97)
+                                            : WebColors.blue,
+                                        fontWeight: FontWeight.w700,
                                       ),
-                                      Icon(
-                                        _canEdit('activityTypes')
-                                            ? Icons.keyboard_arrow_down_rounded
-                                            : Icons.lock_outline,
-                                        color: WebColors.red,
-                                      ),
-                                    ],
+                                    ),
                                   ),
-                                ),
+                                  Icon(
+                                    _canEdit('activityTypes')
+                                        ? Icons.keyboard_arrow_down_rounded
+                                        : Icons.lock_outline,
+                                    color: WebColors.red,
+                                  ),
+                                ],
                               ),
                             ),
-                            _buildActivityMultiSelect(fieldState),
-                          ],
+                          ),
                         ),
                       ),
                       if (_isFrenchRegistration) ...[
