@@ -353,37 +353,46 @@ if (widget.draftOnly) {
     final rootOverlay = Overlay.of(context, rootOverlay: true);
     final overlayBox = rootOverlay.context.findRenderObject();
     if (overlayBox is! RenderBox) return;
-    final position = renderObject.localToGlobal(
-      Offset.zero,
-      ancestor: overlayBox,
-    );
-    final size = renderObject.size;
-
     _activityOverlay = OverlayEntry(
       builder: (overlayContext) => StatefulBuilder(
-        builder: (overlayContext, overlaySetState) => Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _closeActivityMenu,
-                child: const ColoredBox(color: Colors.transparent),
+        builder: (overlayContext, overlaySetState) {
+          final anchor = _activityFieldKey.currentContext?.findRenderObject();
+          if (anchor is! RenderBox) return const SizedBox.shrink();
+          final position = anchor.localToGlobal(
+            Offset.zero,
+            ancestor: overlayBox,
+          );
+          final size = anchor.size;
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _closeActivityMenu,
+                  child: const ColoredBox(color: Colors.transparent),
+                ),
               ),
-            ),
-            Positioned(
-              left: position.dx,
-              top: position.dy + size.height - 12,
-              width: size.width,
-              child: Material(
-                color: Colors.transparent,
-                child: _buildActivityMultiSelect(fieldState, overlaySetState),
+              Positioned(
+                left: position.dx,
+                top: position.dy + size.height - 12,
+                width: size.width,
+                child: Material(
+                  color: Colors.transparent,
+                  child: _buildActivityMultiSelect(fieldState, overlaySetState),
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
     rootOverlay.insert(_activityOverlay!);
+  }
+
+  void _refreshActivityMenuPosition() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _activityOverlay?.markNeedsBuild();
+    });
   }
 
   Widget _buildActivityMultiSelect(
@@ -442,6 +451,7 @@ if (widget.draftOnly) {
                     });
                     fieldState.didChange(_activityType);
                     overlaySetState(() {});
+                    _refreshActivityMenuPosition();
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -483,6 +493,7 @@ if (widget.draftOnly) {
                           _completed = false;
                         });
                         overlaySetState(() {});
+                        _refreshActivityMenuPosition();
                       },
                       decoration: InputDecoration(
                         labelText: 'Précisez l’autre activité',
