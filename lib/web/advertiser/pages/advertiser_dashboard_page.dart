@@ -211,8 +211,23 @@ bool get _applicationLocked {
     return scopes.map((item) => item.toString()).toSet();
   }
 
+  Set<String> get _authorizedCorrectionFields {
+    if (!_isPhaseOneCorrection) return const <String>{};
+    final request = _map(_requestData['correctionRequest']);
+    if ((request['status'] ?? '').toString() != 'changes_requested') {
+      return const <String>{};
+    }
+    final fields = request['fields'];
+    if (fields is! List) return const <String>{};
+    return fields.map((item) => item.toString()).toSet();
+  }
+
   bool _canEditPhaseOneScope(String scope) =>
-      !_isPhaseOneCorrection || _authorizedCorrectionScopes.contains(scope);
+      !_isPhaseOneCorrection ||
+      (_authorizedCorrectionFields.isNotEmpty
+          ? _authorizedCorrectionFields.any((field) =>
+              field == scope || field.startsWith('$scope.'))
+          : _authorizedCorrectionScopes.contains(scope));
 
   bool get _canEditPhaseOneApplication =>
       _canEditPhaseOneScope('location') ||
@@ -228,9 +243,35 @@ bool get _applicationLocked {
       'destination': 'Lien de destination',
       'legal': 'Validations juridiques',
     };
+    const fieldTitles = <String, String>{
+      'identity.contactCivility': 'Civilité',
+      'identity.contactLastName': 'Nom',
+      'identity.contactFirstName': 'Prénom',
+      'identity.contactFunction': 'Fonction',
+      'identity.contactPhone': 'Téléphone professionnel',
+      'identity.contactEmail': 'Email professionnel',
+      'establishment.registrationMode': 'Entreprise française / étrangère',
+      'establishment.siret': 'SIRET',
+      'establishment.legalName': 'Raison sociale',
+      'establishment.businessName': 'Nom commercial / marque',
+      'establishment.activityTypes': 'Types d’activités et précision « Autre »',
+      'establishment.registrationCountryCode': 'Pays d’immatriculation',
+      'establishment.foreignRegistrationNumber': 'N° d’enregistrement',
+      'establishment.foreignRegistrationAuthority': 'Registre / autorité',
+      'establishment.foreignProof': 'Justificatif officiel',
+      'establishment.address': 'Adresse',
+      'establishment.addressComplement': 'Complément d’adresse',
+      'establishment.postalCode': 'Code postal',
+      'establishment.city': 'Ville',
+      'location': 'Emplacement sur la carte',
+      'visual': 'Visuel publicitaire',
+      'destination': 'Lien de destination',
+      'legal': 'Validations juridiques',
+    };
     final request = _map(_requestData['correctionRequest']);
     final reason = (request['reason'] ?? '').toString().trim();
     final scopes = _authorizedCorrectionScopes;
+    final fields = _authorizedCorrectionFields;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(14),
@@ -251,9 +292,11 @@ bool get _applicationLocked {
           ),
           const SizedBox(height: 6),
           Text(
-            scopes.isEmpty
-                ? 'Aucune rubrique autorisée. Contactez l’équipe SPHOT.'
-                : 'Rubriques modifiables : ${titles.entries.where((item) => scopes.contains(item.key)).map((item) => item.value).join(' • ')}',
+            fields.isNotEmpty
+                ? 'Champs modifiables :\n${fields.map((field) => '• ${fieldTitles[field] ?? field}').join('\n')}'
+                : scopes.isEmpty
+                    ? 'Aucune rubrique autorisée. Contactez l’équipe SPHOT.'
+                    : 'Rubriques modifiables : ${titles.entries.where((item) => scopes.contains(item.key)).map((item) => item.value).join(' • ')}',
             style: const TextStyle(color: WebColors.blue),
           ),
           if (reason.isNotEmpty) ...[
@@ -1208,6 +1251,8 @@ _detailScrollController.dispose();
   requestId: _requestId,
   readOnly: _applicationLocked ||
       !_canEditPhaseOneScope('identity'),
+  isCorrection: _isPhaseOneCorrection,
+  correctionFields: _authorizedCorrectionFields,
   draftOnly: _localPhaseOneDraft,
             ),
             const SizedBox(height: 8),
@@ -1217,6 +1262,8 @@ _detailScrollController.dispose();
   requestId: _requestId,
   readOnly: _applicationLocked ||
       !_canEditPhaseOneScope('establishment'),
+  isCorrection: _isPhaseOneCorrection,
+  correctionFields: _authorizedCorrectionFields,
   draftOnly: _localPhaseOneDraft,
             ),
           ];
