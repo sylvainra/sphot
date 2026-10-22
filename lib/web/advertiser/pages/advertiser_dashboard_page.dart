@@ -189,10 +189,13 @@ class _AdvertiserDashboardPageState extends State<AdvertiserDashboardPage> {
     !_approvedFlow;
 
 bool get _applicationLocked {
-  return !_requestReady ||
+    // Le lien de reprise ne crée jamais de nouveau brouillon et ne
+    // déverrouille aucun champ en dehors d'une correction encore ouverte.
+    return !_requestReady ||
         _requestLoadError != null ||
         isAdvertiserApplicationLocked(_requestStatus) ||
-        _approvedFlow;
+        _approvedFlow ||
+        (widget.existingRequestOnly && !_isPhaseOneCorrection);
   }
 
   // PHASE 1 : en correction, absence de rubriques autorisées = lecture seule.
@@ -222,12 +225,16 @@ bool get _applicationLocked {
     return fields.map((item) => item.toString()).toSet();
   }
 
-  bool _canEditPhaseOneScope(String scope) =>
-      !_isPhaseOneCorrection ||
-      (_authorizedCorrectionFields.isNotEmpty
-          ? _authorizedCorrectionFields.any((field) =>
-              field == scope || field.startsWith('$scope.'))
-          : _authorizedCorrectionScopes.contains(scope));
+  bool _canEditPhaseOneScope(String scope) {
+    if (_applicationLocked) return false;
+    if (!_isPhaseOneCorrection) return !widget.existingRequestOnly;
+
+    // Sécurité : en correction, la liste précise des champs est obligatoire.
+    // Les anciennes rubriques globales ne peuvent jamais élargir les droits.
+    final fields = _authorizedCorrectionFields;
+    return fields.contains(scope) ||
+        fields.any((field) => field.startsWith('$scope.'));
+  }
 
   bool get _canEditPhaseOneApplication =>
       _canEditPhaseOneScope('location') ||
@@ -235,14 +242,6 @@ bool get _applicationLocked {
       _canEditPhaseOneScope('destination');
 
   Widget _buildPhaseOneCorrectionNotice() {
-    const titles = <String, String>{
-      'identity': 'Identité et coordonnées',
-      'establishment': 'Entreprise et justificatifs',
-      'location': 'Emplacement sur la carte',
-      'visual': 'Visuel publicitaire',
-      'destination': 'Lien de destination',
-      'legal': 'Validations juridiques',
-    };
     const fieldTitles = <String, String>{
       'identity.contactCivility': 'Civilité',
       'identity.contactLastName': 'Nom',
@@ -270,7 +269,6 @@ bool get _applicationLocked {
     };
     final request = _map(_requestData['correctionRequest']);
     final reason = (request['reason'] ?? '').toString().trim();
-    final scopes = _authorizedCorrectionScopes;
     final fields = _authorizedCorrectionFields;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -294,9 +292,8 @@ bool get _applicationLocked {
           Text(
             fields.isNotEmpty
                 ? 'Champs modifiables :\n${fields.map((field) => '• ${fieldTitles[field] ?? field}').join('\n')}'
-                : scopes.isEmpty
-                    ? 'Aucune rubrique autorisée. Contactez l’équipe SPHOT.'
-                    : 'Rubriques modifiables : ${titles.entries.where((item) => scopes.contains(item.key)).map((item) => item.value).join(' • ')}',
+                : 'Aucun champ de correction autorisé. '
+                    'Contactez l’équipe SPHOT.',
             style: const TextStyle(color: WebColors.blue),
           ),
           if (reason.isNotEmpty) ...[
@@ -1293,7 +1290,7 @@ _detailScrollController.dispose();
           return [
             AdvertiserLegalAcceptanceSection(
   readOnly: _applicationLocked ||
-      (_isPhaseOneCorrection && _authorizedCorrectionScopes.isEmpty),
+      (_isPhaseOneCorrection && _authorizedCorrectionFields.isEmpty),
   draftOnly: _localPhaseOneDraft,
   canEditLegal: _canEditPhaseOneScope('legal'),
               key: ValueKey<String>(
