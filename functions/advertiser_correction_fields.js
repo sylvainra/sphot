@@ -36,12 +36,25 @@ const FIELD_SCOPES = Object.freeze({
   "legal": "legal",
 });
 
+/**
+ * Construit une erreur HTTP contrôlée.
+ * @param {number} code Code HTTP.
+ * @param {string} message Motif de refus.
+ * @return {Error} Erreur annotée.
+ */
 function deny(code, message) {
   const e = new Error(message);
   e.httpStatus = code;
   return e;
 }
 
+/**
+ * Normalise une chaîne et limite sa longueur.
+ * @param {*} value Valeur à contrôler.
+ * @param {string} key Nom du champ.
+ * @param {number} limit Nombre maximal de caractères.
+ * @return {string} Texte normalisé.
+ */
 function textValue(value, key, limit = 300) {
   if (typeof value !== "string" || value.trim().length > limit) {
     throw deny(400, "Valeur non conforme : " + key);
@@ -49,6 +62,13 @@ function textValue(value, key, limit = 300) {
   return value.trim();
 }
 
+/**
+ * Normalise un texte obligatoire.
+ * @param {*} value Valeur à contrôler.
+ * @param {string} key Nom du champ.
+ * @param {number} limit Nombre maximal de caractères.
+ * @return {string} Texte obligatoire.
+ */
 function requireText(value, key, limit = 300) {
   const text = textValue(value, key, limit);
   if (!text) throw deny(400, "Valeur manquante : " + key);
@@ -163,7 +183,7 @@ function buildCorrectionFieldPatch(data, fields, fv, requestId) {
       }
       const urlText = requireText(value.url, key, 2048);
       let url;
-      try { url = new URL(urlText); } catch (_) {
+      try {url = new URL(urlText);} catch (_) {
         throw deny(400, "URL de justificatif invalide.");
       }
       if (url.protocol !== "https:" ||
@@ -205,6 +225,13 @@ function buildCorrectionFieldPatch(data, fields, fv, requestId) {
   return updates;
 }
 
+/**
+ * Expose la sauvegarde des corrections après authentification Firebase.
+ * @param {Object} dependencies Services Firebase injectés.
+ * @param {Object} dependencies.admin SDK d'administration Firebase.
+ * @param {Function} dependencies.onRequest Déclaration de fonction HTTPS.
+ * @return {Function} Gestionnaire de requêtes.
+ */
 function registerAdvertiserCorrectionFields({admin, onRequest}) {
   return onRequest(
       {region: "us-central1", cors: true, cpu: 1, memory: "256MiB"},
