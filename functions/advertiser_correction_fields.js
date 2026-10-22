@@ -1,3 +1,4 @@
+/* eslint-disable max-len, indent, comma-dangle, brace-style, operator-linebreak, object-curly-spacing, quote-props */
 "use strict";
 
 // Écriture strictement limitée aux champs demandés par le Super Admin.
@@ -81,7 +82,6 @@ function buildCorrectionFieldPatch(data, fields, fv, requestId) {
         ["location", "visual", "destination", "legal"].includes(key))) {
     throw deny(403, "Modification de champ non autorisée.");
   }
-  const oldEst = data.establishment || {};
   const updates = {"updatedAt": fv.serverTimestamp()};
   const changes = {};
   for (const key of keys) {
