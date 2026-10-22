@@ -333,14 +333,10 @@ if (widget.draftOnly) {
   }
 
   void _closeActivityMenu() {
-    if (_activitiesExpanded && mounted) {
-      setState(() => _activitiesExpanded = false);
-    } else {
-      _activitiesExpanded = false;
-    }
+    _activitiesExpanded = false;
   }
 
-  void _openActivityMenu(FormFieldState<String> fieldState) {
+  void _openActivityMenu() {
     if (!_canEdit('activityTypes')) return;
     _closeCountryMenu();
     setState(() => _activitiesExpanded = !_activitiesExpanded);
@@ -359,7 +355,6 @@ if (widget.draftOnly) {
       ),
       constraints: const BoxConstraints(maxHeight: 345),
       child: Scrollbar(
-        thumbVisibility: true,
         child: ListView(
           shrinkWrap: true,
           primary: false,
@@ -1026,7 +1021,7 @@ if (widget.draftOnly) {
                           child: GestureDetector(
                             onTap: !_canEdit('activityTypes')
                                 ? null
-                                : () => _openActivityMenu(fieldState),
+                                : _openActivityMenu,
                             child: InputDecorator(
                               decoration: _activityFieldDecoration(
                                  'Types d’activité *',
