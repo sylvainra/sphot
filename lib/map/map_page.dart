@@ -2743,23 +2743,25 @@ Widget _buildAdBanner() {
                     // Rétablit le fin contour orange validé par-dessus les
                     // visuels recentrés, sans retoucher le texte, le fond,
                     // les proportions ni l'arrondi de 18 px.
-                    foregroundDecoration: hasAdvertisement
-                        ? null
-                        : BoxDecoration(
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: const Color(0xFFFF9800),
-                              width: 1.5,
-                            ),
-                          ),
+                    foregroundDecoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: const Color(0xFFFF9800),
+                        width: 1.5,
+                      ),
+                    ),
                     child: SphotAdvertisingInvitationVisual(
                       compact: hasAdvertisement,
                       mobileMap: isMobile && !hasAdvertisement,
                       // L'image adaptée au mobile conserve ses proportions.
                       // La bande Web reste remplie comme auparavant.
-                      fit: (isMobile || hasAdvertisement)
-                          ? BoxFit.contain
-                          : BoxFit.fill,
+                      fit: hasAdvertisement
+                          // Seul le petit encart de candidature avec pub
+                          // remplit sa hauteur, sans déformer logo ni texte.
+                          ? BoxFit.cover
+                          : isMobile
+                              ? BoxFit.contain
+                              : BoxFit.fill,
                     ),
                   ),
                 ),
@@ -2788,8 +2790,12 @@ Widget _buildAdBanner() {
               // approuvé. La couche Flutter au-dessus du rendu HTML garantit
               // que le clic reste accessible dans Chrome et sur mobile.
               Expanded(
-                child: ColoredBox(
-                  color: const Color(0xFF063551),
+                child: Container(
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF063551),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
                   child: Stack(
                     fit: StackFit.expand,
                     children: [

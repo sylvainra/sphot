@@ -483,13 +483,17 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(7),
                 child: AspectRatio(
-                  aspectRatio: 6,
+                  // Publicité active uniquement : +20 % en hauteur.
+                  // Les invitations sans annonce conservent leur taille.
+                  aspectRatio: 5,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
                       Image.network(
                         bannerUrl,
-                        fit: BoxFit.contain,
+                        // Option B validée : léger étirement vertical,
+                        // sans rogner le visuel de l'annonceur.
+                        fit: BoxFit.fill,
                         webHtmlElementStrategy:
                             WebHtmlElementStrategy.prefer,
                         errorBuilder: (_, __, ___) => const Center(

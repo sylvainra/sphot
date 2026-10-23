@@ -19,7 +19,7 @@ class SphotAdvertisingInvitationVisual extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final assetPath = compact
-        ? 'data/images/sphot_advertising_callout_compact.png'
+        ? 'data/images/sphot_advertising_callout_compact_rounded_v6.png'
         : mobileMap
             ? 'data/images/sphot_advertising_callout_mobile_centered_v3.png'
             : 'data/images/sphot_advertising_callout_web_centered_v3.png';
