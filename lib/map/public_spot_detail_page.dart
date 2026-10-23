@@ -9,6 +9,7 @@ import '../models/flag_state.dart';
 import '../services/firestore_service.dart';
 import '../services/public_favorites_service.dart';
 import '../widgets/danger_pictogram.dart';
+import '../widgets/sphot_advertising_invitation_visual.dart';
 import 'flag_marker.dart';
 import 'public_webcam_view.dart';
 
@@ -356,38 +357,56 @@ class _PublicSpotMobileSheetState extends State<PublicSpotMobileSheet> {
   // Cette invitation reste visible sous une publicité active
   // et remplace uniquement l'annonce en l'absence de campagne éligible.
   Widget _buildEmptyAdvertisingSpace({bool hasAdvertisement = false}) {
-    // Même style compact rouge/orange que les autres boutons de la fiche.
-    // L'encart reste SOUS l'image publicitaire, jamais au-dessus.
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: _openAdvertiserWebsite,
-        borderRadius: BorderRadius.circular(11),
-        child: Container(
-          width: double.infinity,
-          height: 34,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: _sphotWarmSurface,
+    // Avec publicité : le petit encart conserve exactement ses 34 px.
+    // Sans publicité : même hauteur totale que la publicité Premium
+    // (bord de 1 px + marge de 6 px sur chaque côté et ratio 6:1).
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bannerHeight = 14.0 + (constraints.maxWidth - 14.0) / 6.0;
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _openAdvertiserWebsite,
             borderRadius: BorderRadius.circular(11),
-            border: Border.all(color: _sphotWarmRed, width: 1),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            hasAdvertisement
-                ? 'Votre SPHOT PUBLICITAIRE ici!'
-                : 'CRÉER VOTRE SPHOT PUBLICITAIRE ICI!',
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: _sphotWarmRed,
+            child: Semantics(
+              button: true,
+              label: hasAdvertisement
+                  ? 'Votre SPHOT PUBLICITAIRE ici!'
+                  : 'CRÉER VOTRE SPHOT PUBLICITAIRE ICI!',
+              child: SizedBox(
+                width: double.infinity,
+                height: hasAdvertisement ? 34.0 : bannerHeight,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(11),
+                  child: hasAdvertisement
+                      ? const SphotAdvertisingInvitationVisual()
+                      : Container(
+                          color: const Color(0xFF03283D),
+                          foregroundDecoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(11),
+                            border: Border.all(
+                              color: const Color(0xFFFF9800),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Image.asset(
+                            'data/images/sphot_advertising_callout_detail_no_ad_v4.png',
+                            width: double.infinity,
+                            height: double.infinity,
+                            // Le cadrage remplit la hauteur du grand encart
+                            // sans déformer le titre ni le pictogramme.
+                            fit: BoxFit.cover,
+                            alignment: Alignment.center,
+                            filterQuality: FilterQuality.high,
+                            excludeFromSemantics: true,
+                          ),
+                        ),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

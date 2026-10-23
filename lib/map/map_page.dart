@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../widgets/adaptive_asset_image.dart';
+import '../widgets/sphot_advertising_invitation_visual.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -2722,8 +2723,8 @@ Widget _buildAdBanner() {
             ? min(118.0, panoramicWidth / 6.0)
             : max(52.0, panoramicWidth / 6.0);
 
-        // Même fond clair que l'encart de création sans campagne.
-        // Le Fire rouge est restauré sans changer la navigation.
+        // Même géométrie et même destination qu'auparavant : seul le visuel
+        // de candidature change, en utilisant les créations SPHOT validées.
         Widget createAdvertisingInvitation({
           bool hasAdvertisement = false,
         }) {
@@ -2736,47 +2737,29 @@ Widget _buildAdBanner() {
                 label: hasAdvertisement
                     ? 'Votre SPHOT PUBLICITAIRE ici!'
                     : 'CRÉER VOTRE SPHOT PUBLICITAIRE ICI!',
-                child: Container(
-                  alignment: Alignment.center,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 2.0 : 5.0,
-                    vertical: isMobile ? 2.0 : 4.0,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.72),
-                    border: Border(
-                      left: BorderSide(
-                        color: Colors.black.withOpacity(0.08),
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.center,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SvgPicture.asset(
-                          'data/icons/fire_red_icon.svg',
-                          width: isMobile ? 19 : 28,
-                          height: isMobile ? 24 : 36,
-                          fit: BoxFit.contain,
-                        ),
-                        SizedBox(height: isMobile ? 2 : 4),
-                        Text(
-                          hasAdvertisement
-                              ? 'Votre\nSPHOT\nPUBLICITAIRE\nici!'
-                              : 'CRÉER VOTRE\nSPHOT PUBLICITAIRE\nICI!',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: isMobile ? 9 : 11,
-                            height: 1.1,
-                            color: Colors.black87,
-                            fontWeight: FontWeight.w900,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Container(
+                    // Rétablit le fin contour orange validé par-dessus les
+                    // visuels recentrés, sans retoucher le texte, le fond,
+                    // les proportions ni l'arrondi de 18 px.
+                    foregroundDecoration: hasAdvertisement
+                        ? null
+                        : BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: const Color(0xFFFF9800),
+                              width: 1.5,
+                            ),
                           ),
-                        ),
-                      ],
+                    child: SphotAdvertisingInvitationVisual(
+                      compact: hasAdvertisement,
+                      mobileMap: isMobile && !hasAdvertisement,
+                      // L'image adaptée au mobile conserve ses proportions.
+                      // La bande Web reste remplie comme auparavant.
+                      fit: (isMobile || hasAdvertisement)
+                          ? BoxFit.contain
+                          : BoxFit.fill,
                     ),
                   ),
                 ),
