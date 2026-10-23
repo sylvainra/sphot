@@ -4,8 +4,8 @@
 
 Tester **un compte de démonstration par rôle** (Sauveteur, Admin,
 Publicitaire), avec une véritable adresse email, dans `sphot-ab80b`.
-Le Sauveteur a déjà été vérifié en réel ; les deux parcours professionnels
-restent à valider. Ce projet Firebase est également celui de production :
+Les trois parcours ont ensuite été vérifiés en réel (bilan du 24/10/2026).
+Ce projet Firebase est également celui de production :
 seuls les endpoints de test sont isolés, **pas la base Firestore**.
 
 - Ne jamais utiliser un compte opérationnel : les essais changent réellement
@@ -17,7 +17,8 @@ seuls les endpoints de test sont isolés, **pas la base Firestore**.
   **uniquement un canal d'aperçu** de ce site existant.
 - Ne pas déployer les fonctions de connexion de production :
   `loginSauveteur`, `loginAdmin`, `loginAdvertiser`, etc.
-- La branche d'essai ne doit pas être fusionnée dans `main` à cette étape.
+- Durant la phase pilote, ne pas fusionner dans `main` avant validation
+  des trois parcours et revue des impacts sur les fonctions existantes.
 
 ## Préparation du compte
 
@@ -106,8 +107,33 @@ Ne pas supprimer d'autres fonctions, fichiers, utilisateurs ou sites Hosting.
 
 - Ancienne version à un rôle : tests Node et ESLint réussis, premier essai
   réel Sauveteur confirmé par l'utilisateur.
-- Nouvelle version à trois rôles : résultats des tests et des essais à
-  renseigner après leur exécution.
+- Nouvelle version à trois rôles : parcours réels confirmés ci-dessous.
 - Flutter SDK et Firebase CLI : non disponibles dans l'environnement de
   développement distant. Le déploiement doit être exécuté depuis le poste
   autorisé et vérifié avant toute validation des deux nouveaux parcours.
+
+## Bilan vérifié le 24/10/2026 et préparation de l'intégration
+
+- Sauveteur : réception du mail, nouveau mot de passe et reconnexion
+  validés par l'utilisateur.
+- Publicitaire : changement du mot de passe et reconnexion validés
+  par l'utilisateur.
+- Admin : identifiant de connexion identique à son adresse email ;
+  reconnaissance Firebase confirmée, mail reçu, changement et reconnexion
+  validés par l'utilisateur.
+- Super Admin : exclu du dispositif pilote de récupération.
+- Déploiements pilotes : canal d'aperçu Hosting et cinq fonctions dédiées,
+  sans remplacement des fonctions de connexion en production.
+- Révision de la branche testée : `2660da1` ; base `main` : `00514fd`.
+- Contrôle local d'intégration : `npm run lint` réussi ; 33 suites sur 34
+  passent avec `node --test test/*.test.js`. L'échec de
+  `commercial_radius_catalog.test.js` concerne des fichiers tarifaires
+  identiques à ceux de `main` et n'est pas lié au chantier mot de passe.
+- Limite : le SDK Flutter n'est pas présent dans l'environnement distant.
+  Les parcours réels de récupération sont validés, mais les autres actions
+  affectées par le renforcement des droits (création, modification,
+  suppression de sauveteurs et première connexion) nécessitent une
+  vérification de non-régression avant déploiement général.
+- La fusion du code dans `main` et le déploiement sur les URLs de production
+  sont deux opérations distinctes. Aucun déploiement général ne doit être
+  déduit de la seule fusion Git.
