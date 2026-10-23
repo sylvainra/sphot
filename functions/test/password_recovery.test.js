@@ -3,7 +3,7 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {registerPasswordRecovery, digest} =
+const {registerPasswordRecovery, digest, pilotAllowsAccount} =
   require("../password_recovery");
 const {verifyAccountPassword} = require("../password_security");
 
@@ -150,7 +150,7 @@ test("recovery uses a hashed single-use token and excludes Super Admin",
           "Unchanged@9Password");
     });
 
-test("pilot recovers only the allowlisted Sauveteur with isolated tokens",
+test("pilot recovers only allowlisted roles with isolated tokens",
     async () => {
       const {admin, docs} = fakeFirebase();
       const emails = [];
@@ -169,7 +169,11 @@ test("pilot recovers only the allowlisted Sauveteur with isolated tokens",
       const pilot = registerPasswordRecovery({
         ...dependencies,
         pilotConfig: () => enabled ? {
-          login: "pilote-sauveteur",
+          accounts: {
+            SAUVETEUR: "pilote-sauveteur",
+            ADMIN: "pilote-admin",
+            ANNONCEUR: "pilote-publicitaire",
+          },
           baseUrl: "https://sphot-advertiser-test--password-pilot-1.web.app",
         } : null,
       });
@@ -225,3 +229,110 @@ test("pilot recovers only the allowlisted Sauveteur with isolated tokens",
           {token, newPassword: "Again@9Password"});
       assert.equal(replay.statusCode, 400);
     });
+
+test("pilot role whitelist excludes unauthorized accounts", async () => {
+  const {admin, docs} = fakeFirebase();
+  const emails = [];
+  const pilotConfig = () => ({
+    accounts: {
+      SAUVETEUR: "pilote-sauveteur",
+      ADMIN: "pilote-admin",
+      ANNONCEUR: "pilote-publicitaire",
+    },
+    baseUrl: "https://sphot-advertiser-test--password-pilot-1.web.app",
+  });
+  const routes = registerPasswordRecovery({
+    admin,
+    onRequest: (_options, callback) => callback,
+    sendSphotMail: async (_transport, message) => {
+      emails.push(message);
+      return {success: true};
+    },
+    mailFrom: "SPHOT <no-reply@sphot.app>",
+    smtpUser: "admin@sphot.app",
+    baseUrl: "https://sphot.app",
+    pilotConfig,
+  });
+
+  docs.set("adminAccounts/pilote-admin", {
+    email: "pilote-admin@example.org",
+    role: "ADMIN",
+    accountStatus: "ACTIVE",
+    temporaryPassword: "Old@9Password",
+  });
+  docs.set("advertiserAccounts/pilote-publicitaire", {
+    email: "pilote-publicitaire@example.org",
+    role: "ANNONCEUR",
+    accountStatus: "ACTIVE",
+    temporaryPassword: "Old@9Password",
+  });
+  docs.set("adminAccounts/another-admin", {
+    email: "another-admin@example.org",
+    role: "ADMIN",
+    accountStatus: "ACTIVE",
+    temporaryPassword: "Old@9Password",
+  });
+  docs.set("sauveteurAccounts/pilote-sauveteur", {
+    email: "pilote-sauveteur@example.org",
+    role: "SUPER_ADMIN",
+    accountStatus: "ACTIVE",
+    temporaryPassword: "Old@9Password",
+  });
+
+  const allowed = pilotConfig();
+  assert.equal(pilotAllowsAccount(allowed, "ADMIN", "pilote-admin"), true);
+  assert.equal(pilotAllowsAccount(allowed, "ANNONCEUR", "pilote-publicitaire"),
+      true);
+  assert.equal(pilotAllowsAccount(allowed, "ADMIN", "pilote-publicitaire"),
+      false);
+  assert.equal(pilotAllowsAccount(null, "ADMIN", "pilote-admin"), false);
+  for (const [login, audience] of [
+    ["another-admin", "ADMIN"],
+    ["pilote-admin", "ANNONCEUR"],
+    ["pilote-publicitaire", "ADMIN"],
+    ["pilote-sauveteur", "SAUVETEUR"],
+  ]) {
+    const result = await invoke(routes.requestSphotPasswordRecovery,
+        {login, audience});
+    assert.equal(result.statusCode, 200);
+  }
+  assert.equal(emails.length, 0);
+
+  for (const [login, audience, collection] of [
+    ["pilote-admin", "ADMIN", "adminAccounts"],
+    ["pilote-publicitaire", "ANNONCEUR", "advertiserAccounts"],
+  ]) {
+    const requested = await invoke(routes.requestSphotPasswordRecovery,
+        {login, audience});
+    assert.equal(requested.statusCode, 200);
+    const message = emails.at(-1);
+    assert.match(message.html, /background:#1e3a8a/);
+    const token = message.text.match(/token=([a-f0-9]{64})/)[1];
+    assert.equal(docs.has(`passwordRecoveryPilotTokens/${digest(token)}`),
+        true);
+    const completed = await invoke(routes.completeSphotPasswordRecovery,
+        {token, newPassword: "New@9Password"});
+    assert.equal(completed.statusCode, 200);
+    assert.equal(verifyAccountPassword(docs.get(`${collection}/${login}`),
+        "New@9Password"), true);
+    const replay = await invoke(routes.completeSphotPasswordRecovery,
+        {token, newPassword: "Again@9Password"});
+    assert.equal(replay.statusCode, 400);
+  }
+  assert.equal(verifyAccountPassword(docs.get("adminAccounts/another-admin"),
+      "Old@9Password"), true);
+  assert.equal(docs.get("sauveteurAccounts/pilote-sauveteur")
+      .temporaryPassword, "Old@9Password");
+
+  // Even an allowlisted identifier must not recover a Super Admin account.
+  docs.set("adminAccounts/pilote-admin", {
+    email: "pilote-admin@example.org",
+    role: "SUPER_ADMIN",
+    accountStatus: "ACTIVE",
+    temporaryPassword: "Original@9Password",
+  });
+  const sentBeforeSuperAdmin = emails.length;
+  await invoke(routes.requestSphotPasswordRecovery,
+      {login: "pilote-admin", audience: "ADMIN"});
+  assert.equal(emails.length, sentBeforeSuperAdmin);
+});

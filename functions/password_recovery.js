@@ -18,6 +18,19 @@ const REQUEST_INTERVAL_MS = 2 * 60 * 1000;
 const HOURLY_LIMIT = 5;
 
 /**
+ * Only accounts explicitly assigned to their role in the current pilot can
+ * use pilot endpoints. A matching login under a different role is rejected.
+ * @param {?Object} pilot Active pilot configuration.
+ * @param {string} audience Account role.
+ * @param {string} login Normalized login.
+ * @return {boolean} Whether the account is part of the pilot.
+ */
+function pilotAllowsAccount(pilot, audience, login) {
+  return Boolean(pilot && pilot.accounts &&
+    pilot.accounts[audience] && pilot.accounts[audience] === login);
+}
+
+/**
  * @param {string} value Value to hash.
  * @return {string} SHA256 digest.
  */
@@ -36,8 +49,8 @@ function registerPasswordRecovery(dependencies) {
   const {admin, onRequest, sendSphotMail, mailFrom, smtpUser, baseUrl} =
     dependencies;
   const db = admin.firestore();
-  // Pilot endpoints use their own tokens and throttle counters. They can
-  // affect only the explicitly configured Sauveteur account.
+  // Pilot endpoints use separate tokens and throttle counters and can
+  // affect only the explicitly configured accounts for their exact roles.
   const pilotConfig = dependencies.pilotConfig || null;
   const tokenCollection = pilotConfig ?
     "passwordRecoveryPilotTokens" : "passwordRecoveryTokens";
@@ -136,8 +149,7 @@ function registerPasswordRecovery(dependencies) {
     const accepted = {success: true};
     try {
       const pilot = pilotConfig ? pilotConfig() : null;
-      if (pilotConfig && (!pilot || audience !== "SAUVETEUR" ||
-          login !== pilot.login)) {
+      if (pilotConfig && !pilotAllowsAccount(pilot, audience, login)) {
         response.status(200).json(accepted);
         return;
       }
@@ -150,9 +162,12 @@ function registerPasswordRecovery(dependencies) {
           .doc(login).get();
       const data = account.data() || {};
       const email = (data.email || "").toString().trim().toLowerCase();
+      const role = (data.role || "").toString().trim().toUpperCase();
       if (!account.exists || data.accountStatus !== "ACTIVE" ||
           !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
-          (audience === "SAUVETEUR" && isSuperAdminAccount(data))) {
+          isSuperAdminAccount(data) ||
+          (pilotConfig && audience !== "SAUVETEUR" &&
+            role && role !== audience)) {
         response.status(200).json(accepted);
         return;
       }
@@ -232,16 +247,18 @@ function registerPasswordRecovery(dependencies) {
           info.expiresAt.toMillis() : 0;
         if (!tokenSnapshot.exists || info.usedAt || expiry <= Date.now() ||
             !COLLECTIONS[info.audience] || !info.login) return null;
-        if (pilot && (info.audience !== "SAUVETEUR" ||
-            info.login !== pilot.login)) return null;
+        if (pilotConfig && !pilotAllowsAccount(
+            pilot, info.audience, info.login)) return null;
 
         const accountRef = db.collection(COLLECTIONS[info.audience])
             .doc(info.login);
         const accountSnapshot = await tx.get(accountRef);
         const account = accountSnapshot.data() || {};
+        const role = (account.role || "").toString().trim().toUpperCase();
         if (!accountSnapshot.exists || account.accountStatus !== "ACTIVE" ||
-            (info.audience === "SAUVETEUR" &&
-              isSuperAdminAccount(account))) return null;
+            isSuperAdminAccount(account) ||
+            (pilotConfig && info.audience !== "SAUVETEUR" &&
+              role && role !== info.audience)) return null;
 
         tx.update(accountRef, {
           passwordHash: nextHash,
@@ -333,4 +350,4 @@ function registerPasswordRecovery(dependencies) {
   return {requestSphotPasswordRecovery, completeSphotPasswordRecovery};
 }
 
-module.exports = {registerPasswordRecovery, digest};
+module.exports = {registerPasswordRecovery, digest, pilotAllowsAccount};

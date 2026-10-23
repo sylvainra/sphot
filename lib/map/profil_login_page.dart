@@ -148,9 +148,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
               .toSet()
               .toList()
           : <String>[];
-      final accountTypes = sphotPasswordPilotMode
-          ? resolvedTypes.where((type) => type == 'SAUVETEUR').toList()
-          : resolvedTypes;
+      final accountTypes = resolvedTypes;
 
       if (accountTypes.isEmpty) {
         if (!mounted) return;
@@ -205,11 +203,13 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
     required String login,
     required String password,
   }) async {
-    if (sphotPasswordPilotMode && endpoint != 'loginSauveteur') {
-      throw StateError('Seul le compte Sauveteur pilote est autorisé.');
-    }
     final actualEndpoint = sphotPasswordPilotMode
-        ? 'loginSauveteurPilot'
+        ? switch (endpoint) {
+            'loginAdmin' => 'loginAdminPilot',
+            'loginAdvertiser' => 'loginAdvertiserPilot',
+            'loginSauveteur' => 'loginSauveteurPilot',
+            _ => throw StateError('Connexion pilote non autorisée.'),
+          }
         : endpoint;
     final response = await http.post(
       Uri.parse('$_functionsBaseUrl/$actualEndpoint'),
@@ -301,7 +301,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
          * on conserve la reconnaissance historique sans lui imposer
          * une page de connexion dédiée.
          */
-        if (decoded == null && _hasSauveteur) {
+        if (decoded == null && _hasSauveteur && !sphotPasswordPilotMode) {
           final potentialSuperAdmin = await _tryLogin(
             endpoint: 'loginSauveteur',
             login: login,

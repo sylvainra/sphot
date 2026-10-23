@@ -16,7 +16,8 @@ const {
   isValidNewPassword,
   verifyAccountPassword,
 } = require("./password_security");
-const {registerPasswordRecovery} = require("./password_recovery");
+const {registerPasswordRecovery, pilotAllowsAccount} =
+  require("./password_recovery");
 const {checkLoginRateLimit} = require("./login_protection");
 const commercialPricing = require("./commercial_pricing");
 const commercialQuotePricing = require("./commercial_quote_pricing");
@@ -62,6 +63,10 @@ const SPHOT_SAUVETEUR_LOGIN_URL =
 const pilotLoginParameter = defineString("SPHOT_PASSWORD_PILOT_LOGIN", {
   default: "",
 });
+const pilotAdminLoginParameter = defineString(
+    "SPHOT_PASSWORD_PILOT_ADMIN_LOGIN", {default: ""});
+const pilotAdvertiserLoginParameter = defineString(
+    "SPHOT_PASSWORD_PILOT_ADVERTISER_LOGIN", {default: ""});
 const pilotUrlParameter = defineString("SPHOT_PASSWORD_PILOT_URL", {
   default: "",
 });
@@ -70,19 +75,75 @@ const pilotExpiryParameter = defineString("SPHOT_PASSWORD_PILOT_EXPIRES_AT", {
 });
 
 /**
- * @return {?Object} The single enabled and unexpired password pilot.
+ * @return {?Object} The enabled and unexpired role-specific password pilot.
  */
 function activePasswordPilot() {
   const login = pilotLoginParameter.value().trim().toLowerCase();
+  const adminLogin = pilotAdminLoginParameter.value().trim().toLowerCase();
+  const advertiserLogin = pilotAdvertiserLoginParameter.value()
+      .trim().toLowerCase();
   const baseUrl = pilotUrlParameter.value().trim().replace(/\/$/, "");
   const expiry = Date.parse(pilotExpiryParameter.value().trim());
-  if (!login || login.length > 200 || login.includes("/") ||
+  if (!login || [login, adminLogin, advertiserLogin].some(
+      (value) => value.length > 200 || value.includes("/")) ||
       !/^https:\/\/sphot-advertiser-test--[a-z0-9-]+\.web\.app$/.test(
           baseUrl) || !Number.isFinite(expiry) ||
       expiry <= Date.now() || expiry > Date.now() + 14 * 86400000) {
     return null;
   }
-  return {login, baseUrl};
+  return {baseUrl, accounts: {
+    SAUVETEUR: login,
+    ...(adminLogin ? {ADMIN: adminLogin} : {}),
+    ...(advertiserLogin ? {ANNONCEUR: advertiserLogin} : {}),
+  }};
+}
+
+/**
+ * Restrict a professional pilot login to its explicitly configured account.
+ * The existing production handler is reused without altering its logic.
+ * @param {string} audience ADMIN or ANNONCEUR.
+ * @param {Function} handler Existing login handler.
+ * @param {Object} request HTTP request.
+ * @param {Object} response HTTP response.
+ * @return {Promise<void>} Login response.
+ */
+async function handlePilotProfessionalLogin(
+    audience, handler, request, response) {
+  if (request.method === "OPTIONS") return handler(request, response);
+  response.set("Access-Control-Allow-Origin", "*");
+  response.set("Cache-Control", "no-store");
+  if (request.method !== "POST") {
+    response.status(405).json({success: false});
+    return;
+  }
+  const login = (request.body?.login || "").toString().trim().toLowerCase();
+  if (!pilotAllowsAccount(activePasswordPilot(), audience, login)) {
+    response.status(403).json({success: false});
+    return;
+  }
+  try {
+    const collection = audience === "ADMIN" ?
+      "adminAccounts" : "advertiserAccounts";
+    const account = await admin.firestore().collection(collection)
+        .doc(login).get();
+    const data = account.data() || {};
+    const role = (data.role || "").toString().trim().toUpperCase();
+    if (!account.exists || data.accountStatus !== "ACTIVE" ||
+        isSuperAdminAccount(data) || (role && role !== audience)) {
+      response.status(403).json({success: false});
+      return;
+    }
+    // The pilot must never finalize a pending administrator replacement.
+    if (audience === "ADMIN" && data.replacementPending === true) {
+      response.status(403).json({success: false});
+      return;
+    }
+  } catch (error) {
+    console.error("Vérification compte professionnel pilote:", error);
+    response.status(500).json({success: false});
+    return;
+  }
+  return handler(request, response);
 }
 
 const passwordRecovery = registerPasswordRecovery({
@@ -5680,7 +5741,8 @@ exports.loginSauveteurPilot = onRequest({
   const pilot = activePasswordPilot();
   const login = (request.body?.login || "")
       .toString().trim().toLowerCase();
-  if (!pilot || login !== pilot.login || request.method !== "POST") {
+  if (!pilotAllowsAccount(pilot, "SAUVETEUR", login) ||
+      request.method !== "POST") {
     response.set("Access-Control-Allow-Origin", "*");
     response.set("Cache-Control", "no-store");
     response.status(403).json({success: false});
@@ -9109,6 +9171,13 @@ L'équipe SPHOT`,
     },
 );
 
+exports.loginAdminPilot = onRequest({
+  secrets: ["GMAIL_APP_PASSWORD"],
+  cpu: 1,
+  memory: "256MiB",
+}, (request, response) => handlePilotProfessionalLogin(
+    "ADMIN", exports.loginAdmin, request, response));
+
 /**
  * Supprime définitivement un SPHOT du territoire de l'administrateur connecté.
  *
@@ -11242,6 +11311,11 @@ exports.loginAdvertiser = onRequest(
       }
     },
 );
+
+exports.loginAdvertiserPilot = onRequest(
+    {cpu: 1, memory: "256MiB"},
+    (request, response) => handlePilotProfessionalLogin(
+        "ANNONCEUR", exports.loginAdvertiser, request, response));
 
 /** Changement obligatoire du mot de passe annonceur. */
 exports.changeAdvertiserPassword = onRequest(
