@@ -1,5 +1,6 @@
 const {sendSphotMail} = require("./sphot_email_design");
 const {setGlobalOptions} = require("firebase-functions");
+const {defineString} = require("firebase-functions/params");
 const {onRequest} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {
@@ -56,6 +57,34 @@ const SPHOT_LOGIN_URL = "https://sphot.app";
 const SPHOT_SAUVETEUR_LOGIN_URL =
   `${SPHOT_LOGIN_URL}/sauveteur-login`;
 
+// Dedicated pilot: no test account or URL is stored in Git. The pilot is
+// disabled unless all three deployment parameters are explicitly set.
+const pilotLoginParameter = defineString("SPHOT_PASSWORD_PILOT_LOGIN", {
+  default: "",
+});
+const pilotUrlParameter = defineString("SPHOT_PASSWORD_PILOT_URL", {
+  default: "",
+});
+const pilotExpiryParameter = defineString("SPHOT_PASSWORD_PILOT_EXPIRES_AT", {
+  default: "",
+});
+
+/**
+ * @return {?Object} The single enabled and unexpired password pilot.
+ */
+function activePasswordPilot() {
+  const login = pilotLoginParameter.value().trim().toLowerCase();
+  const baseUrl = pilotUrlParameter.value().trim().replace(/\/$/, "");
+  const expiry = Date.parse(pilotExpiryParameter.value().trim());
+  if (!login || login.length > 200 || login.includes("/") ||
+      !/^https:\/\/sphot-advertiser-test--[a-z0-9-]+\.web\.app$/.test(
+          baseUrl) || !Number.isFinite(expiry) ||
+      expiry <= Date.now() || expiry > Date.now() + 14 * 86400000) {
+    return null;
+  }
+  return {login, baseUrl};
+}
+
 const passwordRecovery = registerPasswordRecovery({
   admin, onRequest, sendSphotMail,
   mailFrom: MAIL_FROM,
@@ -66,6 +95,20 @@ exports.requestSphotPasswordRecovery =
   passwordRecovery.requestSphotPasswordRecovery;
 exports.completeSphotPasswordRecovery =
   passwordRecovery.completeSphotPasswordRecovery;
+
+// These endpoint names are distinct from all production login endpoints.
+// They use an allowlisted account, a short expiry and separate token storage.
+const pilotPasswordRecovery = registerPasswordRecovery({
+  admin, onRequest, sendSphotMail,
+  mailFrom: MAIL_FROM,
+  smtpUser: SMTP_USER,
+  baseUrl: SPHOT_LOGIN_URL,
+  pilotConfig: activePasswordPilot,
+});
+exports.requestSphotPasswordRecoveryPilot =
+  pilotPasswordRecovery.requestSphotPasswordRecovery;
+exports.completeSphotPasswordRecoveryPilot =
+  pilotPasswordRecovery.completeSphotPasswordRecovery;
 
 /**
  * Authorize sensitive sauveteur account management with the signed-in
@@ -5469,153 +5512,182 @@ exports.resolveLoginIdentity = onRequest(
     },
 );
 
-exports.loginSauveteur = onRequest(
-    {
-      cpu: 1,
-      memory: "256MiB",
-    },
-    async (request, response) => {
-      response.set("Access-Control-Allow-Origin", "*");
-      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-      response.set("Access-Control-Allow-Headers", "Content-Type");
+/**
+ * @param {Object} request HTTP request.
+ * @param {Object} response HTTP response.
+ * @param {boolean} pilot Restrict Super Admin for the dedicated pilot.
+ * @return {Promise<void>} Login result.
+ */
+async function handleSauveteurLogin(request, response, pilot = false) {
+  response.set("Access-Control-Allow-Origin", "*");
+  response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  response.set("Access-Control-Allow-Headers", "Content-Type");
 
-      if (request.method === "OPTIONS") {
-        response.status(204).send("");
-        return;
-      }
+  if (request.method === "OPTIONS") {
+    response.status(204).send("");
+    return;
+  }
 
-      try {
-        const login = (request.body.login || "")
-            .toString()
-            .trim()
-            .toLowerCase();
+  try {
+    const login = (request.body.login || "")
+        .toString()
+        .trim()
+        .toLowerCase();
 
-        const password = (request.body.password || "")
-            .toString()
-            .trim();
+    const password = (request.body.password || "")
+        .toString()
+        .trim();
 
-        if (!login || !password) {
-          response.status(400).json({success: false});
-          return;
-        }
+    if (!login || !password) {
+      response.status(400).json({success: false});
+      return;
+    }
 
-        const accountDoc = await admin.firestore()
-            .collection("sauveteurAccounts")
-            .doc(login)
-            .get();
+    const accountDoc = await admin.firestore()
+        .collection("sauveteurAccounts")
+        .doc(login)
+        .get();
 
-        if (!accountDoc.exists) {
-          response.status(401).json({success: false});
-          return;
-        }
+    if (!accountDoc.exists) {
+      response.status(401).json({success: false});
+      return;
+    }
 
-        const data = accountDoc.data() || {};
+    const data = accountDoc.data() || {};
 
-        if (data.accountStatus !== "ACTIVE") {
-          response.status(401).json({success: false});
-          return;
-        }
+    if (data.accountStatus !== "ACTIVE") {
+      response.status(401).json({success: false});
+      return;
+    }
 
-        // Super Admin retains its existing login behaviour and is excluded
-        // from the new self-service password management policy.
-        const attempt = isSuperAdminAccount(data) ? null :
+    if (pilot && isSuperAdminAccount(data)) {
+      response.status(403).json({success: false});
+      return;
+    }
+
+    // Super Admin retains its existing login behaviour and is excluded
+    // from the new self-service password management policy.
+    const attempt = isSuperAdminAccount(data) ? null :
           await checkLoginRateLimit(admin, request, "SAUVETEUR", login);
-        if (attempt && !attempt.allowed) {
-          response.status(429).json({success: false,
-            error: "too_many_attempts"});
-          return;
-        }
+    if (attempt && !attempt.allowed) {
+      response.status(429).json({success: false,
+        error: "too_many_attempts"});
+      return;
+    }
 
-        if (!verifyAccountPassword(data, password)) {
-          response.status(401).json({success: false});
-          return;
-        }
+    if (!verifyAccountPassword(data, password)) {
+      response.status(401).json({success: false});
+      return;
+    }
 
-        const context = await resolveSauveteurOperationalContext(
-            data,
-            login,
-        );
+    const context = await resolveSauveteurOperationalContext(
+        data,
+        login,
+    );
 
-        const activeLegalPack = await activeLegalPackInfo();
-        const legalAcceptanceRequired =
+    const activeLegalPack = await activeLegalPackInfo();
+    const legalAcceptanceRequired =
           !sauveteurLegalAcceptanceIsCurrent(data, activeLegalPack);
 
-        await accountDoc.ref.set(
-            {
-              ...(data.mustChangePassword === false &&
+    await accountDoc.ref.set(
+        {
+          ...(data.mustChangePassword === false &&
                 !data.passwordHash && !isSuperAdminAccount(data) ? {
                   passwordHash: hashPassword(password),
                   temporaryPassword:
                     admin.firestore.FieldValue.delete(),
                 } : {}),
-              sauveteurId: context.sauveteurId,
-              fonctions: context.functions,
-              postesAffectes: context.assignedSpotIds,
-              periodesSurveillance: context.assignedPeriodIds,
-              lastLoginAt:
-                  admin.firestore.FieldValue.serverTimestamp(),
-              updatedAt:
-                  admin.firestore.FieldValue.serverTimestamp(),
-            },
-            {merge: true},
-        );
-
-        const sauveteurSessionToken = await createSauveteurSession(
-            login,
-            context,
-        );
-
-        let webSessionToken = "";
-
-        if (context.userRole.toUpperCase() === "SUPER_ADMIN") {
-          webSessionToken = crypto.randomBytes(32).toString("hex");
-          const tokenHash = crypto
-              .createHash("sha256")
-              .update(webSessionToken)
-              .digest("hex");
-
-          await admin.firestore()
-              .collection("superAdminWebSessions")
-              .doc(tokenHash)
-              .set({
-                login: accountDoc.id,
-                createdAt:
-                    admin.firestore.FieldValue.serverTimestamp(),
-                expiresAt: admin.firestore.Timestamp.fromMillis(
-                    Date.now() + 5 * 60 * 1000,
-                ),
-              });
-        }
-
-        if (attempt) await attempt.clear();
-        response.status(200).json({
-          success: true,
           sauveteurId: context.sauveteurId,
-          territoireId: context.territoireId,
-          userRole: context.userRole,
           fonctions: context.functions,
           postesAffectes: context.assignedSpotIds,
-          postesAffectesDetails: context.assignedSpotDetails,
           periodesSurveillance: context.assignedPeriodIds,
-          activePeriodIds: context.activePeriodIds,
-          diffusionAccessGranted: context.diffusionAccessGranted,
-          sphotMode: context.sphotMode,
-          sphotModeReason: context.sphotModeReason,
-          canManageRestrictedOperationalData:
+          lastLoginAt:
+                  admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt:
+                  admin.firestore.FieldValue.serverTimestamp(),
+        },
+        {merge: true},
+    );
+
+    const sauveteurSessionToken = await createSauveteurSession(
+        login,
+        context,
+    );
+
+    let webSessionToken = "";
+
+    if (context.userRole.toUpperCase() === "SUPER_ADMIN") {
+      webSessionToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = crypto
+          .createHash("sha256")
+          .update(webSessionToken)
+          .digest("hex");
+
+      await admin.firestore()
+          .collection("superAdminWebSessions")
+          .doc(tokenHash)
+          .set({
+            login: accountDoc.id,
+            createdAt:
+                    admin.firestore.FieldValue.serverTimestamp(),
+            expiresAt: admin.firestore.Timestamp.fromMillis(
+                Date.now() + 5 * 60 * 1000,
+            ),
+          });
+    }
+
+    if (attempt) await attempt.clear();
+    response.status(200).json({
+      success: true,
+      sauveteurId: context.sauveteurId,
+      territoireId: context.territoireId,
+      userRole: context.userRole,
+      fonctions: context.functions,
+      postesAffectes: context.assignedSpotIds,
+      postesAffectesDetails: context.assignedSpotDetails,
+      periodesSurveillance: context.assignedPeriodIds,
+      activePeriodIds: context.activePeriodIds,
+      diffusionAccessGranted: context.diffusionAccessGranted,
+      sphotMode: context.sphotMode,
+      sphotModeReason: context.sphotModeReason,
+      canManageRestrictedOperationalData:
             context.canManageRestrictedOperationalData,
-          legalAcceptanceRequired,
-          activeLegalVersion: activeLegalPack.version,
-          backendRevision: SAUVETEUR_BACKEND_REVISION,
-          mustChangePassword: data.mustChangePassword === true,
-          sauveteurSessionToken,
-          webSessionToken,
-        });
-      } catch (error) {
-        console.error("Erreur login sauveteur:", error);
-        response.status(500).json({success: false});
-      }
-    },
-);
+      legalAcceptanceRequired,
+      activeLegalVersion: activeLegalPack.version,
+      backendRevision: SAUVETEUR_BACKEND_REVISION,
+      mustChangePassword: data.mustChangePassword === true,
+      sauveteurSessionToken,
+      webSessionToken,
+    });
+  } catch (error) {
+    console.error("Erreur login sauveteur:", error);
+    response.status(500).json({success: false});
+  }
+}
+
+exports.loginSauveteur = onRequest({
+  cpu: 1,
+  memory: "256MiB",
+}, (request, response) => handleSauveteurLogin(request, response));
+
+exports.loginSauveteurPilot = onRequest({
+  cpu: 1,
+  memory: "256MiB",
+}, (request, response) => {
+  if (request.method === "OPTIONS") {
+    return handleSauveteurLogin(request, response, true);
+  }
+  const pilot = activePasswordPilot();
+  const login = (request.body?.login || "")
+      .toString().trim().toLowerCase();
+  if (!pilot || login !== pilot.login || request.method !== "POST") {
+    response.set("Access-Control-Allow-Origin", "*");
+    response.set("Cache-Control", "no-store");
+    response.status(403).json({success: false});
+    return;
+  }
+  return handleSauveteurLogin(request, response, true);
+});
 
 exports.getSauveteurSessionState = onRequest(
     {

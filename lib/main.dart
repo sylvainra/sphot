@@ -8,6 +8,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'firebase_options.dart';
+import 'config/password_pilot.dart';
 import 'map/map_page.dart';
 import 'map/profil_login_page.dart';
 import 'web/shared/sphot_access_page.dart';
@@ -76,7 +77,13 @@ Future<void> main() async {
           : (fragment.startsWith('/') ? fragment : '/$fragment'))
       : (platformInitialRoute.isNotEmpty ? platformInitialRoute : '/');
 
-  runApp(SphotApp(initialRoute: initialRoute));
+  // In the pilot preview, open the login by default while preserving
+  // the emailed /reset-password route.
+  final pilotRoute = sphotPasswordPilotMode &&
+          !initialRoute.startsWith('/reset-password')
+      ? '/login'
+      : initialRoute;
+  runApp(SphotApp(initialRoute: pilotRoute));
 }
 
 class SphotApp extends StatelessWidget {

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../config/password_pilot.dart';
 import '../pages/sauveteur/change_password_page.dart';
 import '../pages/sauveteur/sauveteur_legal_acceptance_page.dart';
 import '../pages/sauveteur/sauveteur_menu_page.dart';
@@ -141,12 +142,15 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
         throw const FormatException('Réponse de connexion invalide.');
       }
 
-      final accountTypes = decoded['accountTypes'] is List
+      final resolvedTypes = decoded['accountTypes'] is List
           ? (decoded['accountTypes'] as List)
               .map((value) => value.toString().toUpperCase())
               .toSet()
               .toList()
           : <String>[];
+      final accountTypes = sphotPasswordPilotMode
+          ? resolvedTypes.where((type) => type == 'SAUVETEUR').toList()
+          : resolvedTypes;
 
       if (accountTypes.isEmpty) {
         if (!mounted) return;
@@ -201,8 +205,14 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
     required String login,
     required String password,
   }) async {
+    if (sphotPasswordPilotMode && endpoint != 'loginSauveteur') {
+      throw StateError('Seul le compte Sauveteur pilote est autorisé.');
+    }
+    final actualEndpoint = sphotPasswordPilotMode
+        ? 'loginSauveteurPilot'
+        : endpoint;
     final response = await http.post(
-      Uri.parse('$_functionsBaseUrl/$endpoint'),
+      Uri.parse('$_functionsBaseUrl/$actualEndpoint'),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
         'login': login,

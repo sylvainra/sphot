@@ -36,6 +36,13 @@ function registerPasswordRecovery(dependencies) {
   const {admin, onRequest, sendSphotMail, mailFrom, smtpUser, baseUrl} =
     dependencies;
   const db = admin.firestore();
+  // Pilot endpoints use their own tokens and throttle counters. They can
+  // affect only the explicitly configured Sauveteur account.
+  const pilotConfig = dependencies.pilotConfig || null;
+  const tokenCollection = pilotConfig ?
+    "passwordRecoveryPilotTokens" : "passwordRecoveryTokens";
+  const throttleCollection = pilotConfig ?
+    "passwordRecoveryPilotThrottles" : "passwordRecoveryThrottles";
 
   /** @param {Object} response HTTP response. */
   function setCors(response) {
@@ -76,7 +83,7 @@ function registerPasswordRecovery(dependencies) {
    */
   async function allowRequest(audience, login) {
     const key = digest(`${audience}\u0000${login}`);
-    const ref = db.collection("passwordRecoveryThrottles").doc(key);
+    const ref = db.collection(throttleCollection).doc(key);
     const now = Date.now();
     return db.runTransaction(async (tx) => {
       const snapshot = await tx.get(ref);
@@ -128,6 +135,12 @@ function registerPasswordRecovery(dependencies) {
     // account is unknown, inactive, unverified or a Super Admin.
     const accepted = {success: true};
     try {
+      const pilot = pilotConfig ? pilotConfig() : null;
+      if (pilotConfig && (!pilot || audience !== "SAUVETEUR" ||
+          login !== pilot.login)) {
+        response.status(200).json(accepted);
+        return;
+      }
       if (!await allowRequest(audience, login)) {
         response.status(200).json(accepted);
         return;
@@ -145,7 +158,7 @@ function registerPasswordRecovery(dependencies) {
       }
 
       const token = crypto.randomBytes(32).toString("hex");
-      const ref = db.collection("passwordRecoveryTokens").doc(digest(token));
+      const ref = db.collection(tokenCollection).doc(digest(token));
       await ref.set({
         audience,
         login,
@@ -155,7 +168,8 @@ function registerPasswordRecovery(dependencies) {
         usedAt: null,
       });
 
-      const link = `${baseUrl}/#/reset-password?token=${token}`;
+      const link = `${pilot ? pilot.baseUrl : baseUrl}` +
+        `/#/reset-password?token=${token}`;
       const subject = "SPHOT - Réinitialisation de votre mot de passe";
       await mail(email, subject,
           `Bonjour,\n\nVous avez demandé à réinitialiser votre mot de ` +
@@ -199,8 +213,13 @@ function registerPasswordRecovery(dependencies) {
     }
 
     try {
+      const pilot = pilotConfig ? pilotConfig() : null;
+      if (pilotConfig && !pilot) {
+        response.status(400).json({success: false, error: "expired_link"});
+        return;
+      }
       const nextHash = hashPassword(password);
-      const ref = db.collection("passwordRecoveryTokens").doc(digest(token));
+      const ref = db.collection(tokenCollection).doc(digest(token));
       const result = await db.runTransaction(async (tx) => {
         const tokenSnapshot = await tx.get(ref);
         const info = tokenSnapshot.data() || {};
@@ -208,6 +227,8 @@ function registerPasswordRecovery(dependencies) {
           info.expiresAt.toMillis() : 0;
         if (!tokenSnapshot.exists || info.usedAt || expiry <= Date.now() ||
             !COLLECTIONS[info.audience] || !info.login) return null;
+        if (pilot && (info.audience !== "SAUVETEUR" ||
+            info.login !== pilot.login)) return null;
 
         const accountRef = db.collection(COLLECTIONS[info.audience])
             .doc(info.login);

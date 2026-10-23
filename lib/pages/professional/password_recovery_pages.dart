@@ -3,12 +3,19 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../../config/password_pilot.dart';
 import '../../web/shared/sphot_access_page.dart';
 
 const _blue = Color(0xFF1E3A8A);
 const _red = Color(0xFFDC2626);
 const _functionsUrl =
     'https://us-central1-sphot-ab80b.cloudfunctions.net';
+const _requestFunction = sphotPasswordPilotMode
+    ? 'requestSphotPasswordRecoveryPilot'
+    : 'requestSphotPasswordRecovery';
+const _completeFunction = sphotPasswordPilotMode
+    ? 'completeSphotPasswordRecoveryPilot'
+    : 'completeSphotPasswordRecovery';
 
 class PasswordRecoveryRequestPage extends StatefulWidget {
   const PasswordRecoveryRequestPage({
@@ -77,7 +84,7 @@ class _PasswordRecoveryRequestPageState
     });
     try {
       final response = await http.post(
-        Uri.parse('$_functionsUrl/requestSphotPasswordRecovery'),
+        Uri.parse('$_functionsUrl/$_requestFunction'),
         headers: const {'Content-Type': 'application/json'},
         body: jsonEncode({'login': login, 'audience': _audience}),
       );
@@ -231,7 +238,7 @@ class _PasswordRecoveryConfirmPageState
     });
     try {
       final response = await http.post(
-        Uri.parse('$_functionsUrl/completeSphotPasswordRecovery'),
+        Uri.parse('$_functionsUrl/$_completeFunction'),
         headers: const {'Content-Type': 'application/json'},
         body: jsonEncode({
           'token': widget.token,

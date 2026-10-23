@@ -143,3 +143,79 @@ test("recovery uses a hashed single-use token and excludes Super Admin",
       assert.equal(docs.get("sauveteurAccounts/super-admin").temporaryPassword,
           "Unchanged@9Password");
     });
+
+test("pilot recovers only the allowlisted Sauveteur with isolated tokens",
+    async () => {
+      const {admin, docs} = fakeFirebase();
+      const emails = [];
+      let enabled = true;
+      const dependencies = {
+        admin,
+        onRequest: (_options, callback) => callback,
+        sendSphotMail: async (_transport, message) => {
+          emails.push(message);
+          return {success: true};
+        },
+        mailFrom: "SPHOT <no-reply@sphot.app>",
+        smtpUser: "admin@sphot.app",
+        baseUrl: "https://sphot.app",
+      };
+      const pilot = registerPasswordRecovery({
+        ...dependencies,
+        pilotConfig: () => enabled ? {
+          login: "pilote-sauveteur",
+          baseUrl: "https://sphot-advertiser-test--password-pilot-1.web.app",
+        } : null,
+      });
+      const production = registerPasswordRecovery(dependencies);
+
+      for (const login of ["pilote-sauveteur", "autre-sauveteur"]) {
+        docs.set(`sauveteurAccounts/${login}`, {
+          email: `${login}@example.org`,
+          accountStatus: "ACTIVE",
+          temporaryPassword: "Old@9Password",
+        });
+      }
+      await invoke(pilot.requestSphotPasswordRecovery, {
+        login: "autre-sauveteur", audience: "SAUVETEUR",
+      });
+      await invoke(pilot.requestSphotPasswordRecovery, {
+        login: "pilote-sauveteur", audience: "ADMIN",
+      });
+      assert.equal(emails.length, 0);
+
+      const request = await invoke(pilot.requestSphotPasswordRecovery, {
+        login: "pilote-sauveteur", audience: "SAUVETEUR",
+      });
+      assert.equal(request.statusCode, 200);
+      assert.equal(emails.length, 1);
+      assert.match(emails[0].text, /sphot-advertiser-test--password-pilot/);
+      const token = emails[0].text.match(/token=([a-f0-9]{64})/)[1];
+      assert.equal(docs.has(`passwordRecoveryPilotTokens/${digest(token)}`),
+          true);
+      assert.equal(docs.has(`passwordRecoveryTokens/${digest(token)}`), false);
+
+      const productionRejectsPilotToken = await invoke(
+          production.completeSphotPasswordRecovery,
+          {token, newPassword: "New@9Password"});
+      assert.equal(productionRejectsPilotToken.statusCode, 400);
+
+      enabled = false;
+      const disabled = await invoke(pilot.completeSphotPasswordRecovery,
+          {token, newPassword: "New@9Password"});
+      assert.equal(disabled.statusCode, 400);
+      enabled = true;
+
+      const completed = await invoke(pilot.completeSphotPasswordRecovery,
+          {token, newPassword: "New@9Password"});
+      assert.equal(completed.statusCode, 200);
+      assert.equal(verifyAccountPassword(
+          docs.get("sauveteurAccounts/pilote-sauveteur"), "New@9Password"),
+      true);
+      assert.equal(verifyAccountPassword(
+          docs.get("sauveteurAccounts/autre-sauveteur"), "Old@9Password"),
+      true);
+      const replay = await invoke(pilot.completeSphotPasswordRecovery,
+          {token, newPassword: "Again@9Password"});
+      assert.equal(replay.statusCode, 400);
+    });
