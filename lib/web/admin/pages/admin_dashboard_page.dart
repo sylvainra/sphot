@@ -7749,6 +7749,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required String temporaryPassword,
     required String sauveteurId,
   }) async {
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+    if (idToken == null || idToken.isEmpty) {
+      throw StateError('Session SPHOT ADMIN expirée. Reconnectez-vous.');
+    }
     final uri = Uri.parse(
       'https://us-central1-sphot-ab80b.cloudfunctions.net/'
       'upsertSauveteurAccount',
@@ -7756,10 +7760,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     final response = await http.post(
       uri,
-      headers: const {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
       body: jsonEncode({
         'login': login,
         'temporaryPassword': temporaryPassword,
+        'resetPassword': true,
         'mustChangePassword': true,
         'accountStatus': 'ACTIVE',
         'territoireId': _resolvedTerritoireId,
@@ -7787,6 +7795,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       return;
     }
 
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+    if (idToken == null || idToken.isEmpty) {
+      throw StateError('Session SPHOT ADMIN expirée. Reconnectez-vous.');
+    }
     final uri = Uri.parse(
       'https://us-central1-sphot-ab80b.cloudfunctions.net/'
       'upsertSauveteurAccount',
@@ -7794,7 +7806,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     final response = await http.post(
       uri,
-      headers: const {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
       body: jsonEncode({
         'login': login.trim().toLowerCase(),
         'sauveteurId': sauveteurId,
@@ -7966,10 +7981,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       return;
     }
 
-    final uri = Uri.https(
-      'us-central1-sphot-ab80b.cloudfunctions.net',
-      '/sendSauveteurCredentialsEmail',
-      {
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+    if (idToken == null || idToken.isEmpty) {
+      throw StateError('Session SPHOT ADMIN expirée. Reconnectez-vous.');
+    }
+    final uri = Uri.parse(
+      'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+      'sendSauveteurCredentialsEmail',
+    );
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
+      body: jsonEncode({
         'email': _sauveteurEmailController.text.trim(),
         'prenom': _sauveteurPrenomController.text.trim(),
         'nom': _sauveteurNomController.text.trim().toUpperCase(),
@@ -7977,10 +8003,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         'identifiant': _sauveteurGeneratedLogin,
         'motdepasse': _sauveteurGeneratedPassword,
         'type': isReset ? 'reset' : 'creation',
-      },
+      }),
     );
-
-    final response = await http.get(uri);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(
@@ -8677,12 +8701,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       final login = _cleanText(data['login']);
       if (login.isNotEmpty) {
+        final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+        if (idToken == null || idToken.isEmpty) {
+          throw StateError('Session SPHOT ADMIN expirée. Reconnectez-vous.');
+        }
         final response = await http.post(
           Uri.parse(
             'https://us-central1-sphot-ab80b.cloudfunctions.net/'
             'deleteSauveteurAccount',
           ),
-          headers: const {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $idToken',
+          },
           body: jsonEncode({'login': login}),
         );
 

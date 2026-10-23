@@ -13,6 +13,7 @@ import 'map/profil_login_page.dart';
 import 'web/shared/sphot_access_page.dart';
 import 'web/advertiser/web_advertiser_app.dart';
 import 'web/advertiser/pages/advertiser_first_access_page.dart';
+import 'pages/professional/password_recovery_pages.dart';
 import 'web/admin/pages/admin_access_page.dart';
 import 'web/admin/pages/admin_trial_request_page.dart';
 import 'web/admin/pages/admin_dashboard_page.dart';
@@ -130,6 +131,15 @@ class SphotApp extends StatelessWidget {
         settings: settings,
         builder: (_) => AdvertiserFirstAccessPage(
           login: uri.queryParameters['login'] ?? '',
+          token: uri.queryParameters['token'] ?? '',
+        ),
+      );
+    }
+
+    if (uri.path == '/reset-password') {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => PasswordRecoveryConfirmPage(
           token: uri.queryParameters['token'] ?? '',
         ),
       );

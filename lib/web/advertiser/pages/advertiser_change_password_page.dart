@@ -71,7 +71,7 @@ class _AdvertiserChangePasswordPageState
   }
 
   bool _passwordIsValid(String value) {
-    return RegExp(r'^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#?*\-]).{8,}$')
+    return RegExp(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[!@#?*\-]).{8,}$')
         .hasMatch(value);
   }
 
@@ -85,7 +85,8 @@ class _AdvertiserChangePasswordPageState
     }
     if (!_passwordIsValid(password)) {
       setState(() {
-        _error = '8 caractères mini, 1 majuscule, 1 chiffre, 1 caractère : ! @ # ? * -';
+        _error = '8 caractères mini, 1 majuscule, 1 minuscule, '
+            '1 chiffre, 1 caractère : ! @ # ? * -';
       });
       return;
     }

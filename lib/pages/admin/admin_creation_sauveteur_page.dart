@@ -5,8 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'admin_profile_button.dart';
 
@@ -197,14 +199,12 @@ String _normalizeLogin(String value) {
 final login =
     await _generateUniqueLogin(baseLogin);
 
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  final now = DateTime.now().millisecondsSinceEpoch;
-
-  String password = '';
-
-  for (int i = 0; i < 8; i++) {
-    password += chars[(now + i * 17) % chars.length];
-  }
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  final random = math.Random.secure();
+  final password = List<String>.generate(
+    12,
+    (_) => chars[random.nextInt(chars.length)],
+  ).join();
 
   final sauveteursRef = FirebaseFirestore.instance
       .collection('territoires')
@@ -229,6 +229,7 @@ createdSauveteurDocId ??= docRef.id;
   await _upsertSauveteurAccount(
     login: login,
     temporaryPassword: password,
+    resetPassword: true,
     accountStatus: 'ACTIVE',
     sauveteurId: docRef.id,
     nom: nom.toUpperCase(),
@@ -250,6 +251,7 @@ createdSauveteurDocId ??= docRef.id;
 Future<void> _upsertSauveteurAccount({
   required String login,
   required String temporaryPassword,
+  bool resetPassword = false,
   required String accountStatus,
   required String sauveteurId,
   required String nom,
@@ -258,16 +260,24 @@ Future<void> _upsertSauveteurAccount({
   required List<String> fonctions,
   required List<String> postesAffectes,
 }) async {
+  final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+  if (idToken == null || idToken.isEmpty) {
+    throw StateError('Session SPHOT ADMIN expirée. Reconnectez-vous.');
+  }
   final uri = Uri.parse(
     'https://us-central1-sphot-ab80b.cloudfunctions.net/upsertSauveteurAccount',
   );
 
-  await http.post(
+  final response = await http.post(
     uri,
-    headers: {'Content-Type': 'application/json'},
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $idToken',
+    },
     body: jsonEncode({
       'login': login,
       'temporaryPassword': temporaryPassword,
+      'resetPassword': resetPassword,
       'mustChangePassword': true,
       'accountStatus': accountStatus,
       'territoireId': widget.territoireId,
@@ -280,6 +290,10 @@ Future<void> _upsertSauveteurAccount({
       'postesAffectes': postesAffectes,
     }),
   );
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw StateError('Mise à jour du compte sauveteur impossible '
+        '(${response.statusCode}).');
+  }
 }
 
 Future<void> _sendCredentialsEmail() async {
@@ -292,36 +306,43 @@ Future<void> _sendCredentialsEmail() async {
 
   if (!mounted) return;
 
-  setState(() {
-  emailEnvoye = true;
-});
-
-debugPrint(">>> emailEnvoye = $emailEnvoye");
-
-  final uri = Uri.https(
-    'us-central1-sphot-ab80b.cloudfunctions.net',
-    '/sendSauveteurCredentialsEmail',
-    {
+  final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+  if (idToken == null || idToken.isEmpty) {
+    throw StateError('Session SPHOT ADMIN expirée. Reconnectez-vous.');
+  }
+  final uri = Uri.parse(
+    'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+    'sendSauveteurCredentialsEmail',
+  );
+  final body = {
       'email': email,
       'prenom': prenom,
       'identifiant': generatedLogin,
       'motdepasse': generatedPassword,
-    },
-  );
+    };
 
   try {
     debugPrint(">>> Avant appel HTTP");
-    final response = await http.get(uri);
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
+      body: jsonEncode(body),
+    );
     debugPrint(">>> Après appel HTTP");
 
     debugPrint("STATUS EMAIL = ${response.statusCode}");
     debugPrint("BODY EMAIL = ${response.body}");
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      debugPrint('Erreur email SPHOT : ${response.statusCode} - ${response.body}');
+      debugPrint('Erreur email SPHOT : ${response.statusCode}');
+    } else if (mounted) {
+      setState(() => emailEnvoye = true);
     }
   } catch (e) {
-    debugPrint('Email probablement envoyé, mais réponse non lisible : $e');
+    debugPrint('Email non confirmé : $e');
   }
 }
 
@@ -411,10 +432,6 @@ final sauveteurData = {
   'accessInheritedStatus': 'ACTIVE',
   'authUid': '',
   'login': loginToSave,
-  'temporaryPassword': widget.docId == null
-    ? generatedPassword
-    : (widget.data?['temporaryPassword'] ?? '').toString(),
-  'mustChangePassword': true,
   'createdByAdmin': true,
     'dateNaissance': dateNaissanceController.text.trim(),
     'age': ageController.text.trim(),
@@ -433,6 +450,8 @@ final sauveteurData = {
 
   if (widget.docId == null) {
     sauveteurData['createdAt'] = FieldValue.serverTimestamp();
+    sauveteurData['temporaryPassword'] = generatedPassword;
+    sauveteurData['mustChangePassword'] = true;
   }
 
   await docRef.set(sauveteurData, SetOptions(merge: true));
@@ -441,7 +460,7 @@ final sauveteurData = {
   await _upsertSauveteurAccount(
     login: loginToSave,
     temporaryPassword:
-        sauveteurData['temporaryPassword'].toString(),
+        (sauveteurData['temporaryPassword'] ?? '').toString(),
     accountStatus: 'ACTIVE',
     sauveteurId: docRef.id,
     nom: nom.toUpperCase(),

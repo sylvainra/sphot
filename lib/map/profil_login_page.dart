@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import '../pages/sauveteur/change_password_page.dart';
 import '../pages/sauveteur/sauveteur_legal_acceptance_page.dart';
 import '../pages/sauveteur/sauveteur_menu_page.dart';
+import '../pages/professional/password_recovery_pages.dart';
 import '../web/admin/pages/admin_change_password_page.dart';
 import '../web/admin/pages/admin_dashboard_page.dart';
 import '../web/advertiser/pages/advertiser_change_password_page.dart';
@@ -18,6 +19,8 @@ enum _LoginAudience {
   admin,
   advertiser,
 }
+
+class _TooManyLoginAttempts implements Exception {}
 
 class ProfilLoginPage extends StatefulWidget {
   const ProfilLoginPage({super.key});
@@ -121,7 +124,8 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
       if (response.statusCode == 404) {
         if (!mounted) return;
         setState(() {
-          _errorMessage = 'Identifiant inconnu.';
+          _errorMessage = 'Identifiant inconnu ou compte indisponible. '
+              'Vérifiez votre saisie ou contactez votre administrateur.';
         });
         return;
       }
@@ -147,7 +151,8 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
       if (accountTypes.isEmpty) {
         if (!mounted) return;
         setState(() {
-          _errorMessage = 'Identifiant inconnu.';
+          _errorMessage = 'Identifiant inconnu ou compte indisponible. '
+              'Vérifiez votre saisie ou contactez votre administrateur.';
         });
         return;
       }
@@ -207,6 +212,10 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
 
     if (response.statusCode == 401) {
       return null;
+    }
+
+    if (response.statusCode == 429) {
+      throw _TooManyLoginAttempts();
     }
 
     if (response.statusCode != 200) {
@@ -339,8 +348,10 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
       if (!mounted) return;
 
       setState(() {
-        _errorMessage =
-            'Connexion impossible. Vérifiez votre connexion internet et réessayez.';
+        _errorMessage = error is _TooManyLoginAttempts
+            ? 'Trop de tentatives de connexion. '
+                'Réessayez dans 15 minutes ou utilisez « Mot de passe oublié ? ».'
+            : 'Connexion impossible. Vérifiez votre connexion internet et réessayez.';
       });
     } finally {
       if (mounted) {
@@ -765,6 +776,25 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
     Navigator.of(context).pushNamed('/advertiser');
   }
 
+  void _openPasswordRecovery() {
+    FocusScope.of(context).unfocus();
+    String? audience;
+    if (_selectedAudience == _LoginAudience.admin) {
+      audience = 'ADMIN';
+    } else if (_selectedAudience == _LoginAudience.advertiser) {
+      audience = 'ANNONCEUR';
+    } else if (_accountTypes.length == 1) {
+      audience = _accountTypes.first;
+    }
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => PasswordRecoveryRequestPage(
+        login: _identifierController.text.trim(),
+        availableAudiences: _accountTypes,
+        initialAudience: audience,
+      ),
+    ));
+  }
+
   InputDecoration _inputDecoration({
     required String hintText,
     Widget? suffixIcon,
@@ -1157,6 +1187,20 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
                     ? Icons.visibility_off_rounded
                     : Icons.visibility_rounded,
                 color: _red,
+              ),
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: _isLoggingIn ? null : _openPasswordRecovery,
+            child: const Text(
+              'MOT DE PASSE OUBLIÉ ?',
+              style: TextStyle(
+                color: _blue,
+                fontWeight: FontWeight.w900,
+                decoration: TextDecoration.underline,
               ),
             ),
           ),

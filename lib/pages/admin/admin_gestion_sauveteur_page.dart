@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'admin_profile_button.dart';
 import 'admin_creation_sauveteur_page.dart';
 import 'dart:convert';
+import 'dart:math' as math;
 
 class AdminGestionSauveteurPage extends StatefulWidget {
   final String ville;
@@ -33,17 +35,12 @@ class _AdminGestionSauveteurPageState
   final Map<String, String> passwordResetPasswordsById = {};
 
 String _generateTemporaryPassword() {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-
-  final now = DateTime.now().millisecondsSinceEpoch;
-
-  String password = '';
-
-  for (int i = 0; i < 8; i++) {
-    password += chars[(now + i * 17) % chars.length];
-  }
-
-  return password;
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  final random = math.Random.secure();
+  return List<String>.generate(
+    12,
+    (_) => chars[random.nextInt(chars.length)],
+  ).join();
 }
 
 Future<void> _sendResetCredentialsEmail({
@@ -55,7 +52,6 @@ Future<void> _sendResetCredentialsEmail({
 }) async {
   debugPrint('RESET EMAIL = "$email"');
   debugPrint('RESET IDENTIFIANT = "$identifiant"');
-  debugPrint('RESET PASSWORD = "$motDePasse"');
 
   if (email.isEmpty || identifiant.isEmpty || motDePasse.isEmpty) {
     if (!mounted) return;
@@ -65,30 +61,39 @@ Future<void> _sendResetCredentialsEmail({
 
   if (!mounted) return;
 
-setState(() {
-  passwordResetEmailSentIds.add(sauveteurId);
-});
-
-  final uri = Uri.https(
-  'us-central1-sphot-ab80b.cloudfunctions.net',
-  '/sendSauveteurCredentialsEmail',
-  {
+  final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+  if (idToken == null || idToken.isEmpty) {
+    throw StateError('Session SPHOT ADMIN expirée. Reconnectez-vous.');
+  }
+  final uri = Uri.parse(
+    'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+    'sendSauveteurCredentialsEmail',
+  );
+  final body = {
     'email': email,
     'prenom': prenom,
     'identifiant': identifiant,
     'motdepasse': motDePasse,
     'type': 'reset',
-  },
-);
+  };
 
   try {
-    final response = await http.get(uri);
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
+      body: jsonEncode(body),
+    );
 
     debugPrint('RESET EMAIL STATUS = ${response.statusCode}');
     debugPrint('RESET EMAIL BODY = ${response.body}');
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
   debugPrint('Erreur email SPHOT : ${response.statusCode} - ${response.body}');
+    } else if (mounted) {
+      setState(() => passwordResetEmailSentIds.add(sauveteurId));
 }
   } catch (e) {
     debugPrint('ERREUR APPEL EMAIL RESET = $e');
@@ -102,20 +107,33 @@ Future<void> _upsertSauveteurAccount({
   required String login,
   required String temporaryPassword,
 }) async {
+  final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+  if (idToken == null || idToken.isEmpty) {
+    throw StateError('Session SPHOT ADMIN expirée. Reconnectez-vous.');
+  }
   final uri = Uri.parse(
     'https://us-central1-sphot-ab80b.cloudfunctions.net/upsertSauveteurAccount',
   );
 
-  await http.post(
+  final response = await http.post(
     uri,
-    headers: {'Content-Type': 'application/json'},
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $idToken',
+    },
     body: jsonEncode({
       'login': login,
+      'territoireId': widget.territoireId,
       'temporaryPassword': temporaryPassword,
+      'resetPassword': true,
       'mustChangePassword': true,
       'accountStatus': 'ACTIVE',
     }),
   );
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw StateError('Mise à jour du compte sauveteur impossible '
+        '(${response.statusCode}).');
+  }
 }  
 
 Future<List<Widget>> _buildSphotLines(List<String> posteIds) async {
@@ -706,11 +724,18 @@ await FirebaseFirestore.instance
     .delete();
 
 if (login.isNotEmpty) {
+  final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+  if (idToken == null || idToken.isEmpty) {
+    throw StateError('Session SPHOT ADMIN expirée. Reconnectez-vous.');
+  }
   await http.post(
     Uri.parse(
       'https://us-central1-sphot-ab80b.cloudfunctions.net/deleteSauveteurAccount',
     ),
-    headers: {'Content-Type': 'application/json'},
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $idToken',
+    },
     body: jsonEncode({
       'login': login,
     }),

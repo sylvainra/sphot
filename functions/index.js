@@ -9,6 +9,14 @@ const {
 } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
+const {
+  hashPassword,
+  isSuperAdminAccount,
+  isValidNewPassword,
+  verifyAccountPassword,
+} = require("./password_security");
+const {registerPasswordRecovery} = require("./password_recovery");
+const {checkLoginRateLimit} = require("./login_protection");
 const commercialPricing = require("./commercial_pricing");
 const commercialQuotePricing = require("./commercial_quote_pricing");
 const {spotCountry} = require("./advertiser_country_coverage");
@@ -47,6 +55,38 @@ const SPHOT_LOGIN_URL = "https://sphot.app";
 // Lien Android App Links : ouvre SPHOT si l'association du domaine est valide.
 const SPHOT_SAUVETEUR_LOGIN_URL =
   `${SPHOT_LOGIN_URL}/sauveteur-login`;
+
+const passwordRecovery = registerPasswordRecovery({
+  admin, onRequest, sendSphotMail,
+  mailFrom: MAIL_FROM,
+  smtpUser: SMTP_USER,
+  baseUrl: SPHOT_LOGIN_URL,
+});
+exports.requestSphotPasswordRecovery =
+  passwordRecovery.requestSphotPasswordRecovery;
+exports.completeSphotPasswordRecovery =
+  passwordRecovery.completeSphotPasswordRecovery;
+
+/**
+ * Authorize sensitive sauveteur account management with the signed-in
+ * territory Admin identity. Never trust a territory or role sent in the body.
+ * @param {Object} request HTTP request.
+ * @return {Promise<Object|null>} Verified claims or null.
+ */
+async function verifiedTerritoryAdmin(request) {
+  const authorization = (request.get("Authorization") || "").trim();
+  if (!authorization.startsWith("Bearer ")) return null;
+  try {
+    const claims = await admin.auth().verifyIdToken(
+        authorization.substring(7).trim(), true);
+    if ((claims.role || "").toString().toUpperCase() !== "ADMIN" ||
+        !claims.adminUid || !claims.territoireId ||
+        claims.uid !== claims.adminUid) return null;
+    return claims;
+  } catch (_) {
+    return null;
+  }
+}
 
 
 setGlobalOptions({maxInstances: 10});
@@ -4410,29 +4450,55 @@ exports.sendSauveteurCredentialsEmail = onRequest(
     },
     async (request, response) => {
       response.set("Access-Control-Allow-Origin", "*");
-      response.set("Access-Control-Allow-Methods", "GET, OPTIONS");
-      response.set("Access-Control-Allow-Headers", "Content-Type");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set(
+          "Access-Control-Allow-Headers", "Content-Type, Authorization");
 
       if (request.method === "OPTIONS") {
         response.status(204).send("");
         return;
       }
 
-      try {
-        const email = request.query.email;
-        const identifiant = request.query.identifiant || "";
-        const motDePasse = request.query.motdepasse || "";
-        const type = request.query.type || "creation";
-        const isReset = type === "reset";
-        let nom = (request.query.nom || "").toString().trim();
-        let civilite = (request.query.civilite || "")
-            .toString()
-            .trim();
+      if (request.method !== "POST") {
+        response.status(405).json({success: false});
+        return;
+      }
 
-        if (!email) {
-          response.status(400).send("Email manquant.");
+      try {
+        const caller = await verifiedTerritoryAdmin(request);
+        if (!caller) {
+          response.status(401).json({success: false});
           return;
         }
+        const identifiant = (request.body.identifiant || "")
+            .toString().trim().toLowerCase();
+        const motDePasse = (request.body.motdepasse || "").toString();
+        const type = request.body.type || "creation";
+        const isReset = type === "reset";
+        if (!identifiant || !motDePasse || identifiant.includes("/")) {
+          response.status(400).json({success: false});
+          return;
+        }
+        const accountSnapshot = await admin.firestore()
+            .collection("sauveteurAccounts").doc(identifiant).get();
+        const account = accountSnapshot.data() || {};
+        if (!accountSnapshot.exists ||
+            account.territoireId !== caller.territoireId ||
+            account.accountStatus !== "ACTIVE" ||
+            isSuperAdminAccount(account) ||
+            !verifyAccountPassword(account, motDePasse) ||
+            account.mustChangePassword !== true) {
+          response.status(403).json({success: false});
+          return;
+        }
+        const email = (account.email || "").toString().trim();
+        if (!email) {
+          response.status(400).json({success: false});
+          return;
+        }
+        let nom = (account.nom || "").toString().trim();
+        let civilite = (account.civilite || "")
+            .toString().trim();
 
         if (identifiant && (!nom || !civilite)) {
           const accountSnapshot = await admin.firestore()
@@ -5196,6 +5262,16 @@ async function resolveSauveteurSession(token) {
   const accountData = accountSnapshot.data() || {};
   if (accountData.accountStatus !== "ACTIVE") return null;
 
+  // Sessions created before a password change or reset are no longer valid.
+  const passwordChanged = accountData.passwordUpdatedAt;
+  const sessionCreated = session.createdAt;
+  if (passwordChanged && passwordChanged.toMillis &&
+      sessionCreated && sessionCreated.toMillis &&
+      passwordChanged.toMillis() > sessionCreated.toMillis()) {
+    await sessionReference.delete();
+    return null;
+  }
+
   const context = await resolveSauveteurOperationalContext(
       accountData,
       login,
@@ -5440,7 +5516,17 @@ exports.loginSauveteur = onRequest(
           return;
         }
 
-        if (data.temporaryPassword !== password) {
+        // Super Admin retains its existing login behaviour and is excluded
+        // from the new self-service password management policy.
+        const attempt = isSuperAdminAccount(data) ? null :
+          await checkLoginRateLimit(admin, request, "SAUVETEUR", login);
+        if (attempt && !attempt.allowed) {
+          response.status(429).json({success: false,
+            error: "too_many_attempts"});
+          return;
+        }
+
+        if (!verifyAccountPassword(data, password)) {
           response.status(401).json({success: false});
           return;
         }
@@ -5456,6 +5542,12 @@ exports.loginSauveteur = onRequest(
 
         await accountDoc.ref.set(
             {
+              ...(data.mustChangePassword === false &&
+                !data.passwordHash && !isSuperAdminAccount(data) ? {
+                  passwordHash: hashPassword(password),
+                  temporaryPassword:
+                    admin.firestore.FieldValue.delete(),
+                } : {}),
               sauveteurId: context.sauveteurId,
               fonctions: context.functions,
               postesAffectes: context.assignedSpotIds,
@@ -5495,6 +5587,7 @@ exports.loginSauveteur = onRequest(
               });
         }
 
+        if (attempt) await attempt.clear();
         response.status(200).json({
           success: true,
           sauveteurId: context.sauveteurId,
@@ -7867,14 +7960,9 @@ exports.requestAdminReplacement = onRequest(
             "",
         ).toUpperCase();
 
-        const storedPassword = cleanValue(
-            currentAccountData.temporaryPassword,
-            "",
-        );
-
         if (
           currentAccountStatus !== "ACTIVE" ||
-          storedPassword !== currentPassword
+          !verifyAccountPassword(currentAccountData, currentPassword)
         ) {
           response.status(401).json({
             success: false,
@@ -8379,6 +8467,14 @@ exports.loginAdmin = onRequest(
           return;
         }
 
+        const attempt = await checkLoginRateLimit(
+            admin, request, "ADMIN", login);
+        if (!attempt.allowed) {
+          response.status(429).json({success: false,
+            error: "too_many_attempts"});
+          return;
+        }
+
         const accountDoc = await admin.firestore()
             .collection("adminAccounts")
             .doc(login)
@@ -8396,7 +8492,7 @@ exports.loginAdmin = onRequest(
           return;
         }
 
-        if (data.temporaryPassword !== password) {
+        if (!verifyAccountPassword(data, password)) {
           response.status(401).json({success: false});
           return;
         }
@@ -8861,6 +8957,12 @@ L'équipe SPHOT`,
 
         await accountDoc.ref.set(
             {
+              ...(data.mustChangePassword === false &&
+                !data.passwordHash ? {
+                  passwordHash: hashPassword(password),
+                  temporaryPassword:
+                    admin.firestore.FieldValue.delete(),
+                } : {}),
               lastLoginAt:
                   admin.firestore.FieldValue.serverTimestamp(),
             },
@@ -8913,6 +9015,7 @@ L'équipe SPHOT`,
             },
         );
 
+        await attempt.clear();
         response.status(200).json({
           success: true,
           adminId: accountDoc.id,
@@ -9065,33 +9168,84 @@ exports.upsertSauveteurAccount = onRequest(
     async (request, response) => {
       response.set("Access-Control-Allow-Origin", "*");
       response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-      response.set("Access-Control-Allow-Headers", "Content-Type");
+      response.set(
+          "Access-Control-Allow-Headers", "Content-Type, Authorization");
 
       if (request.method === "OPTIONS") {
         response.status(204).send("");
         return;
       }
 
+      if (request.method !== "POST") {
+        response.status(405).json({success: false});
+        return;
+      }
+
       try {
+        const caller = await verifiedTerritoryAdmin(request);
+        if (!caller) {
+          response.status(401).json({success: false});
+          return;
+        }
         const data = request.body || {};
         const login = (data.login || "").toString().trim().toLowerCase();
 
-        if (!login) {
+        if (!login || login.includes("/")) {
           response.status(400).json({success: false});
           return;
         }
 
-        await admin.firestore()
-            .collection("sauveteurAccounts")
-            .doc(login)
-            .set(
-                {
-                  ...data,
-                  login: login,
-                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                },
-                {merge: true},
-            );
+        const reference = admin.firestore()
+            .collection("sauveteurAccounts").doc(login);
+        const snapshot = await reference.get();
+        const existing = snapshot.data() || {};
+        const territory = (data.territoireId || existing.territoireId || "")
+            .toString().trim();
+        if (territory !== caller.territoireId ||
+            (snapshot.exists &&
+              existing.territoireId !== caller.territoireId) ||
+            isSuperAdminAccount(existing) || isSuperAdminAccount(data)) {
+          response.status(403).json({success: false});
+          return;
+        }
+
+        // Only permitted profile fields can be written by an Admin. Never
+        // accept the account's role, UID or session-related fields from HTTP.
+        const permitted = ["sauveteurId", "civilite", "nom", "prenom",
+          "email", "fonctions", "postesAffectes", "periodesSurveillance",
+          "accountStatus"];
+        const update = {
+          login,
+          territoireId: territory,
+          role: "SAUVETEUR",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        for (const field of permitted) {
+          if (Object.prototype.hasOwnProperty.call(data, field)) {
+            update[field] = data[field];
+          }
+        }
+        const temporaryPassword = typeof data.temporaryPassword ===
+          "string" ? data.temporaryPassword : "";
+        // A profile synchronization must never reset an already chosen
+        // password because the caller still carries a stale temporary value.
+        // A deliberate Admin reset is explicitly marked by resetPassword.
+        if (temporaryPassword && (!snapshot.exists ||
+            existing.mustChangePassword === true ||
+            data.resetPassword === true)) {
+          if (temporaryPassword.length < 8 ||
+              temporaryPassword.length > 256) {
+            response.status(400).json({success: false});
+            return;
+          }
+          update.passwordHash = hashPassword(temporaryPassword);
+          update.temporaryPassword =
+            admin.firestore.FieldValue.delete();
+          update.mustChangePassword = true;
+          update.passwordUpdatedAt =
+            admin.firestore.FieldValue.serverTimestamp();
+        }
+        await reference.set(update, {merge: true});
 
         response.status(200).json({success: true});
       } catch (error) {
@@ -9132,6 +9286,24 @@ exports.changeSauveteurPassword = onRequest(
           return;
         }
 
+        // A current sauveteur session is mandatory. The same existing
+        // authenticated first-login flow is retained for the Super Admin.
+        const session = await resolveSauveteurSession(
+            (request.body.sauveteurSessionToken || "").toString());
+        if (!session || session.login !== login) {
+          response.status(401).json({success: false});
+          return;
+        }
+        const isSuperAdmin = isSuperAdminAccount(session.accountData);
+        const superAdminLegacyPolicy = newPassword.length >= 8 &&
+          /[A-Z]/.test(newPassword) && /[0-9]/.test(newPassword) &&
+          /[!@#?*-]/.test(newPassword);
+        if (isSuperAdmin ? !superAdminLegacyPolicy :
+          !isValidNewPassword(newPassword)) {
+          response.status(400).json({success: false});
+          return;
+        }
+
         const accountReference = admin.firestore()
             .collection("sauveteurAccounts")
             .doc(login);
@@ -9147,19 +9319,24 @@ exports.changeSauveteurPassword = onRequest(
               }
 
               const accountData = accountSnapshot.data() || {};
-              const storedPassword =
-                  (accountData.temporaryPassword || "")
-                      .toString();
-
               const alreadyProcessed =
                   accountData.mustChangePassword === false &&
-                  storedPassword === newPassword;
+                  verifyAccountPassword(accountData, newPassword);
 
               if (!alreadyProcessed) {
+                const secretUpdate = isSuperAdminAccount(accountData) ?
+                  {
+                    temporaryPassword: newPassword,
+                    passwordHash: admin.firestore.FieldValue.delete(),
+                  } : {
+                    passwordHash: hashPassword(newPassword),
+                    temporaryPassword:
+                      admin.firestore.FieldValue.delete(),
+                  };
                 transaction.set(
                     accountReference,
                     {
-                      temporaryPassword: newPassword,
+                      ...secretUpdate,
                       mustChangePassword: false,
                       passwordUpdatedAt:
                           admin.firestore.FieldValue.serverTimestamp(),
@@ -9172,6 +9349,7 @@ exports.changeSauveteurPassword = onRequest(
 
               return {
                 exists: true,
+                superAdmin: isSuperAdminAccount(accountData),
                 email: (accountData.email || "").toString().trim(),
                 prenom: (accountData.prenom || "Sauveteur")
                     .toString()
@@ -9194,6 +9372,26 @@ exports.changeSauveteurPassword = onRequest(
         if (!accountResult.exists) {
           response.status(404).json({success: false});
           return;
+        }
+
+        // Remove the obsolete copy of an old temporary password after a
+        // normal sauveteur chooses their own password. Never touch the
+        // Super Admin's historical account flow.
+        if (!accountResult.superAdmin && accountResult.territoireId &&
+            accountResult.sauveteurId) {
+          try {
+            await admin.firestore().collection("territoires")
+                .doc(accountResult.territoireId)
+                .collection("sauveteurs")
+                .doc(accountResult.sauveteurId)
+                .update({
+                  temporaryPassword:
+                    admin.firestore.FieldValue.delete(),
+                  mustChangePassword: false,
+                });
+          } catch (cleanupError) {
+            console.error("Nettoyage ancien mot de passe:", cleanupError);
+          }
         }
 
         const email = accountResult.email;
@@ -9365,7 +9563,8 @@ exports.changeAdminPassword = onRequest(
     async (request, response) => {
       response.set("Access-Control-Allow-Origin", "*");
       response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-      response.set("Access-Control-Allow-Headers", "Content-Type");
+      response.set(
+          "Access-Control-Allow-Headers", "Content-Type, Authorization");
 
       if (request.method === "OPTIONS") {
         response.status(204).send("");
@@ -9382,8 +9581,14 @@ exports.changeAdminPassword = onRequest(
             .toString()
             .trim();
 
-        if (!login || !newPassword) {
+        if (!login || !isValidNewPassword(newPassword)) {
           response.status(400).json({success: false});
+          return;
+        }
+
+        const caller = await verifiedTerritoryAdmin(request);
+        if (!caller) {
+          response.status(401).json({success: false});
           return;
         }
 
@@ -9409,6 +9614,14 @@ exports.changeAdminPassword = onRequest(
               accountData.requestId,
               "",
           );
+        }
+
+        if (!accountSnapshot.exists ||
+            accountData.accountStatus !== "ACTIVE" ||
+            accountData.adminUid !== caller.adminUid ||
+            accountData.territoireId !== caller.territoireId) {
+          response.status(403).json({success: false});
+          return;
         }
 
         /*
@@ -9462,7 +9675,8 @@ exports.changeAdminPassword = onRequest(
 
         await accountReference.set(
             {
-              temporaryPassword: newPassword,
+              passwordHash: hashPassword(newPassword),
+              temporaryPassword: admin.firestore.FieldValue.delete(),
               mustChangePassword: false,
               passwordUpdatedAt:
                   admin.firestore.FieldValue.serverTimestamp(),
@@ -9631,14 +9845,25 @@ exports.deleteSauveteurAccount = onRequest(
     async (request, response) => {
       response.set("Access-Control-Allow-Origin", "*");
       response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-      response.set("Access-Control-Allow-Headers", "Content-Type");
+      response.set(
+          "Access-Control-Allow-Headers", "Content-Type, Authorization");
 
       if (request.method === "OPTIONS") {
         response.status(204).send("");
         return;
       }
 
+      if (request.method !== "POST") {
+        response.status(405).json({success: false});
+        return;
+      }
+
       try {
+        const caller = await verifiedTerritoryAdmin(request);
+        if (!caller) {
+          response.status(401).json({success: false});
+          return;
+        }
         const login = (request.body.login || "")
             .toString()
             .trim()
@@ -9649,10 +9874,17 @@ exports.deleteSauveteurAccount = onRequest(
           return;
         }
 
-        await admin.firestore()
-            .collection("sauveteurAccounts")
-            .doc(login)
-            .delete();
+        const reference = admin.firestore()
+            .collection("sauveteurAccounts").doc(login);
+        const snapshot = await reference.get();
+        const account = snapshot.data() || {};
+        if (!snapshot.exists ||
+            account.territoireId !== caller.territoireId ||
+            isSuperAdminAccount(account)) {
+          response.status(403).json({success: false});
+          return;
+        }
+        await reference.delete();
 
         response.status(200).json({success: true});
       } catch (error) {
@@ -10876,13 +11108,23 @@ exports.loginAdvertiser = onRequest(
           response.status(400).json({success: false});
           return;
         }
+        const attempt = await checkLoginRateLimit(
+            admin, request, "ANNONCEUR", login);
+        if (!attempt.allowed) {
+          response.status(429).json({success: false,
+            error: "too_many_attempts"});
+          return;
+        }
         const snapshot = await admin.firestore()
             .collection("advertiserAccounts")
             .doc(login)
             .get();
         const data = snapshot.data() || {};
-        if (!snapshot.exists || data.accountStatus !== "ACTIVE" ||
-            cleanValue(data.temporaryPassword, "") !== password) {
+        if (!snapshot.exists || data.accountStatus !== "ACTIVE") {
+          response.status(401).json({success: false});
+          return;
+        }
+        if (!verifyAccountPassword(data, password)) {
           response.status(401).json({success: false});
           return;
         }
@@ -10904,9 +11146,15 @@ exports.loginAdvertiser = onRequest(
             },
         );
         await snapshot.ref.set({
+          ...(data.mustChangePassword === false &&
+            !data.passwordHash ? {
+              passwordHash: hashPassword(password),
+              temporaryPassword: admin.firestore.FieldValue.delete(),
+            } : {}),
           firebaseUid: firebaseUid,
           lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
         }, {merge: true});
+        await attempt.clear();
         response.status(200).json({
           success: true,
           advertiserRequestId: advertiserRequestId,
@@ -10925,7 +11173,7 @@ exports.loginAdvertiser = onRequest(
 
 /** Changement obligatoire du mot de passe annonceur. */
 exports.changeAdvertiserPassword = onRequest(
-    {cpu: 1, memory: "256MiB"},
+    {cpu: 1, memory: "256MiB", secrets: ["GMAIL_APP_PASSWORD"]},
     async (request, response) => {
       response.set("Access-Control-Allow-Origin", "*");
       response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -10948,7 +11196,7 @@ exports.changeAdvertiserPassword = onRequest(
           return;
         }
         const idToken = authorization.substring("Bearer ".length).trim();
-        const session = await admin.auth().verifyIdToken(idToken);
+        const session = await admin.auth().verifyIdToken(idToken, true);
         if (session.role !== "ANNONCEUR" ||
             !cleanValue(session.advertiserRequestId, "")) {
           response.status(403).json({success: false});
@@ -10980,18 +11228,40 @@ exports.changeAdvertiserPassword = onRequest(
                 access.tokenHash !== session.firstAccessHash ||
                 expiry <= Date.now()) return false;
           }
+          if (!isValidNewPassword(newPassword)) return false;
           tx.set(reference, {
-            temporaryPassword: newPassword,
+            passwordHash: hashPassword(newPassword),
+            temporaryPassword: admin.firestore.FieldValue.delete(),
             mustChangePassword: false,
             firstAccess: admin.firestore.FieldValue.delete(),
             passwordUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           }, {merge: true});
-          return true;
+          return {email: (accountData.email || "").toString().trim()};
         });
         if (!changed) {
           response.status(403).json({success: false});
           return;
+        }
+        try {
+          if (changed.email) {
+            const transporter = nodemailer.createTransport({
+              service: "gmail",
+              auth: {user: SMTP_USER, pass: process.env.GMAIL_APP_PASSWORD},
+            });
+            await sendSphotMail(transporter, {
+              from: MAIL_FROM,
+              to: changed.email,
+              replyTo: "contact@sphot.app",
+              subject: "SPHOT - Mot de passe publicitaire modifié",
+              text: "Bonjour,\n\nVotre mot de passe SPHOT PUBLICITAIRE " +
+                "a été modifié avec succès. Si vous n'êtes pas à " +
+                "l'origine de cette action, contactez contact@sphot.app.\n\n" +
+                "L'équipe SPHOT",
+            });
+          }
+        } catch (mailError) {
+          console.error("Confirmation mot de passe annonceur:", mailError);
         }
         response.status(200).json({success: true});
       } catch (error) {

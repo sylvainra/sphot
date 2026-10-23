@@ -51,14 +51,18 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       return false;
     }
 
-    final regex = RegExp(
-      r'^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#?*\-]).{8,}$',
-    );
+    final isSuperAdmin = widget.userRole.toUpperCase() == 'SUPER_ADMIN';
+    final regex = RegExp(isSuperAdmin
+        ? r'^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#?*\-]).{8,}$'
+        : r'^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[!@#?*\-]).{8,}$');
 
     if (!regex.hasMatch(password)) {
       setState(() {
-        _message =
-            '8 caractères mini, 1 majuscule, 1 chiffre, 1 caractère : ! @ # ? * -';
+        _message = isSuperAdmin
+            ? '8 caractères mini, 1 majuscule, 1 chiffre, '
+                '1 caractère : ! @ # ? * -'
+            : '8 caractères mini, 1 majuscule, 1 minuscule, '
+                '1 chiffre, 1 caractère : ! @ # ? * -';
       });
       return false;
     }
@@ -89,6 +93,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       body: jsonEncode({
         'login': widget.login,
         'newPassword': newPassword,
+        'sauveteurSessionToken': widget.sauveteurSessionToken,
       }),
     );
 

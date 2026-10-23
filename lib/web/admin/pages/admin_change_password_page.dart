@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 import 'admin_dashboard_page.dart';
@@ -136,14 +137,19 @@ class _AdminChangePasswordPageState extends State<AdminChangePasswordPage> {
     });
 
     try {
+      final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
+        throw StateError('Session administrateur absente.');
+      }
       final uri = Uri.parse(
         'https://us-central1-sphot-ab80b.cloudfunctions.net/changeAdminPassword',
       );
 
       final response = await http.post(
         uri,
-        headers: const {
+        headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $idToken',
         },
         body: jsonEncode({
           'login': widget.login.trim().toLowerCase(),
