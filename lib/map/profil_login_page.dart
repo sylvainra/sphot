@@ -1210,7 +1210,6 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
               style: TextStyle(
                 color: _blue,
                 fontWeight: FontWeight.w900,
-                decoration: TextDecoration.underline,
               ),
             ),
           ),

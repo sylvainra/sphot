@@ -110,6 +110,12 @@ test("recovery uses a hashed single-use token and excludes Super Admin",
       assert.equal(requested.statusCode, 200);
       assert.equal(emails.length, 1);
       const token = emails[0].text.match(/token=([a-f0-9]{64})/)[1];
+      assert.match(emails[0].html,
+          /background:#1e3a8a;color:#ffffff;text-decoration:none/);
+      assert.match(emails[0].html,
+          /CHOISIR UN NOUVEAU MOT DE PASSE<\/a>/);
+      assert.match(emails[0].html,
+          new RegExp(`href="[^"]*token=${token}"`));
       assert.equal(docs.has(`passwordRecoveryTokens/${digest(token)}`), true);
       assert.equal(docs.has(`passwordRecoveryTokens/${token}`), false);
 

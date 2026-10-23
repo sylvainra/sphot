@@ -177,8 +177,13 @@ function registerPasswordRecovery(dependencies) {
           `seule fois :\n\n${link}\n\nSi vous n'êtes pas à l'origine ` +
           `de cette demande, ignorez ce message.\n\nL'équipe SPHOT`,
           `<p>Bonjour,</p><p>Vous avez demandé la réinitialisation ` +
-          `de votre mot de passe SPHOT.</p><p><a href="${link}">` +
-          `Choisir un nouveau mot de passe</a></p><p>Ce lien personnel ` +
+          `de votre mot de passe SPHOT.</p>` +
+          `<div style="text-align:center;margin:30px 0;">` +
+          `<a href="${link}" style="display:inline-block;` +
+          `padding:15px 28px;border-radius:14px;background:#1e3a8a;` +
+          `color:#ffffff;text-decoration:none;font-size:16px;` +
+          `font-weight:900;">CHOISIR UN NOUVEAU MOT DE PASSE</a>` +
+          `</div><p>Ce lien personnel ` +
           `expire dans 15 minutes et ne peut être utilisé qu'une seule fois.` +
           `</p><p>Si vous n'êtes pas à l'origine de cette demande, ` +
           `ignorez ce message.</p><p>L'équipe SPHOT</p>`);
