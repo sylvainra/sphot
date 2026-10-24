@@ -85,3 +85,51 @@ Ne supprimer ni fonctions de production, ni utilisateur non lié au test.
 Ne pousser aucun changement dans `main` et ne déployer aucune fonction pilote
 sans validation explicite de l'utilisateur après revue du diff et des tests.
 Consigner séparément chaque résultat réel (réussi, échoué, non exécuté).
+
+## Résultats réels constatés le 24/10/2026
+
+Essai autorisé par l'utilisateur sur `sphot-ab80b`, en mode Flutter pilote
+`SPHOT_PASSWORD_PILOT=true`, avec le compte jetable `psphottest2026`.
+Les fonctions `upsertSauveteurAccountPilot`,
+`sendSauveteurCredentialsEmailPilot`,
+`deleteSauveteurAccountPilot` et `changeSauveteurPasswordPilot`
+ont été créées, et `loginSauveteurPilot` a été mis à jour avec succès.
+Les quatre fonctions habituelles de production n'ont pas été remplacées.
+
+| Contrôle | État et preuve |
+| --- | --- |
+| Création | **Réussi** : Pilote SPHOTTEST2026, identifiant `psphottest2026` |
+| Affectation initiale | **Visible** : LONGE 09 - Plage du Rocher |
+| Courriel d'identifiants | **Réussi** : courriel reçu avec accès temporaire |
+| Connexion provisoire | **Réussi** : écran de changement obligatoire affiché |
+| Changement effectif de mot de passe | **Réussi côté serveur** : une réponse HTTP 200, `success:true`, `duplicate:false` ; courriel de confirmation reçu |
+| Reconnexion avec nouveau mot de passe | **Réussi selon l'utilisateur** |
+| Continuation automatique après changement | **Défaut confirmé** : écran pouvant annoncer à tort « Modification impossible » ; plusieurs appels avec le jeton ancien renvoient HTTP 401 après la réussite |
+| Demande « Mot de passe oublié ? » du compte jetable | **Non validée de bout en bout** : accusé générique affiché, mais aucun lien reçu ni réinitialisation confirmés ; l'autorisation des endpoints de récupération pilote demeure limitée au compte Sauveteur initial, distinct du compte jetable |
+| Deuxième affectation puis retour à une seule | **Non testé dans les preuves de cette session** |
+| Suppression complète du compte jetable | **Non testée dans les preuves de cette session** |
+
+Le message générique de la récupération ne prouve pas qu'un lien a été envoyé.
+La capture du courriel « Mise à jour de votre compte SPHOT » confirme un
+**changement de mot de passe**, pas une récupération par lien.
+
+### Vérifications techniques et réserve
+
+- Cinq tests unitaires de protection des opérations Sauveteur pilotes : **5/5 réussis**.
+- `npm run lint --prefix functions` : **réussi**.
+- Ensemble des fichiers de tests backend : **34/35 réussis** ;
+  `commercial_radius_catalog.test.js` échoue sur une logique commerciale
+  non modifiée par cette branche ; aucune correction effectuée dans ce chantier.
+- Analyse Flutter ciblée sur PC : **199 diagnostics de conseil/avertissement**,
+  aucune entrée `error` dans la sortie transmise.
+- Intégration sur `main` autorisée par l'utilisateur malgré le défaut
+  d'affichage identifié : la branche garde le routage pilote derrière les
+  `dart-define` explicites, désactivés par défaut.
+- **Suite à traiter séparément avant validation finale du parcours complet** :
+  empêcher les envois simultanés du formulaire de changement de mot de passe,
+  reconnecter l'utilisateur via `loginSauveteurPilot` en mode pilote, et
+  distinguer visiblement succès confirmé et session expirée.
+- Ne pas déclarer les affectations multiples, la suppression ni la
+  récupération du compte jetable comme validées avant preuve réelle.
+- Aucun secret, mot de passe provisoire ou nouveau mot de passe n'est
+  reproduit dans cette documentation.
