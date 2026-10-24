@@ -18,6 +18,7 @@ import '../models/advertiser_request_status.dart';
 import '../models/advertising_visual_data.dart';
 import '../models/diffusion_preview_data.dart';
 import '../models/planning_data.dart';
+import '../services/odoo_simulation_service.dart';
 import '../services/advertiser_territory_service.dart';
 import '../services/advertiser_country_boundary_service.dart';
 import '../widgets/advertising_spot_section.dart';
@@ -29,6 +30,7 @@ import '../widgets/diffusion_section.dart';
 import '../widgets/establishment_section.dart';
 import '../widgets/identity_professional_section.dart';
 import '../widgets/planning_section.dart';
+import '../widgets/advertiser_payment_simulation_section.dart';
 import '../widgets/quote_order_section.dart';
 
 class AdvertiserDashboardPage extends StatefulWidget {
@@ -1438,6 +1440,22 @@ _detailScrollController.dispose();
         ];
       case 5:
         return [
+          if (OdooSimulationService.enabled)
+            AdvertiserPaymentSimulationSection(
+              key: ValueKey<String>(
+                'odoo-sim-${_advertisingTerritory?.level.storageKey}-'
+                '$_visibilityType-${_planningData.durationLabel}-'
+                '$_publishedPricingReference',
+              ),
+              territory: _advertisingTerritory?.level.storageKey,
+              offer: _diffusionPreview.type == null ? null : _visibilityType,
+              duration: _planningData.durationLabel,
+              planningComplete: _planningData.isComplete,
+              publishedPricingReference: _publishedPricingReference,
+              publishedPayableExclTaxCents: _payableCentsFor(
+                _planningData.durationLabel ?? '1 semaine',
+              ),
+            ),
           _StatusCard(
             icon: Icons.credit_card_outlined,
             title: 'PAIEMENT SÉCURISÉ',
