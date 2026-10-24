@@ -18,6 +18,8 @@ const {
 } = require("./password_security");
 const {registerPasswordRecovery, pilotAllowsAccount} =
   require("./password_recovery");
+const {registerSauveteurManagementPilot} =
+  require("./sauveteur_management_pilot");
 const {checkLoginRateLimit} = require("./login_protection");
 const commercialPricing = require("./commercial_pricing");
 const commercialQuotePricing = require("./commercial_quote_pricing");
@@ -67,6 +69,8 @@ const pilotAdminLoginParameter = defineString(
     "SPHOT_PASSWORD_PILOT_ADMIN_LOGIN", {default: ""});
 const pilotAdvertiserLoginParameter = defineString(
     "SPHOT_PASSWORD_PILOT_ADVERTISER_LOGIN", {default: ""});
+const pilotTestSauveteurLoginParameter = defineString(
+    "SPHOT_PASSWORD_PILOT_TEST_SAUVETEUR_LOGIN", {default: ""});
 const pilotUrlParameter = defineString("SPHOT_PASSWORD_PILOT_URL", {
   default: "",
 });
@@ -82,9 +86,11 @@ function activePasswordPilot() {
   const adminLogin = pilotAdminLoginParameter.value().trim().toLowerCase();
   const advertiserLogin = pilotAdvertiserLoginParameter.value()
       .trim().toLowerCase();
+  const testSauveteurLogin = pilotTestSauveteurLoginParameter.value()
+      .trim().toLowerCase();
   const baseUrl = pilotUrlParameter.value().trim().replace(/\/$/, "");
   const expiry = Date.parse(pilotExpiryParameter.value().trim());
-  if (!login || [login, adminLogin, advertiserLogin].some(
+  if (!login || [login, adminLogin, advertiserLogin, testSauveteurLogin].some(
       (value) => value.length > 200 || value.includes("/")) ||
       !/^https:\/\/sphot-advertiser-test--[a-z0-9-]+\.web\.app$/.test(
           baseUrl) || !Number.isFinite(expiry) ||
@@ -95,7 +101,7 @@ function activePasswordPilot() {
     SAUVETEUR: login,
     ...(adminLogin ? {ADMIN: adminLogin} : {}),
     ...(advertiserLogin ? {ANNONCEUR: advertiserLogin} : {}),
-  }};
+  }, testSauveteurLogin};
 }
 
 /**
@@ -5741,7 +5747,8 @@ exports.loginSauveteurPilot = onRequest({
   const pilot = activePasswordPilot();
   const login = (request.body?.login || "")
       .toString().trim().toLowerCase();
-  if (!pilotAllowsAccount(pilot, "SAUVETEUR", login) ||
+  if (!(pilotAllowsAccount(pilot, "SAUVETEUR", login) ||
+      (pilot?.testSauveteurLogin && pilot.testSauveteurLogin === login)) ||
       request.method !== "POST") {
     response.set("Access-Control-Allow-Origin", "*");
     response.set("Cache-Control", "no-store");
@@ -12130,3 +12137,20 @@ const {registerAdvertiserRefusalCleanup} =
 exports.cleanupRejectedAdvertiserRequest = registerAdvertiserRefusalCleanup({
   admin, onDocumentUpdated,
 });
+
+// Tests locaux Flutter : les quatre opérations de gestion des sauveteurs
+// empruntent des fonctions distinctes, limitées à un seul compte de test.
+// Les fonctions utilisées par les versions publiées restent inchangées.
+Object.assign(exports, registerSauveteurManagementPilot({
+  admin,
+  onRequest,
+  activePasswordPilot,
+  verifiedTerritoryAdmin,
+  isSuperAdminAccount,
+  handlers: {
+    upsert: exports.upsertSauveteurAccount,
+    sendEmail: exports.sendSauveteurCredentialsEmail,
+    remove: exports.deleteSauveteurAccount,
+    changePassword: exports.changeSauveteurPassword,
+  },
+}));

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../../config/password_pilot.dart';
 import 'sauveteur_legal_acceptance_page.dart';
 import 'sauveteur_menu_page.dart';
 
@@ -82,7 +83,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     final newPassword = _newPasswordController.text.trim();
 
     final uri = Uri.parse(
-      'https://us-central1-sphot-ab80b.cloudfunctions.net/changeSauveteurPassword',
+      'https://us-central1-sphot-ab80b.cloudfunctions.net/'
+      '${sphotSauveteurManagementEndpoint('changeSauveteurPassword')}',
     );
 
     debugPrint('>>> APPEL changeSauveteurPassword');

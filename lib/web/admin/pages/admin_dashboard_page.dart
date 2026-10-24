@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../models/advertising_pricing_config.dart';
+import '../../../config/password_pilot.dart';
 import '../../../services/admin_logo_storage_service.dart';
 import '../../../services/sphot_media_storage_service.dart';
 import '../../../widgets/adaptive_asset_image.dart';
@@ -7749,13 +7750,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required String temporaryPassword,
     required String sauveteurId,
   }) async {
+    if (!sphotPilotAllowsSauveteur(login)) {
+      throw StateError('Seul le sauveteur de test est autorisé en mode pilote.');
+    }
     final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
     if (idToken == null || idToken.isEmpty) {
       throw StateError('Session SPHOT ADMIN expirée. Reconnectez-vous.');
     }
     final uri = Uri.parse(
       'https://us-central1-sphot-ab80b.cloudfunctions.net/'
-      'upsertSauveteurAccount',
+      '${sphotSauveteurManagementEndpoint('upsertSauveteurAccount')}',
     );
 
     final response = await http.post(
@@ -7794,6 +7798,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     if (login.trim().isEmpty) {
       return;
     }
+    if (!sphotPilotAllowsSauveteur(login)) {
+      throw StateError('Seul le sauveteur de test est autorisé en mode pilote.');
+    }
 
     final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
     if (idToken == null || idToken.isEmpty) {
@@ -7801,7 +7808,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
     final uri = Uri.parse(
       'https://us-central1-sphot-ab80b.cloudfunctions.net/'
-      'upsertSauveteurAccount',
+      '${sphotSauveteurManagementEndpoint('upsertSauveteurAccount')}',
     );
 
     final response = await http.post(
@@ -7848,6 +7855,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     try {
       final login = await _generateUniqueSauveteurLogin(baseLogin);
+      if (!sphotPilotAllowsSauveteur(login)) {
+        throw StateError('Identifiant non autorisé pour cet essai : $login.');
+      }
       const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
       final random = math.Random.secure();
       final password = List<String>.generate(
@@ -7916,6 +7926,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       );
       return false;
     }
+    if (!sphotPilotAllowsSauveteur(login)) {
+      _showSauveteurError('Seul le sauveteur de test peut être modifié.');
+      return false;
+    }
 
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     final random = math.Random.secure();
@@ -7980,6 +7994,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     if (!_sauveteurAccessGenerated || _sauveteurEmailSent) {
       return;
     }
+    if (!sphotPilotAllowsSauveteur(_sauveteurGeneratedLogin)) {
+      throw StateError('Envoi réservé au sauveteur de test en mode pilote.');
+    }
 
     final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
     if (idToken == null || idToken.isEmpty) {
@@ -7987,7 +8004,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
     final uri = Uri.parse(
       'https://us-central1-sphot-ab80b.cloudfunctions.net/'
-      'sendSauveteurCredentialsEmail',
+      '${sphotSauveteurManagementEndpoint('sendSauveteurCredentialsEmail')}',
     );
     final response = await http.post(
       uri,
@@ -8120,6 +8137,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   Future<void> _saveSauveteur() async {
     if (!_validateSauveteurBeforeSave()) {
+      return;
+    }
+    if (!sphotPilotAllowsSauveteur(_sauveteurGeneratedLogin)) {
+      _showSauveteurError('Seul le sauveteur de test peut être enregistré.');
       return;
     }
 
@@ -8632,6 +8653,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     String sauveteurId,
     Map<String, dynamic> data,
   ) async {
+    if (!sphotPilotAllowsSauveteur(_cleanText(data['login']))) {
+      _showSauveteurError('Suppression réservée au sauveteur de test.');
+      return;
+    }
     final nom = [
       _cleanText(data['prenom']),
       _cleanText(data['nom']).toUpperCase(),
@@ -8708,7 +8733,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         final response = await http.post(
           Uri.parse(
             'https://us-central1-sphot-ab80b.cloudfunctions.net/'
-            'deleteSauveteurAccount',
+            '${sphotSauveteurManagementEndpoint('deleteSauveteurAccount')}',
           ),
           headers: {
             'Content-Type': 'application/json',
