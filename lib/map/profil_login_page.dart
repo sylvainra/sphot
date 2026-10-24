@@ -86,7 +86,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
     final popped = await navigator.maybePop();
 
     if (!popped && mounted) {
-      navigator.pushNamedAndRemoveUntil('/', (route) => false);
+      navigator.pushNamedAndRemoveUntil('/map', (route) => false);
     }
   }
 
