@@ -50,20 +50,51 @@ class _EstablishmentSectionState extends State<EstablishmentSection> {
     'GB': 'ROYAUME-UNI',
     'OTHER': 'AUTRE PAYS',
   };
-  static const _activityTypes = <String>[
-    'Cosmétique',
-    'Optique / lunettes',
-    'Surfwear / prêt-à-porter',
-    'Sports nautiques',
-    'Tourisme',
-    'Restauration',
-    'Produits alimentaires',
-    'Boissons',
-    'Hôtellerie',
-    'Hôtellerie de plein air',
-    'Commerce local',
-    'Institutionnel',
-    'Autre',
+  // Les titres de familles organisent seulement le menu. Seules les
+  // activités sont sélectionnées et enregistrées dans Firestore.
+  // Conserver à l'identique les anciens libellés pour les dossiers existants.
+  static const _activityGroups = <String, List<String>>{
+    'NAUTISME ET SPORTS DE GLISSE': <String>[
+      'Sports nautiques',
+      'Sports de glisse',
+      'Écoles et stages de sports nautiques',
+      'Location de matériel nautique',
+      'Vente de matériel nautique et de glisse',
+      'Réparation et entretien de matériel nautique',
+      'Plongée sous-marine / snorkeling',
+      'Plaisance et excursions en mer',
+    ],
+    'TOURISME ET LOISIRS': <String>[
+      'Tourisme',
+      'Activités de plage et de plein air',
+      'Excursions et visites guidées',
+      'Parcs de loisirs et activités récréatives',
+      'Location de vélos et mobilités douces',
+    ],
+    'HÉBERGEMENT ET BIEN-ÊTRE': <String>[
+      'Hôtellerie',
+      'Hôtellerie de plein air',
+      'Locations saisonnières et hébergements touristiques',
+      'Bien-être / spa / thalassothérapie',
+    ],
+    'COMMERCES ET ÉQUIPEMENTS': <String>[
+      'Surfwear / prêt-à-porter',
+      'Cosmétique',
+      'Optique / lunettes',
+      'Commerce local',
+    ],
+    'RESTAURATION ET ALIMENTATION': <String>[
+      'Restauration',
+      'Produits alimentaires',
+      'Boissons',
+    ],
+    'AUTRES ACTIVITÉS': <String>[
+      'Institutionnel',
+      'Autre',
+    ],
+  };
+  static final List<String> _activityTypes = <String>[
+    for (final group in _activityGroups.values) ...group,
   ];
 
   final _formKey = GlobalKey<FormState>();
@@ -434,75 +465,92 @@ if (widget.draftOnly) {
             primary: false,
             padding: EdgeInsets.zero,
             children: [
-              for (final choice in _activityTypes) ...[
-                InkWell(
-                  onTap: () {
-                    if (!_canEdit('activityTypes')) return;
-                    setState(() {
-                      if (_selectedActivityTypes.contains(choice)) {
-                        _selectedActivityTypes.remove(choice);
-                        // Conserver la précision « Autre » en cas de clic
-                        // accidentel ; ne pas effacer une valeur déjà saisie.
-                      } else {
-                        _selectedActivityTypes.add(choice);
-                      }
-                      _activityError = null;
-                      _completed = false;
-                    });
-                    fieldState.didChange(_activityType);
-                    overlaySetState(() {});
-                    _refreshActivityMenuPosition();
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 9,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            choice,
-                            style: const TextStyle(
-                              color: WebColors.blue,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        Icon(
-                          _selectedActivityTypes.contains(choice)
-                              ? Icons.check_box_rounded
-                              : Icons.check_box_outline_blank_rounded,
-                          color: _selectedActivityTypes.contains(choice)
-                              ? WebColors.red
-                              : WebColors.blue,
-                        ),
-                      ],
+              for (final group in _activityGroups.entries) ...[
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(top: 5),
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+                  color: const Color(0xFFEAF0F8),
+                  child: Text(
+                    group.key,
+                    style: const TextStyle(
+                      color: WebColors.blue,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.3,
                     ),
                   ),
                 ),
-                if (choice == 'Autre' &&
-                    _selectedActivityTypes.contains('Autre'))
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-                    child: TextField(
-                      controller: _otherActivityController,
-                      onChanged: (_) {
-                        setState(() {
-                          _activityError = null;
-                          _completed = false;
-                        });
-                        overlaySetState(() {});
-                        _refreshActivityMenuPosition();
-                      },
-                      decoration: InputDecoration(
-                        labelText: 'Précisez l’autre activité',
-                        errorText: _activityError,
-                        border: const OutlineInputBorder(),
-                        isDense: true,
+                for (final choice in group.value) ...[
+                  InkWell(
+                    onTap: () {
+                      if (!_canEdit('activityTypes')) return;
+                      setState(() {
+                        if (_selectedActivityTypes.contains(choice)) {
+                          _selectedActivityTypes.remove(choice);
+                          // Conserver la précision « Autre » en cas de clic
+                          // accidentel ; ne pas effacer une valeur déjà saisie.
+                        } else {
+                          _selectedActivityTypes.add(choice);
+                        }
+                        _activityError = null;
+                        _completed = false;
+                      });
+                      fieldState.didChange(_activityType);
+                      overlaySetState(() {});
+                      _refreshActivityMenuPosition();
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 9,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              choice,
+                              style: const TextStyle(
+                                color: WebColors.blue,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            _selectedActivityTypes.contains(choice)
+                                ? Icons.check_box_rounded
+                                : Icons.check_box_outline_blank_rounded,
+                            color: _selectedActivityTypes.contains(choice)
+                                ? WebColors.red
+                                : WebColors.blue,
+                          ),
+                        ],
                       ),
                     ),
                   ),
+                  if (choice == 'Autre' &&
+                      _selectedActivityTypes.contains('Autre'))
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                      child: TextField(
+                        controller: _otherActivityController,
+                        onChanged: (_) {
+                          setState(() {
+                            _activityError = null;
+                            _completed = false;
+                          });
+                          overlaySetState(() {});
+                          _refreshActivityMenuPosition();
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Précisez l’autre activité',
+                          errorText: _activityError,
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                ],
               ],
             ],
           ),
