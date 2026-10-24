@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../shared/web_colors.dart';
+import '../../../widgets/sphot_advertising_invitation_visual.dart';
 import '../models/diffusion_preview_data.dart';
 
 class DiffusionCentralPreview extends StatelessWidget {
@@ -691,6 +692,9 @@ class _MapAdvertisingPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasAdvertisement = data.bannerBytes != null ||
+        (data.bannerUrl?.trim().isNotEmpty ?? false);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final availableWidth = constraints.maxWidth;
@@ -706,74 +710,35 @@ class _MapAdvertisingPreview extends StatelessWidget {
           height: bannerHeight,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(11),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: ColoredBox(
-                    color: const Color(0xFF063551),
-                    child: _AdvertisingVisual(
-                      data: data,
-                      fit: BoxFit.contain,
-                    ),
+            child: hasAdvertisement
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: ColoredBox(
+                          color: const Color(0xFF063551),
+                          child: _AdvertisingVisual(
+                            data: data,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: creationWidth,
+                        child: const SphotAdvertisingInvitationVisual(
+                          compact: true,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ],
+                  )
+                : const SphotAdvertisingInvitationVisual(
+                    mobileMap: true,
+                    fit: BoxFit.contain,
                   ),
-                ),
-                SizedBox(
-                  width: creationWidth,
-                  child: const _MapAdvertisingInvitation(),
-                ),
-              ],
-            ),
           ),
         );
       },
-    );
-  }
-}
-
-class _MapAdvertisingInvitation extends StatelessWidget {
-  const _MapAdvertisingInvitation();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.72),
-        border: Border(
-          left: BorderSide(
-            color: Colors.black.withOpacity(0.08),
-            width: 1,
-          ),
-        ),
-      ),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SvgPicture.asset(
-              'data/icons/fire_red_icon.svg',
-              width: 19,
-              height: 24,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(height: 2),
-            const Text(
-              'Votre\nSPHOT\nPUBLICITAIRE\nici!',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 9,
-                height: 1.1,
-                color: Colors.black87,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -788,6 +753,9 @@ class _SheetAdvertisingPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasAdvertisement = data.bannerBytes != null ||
+        (data.bannerUrl?.trim().isNotEmpty ?? false);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -803,34 +771,28 @@ class _SheetAdvertisingPreview extends StatelessWidget {
             borderRadius: BorderRadius.circular(7),
             child: AspectRatio(
               aspectRatio: 6,
-              child: _AdvertisingVisual(
-                data: data,
-                fit: BoxFit.contain,
-              ),
+              child: hasAdvertisement
+                  ? _AdvertisingVisual(data: data, fit: BoxFit.contain)
+                  : Image.asset(
+                      'data/images/sphot_advertising_callout_detail_no_ad_v4.png',
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.high,
+                    ),
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        Container(
-          height: 29,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFFAF5),
-            border: Border.all(color: WebColors.red, width: 1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Text(
-            'Votre SPHOT PUBLICITAIRE ici!',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: WebColors.red,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
+        if (hasAdvertisement) ...[
+          const SizedBox(height: 8),
+          const SizedBox(
+            height: 29,
+            child: ClipRRect(
+              borderRadius: BorderRadius.all(Radius.circular(8)),
+              child: SphotAdvertisingInvitationVisual(fit: BoxFit.contain),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -867,94 +829,25 @@ class _AdvertisingVisual extends StatelessWidget {
         fit: fit,
         alignment: Alignment.center,
         webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-        errorBuilder: (_, __, ___) => _BannerPlaceholder(data: data),
+        errorBuilder: (_, __, ___) => const _BannerPlaceholder(),
       );
     }
 
-    return _BannerPlaceholder(data: data);
+    return const _BannerPlaceholder();
   }
 }
 
 class _BannerPlaceholder extends StatelessWidget {
-  const _BannerPlaceholder({required this.data});
-
-  final DiffusionPreviewData data;
+  const _BannerPlaceholder();
 
   @override
   Widget build(BuildContext context) {
-    final name = data.advertiserName.trim().isEmpty
-        ? 'VOTRE ÉTABLISSEMENT'
-        : data.advertiserName.trim().toUpperCase();
-
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(colors: [Color(0xFFFFF4E8), Colors.white]),
-      ),
-      child: Row(
-        children: [
-          _AdvertiserLogo(logoUrl: data.logoUrl),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: WebColors.blue,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                const Text(
-                  'VOTRE VISUEL PUBLICITAIRE',
-                  style: TextStyle(
-                    color: WebColors.red,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AdvertiserLogo extends StatelessWidget {
-  const _AdvertiserLogo({required this.logoUrl});
-
-  final String? logoUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    final url = logoUrl?.trim() ?? '';
-    return SizedBox(
-      width: 38,
-      height: 38,
-      child: url.isEmpty
-          ? SvgPicture.asset(
-              'data/icons/fire_red_icon.svg',
-              fit: BoxFit.contain,
-            )
-          : ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                url,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => SvgPicture.asset(
-                  'data/icons/fire_red_icon.svg',
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
+    return Image.asset(
+      'data/images/sphot_advertising_callout_detail_no_ad_v4.png',
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      filterQuality: FilterQuality.high,
     );
   }
 }
