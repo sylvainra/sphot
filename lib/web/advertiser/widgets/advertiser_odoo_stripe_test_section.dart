@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../shared/web_colors.dart';
 import '../services/odoo_local_order_service.dart';
 
-/// Troisième achat local, réservé au prestataire Stripe SANDBOX d'Odoo.
+/// Quatrième achat local, réservé au prestataire Stripe SANDBOX d'Odoo.
 /// Le navigateur ne déclare jamais lui-même un paiement réussi.
 /// Aucune campagne ou donnée Firebase n'est modifiée.
 class AdvertiserOdooStripeTestSection extends StatefulWidget {
@@ -133,10 +133,11 @@ class _AdvertiserOdooStripeTestSectionState
   }
 
   Future<void> _newOrder() async {
-    if (!await _confirm('TROISIÈME ACHAT ODOO — STRIPE TEST',
+    if (!await _confirm('QUATRIÈME ACHAT ODOO — STRIPE TEST',
         'Créer une nouvelle commande de test pour BLUE SURF SCHOOL, '
         'avec le prix Odoo historique ? Les commandes et factures '
-        'précédentes seront conservées. Aucun paiement et aucune '
+        'précédentes, y compris la facture soldée par Démo, seront conservées. '
+        'Aucun paiement et aucune '
         'campagne active à cette étape.')) return;
     if (mounted) await _act(() => _service.stripeTestConfirm(widget.requestId));
   }
@@ -225,12 +226,16 @@ class _AdvertiserOdooStripeTestSectionState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('ACHAT N° 3 — PAIEMENT STRIPE TEST',
+          const Text('ACHAT N° 4 — PAIEMENT STRIPE TEST',
               style: TextStyle(color: WebColors.blue,
                   fontWeight: FontWeight.w900)),
           const SizedBox(height: 8),
           const Text('Stripe SANDBOX via Odoo local. Cartes fictives '
               'uniquement. Aucun débit bancaire réel, aucune campagne active.'),
+          const SizedBox(height: 6),
+          const Text('Avant le paiement : Démo doit être NON PUBLIÉ dans '
+              'Odoo, puis republié après le test.',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
           if (_loading)
             const Padding(
               padding: EdgeInsets.all(12),
@@ -241,7 +246,7 @@ class _AdvertiserOdooStripeTestSectionState
             FilledButton.icon(
               onPressed: _submitting ? null : _newOrder,
               icon: const Icon(Icons.shopping_cart_outlined),
-              label: const Text('CRÉER LA TROISIÈME COMMANDE DE TEST'),
+              label: const Text('CRÉER LA QUATRIÈME COMMANDE DE TEST'),
             ),
           ] else ...[
             const SizedBox(height: 10),

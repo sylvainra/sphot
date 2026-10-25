@@ -9,7 +9,7 @@
 // An additional explicit action can create/post an invoice in the LOCAL test DB.
 // A separate confirmed action may record a MANUAL test accounting payment.
 // A SECOND isolated order may use Odoo's own Demo portal payment provider.
-// A THIRD isolated order may use Odoo's Stripe SANDBOX provider only.
+// A FOURTH isolated order may use Odoo's Stripe SANDBOX provider only.
 // No Firestore writes, real bank transactions, emails or campaign activation.
 
 const http = require("node:http");
@@ -189,7 +189,9 @@ function demoReferenceFor(requestId) {
 }
 
 function stripeTestReferenceFor(requestId) {
-  return referenceFor(requestId) + "-STRIPE-03";
+  // The prior -STRIPE-03 sale was paid through Odoo Demo by mistake.
+  // Never reuse or overwrite that paid invoice for another checkout.
+  return referenceFor(requestId) + "-STRIPE-04";
 }
 
 // The first LOCAL sale is never written back to Firestore. Odoo is the only
@@ -346,6 +348,18 @@ async function stripeTestProvider(odoo, requirePublished = false) {
   return providers[0];
 }
 
+async function assertDemoHiddenForStripeTest(odoo) {
+  const providers = await odoo.call("payment.provider", "search_read", {
+    domain: [["code", "=", "demo"]],
+    fields: ["id", "code", "is_published"], limit: 2,
+  });
+  if (!Array.isArray(providers) || providers.length !== 1 ||
+      providers[0].is_published !== false) {
+    throw httpError(409,
+        "Masquez temporairement Démo (Non publié) avant le paiement Stripe TEST.");
+  }
+}
+
 // Only Odoo's own verified Stripe transaction is trusted, never a browser
 // return URL or an unsigned status sent by Flutter.
 async function findStripeTestTransactions(odoo, invoice) {
@@ -405,6 +419,8 @@ async function stripeTestCheckoutUrl(odoo, invoice) {
     throw httpError(409, "Facture déjà réglée ou incompatible avec Stripe TEST.");
   }
   await stripeTestProvider(odoo, true);
+  // Fail closed: the previous test accidentally used Demo instead of Card.
+  await assertDemoHiddenForStripeTest(odoo);
   const relative = await odoo.call("account.move", "get_portal_url", {
     ids: [invoice.id],
   });
@@ -662,7 +678,7 @@ async function confirmStripeTestOrder(odoo, reference, stripeReference,
     throw httpError(409, "Une transaction Démo confirmée est requise.");
   }
   // Reuse the tested, immutable first-sale snapshot. No new SPHOT quote,
-  // Firestore write, advertiser, or product is created for this third order.
+  // Firestore write, advertiser, or product is created for this fourth order.
   const draft = await demoDraftFromOriginal(odoo, original, stripeReference);
   const found = await findOrder(odoo, stripeReference);
   if (found) {
@@ -1193,4 +1209,5 @@ module.exports = {createOdooClient, createLocalBridge, createServer,
   findOrCreatePartner, findOrCreateProduct, createdId,
   demoReferenceFor, demoDraftFromOriginal, verifyDemoReplica,
   findDemoTransactions, demoCheckoutUrl, stripeTestReferenceFor,
-  stripeTestProvider, findStripeTestTransactions, stripeTestCheckoutUrl};
+  stripeTestProvider, assertDemoHiddenForStripeTest,
+  findStripeTestTransactions, stripeTestCheckoutUrl};

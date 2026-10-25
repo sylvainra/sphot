@@ -175,14 +175,22 @@ function fixture() {
         return `/my/invoices/${body.ids[0]}?access_token=test-token`;
       }
       if (model === "payment.provider" && method === "search_read") {
-        assert.deepEqual(body.fields,
-            ["id", "code", "is_live", "is_published"]);
         if (body.domain[0][2] === "stripe") {
+          assert.deepEqual(body.fields,
+              ["id", "code", "is_live", "is_published"]);
           assert.deepEqual(body.domain, [["code", "=", "stripe"],
             ["is_live", "=", false]]);
           return controls.stripeProviderLive ? [] : [{id: 7, code: "stripe",
             is_live: false, is_published: !controls.stripeProviderUnpublished}];
         }
+        if (body.domain.length === 1) {
+          assert.deepEqual(body.domain, [["code", "=", "demo"]]);
+          assert.deepEqual(body.fields, ["id", "code", "is_published"]);
+          return [{id: 6, code: "demo",
+            is_published: !controls.demoProviderUnpublished}];
+        }
+        assert.deepEqual(body.fields,
+            ["id", "code", "is_live", "is_published"]);
         assert.deepEqual(body.domain, [["code", "=", "demo"],
           ["is_live", "=", false]]);
         return [{id: 6, code: "demo", is_live: false,
@@ -386,6 +394,7 @@ async function demoPaidForStripe(f) {
   f.invoices[1].payment_state = "paid";
   f.invoices[1].amount_residual = 0;
   f.invoices[1].matched_payment_ids = [60];
+  f.controls.demoProviderUnpublished = true; // Temporarily hide Demo for Stripe.
   return {bridge, base};
 }
 
@@ -401,7 +410,7 @@ test("Stripe TEST : nouvelle vente isolée, facture et portail sans doublon", as
   ]);
   assert.equal(both[0].order.odooOrderName, "S00003");
   assert.equal(both[1].order.odooOrderName, "S00003");
-  assert.ok(f.orders[2].client_order_ref.endsWith("-STRIPE-03"));
+  assert.ok(f.orders[2].client_order_ref.endsWith("-STRIPE-04"));
   assert.equal(f.orders[2].partner_id, f.orders[0].partner_id);
   assert.equal(f.orders[2].amount_untaxed, f.orders[0].amount_untaxed);
   assert.equal(f.orders.length, 3);
@@ -413,6 +422,11 @@ test("Stripe TEST : nouvelle vente isolée, facture et portail sans doublon", as
   const second = await bridge.handle({...base, action: "stripe_test_invoice"});
   assert.equal(second.alreadyExists, true);
   assert.equal(f.invoices.length, 3);
+  f.controls.demoProviderUnpublished = false;
+  await assert.rejects(
+      () => bridge.handle({...base, action: "stripe_test_checkout"}),
+      /Masquez temporairement Démo/i);
+  f.controls.demoProviderUnpublished = true;
   const checkout = await bridge.handle({...base, action: "stripe_test_checkout"});
   assert.equal(checkout.portalUrl,
       "http://127.0.0.1:8069/my/invoices/3?access_token=test-token");
