@@ -5,7 +5,6 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {createLocalBridge, receipt, firestoreValue} =
     require("../local/odoo_community_bridge_server");
-const {referenceFor} = require("../advertiser_initial_order");
 
 function fsValue(value) {
   if (value instanceof Date) return {timestampValue: value.toISOString()};
@@ -46,6 +45,7 @@ function fixture() {
   const partners = [];
   const products = [];
   const orders = [];
+  const orderLines = [];
   const invoices = [];
   const wizards = [];
   const paymentWizards = [];
@@ -81,6 +81,9 @@ function fixture() {
       }
       if (model === "product.product") {
         if (method === "search_read") return [...products];
+        if (method === "read") {
+          return products.filter((p) => body.ids.includes(p.id));
+        }
         const id = products.length + 1;
         products.push({...body.vals_list[0], id});
         return [id];
@@ -92,6 +95,7 @@ function fixture() {
         if (method === "read") {
           return orders.filter((o) => body.ids.includes(o.id))
               .map((o) => ({id: o.id, partner_id: [o.partner_id, "Client"],
+                origin: o.origin, order_line: o.order_line,
                 invoice_ids: invoices.filter((i) => i.order_id === o.id)
                     .map((i) => i.id)}));
         }
@@ -101,8 +105,15 @@ function fixture() {
           const untaxed = line.price_unit * (100 - line.discount) / 100;
           const tax = Math.round(untaxed * 20) / 100;
           const id = orders.length + 1;
+          const lineId = orderLines.length + 1;
+          orderLines.push({id: lineId, order_id: id,
+            product_id: [line.product_id, "SPHOT PUBLICITAIRE"],
+            product_uom_qty: line.product_uom_qty,
+            price_unit: line.price_unit, discount: line.discount,
+            name: line.name, tax_id: [1]});
           orders.push({id, name: `S${String(id).padStart(5, "0")}`,
             state: "draft", partner_id: values.partner_id,
+            origin: values.origin, order_line: [lineId],
             client_order_ref: values.client_order_ref,
             invoice_status: "no", amount_untaxed: untaxed,
             amount_tax: tax, amount_total: untaxed + tax});
@@ -112,6 +123,9 @@ function fixture() {
           orders.find((o) => o.id === body.ids[0]).state = "sale";
           return true;
         }
+      }
+      if (model === "sale.order.line" && method === "read") {
+        return orderLines.filter((line) => body.ids.includes(line.id));
       }
       if (model === "sale.advance.payment.inv") {
         if (method === "create") {
@@ -219,7 +233,7 @@ function fixture() {
     (() => { throw new Error("Invalid token"); })();
   const bridge = () => createLocalBridge({fetchImpl, verifyToken, odooClient});
   return {bridge, customer, quote, expected, calls, partners, products,
-    orders, invoices, wizards, paymentWizards, payments, controls,
+    orders, orderLines, invoices, wizards, paymentWizards, payments, controls,
     demoTransactions};
 }
 
@@ -241,23 +255,14 @@ async function firstCyclePaid(f) {
   f.invoices[0].payment_state = "paid";
   f.invoices[0].amount_residual = 0;
   f.invoices[0].matched_payment_ids = [50];
-  f.customer.quoteOrderCompleted = true;
-  f.customer.order = {
-    origin: "sphot_advertiser_initial_v1",
-    reference: referenceFor("blue-surf-001"),
-    publishedVersion: 1,
-    pricingReference: f.quote.pricingReference,
-    currency: "EUR",
-    baseAmountExclTaxCents: 12900,
-    discountPercent: 0,
-    payableExclTaxCents: 12900,
-  };
   return {bridge, base};
 }
 
-test("Démo native : deuxième commande et facture distinctes, reprise sans doublon", async () => {
+test("Démo native : Odoo seul conserve le devis ; facture et reprise sans doublon", async () => {
   const f = fixture();
   const {bridge, base} = await firstCyclePaid(f);
+  assert.equal(f.customer.quoteOrderCompleted, undefined);
+  assert.equal(f.customer.order, undefined);
   const empty = await bridge.handle({...base, action: "demo_status"});
   assert.equal(empty.found, false);
   const first = await bridge.handle({...base, action: "demo_confirm"});
@@ -265,8 +270,14 @@ test("Démo native : deuxième commande et facture distinctes, reprise sans doub
   assert.equal(first.order.odooOrderName, "S00002");
   assert.equal(first.order.odooUntaxedCents, 12900);
   assert.equal(f.orders[1].partner_id, f.orders[0].partner_id);
+  assert.equal(f.orders[1].origin, f.orders[0].origin);
+  assert.equal(f.orderLines[1].name, f.orderLines[0].name);
+  assert.equal(f.orderLines[1].price_unit, f.orderLines[0].price_unit);
+  assert.equal(f.orderLines[1].discount, f.orderLines[0].discount);
   const again = await bridge.handle({...base, action: "demo_confirm"});
   assert.equal(again.alreadyExists, true);
+  const restarted = await f.bridge().handle({...base, action: "demo_status"});
+  assert.equal(restarted.order.odooOrderName, "S00002");
   assert.equal(f.orders.length, 2);
   assert.equal(f.partners.length, 1);
   const invoice = await bridge.handle({...base, action: "demo_invoice"});
@@ -285,6 +296,17 @@ test("Démo native : deuxième commande et facture distinctes, reprise sans doub
   assert.equal(status.transactions.length, 0);
   assert.equal(status.invoice.paymentState, "not_paid");
   assert.equal(status.campaignActivationAllowed, false);
+});
+
+test("Démo native : une ligne historique Odoo altérée empêche un second achat", async () => {
+  const f = fixture();
+  const {bridge, base} = await firstCyclePaid(f);
+  f.orderLines[0].product_id = [99, "Produit étranger"];
+  await assert.rejects(
+      () => bridge.handle({...base, action: "demo_confirm"}),
+      /tarif ou produit/i);
+  assert.equal(f.orders.length, 1);
+  assert.equal(f.invoices.length, 1);
 });
 
 test("Démo native : transaction Odoo lue, jamais inventée ni activante", async () => {

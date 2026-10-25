@@ -187,22 +187,83 @@ function demoReferenceFor(requestId) {
   return referenceFor(requestId) + "-DEMO-02";
 }
 
-function frozenDemoQuote(data, choice, requestId) {
-  const stored = map(data.order);
-  if (stored.origin !== "sphot_advertiser_initial_v1" ||
-      stored.reference !== referenceFor(requestId) ||
-      data.quoteOrderCompleted !== true) {
-    throw httpError(409, "Devis SPHOT historique absent pour le test Démo.");
+// The first LOCAL sale is never written back to Firestore. Odoo is the only
+// durable source for its historical terms: read its actual line rather than
+// expecting data.order / quoteOrderCompleted to exist in the SPHOT dossier.
+async function demoDraftFromOriginal(odoo, original, demoReference) {
+  const rows = await odoo.call("sale.order", "read", {
+    ids: [original.id], fields: ["partner_id", "origin", "order_line"],
+  });
+  if (!Array.isArray(rows) || rows.length !== 1 ||
+      !Array.isArray(rows[0].order_line) ||
+      rows[0].order_line.length !== 1 ||
+      !/^SPHOT FR_ADVERTISER_RADIUS-V[1-9][0-9]*$/.test(rows[0].origin)) {
+    throw httpError(409, "Commande SPHOT initiale incompatible avec le test Démo.");
   }
-  return quoteForBridge({
-    market: "ADVERTISER_RADIUS", previewOnly: true,
-    version: stored.publishedVersion,
-    pricingReference: stored.pricingReference,
-    currency: stored.currency,
-    amountExclTax: stored.baseAmountExclTaxCents / 100,
-    discountPercent: stored.discountPercent,
-    payableExclTaxCents: stored.payableExclTaxCents,
-  }, choice);
+  const partnerId = relationId(rows[0].partner_id);
+  const lineId = rows[0].order_line[0];
+  if (!Number.isSafeInteger(partnerId) || partnerId < 1 ||
+      !Number.isSafeInteger(lineId) || lineId < 1) {
+    throw httpError(409, "Client ou ligne de vente Odoo d'origine invalide.");
+  }
+  const lines = await odoo.call("sale.order.line", "read", {
+    ids: [lineId], fields: ["product_id", "product_uom_qty",
+      "price_unit", "discount", "name", "tax_id"],
+  });
+  if (!Array.isArray(lines) || lines.length !== 1) {
+    throw httpError(409, "Ligne historique de vente Odoo introuvable.");
+  }
+  const line = lines[0];
+  const productId = relationId(line.product_id);
+  const products = Number.isSafeInteger(productId) && productId > 0 ?
+    await odoo.call("product.product", "read", {
+      ids: [productId], fields: ["default_code"],
+    }) : [];
+  const price = Number(line.price_unit);
+  const discount = Number(line.discount);
+  const taxIds = line.tax_id;
+  const originalUntaxedCents = Math.round(Number(original.amount_untaxed) * 100);
+  if (!Array.isArray(products) || products.length !== 1 ||
+      products[0].default_code !== "SPHOT-PUB-LOCAL-TEST" ||
+      Number(line.product_uom_qty) !== 1 ||
+      !Number.isSafeInteger(price) || price <= 0 ||
+      !Number.isInteger(discount) || discount < 0 || discount > 90 ||
+      typeof line.name !== "string" ||
+      !line.name.startsWith("SPHOT PUBLICITAIRE / ") ||
+      !line.name.endsWith(" / Tarif " + rows[0].origin.slice(6)) ||
+      !Array.isArray(taxIds) ||
+      !taxIds.every((id) => Number.isSafeInteger(id) && id > 0) ||
+      Math.round(price * (100 - discount)) !== originalUntaxedCents) {
+    throw httpError(409, "Tarif ou produit de la première commande Odoo incohérent.");
+  }
+  return {
+    partnerId,
+    values: {
+      partner_id: partnerId,
+      client_order_ref: demoReference,
+      origin: rows[0].origin,
+      order_line: [[0, 0, {
+        product_id: productId,
+        product_uom_qty: 1,
+        price_unit: price,
+        discount,
+        name: line.name,
+        tax_id: [[6, 0, taxIds]],
+      }]],
+    },
+  };
+}
+
+function verifyDemoReplica(original, duplicate, reference) {
+  const result = receipt(duplicate, reference);
+  const originalResult = receipt(original, original.client_order_ref);
+  if (result.odooUntaxedCents !== originalResult.odooUntaxedCents ||
+      result.odooTaxCents !== originalResult.odooTaxCents ||
+      result.odooTotalCents !== originalResult.odooTotalCents) {
+    throw httpError(409,
+        "La deuxième commande ne reprend pas les montants initiaux Odoo.");
+  }
+  return result;
 }
 
 async function findDemoTransactions(odoo, invoice) {
@@ -627,11 +688,11 @@ function createLocalBridge({fetchImpl = fetch, verifyToken, apiKey,
             throw httpError(409,
                 "Le premier cycle Odoo doit être terminé avant la Démo.");
           }
-          const choice = savedChoices(data);
-          const quote = frozenDemoQuote(data, choice, requestId);
-          receipt(original, reference, quote); // Frozen price must still match.
+          invoiceReceipt(originalInvoice, original);
+          const snapshot = await demoDraftFromOriginal(odoo, original,
+              demoReference);
           if (found) {
-            receipt(found, demoReference, quote);
+            verifyDemoReplica(original, found, demoReference);
             if (["draft", "sent"].includes(found.state)) {
               await odoo.call("sale.order", "action_confirm",
                   {ids: [found.id]});
@@ -644,35 +705,22 @@ function createLocalBridge({fetchImpl = fetch, verifyToken, apiKey,
               throw httpError(502, "Reprise de commande Démo impossible.");
             }
             return {ok: true, alreadyExists: true, testOnly: true,
-              order: receipt(reused, demoReference, quote)};
+              order: verifyDemoReplica(original, reused, demoReference)};
           }
-          const originalRead = await odoo.call("sale.order", "read", {
-            ids: [original.id], fields: ["partner_id"],
-          });
-          const partnerId = Array.isArray(originalRead) &&
-              originalRead.length === 1 ?
-            relationId(originalRead[0].partner_id) : null;
-          if (!Number.isSafeInteger(partnerId) || partnerId < 1) {
-            throw httpError(502, "Client de la commande précédente introuvable.");
-          }
-          const productId = await findOrCreateProduct(odoo);
-          const draft = buildOdooDraft({quote, partnerId,
-            productIds: {advertiser: productId},
-            sphotReference: demoReference});
           const id = createdId(await odoo.call("sale.order", "create",
-              {vals_list: [draft.values]}));
+              {vals_list: [snapshot.values]}));
           const created = await findOrder(odoo, demoReference);
           if (!created || created.id !== id || created.state !== "draft") {
             throw httpError(409, "Commande Démo créée incohérente.");
           }
-          receipt(created, demoReference, quote);
+          verifyDemoReplica(original, created, demoReference);
           await odoo.call("sale.order", "action_confirm", {ids: [id]});
           const confirmed = await findOrder(odoo, demoReference);
           if (!confirmed || confirmed.state !== "sale") {
             throw httpError(502, "Confirmation de commande Démo échouée.");
           }
           return {ok: true, alreadyExists: false, testOnly: true,
-            order: receipt(confirmed, demoReference, quote)};
+            order: verifyDemoReplica(original, confirmed, demoReference)};
         })();
         pending.set(key, operation);
         try {
@@ -918,4 +966,5 @@ module.exports = {createOdooClient, createLocalBridge, createServer,
   findOrder, findInvoice, invoiceReceipt, confirmInvoice,
   findManualCashMethod, registerTestPayment,
   findOrCreatePartner, findOrCreateProduct, createdId,
-  demoReferenceFor, frozenDemoQuote, findDemoTransactions, demoCheckoutUrl};
+  demoReferenceFor, demoDraftFromOriginal, verifyDemoReplica,
+  findDemoTransactions, demoCheckoutUrl};

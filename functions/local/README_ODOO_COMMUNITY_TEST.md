@@ -142,6 +142,14 @@ de la première commande, mais utilise une **autre référence SPHOT** portant
 le suffixe `-DEMO-02`. La deuxième commande, sa facture et les transactions
 de son portail restent séparées de S00001 et FAC/2026/00001.
 
+**Reprise du test local :** le premier achat Odoo n'a volontairement pas été
+écrit dans Firestore (`order` / `quoteOrderCompleted` peuvent être absents).
+La deuxième commande reprend donc la ligne commerciale, le produit, le client,
+la remise et les taxes **directement depuis la première vente Odoo déjà
+facturée et soldée**. Les montants HT, TVA et TTC des deux commandes doivent
+être identiques, sinon la confirmation s'arrête. Après navigation ou relance
+du navigateur, le statut de ce deuxième achat est retrouvé dans Odoo.
+
 Dans **Odoo local**, avant le paiement, vérifier :
 
 - `Facturation → Configuration → Paiements en ligne → Démo` : prestataire
