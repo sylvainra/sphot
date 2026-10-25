@@ -19,6 +19,7 @@ import '../models/advertising_visual_data.dart';
 import '../models/diffusion_preview_data.dart';
 import '../models/planning_data.dart';
 import '../services/odoo_simulation_service.dart';
+import '../services/odoo_local_order_service.dart';
 import '../services/advertiser_territory_service.dart';
 import '../services/advertiser_country_boundary_service.dart';
 import '../widgets/advertising_spot_section.dart';
@@ -1465,7 +1466,8 @@ _detailScrollController.dispose();
               _planningData.durationLabel ?? '1 semaine',
             ),
             requestData: _requestData,
-            testOrderEnabled: OdooSimulationService.enabled,
+            testOrderEnabled: OdooSimulationService.enabled ||
+                OdooLocalOrderService.enabled,
             onRefreshPricing: () {
               _loadPublishedPrices();
             },
@@ -1481,7 +1483,8 @@ _detailScrollController.dispose();
         ];
       case 5:
         return [
-          if (OdooSimulationService.enabled)
+          if (OdooSimulationService.enabled &&
+              !OdooLocalOrderService.enabled)
             AdvertiserPaymentSimulationSection(
               key: ValueKey<String>(
                 'odoo-sim-${_advertisingTerritory?.level.storageKey}-'

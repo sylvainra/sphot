@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/advertiser_territory_service.dart';
 import '../services/advertiser_initial_order_service.dart';
+import '../services/odoo_local_order_service.dart';
 import '../../shared/web_colors.dart';
 import '../models/diffusion_preview_data.dart';
 import '../models/planning_data.dart';
@@ -69,6 +70,8 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
   Map<String, dynamic>? _receipt;
   final AdvertiserInitialOrderService _orderService =
       const AdvertiserInitialOrderService();
+  final OdooLocalOrderService _odooLocalService =
+      const OdooLocalOrderService();
   String _professionalIdentity = 'À compléter';
   String _establishment = 'À compléter';
 
@@ -76,6 +79,26 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
   void initState() {
     super.initState();
     _loadSummary();
+    if (OdooLocalOrderService.enabled) _restoreLocalOrder();
+  }
+
+  Future<void> _restoreLocalOrder() async {
+    final requestId = _requestId;
+    if (requestId == null) return;
+    try {
+      final existing = await _odooLocalService.lookup(requestId);
+      if (mounted && existing != null) {
+        setState(() {
+          _receipt = existing;
+          _orderError = null;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _orderError =
+            'Lecture Odoo locale indisponible : $error');
+      }
+    }
   }
 
   Map<String, dynamic> _map(dynamic value) {
@@ -200,7 +223,8 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
         widget.pricingReference != null &&
         widget.pricingError == null &&
         widget.payableExclTaxCents > 0 &&
-        _existingOrder == null && _pendingOtherOrder == null && !_confirming;
+        _existingOrder == null && _pendingOtherOrder == null &&
+        _receipt == null && !_confirming;
   }
 
   Map<String, dynamic>? get _existingOrder {
@@ -216,6 +240,7 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
       widget.costExclTax * 100;
 
   int get _displayPayableCents =>
+      (_confirmedOrder?['odooUntaxedCents'] as num?)?.toInt() ??
       (_confirmedOrder?['payableExclTaxCents'] as num?)?.toInt() ??
       widget.payableExclTaxCents;
 
@@ -245,13 +270,19 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('CONFIRMER LA COMMANDE SPHOT TEST'),
+        title: Text(OdooLocalOrderService.enabled
+            ? 'CONFIRMER LA COMMANDE DANS ODOO LOCAL'
+            : 'CONFIRMER LA COMMANDE SPHOT TEST'),
         content: Text(
           'Commande de test : ${(widget.payableExclTaxCents / 100).toStringAsFixed(2)} € HT '
-          '(TVA déterminée ultérieurement par Odoo).\n\n'
-          'La sélection enregistrée sera figée pour ce dossier. '
-          'Aucune facture, transaction bancaire ou campagne active '
-          'ne sera créée.',
+          '(TVA déterminée ultérieurement par Odoo).\n\n' +
+          (OdooLocalOrderService.enabled
+              ? 'Une véritable commande de TEST sera créée dans Odoo '
+                  'sur cet ordinateur. Aucune facture, transaction bancaire '
+                  'ou campagne active ne sera créée.'
+              : 'La sélection enregistrée sera figée pour ce dossier. '
+                  'Aucune facture, transaction bancaire ou campagne active '
+                  'ne sera créée.'),
         ),
         actions: [
           TextButton(
@@ -274,15 +305,25 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
       final day = '${startDate.year.toString().padLeft(4, '0')}-'
           '${startDate.month.toString().padLeft(2, '0')}-'
           '${startDate.day.toString().padLeft(2, '0')}';
-      final result = await _orderService.prepare(
-        requestId: requestId,
-        territory: territory,
-        offer: offer,
-        duration: duration,
-        startDate: day,
-        pricingReference: reference,
-        payableExclTaxCents: widget.payableExclTaxCents,
-      );
+      final result = OdooLocalOrderService.enabled
+          ? await _odooLocalService.confirm(
+              requestId: requestId,
+              territory: territory,
+              offer: offer,
+              duration: duration,
+              startDate: day,
+              pricingReference: reference,
+              payableExclTaxCents: widget.payableExclTaxCents,
+            )
+          : await _orderService.prepare(
+              requestId: requestId,
+              territory: territory,
+              offer: offer,
+              duration: duration,
+              startDate: day,
+              pricingReference: reference,
+              payableExclTaxCents: widget.payableExclTaxCents,
+            );
       if (!mounted) return;
       setState(() => _receipt = result);
     } catch (error) {
@@ -573,19 +614,33 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
                       fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'La confirmation enregistre uniquement un dossier de '
-                  'commande SPHOT TEST. Elle ne passe aucune commande '
-                  'dans Odoo et ne déclenche ni paiement ni publicité.',
-                ),
+                Text(OdooLocalOrderService.enabled
+                    ? 'Connexion directe à Odoo Community LOCAL. '
+                        'La commande est enregistrée dans Odoo uniquement '
+                        'après confirmation. Aucun paiement ni publicité '
+                        'active ne sera déclenché.'
+                    : 'La confirmation enregistre uniquement un dossier de '
+                        'commande SPHOT TEST. Elle ne passe aucune commande '
+                        'dans Odoo et ne déclenche ni paiement ni publicité.'),
                 if (_existingOrder != null || _receipt != null) ...[
                   const SizedBox(height: 10),
                   Text('RÉFÉRENCE : ${(_receipt ?? _existingOrder)!['reference']}',
                       style: const TextStyle(fontWeight: FontWeight.w900,
                           color: WebColors.blue)),
-                  const Text('COMMANDE TEST ENREGISTRÉE — '
-                      'EN ATTENTE DE RACCORDEMENT ODOO',
-                      style: TextStyle(fontWeight: FontWeight.w800)),
+                  if (_confirmedOrder?['odooOrderName'] != null) ...[
+                    Text('COMMANDE ODOO : '
+                        '${_confirmedOrder!['odooOrderName']}',
+                        style: const TextStyle(fontWeight: FontWeight.w900)),
+                    Text('STATUT ODOO : '
+                        '${_confirmedOrder!['odooState']}',
+                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                    Text('TOTAL ODOO : '
+                        '${((_confirmedOrder!['odooTotalCents'] as num) / 100).toStringAsFixed(2)} € TTC',
+                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                  ] else
+                    const Text('COMMANDE TEST ENREGISTRÉE — '
+                        'EN ATTENTE DE RACCORDEMENT ODOO',
+                        style: TextStyle(fontWeight: FontWeight.w800)),
                   const Text('Paiement non commencé ; campagne non activée.'),
                 ] else ...[
                   if (!_savedChoicesMatch)
