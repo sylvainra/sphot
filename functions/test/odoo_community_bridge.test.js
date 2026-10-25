@@ -47,7 +47,10 @@ function fixture() {
   const orders = [];
   const invoices = [];
   const wizards = [];
-  const controls = {wrongInvoiceAmount: false};
+  const paymentWizards = [];
+  const payments = [];
+  const controls = {wrongInvoiceAmount: false, noCashJournal: false,
+    wrongPaymentAmount: false, paymentStaysUnpaid: false};
   function json(value, status = 200) {
     return {ok: status < 400, status, json: async () => value};
   }
@@ -129,7 +132,7 @@ function fixture() {
               amount_untaxed: untaxed, amount_tax: order.amount_tax,
               amount_total: untaxed + order.amount_tax,
               amount_residual: untaxed + order.amount_tax,
-              invoice_origin: order.name});
+              matched_payment_ids: [], invoice_origin: order.name});
           }
           return {type: "ir.actions.act_window_close"};
         }
@@ -147,6 +150,51 @@ function fixture() {
           return true;
         }
       }
+      if (model === "account.journal" && method === "search_read") {
+        assert.deepEqual(body.domain, [["type", "=", "cash"]]);
+        return controls.noCashJournal ? [] : [{id: 10, name: "Cash TEST", type: "cash"}];
+      }
+      if (model === "account.payment.method.line" && method === "search_read") {
+        assert.deepEqual(body.domain, [["journal_id", "=", 10],
+          ["code", "=", "manual"], ["payment_type", "=", "inbound"]]);
+        return [{id: 20, code: "manual", payment_type: "inbound",
+          journal_id: [10, "Cash TEST"]}];
+      }
+      if (model === "account.move.line" && method === "search_read") {
+        const invoice = invoices.find((i) => i.id === body.domain[0][2]);
+        assert.ok(invoice);
+        return [{id: 30, amount_residual: invoice.amount_residual,
+          reconciled: false}];
+      }
+      if (model === "account.payment.register") {
+        if (method === "create") {
+          const values = body.vals_list[0];
+          const id = paymentWizards.length + 1;
+          paymentWizards.push({id, amount: controls.wrongPaymentAmount ?
+            values.amount - 1 : values.amount,
+          journal_id: [values.journal_id, "Cash TEST"],
+          payment_method_line_id: [values.payment_method_line_id, "Manual"],
+          payment_type: "inbound", partner_type: "customer",
+          line_ids: values.line_ids[0][2]});
+          return [id];
+        }
+        if (method === "read") {
+          return paymentWizards.filter((w) => body.ids.includes(w.id));
+        }
+        if (method === "action_create_payments") {
+          const wizard = paymentWizards.find((w) => w.id === body.ids[0]);
+          assert.ok(wizard);
+          const invoice = invoices[0];
+          const id = payments.length + 1;
+          payments.push({id, amount: wizard.amount});
+          invoice.matched_payment_ids.push(id);
+          if (!controls.paymentStaysUnpaid) {
+            invoice.payment_state = "in_payment";
+            invoice.amount_residual = 0;
+          }
+          return {res_model: "account.payment", res_id: id};
+        }
+      }
       throw new Error("Appel Odoo inconnu : " + model + "/" + method);
     },
   };
@@ -156,7 +204,7 @@ function fixture() {
     (() => { throw new Error("Invalid token"); })();
   const bridge = () => createLocalBridge({fetchImpl, verifyToken, odooClient});
   return {bridge, customer, quote, expected, calls, partners, products,
-    orders, invoices, wizards, controls};
+    orders, invoices, wizards, paymentWizards, payments, controls};
 }
 
 test("SPHOT Odoo local : aucun client ni commande avant confirmation", async () => {
@@ -267,6 +315,83 @@ test("SPHOT Odoo local : écart comptable interdit avant validation facture", as
   assert.equal(f.invoices[0].state, "draft");
   assert.equal(f.calls.filter((c) => c.model === "account.move" &&
       c.method === "action_post").length, 0);
+});
+
+test("SPHOT Odoo local : règlement de caisse manuel, jamais de banque ou carte", async () => {
+  const f = fixture();
+  const bridge = f.bridge();
+  const base = {token: "valid-token", requestId: "blue-surf-001"};
+  await bridge.handle({action: "confirm", ...base, expected: f.expected});
+  await assert.rejects(() => bridge.handle({action: "payment", ...base}),
+      /facture Odoo validée/);
+  await bridge.handle({action: "invoice", ...base});
+  assert.equal(f.payments.length, 0);
+  const first = await bridge.handle({action: "payment", ...base});
+  assert.equal(first.alreadyExists, false);
+  assert.equal(first.invoice.paymentState, "in_payment");
+  assert.equal(first.invoice.odooPaymentRecorded, true);
+  assert.equal(first.invoice.paymentInitiated, false);
+  assert.equal(first.invoice.campaignActivationAllowed, false);
+  assert.equal(f.payments.length, 1);
+  assert.equal(f.payments[0].amount, 154.8);
+  assert.equal(f.paymentWizards[0].journal_id[0], 10);
+  assert.equal(f.paymentWizards[0].payment_method_line_id[0], 20);
+  assert.equal(f.calls.filter((c) => c.model === "account.payment" ||
+      c.model === "payment.transaction").length, 0);
+  const afterNav = await f.bridge().handle({action: "invoice_status", ...base});
+  assert.equal(afterNav.invoice.paymentState, "in_payment");
+  const restoredOrder = await f.bridge().handle({action: "status", ...base});
+  assert.equal(restoredOrder.order.paymentStatus, "in_payment");
+  assert.equal(restoredOrder.order.odooInvoiceName, "INV/2026/00001");
+  const second = await f.bridge().handle({action: "payment", ...base});
+  assert.equal(second.alreadyExists, true);
+  assert.equal(f.payments.length, 1);
+});
+
+test("SPHOT Odoo local : double clic règlement sans doublon", async () => {
+  const f = fixture();
+  const bridge = f.bridge();
+  const base = {token: "valid-token", requestId: "blue-surf-001"};
+  await bridge.handle({action: "confirm", ...base, expected: f.expected});
+  await bridge.handle({action: "invoice", ...base});
+  const two = await Promise.all([
+    bridge.handle({action: "payment", ...base}),
+    bridge.handle({action: "payment", ...base}),
+  ]);
+  assert.equal(two[0].invoice.paymentState, two[1].invoice.paymentState);
+  assert.equal(f.payments.length, 1);
+});
+
+test("SPHOT Odoo local : règlement interdit sans caisse ou si montant erroné", async () => {
+  const f = fixture();
+  const bridge = f.bridge();
+  const base = {token: "valid-token", requestId: "blue-surf-001"};
+  await bridge.handle({action: "confirm", ...base, expected: f.expected});
+  await bridge.handle({action: "invoice", ...base});
+  f.controls.noCashJournal = true;
+  await assert.rejects(() => bridge.handle({action: "payment", ...base}),
+      /journal de caisse/);
+  assert.equal(f.payments.length, 0);
+  f.controls.noCashJournal = false;
+  f.controls.wrongPaymentAmount = true;
+  await assert.rejects(() => bridge.handle({action: "payment", ...base}),
+      /Assistant Odoo non conforme/);
+  assert.equal(f.payments.length, 0);
+});
+
+test("SPHOT Odoo local : paiement inconclus n'est jamais répété", async () => {
+  const f = fixture();
+  const bridge = f.bridge();
+  const base = {token: "valid-token", requestId: "blue-surf-001"};
+  await bridge.handle({action: "confirm", ...base, expected: f.expected});
+  await bridge.handle({action: "invoice", ...base});
+  f.controls.paymentStaysUnpaid = true;
+  await assert.rejects(() => bridge.handle({action: "payment", ...base}),
+      /Ne pas relancer/);
+  assert.equal(f.payments.length, 1);
+  await assert.rejects(() => f.bridge().handle({action: "payment", ...base}),
+      /éviter un doublon/);
+  assert.equal(f.payments.length, 1);
 });
 
 test("SPHOT Odoo local : refuse prix falsifié et autre identité", async () => {

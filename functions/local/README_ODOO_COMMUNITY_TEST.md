@@ -3,7 +3,8 @@
 Cette passerelle est **strictement locale**. Elle ne doit jamais être déployée
 dans Firebase ou exposée sur Internet. Elle écoute uniquement sur
 `127.0.0.1:8767`, utilise l'API JSON-2 du serveur Odoo local
-`127.0.0.1:8069`, et ne traite **aucun paiement**.
+`127.0.0.1:8069`, et ne traite **aucun paiement bancaire réel**. Un
+règlement comptable manuel peut être simulé uniquement dans la base de test.
 
 ## Prérequis
 
@@ -81,11 +82,41 @@ un paiement : elle reste à régler.
 **Ne pas utiliser manuellement « Créer une facture » dans Odoo** pour ce
 test : nous vérifions que SPHOT réalise ce travail via l'API.
 
+## Simulation comptable du règlement (troisième étape du test)
+
+Après apparition de la facture validée dans **PAIEMENT CB** :
+
+1. Cliquer sur **SIMULER LE RÈGLEMENT DANS ODOO (SANS CB)**.
+2. Confirmer l'enregistrement **manuel de test** dans la boîte de dialogue.
+3. Odoo doit mettre à jour le statut de la facture (typiquement `in_payment`,
+   parfois `paid` selon sa configuration comptable). Le numéro de facture,
+   ses montants et la commande S00001 restent identiques.
+4. Passer dans **DOCUMENTS & FACTURES**, puis revenir dans **PAIEMENT CB** :
+   le statut de règlement doit être retrouvé et le bouton masqué.
+
+Le serveur n'accepte **qu'un seul journal de type `cash` (caisse)** dans cette
+base de test, avec une méthode **`manual` entrante** ; il refuse de choisir un
+journal bancaire ou un fournisseur de paiement, ainsi que plusieurs caisses
+ambiguës. Si ce prérequis manque, la simulation s'arrête avec un message de
+configuration, sans inventer de paiement. Le serveur utilise l'assistant natif
+`account.payment.register`, puis **relit Odoo** pour confirmer le résultat.
+Un second clic, un changement de rubrique ou un redémarrage de la passerelle
+ne doivent pas engendrer un deuxième règlement.
+
+**Attention :** une inscription comptable manuelle n'est **pas** un paiement CB
+et ne constitue pas une preuve d'encaissement réel. L'état `in_payment` n'est
+pas équivalent à `paid` : Odoo peut attendre une opération de rapprochement
+comptable. Aucun état n'est propagé dans Firestore et aucune campagne n'est
+activée. Il ne faut pas traiter cette simulation comme une validation d'achat
+pour la production.
+
 ## Protection
 
 - Aucune écriture Firestore, aucune Cloud Function modifiée ou déployée.
 - Une facture de test peut être créée et validée **uniquement après un clic
   explicite dans SPHOT** dans la base Odoo locale `sphot_publicitaire_test`.
+- Un règlement **comptable manuel de test** peut être enregistré après
+  confirmation explicite dans SPHOT, uniquement dans la base locale.
 - Aucune transaction bancaire, aucun email envoyé, aucune campagne active.
 - La TVA est calculée par Odoo selon sa configuration, jamais forcée à 20 %
   depuis SPHOT. Ne pas traiter une TVA à zéro comme une validation fiscale.

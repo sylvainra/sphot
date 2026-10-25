@@ -7,7 +7,8 @@
 // obtains the published price from the existing SPHOT pricing endpoint,
 // and creates an Odoo customer/product/order only after explicit confirmation.
 // An additional explicit action can create/post an invoice in the LOCAL test DB.
-// No Firestore writes, real payments, emails or campaign activation.
+// A separate confirmed action may record a MANUAL test accounting payment.
+// No Firestore writes, bank transactions, emails or campaign activation.
 
 const http = require("node:http");
 const {referenceFor} = require("../advertiser_initial_order");
@@ -209,7 +210,7 @@ async function findInvoice(odoo, order) {
   const invoices = await odoo.call("account.move", "read", {
     ids, fields: ["id", "name", "state", "move_type", "payment_state",
       "amount_untaxed", "amount_tax", "amount_total", "amount_residual",
-      "invoice_origin"],
+      "invoice_origin", "matched_payment_ids"],
   });
   if (!Array.isArray(invoices) || invoices.length !== 1 ||
       invoices[0].move_type !== "out_invoice") {
@@ -236,6 +237,8 @@ function invoiceReceipt(invoice, order) {
     amountTaxCents: Math.round(Number(invoice.amount_tax) * 100),
     amountTotalCents: totalCents,
     amountResidualCents: Math.round(Number(invoice.amount_residual) * 100),
+    odooPaymentRecorded: Array.isArray(invoice.matched_payment_ids) &&
+        invoice.matched_payment_ids.length > 0,
     paymentInitiated: false,
     campaignActivationAllowed: false,
     testOnly: true,
@@ -271,6 +274,96 @@ async function confirmInvoice(odoo, order) {
     throw httpError(502, "Facture Odoo non validée.");
   }
   return {alreadyExists, invoice: invoiceReceipt(invoice, order)};
+}
+
+function relationId(value) {
+  if (Number.isSafeInteger(value) && value > 0) return value;
+  return Array.isArray(value) && Number.isSafeInteger(value[0]) ?
+    value[0] : null;
+}
+
+async function findManualCashMethod(odoo) {
+  // The local test must never select a real banking/payment-provider journal.
+  const journals = await odoo.call("account.journal", "search_read", {
+    domain: [["type", "=", "cash"]],
+    fields: ["id", "name", "type"], limit: 3,
+  });
+  if (!Array.isArray(journals) || journals.length !== 1) {
+    throw httpError(409, "Le test nécessite un seul journal de caisse Odoo (type cash). Aucun journal bancaire ne sera utilisé.");
+  }
+  const journal = journals[0];
+  const methods = await odoo.call("account.payment.method.line", "search_read", {
+    domain: [["journal_id", "=", journal.id], ["code", "=", "manual"],
+      ["payment_type", "=", "inbound"]],
+    fields: ["id", "code", "payment_type", "journal_id"], limit: 2,
+  });
+  if (!Array.isArray(methods) || methods.length !== 1 ||
+      relationId(methods[0].journal_id) !== journal.id ||
+      methods[0].code !== "manual" ||
+      methods[0].payment_type !== "inbound") {
+    throw httpError(409, "Le journal de caisse Odoo n'a pas de méthode d'encaissement manuelle.");
+  }
+  return {journalId: journal.id, methodId: methods[0].id};
+}
+
+async function registerTestPayment(odoo, order) {
+  if (order.state !== "sale") {
+    throw httpError(409, "Commande Odoo non confirmée.");
+  }
+  let invoice = await findInvoice(odoo, order);
+  if (!invoice || invoice.state !== "posted") {
+    throw httpError(409, "Une facture Odoo validée est requise avant tout règlement de test.");
+  }
+  invoiceReceipt(invoice, order);
+  if (["in_payment", "paid"].includes(invoice.payment_state)) {
+    return {alreadyExists: true, invoice: invoiceReceipt(invoice, order)};
+  }
+  const expectedCents = Math.round(Number(invoice.amount_total) * 100);
+  const residualCents = Math.round(Number(invoice.amount_residual) * 100);
+  if (invoice.payment_state !== "not_paid" || expectedCents <= 0 ||
+      residualCents !== expectedCents ||
+      (invoice.matched_payment_ids || []).length > 0) {
+    throw httpError(409, "État de paiement Odoo déjà modifié : règlement de test bloqué pour éviter un doublon.");
+  }
+  const {journalId, methodId} = await findManualCashMethod(odoo);
+  const lines = await odoo.call("account.move.line", "search_read", {
+    domain: [["move_id", "=", invoice.id],
+      ["account_type", "=", "asset_receivable"], ["reconciled", "=", false]],
+    fields: ["id", "amount_residual", "reconciled"], limit: 3,
+  });
+  if (!Array.isArray(lines) || lines.length !== 1 ||
+      Math.abs(Math.round(Number(lines[0].amount_residual) * 100) -
+        residualCents) > 1) {
+    throw httpError(409, "Une seule ligne client non réglée est requise pour ce test.");
+  }
+  const wizardId = createdId(await odoo.call("account.payment.register",
+      "create", {vals_list: [{line_ids: [[6, 0, [lines[0].id]]],
+        journal_id: journalId, payment_method_line_id: methodId,
+        installments_mode: "full", amount: expectedCents / 100}]}));
+  const wizard = await odoo.call("account.payment.register", "read", {
+    ids: [wizardId], fields: ["amount", "journal_id", "payment_method_line_id",
+      "payment_type", "partner_type", "line_ids"],
+  });
+  if (!Array.isArray(wizard) || wizard.length !== 1 ||
+      wizard[0].payment_type !== "inbound" ||
+      wizard[0].partner_type !== "customer" ||
+      relationId(wizard[0].journal_id) !== journalId ||
+      relationId(wizard[0].payment_method_line_id) !== methodId ||
+      Math.round(Number(wizard[0].amount) * 100) !== expectedCents ||
+      !Array.isArray(wizard[0].line_ids) ||
+      wizard[0].line_ids.length !== 1 ||
+      wizard[0].line_ids[0] !== lines[0].id) {
+    throw httpError(409, "Assistant Odoo non conforme : aucun règlement de test créé.");
+  }
+  await odoo.call("account.payment.register", "action_create_payments",
+      {ids: [wizardId]});
+  invoice = await findInvoice(odoo, order);
+  if (!invoice || !["in_payment", "paid"].includes(invoice.payment_state) ||
+      !Array.isArray(invoice.matched_payment_ids) ||
+      invoice.matched_payment_ids.length < 1) {
+    throw httpError(409, "Le règlement manuel a été transmis mais Odoo ne confirme pas son état. Ne pas relancer avant vérification.");
+  }
+  return {alreadyExists: false, invoice: invoiceReceipt(invoice, order)};
 }
 
 function receipt(odooOrder, reference, quote) {
@@ -422,10 +515,15 @@ function createLocalBridge({fetchImpl = fetch, verifyToken, apiKey,
     const reference = referenceFor(requestId);
     if (action === "status") {
       const found = await findOrder(odoo, reference);
-      return found ? {ok: true, found: true, order: receipt(found, reference)} :
-        {ok: true, found: false};
+      if (!found) return {ok: true, found: false};
+      const invoice = await findInvoice(odoo, found);
+      return {ok: true, found: true, order: {
+        ...receipt(found, reference),
+        paymentStatus: invoice ? invoice.payment_state : "not_started",
+        odooInvoiceName: invoice ? invoice.name : null,
+      }};
     }
-    if (action === "invoice_status" || action === "invoice") {
+    if (["invoice_status", "invoice", "payment"].includes(action)) {
       const order = await findOrder(odoo, reference);
       if (!order || order.state !== "sale") {
         throw httpError(409, "Confirmez d'abord la commande SPHOT dans Odoo.");
@@ -435,6 +533,20 @@ function createLocalBridge({fetchImpl = fetch, verifyToken, apiKey,
         const invoice = await findInvoice(odoo, order);
         return {ok: true, order: orderResult,
           invoice: invoice ? invoiceReceipt(invoice, order) : null};
+      }
+      if (action === "payment") {
+        const key = reference + ":payment";
+        if (pending.has(key)) return pending.get(key);
+        const operation = (async () => {
+          const result = await registerTestPayment(odoo, order);
+          return {ok: true, order: orderResult, ...result};
+        })();
+        pending.set(key, operation);
+        try {
+          return await operation;
+        } finally {
+          pending.delete(key);
+        }
       }
       const key = reference + ":invoice";
       if (pending.has(key)) return pending.get(key);
@@ -531,7 +643,8 @@ function createServer(bridge) {
       if (req.method === "GET" && req.url === "/health") {
         res.writeHead(200, {"Content-Type": "application/json"});
         res.end(JSON.stringify({ok: true, mode: "ODOO_COMMUNITY_LOCAL_TEST",
-          paymentsEnabled: false, firebaseWritesEnabled: false}));
+          paymentsEnabled: false, manualTestPaymentEnabled: true,
+          firebaseWritesEnabled: false}));
         return;
       }
       if (req.method !== "POST" || req.url !== "/order") {
@@ -557,7 +670,7 @@ function createServer(bridge) {
       if (!body || typeof body !== "object" || Array.isArray(body) ||
           Object.keys(body).some((key) =>
             !["action", "requestId", "expected"].includes(key)) ||
-          !["status", "confirm", "invoice", "invoice_status"].includes(body.action) ||
+          !["status", "confirm", "invoice", "invoice_status", "payment"].includes(body.action) ||
           (body.action !== "confirm" && body.expected !== undefined)) {
         throw httpError(400, "Paramètres de commande inconnus.");
       }
@@ -594,11 +707,12 @@ if (require.main === module) {
     });
     createServer(bridge).listen(PORT, HOST, () => console.log(
         "SPHOT -> Odoo LOCAL sur http://" + HOST + ":" + PORT +
-        " (aucun paiement, aucune écriture Firebase)"));
+        " (paiement manuel TEST uniquement, aucune écriture Firebase)"));
   }
 }
 
 module.exports = {createOdooClient, createLocalBridge, createServer,
   firestoreValue, savedChoices, assertExpected, readIdentity, receipt,
   findOrder, findInvoice, invoiceReceipt, confirmInvoice,
+  findManualCashMethod, registerTestPayment,
   findOrCreatePartner, findOrCreateProduct, createdId};

@@ -70,6 +70,20 @@ class OdooLocalOrderService {
     return result;
   }
 
+  Future<Map<String, dynamic>> registerTestPayment(String requestId) async {
+    final result = await _send({'action': 'payment', 'requestId': requestId});
+    final raw = result['invoice'];
+    if (raw is! Map || raw['testOnly'] != true ||
+        raw['campaignActivationAllowed'] != false ||
+        raw['paymentInitiated'] != false ||
+        raw['odooPaymentRecorded'] != true ||
+        !['in_payment', 'paid'].contains(raw['paymentState']) ||
+        raw['state'] != 'posted') {
+      throw StateError('Règlement Odoo de test non confirmé.');
+    }
+    return result;
+  }
+
   Future<Map<String, dynamic>> _send(Map<String, dynamic> request) async {
     if (!enabled) {
       throw StateError('Connexion Odoo désactivée hors du test local.');

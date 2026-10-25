@@ -105,6 +105,54 @@ class _AdvertiserOdooLocalInvoiceSectionState
     }
   }
 
+  Future<void> _registerTestPayment() async {
+    if (_invoice == null || _submitting || widget.readOnly ||
+        _invoice!['paymentState'] != 'not_paid') return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('RÈGLEMENT FICTIF — ODOO LOCAL'),
+        content: const Text(
+          'Cette opération enregistrera dans Odoo un règlement comptable '
+          'MANUEL DE TEST, dans le journal de caisse local. '
+          'Elle ne débite aucune carte, ne contacte aucune banque et '
+          'n’active aucune campagne SPHOT. '
+          'Un règlement comptabilisé peut rester « en paiement » '
+          'tant qu’il n’est pas rapproché dans Odoo.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ANNULER'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('ENREGISTRER LE TEST'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      final result = await _service.registerTestPayment(widget.requestId);
+      if (!mounted) return;
+      setState(() {
+        _order = Map<String, dynamic>.from(result['order'] as Map);
+        _invoice = Map<String, dynamic>.from(result['invoice'] as Map);
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = error.toString().replaceFirst('Bad state: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
   String _euro(dynamic cents) {
     final value = cents is num ? cents / 100 : 0;
     return '${value.toStringAsFixed(2)} €';
@@ -168,6 +216,31 @@ class _AdvertiserOdooLocalInvoiceSectionState
             Text('TOTAL TTC : ${_euro(_invoice!['amountTotalCents'])}',
                 style: const TextStyle(fontWeight: FontWeight.w900)),
             Text('PAIEMENT : ${_invoice!['paymentState']}'),
+            if (_invoice!['odooPaymentRecorded'] == true) ...[
+              const SizedBox(height: 4),
+              Text(_invoice!['paymentState'] == 'not_paid'
+                  ? 'Un règlement de test est déjà lié à la facture, '
+                    'mais Odoo ne le confirme pas comme réglé. '
+                    'Ne pas relancer le paiement sans vérification.'
+                  : 'Règlement comptable enregistré dans Odoo TEST. '
+                    'Aucun débit bancaire.'),
+            ],
+            if (!widget.readOnly && !_loading &&
+                _invoice!['state'] == 'posted' &&
+                _invoice!['paymentState'] == 'not_paid' &&
+                _invoice!['odooPaymentRecorded'] != true) ...[
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _submitting ? null : _registerTestPayment,
+                icon: _submitting
+                    ? const SizedBox(width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.account_balance_wallet_outlined),
+                label: Text(_submitting
+                    ? 'RÈGLEMENT TEST EN COURS…'
+                    : 'SIMULER LE RÈGLEMENT DANS ODOO (SANS CB)'),
+              ),
+            ],
             const Text('Campagne non activée.'),
           ],
           if (_error != null) ...[

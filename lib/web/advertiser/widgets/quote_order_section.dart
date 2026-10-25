@@ -617,7 +617,7 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
                 Text(OdooLocalOrderService.enabled
                     ? 'Connexion directe à Odoo Community LOCAL. '
                         'La commande est enregistrée dans Odoo uniquement '
-                        'après confirmation. Aucun paiement ni publicité '
+                        'après confirmation. Aucun paiement bancaire ni publicité '
                         'active ne sera déclenché.'
                     : 'La confirmation enregistre uniquement un dossier de '
                         'commande SPHOT TEST. Elle ne passe aucune commande '
@@ -637,11 +637,17 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
                     Text('TOTAL ODOO : '
                         '${((_confirmedOrder!['odooTotalCents'] as num) / 100).toStringAsFixed(2)} € TTC',
                         style: const TextStyle(fontWeight: FontWeight.w800)),
+                    if (_confirmedOrder?['odooInvoiceName'] != null)
+                      Text('FACTURE ODOO : '
+                          '${_confirmedOrder!['odooInvoiceName']}'),
+                    Text('RÈGLEMENT ODOO : '
+                        '${_confirmedOrder!['paymentStatus'] ?? 'not_started'}'),
                   ] else
                     const Text('COMMANDE TEST ENREGISTRÉE — '
                         'EN ATTENTE DE RACCORDEMENT ODOO',
                         style: TextStyle(fontWeight: FontWeight.w800)),
-                  const Text('Paiement non commencé ; campagne non activée.'),
+                  const Text('Aucun paiement bancaire ; '
+                      'campagne non activée (test local).'),
                 ] else ...[
                   if (!_savedChoicesMatch)
                     const Padding(
