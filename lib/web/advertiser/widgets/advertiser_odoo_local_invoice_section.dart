@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/odoo_local_order_service.dart';
+import 'advertiser_odoo_local_card_preview.dart';
 import '../../shared/web_colors.dart';
 
 /// Test local Odoo uniquement : facture liée à la commande SPHOT existante.
@@ -242,6 +243,12 @@ class _AdvertiserOdooLocalInvoiceSectionState
               ),
             ],
             const Text('Campagne non activée.'),
+            if (!widget.readOnly)
+              AdvertiserOdooLocalCardPreview(
+                requestId: widget.requestId,
+                order: _order!,
+                invoice: _invoice!,
+              ),
           ],
           if (_error != null) ...[
             const SizedBox(height: 10),

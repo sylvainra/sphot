@@ -110,6 +110,30 @@ comptable. Aucun état n'est propagé dans Firestore et aucune campagne n'est
 activée. Il ne faut pas traiter cette simulation comme une validation d'achat
 pour la production.
 
+## Aperçu visuel CB et activation (quatrième étape du test)
+
+Sur le dossier BLUE SURF SCHOOL, revenir à **PAIEMENT CB** après avoir
+consulté la facture existante. La rubrique locale propose maintenant :
+
+1. **VOIR LA SIMULATION DE PAIEMENT CB** : une maquette avec une carte fictive,
+   le montant et trois résultats (acceptée, refusée, en attente). Aucun
+   numéro bancaire ne doit être saisi. Le résultat de cette seule maquette
+   est conservé entre les rubriques pendant la session Flutter en cours.
+2. **PRÉVISUALISER L'ACTIVATION (TEST)** : consulter les contrôles de commande,
+   facture et règlement comptable, ainsi que les deux points volontairement
+   bloquants : aucune preuve CB réelle et aucune autorisation de publication.
+
+Ces boutons n'appellent **aucun endpoint de paiement** et ne modifient **ni**
+la facture Odoo déjà soldée **ni** Firestore. Un résultat « CB acceptée » dans
+la maquette ne signifie **jamais** que Odoo a créé une transaction CB.
+
+**Étape distincte à venir :** pour éprouver une véritable transaction de test
+en ligne dans Odoo, utiliser le **prestataire Démo** d'Odoo 20 en mode test
+sur une facture **non réglée**. La facture FAC/2026/00001 est déjà soldée par
+la caisse de test : ne pas tenter de la faire payer une seconde fois. Odoo
+Démo permet de choisir le résultat sans identifiants bancaires ni carte réelle.
+Référence : https://www.odoo.com/documentation/20.0/fr/applications/finance/payment_providers/demo.html
+
 ## Protection
 
 - Aucune écriture Firestore, aucune Cloud Function modifiée ou déployée.
