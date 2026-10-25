@@ -110,7 +110,7 @@ function fixture() {
             product_id: [line.product_id, "SPHOT PUBLICITAIRE"],
             product_uom_qty: line.product_uom_qty,
             price_unit: line.price_unit, discount: line.discount,
-            name: line.name, tax_id: [1]});
+            name: line.name, tax_ids: [1]});
           orders.push({id, name: `S${String(id).padStart(5, "0")}`,
             state: "draft", partner_id: values.partner_id,
             origin: values.origin, order_line: [lineId],
@@ -274,6 +274,12 @@ test("Démo native : Odoo seul conserve le devis ; facture et reprise sans doubl
   assert.equal(f.orderLines[1].name, f.orderLines[0].name);
   assert.equal(f.orderLines[1].price_unit, f.orderLines[0].price_unit);
   assert.equal(f.orderLines[1].discount, f.orderLines[0].discount);
+  assert.deepEqual(f.calls.find((call) => call.model === "sale.order.line" &&
+      call.method === "read").body.fields.includes("tax_ids"), true);
+  assert.deepEqual(f.calls.find((call) => call.model === "sale.order" &&
+      call.method === "create" &&
+      call.body.vals_list[0].client_order_ref.endsWith("-DEMO-02"))
+      .body.vals_list[0].order_line[0][2].tax_ids, [[6, 0, [1]]]);
   const again = await bridge.handle({...base, action: "demo_confirm"});
   assert.equal(again.alreadyExists, true);
   const restarted = await f.bridge().handle({...base, action: "demo_status"});

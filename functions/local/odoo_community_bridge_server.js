@@ -208,7 +208,7 @@ async function demoDraftFromOriginal(odoo, original, demoReference) {
   }
   const lines = await odoo.call("sale.order.line", "read", {
     ids: [lineId], fields: ["product_id", "product_uom_qty",
-      "price_unit", "discount", "name", "tax_id"],
+      "price_unit", "discount", "name", "tax_ids"],
   });
   if (!Array.isArray(lines) || lines.length !== 1) {
     throw httpError(409, "Ligne historique de vente Odoo introuvable.");
@@ -221,7 +221,7 @@ async function demoDraftFromOriginal(odoo, original, demoReference) {
     }) : [];
   const price = Number(line.price_unit);
   const discount = Number(line.discount);
-  const taxIds = line.tax_id;
+  const taxIds = line.tax_ids;
   const originalUntaxedCents = Math.round(Number(original.amount_untaxed) * 100);
   if (!Array.isArray(products) || products.length !== 1 ||
       products[0].default_code !== "SPHOT-PUB-LOCAL-TEST" ||
@@ -248,7 +248,7 @@ async function demoDraftFromOriginal(odoo, original, demoReference) {
         price_unit: price,
         discount,
         name: line.name,
-        tax_id: [[6, 0, taxIds]],
+        tax_ids: [[6, 0, taxIds]],
       }]],
     },
   };
