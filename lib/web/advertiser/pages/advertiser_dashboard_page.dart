@@ -475,6 +475,42 @@ _detailScrollController.dispose();
         ),
       );
     }
+    // Restore the SAVED commercial choices too. Otherwise the quote screen
+    // shows empty UI choices even though Firestore has a valid configuration.
+    final savedDiffusion = _map(data['diffusion']);
+    final savedOffer = savedDiffusion['visibilityType']?.toString();
+    final savedType = switch (savedOffer) {
+      'map' => DiffusionPreviewType.map,
+      'premium' => DiffusionPreviewType.premium,
+      'pack' => DiffusionPreviewType.pack,
+      _ => null,
+    };
+    if (data['diffusionCompleted'] == true && savedType != null) {
+      _setDiffusionPreview(DiffusionPreviewData(
+        type: savedType,
+        bannerUrl: _nullableText(
+          _map(data['advertisingSpot'])['bannerUrl'] ?? url,
+        ),
+        advertiserName: _nullableText(
+          _map(data['establishment'])['businessName'] ??
+              data['advertiserName'],
+        ) ?? '',
+        latitude: latitude,
+        longitude: longitude,
+      ));
+    }
+    final savedPlanning = _map(data['planning']);
+    final start = savedPlanning['campaignStartDate'];
+    final end = savedPlanning['campaignEndDate'];
+    if (data['planningCompleted'] == true &&
+        start is Timestamp && end is Timestamp) {
+      _setPlanningData(PlanningData(
+        durationLabel: _nullableText(savedPlanning['durationLabel']),
+        startDate: start.toDate(),
+        endDate: end.toDate(),
+        availabilityConfirmed: true,
+      ));
+    }
     _restoredRequestAssets = true;
   }
 
@@ -1428,6 +1464,11 @@ _detailScrollController.dispose();
             payableExclTaxCents: _payableCentsFor(
               _planningData.durationLabel ?? '1 semaine',
             ),
+            requestData: _requestData,
+            testOrderEnabled: OdooSimulationService.enabled,
+            onRefreshPricing: () {
+              _loadPublishedPrices();
+            },
             selectedTerritory: _advertisingTerritory,
             onRadiusChanged: _setAdvertisingRadius,
             onDiffusionChanged: _setDiffusionType,

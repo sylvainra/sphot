@@ -12121,6 +12121,15 @@ exports.saveAdvertiserPhaseTwo = registerAdvertiserPhaseTwoWrite({
   admin, onRequest,
 });
 
+// Initial advertiser order: stores an immutable TEST-only quote snapshot.
+// No Odoo API, card payment, invoice, ad activation or auto-renewal.
+// Deploy only to an explicitly approved test environment.
+const {registerAdvertiserInitialOrder} =
+    require("./advertiser_initial_order");
+exports.prepareAdvertiserInitialOrder = registerAdvertiserInitialOrder({
+  admin, onRequest,
+});
+
 // Seules les décisions authentifiées côté serveur peuvent écrire les
 // historiques administratifs de PHASE 1 et de révision d'actifs PHASE 2.
 const {registerAdvertiserReviewDecision} =
