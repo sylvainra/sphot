@@ -9,6 +9,7 @@
 // An additional explicit action can create/post an invoice in the LOCAL test DB.
 // A separate confirmed action may record a MANUAL test accounting payment.
 // A SECOND isolated order may use Odoo's own Demo portal payment provider.
+// A THIRD isolated order may use Odoo's Stripe SANDBOX provider only.
 // No Firestore writes, real bank transactions, emails or campaign activation.
 
 const http = require("node:http");
@@ -86,7 +87,7 @@ function createOdooClient({fetchImpl = fetch, apiKey, database,
     const response = await send(url + "/json/2/" + model + "/" + method, {
       method: "POST",
       headers: {
-        Authorization: "bearer " + apiKey,
+        "Authorization": "bearer " + apiKey,
         "X-Odoo-Database": database,
         "Content-Type": "application/json; charset=utf-8",
         "User-Agent": "SPHOT-local-publicitaire-test",
@@ -185,6 +186,10 @@ function savedChoices(data) {
 // Never recycle the already paid first invoice for a second checkout.
 function demoReferenceFor(requestId) {
   return referenceFor(requestId) + "-DEMO-02";
+}
+
+function stripeTestReferenceFor(requestId) {
+  return referenceFor(requestId) + "-STRIPE-03";
 }
 
 // The first LOCAL sale is never written back to Firestore. Odoo is the only
@@ -328,6 +333,96 @@ async function demoCheckoutUrl(odoo, invoice) {
   return url.toString();
 }
 
+async function stripeTestProvider(odoo, requirePublished = false) {
+  const providers = await odoo.call("payment.provider", "search_read", {
+    domain: [["code", "=", "stripe"], ["is_live", "=", false]],
+    fields: ["id", "code", "is_live", "is_published"], limit: 2,
+  });
+  if (!Array.isArray(providers) || providers.length !== 1 ||
+      providers[0].code !== "stripe" || providers[0].is_live !== false ||
+      (requirePublished && providers[0].is_published !== true)) {
+    throw httpError(409, "Prestataire Odoo Stripe indisponible en mode TEST.");
+  }
+  return providers[0];
+}
+
+// Only Odoo's own verified Stripe transaction is trusted, never a browser
+// return URL or an unsigned status sent by Flutter.
+async function findStripeTestTransactions(odoo, invoice) {
+  const provider = await stripeTestProvider(odoo);
+  const currencyId = relationId(invoice.currency_id);
+  const currencyLabel = Array.isArray(invoice.currency_id) ?
+    invoice.currency_id[1] : "";
+  const totalCents = Math.round(Number(invoice.amount_total) * 100);
+  if (!currencyId || currencyLabel !== "EUR" || totalCents <= 0 ||
+      !Number.isSafeInteger(totalCents)) {
+    throw httpError(409, "Facture Stripe TEST sans montant EUR valide.");
+  }
+  const rows = await odoo.call("payment.transaction", "search_read", {
+    domain: [["invoice_ids", "in", [invoice.id]]],
+    fields: ["id", "reference", "state", "provider_code", "provider_id",
+      "amount", "currency_id", "invoice_ids"],
+    order: "id desc", limit: 20,
+  });
+  if (!Array.isArray(rows) || rows.length === 20) {
+    throw httpError(409, "Historique Stripe TEST ambigu.");
+  }
+  for (const row of rows) {
+    if (row.provider_code !== "stripe" ||
+        relationId(row.provider_id) !== provider.id ||
+        relationId(row.currency_id) !== currencyId ||
+        !Array.isArray(row.invoice_ids) ||
+        !row.invoice_ids.includes(invoice.id) ||
+        typeof row.reference !== "string" || !row.reference.trim() ||
+        !Number.isFinite(Number(row.amount)) ||
+        Math.round(Number(row.amount) * 100) !== totalCents) {
+      throw httpError(409,
+          "Transaction Stripe TEST non conforme à la facture : contrôle requis.");
+    }
+  }
+  if (rows.filter((row) => row.state === "done").length > 1) {
+    throw httpError(409, "Plusieurs paiements Stripe confirmés : contrôle requis.");
+  }
+  const transactions = rows.map((row) => ({
+    id: row.id, reference: row.reference, state: row.state,
+    amountCents: Math.round(Number(row.amount) * 100),
+    currency: "EUR", provider: "stripe", testOnly: true,
+  }));
+  const paymentConfirmed = rows.some((row) => row.state === "done") &&
+      invoice.state === "posted" && invoice.payment_state === "paid" &&
+      Math.round(Number(invoice.amount_residual) * 100) === 0 &&
+      Array.isArray(invoice.matched_payment_ids) &&
+      invoice.matched_payment_ids.length > 0;
+  return {transactions, paymentConfirmed};
+}
+
+async function stripeTestCheckoutUrl(odoo, invoice) {
+  const totalCents = Math.round(Number(invoice.amount_total) * 100);
+  if (invoice.state !== "posted" || invoice.payment_state !== "not_paid" ||
+      totalCents <= 0 ||
+      Math.round(Number(invoice.amount_residual) * 100) !== totalCents ||
+      (invoice.matched_payment_ids || []).length !== 0) {
+    throw httpError(409, "Facture déjà réglée ou incompatible avec Stripe TEST.");
+  }
+  await stripeTestProvider(odoo, true);
+  const relative = await odoo.call("account.move", "get_portal_url", {
+    ids: [invoice.id],
+  });
+  if (typeof relative !== "string") {
+    throw httpError(502, "Lien du portail Stripe TEST invalide.");
+  }
+  const url = new URL(relative, "http://127.0.0.1:8069");
+  if (!(url.protocol === "http:" && url.port === "8069" &&
+        ["127.0.0.1", "localhost"].includes(url.hostname) &&
+        url.pathname === "/my/invoices/" + invoice.id &&
+        url.searchParams.has("access_token"))) {
+    throw httpError(502, "Le paiement Stripe TEST exige un portail Odoo local.");
+  }
+  url.hostname = "127.0.0.1";
+  // This URL carries a private invoice access token. Never log or persist it.
+  return url.toString();
+}
+
 async function findOrder(odoo, reference) {
   const found = await odoo.call("sale.order", "search_read", {
     domain: [["client_order_ref", "=", reference]],
@@ -357,7 +452,7 @@ async function findInvoice(odoo, order) {
   const invoices = await odoo.call("account.move", "read", {
     ids, fields: ["id", "name", "state", "move_type", "payment_state",
       "amount_untaxed", "amount_tax", "amount_total", "amount_residual",
-      "invoice_origin", "matched_payment_ids"],
+      "invoice_origin", "matched_payment_ids", "currency_id"],
   });
   if (!Array.isArray(invoices) || invoices.length !== 1 ||
       invoices[0].move_type !== "out_invoice") {
@@ -538,6 +633,68 @@ function receipt(odooOrder, reference, quote) {
   };
 }
 
+async function confirmStripeTestOrder(odoo, reference, stripeReference,
+    demoReference) {
+  const original = await findOrder(odoo, reference);
+  if (!original || original.state !== "sale") {
+    throw httpError(409, "Première commande SPHOT Odoo manquante.");
+  }
+  const firstInvoice = await findInvoice(odoo, original);
+  if (!firstInvoice || firstInvoice.state !== "posted" ||
+      firstInvoice.payment_state !== "paid" ||
+      Math.round(Number(firstInvoice.amount_residual) * 100) !== 0) {
+    throw httpError(409, "Premier cycle Odoo non terminé.");
+  }
+  invoiceReceipt(firstInvoice, original);
+  const demoOrder = await findOrder(odoo, demoReference);
+  if (!demoOrder || demoOrder.state !== "sale") {
+    throw httpError(409, "Commande Démo préalable introuvable.");
+  }
+  const demoInvoice = await findInvoice(odoo, demoOrder);
+  if (!demoInvoice || demoInvoice.state !== "posted" ||
+      demoInvoice.payment_state !== "paid" ||
+      Math.round(Number(demoInvoice.amount_residual) * 100) !== 0) {
+    throw httpError(409, "Le paiement Démo préalable doit être terminé.");
+  }
+  invoiceReceipt(demoInvoice, demoOrder);
+  const demoTransactions = await findDemoTransactions(odoo, demoInvoice);
+  if (demoTransactions.filter((tx) => tx.state === "done").length !== 1) {
+    throw httpError(409, "Une transaction Démo confirmée est requise.");
+  }
+  // Reuse the tested, immutable first-sale snapshot. No new SPHOT quote,
+  // Firestore write, advertiser, or product is created for this third order.
+  const draft = await demoDraftFromOriginal(odoo, original, stripeReference);
+  const found = await findOrder(odoo, stripeReference);
+  if (found) {
+    verifyDemoReplica(original, found, stripeReference);
+    if (["draft", "sent"].includes(found.state)) {
+      await odoo.call("sale.order", "action_confirm", {ids: [found.id]});
+    } else if (found.state !== "sale") {
+      throw httpError(409, "Commande Stripe TEST existante incompatible.");
+    }
+    const reused = await findOrder(odoo, stripeReference);
+    if (!reused || reused.state !== "sale") {
+      throw httpError(502, "Reprise de commande Stripe TEST impossible.");
+    }
+    return {alreadyExists: true,
+      order: verifyDemoReplica(original, reused, stripeReference)};
+  }
+  const id = createdId(await odoo.call("sale.order", "create",
+      {vals_list: [draft.values]}));
+  const created = await findOrder(odoo, stripeReference);
+  if (!created || created.id !== id || created.state !== "draft") {
+    throw httpError(409, "Commande Stripe TEST créée incohérente.");
+  }
+  verifyDemoReplica(original, created, stripeReference);
+  await odoo.call("sale.order", "action_confirm", {ids: [id]});
+  const confirmed = await findOrder(odoo, stripeReference);
+  if (!confirmed || confirmed.state !== "sale") {
+    throw httpError(502, "Confirmation de commande Stripe TEST échouée.");
+  }
+  return {alreadyExists: false,
+    order: verifyDemoReplica(original, confirmed, stripeReference)};
+}
+
 async function findOrCreatePartner(odoo, identity) {
   // This first integration is scoped to the French BLUE SURF SCHOOL test.
   // Never guess the fiscal country for another customer's future invoice.
@@ -635,7 +792,7 @@ function createLocalBridge({fetchImpl = fetch, verifyToken, apiKey,
   async function getQuote(token, choice) {
     const response = await send(BASE + "/previewPublishedCommercialQuote", {
       method: "POST",
-      headers: {Authorization: "Bearer " + token,
+      headers: {"Authorization": "Bearer " + token,
         "Content-Type": "application/json"},
       body: JSON.stringify({market: "ADVERTISER_RADIUS",
         territory: choice.territory, offer: choice.offer,
@@ -660,6 +817,70 @@ function createLocalBridge({fetchImpl = fetch, verifyToken, apiKey,
     }
     const data = await readDossier(token, requestId, user);
     const reference = referenceFor(requestId);
+    if (["stripe_test_status", "stripe_test_confirm", "stripe_test_invoice",
+      "stripe_test_checkout"].includes(action)) {
+      const stripeReference = stripeTestReferenceFor(requestId);
+      const found = await findOrder(odoo, stripeReference);
+      if (action === "stripe_test_status") {
+        if (!found) {
+          return {ok: true, found: false, testOnly: true,
+            campaignActivationAllowed: false, paymentConfirmed: false};
+        }
+        const invoice = await findInvoice(odoo, found);
+        const payment = invoice ? await findStripeTestTransactions(odoo, invoice) :
+          {transactions: [], paymentConfirmed: false};
+        return {ok: true, found: true, testOnly: true,
+          order: receipt(found, stripeReference),
+          invoice: invoice ? invoiceReceipt(invoice, found) : null,
+          ...payment, campaignActivationAllowed: false};
+      }
+      if (action === "stripe_test_confirm") {
+        const key = stripeReference + ":confirm";
+        if (pending.has(key)) return pending.get(key);
+        const operation = (async () => {
+          const result = await confirmStripeTestOrder(odoo, reference,
+              stripeReference, demoReferenceFor(requestId));
+          return {ok: true, testOnly: true,
+            campaignActivationAllowed: false, ...result};
+        })();
+        pending.set(key, operation);
+        try {
+          return await operation;
+        } finally {
+          pending.delete(key);
+        }
+      }
+      if (!found || found.state !== "sale") {
+        throw httpError(409, "Confirmer d'abord la commande Stripe TEST.");
+      }
+      if (action === "stripe_test_invoice") {
+        const key = stripeReference + ":invoice";
+        if (pending.has(key)) return pending.get(key);
+        const operation = (async () => {
+          const result = await confirmInvoice(odoo, found);
+          return {ok: true, testOnly: true,
+            campaignActivationAllowed: false,
+            order: receipt(found, stripeReference), ...result};
+        })();
+        pending.set(key, operation);
+        try {
+          return await operation;
+        } finally {
+          pending.delete(key);
+        }
+      }
+      const invoice = await findInvoice(odoo, found);
+      if (!invoice) throw httpError(409, "Facture Stripe TEST absente.");
+      const payment = await findStripeTestTransactions(odoo, invoice);
+      if (payment.transactions.some((tx) =>
+        ["done", "pending", "authorized"].includes(tx.state))) {
+        throw httpError(409, "Transaction Stripe déjà confirmée ou en cours.");
+      }
+      const portalUrl = await stripeTestCheckoutUrl(odoo, invoice);
+      return {ok: true, testOnly: true, portalUrl,
+        invoice: invoiceReceipt(invoice, found),
+        campaignActivationAllowed: false};
+    }
     if (["demo_status", "demo_confirm", "demo_invoice",
       "demo_checkout"].includes(action)) {
       const demoReference = demoReferenceFor(requestId);
@@ -894,6 +1115,7 @@ function createServer(bridge) {
         res.end(JSON.stringify({ok: true, mode: "ODOO_COMMUNITY_LOCAL_TEST",
           paymentsEnabled: false, manualTestPaymentEnabled: true,
           nativeOdooDemoCheckoutEnabled: true,
+          nativeOdooStripeTestCheckoutEnabled: true,
           firebaseWritesEnabled: false}));
         return;
       }
@@ -922,7 +1144,8 @@ function createServer(bridge) {
             !["action", "requestId", "expected"].includes(key)) ||
           !["status", "confirm", "invoice", "invoice_status", "payment",
             "demo_status", "demo_confirm", "demo_invoice",
-            "demo_checkout"].includes(body.action) ||
+            "demo_checkout", "stripe_test_status", "stripe_test_confirm",
+            "stripe_test_invoice", "stripe_test_checkout"].includes(body.action) ||
           (body.action !== "confirm" && body.expected !== undefined)) {
         throw httpError(400, "Paramètres de commande inconnus.");
       }
@@ -959,7 +1182,7 @@ if (require.main === module) {
     });
     createServer(bridge).listen(PORT, HOST, () => console.log(
         "SPHOT -> Odoo LOCAL sur http://" + HOST + ":" + PORT +
-        " (paiement manuel et prestataire Démo TEST, aucune écriture Firebase)"));
+        " (paiements Démo et Stripe TEST, aucune écriture Firebase)"));
   }
 }
 
@@ -969,4 +1192,5 @@ module.exports = {createOdooClient, createLocalBridge, createServer,
   findManualCashMethod, registerTestPayment,
   findOrCreatePartner, findOrCreateProduct, createdId,
   demoReferenceFor, demoDraftFromOriginal, verifyDemoReplica,
-  findDemoTransactions, demoCheckoutUrl};
+  findDemoTransactions, demoCheckoutUrl, stripeTestReferenceFor,
+  stripeTestProvider, findStripeTestTransactions, stripeTestCheckoutUrl};

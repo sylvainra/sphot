@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/odoo_local_order_service.dart';
 import 'advertiser_odoo_local_card_preview.dart';
 import 'advertiser_odoo_demo_checkout_section.dart';
+import 'advertiser_odoo_stripe_test_section.dart';
 import '../../shared/web_colors.dart';
 
 /// Test local Odoo uniquement : facture liée à la commande SPHOT existante.
@@ -252,8 +253,10 @@ class _AdvertiserOdooLocalInvoiceSectionState
               ),
             if (!widget.readOnly &&
                 _invoice!['state'] == 'posted' &&
-                _invoice!['paymentState'] == 'paid')
+                _invoice!['paymentState'] == 'paid') ...[
               AdvertiserOdooDemoCheckoutSection(requestId: widget.requestId),
+              AdvertiserOdooStripeTestSection(requestId: widget.requestId),
+            ],
           ],
           if (_error != null) ...[
             const SizedBox(height: 10),

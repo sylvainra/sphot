@@ -51,9 +51,11 @@ function fixture() {
   const paymentWizards = [];
   const payments = [];
   const demoTransactions = [];
+  const stripeTransactions = [];
   const controls = {wrongInvoiceAmount: false, noCashJournal: false,
     wrongPaymentAmount: false, paymentStaysUnpaid: false,
-    demoProviderUnpublished: false};
+    demoProviderUnpublished: false, stripeProviderUnpublished: false,
+    stripeProviderLive: false};
   function json(value, status = 200) {
     return {ok: status < 400, status, json: async () => value};
   }
@@ -150,7 +152,8 @@ function fixture() {
               amount_untaxed: untaxed, amount_tax: order.amount_tax,
               amount_total: untaxed + order.amount_tax,
               amount_residual: untaxed + order.amount_tax,
-              matched_payment_ids: [], invoice_origin: order.name});
+              matched_payment_ids: [], invoice_origin: order.name,
+              currency_id: [1, "EUR"]});
           }
           return {type: "ir.actions.act_window_close"};
         }
@@ -172,16 +175,23 @@ function fixture() {
         return `/my/invoices/${body.ids[0]}?access_token=test-token`;
       }
       if (model === "payment.provider" && method === "search_read") {
-        assert.deepEqual(body.domain, [["code", "=", "demo"],
-          ["is_live", "=", false]]);
         assert.deepEqual(body.fields,
             ["id", "code", "is_live", "is_published"]);
+        if (body.domain[0][2] === "stripe") {
+          assert.deepEqual(body.domain, [["code", "=", "stripe"],
+            ["is_live", "=", false]]);
+          return controls.stripeProviderLive ? [] : [{id: 7, code: "stripe",
+            is_live: false, is_published: !controls.stripeProviderUnpublished}];
+        }
+        assert.deepEqual(body.domain, [["code", "=", "demo"],
+          ["is_live", "=", false]]);
         return [{id: 6, code: "demo", is_live: false,
           is_published: !controls.demoProviderUnpublished}];
       }
       if (model === "payment.transaction" && method === "search_read") {
         const invoiceId = body.domain[0][2][0];
-        return demoTransactions.filter((tx) => tx.invoice_ids.includes(invoiceId));
+        return [...demoTransactions, ...stripeTransactions]
+            .filter((tx) => tx.invoice_ids.includes(invoiceId));
       }
       if (model === "account.journal" && method === "search_read") {
         assert.deepEqual(body.domain, [["type", "=", "cash"]]);
@@ -234,11 +244,11 @@ function fixture() {
   const verifyToken = async (token) => token === "valid-token" ?
     {uid: "uid-blue", role: "ANNONCEUR", advertiserRequestId: "blue-surf-001",
       email: "bluesurfschool@example.test"} :
-    (() => { throw new Error("Invalid token"); })();
+    (() => {throw new Error("Invalid token");})();
   const bridge = () => createLocalBridge({fetchImpl, verifyToken, odooClient});
   return {bridge, customer, quote, expected, calls, partners, products,
     orders, orderLines, invoices, wizards, paymentWizards, payments, controls,
-    demoTransactions};
+    demoTransactions, stripeTransactions};
 }
 
 test("SPHOT Odoo local : aucun client ni commande avant confirmation", async () => {
@@ -365,6 +375,134 @@ test("Démo native : prestataire non publié et transaction inattendue refusés"
   await assert.rejects(
       () => bridge.handle({...base, action: "demo_status"}),
       /non Démo/i);
+});
+
+async function demoPaidForStripe(f) {
+  const {bridge, base} = await firstCyclePaid(f);
+  await bridge.handle({...base, action: "demo_confirm"});
+  await bridge.handle({...base, action: "demo_invoice"});
+  f.demoTransactions.push({id: 60, reference: "DEMO-PAID", state: "done",
+    provider_code: "demo", amount: 154.8, invoice_ids: [2]});
+  f.invoices[1].payment_state = "paid";
+  f.invoices[1].amount_residual = 0;
+  f.invoices[1].matched_payment_ids = [60];
+  return {bridge, base};
+}
+
+test("Stripe TEST : nouvelle vente isolée, facture et portail sans doublon", async () => {
+  const f = fixture();
+  const {bridge, base} = await demoPaidForStripe(f);
+  const empty = await bridge.handle({...base, action: "stripe_test_status"});
+  assert.equal(empty.found, false);
+  assert.equal(empty.paymentConfirmed, false);
+  const both = await Promise.all([
+    bridge.handle({...base, action: "stripe_test_confirm"}),
+    bridge.handle({...base, action: "stripe_test_confirm"}),
+  ]);
+  assert.equal(both[0].order.odooOrderName, "S00003");
+  assert.equal(both[1].order.odooOrderName, "S00003");
+  assert.ok(f.orders[2].client_order_ref.endsWith("-STRIPE-03"));
+  assert.equal(f.orders[2].partner_id, f.orders[0].partner_id);
+  assert.equal(f.orders[2].amount_untaxed, f.orders[0].amount_untaxed);
+  assert.equal(f.orders.length, 3);
+  assert.equal(f.partners.length, 1);
+  assert.equal(f.products.length, 1);
+  const first = await bridge.handle({...base, action: "stripe_test_invoice"});
+  assert.equal(first.invoice.paymentState, "not_paid");
+  assert.equal(first.invoice.amountTotalCents, 15480);
+  const second = await bridge.handle({...base, action: "stripe_test_invoice"});
+  assert.equal(second.alreadyExists, true);
+  assert.equal(f.invoices.length, 3);
+  const checkout = await bridge.handle({...base, action: "stripe_test_checkout"});
+  assert.equal(checkout.portalUrl,
+      "http://127.0.0.1:8069/my/invoices/3?access_token=test-token");
+  assert.equal(checkout.campaignActivationAllowed, false);
+  assert.equal(f.customer.campaignActivated, undefined);
+  assert.equal(f.invoices[0].payment_state, "paid");
+  assert.equal(f.invoices[1].payment_state, "paid");
+  assert.equal((await f.bridge().handle({...base,
+    action: "stripe_test_status"})).paymentConfirmed, false);
+});
+
+test("Stripe TEST : confirmation automatique uniquement après preuve Odoo complète", async () => {
+  const f = fixture();
+  const {bridge, base} = await demoPaidForStripe(f);
+  await bridge.handle({...base, action: "stripe_test_confirm"});
+  await bridge.handle({...base, action: "stripe_test_invoice"});
+  f.stripeTransactions.push({id: 70, reference: "STRIPE-SANDBOX",
+    state: "done", provider_code: "stripe", provider_id: [7, "Stripe"],
+    amount: 154.8, currency_id: [1, "EUR"], invoice_ids: [3]});
+  const unsettled = await bridge.handle({...base, action: "stripe_test_status"});
+  assert.equal(unsettled.transactions[0].state, "done");
+  assert.equal(unsettled.paymentConfirmed, false);
+  f.invoices[2].payment_state = "paid";
+  f.invoices[2].amount_residual = 0;
+  f.invoices[2].matched_payment_ids = [70];
+  const paid = await f.bridge().handle({...base, action: "stripe_test_status"});
+  assert.equal(paid.paymentConfirmed, true);
+  assert.equal(paid.transactions[0].provider, "stripe");
+  assert.equal(paid.transactions[0].amountCents, 15480);
+  assert.equal(paid.campaignActivationAllowed, false);
+  await assert.rejects(
+      () => bridge.handle({...base, action: "stripe_test_checkout"}),
+      /déjà confirmée ou en cours/i);
+  assert.equal(f.customer.campaignActivated, undefined);
+  assert.equal(f.payments.length, 0);
+});
+
+test("Stripe TEST : refus d'un autre prestataire, montant ou devise", async () => {
+  const f = fixture();
+  const {bridge, base} = await demoPaidForStripe(f);
+  await bridge.handle({...base, action: "stripe_test_confirm"});
+  await bridge.handle({...base, action: "stripe_test_invoice"});
+  const tx = {id: 70, reference: "STRIPE-SANDBOX", state: "done",
+    provider_code: "stripe", provider_id: [7, "Stripe"],
+    amount: 154.8, currency_id: [1, "EUR"], invoice_ids: [3]};
+  f.stripeTransactions.push(tx);
+  tx.provider_code = "demo";
+  await assert.rejects(() => bridge.handle({...base,
+    action: "stripe_test_status"}), /non conforme/i);
+  tx.provider_code = "stripe";
+  tx.amount = 155;
+  await assert.rejects(() => bridge.handle({...base,
+    action: "stripe_test_status"}), /non conforme/i);
+  tx.amount = 154.8;
+  tx.currency_id = [2, "USD"];
+  await assert.rejects(() => bridge.handle({...base,
+    action: "stripe_test_status"}), /non conforme/i);
+  tx.currency_id = [1, "EUR"];
+  f.stripeTransactions.push({...tx, id: 71, reference: "DUPLICATE"});
+  await assert.rejects(() => bridge.handle({...base,
+    action: "stripe_test_status"}), /Plusieurs paiements/i);
+});
+
+test("Stripe TEST : bloque la production et les paiements déjà en cours", async () => {
+  const f = fixture();
+  const {bridge, base} = await demoPaidForStripe(f);
+  await bridge.handle({...base, action: "stripe_test_confirm"});
+  await bridge.handle({...base, action: "stripe_test_invoice"});
+  f.controls.stripeProviderUnpublished = true;
+  await assert.rejects(() => bridge.handle({...base,
+    action: "stripe_test_checkout"}), /indisponible en mode TEST/i);
+  f.controls.stripeProviderUnpublished = false;
+  f.controls.stripeProviderLive = true;
+  await assert.rejects(() => bridge.handle({...base,
+    action: "stripe_test_checkout"}), /indisponible en mode TEST/i);
+  f.controls.stripeProviderLive = false;
+  f.stripeTransactions.push({id: 70, reference: "STRIPE-SANDBOX",
+    state: "pending", provider_code: "stripe", provider_id: [7, "Stripe"],
+    amount: 154.8, currency_id: [1, "EUR"], invoice_ids: [3]});
+  await assert.rejects(() => bridge.handle({...base,
+    action: "stripe_test_checkout"}), /déjà confirmée ou en cours/i);
+});
+
+test("Stripe TEST : refus sans achat Démo confirmé", async () => {
+  const f = fixture();
+  const {bridge, base} = await firstCyclePaid(f);
+  await assert.rejects(() => bridge.handle({...base,
+    action: "stripe_test_confirm"}), /Démo préalable/i);
+  assert.equal(f.orders.length, 1);
+  assert.equal(f.invoices.length, 1);
 });
 
 test("SPHOT Odoo local : client/produit/commande créés une fois, reprise après navigation", async () => {

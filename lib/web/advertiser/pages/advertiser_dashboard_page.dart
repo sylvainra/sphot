@@ -1511,8 +1511,8 @@ _detailScrollController.dispose();
                 ? 'La grille des six rayons doit être publiée et '
                     'la planification confirmée avant toute commande.'
                 : OdooLocalOrderService.enabled
-                  ? 'Deuxième achat de test et paiement Démo via le '
-                    'portail Odoo local, sans transaction bancaire réelle.'
+                  ? 'Achats de test Démo et Stripe SANDBOX via le '
+                    'portail Odoo local, sans débit bancaire réel.'
                   : 'Devis et commande à établir dans Odoo. '
                     'Paiement CB par Stripe après confirmation '
                     'de la commande côté serveur.',
@@ -1524,7 +1524,7 @@ _detailScrollController.dispose();
             title: OdooLocalOrderService.enabled
                 ? 'AUCUN PAIEMENT BANCAIRE RÉEL' : 'AUCUN PAIEMENT INITIÉ',
             description: OdooLocalOrderService.enabled
-                ? 'Les transactions Odoo Démo sont fictives. '
+                ? 'Les transactions Odoo Démo et Stripe sont en mode TEST. '
                     'La campagne reste inactive et Firebase inchangé.'
                 : 'Aucun prélèvement automatique. '
                     'La campagne ne devient pas active avant '

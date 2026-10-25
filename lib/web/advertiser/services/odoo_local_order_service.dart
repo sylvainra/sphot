@@ -132,6 +132,65 @@ class OdooLocalOrderService {
     return uri;
   }
 
+  /// Troisième achat local : Stripe SANDBOX via le portail natif Odoo.
+  /// Seul Odoo confirme le résultat ; aucune activation de campagne.
+  Future<Map<String, dynamic>> stripeTestStatus(String requestId) async {
+    final raw = await _send({
+      'action': 'stripe_test_status', 'requestId': requestId,
+    });
+    if (raw['testOnly'] != true ||
+        raw['campaignActivationAllowed'] != false ||
+        raw['paymentConfirmed'] is! bool) {
+      throw StateError('Statut Stripe TEST Odoo non conforme.');
+    }
+    return raw;
+  }
+
+  Future<Map<String, dynamic>> stripeTestConfirm(String requestId) async {
+    final raw = await _send({
+      'action': 'stripe_test_confirm', 'requestId': requestId,
+    });
+    final order = raw['order'];
+    if (raw['testOnly'] != true ||
+        raw['campaignActivationAllowed'] != false ||
+        order is! Map || order['odooState'] != 'sale' ||
+        order['campaignActivationAllowed'] != false) {
+      throw StateError('Commande Stripe TEST non conforme.');
+    }
+    return raw;
+  }
+
+  Future<Map<String, dynamic>> stripeTestInvoice(String requestId) async {
+    final raw = await _send({
+      'action': 'stripe_test_invoice', 'requestId': requestId,
+    });
+    final invoice = raw['invoice'];
+    if (raw['testOnly'] != true ||
+        raw['campaignActivationAllowed'] != false ||
+        invoice is! Map || invoice['state'] != 'posted' ||
+        invoice['campaignActivationAllowed'] != false) {
+      throw StateError('Facture Stripe TEST non conforme.');
+    }
+    return raw;
+  }
+
+  Future<Uri> stripeTestCheckout(String requestId) async {
+    final raw = await _send({
+      'action': 'stripe_test_checkout', 'requestId': requestId,
+    });
+    final text = raw['portalUrl'];
+    final uri = text is String ? Uri.tryParse(text) : null;
+    if (raw['testOnly'] != true ||
+        raw['campaignActivationAllowed'] != false ||
+        uri == null || uri.scheme != 'http' ||
+        uri.host != '127.0.0.1' || uri.port != 8069 ||
+        !RegExp(r'^/my/invoices/[0-9]+$').hasMatch(uri.path) ||
+        !uri.queryParameters.containsKey('access_token')) {
+      throw StateError('Lien du portail Stripe TEST non conforme.');
+    }
+    return uri;
+  }
+
   Future<Map<String, dynamic>> _send(Map<String, dynamic> request) async {
     if (!enabled) {
       throw StateError('Connexion Odoo désactivée hors du test local.');

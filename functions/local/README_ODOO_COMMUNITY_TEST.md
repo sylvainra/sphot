@@ -188,6 +188,53 @@ d'encaissement réel ou une autorisation d'activation publicitaire SPHOT.
 Documentation du portail de paiement :
 https://www.odoo.com/documentation/20.0/fr/applications/finance/accounting/payments.html
 
+## Troisième achat : Stripe SANDBOX par Odoo (sixième étape)
+
+Le premier achat et le deuxième achat Démo doivent être **payés dans Odoo** ;
+la transaction du second doit être confirmée (`done`). Le troisième achat
+conserve le dossier SPHOT, le client et le tarif Odoo historique mais reçoit
+une référence **distincte** suffixée `-STRIPE-03`. Il ne réutilise **jamais**
+une facture déjà payée. Les commandes et les numéros de facture sont attribués
+par Odoo : ils peuvent différer de ceux des captures précédentes.
+
+Dans la **seule** base Odoo `sphot_publicitaire_test`, le prestataire Stripe
+doit être en **mode test** (`is_live = false`) et publié, avec des identifiants
+de **sandbox**. L'environnement Stripe CLI ne doit correspondre qu'à cette
+sandbox ; le webhook Stripe doit être transmis à Odoo sur
+`http://127.0.0.1:8069/payment/stripe/webhook`.
+
+Dans un PowerShell dédié, après vérification de la sandbox active :
+
+```powershell
+stripe login list
+stripe listen --events="payment_intent.succeeded,payment_intent.payment_failed,payment_intent.processing" --forward-to "http://127.0.0.1:8069/payment/stripe/webhook"
+```
+
+Conserver ce terminal ouvert pendant le test. Ne jamais communiquer le
+secret de signature `whsec_` affiché par la CLI.
+
+Dans **SPHOT → PAIEMENT CB**, la section **ACHAT N° 3 — PAIEMENT STRIPE TEST** :
+
+1. **CRÉER LA TROISIÈME COMMANDE DE TEST** : copie de la ligne commerciale
+   historique dans une nouvelle commande Odoo, après confirmation explicite.
+2. **CRÉER LA FACTURE STRIPE TEST** : facture liée et validée une seule fois.
+3. **PRÉPARER LE PAIEMENT STRIPE TEST** : vérifie mode test, publication,
+   montant impayé et absence de transaction en cours ; demande à Odoo son lien.
+4. **OUVRIR LE PORTAIL ODOO — STRIPE TEST** : utiliser une **carte fictive**
+   du fournisseur de test, jamais une carte personnelle ou professionnelle.
+5. Retourner dans SPHOT : l'interface **relit automatiquement Odoo** toutes
+   les cinq secondes (au plus cinq minutes), ou sur clic **ACTUALISER**.
+
+Le serveur vérifie que l'opération Odoo est liée à la **troisième facture**,
+que le prestataire est **Stripe en mode TEST**, que montant et devise EUR
+correspondent et que la transaction est `done`. SPHOT n'affiche une confirmation
+que lorsque **la facture Odoo est payée et son solde à zéro**. Le simple retour
+au portail et le message `200` du webhook ne suffisent pas.
+
+**Aucun débit réel, aucune écriture Firestore, aucune activation de campagne.**
+Le lien du portail contient un jeton : ne jamais le partager. Aucune clé
+Stripe ou Odoo n'est transmise à Flutter ni conservée dans Git.
+
 ## Protection
 
 - Aucune écriture Firestore, aucune Cloud Function modifiée ou déployée.
