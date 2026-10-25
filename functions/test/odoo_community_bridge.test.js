@@ -172,7 +172,11 @@ function fixture() {
         return `/my/invoices/${body.ids[0]}?access_token=test-token`;
       }
       if (model === "payment.provider" && method === "search_read") {
-        return [{id: 6, code: "demo", state: "test",
+        assert.deepEqual(body.domain, [["code", "=", "demo"],
+          ["is_live", "=", false]]);
+        assert.deepEqual(body.fields,
+            ["id", "code", "is_live", "is_published"]);
+        return [{id: 6, code: "demo", is_live: false,
           is_published: !controls.demoProviderUnpublished}];
       }
       if (model === "payment.transaction" && method === "search_read") {

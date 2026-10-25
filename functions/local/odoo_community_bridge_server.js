@@ -299,11 +299,13 @@ async function demoCheckoutUrl(odoo, invoice) {
     throw httpError(409,
         "Cette facture ne peut plus ouvrir un nouveau paiement Démo.");
   }
+  // Odoo 20 uses is_live (boolean), not the old state="test" selection.
   const providers = await odoo.call("payment.provider", "search_read", {
-    domain: [["code", "=", "demo"], ["state", "=", "test"]],
-    fields: ["id", "code", "state", "is_published"], limit: 2,
+    domain: [["code", "=", "demo"], ["is_live", "=", false]],
+    fields: ["id", "code", "is_live", "is_published"], limit: 2,
   });
   if (!Array.isArray(providers) || providers.length !== 1 ||
+      providers[0].is_live !== false ||
       providers[0].is_published !== true) {
     throw httpError(409, "Prestataire Odoo Démo non publié en mode TEST.");
   }
