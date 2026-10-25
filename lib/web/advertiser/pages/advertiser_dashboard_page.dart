@@ -1510,17 +1510,25 @@ _detailScrollController.dispose();
                     !_planningData.isComplete
                 ? 'La grille des six rayons doit être publiée et '
                     'la planification confirmée avant toute commande.'
-                : 'Devis et commande à établir dans Odoo. '
+                : OdooLocalOrderService.enabled
+                  ? 'Deuxième achat de test et paiement Démo via le '
+                    'portail Odoo local, sans transaction bancaire réelle.'
+                  : 'Devis et commande à établir dans Odoo. '
                     'Paiement CB par Stripe après confirmation '
                     'de la commande côté serveur.',
-            status: 'PAIEMENT NON ACTIVÉ',
+            status: OdooLocalOrderService.enabled
+                ? 'MODE TEST ODOO' : 'PAIEMENT NON ACTIVÉ',
           ),
-          const _StatusCard(
+          _StatusCard(
             icon: Icons.lock_outline,
-            title: 'AUCUN PAIEMENT INITIÉ',
-            description: 'Aucun prélèvement automatique. '
-                'La campagne ne devient pas active avant '
-                'la confirmation de paiement authentifiée.',
+            title: OdooLocalOrderService.enabled
+                ? 'AUCUN PAIEMENT BANCAIRE RÉEL' : 'AUCUN PAIEMENT INITIÉ',
+            description: OdooLocalOrderService.enabled
+                ? 'Les transactions Odoo Démo sont fictives. '
+                    'La campagne reste inactive et Firebase inchangé.'
+                : 'Aucun prélèvement automatique. '
+                    'La campagne ne devient pas active avant '
+                    'la confirmation de paiement authentifiée.',
             status: 'SÉCURISÉ',
           ),
         ];

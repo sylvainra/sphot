@@ -84,6 +84,54 @@ class OdooLocalOrderService {
     return result;
   }
 
+  /// Deuxième achat Odoo, réservé au prestataire natif Démo (mode TEST).
+  /// La première commande et sa facture déjà payée ne sont jamais réutilisées.
+  Future<Map<String, dynamic>> demoStatus(String requestId) async {
+    final raw = await _send({'action': 'demo_status', 'requestId': requestId});
+    if (raw['testOnly'] != true ||
+        (raw['found'] == true && raw['campaignActivationAllowed'] != false)) {
+      throw StateError('Statut Odoo Démo non conforme.');
+    }
+    return raw;
+  }
+
+  Future<Map<String, dynamic>> demoConfirm(String requestId) async {
+    final raw = await _send({'action': 'demo_confirm', 'requestId': requestId});
+    final order = raw['order'];
+    if (raw['testOnly'] != true || order is! Map ||
+        order['odooState'] != 'sale' ||
+        order['campaignActivationAllowed'] != false) {
+      throw StateError('Commande Démo Odoo non conforme.');
+    }
+    return raw;
+  }
+
+  Future<Map<String, dynamic>> demoInvoice(String requestId) async {
+    final raw = await _send({'action': 'demo_invoice', 'requestId': requestId});
+    final invoice = raw['invoice'];
+    if (raw['testOnly'] != true || invoice is! Map ||
+        invoice['state'] != 'posted' ||
+        invoice['campaignActivationAllowed'] != false) {
+      throw StateError('Facture Démo Odoo non conforme.');
+    }
+    return raw;
+  }
+
+  Future<Uri> demoCheckout(String requestId) async {
+    final raw = await _send({'action': 'demo_checkout', 'requestId': requestId});
+    final text = raw['portalUrl'];
+    final uri = text is String ? Uri.tryParse(text) : null;
+    if (raw['testOnly'] != true ||
+        raw['campaignActivationAllowed'] != false ||
+        uri == null || uri.scheme != 'http' ||
+        uri.host != '127.0.0.1' || uri.port != 8069 ||
+        !RegExp(r'^/my/invoices/[0-9]+$').hasMatch(uri.path) ||
+        !uri.queryParameters.containsKey('access_token')) {
+      throw StateError('Lien de paiement Odoo Démo non conforme.');
+    }
+    return uri;
+  }
+
   Future<Map<String, dynamic>> _send(Map<String, dynamic> request) async {
     if (!enabled) {
       throw StateError('Connexion Odoo désactivée hors du test local.');

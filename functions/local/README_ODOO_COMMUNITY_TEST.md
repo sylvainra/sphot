@@ -134,6 +134,52 @@ la caisse de test : ne pas tenter de la faire payer une seconde fois. Odoo
 Démo permet de choisir le résultat sans identifiants bancaires ni carte réelle.
 Référence : https://www.odoo.com/documentation/20.0/fr/applications/finance/payment_providers/demo.html
 
+## Deuxième achat : prestataire natif Odoo Démo (cinquième étape)
+
+La facture du premier cycle **doit déjà être soldée**. Le deuxième cycle
+réutilise le même dossier BLUE SURF SCHOOL, son client Odoo et le prix figé
+de la première commande, mais utilise une **autre référence SPHOT** portant
+le suffixe `-DEMO-02`. La deuxième commande, sa facture et les transactions
+de son portail restent séparées de S00001 et FAC/2026/00001.
+
+Dans **Odoo local**, avant le paiement, vérifier :
+
+- `Facturation → Configuration → Paiements en ligne → Démo` : prestataire
+  en **Mode test**, **Publié**, moyen Démo activé.
+- `Facturation → Configuration → Paramètres` : dans la section paiements
+  clients, activer **Paiement en ligne des factures** si nécessaire, puis
+  enregistrer. Cela permet d'obtenir « Payer maintenant » sur le portail.
+
+Dans **SPHOT → PAIEMENT CB**, sous les anciens contrôles, la nouvelle section
+`ACHAT N° 2 — PAIEMENT DÉMO NATIF ODOO` offre :
+
+1. **CRÉER LA DEUXIÈME COMMANDE DE TEST** : Odoo crée la nouvelle vente à
+   partir du devis SPHOT *historique* enregistré, sans nouveau compte ni
+   écriture Firestore. Un autre clic retrouve la commande créée.
+2. **CRÉER LA FACTURE DÉMO DANS ODOO** : l'assistant Odoo facture cette
+   deuxième commande, attribue son propre numéro et la valide.
+3. **PRÉPARER LE PORTAIL PAIEMENT ODOO** : le pont vérifie le prestataire
+   Démo en mode test, que la facture est encore intégralement non réglée,
+   puis demande à Odoo un lien d'accès au portail de cette facture.
+4. **OUVRIR LE PAIEMENT DÉMO ODOO** : ouvrir ce lien dans un autre onglet,
+   utiliser le moyen « Démo » d'Odoo et sélectionner le résultat voulu.
+5. Retourner dans SPHOT et cliquer sur **ACTUALISER LA TRANSACTION ODOO
+   DÉMO** : le serveur relit les transactions `payment.transaction` Odoo
+   liées à cette **seconde** facture et vérifie le montant ainsi que le
+   prestataire `demo`.
+
+Le lien du portail contient un **jeton d'accès privé** : ne pas le publier,
+le coller dans une conversation ni prendre une capture incluant l'URL
+complète. La fenêtre de paiement doit rester sur `127.0.0.1:8069`.
+
+La démo native enregistre des transactions **fictives** dans la seule base
+Odoo de test. Elle peut laisser la facture au statut `in_payment` plutôt que
+`paid` selon la comptabilité. Aucun succès Odoo Démo ne devient une preuve
+d'encaissement réel ou une autorisation d'activation publicitaire SPHOT.
+
+Documentation du portail de paiement :
+https://www.odoo.com/documentation/20.0/fr/applications/finance/accounting/payments.html
+
 ## Protection
 
 - Aucune écriture Firestore, aucune Cloud Function modifiée ou déployée.

@@ -5,6 +5,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {createLocalBridge, receipt, firestoreValue} =
     require("../local/odoo_community_bridge_server");
+const {referenceFor} = require("../advertiser_initial_order");
 
 function fsValue(value) {
   if (value instanceof Date) return {timestampValue: value.toISOString()};
@@ -49,8 +50,10 @@ function fixture() {
   const wizards = [];
   const paymentWizards = [];
   const payments = [];
+  const demoTransactions = [];
   const controls = {wrongInvoiceAmount: false, noCashJournal: false,
-    wrongPaymentAmount: false, paymentStaysUnpaid: false};
+    wrongPaymentAmount: false, paymentStaysUnpaid: false,
+    demoProviderUnpublished: false};
   function json(value, status = 200) {
     return {ok: status < 400, status, json: async () => value};
   }
@@ -88,7 +91,7 @@ function fixture() {
         }
         if (method === "read") {
           return orders.filter((o) => body.ids.includes(o.id))
-              .map((o) => ({id: o.id,
+              .map((o) => ({id: o.id, partner_id: [o.partner_id, "Client"],
                 invoice_ids: invoices.filter((i) => i.order_id === o.id)
                     .map((i) => i.id)}));
         }
@@ -98,7 +101,8 @@ function fixture() {
           const untaxed = line.price_unit * (100 - line.discount) / 100;
           const tax = Math.round(untaxed * 20) / 100;
           const id = orders.length + 1;
-          orders.push({id, name: "S00001", state: "draft",
+          orders.push({id, name: `S${String(id).padStart(5, "0")}`,
+            state: "draft", partner_id: values.partner_id,
             client_order_ref: values.client_order_ref,
             invoice_status: "no", amount_untaxed: untaxed,
             amount_tax: tax, amount_total: untaxed + tax});
@@ -145,10 +149,21 @@ function fixture() {
         if (method === "action_post") {
           for (const invoice of invoices.filter((i) => body.ids.includes(i.id))) {
             invoice.state = "posted";
-            invoice.name = "INV/2026/00001";
+            invoice.name = `INV/2026/${String(invoice.id).padStart(5, "0")}`;
           }
           return true;
         }
+      }
+      if (model === "account.move" && method === "get_portal_url") {
+        return `/my/invoices/${body.ids[0]}?access_token=test-token`;
+      }
+      if (model === "payment.provider" && method === "search_read") {
+        return [{id: 6, code: "demo", state: "test",
+          is_published: !controls.demoProviderUnpublished}];
+      }
+      if (model === "payment.transaction" && method === "search_read") {
+        const invoiceId = body.domain[0][2][0];
+        return demoTransactions.filter((tx) => tx.invoice_ids.includes(invoiceId));
       }
       if (model === "account.journal" && method === "search_read") {
         assert.deepEqual(body.domain, [["type", "=", "cash"]]);
@@ -204,7 +219,8 @@ function fixture() {
     (() => { throw new Error("Invalid token"); })();
   const bridge = () => createLocalBridge({fetchImpl, verifyToken, odooClient});
   return {bridge, customer, quote, expected, calls, partners, products,
-    orders, invoices, wizards, paymentWizards, payments, controls};
+    orders, invoices, wizards, paymentWizards, payments, controls,
+    demoTransactions};
 }
 
 test("SPHOT Odoo local : aucun client ni commande avant confirmation", async () => {
@@ -215,6 +231,108 @@ test("SPHOT Odoo local : aucun client ni commande avant confirmation", async () 
   assert.equal(f.partners.length, 0);
   assert.equal(f.products.length, 0);
   assert.equal(f.orders.length, 0);
+});
+
+async function firstCyclePaid(f) {
+  const bridge = f.bridge();
+  const base = {token: "valid-token", requestId: "blue-surf-001"};
+  await bridge.handle({...base, action: "confirm", expected: f.expected});
+  await bridge.handle({...base, action: "invoice"});
+  f.invoices[0].payment_state = "paid";
+  f.invoices[0].amount_residual = 0;
+  f.invoices[0].matched_payment_ids = [50];
+  f.customer.quoteOrderCompleted = true;
+  f.customer.order = {
+    origin: "sphot_advertiser_initial_v1",
+    reference: referenceFor("blue-surf-001"),
+    publishedVersion: 1,
+    pricingReference: f.quote.pricingReference,
+    currency: "EUR",
+    baseAmountExclTaxCents: 12900,
+    discountPercent: 0,
+    payableExclTaxCents: 12900,
+  };
+  return {bridge, base};
+}
+
+test("Démo native : deuxième commande et facture distinctes, reprise sans doublon", async () => {
+  const f = fixture();
+  const {bridge, base} = await firstCyclePaid(f);
+  const empty = await bridge.handle({...base, action: "demo_status"});
+  assert.equal(empty.found, false);
+  const first = await bridge.handle({...base, action: "demo_confirm"});
+  assert.equal(first.alreadyExists, false);
+  assert.equal(first.order.odooOrderName, "S00002");
+  assert.equal(first.order.odooUntaxedCents, 12900);
+  assert.equal(f.orders[1].partner_id, f.orders[0].partner_id);
+  const again = await bridge.handle({...base, action: "demo_confirm"});
+  assert.equal(again.alreadyExists, true);
+  assert.equal(f.orders.length, 2);
+  assert.equal(f.partners.length, 1);
+  const invoice = await bridge.handle({...base, action: "demo_invoice"});
+  assert.equal(invoice.invoice.state, "posted");
+  assert.equal(invoice.invoice.paymentState, "not_paid");
+  assert.equal(invoice.invoice.odooInvoiceName, "INV/2026/00002");
+  await bridge.handle({...base, action: "demo_invoice"});
+  assert.equal(f.invoices.length, 2);
+  assert.equal(f.invoices[0].payment_state, "paid");
+  const link = await bridge.handle({...base, action: "demo_checkout"});
+  assert.equal(link.portalUrl,
+      "http://127.0.0.1:8069/my/invoices/2?access_token=test-token");
+  assert.equal(link.campaignActivationAllowed, false);
+  const status = await bridge.handle({...base, action: "demo_status"});
+  assert.equal(status.found, true);
+  assert.equal(status.transactions.length, 0);
+  assert.equal(status.invoice.paymentState, "not_paid");
+  assert.equal(status.campaignActivationAllowed, false);
+});
+
+test("Démo native : transaction Odoo lue, jamais inventée ni activante", async () => {
+  const f = fixture();
+  const {bridge, base} = await firstCyclePaid(f);
+  await bridge.handle({...base, action: "demo_confirm"});
+  await bridge.handle({...base, action: "demo_invoice"});
+  f.demoTransactions.push({id: 1, reference: "DEMO-TEST-2", state: "done",
+    provider_code: "demo", amount: 154.8, invoice_ids: [2]});
+  f.invoices[1].payment_state = "in_payment";
+  f.invoices[1].amount_residual = 0;
+  const status = await bridge.handle({...base, action: "demo_status"});
+  assert.equal(status.transactions.length, 1);
+  assert.equal(status.transactions[0].provider, "demo");
+  assert.equal(status.transactions[0].state, "done");
+  assert.equal(status.invoice.paymentState, "in_payment");
+  assert.equal(status.campaignActivationAllowed, false);
+  await assert.rejects(
+      () => bridge.handle({...base, action: "demo_checkout"}),
+      /déjà en cours ou confirmée/i);
+  assert.equal(f.invoices[0].payment_state, "paid");
+});
+
+test("Démo native : sans premier règlement confirmé, aucun deuxième achat", async () => {
+  const f = fixture();
+  const bridge = f.bridge();
+  const base = {token: "valid-token", requestId: "blue-surf-001"};
+  await assert.rejects(
+      () => bridge.handle({...base, action: "demo_confirm"}),
+      /première commande/i);
+  assert.equal(f.orders.length, 0);
+});
+
+test("Démo native : prestataire non publié et transaction inattendue refusés", async () => {
+  const f = fixture();
+  const {bridge, base} = await firstCyclePaid(f);
+  await bridge.handle({...base, action: "demo_confirm"});
+  await bridge.handle({...base, action: "demo_invoice"});
+  f.controls.demoProviderUnpublished = true;
+  await assert.rejects(
+      () => bridge.handle({...base, action: "demo_checkout"}),
+      /non publié/i);
+  f.controls.demoProviderUnpublished = false;
+  f.demoTransactions.push({id: 1, reference: "REAL-TEST", state: "done",
+    provider_code: "stripe", amount: 154.8, invoice_ids: [2]});
+  await assert.rejects(
+      () => bridge.handle({...base, action: "demo_status"}),
+      /non Démo/i);
 });
 
 test("SPHOT Odoo local : client/produit/commande créés une fois, reprise après navigation", async () => {

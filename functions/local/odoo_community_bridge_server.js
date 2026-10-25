@@ -8,7 +8,8 @@
 // and creates an Odoo customer/product/order only after explicit confirmation.
 // An additional explicit action can create/post an invoice in the LOCAL test DB.
 // A separate confirmed action may record a MANUAL test accounting payment.
-// No Firestore writes, bank transactions, emails or campaign activation.
+// A SECOND isolated order may use Odoo's own Demo portal payment provider.
+// No Firestore writes, real bank transactions, emails or campaign activation.
 
 const http = require("node:http");
 const {referenceFor} = require("../advertiser_initial_order");
@@ -179,6 +180,89 @@ function savedChoices(data) {
     throw httpError(409, "Sélections commerciales SPHOT incomplètes.");
   }
   return {territory, offer, duration, startDate};
+}
+
+// Never recycle the already paid first invoice for a second checkout.
+function demoReferenceFor(requestId) {
+  return referenceFor(requestId) + "-DEMO-02";
+}
+
+function frozenDemoQuote(data, choice, requestId) {
+  const stored = map(data.order);
+  if (stored.origin !== "sphot_advertiser_initial_v1" ||
+      stored.reference !== referenceFor(requestId) ||
+      data.quoteOrderCompleted !== true) {
+    throw httpError(409, "Devis SPHOT historique absent pour le test Démo.");
+  }
+  return quoteForBridge({
+    market: "ADVERTISER_RADIUS", previewOnly: true,
+    version: stored.publishedVersion,
+    pricingReference: stored.pricingReference,
+    currency: stored.currency,
+    amountExclTax: stored.baseAmountExclTaxCents / 100,
+    discountPercent: stored.discountPercent,
+    payableExclTaxCents: stored.payableExclTaxCents,
+  }, choice);
+}
+
+async function findDemoTransactions(odoo, invoice) {
+  const rows = await odoo.call("payment.transaction", "search_read", {
+    domain: [["invoice_ids", "in", [invoice.id]]],
+    fields: ["id", "reference", "state", "provider_code", "amount"],
+    order: "id desc", limit: 20,
+  });
+  if (!Array.isArray(rows) || rows.length === 20) {
+    throw httpError(409, "Historique des transactions Démo ambigu.");
+  }
+  const expectedCents = Math.round(Number(invoice.amount_total) * 100);
+  for (const row of rows) {
+    if (row.provider_code !== "demo" ||
+        Math.abs(Math.round(Number(row.amount) * 100) - expectedCents) > 1) {
+      throw httpError(409,
+          "Transaction non Démo ou montant inattendu : intervention requise.");
+    }
+  }
+  return rows.map((row) => ({
+    id: row.id, reference: row.reference, state: row.state,
+    amountCents: Math.round(Number(row.amount) * 100),
+    provider: "demo", testOnly: true,
+  }));
+}
+
+async function demoCheckoutUrl(odoo, invoice) {
+  const dueCents = Math.round(Number(invoice.amount_residual) * 100);
+  const totalCents = Math.round(Number(invoice.amount_total) * 100);
+  if (invoice.state !== "posted" || invoice.payment_state !== "not_paid" ||
+      totalCents <= 0 || dueCents !== totalCents ||
+      (invoice.matched_payment_ids || []).length !== 0) {
+    throw httpError(409,
+        "Cette facture ne peut plus ouvrir un nouveau paiement Démo.");
+  }
+  const providers = await odoo.call("payment.provider", "search_read", {
+    domain: [["code", "=", "demo"], ["state", "=", "test"]],
+    fields: ["id", "code", "state", "is_published"], limit: 2,
+  });
+  if (!Array.isArray(providers) || providers.length !== 1 ||
+      providers[0].is_published !== true) {
+    throw httpError(409, "Prestataire Odoo Démo non publié en mode TEST.");
+  }
+  const relative = await odoo.call("account.move", "get_portal_url", {
+    ids: [invoice.id],
+  });
+  if (typeof relative !== "string") {
+    throw httpError(502, "Lien du portail de facture Odoo invalide.");
+  }
+  const url = new URL(relative, "http://127.0.0.1:8069");
+  if (!(["localhost", "127.0.0.1"].includes(url.hostname) &&
+        url.port === "8069" && url.protocol === "http:" &&
+        url.pathname === "/my/invoices/" + invoice.id &&
+        url.searchParams.has("access_token"))) {
+    throw httpError(502, "Le paiement Démo exige un portail Odoo local valide.");
+  }
+  url.hostname = "127.0.0.1";
+  // This is an access link: only return it to the authenticated owner.
+  // Never log it or store it in Firestore.
+  return url.toString();
 }
 
 async function findOrder(odoo, reference) {
@@ -513,6 +597,121 @@ function createLocalBridge({fetchImpl = fetch, verifyToken, apiKey,
     }
     const data = await readDossier(token, requestId, user);
     const reference = referenceFor(requestId);
+    if (["demo_status", "demo_confirm", "demo_invoice",
+      "demo_checkout"].includes(action)) {
+      const demoReference = demoReferenceFor(requestId);
+      const found = await findOrder(odoo, demoReference);
+      if (action === "demo_status") {
+        if (!found) return {ok: true, found: false, testOnly: true};
+        const invoice = await findInvoice(odoo, found);
+        const transactions = invoice ?
+          await findDemoTransactions(odoo, invoice) : [];
+        return {ok: true, found: true, testOnly: true,
+          order: receipt(found, demoReference),
+          invoice: invoice ? invoiceReceipt(invoice, found) : null,
+          transactions, campaignActivationAllowed: false};
+      }
+      if (action === "demo_confirm") {
+        const key = demoReference + ":confirm";
+        if (pending.has(key)) return pending.get(key);
+        const operation = (async () => {
+          const original = await findOrder(odoo, reference);
+          if (!original || original.state !== "sale") {
+            throw httpError(409,
+                "La première commande SPHOT doit exister dans Odoo.");
+          }
+          const originalInvoice = await findInvoice(odoo, original);
+          if (!originalInvoice || originalInvoice.state !== "posted" ||
+              originalInvoice.payment_state !== "paid" ||
+              Number(originalInvoice.amount_residual) !== 0) {
+            throw httpError(409,
+                "Le premier cycle Odoo doit être terminé avant la Démo.");
+          }
+          const choice = savedChoices(data);
+          const quote = frozenDemoQuote(data, choice, requestId);
+          receipt(original, reference, quote); // Frozen price must still match.
+          if (found) {
+            receipt(found, demoReference, quote);
+            if (["draft", "sent"].includes(found.state)) {
+              await odoo.call("sale.order", "action_confirm",
+                  {ids: [found.id]});
+            } else if (found.state !== "sale") {
+              throw httpError(409,
+                  "Deuxième commande existante dans un état incompatible.");
+            }
+            const reused = await findOrder(odoo, demoReference);
+            if (!reused || reused.state !== "sale") {
+              throw httpError(502, "Reprise de commande Démo impossible.");
+            }
+            return {ok: true, alreadyExists: true, testOnly: true,
+              order: receipt(reused, demoReference, quote)};
+          }
+          const originalRead = await odoo.call("sale.order", "read", {
+            ids: [original.id], fields: ["partner_id"],
+          });
+          const partnerId = Array.isArray(originalRead) &&
+              originalRead.length === 1 ?
+            relationId(originalRead[0].partner_id) : null;
+          if (!Number.isSafeInteger(partnerId) || partnerId < 1) {
+            throw httpError(502, "Client de la commande précédente introuvable.");
+          }
+          const productId = await findOrCreateProduct(odoo);
+          const draft = buildOdooDraft({quote, partnerId,
+            productIds: {advertiser: productId},
+            sphotReference: demoReference});
+          const id = createdId(await odoo.call("sale.order", "create",
+              {vals_list: [draft.values]}));
+          const created = await findOrder(odoo, demoReference);
+          if (!created || created.id !== id || created.state !== "draft") {
+            throw httpError(409, "Commande Démo créée incohérente.");
+          }
+          receipt(created, demoReference, quote);
+          await odoo.call("sale.order", "action_confirm", {ids: [id]});
+          const confirmed = await findOrder(odoo, demoReference);
+          if (!confirmed || confirmed.state !== "sale") {
+            throw httpError(502, "Confirmation de commande Démo échouée.");
+          }
+          return {ok: true, alreadyExists: false, testOnly: true,
+            order: receipt(confirmed, demoReference, quote)};
+        })();
+        pending.set(key, operation);
+        try {
+          return await operation;
+        } finally {
+          pending.delete(key);
+        }
+      }
+      if (!found || found.state !== "sale") {
+        throw httpError(409, "Confirmer d'abord la deuxième commande Démo.");
+      }
+      if (action === "demo_invoice") {
+        const key = demoReference + ":invoice";
+        if (pending.has(key)) return pending.get(key);
+        const operation = (async () => {
+          const result = await confirmInvoice(odoo, found);
+          return {ok: true, order: receipt(found, demoReference),
+            testOnly: true, ...result};
+        })();
+        pending.set(key, operation);
+        try {
+          return await operation;
+        } finally {
+          pending.delete(key);
+        }
+      }
+      const invoice = await findInvoice(odoo, found);
+      if (!invoice) throw httpError(409, "Facture Démo non créée.");
+      const transactions = await findDemoTransactions(odoo, invoice);
+      if (transactions.some((tx) =>
+        ["done", "pending", "authorized"].includes(tx.state))) {
+        throw httpError(409,
+            "Transaction Démo déjà en cours ou confirmée. Actualisez le statut.");
+      }
+      const portalUrl = await demoCheckoutUrl(odoo, invoice);
+      return {ok: true, testOnly: true, portalUrl,
+        invoice: invoiceReceipt(invoice, found),
+        campaignActivationAllowed: false};
+    }
     if (action === "status") {
       const found = await findOrder(odoo, reference);
       if (!found) return {ok: true, found: false};
@@ -644,6 +843,7 @@ function createServer(bridge) {
         res.writeHead(200, {"Content-Type": "application/json"});
         res.end(JSON.stringify({ok: true, mode: "ODOO_COMMUNITY_LOCAL_TEST",
           paymentsEnabled: false, manualTestPaymentEnabled: true,
+          nativeOdooDemoCheckoutEnabled: true,
           firebaseWritesEnabled: false}));
         return;
       }
@@ -670,7 +870,9 @@ function createServer(bridge) {
       if (!body || typeof body !== "object" || Array.isArray(body) ||
           Object.keys(body).some((key) =>
             !["action", "requestId", "expected"].includes(key)) ||
-          !["status", "confirm", "invoice", "invoice_status", "payment"].includes(body.action) ||
+          !["status", "confirm", "invoice", "invoice_status", "payment",
+            "demo_status", "demo_confirm", "demo_invoice",
+            "demo_checkout"].includes(body.action) ||
           (body.action !== "confirm" && body.expected !== undefined)) {
         throw httpError(400, "Paramètres de commande inconnus.");
       }
@@ -707,7 +909,7 @@ if (require.main === module) {
     });
     createServer(bridge).listen(PORT, HOST, () => console.log(
         "SPHOT -> Odoo LOCAL sur http://" + HOST + ":" + PORT +
-        " (paiement manuel TEST uniquement, aucune écriture Firebase)"));
+        " (paiement manuel et prestataire Démo TEST, aucune écriture Firebase)"));
   }
 }
 
@@ -715,4 +917,5 @@ module.exports = {createOdooClient, createLocalBridge, createServer,
   firestoreValue, savedChoices, assertExpected, readIdentity, receipt,
   findOrder, findInvoice, invoiceReceipt, confirmInvoice,
   findManualCashMethod, registerTestPayment,
-  findOrCreatePartner, findOrCreateProduct, createdId};
+  findOrCreatePartner, findOrCreateProduct, createdId,
+  demoReferenceFor, frozenDemoQuote, findDemoTransactions, demoCheckoutUrl};
