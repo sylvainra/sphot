@@ -45,6 +45,9 @@ function fixture() {
   const partners = [];
   const products = [];
   const orders = [];
+  const invoices = [];
+  const wizards = [];
+  const controls = {wrongInvoiceAmount: false};
   function json(value, status = 200) {
     return {ok: status < 400, status, json: async () => value};
   }
@@ -80,19 +83,67 @@ function fixture() {
         if (method === "search_read") {
           return orders.filter((o) => o.client_order_ref === body.domain[0][2]);
         }
+        if (method === "read") {
+          return orders.filter((o) => body.ids.includes(o.id))
+              .map((o) => ({id: o.id,
+                invoice_ids: invoices.filter((i) => i.order_id === o.id)
+                    .map((i) => i.id)}));
+        }
         if (method === "create") {
           const values = body.vals_list[0];
           const line = values.order_line[0][2];
           const untaxed = line.price_unit * (100 - line.discount) / 100;
+          const tax = Math.round(untaxed * 20) / 100;
           const id = orders.length + 1;
           orders.push({id, name: "S00001", state: "draft",
             client_order_ref: values.client_order_ref,
             invoice_status: "no", amount_untaxed: untaxed,
-            amount_tax: 0, amount_total: untaxed});
+            amount_tax: tax, amount_total: untaxed + tax});
           return [id];
         }
         if (method === "action_confirm") {
           orders.find((o) => o.id === body.ids[0]).state = "sale";
+          return true;
+        }
+      }
+      if (model === "sale.advance.payment.inv") {
+        if (method === "create") {
+          const value = body.vals_list[0];
+          assert.equal(value.advance_payment_method, "delivered");
+          const ids = value.sale_order_ids[0][2];
+          assert.deepEqual(value.sale_order_ids[0].slice(0, 2), [6, 0]);
+          const id = wizards.length + 1;
+          wizards.push({id, order_ids: ids});
+          return [id];
+        }
+        if (method === "create_invoices") {
+          const wizard = wizards.find((w) => w.id === body.ids[0]);
+          assert.ok(wizard);
+          for (const orderId of wizard.order_ids) {
+            const order = orders.find((o) => o.id === orderId);
+            const untaxed = controls.wrongInvoiceAmount ?
+              order.amount_untaxed + 1 : order.amount_untaxed;
+            invoices.push({id: invoices.length + 1,
+              order_id: orderId, name: "/", move_type: "out_invoice",
+              state: "draft", payment_state: "not_paid",
+              amount_untaxed: untaxed, amount_tax: order.amount_tax,
+              amount_total: untaxed + order.amount_tax,
+              amount_residual: untaxed + order.amount_tax,
+              invoice_origin: order.name});
+          }
+          return {type: "ir.actions.act_window_close"};
+        }
+      }
+      if (model === "account.move") {
+        if (method === "read") {
+          return invoices.filter((i) => body.ids.includes(i.id))
+              .map((i) => ({...i}));
+        }
+        if (method === "action_post") {
+          for (const invoice of invoices.filter((i) => body.ids.includes(i.id))) {
+            invoice.state = "posted";
+            invoice.name = "INV/2026/00001";
+          }
           return true;
         }
       }
@@ -104,7 +155,8 @@ function fixture() {
       email: "bluesurfschool@example.test"} :
     (() => { throw new Error("Invalid token"); })();
   const bridge = () => createLocalBridge({fetchImpl, verifyToken, odooClient});
-  return {bridge, customer, quote, expected, calls, partners, products, orders};
+  return {bridge, customer, quote, expected, calls, partners, products,
+    orders, invoices, wizards, controls};
 }
 
 test("SPHOT Odoo local : aucun client ni commande avant confirmation", async () => {
@@ -152,6 +204,69 @@ test("SPHOT Odoo local : deux confirmations simultanées ne dupliquent pas", asy
   const result = await Promise.all([bridge.handle(request), bridge.handle(request)]);
   assert.equal(result[0].order.reference, result[1].order.reference);
   assert.equal(f.orders.length, 1);
+});
+
+test("SPHOT Odoo local : facturation uniquement sur demande, liée à S00001", async () => {
+  const f = fixture();
+  const bridge = f.bridge();
+  await bridge.handle({action: "confirm", token: "valid-token",
+    requestId: "blue-surf-001", expected: f.expected});
+  assert.equal(f.invoices.length, 0);
+  const status = await bridge.handle({action: "invoice_status",
+    token: "valid-token", requestId: "blue-surf-001"});
+  assert.equal(status.invoice, null);
+  assert.equal(f.invoices.length, 0);
+  const result = await bridge.handle({action: "invoice",
+    token: "valid-token", requestId: "blue-surf-001"});
+  assert.equal(result.alreadyExists, false);
+  assert.equal(result.order.odooOrderName, "S00001");
+  assert.equal(result.invoice.odooInvoiceName, "INV/2026/00001");
+  assert.equal(result.invoice.state, "posted");
+  assert.equal(result.invoice.paymentState, "not_paid");
+  assert.equal(result.invoice.amountUntaxedCents, 12900);
+  assert.equal(result.invoice.amountTaxCents, 2580);
+  assert.equal(result.invoice.amountTotalCents, 15480);
+  assert.equal(result.invoice.paymentInitiated, false);
+  assert.equal(result.invoice.campaignActivationAllowed, false);
+  assert.equal(f.invoices.length, 1);
+  assert.equal(f.invoices[0].order_id, f.orders[0].id);
+  assert.equal(f.wizards.length, 1);
+  assert.equal(f.calls.some((c) => c.model === "account.payment"), false);
+});
+
+test("SPHOT Odoo local : retrouver facture sans duplication après navigation", async () => {
+  const f = fixture();
+  const bridge = f.bridge();
+  await bridge.handle({action: "confirm", token: "valid-token",
+    requestId: "blue-surf-001", expected: f.expected});
+  const invoiceRequest = {action: "invoice", token: "valid-token",
+    requestId: "blue-surf-001"};
+  const both = await Promise.all([
+    bridge.handle(invoiceRequest), bridge.handle(invoiceRequest),
+  ]);
+  assert.equal(both[0].invoice.odooInvoiceId, both[1].invoice.odooInvoiceId);
+  assert.equal(f.invoices.length, 1);
+  const fromNewBridge = await f.bridge().handle({action: "invoice_status",
+    token: "valid-token", requestId: "blue-surf-001"});
+  assert.equal(fromNewBridge.invoice.odooInvoiceId, both[0].invoice.odooInvoiceId);
+  const again = await f.bridge().handle(invoiceRequest);
+  assert.equal(again.alreadyExists, true);
+  assert.equal(f.invoices.length, 1);
+  assert.equal(f.wizards.length, 1);
+});
+
+test("SPHOT Odoo local : écart comptable interdit avant validation facture", async () => {
+  const f = fixture();
+  const bridge = f.bridge();
+  await bridge.handle({action: "confirm", token: "valid-token",
+    requestId: "blue-surf-001", expected: f.expected});
+  f.controls.wrongInvoiceAmount = true;
+  await assert.rejects(() => bridge.handle({action: "invoice",
+    token: "valid-token", requestId: "blue-surf-001"}), /Montants de facture/);
+  assert.equal(f.invoices.length, 1);
+  assert.equal(f.invoices[0].state, "draft");
+  assert.equal(f.calls.filter((c) => c.model === "account.move" &&
+      c.method === "action_post").length, 0);
 });
 
 test("SPHOT Odoo local : refuse prix falsifié et autre identité", async () => {

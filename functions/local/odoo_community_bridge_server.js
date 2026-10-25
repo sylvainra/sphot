@@ -6,7 +6,8 @@
 // Reads the advertiser's existing Firebase dossier under THEIR ID token,
 // obtains the published price from the existing SPHOT pricing endpoint,
 // and creates an Odoo customer/product/order only after explicit confirmation.
-// No Firestore writes, real payments, invoices or campaign activation.
+// An additional explicit action can create/post an invoice in the LOCAL test DB.
+// No Firestore writes, real payments, emails or campaign activation.
 
 const http = require("node:http");
 const {referenceFor} = require("../advertiser_initial_order");
@@ -192,6 +193,86 @@ async function findOrder(odoo, reference) {
   return found[0] || null;
 }
 
+async function findInvoice(odoo, order) {
+  const orders = await odoo.call("sale.order", "read", {
+    ids: [order.id], fields: ["invoice_ids"],
+  });
+  if (!Array.isArray(orders) || orders.length !== 1 ||
+      !Array.isArray(orders[0].invoice_ids)) {
+    throw httpError(502, "Factures de la commande Odoo illisibles.");
+  }
+  const ids = orders[0].invoice_ids;
+  if (ids.length > 1) {
+    throw httpError(409, "Plusieurs factures sont liées à cette commande : intervention manuelle requise.");
+  }
+  if (ids.length === 0) return null;
+  const invoices = await odoo.call("account.move", "read", {
+    ids, fields: ["id", "name", "state", "move_type", "payment_state",
+      "amount_untaxed", "amount_tax", "amount_total", "amount_residual",
+      "invoice_origin"],
+  });
+  if (!Array.isArray(invoices) || invoices.length !== 1 ||
+      invoices[0].move_type !== "out_invoice") {
+    throw httpError(409, "Document Odoo lié non conforme à une facture client.");
+  }
+  return invoices[0];
+}
+
+function invoiceReceipt(invoice, order) {
+  const untaxedCents = Math.round(Number(invoice.amount_untaxed) * 100);
+  const totalCents = Math.round(Number(invoice.amount_total) * 100);
+  if (!Number.isSafeInteger(untaxedCents) ||
+      !Number.isSafeInteger(totalCents) ||
+      Math.abs(untaxedCents - Math.round(Number(order.amount_untaxed) * 100)) > 1 ||
+      Math.abs(totalCents - Math.round(Number(order.amount_total) * 100)) > 1) {
+    throw httpError(409, "Montants de facture différents de la commande Odoo.");
+  }
+  return {
+    odooInvoiceId: invoice.id,
+    odooInvoiceName: invoice.name,
+    state: invoice.state,
+    paymentState: invoice.payment_state,
+    amountUntaxedCents: untaxedCents,
+    amountTaxCents: Math.round(Number(invoice.amount_tax) * 100),
+    amountTotalCents: totalCents,
+    amountResidualCents: Math.round(Number(invoice.amount_residual) * 100),
+    paymentInitiated: false,
+    campaignActivationAllowed: false,
+    testOnly: true,
+  };
+}
+
+async function confirmInvoice(odoo, order) {
+  if (order.state !== "sale") {
+    throw httpError(409, "La commande doit être confirmée avant facturation.");
+  }
+  let invoice = await findInvoice(odoo, order);
+  const alreadyExists = invoice !== null;
+  if (!invoice) {
+    // Use Odoo's native Sales invoice wizard. The resulting invoice remains
+    // linked to S00001 and its order line, preserving accounting consistency.
+    const wizardId = createdId(await odoo.call("sale.advance.payment.inv",
+        "create", {vals_list: [{advance_payment_method: "delivered",
+          sale_order_ids: [[6, 0, [order.id]]]}]}));
+    await odoo.call("sale.advance.payment.inv", "create_invoices",
+        {ids: [wizardId]});
+    invoice = await findInvoice(odoo, order);
+    if (!invoice) {
+      throw httpError(502, "L'assistant Odoo n'a pas créé de facture liée.");
+    }
+  }
+  // Verify the numbers BEFORE posting, which gives the invoice its number.
+  invoiceReceipt(invoice, order);
+  if (invoice.state === "draft") {
+    await odoo.call("account.move", "action_post", {ids: [invoice.id]});
+    invoice = await findInvoice(odoo, order);
+  }
+  if (!invoice || invoice.state !== "posted") {
+    throw httpError(502, "Facture Odoo non validée.");
+  }
+  return {alreadyExists, invoice: invoiceReceipt(invoice, order)};
+}
+
 function receipt(odooOrder, reference, quote) {
   if (!odooOrder || odooOrder.client_order_ref !== reference) {
     throw httpError(502, "Référence de commande Odoo incorrecte.");
@@ -344,6 +425,30 @@ function createLocalBridge({fetchImpl = fetch, verifyToken, apiKey,
       return found ? {ok: true, found: true, order: receipt(found, reference)} :
         {ok: true, found: false};
     }
+    if (action === "invoice_status" || action === "invoice") {
+      const order = await findOrder(odoo, reference);
+      if (!order || order.state !== "sale") {
+        throw httpError(409, "Confirmez d'abord la commande SPHOT dans Odoo.");
+      }
+      const orderResult = receipt(order, reference);
+      if (action === "invoice_status") {
+        const invoice = await findInvoice(odoo, order);
+        return {ok: true, order: orderResult,
+          invoice: invoice ? invoiceReceipt(invoice, order) : null};
+      }
+      const key = reference + ":invoice";
+      if (pending.has(key)) return pending.get(key);
+      const operation = (async () => {
+        const result = await confirmInvoice(odoo, order);
+        return {ok: true, order: orderResult, ...result};
+      })();
+      pending.set(key, operation);
+      try {
+        return await operation;
+      } finally {
+        pending.delete(key);
+      }
+    }
     if (action !== "confirm") throw httpError(400, "Action inconnue.");
     if (pending.has(reference)) return pending.get(reference);
     const operation = (async () => {
@@ -452,8 +557,8 @@ function createServer(bridge) {
       if (!body || typeof body !== "object" || Array.isArray(body) ||
           Object.keys(body).some((key) =>
             !["action", "requestId", "expected"].includes(key)) ||
-          !["status", "confirm"].includes(body.action) ||
-          (body.action === "status" && body.expected !== undefined)) {
+          !["status", "confirm", "invoice", "invoice_status"].includes(body.action) ||
+          (body.action !== "confirm" && body.expected !== undefined)) {
         throw httpError(400, "Paramètres de commande inconnus.");
       }
       referenceFor(body.requestId);
@@ -495,4 +600,5 @@ if (require.main === module) {
 
 module.exports = {createOdooClient, createLocalBridge, createServer,
   firestoreValue, savedChoices, assertExpected, readIdentity, receipt,
-  findOrder, findOrCreatePartner, findOrCreateProduct, createdId};
+  findOrder, findInvoice, invoiceReceipt, confirmInvoice,
+  findOrCreatePartner, findOrCreateProduct, createdId};

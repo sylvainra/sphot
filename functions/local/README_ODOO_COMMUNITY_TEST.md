@@ -56,10 +56,37 @@ sont créés dans Odoo. Le client et le produit ne sont pas préconfigurés.
 Dans Odoo → Ventes → Commandes, contrôler la référence SPHOT, le nom et
 le montant HT. Revenir au devis SPHOT : la même commande est retrouvée.
 
+## Facturer la commande existante (deuxième étape du test)
+
+Après avoir retrouvé **S00001** dans **DEVIS & COMMANDE** :
+
+1. Ouvrir **PAIEMENT CB** dans SPHOT. La rubrique « FACTURATION ODOO —
+   ENVIRONNEMENT LOCAL DE TEST » charge la commande depuis Odoo.
+2. Cliquer une seule fois sur **CRÉER LA FACTURE TEST DANS ODOO**, puis
+   confirmer dans la boîte de dialogue.
+3. Ouvrir Odoo → Facturation → Clients → Factures pour constater la facture
+   **validée**, reliée à la commande déjà créée. Son numéro est attribué
+   par Odoo ; ne pas en inventer un côté SPHOT.
+4. Passer à **DOCUMENTS & FACTURES**, puis revenir à **PAIEMENT CB** : la
+   même facture doit réapparaître. Le bouton de création n'apparaît plus.
+
+La passerelle passe par l'assistant officiel de facturation des ventes
+`sale.advance.payment.inv` (`create_invoices`), puis vérifie les montants
+avant `account.move/action_post`. Elle recherche toute facture existante liée
+à la commande **avant** de créer quoi que ce soit. Un second appel ne crée
+pas de deuxième facture ; s'il y a plusieurs factures ou un écart de montants,
+le test s'arrête avec un message d'erreur. Une facture dans Odoo n'est pas
+un paiement : elle reste à régler.
+
+**Ne pas utiliser manuellement « Créer une facture » dans Odoo** pour ce
+test : nous vérifions que SPHOT réalise ce travail via l'API.
+
 ## Protection
 
 - Aucune écriture Firestore, aucune Cloud Function modifiée ou déployée.
-- Aucune création de facture, transaction bancaire ou campagne active.
+- Une facture de test peut être créée et validée **uniquement après un clic
+  explicite dans SPHOT** dans la base Odoo locale `sphot_publicitaire_test`.
+- Aucune transaction bancaire, aucun email envoyé, aucune campagne active.
 - La TVA est calculée par Odoo selon sa configuration, jamais forcée à 20 %
   depuis SPHOT. Ne pas traiter une TVA à zéro comme une validation fiscale.
 - Ne jamais coller la clé dans Git, Flutter, une capture ou un message.

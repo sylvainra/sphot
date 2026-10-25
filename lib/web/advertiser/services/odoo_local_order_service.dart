@@ -53,6 +53,23 @@ class OdooLocalOrderService {
     return Map<String, dynamic>.from(order);
   }
 
+  Future<Map<String, dynamic>> invoiceStatus(String requestId) async {
+    return _send({'action': 'invoice_status', 'requestId': requestId});
+  }
+
+  Future<Map<String, dynamic>> createInvoice(String requestId) async {
+    final result = await _send({'action': 'invoice', 'requestId': requestId});
+    final raw = result['invoice'];
+    if (raw is! Map || raw['testOnly'] != true ||
+        raw['campaignActivationAllowed'] != false ||
+        raw['paymentInitiated'] != false ||
+        raw['state'] != 'posted' || raw['odooInvoiceId'] is! int ||
+        raw['amountTotalCents'] is! int) {
+      throw StateError('Facture Odoo locale non conforme.');
+    }
+    return result;
+  }
+
   Future<Map<String, dynamic>> _send(Map<String, dynamic> request) async {
     if (!enabled) {
       throw StateError('Connexion Odoo désactivée hors du test local.');

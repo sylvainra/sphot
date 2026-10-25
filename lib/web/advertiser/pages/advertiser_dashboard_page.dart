@@ -32,6 +32,7 @@ import '../widgets/establishment_section.dart';
 import '../widgets/identity_professional_section.dart';
 import '../widgets/planning_section.dart';
 import '../widgets/advertiser_payment_simulation_section.dart';
+import '../widgets/advertiser_odoo_local_invoice_section.dart';
 import '../widgets/quote_order_section.dart';
 
 class AdvertiserDashboardPage extends StatefulWidget {
@@ -1483,6 +1484,8 @@ _detailScrollController.dispose();
         ];
       case 5:
         return [
+          if (OdooLocalOrderService.enabled && _requestId != null)
+            AdvertiserOdooLocalInvoiceSection(requestId: _requestId!),
           if (OdooSimulationService.enabled &&
               !OdooLocalOrderService.enabled)
             AdvertiserPaymentSimulationSection(
@@ -1522,14 +1525,19 @@ _detailScrollController.dispose();
           ),
         ];
       case 6:
-        return const [
-          _StatusCard(
+        return [
+          if (OdooLocalOrderService.enabled && _requestId != null)
+            AdvertiserOdooLocalInvoiceSection(
+              requestId: _requestId!,
+              readOnly: true,
+            ),
+          const _StatusCard(
             icon: Icons.receipt_long_outlined,
             title: 'FACTURATION ÉLECTRONIQUE',
             description: 'Numérotation, intégrité et transmission seront préparées pour une plateforme agréée.',
             status: 'À RACCORDER',
           ),
-          _StatusCard(
+          const _StatusCard(
             icon: Icons.inventory_2_outlined,
             title: 'ARCHIVAGE',
             description: 'Les documents finalisés seront conservés sans écrasement et corrigés par avoir ou facture rectificative.',
