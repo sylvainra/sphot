@@ -12,7 +12,52 @@ class OdooLocalOrderService {
   static const bool enabled = kDebugMode && kIsWeb &&
       bool.fromEnvironment('SPHOT_ODOO_LOCAL', defaultValue: false);
 
+  /// Nouveau parcours Odoo anti-doublons, uniquement activable en local.
+  /// Les rubriques historiques restent inchangées par défaut.
+  static const bool secureCheckoutEnabled = enabled &&
+      bool.fromEnvironment('SPHOT_ODOO_SECURE_CHECKOUT', defaultValue: false);
+
   static const String _endpoint = 'http://127.0.0.1:8767/order';
+
+  Future<Map<String, dynamic>> secureCheckoutStatus(String requestId) =>
+      _secureCheckoutSend('secure_status', requestId);
+
+  Future<Map<String, dynamic>> secureCheckoutDraft(String requestId) =>
+      _secureCheckoutSend('secure_draft', requestId);
+
+  Future<Map<String, dynamic>> secureCheckoutInvoice(String requestId) =>
+      _secureCheckoutSend('secure_invoice', requestId);
+
+  Future<Map<String, dynamic>> secureCheckoutStripeStatus(String requestId) =>
+      _secureCheckoutSend('secure_stripe_status', requestId);
+
+  Future<Uri> secureCheckoutStripePortal(String requestId) async {
+    final result = await _secureCheckoutSend('secure_stripe_checkout', requestId);
+    final raw = result['portalUrl'];
+    final uri = raw is String ? Uri.tryParse(raw) : null;
+    if (uri == null || uri.scheme != 'http' ||
+        uri.host != '127.0.0.1' || uri.port != 8069 ||
+        !RegExp(r'^/my/invoices/[0-9]+$').hasMatch(uri.path) ||
+        !uri.queryParameters.containsKey('access_token')) {
+      throw StateError('Portail Stripe TEST sécurisé non conforme.');
+    }
+    return uri;
+  }
+
+  Future<Map<String, dynamic>> _secureCheckoutSend(
+      String action, String requestId) async {
+    if (!secureCheckoutEnabled) {
+      throw StateError('Passerelle Odoo sécurisée désactivée hors test local.');
+    }
+    final result = await _send({'action': action, 'requestId': requestId});
+    if (result['testOnly'] != true ||
+        result['campaignActivationAllowed'] != false ||
+        (action == 'secure_stripe_status' &&
+            result['paymentConfirmed'] is! bool)) {
+      throw StateError('Réponse Odoo sécurisée non conforme.');
+    }
+    return result;
+  }
 
   Future<Map<String, dynamic>?> lookup(String requestId) async {
     final response = await _send({'action': 'status', 'requestId': requestId});

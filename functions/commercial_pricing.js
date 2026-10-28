@@ -23,6 +23,9 @@ function copyPrices(data, type) {
   return type === "ADMIN" ? data.slice() : {...data};
 }
 function validate(type, value, personalised) {
+  if (!["ADMIN", "ADVERTISER_RADIUS"].includes(type)) {
+    throw err(400, "Ancien marché tarifaire retiré.");
+  }
   const values = type === "ADMIN" ? seedAdmin :
     advertiserTariffs.initialPrices();
   if (type === "ADMIN") {

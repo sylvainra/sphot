@@ -86,10 +86,12 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
     final requestId = _requestId;
     if (requestId == null) return;
     try {
-      final existing = await _odooLocalService.lookup(requestId);
+      final existing = OdooLocalOrderService.secureCheckoutEnabled
+          ? (await _odooLocalService.secureCheckoutStatus(requestId))['order']
+          : await _odooLocalService.lookup(requestId);
       if (mounted && existing != null) {
         setState(() {
-          _receipt = existing;
+          _receipt = Map<String, dynamic>.from(existing as Map);
           _orderError = null;
         });
       }
@@ -228,6 +230,7 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
   }
 
   Map<String, dynamic>? get _existingOrder {
+    if (OdooLocalOrderService.secureCheckoutEnabled) return null;
     if (widget.requestData['quoteOrderCompleted'] != true) return null;
     final order = _map(widget.requestData['order']);
     return order['origin'] == 'sphot_advertiser_initial_v1' ? order : null;
@@ -249,6 +252,11 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
       widget.discountPercent;
 
   String? get _pendingOtherOrder {
+    if (OdooLocalOrderService.secureCheckoutEnabled) {
+      final stored = _map(widget.requestData['order']);
+      if (stored.isEmpty || stored['origin'] ==
+          'sphot_advertiser_initial_v1') return null;
+    }
     if (widget.requestData['quoteOrderCompleted'] != true &&
         widget.requestData['order'] == null) return null;
     if (_existingOrder != null) return null;
@@ -270,13 +278,20 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(OdooLocalOrderService.enabled
+        title: Text(OdooLocalOrderService.secureCheckoutEnabled
+            ? 'CRÉER OU RETROUVER LE DEVIS ODOO SÉCURISÉ'
+            : OdooLocalOrderService.enabled
             ? 'CONFIRMER LA COMMANDE DANS ODOO LOCAL'
             : 'CONFIRMER LA COMMANDE SPHOT TEST'),
         content: Text(
           'Commande de test : ${(widget.payableExclTaxCents / 100).toStringAsFixed(2)} € HT '
           '(TVA déterminée ultérieurement par Odoo).\n\n' +
-          (OdooLocalOrderService.enabled
+          (OdooLocalOrderService.secureCheckoutEnabled
+              ? 'Le module sécurisé crée ou retrouve un DEVIS Odoo '
+                  'dans la base neutralisée. La commande sera confirmée '
+                  'et facturée à l’étape PAIEMENT CB, après un second '
+                  'accord explicite. Aucun paiement ni activation.'
+              : OdooLocalOrderService.enabled
               ? 'Une véritable commande de TEST sera créée dans Odoo '
                   'sur cet ordinateur. Aucune facture, transaction bancaire '
                   'ou campagne active ne sera créée.'
@@ -305,17 +320,16 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
       final day = '${startDate.year.toString().padLeft(4, '0')}-'
           '${startDate.month.toString().padLeft(2, '0')}-'
           '${startDate.day.toString().padLeft(2, '0')}';
-      final result = OdooLocalOrderService.enabled
-          ? await _odooLocalService.confirm(
-              requestId: requestId,
-              territory: territory,
-              offer: offer,
-              duration: duration,
-              startDate: day,
-              pricingReference: reference,
-              payableExclTaxCents: widget.payableExclTaxCents,
-            )
-          : await _orderService.prepare(
+      final Map<String, dynamic> result;
+      if (OdooLocalOrderService.secureCheckoutEnabled) {
+        final response = await _odooLocalService.secureCheckoutDraft(requestId);
+        final raw = response['order'];
+        if (raw is! Map) {
+          throw StateError('Devis Odoo sécurisé absent.');
+        }
+        result = Map<String, dynamic>.from(raw);
+      } else if (OdooLocalOrderService.enabled) {
+        result = await _odooLocalService.confirm(
               requestId: requestId,
               territory: territory,
               offer: offer,
@@ -324,6 +338,17 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
               pricingReference: reference,
               payableExclTaxCents: widget.payableExclTaxCents,
             );
+      } else {
+        result = await _orderService.prepare(
+              requestId: requestId,
+              territory: territory,
+              offer: offer,
+              duration: duration,
+              startDate: day,
+              pricingReference: reference,
+              payableExclTaxCents: widget.payableExclTaxCents,
+            );
+      }
       if (!mounted) return;
       setState(() => _receipt = result);
     } catch (error) {
@@ -614,7 +639,11 @@ class _QuoteOrderSectionState extends State<QuoteOrderSection> {
                       fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 8),
-                Text(OdooLocalOrderService.enabled
+                Text(OdooLocalOrderService.secureCheckoutEnabled
+                    ? 'Nouvelle passerelle Odoo anti-doublons. Devis '
+                      'établi sur une base neutralisée, sans paiement '
+                      'ni activation. La facture sera créée séparément.'
+                    : OdooLocalOrderService.enabled
                     ? 'Connexion directe à Odoo Community LOCAL. '
                         'La commande est enregistrée dans Odoo uniquement '
                         'après confirmation. Aucun paiement bancaire ni publicité '

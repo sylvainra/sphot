@@ -10,11 +10,15 @@
 // A separate confirmed action may record a MANUAL test accounting payment.
 // A SECOND isolated order may use Odoo's own Demo portal payment provider.
 // A FOURTH isolated order may use Odoo's Stripe SANDBOX provider only.
+// Optional secure-checkout mode targets ONLY the neutralized test database,
+// uses the dedicated Odoo atomic methods and disables the legacy actions.
 // No Firestore writes, real bank transactions, emails or campaign activation.
 
 const http = require("node:http");
 const {referenceFor} = require("../advertiser_initial_order");
 const {buildOdooDraft} = require("../odoo_commercial_bridge");
+const {CHECKOUT_TEST_DATABASE, prepareTrustedOrder,
+  createSecureCheckoutClient} = require("./odoo_secure_checkout_client");
 
 const HOST = "127.0.0.1";
 const PORT = 8767;
@@ -23,6 +27,8 @@ const BASE = "https://us-central1-sphot-ab80b.cloudfunctions.net";
 const MAX_BODY = 4096;
 const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1):[0-9]{2,5}$/;
 const API_TIMEOUT_MS = 20000;
+const SECURE_ACTIONS = new Set(["secure_status", "secure_draft",
+  "secure_invoice", "secure_stripe_status", "secure_stripe_checkout"]);
 
 function httpError(status, message) {
   const error = new Error(message);
@@ -781,7 +787,9 @@ function quoteForBridge(quote, choice) {
 }
 
 function createLocalBridge({fetchImpl = fetch, verifyToken, apiKey,
-  database = "sphot_publicitaire_test", odooClient} = {}) {
+  database = "sphot_publicitaire_test", odooClient,
+  secureCheckoutClient = null, secureOdooClient = null,
+  securePartnerId = 8, secureProductId = 1} = {}) {
   if (typeof verifyToken !== "function") {
     throw new Error("Vérification Firebase requise.");
   }
@@ -822,6 +830,12 @@ function createLocalBridge({fetchImpl = fetch, verifyToken, apiKey,
   }
 
   async function handle({action, token, requestId, expected}) {
+    if (secureCheckoutClient && !SECURE_ACTIONS.has(action)) {
+      throw httpError(403, "Ancien parcours Odoo désactivé en mode sécurisé.");
+    }
+    if (!secureCheckoutClient && SECURE_ACTIONS.has(action)) {
+      throw httpError(503, "Passerelle Odoo sécurisée non activée.");
+    }
     let user;
     try {
       user = await verifyToken(token);
@@ -833,6 +847,62 @@ function createLocalBridge({fetchImpl = fetch, verifyToken, apiKey,
     }
     const data = await readDossier(token, requestId, user);
     const reference = referenceFor(requestId);
+    if (SECURE_ACTIONS.has(action)) {
+      if (!secureOdooClient || !Number.isSafeInteger(securePartnerId) ||
+          securePartnerId < 1 || !Number.isSafeInteger(secureProductId) ||
+          secureProductId < 1) {
+        throw httpError(503, "Configuration Odoo sécurisée incomplète.");
+      }
+      const choice = savedChoices(data);
+      const stored = map(data.order);
+      const quote = stored.origin === "sphot_advertiser_initial_v1" &&
+          data.quoteOrderCompleted === true ?
+        quoteForBridge({market: "ADVERTISER_RADIUS", previewOnly: true,
+          version: stored.publishedVersion,
+          pricingReference: stored.pricingReference,
+          currency: stored.currency,
+          amountExclTax: stored.baseAmountExclTaxCents / 100,
+          discountPercent: stored.discountPercent,
+          payableExclTaxCents: stored.payableExclTaxCents}, choice) :
+        await getQuote(token, choice);
+      const prepared = prepareTrustedOrder({requestId, quote,
+        partnerId: securePartnerId, productId: secureProductId});
+      const result = action === "secure_draft" ?
+        await secureCheckoutClient.draft(prepared) :
+        action === "secure_invoice" ?
+          await secureCheckoutClient.invoice(prepared) :
+          await secureCheckoutClient.status(prepared);
+      if (!result) {
+        return {ok: true, found: false, testOnly: true,
+          campaignActivationAllowed: false, paymentConfirmed: false};
+      }
+      const order = receipt(result.order, prepared.reference, quote);
+      const invoice = result.invoice ?
+        invoiceReceipt(result.invoice, result.order) : null;
+      const output = {ok: true, found: true,
+        outcome: result.outcome || "existing", order, invoice,
+        testOnly: true, campaignActivationAllowed: false,
+        paymentConfirmed: false};
+      if (action === "secure_stripe_status" && result.invoice) {
+        const payment = await findStripeTestTransactions(secureOdooClient,
+            result.invoice);
+        return {...output, ...payment};
+      }
+      if (action === "secure_stripe_checkout") {
+        if (!result.invoice) {
+          throw httpError(409, "Facture sécurisée non créée.");
+        }
+        const payment = await findStripeTestTransactions(secureOdooClient,
+            result.invoice);
+        if (payment.transactions.some((tx) =>
+          ["done", "pending", "authorized"].includes(tx.state))) {
+          throw httpError(409, "Transaction Stripe déjà confirmée ou en cours.");
+        }
+        return {...output, portalUrl: await stripeTestCheckoutUrl(
+            secureOdooClient, result.invoice)};
+      }
+      return output;
+    }
     if (["stripe_test_status", "stripe_test_confirm", "stripe_test_invoice",
       "stripe_test_checkout"].includes(action)) {
       const stripeReference = stripeTestReferenceFor(requestId);
@@ -1161,7 +1231,8 @@ function createServer(bridge) {
           !["status", "confirm", "invoice", "invoice_status", "payment",
             "demo_status", "demo_confirm", "demo_invoice",
             "demo_checkout", "stripe_test_status", "stripe_test_confirm",
-            "stripe_test_invoice", "stripe_test_checkout"].includes(body.action) ||
+            "stripe_test_invoice", "stripe_test_checkout",
+            ...SECURE_ACTIONS].includes(body.action) ||
           (body.action !== "confirm" && body.expected !== undefined)) {
         throw httpError(400, "Paramètres de commande inconnus.");
       }
@@ -1192,13 +1263,25 @@ if (require.main === module) {
   } else {
     const admin = require("firebase-admin");
     const app = admin.initializeApp({projectId: PROJECT_ID}, "sphot-local-odoo");
+    const secureMode = process.env.SPHOT_ODOO_SECURE_CHECKOUT_TEST === "true";
+    const secureOdooClient = secureMode ? createOdooClient({
+      apiKey: process.env.SPHOT_ODOO_LOCAL_API_KEY,
+      database: CHECKOUT_TEST_DATABASE,
+    }) : null;
     const bridge = createLocalBridge({
       apiKey: process.env.SPHOT_ODOO_LOCAL_API_KEY,
       verifyToken: async (token) => admin.auth(app).verifyIdToken(token),
+      secureCheckoutClient: secureMode ? createSecureCheckoutClient({
+        database: CHECKOUT_TEST_DATABASE, odooClient: secureOdooClient,
+      }) : null,
+      secureOdooClient,
+      securePartnerId: 8, secureProductId: 1,
     });
     createServer(bridge).listen(PORT, HOST, () => console.log(
         "SPHOT -> Odoo LOCAL sur http://" + HOST + ":" + PORT +
-        " (paiements Démo et Stripe TEST, aucune écriture Firebase)"));
+        (secureMode ? " (PASSERELLE SECURISEE, base neutralisée)" :
+          " (paiements Démo et Stripe TEST)") +
+        " ; aucune écriture Firebase"));
   }
 }
 

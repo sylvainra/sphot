@@ -1,5 +1,11 @@
 # SPHOT — Raccordement des tarifs publiés (état de travail)
 
+> **Note du 28/10/2026 : document historique.** L'ancien catalogue
+> `FR_ADVERTISER` à 90 tarifs est retiré des nouvelles ventes. La seule grille
+> Publicitaire active est `FR_ADVERTISER_RADIUS` à 108 tarifs, publiée et
+> versionnée par le Super Admin. Les anciennes références restent uniquement
+> dans l'historique documentaire, sans servir au calcul ni à la facturation.
+
 ## Architecture et règle de sécurité
 
 Les catalogues Firestore commercialPricingMarkets/FR_ADMIN et FR_ADVERTISER sont la seule référence **des prix publiés**. Les brouillons, programmations et archives ne servent jamais à calculer une nouvelle commande.

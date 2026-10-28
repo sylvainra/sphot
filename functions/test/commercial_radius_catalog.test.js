@@ -24,15 +24,17 @@ test("six rayons : 108 cellules exigees", () => {
   assert.throws(() => validate("ADVERTISER_RADIUS", matrix(5), []));
 });
 
-test("90 prix historiques : leur format reste intact", () => {
-  assert.equal(Object.keys(validate("ADVERTISER", matrix(5), []).prices).length, 90);
-  assert.throws(() => validate("ADVERTISER", matrix(6), []));
+test("ancien marché publicitaire à 90 prix supprimé des écritures", () => {
+  assert.throws(() => validate("ADVERTISER", matrix(5), []),
+      /Ancien marché tarifaire retiré/);
+  assert.throws(() => validate("ADVERTISER", matrix(6), []),
+      /Ancien marché tarifaire retiré/);
 });
 
-test("catalogue neuf ne publie aucun prix invente", () => {
+test("catalogue initial à 108 tarifs non publié sans action Super Admin", () => {
   const state = defaultState("ADVERTISER_RADIUS");
   assert.equal(state.publishedVersion, 0);
-  assert.deepEqual(state.publishedPrices, {});
+  assert.equal(Object.keys(state.publishedPrices).length, 108);
   assert.equal(state.draft, null);
 });
 
@@ -40,7 +42,7 @@ test("nouvelle reference propre au catalogue mondial", () => {
   const quote = advertiserQuote({
     type: "ADVERTISER_RADIUS", country: "FR", currency: "EUR",
     publishedVersion: 2, publishedPrices: matrix(6),
-  }, "radius_500km", "pack", "1 an");
+  }, "country", "pack", "1 an");
   assert.equal(quote.tariffKey, "5:2:5");
   assert.equal(quote.pricingReference, "FR_ADVERTISER_RADIUS-V2");
 });
@@ -49,5 +51,5 @@ test("pas de tarif sur grille incomplete", () => {
   assert.throws(() => advertiserQuote({
     type: "ADVERTISER_RADIUS", country: "FR", currency: "EUR",
     publishedVersion: 2, publishedPrices: matrix(5),
-  }, "radius_500km", "pack", "1 an"));
+  }, "country", "pack", "1 an"));
 });

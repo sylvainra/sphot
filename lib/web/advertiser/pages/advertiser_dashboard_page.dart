@@ -33,6 +33,7 @@ import '../widgets/identity_professional_section.dart';
 import '../widgets/planning_section.dart';
 import '../widgets/advertiser_payment_simulation_section.dart';
 import '../widgets/advertiser_odoo_local_invoice_section.dart';
+import '../widgets/advertiser_odoo_secure_checkout_section.dart';
 import '../widgets/quote_order_section.dart';
 
 class AdvertiserDashboardPage extends StatefulWidget {
@@ -1484,7 +1485,12 @@ _detailScrollController.dispose();
         ];
       case 5:
         return [
-          if (OdooLocalOrderService.enabled && _requestId != null)
+          if (OdooLocalOrderService.secureCheckoutEnabled &&
+              _requestId != null)
+            AdvertiserOdooSecureCheckoutSection(requestId: _requestId!),
+          if (OdooLocalOrderService.enabled &&
+              !OdooLocalOrderService.secureCheckoutEnabled &&
+              _requestId != null)
             AdvertiserOdooLocalInvoiceSection(requestId: _requestId!),
           if (OdooSimulationService.enabled &&
               !OdooLocalOrderService.enabled)
@@ -1510,6 +1516,9 @@ _detailScrollController.dispose();
                     !_planningData.isComplete
                 ? 'La grille des six rayons doit être publiée et '
                     'la planification confirmée avant toute commande.'
+                : OdooLocalOrderService.secureCheckoutEnabled
+                  ? 'Commande et facture uniques par la passerelle Odoo '
+                    'sécurisée, puis Stripe Sandbox. Base neutralisée uniquement.'
                 : OdooLocalOrderService.enabled
                   ? 'Achats de test Démo et Stripe SANDBOX via le '
                     'portail Odoo local, sans débit bancaire réel.'
@@ -1534,7 +1543,15 @@ _detailScrollController.dispose();
         ];
       case 6:
         return [
-          if (OdooLocalOrderService.enabled && _requestId != null)
+          if (OdooLocalOrderService.secureCheckoutEnabled &&
+              _requestId != null)
+            AdvertiserOdooSecureCheckoutSection(
+              requestId: _requestId!,
+              readOnly: true,
+            ),
+          if (OdooLocalOrderService.enabled &&
+              !OdooLocalOrderService.secureCheckoutEnabled &&
+              _requestId != null)
             AdvertiserOdooLocalInvoiceSection(
               requestId: _requestId!,
               readOnly: true,
