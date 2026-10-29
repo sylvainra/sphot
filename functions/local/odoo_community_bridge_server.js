@@ -12,7 +12,8 @@
 // A FOURTH isolated order may use Odoo's Stripe SANDBOX provider only.
 // Optional secure-checkout mode targets ONLY the neutralized test database,
 // uses the dedicated Odoo atomic methods and disables the legacy actions.
-// No Firestore writes, real bank transactions, emails or campaign activation.
+// No online Firestore writes, real bank transactions, emails or production ads.
+// C3 can write a LOCAL Firestore emulator only with an explicit opt-in.
 
 const http = require("node:http");
 const {referenceFor} = require("../advertiser_initial_order");
@@ -341,8 +342,8 @@ async function demoCheckoutUrl(odoo, invoice) {
   return url.toString();
 }
 
-async function stripeTestProvider(odoo, requirePublished = false) {
-  const providers = await odoo.call("payment.provider", "search_read", {
+async function stripeTestProvider(odoo, requirePublished = false, evidence = null) {
+  const providers = evidence ? evidence.stripe_providers : await odoo.call("payment.provider", "search_read", {
     domain: [["code", "=", "stripe"], ["is_live", "=", false]],
     fields: ["id", "code", "is_live", "is_published"], limit: 2,
   });
@@ -354,12 +355,13 @@ async function stripeTestProvider(odoo, requirePublished = false) {
   return providers[0];
 }
 
-async function assertDemoHiddenForStripeTest(odoo) {
-  const providers = await odoo.call("payment.provider", "search_read", {
+async function assertDemoHiddenForStripeTest(odoo, evidence = null) {
+  const providers = evidence ? evidence.demo_providers : await odoo.call("payment.provider", "search_read", {
     domain: [["code", "=", "demo"]],
     fields: ["id", "code", "is_published"], limit: 2,
   });
   if (!Array.isArray(providers) || providers.length !== 1 ||
+      providers[0].code !== "demo" ||
       providers[0].is_published !== false) {
     throw httpError(409,
         "Masquez temporairement Démo (Non publié) avant le paiement Stripe TEST.");
@@ -368,8 +370,8 @@ async function assertDemoHiddenForStripeTest(odoo) {
 
 // Only Odoo's own verified Stripe transaction is trusted, never a browser
 // return URL or an unsigned status sent by Flutter.
-async function findStripeTestTransactions(odoo, invoice) {
-  const provider = await stripeTestProvider(odoo);
+async function findStripeTestTransactions(odoo, invoice, evidence = null) {
+  const provider = await stripeTestProvider(odoo, false, evidence);
   const currencyId = relationId(invoice.currency_id);
   const currencyLabel = Array.isArray(invoice.currency_id) ?
     invoice.currency_id[1] : "";
@@ -378,7 +380,7 @@ async function findStripeTestTransactions(odoo, invoice) {
       !Number.isSafeInteger(totalCents)) {
     throw httpError(409, "Facture Stripe TEST sans montant EUR valide.");
   }
-  const rows = await odoo.call("payment.transaction", "search_read", {
+  const rows = evidence ? evidence.transactions : await odoo.call("payment.transaction", "search_read", {
     domain: [["invoice_ids", "in", [invoice.id]]],
     fields: ["id", "reference", "state", "provider_code", "provider_id",
       "amount", "currency_id", "invoice_ids"],
@@ -392,7 +394,7 @@ async function findStripeTestTransactions(odoo, invoice) {
         relationId(row.provider_id) !== provider.id ||
         relationId(row.currency_id) !== currencyId ||
         !Array.isArray(row.invoice_ids) ||
-        !row.invoice_ids.includes(invoice.id) ||
+        row.invoice_ids.length !== 1 || row.invoice_ids[0] !== invoice.id ||
         typeof row.reference !== "string" || !row.reference.trim() ||
         !Number.isFinite(Number(row.amount)) ||
         Math.round(Number(row.amount) * 100) !== totalCents) {
@@ -416,7 +418,7 @@ async function findStripeTestTransactions(odoo, invoice) {
   return {transactions, paymentConfirmed};
 }
 
-async function stripeTestCheckoutUrl(odoo, invoice) {
+async function stripeTestCheckoutUrl(odoo, invoice, evidence = null) {
   const totalCents = Math.round(Number(invoice.amount_total) * 100);
   if (invoice.state !== "posted" || invoice.payment_state !== "not_paid" ||
       totalCents <= 0 ||
@@ -424,9 +426,9 @@ async function stripeTestCheckoutUrl(odoo, invoice) {
       (invoice.matched_payment_ids || []).length !== 0) {
     throw httpError(409, "Facture déjà réglée ou incompatible avec Stripe TEST.");
   }
-  await stripeTestProvider(odoo, true);
+  await stripeTestProvider(odoo, true, evidence);
   // Fail closed: the previous test accidentally used Demo instead of Card.
-  await assertDemoHiddenForStripeTest(odoo);
+  await assertDemoHiddenForStripeTest(odoo, evidence);
   const relative = await odoo.call("account.move", "get_portal_url", {
     ids: [invoice.id],
   });
@@ -789,7 +791,8 @@ function quoteForBridge(quote, choice) {
 function createLocalBridge({fetchImpl = fetch, verifyToken, apiKey,
   database = "sphot_publicitaire_test", odooClient,
   secureCheckoutClient = null, secureOdooClient = null,
-  securePartnerId = 8, secureProductId = 1} = {}) {
+  securePartnerId = 8, secureProductId = 1,
+  emulatorSync = null, testCloudSync = null} = {}) {
   if (typeof verifyToken !== "function") {
     throw new Error("Vérification Firebase requise.");
   }
@@ -884,22 +887,51 @@ function createLocalBridge({fetchImpl = fetch, verifyToken, apiKey,
         testOnly: true, campaignActivationAllowed: false,
         paymentConfirmed: false};
       if (action === "secure_stripe_status" && result.invoice) {
+        const evidence = await secureCheckoutClient.stripeEvidence(
+            prepared, result.invoice);
         const payment = await findStripeTestTransactions(secureOdooClient,
-            result.invoice);
-        return {...output, ...payment};
+            result.invoice, evidence);
+        const status = {...output, ...payment};
+        if (emulatorSync && payment.paymentConfirmed) {
+          try {
+            const localPublication = await emulatorSync.sync({
+              requestId, source: data, order, invoice, payment});
+            return {...status, localPublication};
+          } catch (error) {
+            console.error("Publication vers émulateur local:", error.message);
+            return {...status, localPublication: {simulationOnly: true,
+              phase: "blocked", action: "none",
+              reason: "emulator_sync_failed"}};
+          }
+        }
+        if (testCloudSync && payment.paymentConfirmed) {
+          try {
+            const testPublication = await testCloudSync.sync({
+              requestId, source: data, order, invoice, payment});
+            return {...status, testPublication};
+          } catch (error) {
+            console.error("C4 Firebase TEST :", error.message);
+            return {...status, testPublication: {testOnly: true,
+              phase: "blocked", action: "none",
+              reason: "c4_test_sync_failed"}};
+          }
+        }
+        return status;
       }
       if (action === "secure_stripe_checkout") {
         if (!result.invoice) {
           throw httpError(409, "Facture sécurisée non créée.");
         }
+        const evidence = await secureCheckoutClient.stripeEvidence(
+            prepared, result.invoice);
         const payment = await findStripeTestTransactions(secureOdooClient,
-            result.invoice);
+            result.invoice, evidence);
         if (payment.transactions.some((tx) =>
           ["done", "pending", "authorized"].includes(tx.state))) {
           throw httpError(409, "Transaction Stripe déjà confirmée ou en cours.");
         }
         return {...output, portalUrl: await stripeTestCheckoutUrl(
-            secureOdooClient, result.invoice)};
+            secureOdooClient, result.invoice, evidence)};
       }
       return output;
     }
@@ -1178,7 +1210,8 @@ function createLocalBridge({fetchImpl = fetch, verifyToken, apiKey,
   return {handle};
 }
 
-function createServer(bridge) {
+function createServer(bridge, {emulatorSync = null,
+  testCloudSync = null} = {}) {
   return http.createServer(async (req, res) => {
     const origin = req.headers.origin;
     if (origin && !LOCAL_ORIGIN.test(origin)) {
@@ -1196,13 +1229,32 @@ function createServer(bridge) {
       res.writeHead(204); res.end(); return;
     }
     try {
+      if (req.method === "GET" && req.url === "/c3-public-ads" &&
+          emulatorSync) {
+        const advertisements = await emulatorSync.publicAdvertisements(
+            Date.now());
+        res.writeHead(200, {"Content-Type": "application/json"});
+        res.end(JSON.stringify({success: true, advertisements}));
+        return;
+      }
+      if (req.method === "GET" && req.url === "/c4-public-ads" &&
+          testCloudSync) {
+        const advertisements = await testCloudSync.publicAdvertisements(
+            Date.now());
+        res.writeHead(200, {"Content-Type": "application/json"});
+        res.end(JSON.stringify({success: true, advertisements}));
+        return;
+      }
       if (req.method === "GET" && req.url === "/health") {
         res.writeHead(200, {"Content-Type": "application/json"});
         res.end(JSON.stringify({ok: true, mode: "ODOO_COMMUNITY_LOCAL_TEST",
           paymentsEnabled: false, manualTestPaymentEnabled: true,
           nativeOdooDemoCheckoutEnabled: true,
           nativeOdooStripeTestCheckoutEnabled: true,
-          firebaseWritesEnabled: false}));
+          firebaseWritesEnabled: Boolean(testCloudSync),
+          firebaseProductionWritesEnabled: false,
+          firestoreEmulatorWritesEnabled: Boolean(emulatorSync),
+          firebaseTestProjectWritesEnabled: Boolean(testCloudSync)}));
         return;
       }
       if (req.method !== "POST" || req.url !== "/order") {
@@ -1264,6 +1316,33 @@ if (require.main === module) {
     const admin = require("firebase-admin");
     const app = admin.initializeApp({projectId: PROJECT_ID}, "sphot-local-odoo");
     const secureMode = process.env.SPHOT_ODOO_SECURE_CHECKOUT_TEST === "true";
+    const c3Mode = secureMode &&
+        process.env.SPHOT_ODOO_TO_FIRESTORE_EMULATOR === "true";
+    const c4Mode = secureMode &&
+        process.env.SPHOT_ODOO_TO_C4_TEST_FIRESTORE === "true";
+    if (c3Mode && c4Mode) {
+      throw new Error("C3 et C4 ne peuvent être activés ensemble.");
+    }
+    let emulatorSync = null;
+    let testCloudSync = null;
+    if (c3Mode) {
+      const {DEMO_PROJECT_ID, assertDemoEmulator} =
+          require("./odoo_c2_firestore_emulator");
+      const {createPaidEmulatorSync} =
+          require("./odoo_paid_emulator_sync");
+      assertDemoEmulator();
+      const demoApp = admin.initializeApp({projectId: DEMO_PROJECT_ID},
+          "sphot-c3-demo-firestore");
+      emulatorSync = createPaidEmulatorSync(admin.firestore(demoApp));
+    }
+    if (c4Mode) {
+      const {TEST_PROJECT_ID, createC4TestCloudSync} =
+          require("./odoo_c4_test_firestore");
+      const testApp = admin.initializeApp({projectId: TEST_PROJECT_ID,
+        credential: admin.credential.applicationDefault()},
+      "sphot-c4-test-cloud-firestore");
+      testCloudSync = createC4TestCloudSync(admin.firestore(testApp));
+    }
     const secureOdooClient = secureMode ? createOdooClient({
       apiKey: process.env.SPHOT_ODOO_LOCAL_API_KEY,
       database: CHECKOUT_TEST_DATABASE,
@@ -1276,12 +1355,22 @@ if (require.main === module) {
       }) : null,
       secureOdooClient,
       securePartnerId: 8, secureProductId: 1,
+      emulatorSync, testCloudSync,
     });
-    createServer(bridge).listen(PORT, HOST, () => console.log(
+    if (testCloudSync) {
+      const timer = setInterval(() => testCloudSync.reconcile()
+          .catch((error) => console.error("C4 rapprochement :", error.message)),
+      60000);
+      timer.unref();
+    }
+    createServer(bridge, {emulatorSync, testCloudSync})
+        .listen(PORT, HOST, () => console.log(
         "SPHOT -> Odoo LOCAL sur http://" + HOST + ":" + PORT +
         (secureMode ? " (PASSERELLE SECURISEE, base neutralisée)" :
           " (paiements Démo et Stripe TEST)") +
-        " ; aucune écriture Firebase"));
+        (c3Mode ? " ; écrit uniquement vers l'émulateur Firestore" :
+          c4Mode ? " ; écrit uniquement vers Firebase C4 TEST" :
+            " ; aucune écriture Firebase")));
   }
 }
 

@@ -7,8 +7,8 @@ import '../../shared/web_colors.dart';
 import '../services/odoo_local_order_service.dart';
 
 /// Nouveau parcours Odoo anti-doublons : base locale NEUTRALISÉE uniquement.
-/// Aucune validation Super Admin supplémentaire, écriture Firebase ou
-/// activation de campagne. Le paiement est exclusivement Stripe Sandbox.
+/// Aucun paiement réel ou écriture Firebase en ligne. Le mode C3 explicite
+/// peut publier une campagne exclusivement dans l'émulateur local.
 class AdvertiserOdooSecureCheckoutSection extends StatefulWidget {
   const AdvertiserOdooSecureCheckoutSection({
     super.key,
@@ -33,6 +33,8 @@ class _AdvertiserOdooSecureCheckoutSectionState
   bool _paymentConfirmed = false;
   String? _error;
   String? _stripeWarning;
+  Map<String, dynamic>? _localPublication;
+  Map<String, dynamic>? _testPublication;
   Map<String, dynamic>? _order;
   Map<String, dynamic>? _invoice;
   List<Map<String, dynamic>> _transactions = [];
@@ -77,11 +79,21 @@ class _AdvertiserOdooSecureCheckoutSectionState
       var transactions = <Map<String, dynamic>>[];
       var confirmed = false;
       String? stripeWarning;
+      Map<String, dynamic>? localPublication;
+      Map<String, dynamic>? testPublication;
       if (invoice != null) {
         try {
           final payment = await _service.secureCheckoutStripeStatus(
               widget.requestId);
           confirmed = payment['paymentConfirmed'] == true;
+          final local = payment['localPublication'];
+          if (local is Map) {
+            localPublication = Map<String, dynamic>.from(local);
+          }
+          final remoteTest = payment['testPublication'];
+          if (remoteTest is Map) {
+            testPublication = Map<String, dynamic>.from(remoteTest);
+          }
           final raw = payment['transactions'];
           if (raw is List) {
             transactions = raw.whereType<Map>()
@@ -99,6 +111,8 @@ class _AdvertiserOdooSecureCheckoutSectionState
         _transactions = transactions;
         _paymentConfirmed = confirmed;
         _stripeWarning = stripeWarning;
+        _localPublication = localPublication;
+        _testPublication = testPublication;
         _error = null;
       });
       if (confirmed) _pollTimer?.cancel();
@@ -231,8 +245,8 @@ class _AdvertiserOdooSecureCheckoutSectionState
                   fontWeight: FontWeight.w900)),
           const SizedBox(height: 8),
           const Text('Base neutralisée uniquement. Paiement Stripe SANDBOX '
-              'avec carte fictive. Aucune écriture Firebase, aucun débit réel '
-              'et aucune activation publicitaire.'),
+              'avec carte fictive. Aucune écriture Firebase en ligne, '
+              'aucun débit réel ni publication commerciale.'),
           const SizedBox(height: 8),
           const Text('Avant le paiement Stripe, le prestataire Démo '
               'doit être non publié dans Odoo.',
@@ -309,10 +323,39 @@ class _AdvertiserOdooSecureCheckoutSectionState
             icon: const Icon(Icons.refresh),
             label: const Text('ACTUALISER LE STATUT ODOO'),
           ),
-          const Text('CAMPAGNE NON ACTIVÉE — ENVIRONNEMENT DE TEST',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: WebColors.red,
-                  fontSize: 12, fontWeight: FontWeight.w800)),
+          if (_testPublication?['phase'] == 'active')
+            const Text('CAMPAGNE ACTIVE DANS FIREBASE C4 TEST',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF047857),
+                    fontSize: 12, fontWeight: FontWeight.w800))
+          else if (_testPublication?['phase'] == 'scheduled')
+            const Text('CAMPAGNE PROGRAMMÉE DANS FIREBASE C4 TEST',
+                textAlign: TextAlign.center)
+          else if (_testPublication?['phase'] == 'blocked')
+            Text('PUBLICATION FIREBASE C4 TEST BLOQUÉE : '
+                '${_testPublication?['reason'] ?? 'vérification refusée'}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: WebColors.red,
+                    fontSize: 12, fontWeight: FontWeight.w800))
+          else if (_localPublication?['phase'] == 'active')
+            const Text('CAMPAGNE TEST ACTIVE DANS L’ÉMULATEUR FIRESTORE',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF047857),
+                    fontSize: 12, fontWeight: FontWeight.w800))
+          else if (_localPublication?['phase'] == 'scheduled')
+            const Text('CAMPAGNE TEST PROGRAMMÉE — ÉMULATEUR LOCAL',
+                textAlign: TextAlign.center)
+          else if (_localPublication?['phase'] == 'blocked')
+            Text('PUBLICATION LOCALE BLOQUÉE : '
+                '${_localPublication?['reason'] ?? 'vérification refusée'}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: WebColors.red,
+                    fontSize: 12, fontWeight: FontWeight.w800))
+          else
+            const Text('CAMPAGNE NON ACTIVÉE — ENVIRONNEMENT DE TEST',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: WebColors.red,
+                    fontSize: 12, fontWeight: FontWeight.w800)),
         ],
       ),
     );
