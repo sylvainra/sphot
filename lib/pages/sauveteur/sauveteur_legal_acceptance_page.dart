@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'sauveteur_access_info_page.dart';
+import '../../widgets/sphot_local_legal_draft_card.dart';
 
 class SauveteurLegalAcceptancePage extends StatefulWidget {
   final String login;
@@ -58,7 +59,15 @@ class _SauveteurLegalAcceptancePageState
   bool _sphotTransmissionRoleAcknowledged = false;
   bool _professionalDecisionResponsibilityAccepted = false;
 
+  // Active uniquement par --dart-define en Flutter DEBUG sur localhost.
+  // L'aperçu ne charge pas Firestore et ne peut jamais accepter un document.
+  bool get _previewEnabled =>
+      SphotLocalLegalDraftCard.available &&
+      const bool.fromEnvironment('SPHOT_SAUVETEUR_LEGAL_PREVIEW',
+          defaultValue: false);
+
   bool get _canSubmit =>
+      !_previewEnabled &&
       _cguAccepted &&
       _privacyAcknowledged &&
       _rgpdAcknowledged &&
@@ -73,6 +82,11 @@ class _SauveteurLegalAcceptancePageState
   @override
   void initState() {
     super.initState();
+    if (_previewEnabled) {
+      // Aucun accès aux documents juridiques de production dans cet aperçu.
+      _loading = false;
+      return;
+    }
     _loadLegalPack();
   }
 
@@ -133,7 +147,7 @@ class _SauveteurLegalAcceptancePageState
   }
 
   Future<void> _submit() async {
-    if (!_canSubmit) return;
+    if (_previewEnabled || !_canSubmit) return;
 
     setState(() {
       _submitting = true;
@@ -285,7 +299,7 @@ class _SauveteurLegalAcceptancePageState
   }) {
     return CheckboxListTile(
       value: value,
-      onChanged: _submitting ? null : onChanged,
+      onChanged: (_previewEnabled || _submitting) ? null : onChanged,
       activeColor: const Color(0xFF1E3A8A),
       checkColor: Colors.white,
       controlAffinity: ListTileControlAffinity.leading,
@@ -592,8 +606,10 @@ class _SauveteurLegalAcceptancePageState
                     fit: BoxFit.contain,
                   ),
                   const SizedBox(height: 4),
-                  const Text(
-                    'VALIDATION D’ACCÈS SPHOT SAUVETEUR',
+                  Text(
+                    _previewEnabled
+                        ? 'DOCUMENTS JURIDIQUES SPHOT SAUVETEUR'
+                        : 'VALIDATION D’ACCÈS SPHOT SAUVETEUR',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: red,
@@ -603,7 +619,9 @@ class _SauveteurLegalAcceptancePageState
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Documents juridiques SPHOT — version $_legalVersion',
+                    _previewEnabled
+                        ? 'BROUILLONS 1.0 — NON PUBLIÉS'
+                        : 'Documents juridiques SPHOT — version $_legalVersion',
                     style: const TextStyle(
                       color: blue,
                       fontSize: 12,
@@ -627,6 +645,42 @@ class _SauveteurLegalAcceptancePageState
                             ),
                             child: ListView(
                               children: [
+                                if (_previewEnabled) ...[
+                                  const Padding(
+                                    padding: EdgeInsets.only(bottom: 12),
+                                    child: Text(
+                                      'APERÇU LOCAL UNIQUEMENT : aucune acceptation '
+                                      'juridique, aucun accès au compte ni à Firestore.',
+                                      style: TextStyle(
+                                        color: Color(0xFFB91C1C),
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  const SphotLocalLegalDraftCard(
+                                    assetPath:
+                                        'assets/legal/test_corpus/cgu_sauveteur.md',
+                                    documentTitle: 'CGU SPHOT SAUVETEUR',
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const SphotLocalLegalDraftCard(
+                                    assetPath:
+                                        'assets/legal/test_corpus/charte_sauveteur.md',
+                                    documentTitle: 'CHARTE SPHOT SAUVETEUR',
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'Ces documents sont en relecture et ne '
+                                    'remplacent pas encore les textes publiés. '
+                                    'Les acceptations resteront séparées lors '
+                                    'de leur mise en service.',
+                                    style: TextStyle(
+                                      color: Color(0xFF475569),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ] else ...[
                                 _legalDocument(
                                   title:
                                       'Conditions Générales d’Utilisation',
@@ -671,6 +725,7 @@ class _SauveteurLegalAcceptancePageState
                                   },
                                 ),
                                 _ruleCard(),
+                                ],
                                 if (_message != null)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 10),
@@ -704,9 +759,11 @@ class _SauveteurLegalAcceptancePageState
                             )
                           : const Icon(Icons.verified_user_rounded),
                       label: Text(
-                        _submitting
-                            ? 'VALIDATION EN COURS…'
-                            : 'VALIDER ET CONTINUER',
+                        _previewEnabled
+                            ? 'VALIDATION DÉSACTIVÉE — APERÇU LOCAL'
+                            : _submitting
+                                ? 'VALIDATION EN COURS…'
+                                : 'VALIDER ET CONTINUER',
                         style: const TextStyle(
                           fontWeight: FontWeight.w900,
                         ),
