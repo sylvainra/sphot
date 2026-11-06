@@ -53,6 +53,11 @@ flutter:
 
   assets:
     - assets/data/spots.json
+    - assets/legal/test_corpus/cgv_admin.md
+    - assets/legal/test_corpus/cgv_publicitaire.md
+    - assets/legal/test_corpus/cgu_grand_public.md
+    - assets/legal/test_corpus/cgu_sauveteur.md
+    - assets/legal/test_corpus/charte_sauveteur.md
     - data/icons/
     - data/images/
     - data/logos_departements/france/pays_de_la_loire/

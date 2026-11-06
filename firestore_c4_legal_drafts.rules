@@ -1,0 +1,100 @@
+// SPHOT C4 TEST — brouillons juridiques exclusivement.
+// Ne jamais déployer cette politique sur le projet sphot-ab80b.
+// Règles proposées, NON PUBLIÉES par l'assistant.
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isC4LegalEditor() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/legalC4Editors/$(request.auth.uid))
+        && get(/databases/$(database)/documents/legalC4Editors/$(request.auth.uid))
+            .data.get('active', false) == true
+        && get(/databases/$(database)/documents/legalC4Editors/$(request.auth.uid))
+            .data.get('role', '') == 'legal_editor';
+    }
+
+    function isLegalDocument(documentId) {
+      return documentId in [
+        'adminCgv', 'advertiserCgv', 'publicCgu',
+        'sauveteurCgu', 'sauveteurCharter'
+      ];
+    }
+
+    function validDraft() {
+      return request.resource.data.keys().hasOnly([
+          'title', 'audience', 'testOnly', 'published', 'version',
+          'revision', 'chapters', 'createdByUid', 'createdAt',
+          'updatedAt', 'updatedByUid'
+        ])
+        && request.resource.data.keys().hasAll([
+          'title', 'audience', 'testOnly', 'published', 'version',
+          'revision', 'chapters', 'createdByUid', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.title is string
+        && request.resource.data.audience is string
+        && request.resource.data.testOnly == true
+        && request.resource.data.published == false
+        && request.resource.data.version == '1.0'
+        && request.resource.data.revision is int
+        && request.resource.data.revision >= 1
+        && request.resource.data.chapters is list
+        && request.resource.data.chapters.size() > 0
+        && request.resource.data.chapters.size() <= 30
+        && request.resource.data.createdByUid is string
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.get('updatedByUid', request.auth.uid)
+            == request.auth.uid;
+    }
+
+    function validArchive() {
+      return request.resource.data.keys().hasOnly([
+          'testOnly', 'version', 'chapters', 'archivedAt', 'replacedByUid'
+        ])
+        && request.resource.data.keys().hasAll([
+          'testOnly', 'version', 'chapters', 'archivedAt', 'replacedByUid'
+        ])
+        && request.resource.data.testOnly == true
+        && request.resource.data.version is string
+        && request.resource.data.chapters is list
+        && request.resource.data.archivedAt is timestamp
+        && request.resource.data.replacedByUid == request.auth.uid;
+    }
+
+    // Une entrée d'habilitation est créée uniquement par un administrateur
+    // dans la console Firebase (ou par un serveur privilégié).
+    // Le client connecté ne peut jamais s'attribuer ce rôle.
+    match /legalC4Editors/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+
+    match /legalTestCorpus/{documentId} {
+      allow get: if isC4LegalEditor() && isLegalDocument(documentId);
+      allow list: if false;
+      allow create: if isC4LegalEditor()
+        && isLegalDocument(documentId) && validDraft();
+      allow update: if isC4LegalEditor()
+        && isLegalDocument(documentId)
+        && resource.data.testOnly == true
+        && resource.data.published == false
+        && validDraft();
+      allow delete: if false;
+
+      match /versions/{versionId} {
+        allow get, list: if isC4LegalEditor()
+          && isLegalDocument(documentId);
+        allow create: if isC4LegalEditor()
+          && isLegalDocument(documentId) && validArchive();
+        allow update, delete: if false;
+      }
+    }
+
+    // Toutes les autres collections et sous-collections restent inaccessibles
+    // depuis Flutter Web, comme avant l'intégration juridique.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
