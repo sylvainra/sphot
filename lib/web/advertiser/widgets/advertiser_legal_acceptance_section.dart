@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../shared/web_colors.dart';
+import '../../../widgets/sphot_local_legal_draft_card.dart';
 import 'advertiser_cgv_policy.dart';
 import '../models/advertiser_phase_one_draft.dart';
 
@@ -67,10 +68,18 @@ class _AdvertiserLegalAcceptanceSectionState
 
   bool get _isCorrection =>
       widget.requestStatus.toLowerCase() == 'changes_requested';
+  // L'aperçu des CGV de travail ne constitue jamais une acceptation.
+  bool get _localCgvPreview => SphotLocalLegalDraftCard.available;
+  // L'entrée de prévisualisation dédiée ne se connecte jamais à Firebase.
+  bool get _isolatedLegalPreview => _localCgvPreview &&
+      const bool.fromEnvironment('SPHOT_ADVERTISER_LEGAL_PREVIEW',
+          defaultValue: false);
+
   bool get _acceptanceLocked =>
-      _locked || (_isCorrection && !widget.canEditLegal);
+      _localCgvPreview || _locked || (_isCorrection && !widget.canEditLegal);
 
   bool get _canSubmit =>
+      !_localCgvPreview &&
       _applicationCompleted &&
       ((_isCorrection && !widget.canEditLegal)
           ? _previousLegalAccepted
@@ -78,6 +87,13 @@ class _AdvertiserLegalAcceptanceSectionState
               _cgvAccepted && _representativeAccepted)) &&
       !_locked &&
       !_submitting;
+
+  Map<String, Object?> get _currentDocumentRevisions => {
+    'cgu': _cguDocument?['revision'] ?? 0,
+    'privacyPolicy': _privacyDocument?['revision'] ?? 0,
+    'rgpdNotice': _rgpdDocument?['revision'] ?? 0,
+    'advertiserCgv': _cgvDocument?['revision'] ?? 0,
+  };
 
   @override
   void initState() {
@@ -102,6 +118,13 @@ class _AdvertiserLegalAcceptanceSectionState
         .orderBy(FieldPath.documentId)
         .get();
 
+    if (!document.exists || chapters.docs.isEmpty) {
+      throw StateError(
+        'Le document juridique $documentId n’est pas disponible '
+        'dans la source Firestore commune.',
+      );
+    }
+
     return <String, dynamic>{
       ...?document.data(),
       'chapters': chapters.docs.map((chapter) => chapter.data()).toList(),
@@ -109,6 +132,11 @@ class _AdvertiserLegalAcceptanceSectionState
   }
 
   Future<void> _load() async {
+    // Mode isolé : aucun accès à Firebase, aucune collecte de dossier.
+    if (_isolatedLegalPreview) {
+      _loading = false;
+      return;
+    }
     try {
       final firestore = FirebaseFirestore.instance;
       final requestId = widget.requestId?.trim() ?? '';
@@ -122,7 +150,18 @@ class _AdvertiserLegalAcceptanceSectionState
       final rgpd = await _loadLegalDocument('rgpdNotice');
       final cgvSnapshot = await firestore.collection('legalDocuments')
           .doc(AdvertiserCgvPolicy.documentId).get();
-      final cgvData = cgvSnapshot.data() ?? AdvertiserCgvPolicy.initialDocument;
+      final cgvData = cgvSnapshot.data();
+      final cgvChapters = cgvData?['chapters'];
+      if (!cgvSnapshot.exists ||
+          cgvData == null ||
+          cgvChapters is! List ||
+          cgvChapters.isEmpty ||
+          cgvData?['published'] == false) {
+        throw StateError(
+          'Les CGV SPHOT PUBLICITAIRE publiées dans Firestore sont absentes. '
+          'Aucune acceptation juridique ne peut être enregistrée.',
+        );
+      }
       final cgvVersion = (cgvData['version'] ??
           AdvertiserCgvPolicy.defaultVersion).toString();
 
@@ -138,6 +177,19 @@ class _AdvertiserLegalAcceptanceSectionState
 
       final acceptedDocuments = _map(request['acceptedDocuments']);
       final legalAcceptance = _map(request['legalAcceptance']);
+      final priorRevisions = _map(acceptedDocuments['documentRevisions']);
+      final activeRevisions = {
+        'cgu': cgu['revision'] ?? 0,
+        'privacyPolicy': privacy['revision'] ?? 0,
+        'rgpdNotice': rgpd['revision'] ?? 0,
+        'advertiserCgv': cgvData['revision'] ?? 0,
+      };
+      // Les anciens dossiers n'avaient pas encore de révisions par document.
+      // Ils restent consultables et corrigeables sans perdre leur validation.
+      final sameRevisions = priorRevisions.isEmpty ||
+          activeRevisions.entries.every(
+            (entry) => priorRevisions[entry.key] == entry.value,
+          );
       final metadataData = metadata.data() ?? <String, dynamic>{};
       final activeVersion =
           (metadataData['legalVersion'] ??
@@ -148,7 +200,8 @@ class _AdvertiserLegalAcceptanceSectionState
       final acceptedVersion =
           (legalAcceptance['version'] ?? acceptedDocuments['version'] ?? '')
               .toString();
-      final restoreAcceptance = acceptedVersion == activeVersion;
+      final restoreAcceptance = acceptedVersion == activeVersion &&
+          sameRevisions;
 
       if (!mounted) return;
       setState(() {
@@ -169,7 +222,8 @@ class _AdvertiserLegalAcceptanceSectionState
         _privacyAccepted =
             restoreAcceptance && acceptedDocuments['privacy'] == true;
         _rgpdAccepted = restoreAcceptance && acceptedDocuments['rgpd'] == true;
-        _cgvAccepted = acceptedDocuments['advertiserCgv'] == true &&
+        _cgvAccepted = sameRevisions &&
+            acceptedDocuments['advertiserCgv'] == true &&
             acceptedDocuments['advertiserCgvVersion'] == cgvVersion;
         _representativeAccepted =
             restoreAcceptance &&
@@ -234,6 +288,7 @@ class _AdvertiserLegalAcceptanceSectionState
           'rgpd': true,
           'advertiserCgv': true,
           'advertiserCgvVersion': _cgvVersion,
+          'documentRevisions': _currentDocumentRevisions,
           'version': _version,
           'acceptedAt': FieldValue.serverTimestamp(),
         },
@@ -242,6 +297,7 @@ class _AdvertiserLegalAcceptanceSectionState
           'packPath': _legalPackPath,
           'representativeDeclaration': true,
           'advertiserCgvVersion': _cgvVersion,
+          'documentRevisions': _currentDocumentRevisions,
           'documents': <String, Object?>{
             'cgu': true,
             'privacy': true,
@@ -315,6 +371,7 @@ if (widget.draftOnly) {
       if (legalRequested) ...{
         'legalVersion': _version,
         'advertiserCgvVersion': _cgvVersion,
+        'documentRevisions': _currentDocumentRevisions,
       },
     }),
   );
@@ -497,6 +554,42 @@ _cguController.collapse();
 
   @override
   Widget build(BuildContext context) {
+    if (_isolatedLegalPreview) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SphotLocalLegalDraftCard(
+            assetPath: 'assets/legal/test_corpus/cgv_publicitaire.md',
+            documentTitle: 'CGV SPHOT PUBLICITAIRE',
+          ),
+          SizedBox(height: 12),
+          Text(
+            'Mode aperçu isolé : aucune authentification, lecture Firestore, '
+            'acceptation juridique ou transmission de dossier.',
+            style: TextStyle(color: WebColors.red, fontSize: 12),
+          ),
+        ],
+      );
+    }
+    // Affichage disponible même pendant le chargement des documents publiés.
+    // Ne lit que l'asset local : aucune acceptation ni écriture serveur.
+    if (_loading && _localCgvPreview) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SphotLocalLegalDraftCard(
+            assetPath: 'assets/legal/test_corpus/cgv_publicitaire.md',
+            documentTitle: 'CGV SPHOT PUBLICITAIRE',
+          ),
+          SizedBox(height: 10),
+          Text(
+            'APERÇU LOCAL UNIQUEMENT : les validations juridiques et la '
+            'transmission de demande restent indisponibles.',
+            style: TextStyle(color: WebColors.red, fontSize: 12),
+          ),
+        ],
+      );
+    }
     if (_loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 48),
@@ -554,21 +647,36 @@ _cguController.collapse();
             setState(() => _rgpdAccepted = value ?? false);
           },
         ),
-        _legalDocument(
-          title: 'Conditions Générales de Ventes',
-          document: _cgvDocument,
-          accepted: _cgvAccepted,
-          documentVersion: _cgvVersion,
-          acceptanceText:
-              'J’ai lu et j’accepte les CGV applicables à '
-              'SPHOT PUBLICITAIRE, notamment le verrouillage du rayon '
-              'pendant la période payée et sa sélection lors d’une '
-              'nouvelle souscription.',
-          controller: _cgvController,
-          onChanged: (value) => setState(() {
-            _cgvAccepted = value ?? false;
-          }),
-        ),
+        if (_localCgvPreview)
+          const SphotLocalLegalDraftCard(
+            assetPath: 'assets/legal/test_corpus/cgv_publicitaire.md',
+            documentTitle: 'CGV SPHOT PUBLICITAIRE',
+          )
+        else
+          _legalDocument(
+            title: 'Conditions Générales de Ventes',
+            document: _cgvDocument,
+            accepted: _cgvAccepted,
+            documentVersion: _cgvVersion,
+            acceptanceText:
+                'J’ai lu et j’accepte les CGV applicables à '
+                'SPHOT PUBLICITAIRE, notamment le verrouillage du rayon '
+                'pendant la période payée et sa sélection lors d’une '
+                'nouvelle souscription.',
+            controller: _cgvController,
+            onChanged: (value) => setState(() {
+              _cgvAccepted = value ?? false;
+            }),
+          ),
+        if (_localCgvPreview)
+          const Padding(
+            padding: EdgeInsets.only(top: 10, bottom: 14),
+            child: Text(
+              'Brouillon 1.0 non publié : aucune acceptation contractuelle '
+              'ni transmission de demande n’est possible dans cet aperçu.',
+              style: TextStyle(color: WebColors.red, fontSize: 12),
+            ),
+          ),
         _acceptanceLine(
           value: _representativeAccepted,
           text: 'Je certifie l’exactitude des renseignements transmis et être habilité à représenter l’entreprise.',
