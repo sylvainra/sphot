@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../widgets/adaptive_asset_image.dart';
+import '../../../widgets/sphot_legal_document_card.dart';
+import '../../../widgets/sphot_local_legal_draft_card.dart';
 import '../../../services/published_commercial_quote_service.dart';
 import 'admin_quote_consultation.dart';
 import 'admin_quote_pdf_download.dart';
@@ -1570,9 +1572,20 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
           style: TextStyle(color: _blue, fontSize: 12,
             fontWeight: FontWeight.w900)),
         const SizedBox(height: 7),
+        if (SphotLocalLegalDraftCard.available)
+          const SphotLocalLegalDraftCard(
+            assetPath: 'assets/legal/test_corpus/cgv_admin.md',
+            documentTitle: 'CGV SPHOT ADMIN',
+          )
+        else
+          const SphotLegalDocumentCard(
+            documentId: 'adminCgv',
+            title: 'Consulter les CGV SPHOT ADMIN',
+          ),
+        const SizedBox(height: 7),
         const Text(
-          'Le document de CGV publié, sa version et l’acceptation '
-          'traçable restent à raccorder. Aucun accord n’est présumé.',
+          'Consultation uniquement : aucun accord contractuel, '
+          'aucune commande ni aucun paiement ne sont présumés.',
           style: TextStyle(color: _grey, fontSize: 11, height: 1.35),
         ),
         const SizedBox(height: 14),
