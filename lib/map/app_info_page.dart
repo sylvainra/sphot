@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import '../widgets/sphot_local_legal_draft_card.dart';
 
 class AppInfoPage extends StatelessWidget {
   const AppInfoPage({super.key});
+
+  // Aperçu accessible uniquement en DEBUG localhost et avec drapeau explicite.
+  static bool get _publicLegalPreview =>
+      SphotLocalLegalDraftCard.available &&
+      const bool.fromEnvironment('SPHOT_PUBLIC_LEGAL_PREVIEW',
+          defaultValue: false);
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +26,7 @@ class AppInfoPage extends StatelessWidget {
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
-        children: const [
+        children: [
           _InfoSection(
             icon: Icons.info_outline,
             title: 'À propos de SPHOT',
@@ -38,7 +45,10 @@ class AppInfoPage extends StatelessWidget {
                 "Elles ne remplacent jamais les consignes officielles affichées sur place, les arrêtés municipaux, les instructions des sauveteurs, ni l’appréciation personnelle des conditions de sécurité.\n\n"
                 "Avant toute baignade, l’utilisateur doit vérifier la signalisation locale, les drapeaux, la météo, l’état de la mer et respecter les consignes des autorités compétentes.",
           ),
-          _InfoSection(
+          if (_publicLegalPreview)
+            const _PublicLegalDraftSection()
+          else
+            const _InfoSection(
             icon: Icons.gavel_outlined,
             title: 'Conditions générales d’utilisation',
             content:
@@ -166,4 +176,57 @@ class _InfoSection extends StatelessWidget {
       ),
     );
   }
+}
+
+/// La rubrique publique d'origine reste identique hors aperçu local.
+/// Aucun consentement, aucune session ni accès Firestore n'est utilisé ici.
+class _PublicLegalDraftSection extends StatelessWidget {
+  const _PublicLegalDraftSection();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFF1E3A8A), width: 1.2),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.gavel_outlined, color: Color(0xFF1E3A8A)),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Conditions générales d’utilisation — Grand Public',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF1E3A8A),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12),
+            Text(
+              'BROUILLON 1.0 — consultation locale uniquement. '
+              'Aucune publication ni acceptation.',
+              style: TextStyle(
+                color: Color(0xFFB91C1C),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            SizedBox(height: 10),
+            SphotLocalLegalDraftCard(
+              assetPath: 'assets/legal/test_corpus/cgu_grand_public.md',
+              documentTitle: 'CGU SPHOT GRAND PUBLIC',
+            ),
+          ],
+        ),
+      );
 }
