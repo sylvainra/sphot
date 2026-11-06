@@ -1304,42 +1304,12 @@ exports.activateApprovedAdminOrder = onDocumentUpdated(
       const after = event.data?.after.data() || {};
       if (cleanValue(before.status) === cleanValue(after.status)) return;
       if (!["approved", "paid"].includes(cleanValue(after.status))) return;
-      if (after.subscriptionActivatedAt) return;
-
-      const db = admin.firestore();
-      const uid = cleanValue(after.adminUid);
-      if (!uid) return;
-      const start = new Date();
-      const end = new Date(start);
-      end.setFullYear(end.getFullYear() + 1);
-      const batch = db.batch();
-      batch.set(db.collection("subscriptions").doc(uid), {
-        status: "active",
-        subscriptionStartDate: admin.firestore.Timestamp.fromDate(start),
-        subscriptionEndDate: admin.firestore.Timestamp.fromDate(end),
-        billingCycle: "annual",
-        currentOrderId: event.params.orderId,
-        currentOrderNumber: after.orderNumber || null,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, {merge: true});
-      batch.set(db.collection("admins").doc(uid), {
-        diffusionAccessGranted: true,
-        diffusionAccessOpenedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, {merge: true});
-      if (after.requestId) {
-        batch.set(db.collection("adminRequests").doc(after.requestId), {
-          accessPhase: "subscription_active",
-          "commercialTracking.status": "subscription_active",
-          "commercialTracking.subscriptionActivatedAt":
-              admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, {merge: true});
-      }
-      batch.set(event.data.after.ref, {
-        subscriptionActivatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, {merge: true});
-      await batch.commit();
+      // Le statut historique d'une commande Firestore n'est pas une preuve
+      // de contrat vérifié, ni de facture Odoo, ni de paiement Stripe.
+      // Garder le trigger déployable, mais sans aucun effet commercial.
+      // L'activation est exclusivement une projection serveur Odoo vérifiée.
+      console.warn("SPHOT ADMIN: commande historique ignorée; "+
+          "activation via Odoo uniquement", event.params?.orderId);
     },
 );
 

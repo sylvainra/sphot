@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../../../widgets/sphot_legal_document_card.dart';
 import '../../../widgets/sphot_local_legal_draft_card.dart';
+import '../../../widgets/sphot_odoo_billing_status_card.dart';
 import '../../../services/published_commercial_quote_service.dart';
+import '../services/admin_odoo_local_preflight_service.dart';
 import 'admin_quote_consultation.dart';
 import 'admin_quote_pdf_download.dart';
+import 'admin_cgv_acceptance_section.dart';
 
 class AdminSubscriptionPanel extends StatefulWidget {
   final String adminUid;
@@ -34,6 +37,14 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   final Set<String> _expandedSections = <String>{};
 
   String? _savingSection;
+  String? _offerPreflightNotice;
+  bool _offerPreflightOk = false;
+  String? _fixturePreflightNotice;
+  bool _fixturePreflightOk = false;
+  bool _fixturePreflightBusy = false;
+  String? _cardTestStatusNotice;
+  bool _cardTestStatusVerified = false;
+  bool _cardTestStatusBusy = false;
   bool _preparingQuotePdf = false;
   bool? _draftNoOrderRequired;
   String? _draftPaymentMethod;
@@ -455,6 +466,53 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
   ) async {
     if (_uid.isEmpty || _savingSection != null) return;
 
+    // Les postes sélectionnés et le prix contractuel doivent être attestés
+    // côté serveur (tarif, territoire, Odoo), jamais enregistrés depuis Flutter.
+    if (section == 'offer') {
+      if (!mounted) return;
+      if (AdminOdooLocalPreflightService.configured) {
+        setState(() {
+          _savingSection = section;
+          _offerPreflightNotice = null;
+          _offerPreflightOk = false;
+        });
+        try {
+          final rawIds = fields['selectedRescueStationIds'];
+          final ids = rawIds is List
+              ? rawIds.whereType<String>().toList(growable: false)
+              : <String>[];
+          final result = await const AdminOdooLocalPreflightService()
+              .verifySelection(stationIds: ids);
+          if (!mounted) return;
+          final amount = (result['payableExclTaxCents'] as int) / 100;
+          final reference = result['pricingReference']?.toString() ?? '';
+          setState(() {
+            _offerPreflightOk = true;
+            _offerPreflightNotice =
+                'Précontrôle Odoo TEST : ${ids.length} poste(s), '
+                '$reference, ${amount.toStringAsFixed(2)} € HT. '
+                'Aucune commande, facture ou activation créée.';
+          });
+        } catch (error) {
+          if (!mounted) return;
+          setState(() {
+            _offerPreflightOk = false;
+            _offerPreflightNotice = 'Précontrôle ADMIN refusé : $error';
+          });
+        } finally {
+          if (mounted) setState(() => _savingSection = null);
+        }
+        return;
+      }
+      setState(() {
+        _offerPreflightOk = false;
+        _offerPreflightNotice =
+            'Devis consultable, mais enregistrement commercial en attente '
+            'de validation serveur Odoo. Aucune sélection facturable enregistrée.';
+      });
+      return;
+    }
+
     setState(() {
       _savingSection = section;
     });
@@ -502,6 +560,76 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
           _savingSection = null;
         });
       }
+    }
+  }
+
+  Future<void> _checkFictitiousOdooFixture() async {
+    if (!mounted || _fixturePreflightBusy ||
+        !AdminOdooLocalPreflightService.fixtureConfigured) return;
+    setState(() {
+      _fixturePreflightBusy = true;
+      _fixturePreflightNotice = null;
+      _fixturePreflightOk = false;
+    });
+    try {
+      final result = await const AdminOdooLocalPreflightService()
+          .verifyFixture();
+      if (!mounted) return;
+      final reference = result['reference']?.toString() ?? '';
+      final unpaid = result['paymentStatus'] == 'not_paid';
+      final activated = result['rightsActive'] == true;
+      setState(() {
+        _fixturePreflightOk = true;
+        _fixturePreflightNotice =
+            'DOSSIER FICTIF C4 TEST : 3 postes fictifs, sans lien avec '
+            'les postes sélectionnés ci-dessus. Référence $reference. '
+            'Facture Odoo TEST ${unpaid ? 'non payée' : 'à vérifier'}. '
+            'Droits Firestore TEST ${activated ? 'déjà actifs sur engagement simulé' : 'non activés'}. '
+            'Aucune nouvelle écriture effectuée.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _fixturePreflightOk = false;
+        _fixturePreflightNotice = 'Dossier fictif TEST refusé : $error';
+      });
+    } finally {
+      if (mounted) setState(() => _fixturePreflightBusy = false);
+    }
+  }
+
+  Future<void> _checkFictitiousCardTestStatus() async {
+    if (!mounted || _cardTestStatusBusy ||
+        !AdminOdooLocalPreflightService.cardStatusConfigured) return;
+    setState(() {
+      _cardTestStatusBusy = true;
+      _cardTestStatusNotice = null;
+      _cardTestStatusVerified = false;
+    });
+    try {
+      final result = await const AdminOdooLocalPreflightService()
+          .verifyCardTestStatus();
+      if (!mounted) return;
+      final reference = result['reference']?.toString() ?? '';
+      final verified = result['activationVerified'] == true;
+      setState(() {
+        _cardTestStatusVerified = verified;
+        _cardTestStatusNotice = verified
+            ? 'CARTE FICTIVE C4 TEST VALIDÉE — $reference. '
+              'Facture Odoo TEST rapprochée, paiement Stripe TEST vérifié, '
+              'droits Firestore C4 TEST activés. Aucun droit sur ce compte ADMIN.'
+            : 'CARTE FICTIVE C4 TEST — $reference. '
+              'Étape en attente : ${result['nextGate']}. '
+              'Aucun droit sur ce compte ADMIN.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _cardTestStatusVerified = false;
+        _cardTestStatusNotice = 'Vérification CARTE TEST refusée : $error';
+      });
+    } finally {
+      if (mounted) setState(() => _cardTestStatusBusy = false);
     }
   }
 
@@ -1024,31 +1152,38 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
                               : _blue.withOpacity(0.18),
                         ),
                       ),
-                      child: CheckboxListTile(
-                        value: checked,
-                        activeColor: _red,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 1,
-                        ),
-                        title: Text(
-                          _spotDisplayName(document.id, document.data()),
-                          style: const TextStyle(
-                            color: _blue,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
+                      // Le fond est peint par le Container : placer une
+                      // surface Material au-dessus rend l'encre visible.
+                      child: Material(
+                        color: Colors.transparent,
+                        child: CheckboxListTile(
+                          value: checked,
+                          activeColor: _red,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 1,
                           ),
+                          title: Text(
+                            _spotDisplayName(document.id, document.data()),
+                            style: const TextStyle(
+                              color: _blue,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _offerPreflightNotice = null;
+                              _offerPreflightOk = false;
+                              if (value == true) {
+                                _selectedRescueStationIds.add(document.id);
+                              } else {
+                                _selectedRescueStationIds.remove(document.id);
+                              }
+                            });
+                          },
                         ),
-                        onChanged: (value) {
-                          setState(() {
-                            if (value == true) {
-                              _selectedRescueStationIds.add(document.id);
-                            } else {
-                              _selectedRescueStationIds.remove(document.id);
-                            }
-                          });
-                        },
                       ),
                     );
                   }),
@@ -1213,6 +1348,62 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
               style: TextStyle(color: _grey, fontSize: 11),
             ),
             const SizedBox(height: 12),
+            if (_offerPreflightNotice != null) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: (_offerPreflightOk ? _green : _red).withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: (_offerPreflightOk ? _green : _red).withOpacity(0.55),
+                  ),
+                ),
+                child: Text(
+                  _offerPreflightNotice!,
+                  style: TextStyle(
+                    color: _offerPreflightOk ? _green : _red,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (AdminOdooLocalPreflightService.fixtureConfigured) ...[
+              OutlinedButton.icon(
+                onPressed: _fixturePreflightBusy
+                    ? null
+                    : _checkFictitiousOdooFixture,
+                icon: const Icon(Icons.science_outlined),
+                label: Text(_fixturePreflightBusy
+                    ? 'LECTURE DU DOSSIER FICTIF TEST…'
+                    : 'TEST ODOO — DOSSIER FICTIF (3 POSTES)'),
+              ),
+              const SizedBox(height: 8),
+              if (_fixturePreflightNotice != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: (_fixturePreflightOk ? _green : _red)
+                        .withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: (_fixturePreflightOk ? _green : _red)
+                          .withOpacity(0.55),
+                    ),
+                  ),
+                  child: Text(
+                    _fixturePreflightNotice!,
+                    style: TextStyle(
+                      color: _fixturePreflightOk ? _green : _red,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ],
             if (isActiveSubscription)
               const Text(
                 'Abonnement actif : son montant contractuel reste inchangé. '
@@ -1588,7 +1779,48 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
           'aucune commande ni aucun paiement ne sont présumés.',
           style: TextStyle(color: _grey, fontSize: 11, height: 1.35),
         ),
+        const SizedBox(height: 10),
+        if (SphotLocalLegalDraftCard.available)
+          const Text(
+            'Acceptation indisponible en aperçu local : les CGV ne sont '
+            'pas publiées.',
+            style: TextStyle(color: _red, fontSize: 11),
+          )
+        else
+          AdminCgvAcceptanceSection(adminUid: widget.adminUid),
         const SizedBox(height: 14),
+        SphotOdooBillingStatusCard(
+          market: 'ADMIN',
+          requestId: widget.adminUid,
+        ),
+        if (AdminOdooLocalPreflightService.cardStatusConfigured) ...[
+          OutlinedButton.icon(
+            onPressed: _cardTestStatusBusy
+                ? null : _checkFictitiousCardTestStatus,
+            icon: const Icon(Icons.science_outlined, size: 18),
+            label: const Text('VÉRIFIER CARTE FICTIVE C4 TEST'),
+          ),
+          if (_cardTestStatusNotice != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _cardTestStatusVerified
+                    ? _green.withOpacity(0.08) : _orange.withOpacity(0.08),
+                border: Border.all(
+                  color: _cardTestStatusVerified ? _green : _orange,
+                ),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Text(_cardTestStatusNotice!,
+                style: TextStyle(fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: _cardTestStatusVerified ? _green : _blue)),
+            ),
+          ],
+          const SizedBox(height: 12),
+        ],
         SizedBox(
           width: double.infinity, height: 44,
           child: ElevatedButton.icon(
