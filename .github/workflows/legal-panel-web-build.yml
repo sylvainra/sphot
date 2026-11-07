@@ -1,0 +1,41 @@
+name: "SPHOT - Compilation du panneau juridique Web"
+
+on:
+  push:
+    branches:
+      - integration/reconciliation-locale-20261106_105755
+    paths:
+      - .github/workflows/legal-panel-web-build.yml
+      - lib/web/super_admin/**
+      - lib/main_web_admin.dart
+      - assets/legal/test_corpus/**
+      - pubspec.yaml
+      - pubspec.lock
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compilation-super-admin:
+    name: "Flutter Web - Super Admin (aucun deploiement)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: "Recuperer le code de la PR"
+        uses: actions/checkout@v4
+
+      - name: "Installer Flutter stable"
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: "Version de Flutter"
+        run: flutter --version
+
+      - name: "Resoudre les dependances"
+        run: flutter pub get
+
+      - name: "Compiler le portail Web Admin sans publier"
+        run: flutter build web --release --no-pub --target lib/main_web_admin.dart

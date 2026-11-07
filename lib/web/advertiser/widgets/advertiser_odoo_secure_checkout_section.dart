@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../widgets/sphot_odoo_billing_status_card.dart';
+
 import '../../shared/web_colors.dart';
 import '../services/odoo_local_order_service.dart';
 
@@ -151,7 +153,9 @@ class _AdvertiserOdooSecureCheckoutSectionState
     if (!await _confirm('FACTURE UNIQUE — ODOO TEST',
         'Le module Odoo va confirmer la commande existante et établir '
         'une seule facture dans la base neutralisée. Aucun règlement, '
-        'email ni activation publicitaire ne sera effectué.')) return;
+        'email ni activation publicitaire ne sera effectué.')) {
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _busy = true;
@@ -240,6 +244,10 @@ class _AdvertiserOdooSecureCheckoutSectionState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          SphotOdooBillingStatusCard(
+            market: 'ADVERTISER',
+            requestId: widget.requestId,
+          ),
           const Text('ODOO 20 — FACTURATION SÉCURISÉE / TEST',
               style: TextStyle(color: WebColors.blue,
                   fontWeight: FontWeight.w900)),

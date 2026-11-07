@@ -1,0 +1,214 @@
+// SPHOT - BROUILLON STRICT POUR EMULATOR, NON DEPLOYABLE EN L'ETAT.
+// Ne pas copier dans la console de production : les autres parcours
+// (sauveteurs, annonceurs, cartes, essai, devis) restent à migrer/tester.
+// Ce fichier n'est PAS référencé dans firebase.json.
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function superAdmin() {
+      return signedIn()
+        && request.auth.token.get('role', '') == 'SPHOT_SUPER_ADMIN'
+        && request.auth.token.get('sphotSuperAdmin', false) == true
+        && request.auth.token.get('sphotSaSessionExpiresAt', 0) is int
+        && request.auth.token.sphotSaSessionExpiresAt > request.time.toMillis()
+        && request.auth.token.sphotSaSessionExpiresAt
+            <= request.time.toMillis() + 7200000;
+    }
+
+    // Le document de demande est indexé par requestId, qui peut différer
+    // de l'UID Firebase ProConnect. Ne pas les assimiler.
+    function ownsRequest(requestId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/adminRequests/$(requestId))
+        && get(/databases/$(database)/documents/adminRequests/$(requestId))
+            .data.get('proConnect', {}).get('uid', '') == request.auth.uid;
+    }
+
+    function registrationFieldsOnly() {
+      return request.resource.data.keys().hasOnly([
+        'uid', 'proConnect', 'institutionnels', 'profile', 'structure',
+        'territoire', 'trialRequest', 'subscriptionPreview', 'facturation',
+        'status', 'requestedAt', 'updatedAt'
+      ]);
+    }
+
+    function validInitialRequest(requestId) {
+      return signedIn()
+        && request.resource.data.get('uid', '') == requestId
+        && request.resource.data.get('proConnect', {}).get('uid', '')
+            == request.auth.uid
+        && request.resource.data.get('status', '') == 'pending'
+        && request.resource.data.get('trialRequest', {})
+            .get('trialDurationDays', 0) == 8
+        && request.resource.data.get('trialRequest', {})
+            .get('certifyRepresentative', false) == true
+        && request.resource.data.get('trialRequest', {})
+            .get('legalReadConfirmed', false) == true
+        && request.resource.data.get('trialRequest', {})
+            .get('privacyReadConfirmed', false) == true
+        && request.resource.data.get('trialRequest', {})
+            .get('rgpdAccepted', false) == true
+        && request.resource.data.get('subscriptionPreview', {})
+            .get('status', '') == 'awaiting_validation'
+        && registrationFieldsOnly();
+    }
+
+    function applicantCorrectionOnly(requestId) {
+      return ownsRequest(requestId)
+        && resource.data.get('status', '') in ['pending', 'rejected']
+        && request.resource.data.get('status', '') == 'pending'
+        && request.resource.data.get('uid', '') == requestId
+        && request.resource.data.get('proConnect', {})
+            == resource.data.get('proConnect', {})
+        && request.resource.data.get('approvedAt', null)
+            == resource.data.get('approvedAt', null)
+        && request.resource.data.get('setupProgress', {})
+            .get('accessGranted', false) == false
+        && request.resource.data.get('administrativeTracking', {})
+            .get('status', 'pending') != 'approved'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'institutionnels', 'profile', 'structure', 'territoire',
+          'facturation', 'trialRequest', 'subscriptionPreview',
+          'status', 'resubmittedAt', 'updatedAt'
+        ]);
+    }
+
+    function superAdminRejectionOnly() {
+      return superAdmin()
+        && resource.data.get('status', '') in ['pending', 'rejected']
+        && request.resource.data.get('status', '') in ['pending', 'rejected']
+        && request.resource.data.get('proConnect', {})
+            == resource.data.get('proConnect', {})
+        && request.resource.data.get('structure', {})
+            == resource.data.get('structure', {})
+        && request.resource.data.get('approvedAt', null)
+            == resource.data.get('approvedAt', null)
+        && request.resource.data.get('setupProgress', {})
+            .get('accessGranted', false) == false
+        && request.resource.data.get('administrativeTracking', {})
+            .get('status', 'pending') in ['pending', 'rejected']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'accessPhase', 'rejectedAt', 'updatedAt',
+          'administrativeTracking', 'commercialTracking', 'setupProgress',
+          'rejectionEmail', 'lastEvent'
+        ]);
+    }
+
+    match /adminRequests/{requestId} {
+      allow get: if superAdmin() || ownsRequest(requestId);
+      allow list: if superAdmin();
+      allow create: if validInitialRequest(requestId);
+      allow update: if applicantCorrectionOnly(requestId)
+          || superAdminRejectionOnly();
+      allow delete: if false;
+      // L'approbation est exclusivement réalisée par le SDK serveur.
+    }
+
+    match /admins/{adminId} {
+      allow get: if superAdmin() || ownsRequest(adminId);
+      allow list: if superAdmin();
+      allow create: if superAdmin()
+        && request.resource.data.keys().hasOnly([
+          'uid', 'accessStatus', 'updatedAt'
+        ])
+        && request.resource.data.get('uid', '') == adminId
+        && request.resource.data.get('accessStatus', '')
+            in ['pending', 'rejected'];
+      allow update: if superAdmin()
+        && resource.data.get('accessStatus', '')
+            in ['pending', 'rejected']
+        && request.resource.data.get('accessStatus', '')
+            in ['pending', 'rejected']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'uid', 'accessStatus', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    function ownerBillingOnly(adminId) {
+      return ownsRequest(adminId)
+        && request.resource.data.get('adminUid', '') == adminId
+        && resource.data.get('adminUid', '') == adminId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'billingOrganisation', 'billingPayerType', 'billingPayerRelation',
+          'billingSiret', 'billingLegalId', 'billingVatId',
+          'billingAddress', 'billingAddressComplement', 'billingPostalCode',
+          'billingCity', 'billingCountry', 'billingContactName',
+          'billingContactEmail', 'billingContactPhone',
+          'purchaseOrderNumber', 'purchaseOrderNotRequired',
+          'engagementNumber', 'chorusServiceCode',
+          'preferredPaymentMethod', 'administrativeReference', 'updatedAt'
+        ]);
+    }
+
+    match /subscriptions/{adminId} {
+      allow get: if superAdmin() || ownsRequest(adminId);
+      allow list: if superAdmin();
+      allow create: if superAdmin()
+        && request.resource.data.keys().hasOnly([
+          'adminUid', 'status', 'updatedAt'
+        ])
+        && request.resource.data.get('adminUid', '') == adminId
+        && request.resource.data.get('status', '')
+            in ['pending', 'cancelled'];
+      allow update: if ownerBillingOnly(adminId)
+        || (superAdmin()
+          && resource.data.get('status', '') in ['pending', 'cancelled']
+          && request.resource.data.get('status', '')
+              in ['pending', 'cancelled']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'adminUid', 'status', 'updatedAt'
+          ]));
+      allow delete: if false;
+      // Ni 'trial', ni 'active', ni 'paid' ne sont octroyés par le client.
+    }
+
+    match /adminOdooReviewEvidence/{adminId} {
+      allow read, write: if false;
+    }
+    match /adminOdooEngagementEvidence/{adminId} {
+      allow read, write: if false;
+    }
+    match /adminOdooCycles/{cycleId} {
+      allow read, write: if false;
+    }
+
+    match /publicSpots/{spotId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Contenu public éventuel à confirmer avant mise en production.
+    match /legalDocuments/{documentId} {
+      allow read: if true;
+      allow write: if superAdmin();
+      match /chapters/{chapterId} {
+        allow read: if true;
+        allow write: if superAdmin();
+      }
+    }
+    match /legalVersions/{versionId} {
+      allow read: if true;
+      allow write: if superAdmin();
+    }
+
+    match /documents/{documentId} {
+      allow get, list: if signedIn()
+        && request.auth.uid == resource.data.adminUid;
+      allow create, update, delete: if false;
+    }
+
+    // Le reste est interdit dans ce PROFIL STRICT DE TEST :
+    // spots, periodesSurveillance, communes, sauveteurs, territoires,
+    // adRequests, advertiserRequests, advertiserAccounts, settings, test.
+    // Ne pas déployer avant d'avoir remplacé leurs flux d'écriture client.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

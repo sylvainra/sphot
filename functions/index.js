@@ -1,4 +1,4 @@
-const {sendSphotMail} = require("./sphot_email_design");
+const {sendSphotMail, buildSphotMessage} = require("./sphot_email_design");
 const {setGlobalOptions} = require("firebase-functions");
 const {defineString} = require("firebase-functions/params");
 const {onRequest} = require("firebase-functions/v2/https");
@@ -46,6 +46,37 @@ admin.initializeApp();
 if (process.env.SPHOT_ENABLE_ADMIN_QUOTE_PORTAL === "true") {
   exports.adminQuotePortal =
       registerAdminQuotePortalEndpoint({admin, onRequest});
+}
+
+// Acceptation CGV ADMIN phase 2 : desactivee avant audit des regles Firestore
+// protegeant odooAdminCgvAcceptanceEvidence et son historique.
+// Aucun droit commercial, commande ni paiement ne sont declenches ici.
+if (process.env.SPHOT_ENABLE_ADMIN_CGV_ACCEPTANCE === "true") {
+  exports.acceptAdminCommercialCgv =
+      require("./odoo_admin_cgv_acceptance")
+          .registerAdminCgvAcceptance({admin, onRequest});
+}
+
+// Edition des sept documents juridiques : brouillons separes des cinq textes
+// valides, controle Super Admin serveur et historique des versions.
+// DESACTIVEE par defaut. Un second opt-in independant est requis pour publier.
+if (process.env.SPHOT_ENABLE_LEGAL_DOCUMENT_EDITOR === "true") {
+  exports.manageSphotLegalDocumentEditing =
+      require("./legal_document_editor").register({admin, onRequest});
+}
+
+// La première approbation ADMIN doit être disponible dans le vrai portail.
+// Seul un Super Admin muni d'une session Firebase valide et non expirée
+// peut créer sa preuve immuable ; aucune activation commerciale ici.
+// Déployer explicitement cette fonction avant de valider un nouveau dossier.
+exports.approveAdminInitialRequest =
+    require("./admin_initial_approval").endpoint({admin, onRequest});
+
+// Autorisation d'essai ADMIN séparée, uniquement après preuve de validation
+// initiale. Désactivée par défaut : test des règles avant tout déploiement.
+if (process.env.SPHOT_ENABLE_ADMIN_TRIAL_AUTHORIZATION === "true") {
+  exports.authorizeAdminTrial =
+      require("./admin_trial_authorization").endpoint({admin, onRequest});
 }
 
 // Expiration vérifiée côté serveur ; préparation seulement, sans activation
@@ -1866,7 +1897,6 @@ function createAdminRequestPdf({
       const grey = "#607D8B";
       const pale = "#F3F6FB";
       const paleWarm = "#FFF8E1";
-      const white = "#FFFFFF";
 
       const left = doc.page.margins.left;
       const right = doc.page.width - doc.page.margins.right;
@@ -1969,44 +1999,22 @@ function createAdminRequestPdf({
         doc.y = boxY + boxHeight + 10;
       };
 
-      doc
-          .roundedRect(left, 30, contentWidth, 72, 14)
-          .fillAndStroke(white, "#D9E2EC");
+      // Les mêmes images que le mail d'accusé de réception, sans ancien
+      // bandeau encadré ni slogan. Aucun fichier graphique parallèle.
+      const mailAssets = buildSphotMessage({text: ""}).attachments;
+      const mailLogo = mailAssets.find((asset) =>
+        asset.filename === "sphot_title.png")?.content;
+      const mailFire = mailAssets.find((asset) =>
+        asset.filename === "fire_red_icon.png")?.content;
+      if (!Buffer.isBuffer(mailLogo) || !Buffer.isBuffer(mailFire)) {
+        throw new Error("Identité visuelle SPHOT indisponible.");
+      }
+      doc.image(mailLogo, (doc.page.width - 240) / 2, 31, {
+        fit: [240, 58],
+        align: "center",
+      });
 
-      doc
-          .font("Helvetica-Bold")
-          .fontSize(25)
-          .fillColor(red)
-          .text("SPHOT", left + 18, 43, {
-            width: 120,
-          });
-
-      doc
-          .font("Helvetica")
-          .fontSize(7.2)
-          .fillColor(grey)
-          .text(
-              "Des plages plus sûres, propres et connectées",
-              left + 18,
-              73,
-              {width: 200},
-          );
-
-      doc
-          .font("Helvetica-Bold")
-          .fontSize(8)
-          .fillColor(blue)
-          .text(
-              "SURVEILLER  •  PRÉSERVER  •  INFORMER  •  ENSEMBLE",
-              left + 222,
-              56,
-              {
-                width: contentWidth - 240,
-                align: "right",
-              },
-          );
-
-      doc.y = 116;
+      doc.y = 105;
 
       doc
           .font("Helvetica-Bold")
@@ -2015,6 +2023,8 @@ function createAdminRequestPdf({
           .text(
               "ACCUSÉ DE RÉCEPTION DE LA DEMANDE D'ACCÈS " +
               "ADMINISTRATEUR",
+              left,
+              doc.y,
               {
                 align: "center",
                 width: contentWidth,
@@ -2270,6 +2280,10 @@ function createAdminRequestPdf({
             width: contentWidth,
             align: "right",
           });
+
+      // Marqueur centré, identique à celui placé au bas des mails SPHOT.
+      doc.image(mailFire, (doc.page.width - 32) / 2,
+          doc.page.height - 118, {fit: [32, 49]});
 
       const footerY = doc.page.height - 54;
       doc
@@ -4322,6 +4336,10 @@ exports.updateSubscriptionStatuses = onSchedule(
       });
 
       activeSnapshot.docs.forEach((doc) => {
+        // Les retards de paiement des cycles ADMIN suivis dans Odoo donnent
+        // lieu à relances, jamais à une suspension automatique de diffusion.
+        // L'échéance annuelle reste gérée par processSubscriptionLifecycle.
+        if ((doc.data() || {}).odooAdminManaged === true) return;
         batch.set(
             doc.ref,
             {
@@ -5867,6 +5885,47 @@ exports.acceptSauveteurLegalTerms = onRequest(
           return;
         }
 
+        // Une même version 1.0 peut avoir plusieurs révisions d'articles.
+        // Vérifier côté serveur le contenu réellement lu avant d'archiver
+        // la nouvelle acceptation. Les anciens clients restent compatibles.
+        let verifiedDocumentRevisions = null;
+        if (request.body.legalDocumentRevisions != null) {
+          const expected = request.body.legalDocumentRevisions;
+          if (!expected || typeof expected !== "object" ||
+              Array.isArray(expected)) {
+            response.status(400).json({success: false,
+              error: "invalid_document_revisions"});
+            return;
+          }
+          const legalDocuments = admin.firestore().collection("legalDocuments");
+          const specific = legalDocuments.doc("sauveteurCgu");
+          const specificArticles = await specific.collection("chapters")
+              .limit(1).get();
+          const cguDocumentId = specificArticles.empty ?
+            "cgu" : "sauveteurCgu";
+          const ids = [cguDocumentId, "privacyPolicy", "rgpdNotice",
+            "sauveteurCharter"];
+          const snapshots = await Promise.all(ids.map((id) =>
+            legalDocuments.doc(id).get()));
+          verifiedDocumentRevisions = {cguDocumentId};
+          let outOfDate = expected.cguDocumentId !== cguDocumentId;
+          for (let i = 0; i < ids.length; i++) {
+            const data = snapshots[i].data() || {};
+            const revision = data.revision ?? 0;
+            verifiedDocumentRevisions[ids[i]] = revision;
+            if (!snapshots[i].exists || data.published === false ||
+                !Number.isSafeInteger(revision) ||
+                expected[ids[i]] !== revision) {
+              outOfDate = true;
+            }
+          }
+          if (outOfDate) {
+            response.status(409).json({success: false,
+              error: "legal_documents_changed"});
+            return;
+          }
+        }
+
         const requiredFlags = [
           request.body.cguAccepted === true,
           request.body.privacyAcknowledged === true,
@@ -5903,7 +5962,10 @@ exports.acceptSauveteurLegalTerms = onRequest(
             cgu: true,
             privacy: true,
             rgpd: true,
+            sauveteurCharter: true,
           },
+          ...(verifiedDocumentRevisions ?
+            {documentRevisions: verifiedDocumentRevisions} : {}),
           operationalRules: {
             publicOperationalDiffusionAcknowledged: true,
             institutionalReadAcknowledged: true,
@@ -5915,11 +5977,15 @@ exports.acceptSauveteurLegalTerms = onRequest(
           source: "sphot_sauveteur_access_validation",
         };
 
+        const documentRevisionSuffix = verifiedDocumentRevisions ?
+          "_" + crypto.createHash("sha256")
+              .update(JSON.stringify(verifiedDocumentRevisions))
+              .digest("hex").slice(0, 12) : "";
         const historyReference = accountReference
             .collection("legalAcceptances")
             .doc(
                 `${legalPack.versionId}_sauveteur_r` +
-                SAUVETEUR_LEGAL_ACCEPTANCE_REVISION,
+                SAUVETEUR_LEGAL_ACCEPTANCE_REVISION + documentRevisionSuffix,
             );
 
         const historySnapshot = await historyReference.get();
@@ -12120,6 +12186,14 @@ const {registerAdvertiserPhaseTwoWrite} =
 exports.saveAdvertiserPhaseTwo = registerAdvertiserPhaseTwoWrite({
   admin, onRequest,
 });
+
+// Lecture des commandes et factures Odoo depuis SPHOT.APP uniquement.
+// Désactivée tant que l'instance Odoo HTTPS, les secrets et le parcours de
+// facturation serveur ne sont pas opérationnels. Aucune écriture Odoo ici.
+if (process.env.SPHOT_ENABLE_ODOO_BILLING_READONLY === "true") {
+  const {registerOdooBillingStatus} = require("./odoo_billing_status");
+  exports.getOdooBillingStatus = registerOdooBillingStatus({admin, onRequest});
+}
 
 // Initial advertiser order: stores an immutable TEST-only quote snapshot.
 // No Odoo API, card payment, invoice, ad activation or auto-renewal.

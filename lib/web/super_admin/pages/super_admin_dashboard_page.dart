@@ -19,9 +19,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../widgets/super_admin_admin_workflow_panel.dart';
+import '../services/super_admin_initial_approval_service.dart';
 import '../widgets/super_admin_annual_financial_export_card.dart';
 import '../widgets/sphot_dropdown_visuals.dart';
-import '../widgets/super_admin_advertiser_cgv_editor.dart';
+import '../widgets/super_admin_profile_legal_editor.dart';
+import '../widgets/super_admin_legal_audience_panel.dart';
+import '../widgets/super_admin_legal_test_corpus_editor.dart';
 import '../widgets/advertiser_asset_comparison.dart';
 
 enum DashboardSpotFilter {
@@ -5018,78 +5021,19 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
 
   Future<void> _approveAdminRequest(Map<String, dynamic> adminData) async {
     final requestId = _cleanText(adminData['requestId'] ?? adminData['uid']);
-
     if (requestId.isEmpty) {
-      throw Exception('Identifiant de la demande introuvable.');
+      throw StateError('Identifiant de la demande introuvable.');
     }
-
-    final profile = Map<String, dynamic>.from(adminData['profile'] ?? {});
-
-    final proConnect = Map<String, dynamic>.from(adminData['proConnect'] ?? {});
-
-    final recipientEmail = _cleanText(
-      profile['email'] ?? proConnect['email'] ?? adminData['email'],
+    final approved = await SuperAdminInitialApprovalService.approve(
+      context,
+      requestId,
     );
-
-    if (recipientEmail.isEmpty) {
-      throw Exception('Adresse email du demandeur introuvable.');
-    }
-
-    final now = FieldValue.serverTimestamp();
-
-    await FirebaseFirestore.instance
-        .collection('adminRequests')
-        .doc(requestId)
-        .set({
-          'status': 'approved',
-          'accessPhase': 'configuration_access',
-          'updatedAt': now,
-
-          'administrativeTracking': {
-            'status': 'approved',
-            'reviewStartedAt': now,
-            'approvedAt': now,
-            'rejectedAt': null,
-            'rejectionReason': null,
-          },
-
-          'commercialTracking': {
-            'status': 'configuration_access_opened',
-            'configurationAccessOpenedAt': now,
-          },
-
-          'setupProgress': {'accessGranted': true, 'updatedAt': now},
-
-          'approvalEmail': {
-            'status': 'pending',
-            'recipient': recipientEmail,
-            'sentAt': null,
-            'messageId': null,
-            'error': null,
-            'updatedAt': now,
-          },
-
-          'lastEvent': {
-            'type': 'admin_request_approved',
-            'category': 'administrative',
-            'label': 'Demande administrateur approuvée',
-            'createdAt': now,
-            'createdByRole': 'super_admin',
-          },
-        }, SetOptions(merge: true));
-
-    if (!mounted) return;
-
+    if (!approved || !mounted) return;
     setState(() {
-      _selectedAdmin = {
-        ...adminData,
-        'status': 'approved',
-        'accessPhase': 'configuration_access',
-        'approvalEmail': {'status': 'pending', 'recipient': recipientEmail},
-      };
+      _selectedAdmin = {...adminData, 'status': 'approved',
+        'accessPhase': 'configuration_access'};
     });
   }
-
   Future<void> _rejectAdminRequest(
     Map<String, dynamic> adminData,
     String rejectionReason,
@@ -5899,35 +5843,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               ),
               const SizedBox(height: 18),
 
-              _legalDocumentTile(
-                title: 'CGU',
-                subtitle: 'Conditions Générales d’Utilisation',
-                chapters: _documentChapters['CGU'] ?? [],
-              ),
-
-              const SizedBox(height: 12),
-
-              _legalDocumentTile(
-                title: 'POLITIQUE DE CONFIDENTIALITÉ',
-                subtitle: 'Données personnelles et confidentialité',
-                chapters:
-                    _documentChapters['Politique de confidentialité'] ?? [],
-              ),
-
-              const SizedBox(height: 12),
-
-              _legalDocumentTile(
-                title: 'RGPD',
-                subtitle: 'Notice d’information RGPD',
-                chapters: _documentChapters['RGPD'] ?? [],
-              ),
-
-              const SizedBox(height: 12),
-              const SuperAdminAdvertiserCgvEditor(),
-
-              const SizedBox(height: 12),
-
-              _buildLegalVersionTile(),
+              // Quatre publics, documents liés à leur propre version.
+              const SuperAdminLegalAudiencePanel(),
             ],
           ),
         ),
@@ -6796,18 +6713,23 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     });
 
     try {
-      await FirebaseFirestore.instance
-          .collection('legalDocuments')
-          .doc(documentId)
-          .collection('chapters')
-          .doc(chapterId)
-          .set({
-            'order': order,
-            'title': title,
-            'content': content,
-            'isActive': true,
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+      final firestore = FirebaseFirestore.instance;
+      final document = firestore.collection('legalDocuments').doc(documentId);
+      final batch = firestore.batch();
+      batch.set(document.collection('chapters').doc(chapterId), {
+        'order': order,
+        'title': title,
+        'content': content,
+        'isActive': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      batch.set(document, {
+        // La version juridique demeure à 1.0 pendant la phase de test,
+        // chaque modification d'article possède sa propre révision.
+        'revision': FieldValue.increment(1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      await batch.commit();
 
       if (!mounted) return;
 

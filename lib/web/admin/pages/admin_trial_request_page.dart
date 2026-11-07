@@ -539,10 +539,39 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     // Première demande d'accès.
     return _canOpenTrialRequest &&
         _certifyRepresentative &&
+        _registrationLegalDocumentsReady &&
         _legalReadConfirmed &&
         _privacyReadConfirmed &&
         _rgpdAccepted;
   }
+
+  bool get _registrationLegalDocumentsReady {
+    bool hasArticles(Map<String, dynamic>? document) {
+      final chapters = document?['chapters'];
+      return chapters is List && chapters.isNotEmpty;
+    }
+
+    return !_legalLoading &&
+        hasArticles(_cguDoc) &&
+        hasArticles(_privacyDoc) &&
+        hasArticles(_rgpdDoc);
+  }
+
+  // Trace exactement les révisions Firestore consultées, même lorsque le
+  // numéro de version juridique reste volontairement à 1.0 pendant les tests.
+  Map<String, dynamic> _registrationLegalAcceptance() => {
+    'version': _sphotVersion,
+    'publishedAt': _sphotPublishedAt,
+    'acceptedAt': FieldValue.serverTimestamp(),
+    'cgu': true,
+    'privacy': true,
+    'rgpd': true,
+    'documentRevisions': {
+      'cgu': _cguDoc?['revision'] ?? 0,
+      'privacyPolicy': _privacyDoc?['revision'] ?? 0,
+      'rgpdNotice': _rgpdDoc?['revision'] ?? 0,
+    },
+  };
 
   String _normalizeCorrectionReason(String value) {
     return value
@@ -1285,6 +1314,9 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
           'trialRequest.rgpdAccepted': _rgpdAccepted,
 
+          'trialRequest.acceptedDocuments':
+              _registrationLegalAcceptance(),
+
           'status': 'pending',
           'accessPhase': 'awaiting_approval',
 
@@ -1389,14 +1421,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             'legalReadConfirmed': _legalReadConfirmed,
             'privacyReadConfirmed': _privacyReadConfirmed,
             'rgpdAccepted': _rgpdAccepted,
-            'acceptedDocuments': {
-              'version': _sphotVersion,
-              'publishedAt': _sphotPublishedAt,
-              'acceptedAt': FieldValue.serverTimestamp(),
-              'cgu': true,
-              'privacy': true,
-              'rgpd': true,
-            },
+            'acceptedDocuments': _registrationLegalAcceptance(),
             'commercialLabel': 'Demande d’accès SPHOT ADMIN',
           },
 
@@ -1862,7 +1887,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1888,7 +1913,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                   height: 1.25,
                 ),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 12),
               _menuButton(
                 section: _TrialRequestSection.structure,
                 icon: Icons.account_balance_rounded,
@@ -2010,9 +2035,9 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     final stepNumber = section.index + 1;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 6),
       child: SizedBox(
-        height: 72,
+        height: 80,
         child: OutlinedButton(
           onPressed: isEnabled ? () => _selectSection(section) : null,
           style: OutlinedButton.styleFrom(
@@ -2031,8 +2056,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           child: Row(
             children: [
               SizedBox(
-                width: 48,
-                height: 56,
+                width: 44,
+                height: 50,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -2066,8 +2091,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                             ]),
                       child: AdaptiveAssetImage(
                         'data/icons/fire_red_icon.svg',
-                        width: 44,
-                        height: 56,
+                        width: 40,
+                        height: 50,
                         fit: BoxFit.contain,
                       ),
                     ),
@@ -2082,12 +2107,12 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   label,
                   style: const TextStyle(
-                    fontSize: 17,
+                    fontSize: 16,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.25,
                   ),
@@ -2151,28 +2176,33 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         ? Icons.lock_open_rounded
         : Icons.lock_outline_rounded;
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: statusColor, width: 1.4),
-      ),
-      child: Column(
-        children: [
-          Icon(statusIcon, color: statusColor, size: 26),
-          const SizedBox(height: 8),
-          Text(
-            text,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: statusColor,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              height: 1.25,
+    return SizedBox(
+      height: 80,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: statusColor.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: statusColor, width: 1.4),
+        ),
+        child: Row(
+          children: [
+            Icon(statusIcon, color: statusColor, size: 24),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                text,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  height: 1.25,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -2224,12 +2254,46 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                   markers: [
                     Marker(
                       point: cityPoint,
-                      width: 62,
-                      height: 62,
+                      width: 85,
+                      height: 85,
                       alignment: Alignment.topCenter,
-                      child: AdaptiveAssetImage(
-                        'data/icons/fire_red_icon.svg',
-                        filterQuality: FilterQuality.high,
+                      child: SizedBox(
+                        width: 85,
+                        height: 85,
+                        child: Stack(
+                          alignment: Alignment.topCenter,
+                          children: [
+                            const AdaptiveAssetImage(
+                              'data/icons/fire_red_icon.svg',
+                              width: 85,
+                              height: 85,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
+                            ),
+                            if (_hasLogo)
+                              Positioned(
+                                top: 23,
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: ClipOval(
+                                    child: IgnorePointer(
+                                      child: _buildAdminLogoImage(),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -3000,7 +3064,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     return '${(bytes / 1024).toStringAsFixed(1)} Ko';
   }
 
-  Widget _buildAdminLogoPreview() {
+  Widget _buildAdminLogoImage() {
     final selectedLogo = _selectedLogo;
     final logoUrl = _value('logoVille');
     final currentMimeType = _logoMimeType.toLowerCase();
@@ -3047,10 +3111,14 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       );
     }
 
+    return image;
+  }
+
+  Widget _buildAdminLogoPreview() {
     return SizedBox(
       width: 92,
       height: 72,
-      child: Center(child: image),
+      child: Center(child: _buildAdminLogoImage()),
     );
   }
 
@@ -3355,7 +3423,11 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
               ),
             ),
           ),
-          _checkLine(value: checked, text: checkText, onChanged: onChanged),
+          _checkLine(
+            value: checked,
+            text: checkText,
+            onChanged: chapters.isEmpty ? null : onChanged,
+          ),
         ],
       ),
     );
@@ -3418,6 +3490,15 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         if (_legalLoading)
           const Center(child: CircularProgressIndicator())
         else ...[
+          if (!_registrationLegalDocumentsReady)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Les documents juridiques sont momentanément indisponibles. '
+                'La demande d’accès ne peut pas être envoyée avant leur chargement.',
+                style: TextStyle(color: redColor, fontWeight: FontWeight.w700),
+              ),
+            ),
           _legalDropdown(
             title: 'Conditions Générales d’Utilisation',
             document: _cguDoc,
@@ -3595,7 +3676,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   Widget _checkLine({
     required bool value,
     required String text,
-    required ValueChanged<bool?> onChanged,
+    required ValueChanged<bool?>? onChanged,
   }) {
     return CheckboxListTile(
       value: value,

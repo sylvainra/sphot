@@ -245,35 +245,31 @@ class _SuperAdminSubscriptionsPageState extends State<SuperAdminSubscriptionsPag
     );
   }
 
-    Future<void> _updateSubscriptionStatus(
+  Future<void> _updateSubscriptionStatus(
     String subscriptionId,
     String newStatus,
   ) async {
-    final now = DateTime.now();
-
-    final data = <String, dynamic>{
-      'status': newStatus,
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-
-    if (newStatus == 'active') {
-      data.addAll({
-        'subscriptionStartDate': Timestamp.fromDate(now),
-        'subscriptionEndDate': Timestamp.fromDate(
-          DateTime(now.year + 1, now.month, now.day),
+    // Les boutons historiques restent visibles pour la compréhension du
+    // dossier, mais aucun statut ni paiement ne peut être inventé côté UI.
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('MODIFICATION COMMERCIALE BLOQUÉE'),
+        content: Text(
+          'Abonnement $subscriptionId : le changement vers « $newStatus » '
+          'n’a pas été enregistré. Les statuts commerciaux SPHOT ADMIN '
+          'devront être établis par vérification serveur Odoo '
+          'et projection sécurisée Firestore.',
         ),
-        'lastPaymentDate': Timestamp.fromDate(now),
-        'nextInvoiceDate': Timestamp.fromDate(now),
-      });
-    }
-
-    await FirebaseFirestore.instance
-        .collection('subscriptions')
-        .doc(subscriptionId)
-        .set(
-          data,
-          SetOptions(merge: true),
-        );
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('FERMER'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
