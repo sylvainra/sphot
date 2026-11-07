@@ -57,6 +57,14 @@ if (process.env.SPHOT_ENABLE_ADMIN_CGV_ACCEPTANCE === "true") {
           .registerAdminCgvAcceptance({admin, onRequest});
 }
 
+// Edition des sept documents juridiques : brouillons separes des cinq textes
+// valides, controle Super Admin serveur et historique des versions.
+// DESACTIVEE par defaut. Un second opt-in independant est requis pour publier.
+if (process.env.SPHOT_ENABLE_LEGAL_DOCUMENT_EDITOR === "true") {
+  exports.manageSphotLegalDocumentEditing =
+      require("./legal_document_editor").register({admin, onRequest});
+}
+
 // La première approbation ADMIN doit être disponible dans le vrai portail.
 // Seul un Super Admin muni d'une session Firebase valide et non expirée
 // peut créer sa preuve immuable ; aucune activation commerciale ici.
