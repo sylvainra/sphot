@@ -1,12 +1,15 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 
 /// Présentation unifiée des sept sources juridiques SPHOT.
 /// Les documents communs sont référencés, jamais recopiés par public.
-/// La modification des documents actifs reste volontairement désactivée
-/// jusqu'à la validation des règles Firestore et du circuit de publication.
+/// Edition des brouillons par une fonction serveur Super Admin uniquement.
+/// Aucun acces en ecriture directe aux documents juridiques depuis Flutter.
 class SuperAdminLegalAudiencePanel extends StatelessWidget {
   const SuperAdminLegalAudiencePanel({super.key});
 
@@ -192,22 +195,24 @@ class _LegalArticle {
   final String content;
   final int order;
 
-  Map<String, dynamic> toMap() => {
-    'id': id, 'title': title, 'content': content,
-    'order': order, 'isActive': true,
-  };
 }
 
 class _LegalData {
   const _LegalData({required this.articles, required this.version,
     required this.revision, required this.prepared,
-    required this.history, required this.updatedAt});
+    required this.history, required this.updatedAt,
+    required this.editorDraft, required this.initialPackPublished,
+    required this.publicationEnabled, required this.editorError});
   final List<_LegalArticle> articles;
   final String version;
   final int revision;
   final bool prepared;
   final List<Map<String, dynamic>> history;
   final DateTime? updatedAt;
+  final Map<String, dynamic>? editorDraft;
+  final bool initialPackPublished;
+  final bool publicationEnabled;
+  final String? editorError;
 }
 
 class _LegalDocumentCard extends StatefulWidget {
@@ -224,10 +229,19 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
   static const _blue = Color(0xFF213F8E);
   static const _red = Color(0xFFE52525);
 
-  // Aucun enregistrement de production avant sécurisation des règles et accord.
-  static const _editingEnabled = bool.fromEnvironment(
-    'SPHOT_LEGAL_ARTICLE_EDIT', defaultValue: false) &&
-      bool.fromEnvironment('SPHOT_LEGAL_RULES_VERIFIED', defaultValue: false);
+  // L'URL n'est renseignee qu'apres deploiement et validation de la fonction.
+  // Aucun effet de bord si elle n'est pas fournie lors de la compilation.
+  static const _configuredEditorUrl = String.fromEnvironment(
+    'SPHOT_LEGAL_DOCUMENT_EDITOR_URL', defaultValue: '');
+  static Uri? get _editorEndpoint {
+    final uri = Uri.tryParse(_configuredEditorUrl.trim());
+    if (uri == null || uri.scheme != 'https' || uri.hasPort ||
+        uri.userInfo.isNotEmpty || uri.query.isNotEmpty ||
+        uri.fragment.isNotEmpty ||
+        uri.host != 'us-central1-sphot-ab80b.cloudfunctions.net' ||
+        uri.path != '/manageSphotLegalDocumentEditing') return null;
+    return uri;
+  }
   static const _preparedIds = <String>{
     'cgu', 'adminCgv', 'advertiserCgv', 'sauveteurCgu', 'sauveteurCharter',
   };
@@ -308,6 +322,29 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
     return result;
   }
 
+  Future<Map<String, dynamic>> _editorRequest(Map<String, dynamic> body) async {
+    final url = _editorEndpoint;
+    if (url == null) throw StateError('Service sécurisé non activé.');
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('Connexion Super Admin requise.');
+    final token = await user.getIdToken(true);
+    if (token == null || token.isEmpty) {
+      throw StateError('Session Firebase indisponible.');
+    }
+    final response = await http.post(url, headers: {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    }, body: jsonEncode(body)).timeout(const Duration(seconds: 45));
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map || decoded['success'] != true ||
+        response.statusCode != 200) {
+      final reason = decoded is Map ? decoded['error']?.toString() : null;
+      throw StateError('Opération refusée : ${reason ?? 'service indisponible'}.');
+    }
+    return Map<String, dynamic>.from(decoded);
+  }
+
   Future<_LegalData> _load() async {
     final firestore = FirebaseFirestore.instance;
     final ref = firestore.collection('legalDocuments').doc(widget.documentId);
@@ -324,9 +361,10 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
     var version = _string(liveData['version']);
     var revision = liveData['revision'] is int
         ? liveData['revision'] as int : 0;
+    final publicationSource = _string(liveData['publicationSource']);
     final publishedFinal = liveData['published'] == true &&
-        _string(liveData['publicationSource']) ==
-            'legal_pack_five_documents_atomic_v1';
+        (publicationSource == 'legal_pack_five_documents_atomic_v1' ||
+         publicationSource == 'sphot_legal_document_editor_v1');
     if (_preparedIds.contains(widget.documentId) && !publishedFinal) {
       // Les documents préparés pour publication ne doivent pas être lus
       // directement dans Firestore : les règles prévues les protègent.
@@ -340,6 +378,28 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
         }
       } on FlutterError {
         // Conserver le document actif s'il manque un fichier embarqué.
+      }
+    }
+    Map<String, dynamic>? editorDraft;
+    bool initialPackPublished = false;
+    bool publicationEnabled = false;
+    String? editorError;
+    if (_editorEndpoint != null) {
+      try {
+        final state = await _editorRequest({
+          'action': 'status', 'documentId': widget.documentId,
+        });
+        initialPackPublished = state['initialPackPublished'] == true;
+        publicationEnabled = state['publicationEnabled'] == true;
+        final draft = state['draft'];
+        if (draft is Map &&
+            (draft['status'] == 'draft' || draft['status'] == 'validated')) {
+          editorDraft = Map<String, dynamic>.from(draft);
+          final work = _articlesFromList(editorDraft['chapters']);
+          if (work.isNotEmpty) articles = work;
+        }
+      } catch (error) {
+        editorError = error.toString();
       }
     }
     final history = <Map<String, dynamic>>[];
@@ -384,6 +444,10 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
       revision: revision,
       prepared: prepared,
       history: history,
+      editorDraft: editorDraft,
+      initialPackPublished: initialPackPublished,
+      publicationEnabled: publicationEnabled,
+      editorError: editorError,
       updatedAt: (liveData['updatedAt'] is Timestamp)
           ? (liveData['updatedAt'] as Timestamp).toDate() : null,
     );
@@ -407,114 +471,90 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
     });
   }
 
-  Future<void> _save(_LegalData data) async {
-    if (!_editingEnabled || data.prepared || _saving ||
-        _selectedArticleId == null ||
-        _title.text.trim().isEmpty || _content.text.trim().isEmpty ||
-        _changeSummary.text.trim().isEmpty) return;
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    // Le simple affichage du tableau de bord ne suffit pas à autoriser une
-    // écriture. Le serveur doit avoir émis des claims Super Admin non expirés.
-    Map<String, dynamic> claims;
-    try {
-      final token = await user.getIdTokenResult(true);
-      claims = token.claims ?? const <String, dynamic>{};
-    } on FirebaseAuthException {
-      if (mounted) setState(() => _message =
-          'Session Firebase indisponible : reconnectez le Super Admin.');
-      return;
-    }
-    if (!mounted) return;
-    final expiresAt = claims['sphotSaSessionExpiresAt'];
-    final expiresMillis = expiresAt is num ? expiresAt.toInt() : 0;
-    if (claims['role'] != 'SPHOT_SUPER_ADMIN' ||
-        claims['sphotSuperAdmin'] != true ||
-        expiresMillis <= DateTime.now().millisecondsSinceEpoch) {
-      if (mounted) setState(() => _message =
-          'Session Super Admin certifiée requise pour enregistrer.');
-      return;
-    }
-    final confirmed = await showDialog<bool>(context: context,
+  Future<bool> _confirm(String title, String detail, String action) async {
+    return await showDialog<bool>(context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('NOUVELLE RÉVISION JURIDIQUE'),
-        content: Text('Cette action modifie immédiatement le document actif '
-            '${widget.title}, conserve la révision précédente et peut '
-            'nécessiter une nouvelle acceptation par les utilisateurs. '
-            'Confirmer l’enregistrement ?'),
+        title: Text(title),
+        content: Text(detail),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('ANNULER')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('ENREGISTRER LA RÉVISION')),
+              child: Text(action)),
         ],
       ),
     ) == true;
-    if (!confirmed || !mounted) return;
+  }
+
+  Future<void> _runEdit(Map<String, dynamic> request, String success) async {
+    if (_saving || _editorEndpoint == null) return;
     setState(() { _saving = true; _message = null; });
     try {
-      final firestore = FirebaseFirestore.instance;
-      final ref = firestore.collection('legalDocuments').doc(widget.documentId);
-      final oldRevision = data.revision;
-      final nextRevision = oldRevision + 1;
-      final id = _selectedArticleId!;
-      final nextArticles = data.articles.map((article) => article.id == id
-          ? _LegalArticle(id: id, title: _title.text.trim(),
-              content: _content.text.trim(), order: article.order)
-          : article).toList();
-      final priorRef = firestore.collection('legalVersions').doc(
-          '${widget.documentId}_r${'$oldRevision'.padLeft(8, '0')}_before_edit');
-      final nextRef = firestore.collection('legalVersions').doc(
-          '${widget.documentId}_r${'$nextRevision'.padLeft(8, '0')}_edited');
-      await firestore.runTransaction((tx) async {
-        final current = await tx.get(ref);
-        final prior = await tx.get(priorRef);
-        final next = await tx.get(nextRef);
-        if (!current.exists || current.data()?['revision'] != oldRevision ||
-            next.exists) {
-          throw StateError('Le document a changé : rechargez sa version.');
-        }
-        if (!prior.exists) {
-          tx.set(priorRef, {
-            'documentId': widget.documentId, 'version': data.version,
-            'revision': oldRevision, 'status': 'Historique',
-            'chapters': data.articles.map((a) => a.toMap()).toList(),
-            'archivedByUid': user.uid,
-            'archivedAt': FieldValue.serverTimestamp(),
-          });
-        }
-        tx.set(nextRef, {
-          'documentId': widget.documentId, 'version': data.version,
-          'revision': nextRevision, 'status': 'Publié',
-          'chapters': nextArticles.map((a) => a.toMap()).toList(),
-          'changeLog': _changeSummary.text.trim(),
-          'publishedByUid': user.uid,
-          'publishedAt': FieldValue.serverTimestamp(),
-        });
-        tx.set(ref, {
-          'revision': nextRevision,
-          'chapters': nextArticles.map((a) => a.toMap()).toList(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-        final changed = nextArticles.firstWhere((a) => a.id == id);
-        tx.set(ref.collection('chapters').doc(id), {
-          'title': changed.title, 'content': changed.content,
-          'order': changed.order, 'isActive': true,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-      });
+      await _editorRequest({'documentId': widget.documentId, ...request});
       if (!mounted) return;
       setState(() {
         _future = _load();
         _selectedArticleId = null;
-        _message = 'Nouvelle révision enregistrée.';
+        _message = success;
       });
     } catch (error) {
-      if (mounted) setState(() => _message =
-          'Enregistrement non confirmé : $error');
+      if (mounted) setState(() => _message = 'Opération non enregistrée : $error');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _createDraft() async {
+    await _runEdit({'action': 'create'},
+        'Brouillon privé créé. Aucun texte publié n’a été modifié.');
+  }
+
+  Future<void> _save(_LegalData data) async {
+    final draft = data.editorDraft;
+    if (draft == null || _selectedArticleId == null ||
+        _title.text.trim().isEmpty || _content.text.trim().isEmpty ||
+        _changeSummary.text.trim().isEmpty) {
+      setState(() => _message = 'Article et résumé des modifications requis.');
+      return;
+    }
+    await _runEdit({
+      'action': 'save',
+      'expectedDraftRevision': draft['draftRevision'],
+      'articleId': _selectedArticleId,
+      'title': _title.text.trim(),
+      'content': _content.text.trim(),
+      'changeSummary': _changeSummary.text.trim(),
+    }, 'Modification enregistrée dans le brouillon. Aucune publication.');
+  }
+
+  Future<void> _validate(_LegalData data) async {
+    final draft = data.editorDraft;
+    if (draft == null || draft['status'] != 'draft') return;
+    final confirmed = await _confirm('VALIDER LE BROUILLON ?',
+      'Le contenu de ${widget.title} sera marqué comme validé. '
+      'Cette étape ne le publie pas et n’affecte aucun utilisateur.',
+      'VALIDER');
+    if (!confirmed || !mounted) return;
+    await _runEdit({'action': 'validate', 'confirm': true,
+      'expectedDraftRevision': draft['draftRevision']},
+      'Brouillon validé. Publication non effectuée.');
+  }
+
+  Future<void> _publish(_LegalData data) async {
+    final draft = data.editorDraft;
+    if (draft == null || draft['status'] != 'validated' ||
+        !data.publicationEnabled || !data.initialPackPublished) return;
+    final confirmed = await _confirm('PUBLIER UNE NOUVELLE VERSION ?',
+      'Cette action remplacera officiellement le contenu de ${widget.title}, '
+      'archivera la version antérieure et augmentera la version juridique '
+      'globale. Les acceptations des utilisateurs devront être réévaluées. '
+      'Aucune commande ni aucun paiement ne sera déclenché.',
+      'PUBLIER ET ARCHIVER');
+    if (!confirmed || !mounted) return;
+    await _runEdit({'action': 'publish', 'confirm': true,
+      'expectedDraftRevision': draft['draftRevision'],
+      'expectedHash': draft['reviewedHash']},
+      'Nouvelle version publiée et archivée. Vérifiez les acceptations.');
   }
 
   @override
@@ -544,9 +584,11 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
             title: Text(widget.title,
                 style: const TextStyle(color: _blue, fontWeight: FontWeight.w800,
                     fontSize: 12)),
-            subtitle: Text(data.prepared
-                ? '${data.articles.length} articles · Texte final non publié'
-                : '${data.articles.length} articles · Version active ${data.version}',
+            subtitle: Text(data.editorDraft != null
+                ? '${data.articles.length} articles · BROUILLON ${data.editorDraft!['status']}'
+                : data.prepared
+                    ? '${data.articles.length} articles · Texte final non publié'
+                    : '${data.articles.length} articles · Version active ${data.version}',
                 style: const TextStyle(color: _red, fontSize: 11)),
             childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
             children: [
@@ -565,7 +607,7 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
                         style: const TextStyle(fontSize: 12, height: 1.45)),
                     Align(alignment: Alignment.centerRight,
                       child: TextButton.icon(
-                        onPressed: data.prepared || !_editingEnabled
+                        onPressed: _saving || data.editorDraft == null
                             ? null : () => _choose(article),
                         icon: const Icon(Icons.edit_outlined, size: 16),
                         label: const Text('MODIFIER CET ARTICLE'),
@@ -609,12 +651,22 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
             ? 'Texte définitif préparé — publication non effectuée'
             : 'Texte actuellement enregistré dans Firestore',
             style: const TextStyle(color: _red, fontSize: 11)),
+        if (data.editorDraft != null) ...[
+          const SizedBox(height: 8),
+          Text('Brouillon privé · état : ${data.editorDraft!['status']} · '
+              'révision de travail ${data.editorDraft!['draftRevision']}',
+              style: const TextStyle(color: _blue, fontSize: 12,
+                  fontWeight: FontWeight.w700)),
+          if (_string(data.editorDraft!['changeSummary']).isNotEmpty)
+            Text('Dernière modification : ${data.editorDraft!['changeSummary']}',
+                style: const TextStyle(color: _blue, fontSize: 11)),
+        ],
         if (data.updatedAt != null)
           Text('Dernière mise à jour : ${data.updatedAt!.day.toString().padLeft(2, '0')}/'
               '${data.updatedAt!.month.toString().padLeft(2, '0')}/'
               '${data.updatedAt!.year}',
               style: const TextStyle(color: _blue, fontSize: 11)),
-        if (_selectedArticleId != null && !data.prepared) ...[
+        if (_selectedArticleId != null && data.editorDraft != null) ...[
           const SizedBox(height: 10),
           TextField(controller: _title,
               decoration: const InputDecoration(labelText: 'Titre de l’article',
@@ -630,13 +682,53 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
           const SizedBox(height: 8),
           FilledButton.icon(onPressed: _saving ? null : () => _save(data),
               icon: const Icon(Icons.save_outlined),
-              label: const Text('ENREGISTRER UNE NOUVELLE RÉVISION')),
+              label: const Text('ENREGISTRER DANS LE BROUILLON')),
         ],
-        if (!_editingEnabled)
+        if (_editorEndpoint == null)
           const Padding(padding: EdgeInsets.only(top: 8),
-            child: Text('Édition sécurisée désactivée jusqu’à validation '
-                'des règles Firestore et du circuit de publication.',
+            child: Text('Circuit d’édition sécurisé préparé, mais service '
+                'serveur non activé. Aucun texte publié ne peut être modifié.',
                 style: TextStyle(color: _red, fontSize: 11))),
+        if (data.editorError != null)
+          Padding(padding: const EdgeInsets.only(top: 8),
+            child: Text('Éditeur indisponible : ${data.editorError}',
+                style: const TextStyle(color: _red, fontSize: 11))),
+        if (_editorEndpoint != null && data.editorError == null) ...[
+          const SizedBox(height: 10),
+          if (data.editorDraft == null)
+            OutlinedButton.icon(
+              onPressed: _saving ? null : _createDraft,
+              icon: const Icon(Icons.note_add_outlined),
+              label: const Text('CRÉER UN BROUILLON DE CE DOCUMENT'),
+            ),
+          if (data.editorDraft != null)
+            Wrap(spacing: 8, runSpacing: 6, children: [
+              OutlinedButton.icon(
+                onPressed: _saving || data.editorDraft!['status'] != 'draft'
+                    ? null : () => _validate(data),
+                icon: const Icon(Icons.verified_outlined),
+                label: const Text('VALIDER LE BROUILLON'),
+              ),
+              FilledButton.icon(
+                onPressed: _saving || !data.publicationEnabled ||
+                    !data.initialPackPublished ||
+                    data.editorDraft!['status'] != 'validated'
+                    ? null : () => _publish(data),
+                icon: const Icon(Icons.publish_outlined),
+                label: const Text('PUBLIER ET ARCHIVER'),
+              ),
+            ]),
+          if (data.editorDraft != null && !data.initialPackPublished)
+            const Padding(padding: EdgeInsets.only(top: 6),
+              child: Text('Publication individuelle bloquée jusqu’à la '
+                  'publication initiale des cinq textes validés.',
+                  style: TextStyle(color: _red, fontSize: 11))),
+          if (data.editorDraft != null && !data.publicationEnabled)
+            const Padding(padding: EdgeInsets.only(top: 6),
+              child: Text('Publication non activée côté serveur. '
+                  'L’enregistrement et la validation restent distincts.',
+                  style: TextStyle(color: _red, fontSize: 11))),
+        ],
         const SizedBox(height: 10),
         ExpansionTile(
           shape: const Border(), collapsedShape: const Border(),
