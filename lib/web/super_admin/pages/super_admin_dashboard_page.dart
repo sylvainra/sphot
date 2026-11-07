@@ -22,7 +22,8 @@ import '../widgets/super_admin_admin_workflow_panel.dart';
 import '../services/super_admin_initial_approval_service.dart';
 import '../widgets/super_admin_annual_financial_export_card.dart';
 import '../widgets/sphot_dropdown_visuals.dart';
-import '../widgets/super_admin_profile_legal_editor.dart';\nimport '../widgets/super_admin_legal_audience_panel.dart';
+import '../widgets/super_admin_profile_legal_editor.dart';
+import '../widgets/super_admin_legal_audience_panel.dart';
 import '../widgets/super_admin_legal_test_corpus_editor.dart';
 import '../widgets/advertiser_asset_comparison.dart';
 
