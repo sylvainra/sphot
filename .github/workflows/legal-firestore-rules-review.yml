@@ -1,0 +1,46 @@
+name: "SPHOT - Verification des regles juridiques Firestore"
+
+on:
+  push:
+    branches:
+      - integration/reconciliation-locale-20261106_105755
+    paths:
+      - .github/workflows/legal-firestore-rules-review.yml
+      - firestore.rules
+      - firebase.legal-rules-review.json
+      - functions/test/legal_rules_review.test.cjs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-regles-juridiques:
+    name: "Emulateur Firestore - aucune connexion a la production"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: "Recuperer le code de la PR"
+        uses: actions/checkout@v4
+
+      - name: "Installer Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: "Installer Java pour l'emulateur"
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: "Installer les outils de test Firebase"
+        run: npm install --no-save --no-package-lock firebase firebase-tools @firebase/rules-unit-testing
+
+      - name: "Tester les droits dans l'emulateur uniquement"
+        run: >-
+          npx --no-install firebase emulators:exec
+          --project demo-sphot-legal-rules
+          --config firebase.legal-rules-review.json
+          --only firestore
+          "node --test functions/test/legal_rules_review.test.cjs"
