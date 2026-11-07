@@ -22,7 +22,7 @@ import '../widgets/super_admin_admin_workflow_panel.dart';
 import '../services/super_admin_initial_approval_service.dart';
 import '../widgets/super_admin_annual_financial_export_card.dart';
 import '../widgets/sphot_dropdown_visuals.dart';
-import '../widgets/super_admin_profile_legal_editor.dart';
+import '../widgets/super_admin_profile_legal_editor.dart';\nimport '../widgets/super_admin_legal_audience_panel.dart';
 import '../widgets/super_admin_legal_test_corpus_editor.dart';
 import '../widgets/advertiser_asset_comparison.dart';
 
@@ -5842,38 +5842,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               ),
               const SizedBox(height: 18),
 
-              _legalDocumentTile(
-                title: 'CGU',
-                subtitle: 'Conditions Générales d’Utilisation',
-                chapters: _documentChapters['CGU'] ?? [],
-              ),
-
-              const SizedBox(height: 12),
-
-              _legalDocumentTile(
-                title: 'POLITIQUE DE CONFIDENTIALITÉ',
-                subtitle: 'Données personnelles et confidentialité',
-                chapters:
-                    _documentChapters['Politique de confidentialité'] ?? [],
-              ),
-
-              const SizedBox(height: 12),
-
-              _legalDocumentTile(
-                title: 'RGPD',
-                subtitle: 'Notice d’information RGPD',
-                chapters: _documentChapters['RGPD'] ?? [],
-              ),
-
-              const SizedBox(height: 12),
-              const SuperAdminProfileLegalEditor(),
-
-              const SizedBox(height: 12),
-              const SuperAdminLegalTestCorpusEditor(),
-
-              const SizedBox(height: 12),
-
-              _buildLegalVersionTile(),
+              // Quatre publics, documents liés à leur propre version.
+              const SuperAdminLegalAudiencePanel(),
             ],
           ),
         ),
