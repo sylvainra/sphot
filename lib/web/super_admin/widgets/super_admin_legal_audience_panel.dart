@@ -11,7 +11,6 @@ class SuperAdminLegalAudiencePanel extends StatelessWidget {
   const SuperAdminLegalAudiencePanel({super.key});
 
   static const _blue = Color(0xFF213F8E);
-  static const _red = Color(0xFFE52525);
 
   static const _audiences = <_LegalAudience>[
     _LegalAudience('GRAND PUBLIC', [
@@ -63,61 +62,7 @@ class SuperAdminLegalAudiencePanel extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         for (final audience in _audiences) ...[
-          Container(
-            decoration: BoxDecoration(
-              color: _blue.withOpacity(0.055),
-              border: Border.all(color: _blue, width: 1.4),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: ExpansionTile(
-              key: PageStorageKey('legal-audience-${audience.name}'),
-              shape: const Border(),
-              collapsedShape: const Border(),
-              iconColor: _red,
-              collapsedIconColor: _red,
-              title: Text(audience.name,
-                  style: const TextStyle(color: _red,
-                      fontSize: 15, fontWeight: FontWeight.w900)),
-              childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
-              children: [
-                for (final section in audience.sections)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: _blue.withOpacity(0.65)),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ExpansionTile(
-                        key: PageStorageKey(
-                            'legal-section-${audience.name}-${section.name}'),
-                        shape: const Border(),
-                        collapsedShape: const Border(),
-                        iconColor: _red,
-                        collapsedIconColor: _red,
-                        title: Text(section.name,
-                            style: const TextStyle(color: _blue,
-                                fontSize: 14, fontWeight: FontWeight.w900)),
-                        childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                        children: [
-                          for (final target in section.targets)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: _LegalDocumentCard(
-                                key: ValueKey(
-                                    '${audience.name}-${target.documentId}'),
-                                title: target.title,
-                                documentId: target.documentId,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+          _LegalAudienceCard(key: ValueKey(audience.name), audience: audience),
           const SizedBox(height: 12),
         ],
       ],
@@ -143,6 +88,102 @@ class _LegalTarget {
   final String documentId;
 }
 
+/// Construit les lectures Firestore uniquement après ouverture d'une rubrique.
+/// Les sept sources communes ne provoquent donc pas quinze chargements initiaux.
+class _LegalAudienceCard extends StatefulWidget {
+  const _LegalAudienceCard({super.key, required this.audience});
+  final _LegalAudience audience;
+
+  @override
+  State<_LegalAudienceCard> createState() => _LegalAudienceCardState();
+}
+
+class _LegalAudienceCardState extends State<_LegalAudienceCard> {
+  static const _blue = Color(0xFF213F8E);
+  static const _red = Color(0xFFE52525);
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: _blue.withOpacity(0.055),
+      border: Border.all(color: _blue, width: 1.4),
+      borderRadius: BorderRadius.circular(15),
+    ),
+    child: ExpansionTile(
+      onExpansionChanged: (value) => setState(() => _expanded = value),
+      shape: const Border(),
+      collapsedShape: const Border(),
+      iconColor: _red,
+      collapsedIconColor: _red,
+      title: Text(widget.audience.name,
+          style: const TextStyle(color: _red, fontSize: 15,
+              fontWeight: FontWeight.w900)),
+      childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+      children: _expanded
+          ? [for (final section in widget.audience.sections)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: _LegalSectionCard(
+                  key: ValueKey(section.name),
+                  section: section,
+                  audienceName: widget.audience.name,
+                ),
+              ),
+            ]
+          : const [],
+    ),
+  );
+}
+
+class _LegalSectionCard extends StatefulWidget {
+  const _LegalSectionCard({super.key, required this.section,
+    required this.audienceName});
+  final _LegalSection section;
+  final String audienceName;
+
+  @override
+  State<_LegalSectionCard> createState() => _LegalSectionCardState();
+}
+
+class _LegalSectionCardState extends State<_LegalSectionCard> {
+  static const _blue = Color(0xFF213F8E);
+  static const _red = Color(0xFFE52525);
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: _blue.withOpacity(0.65)),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: ExpansionTile(
+      onExpansionChanged: (value) => setState(() => _expanded = value),
+      shape: const Border(),
+      collapsedShape: const Border(),
+      iconColor: _red,
+      collapsedIconColor: _red,
+      title: Text(widget.section.name,
+          style: const TextStyle(color: _blue, fontSize: 14,
+              fontWeight: FontWeight.w900)),
+      childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      children: _expanded
+          ? [for (final target in widget.section.targets)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _LegalDocumentCard(
+                  key: ValueKey('${widget.audienceName}-${target.documentId}'),
+                  title: target.title,
+                  documentId: target.documentId,
+                ),
+              ),
+            ]
+          : const [],
+    ),
+  );
+}
+
 class _LegalArticle {
   const _LegalArticle({required this.id, required this.title,
     required this.content, required this.order});
@@ -160,12 +201,11 @@ class _LegalArticle {
 class _LegalData {
   const _LegalData({required this.articles, required this.version,
     required this.revision, required this.prepared,
-    required this.preparedStatus, required this.history, required this.updatedAt});
+    required this.history, required this.updatedAt});
   final List<_LegalArticle> articles;
   final String version;
   final int revision;
   final bool prepared;
-  final String preparedStatus;
   final List<Map<String, dynamic>> history;
   final DateTime? updatedAt;
 }
@@ -186,7 +226,8 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
 
   // Aucun enregistrement de production avant sécurisation des règles et accord.
   static const _editingEnabled = bool.fromEnvironment(
-    'SPHOT_LEGAL_ARTICLE_EDIT', defaultValue: false);
+    'SPHOT_LEGAL_ARTICLE_EDIT', defaultValue: false) &&
+      bool.fromEnvironment('SPHOT_LEGAL_RULES_VERIFIED', defaultValue: false);
   static const _preparedIds = <String>{
     'cgu', 'adminCgv', 'advertiserCgv', 'sauveteurCgu', 'sauveteurCharter',
   };
@@ -280,7 +321,6 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
       }).toList());
     }
     var prepared = false;
-    var preparedStatus = '';
     var version = _string(liveData['version']);
     var revision = liveData['revision'] is int
         ? liveData['revision'] as int : 0;
@@ -288,37 +328,18 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
         _string(liveData['publicationSource']) ==
             'legal_pack_five_documents_atomic_v1';
     if (_preparedIds.contains(widget.documentId) && !publishedFinal) {
+      // Les documents préparés pour publication ne doivent pas être lus
+      // directement dans Firestore : les règles prévues les protègent.
+      // Les cinq fichiers embarqués ont déjà été rapprochés de leur corpus
+      // validé. Cette consultation n'écrit et ne publie rien.
       try {
-        final pending = await firestore.collection('legalDocumentDrafts')
-            .doc(widget.documentId).get();
-        final candidate = pending.data();
-        if (candidate != null &&
-            _string(candidate['status']) != 'published' &&
-            candidate['chapters'] is List) {
-          final finalArticles = _articlesFromList(candidate['chapters']);
-          if (finalArticles.isNotEmpty) {
-            articles = finalArticles;
-            prepared = true;
-            preparedStatus = _string(candidate['status']);
-            version = _string(candidate['sourceVersion']).isEmpty
-                ? version : _string(candidate['sourceVersion']);
-          }
+        final bundled = await _validatedBundle(widget.documentId);
+        if (bundled.isNotEmpty) {
+          articles = bundled;
+          prepared = true;
         }
-      } on FirebaseException {
-        // Si l'accès aux textes préparés est restreint, le texte actif reste
-        // disponible. Le repli local n'écrit jamais dans Firestore.
-      }
-      if (!prepared) {
-        try {
-          final bundled = await _validatedBundle(widget.documentId);
-          if (bundled.isNotEmpty) {
-            articles = bundled;
-            prepared = true;
-            preparedStatus = 'localValidated';
-          }
-        } on FlutterError {
-          // Conserver le document actif s'il manque un fichier embarqué.
-        }
+      } on FlutterError {
+        // Conserver le document actif s'il manque un fichier embarqué.
       }
     }
     final history = <Map<String, dynamic>>[];
@@ -362,7 +383,6 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
       version: version.isEmpty ? '1.0' : version,
       revision: revision,
       prepared: prepared,
-      preparedStatus: preparedStatus,
       history: history,
       updatedAt: (liveData['updatedAt'] is Timestamp)
           ? (liveData['updatedAt'] as Timestamp).toDate() : null,
@@ -379,6 +399,14 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
     });
   }
 
+  void _refresh() {
+    setState(() {
+      _selectedArticleId = null;
+      _message = null;
+      _future = _load();
+    });
+  }
+
   Future<void> _save(_LegalData data) async {
     if (!_editingEnabled || data.prepared || _saving ||
         _selectedArticleId == null ||
@@ -388,8 +416,16 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
     if (user == null) return;
     // Le simple affichage du tableau de bord ne suffit pas à autoriser une
     // écriture. Le serveur doit avoir émis des claims Super Admin non expirés.
-    final token = await user.getIdTokenResult(true);
-    final claims = token.claims ?? const <String, dynamic>{};
+    Map<String, dynamic> claims;
+    try {
+      final token = await user.getIdTokenResult(true);
+      claims = token.claims ?? const <String, dynamic>{};
+    } on FirebaseAuthException {
+      if (mounted) setState(() => _message =
+          'Session Firebase indisponible : reconnectez le Super Admin.');
+      return;
+    }
+    if (!mounted) return;
     final expiresAt = claims['sphotSaSessionExpiresAt'];
     final expiresMillis = expiresAt is num ? expiresAt.toInt() : 0;
     if (claims['role'] != 'SPHOT_SUPER_ADMIN' ||
@@ -555,17 +591,22 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
         border: Border.all(color: _red.withOpacity(0.65)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('VERSION', style: TextStyle(color: _red,
-            fontWeight: FontWeight.w900, fontSize: 14)),
+        Row(children: [
+          const Expanded(child: Text('VERSION', style: TextStyle(color: _red,
+              fontWeight: FontWeight.w900, fontSize: 14))),
+          IconButton(
+            tooltip: 'Actualiser le document et son historique',
+            onPressed: _saving ? null : _refresh,
+            icon: const Icon(Icons.refresh_rounded, color: _blue, size: 20),
+          ),
+        ]),
         const SizedBox(height: 6),
         Text('Document : ${widget.title}',
             style: const TextStyle(color: _blue, fontSize: 12)),
         Text('Version ${data.version} · Révision active ${data.revision}',
             style: const TextStyle(color: _blue, fontSize: 12)),
         Text(data.prepared
-            ? (data.preparedStatus == 'validated'
-                ? 'Texte validé — publication non effectuée'
-                : 'Texte préparé — publication non effectuée')
+            ? 'Texte définitif préparé — publication non effectuée'
             : 'Texte actuellement enregistré dans Firestore',
             style: const TextStyle(color: _red, fontSize: 11)),
         if (data.updatedAt != null)
