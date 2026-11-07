@@ -1,0 +1,116 @@
+// CANDIDAT DE SECURISATION JURIDIQUE SPHOT — NON DEPLOYE.
+// Base: regles de production transmises par l'utilisateur le 07/11/2026.
+// Seules les autorisations juridiques sont resserrees a cette etape.
+// ATTENTION: d'autres collections gardent provisoirement des droits trop
+// larges. Ne pas considerer ce fichier comme un audit de securite global.
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /publicSpots/{spotId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /spots/{spotId} {
+      allow read, write: if true;
+    }
+
+    match /periodesSurveillance/{periodeId} {
+      allow read, write: if true;
+    }
+
+    match /communes/{communeId}/{document=**} {
+      allow read, write: if true;
+    }
+
+    match /sauveteurs/{sauveteurId} {
+      allow read, write: if true;
+    }
+
+    match /territoires/{territoireId}/{document=**} {
+      allow read, write: if true;
+    }
+
+    match /admins/{adminId} {
+      allow read, write: if true;
+    }
+
+    match /adminRequests/{uid} {
+      allow read, write: if true;
+    }
+
+    match /subscriptions/{subscriptionId} {
+      allow read, write: if true;
+    }
+
+    match /adRequests/{adRequestId} {
+      allow read, write: if true;
+    }
+
+    match /advertiserRequests/{uid} {
+      allow read, write: if true;
+    }
+
+    match /advertiserAccounts/{accountId} {
+      allow read, write: if true;
+    }
+
+    match /settings/{documentId} {
+      allow read, write: if true;
+    }
+
+    match /test/{document=**} {
+      allow read, write: if true;
+    }
+
+    // TEXTES JURIDIQUES SPHOT : lecture cliente conservee pour compatibilite.
+    // Ecritures uniquement via fonctions serveur avec controle de droits,
+    // revision et historique. L'Admin SDK contourne les Firestore Rules.
+    match /legalDocuments/{documentId} {
+      allow read: if true;
+      allow create, update, delete: if false;
+
+      match /chapters/{chapterId} {
+        allow read: if true;
+        allow create, update, delete: if false;
+      }
+    }
+
+    // Les versions publiees et les archives sont immuables cote client.
+    // La lecture reste IDENTIQUE aux regles precedentes dans ce correctif.
+    match /legalVersions/{versionId} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+
+    // Brouillons et packs officiels : aucun acces client direct.
+    // Les Cloud Functions avec Admin SDK assurent le circuit autorise.
+    match /legalDocumentDrafts/{documentId} {
+      allow read, write: if false;
+    }
+
+    // Les brouillons editoriaux ne sont accessibles que par le serveur Admin
+    // SDK apres verification de la session Super Admin.
+    match /legalEditorialDrafts/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /legalPacks/{document=**} {
+      allow read, write: if false;
+    }
+
+    // DOCUMENTS ADMINISTRATIFS SPHOT
+    // Lecture uniquement par l'Admin proprietaire.
+    // Aucune ecriture directe depuis Flutter.
+
+    match /documents/{documentId} {
+
+      allow get, list: if request.auth != null
+        && request.auth.uid == resource.data.adminUid;
+
+      allow create, update, delete: if false;
+    }
+  }
+}
