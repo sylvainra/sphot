@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../../../models/advertising_pricing_config.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../widgets/super_admin_pricing_panel.dart';
-import '../widgets/super_admin_initial_legal_pack_panel.dart';
 import '../widgets/super_admin_legal_audience_panel.dart';
 
 import 'package:flutter_map/flutter_map.dart';
@@ -5899,8 +5898,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              const SuperAdminInitialLegalPackPanel(),
               const SizedBox(height: 12),
               const SuperAdminLegalAudiencePanel(),
             ],
