@@ -6,9 +6,15 @@ import '../services/public_legal_acceptance_service.dart';
 /// Accueil juridique du grand public, commun à Flutter mobile et Flutter Web.
 /// Les routes professionnelles conservent leurs propres contrôles juridiques.
 class PublicLegalGate extends StatefulWidget {
-  const PublicLegalGate({super.key, required this.child});
+  const PublicLegalGate({
+    super.key,
+    required this.child,
+    this.loadDocuments,
+  });
 
   final Widget child;
+  /// Permet de vérifier le parcours sans interroger Firestore pendant les tests.
+  final Future<List<PublicLegalDocument>> Function()? loadDocuments;
 
   @override
   State<PublicLegalGate> createState() => _PublicLegalGateState();
@@ -22,7 +28,7 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
 
   final _acceptanceService = const PublicLegalAcceptanceService();
   _PublicLegalStage _stage = _PublicLegalStage.loading;
-  Map<String, _PublicLegalDocument> _documents = {};
+  Map<String, PublicLegalDocument> _documents = {};
   PublicLegalVersions? _versions;
   bool _checked = false;
   bool _saving = false;
@@ -42,14 +48,14 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
     });
 
     try {
-      final loaded = await Future.wait([
-        _PublicLegalDocument.load('cgu', 'Conditions Générales d’Utilisation'),
-        _PublicLegalDocument.load(
+      final loaded = await (widget.loadDocuments?.call() ?? Future.wait([
+        PublicLegalDocument.load('cgu', 'Conditions Générales d’Utilisation'),
+        PublicLegalDocument.load(
           'privacyPolicy',
           'Politique de confidentialité',
         ),
-        _PublicLegalDocument.load('rgpdNotice', 'Notice RGPD'),
-      ]);
+        PublicLegalDocument.load('rgpdNotice', 'Notice RGPD'),
+      ]));
       final documents = {for (final document in loaded) document.id: document};
       final versions = PublicLegalVersions(
         cgu: documents['cgu']!.versionId,
@@ -331,8 +337,8 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
   }
 }
 
-class _PublicLegalDocument {
-  const _PublicLegalDocument({
+class PublicLegalDocument {
+  const PublicLegalDocument({
     required this.id,
     required this.title,
     required this.version,
@@ -344,11 +350,11 @@ class _PublicLegalDocument {
   final String title;
   final String version;
   final int revision;
-  final List<_PublicLegalChapter> chapters;
+  final List<PublicLegalChapter> chapters;
 
   String get versionId => '$version:r$revision';
 
-  static Future<_PublicLegalDocument> load(String id, String title) async {
+  static Future<PublicLegalDocument> load(String id, String title) async {
     final reference = FirebaseFirestore.instance.collection('legalDocuments').doc(id);
     final snapshot = await reference.get();
     final data = snapshot.data();
@@ -363,13 +369,13 @@ class _PublicLegalDocument {
       throw StateError('Version juridique invalide : $id');
     }
 
-    final chapters = <_PublicLegalChapter>[];
+    final chapters = <PublicLegalChapter>[];
     final inlineChapters = data['chapters'];
     if (inlineChapters is List) {
       for (var index = 0; index < inlineChapters.length; index++) {
         final value = inlineChapters[index];
         if (value is Map) {
-          chapters.add(_PublicLegalChapter.fromMap(
+          chapters.add(PublicLegalChapter.fromMap(
             Map<String, dynamic>.from(value),
             index + 1,
           ));
@@ -380,7 +386,7 @@ class _PublicLegalDocument {
     if (chapters.isEmpty) {
       final chapterSnapshot = await reference.collection('chapters').get();
       for (var index = 0; index < chapterSnapshot.docs.length; index++) {
-        chapters.add(_PublicLegalChapter.fromMap(
+        chapters.add(PublicLegalChapter.fromMap(
           chapterSnapshot.docs[index].data(),
           index + 1,
         ));
@@ -393,7 +399,7 @@ class _PublicLegalDocument {
       throw StateError('Document juridique sans texte : $id');
     }
 
-    return _PublicLegalDocument(
+    return PublicLegalDocument(
       id: id,
       title: title,
       version: version,
@@ -403,8 +409,8 @@ class _PublicLegalDocument {
   }
 }
 
-class _PublicLegalChapter {
-  const _PublicLegalChapter({
+class PublicLegalChapter {
+  const PublicLegalChapter({
     required this.title,
     required this.content,
     required this.order,
@@ -414,9 +420,9 @@ class _PublicLegalChapter {
   final String content;
   final int order;
 
-  factory _PublicLegalChapter.fromMap(Map<String, dynamic> data, int fallbackOrder) {
+  factory PublicLegalChapter.fromMap(Map<String, dynamic> data, int fallbackOrder) {
     final rawOrder = data['order'];
-    return _PublicLegalChapter(
+    return PublicLegalChapter(
       title: (data['title'] ?? data['titre'] ?? '').toString().trim(),
       content: (data['content'] ?? data['texte'] ?? '').toString().trim(),
       order: rawOrder is num ? rawOrder.toInt() : fallbackOrder,

@@ -10,6 +10,7 @@ on:
       - lib/map/public_legal_gate.dart
       - lib/services/public_legal_acceptance_service.dart
       - test/public_legal_acceptance_service_test.dart
+      - test/public_legal_gate_widget_test.dart
   workflow_dispatch:
 
 permissions:
@@ -45,11 +46,15 @@ jobs:
             lib/main.dart \
             lib/map/public_legal_gate.dart \
             lib/services/public_legal_acceptance_service.dart \
-            test/public_legal_acceptance_service_test.dart
+            test/public_legal_acceptance_service_test.dart \
+            test/public_legal_gate_widget_test.dart
 
       - name: Test first-opening and version changes
         if: success() || failure()
-        run: flutter test --no-pub test/public_legal_acceptance_service_test.dart
+        run: |
+          flutter test --no-pub \
+            test/public_legal_acceptance_service_test.dart \
+            test/public_legal_gate_widget_test.dart
 
       - name: Compile Flutter Web (without deployment)
         if: success() || failure()
