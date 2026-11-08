@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'config/password_pilot.dart';
 import 'map/map_page.dart';
+import 'map/public_legal_gate.dart';
 import 'map/profil_login_page.dart';
 import 'web/shared/sphot_access_page.dart';
 import 'web/advertiser/web_advertiser_app.dart';
@@ -110,7 +111,7 @@ class SphotApp extends StatelessWidget {
     if (uri.path == '/map') {
       return MaterialPageRoute(
         settings: settings,
-        builder: (_) => const MapPage(),
+        builder: (_) => const PublicLegalGate(child: MapPage()),
       );
     }
 
@@ -230,7 +231,7 @@ class SphotApp extends StatelessWidget {
 
     return MaterialPageRoute(
       settings: settings,
-      builder: (_) => const MapPage(),
+      builder: (_) => const PublicLegalGate(child: MapPage()),
     );
   }
 
