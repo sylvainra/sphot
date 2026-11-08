@@ -128,4 +128,30 @@ void main() {
         find.widgetWithText(FilledButton, 'ACCEPTER ET CONTINUER');
     expect(tester.widget<FilledButton>(continueButton).onPressed, isNull);
   });
+
+  testWidgets('écran mobile étroit : fenêtre défilable et bouton accessible',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_testApp(_documents()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('BIENVENUE SUR SPHOT'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.ensureVisible(find.byType(CheckboxListTile));
+    await tester.tap(find.byType(CheckboxListTile));
+    await tester.pump();
+
+    final continueButton =
+        find.widgetWithText(FilledButton, 'ACCEPTER ET CONTINUER');
+    await tester.ensureVisible(continueButton);
+    expect(tester.widget<FilledButton>(continueButton).onPressed, isNotNull);
+    await tester.tap(continueButton);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('CARTE SPHOT DE TEST'), findsOneWidget);
+  });
 }

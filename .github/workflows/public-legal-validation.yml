@@ -56,6 +56,10 @@ jobs:
             test/public_legal_acceptance_service_test.dart \
             test/public_legal_gate_widget_test.dart
 
+      - name: Run all Flutter regression tests
+        if: success() || failure()
+        run: flutter test --no-pub
+
       - name: Compile Flutter Web (without deployment)
         if: success() || failure()
         run: flutter build web --release --no-pub -t lib/main.dart
