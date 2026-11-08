@@ -47,6 +47,36 @@ Widget _testApp(List<PublicLegalDocument> documents) {
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  test('les notices communes historiques sont reconnues comme actives', () {
+    const legacy = <String, dynamic>{'version': '1.0', 'revision': 1};
+    expect(PublicLegalDocument.isEligibleLiveDocument('privacyPolicy', legacy),
+        isTrue);
+    expect(PublicLegalDocument.isEligibleLiveDocument('rgpdNotice', legacy),
+        isTrue);
+    expect(PublicLegalDocument.isEligibleLiveDocument('cgu', legacy), isFalse);
+    expect(
+      PublicLegalDocument.isEligibleLiveDocument(
+        'cgu',
+        {'published': true, 'testOnly': false},
+      ),
+      isTrue,
+    );
+    expect(
+      PublicLegalDocument.isEligibleLiveDocument(
+        'privacyPolicy',
+        {'published': false},
+      ),
+      isFalse,
+    );
+    expect(
+      PublicLegalDocument.isEligibleLiveDocument(
+        'rgpdNotice',
+        {'testOnly': true},
+      ),
+      isFalse,
+    );
+  });
+
   testWidgets('première visite : textes accessibles et case obligatoire',
       (tester) async {
     await tester.pumpWidget(_testApp(_documents()));

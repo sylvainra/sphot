@@ -81,8 +81,8 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
       if (!mounted) return;
       setState(() {
         _stage = _PublicLegalStage.error;
-        _error = 'Les documents juridiques publiés sont momentanément '
-            'indisponibles. Vérifiez votre connexion et réessayez.';
+        _error = 'Impossible de charger les documents juridiques pour le moment. '
+            'Veuillez réessayer.';
       });
       debugPrint('Chargement des documents grand public impossible : $error');
     }
@@ -360,11 +360,23 @@ class PublicLegalDocument {
 
   String get versionId => '$version:r$revision';
 
+  /// Les notices communes sont des documents actifs historiques : le champ
+  /// `published` peut y être absent. À l'inverse, les CGU Grand Public du
+  /// paquet publié C4 doivent explicitement porter `published: true`.
+  static bool isEligibleLiveDocument(String id, Map<String, dynamic>? data) {
+    if (data == null || data['testOnly'] == true) return false;
+    if (id == 'cgu') return data['published'] == true;
+    if (id == 'privacyPolicy' || id == 'rgpdNotice') {
+      return !data.containsKey('published') || data['published'] == true;
+    }
+    return false;
+  }
+
   static Future<PublicLegalDocument> load(String id, String title) async {
     final reference = FirebaseFirestore.instance.collection('legalDocuments').doc(id);
     final snapshot = await reference.get();
     final data = snapshot.data();
-    if (data == null || data['published'] != true || data['testOnly'] == true) {
+    if (data == null || !isEligibleLiveDocument(id, data)) {
       throw StateError('Document juridique non publié : $id');
     }
 
