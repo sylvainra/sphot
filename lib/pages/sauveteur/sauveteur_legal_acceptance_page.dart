@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../widgets/sphot_legal_document_card.dart';
 
 import 'sauveteur_access_info_page.dart';
 
@@ -43,6 +44,7 @@ class _SauveteurLegalAcceptancePageState
   Map<String, dynamic>? _cguDocument;
   Map<String, dynamic>? _privacyDocument;
   Map<String, dynamic>? _rgpdDocument;
+  Map<String, Object?> _legalDocumentRevisions = {};
 
   String _legalVersion = '1.0';
   bool _loading = true;
@@ -52,6 +54,7 @@ class _SauveteurLegalAcceptancePageState
   bool _cguAccepted = false;
   bool _privacyAcknowledged = false;
   bool _rgpdAcknowledged = false;
+  bool _charterAvailable = false;
   bool _publicOperationalDiffusionAcknowledged = false;
   bool _institutionalReadAcknowledged = false;
   bool _personalAccountUseAccepted = false;
@@ -59,6 +62,7 @@ class _SauveteurLegalAcceptancePageState
   bool _professionalDecisionResponsibilityAccepted = false;
 
   bool get _canSubmit =>
+      _legalPackReady &&
       _cguAccepted &&
       _privacyAcknowledged &&
       _rgpdAcknowledged &&
@@ -69,6 +73,18 @@ class _SauveteurLegalAcceptancePageState
       _professionalDecisionResponsibilityAccepted &&
       !_loading &&
       !_submitting;
+
+  bool get _legalPackReady {
+    bool hasArticles(Map<String, dynamic>? document) {
+      final chapters = document?['chapters'];
+      return chapters is List && chapters.isNotEmpty;
+    }
+
+    return _charterAvailable &&
+        hasArticles(_cguDocument) &&
+        hasArticles(_privacyDocument) &&
+        hasArticles(_rgpdDocument);
+  }
 
   @override
   void initState() {
@@ -104,9 +120,25 @@ class _SauveteurLegalAcceptancePageState
 
       final data = metadata.data() ?? <String, dynamic>{};
 
-      final cgu = await _loadDocument('cgu');
+      final sauveteurCgu = await _loadDocument('sauveteurCgu');
+      final specificChapters = sauveteurCgu['chapters'];
+      final usesProfessionalCgu =
+          specificChapters is List && specificChapters.isNotEmpty;
+      final cgu = usesProfessionalCgu
+          ? sauveteurCgu
+          : await _loadDocument('cgu');
       final privacy = await _loadDocument('privacyPolicy');
       final rgpd = await _loadDocument('rgpdNotice');
+      final charter = await _loadDocument('sauveteurCharter');
+
+      bool hasArticles(Map<String, dynamic> document) {
+        final chapters = document['chapters'];
+        return chapters is List && chapters.isNotEmpty;
+      }
+      if (!hasArticles(cgu) || !hasArticles(privacy) ||
+          !hasArticles(rgpd) || !hasArticles(charter)) {
+        throw StateError('Le dossier juridique SAUVETEUR est incomplet.');
+      }
 
       if (!mounted) return;
 
@@ -120,6 +152,15 @@ class _SauveteurLegalAcceptancePageState
         _cguDocument = cgu;
         _privacyDocument = privacy;
         _rgpdDocument = rgpd;
+        _legalDocumentRevisions = {
+          'cguDocumentId': usesProfessionalCgu ? 'sauveteurCgu' : 'cgu',
+          if (usesProfessionalCgu) 'sauveteurCgu': cgu['revision'] ?? 0,
+          if (!usesProfessionalCgu) 'cgu': cgu['revision'] ?? 0,
+          'privacyPolicy': privacy['revision'] ?? 0,
+          'rgpdNotice': rgpd['revision'] ?? 0,
+          'sauveteurCharter': charter['revision'] ?? 0,
+        };
+        _charterAvailable = true;
         _loading = false;
       });
     } catch (_) {
@@ -150,6 +191,7 @@ class _SauveteurLegalAcceptancePageState
         body: jsonEncode({
           'sauveteurSessionToken': widget.sauveteurSessionToken,
           'legalVersion': _legalVersion,
+          'legalDocumentRevisions': _legalDocumentRevisions,
           'cguAccepted': true,
           'privacyAcknowledged': true,
           'rgpdAcknowledged': true,
@@ -670,6 +712,12 @@ class _SauveteurLegalAcceptancePageState
                                     });
                                   },
                                 ),
+                                const SphotLegalDocumentCard(
+                                  documentId: 'sauveteurCharter',
+                                  title: 'Charte professionnelle SPHOT SAUVETEUR',
+                                  initiallyExpanded: true,
+                                ),
+                                const SizedBox(height: 10),
                                 _ruleCard(),
                                 if (_message != null)
                                   Padding(
