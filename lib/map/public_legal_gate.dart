@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../services/public_legal_acceptance_service.dart';
+import '../widgets/fire_icon_assets.dart';
 
 /// Accueil juridique du grand public, commun à Flutter mobile et Flutter Web.
 /// Les routes professionnelles conservent leurs propres contrôles juridiques.
@@ -198,7 +200,11 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.verified_user_outlined, color: _blue, size: 38),
+            SvgPicture.asset(
+              FireIconAssets.red,
+              width: 42,
+              height: 58,
+            ),
             const SizedBox(height: 8),
             const Text(
               'BIENVENUE SUR SPHOT',

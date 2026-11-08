@@ -2,6 +2,7 @@ import 'package:bathing_spots_app/map/public_legal_gate.dart';
 import 'package:bathing_spots_app/services/public_legal_acceptance_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 List<PublicLegalDocument> _documents({
@@ -52,6 +53,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('BIENVENUE SUR SPHOT'), findsOneWidget);
+    expect(find.byType(SvgPicture), findsOneWidget);
     expect(find.byType(CheckboxListTile), findsOneWidget);
     final continueButton =
         find.widgetWithText(FilledButton, 'ACCEPTER ET CONTINUER');
