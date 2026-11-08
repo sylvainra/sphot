@@ -53,6 +53,7 @@ flutter:
 
   assets:
     - assets/data/spots.json
+    - assets/legal/test_corpus/
     - data/icons/
     - data/images/
     - data/logos_departements/france/pays_de_la_loire/
