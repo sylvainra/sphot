@@ -134,7 +134,7 @@ class _PublishedAdminCgvState extends State<_PublishedAdminCgv> {
                   Expanded(
                     child: ListView.separated(
                       itemCount: document.chapters.length,
-                      separatorBuilder: (_, __) => const Divider(height: 26),
+                      separatorBuilder: (_, _) => const Divider(height: 26),
                       itemBuilder: (context, index) {
                         final chapter = document.chapters[index];
                         return Column(
