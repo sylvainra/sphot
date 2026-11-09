@@ -77,6 +77,53 @@ void main() {
     );
   });
 
+  test('les versions historiques des notices sont compatibles sans révision', () {
+    final privacy = PublicLegalDocument.resolveVersion(
+      'privacyPolicy',
+      {'version': '2.4'},
+    );
+    expect(privacy.version, '2.4');
+    expect(privacy.revision, -1);
+
+    final rgpd = PublicLegalDocument.resolveVersion(
+      'rgpdNotice',
+      {},
+      globalVersion: '2.5',
+    );
+    expect(rgpd.version, '2.5');
+    expect(rgpd.revision, -1);
+
+    expect(
+      () => PublicLegalDocument.resolveVersion(
+        'cgu',
+        {'version': '2.5'},
+        globalVersion: '2.5',
+      ),
+      throwsStateError,
+    );
+    expect(
+      () => PublicLegalDocument.resolveVersion('privacyPolicy', {}),
+      throwsStateError,
+    );
+    expect(
+      PublicLegalDocument.resolveVersion('cgu', {'version': '2.5', 'revision': 3}),
+      (version: '2.5', revision: 3),
+    );
+  });
+
+  testWidgets('une notice historique affiche sa version sans fausse révision',
+      (tester) async {
+    await tester.pumpWidget(_testApp(_documents(privacyRevision: -1)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Politique de confidentialité'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Version 1.0 — édition historique'), findsOneWidget);
+    await tester.tap(find.text('FERMER'));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('première visite : textes accessibles et case obligatoire',
       (tester) async {
     await tester.pumpWidget(_testApp(_documents()));

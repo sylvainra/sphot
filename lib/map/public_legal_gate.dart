@@ -133,7 +133,9 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
           child: ListView(
             children: [
               Text(
-                'Version ${document.version} — révision ${document.revision}',
+                document.revision >= 0
+                    ? 'Version ${document.version} — révision ${document.revision}'
+                    : 'Version ${document.version} — édition historique',
                 style: const TextStyle(
                   color: _blue,
                   fontWeight: FontWeight.bold,
@@ -358,7 +360,34 @@ class PublicLegalDocument {
   final int revision;
   final List<PublicLegalChapter> chapters;
 
-  String get versionId => '$version:r$revision';
+  String get versionId => revision >= 0
+      ? '$version:r$revision'
+      : '$version:historique';
+
+  /// Les textes communs existaient avant la publication C4 : leur version
+  /// individuelle ou leur révision peuvent manquer. Le numéro global est
+  /// celui déjà utilisé par la page Profil pour ces textes historiques.
+  /// Les CGU Grand Public restent soumises au versionnement strict.
+  static ({String version, int revision}) resolveVersion(
+    String id,
+    Map<String, dynamic> data, {
+    String? globalVersion,
+  }) {
+    final isCommon = id == 'privacyPolicy' || id == 'rgpdNotice';
+    final individualVersion = (data['version'] ?? '').toString().trim();
+    final fallback = (globalVersion ?? '').trim();
+    final version = individualVersion.isNotEmpty
+        ? individualVersion
+        : (isCommon ? fallback : '');
+    final rawRevision = data['revision'];
+    final revision = rawRevision is int && rawRevision >= 0
+        ? rawRevision
+        : -1;
+    if (version.isEmpty || (!isCommon && revision < 0)) {
+      throw StateError('Version juridique invalide : $id');
+    }
+    return (version: version, revision: revision);
+  }
 
   /// Les notices communes sont des documents actifs historiques : le champ
   /// `published` peut y être absent. À l'inverse, les CGU Grand Public du
@@ -380,12 +409,21 @@ class PublicLegalDocument {
       throw StateError('Document juridique non publié : $id');
     }
 
-    final version = (data['version'] ?? '').toString().trim();
-    final rawRevision = data['revision'];
-    final revision = rawRevision is num ? rawRevision.toInt() : -1;
-    if (version.isEmpty || revision < 0) {
-      throw StateError('Version juridique invalide : $id');
+    String? globalVersion;
+    if (id != 'cgu' && (data['version'] ?? '').toString().trim().isEmpty) {
+      final metadataSnapshot = await FirebaseFirestore.instance
+          .collection('legalDocuments')
+          .doc('metadata')
+          .get();
+      final metadata = metadataSnapshot.data() ?? {};
+      globalVersion = (metadata['legalVersion'] ??
+              metadata['version'] ??
+              metadata['activeVersion'] ??
+              '1.0')
+          .toString()
+          .trim();
     }
+    final resolved = resolveVersion(id, data, globalVersion: globalVersion);
 
     final chapters = <PublicLegalChapter>[];
     final inlineChapters = data['chapters'];
@@ -420,8 +458,8 @@ class PublicLegalDocument {
     return PublicLegalDocument(
       id: id,
       title: title,
-      version: version,
-      revision: revision,
+      version: resolved.version,
+      revision: resolved.revision,
       chapters: chapters,
     );
   }
