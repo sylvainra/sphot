@@ -34,6 +34,7 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
   PublicLegalVersions? _versions;
   bool _checked = false;
   bool _saving = false;
+  bool _showLoadingCard = false;
   String? _error;
 
   @override
@@ -45,11 +46,17 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
   Future<void> _loadCurrentDocuments() async {
     setState(() {
       _stage = _PublicLegalStage.loading;
+      _showLoadingCard = false;
       _error = null;
       _checked = false;
     });
 
     try {
+      final alreadyAccepted =
+          await _acceptanceService.hasRecordedCguAcceptance();
+      if (!mounted) return;
+      setState(() => _showLoadingCard = !alreadyAccepted);
+
       final loaded = await (widget.loadDocuments?.call() ?? Future.wait([
         PublicLegalDocument.load('cgu', 'Conditions Générales d’Utilisation'),
         PublicLegalDocument.load(
@@ -325,20 +332,26 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
       children: [
         widget.child,
         if (_stage != _PublicLegalStage.ready) ...[
-          const ModalBarrier(color: Color(0x99000000), dismissible: false),
-          Positioned.fill(
-            child: SafeArea(
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 480),
-                    child: _buildCard(),
+          ModalBarrier(
+            color: _stage == _PublicLegalStage.loading && !_showLoadingCard
+                ? Colors.transparent
+                : const Color(0x99000000),
+            dismissible: false,
+          ),
+          if (_stage != _PublicLegalStage.loading || _showLoadingCard)
+            Positioned.fill(
+              child: SafeArea(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 480),
+                      child: _buildCard(),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ],
     );

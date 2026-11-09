@@ -31,6 +31,14 @@ class PublicLegalAcceptanceService {
   static const _informationSeenAtKey =
       'sphot_public_legal_information_seen_at_v1';
 
+  /// Évite d'afficher la fenêtre de vérification à chaque réouverture quand
+  /// une CGU a déjà été acceptée. La comparaison des versions publiées reste
+  /// obligatoire avant d'autoriser l'interaction avec la carte.
+  Future<bool> hasRecordedCguAcceptance() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getString(_cguKey)?.isNotEmpty ?? false;
+  }
+
   Future<PublicLegalAccessDecision> accessDecision(
     PublicLegalVersions current,
   ) async {

@@ -13,12 +13,15 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   test('une première ouverture demande une acceptation explicite', () async {
+    expect(await service.hasRecordedCguAcceptance(), isFalse);
     expect(
       await service.accessDecision(original),
       PublicLegalAccessDecision.acceptCgu,
     );
 
     await service.accept(original);
+
+    expect(await service.hasRecordedCguAcceptance(), isTrue);
 
     expect(
       await service.accessDecision(original),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bathing_spots_app/map/public_legal_gate.dart';
 import 'package:bathing_spots_app/services/public_legal_acceptance_service.dart';
 import 'package:flutter/material.dart';
@@ -33,10 +35,13 @@ List<PublicLegalDocument> _documents({
   ];
 }
 
-Widget _testApp(List<PublicLegalDocument> documents) {
+Widget _testApp(
+  List<PublicLegalDocument> documents, {
+  Future<List<PublicLegalDocument>> Function()? loadDocuments,
+}) {
   return MaterialApp(
     home: PublicLegalGate(
-      loadDocuments: () async => documents,
+      loadDocuments: loadDocuments ?? () async => documents,
       child: const Scaffold(
         body: Center(child: Text('CARTE SPHOT DE TEST')),
       ),
@@ -169,6 +174,59 @@ void main() {
 
     expect(find.text('BIENVENUE SUR SPHOT'), findsNothing);
     expect(find.text('CARTE SPHOT DE TEST'), findsOneWidget);
+  });
+
+  testWidgets('rafraîchissement accepté : aucun volet de chargement fugace',
+      (tester) async {
+    await const PublicLegalAcceptanceService().accept(
+      const PublicLegalVersions(
+        cgu: '1.0:r1',
+        privacyPolicy: '1.0:r1',
+        rgpdNotice: '1.0:r1',
+      ),
+    );
+
+    final pending = Completer<List<PublicLegalDocument>>();
+    await tester.pumpWidget(
+      _testApp(_documents(), loadDocuments: () => pending.future),
+    );
+    await tester.pump();
+
+    expect(find.text('BIENVENUE SUR SPHOT'), findsNothing);
+    expect(
+      find.text('Vérification des documents juridiques publiés…'),
+      findsNothing,
+    );
+    expect(find.byType(ModalBarrier), findsOneWidget);
+    expect(find.text('CARTE SPHOT DE TEST'), findsOneWidget);
+
+    pending.complete(_documents());
+    await tester.pumpAndSettle();
+    expect(find.byType(ModalBarrier), findsNothing);
+    expect(find.text('BIENVENUE SUR SPHOT'), findsNothing);
+  });
+
+  testWidgets('les CGU révisées réapparaissent après vérification silencieuse',
+      (tester) async {
+    await const PublicLegalAcceptanceService().accept(
+      const PublicLegalVersions(
+        cgu: '1.0:r1',
+        privacyPolicy: '1.0:r1',
+        rgpdNotice: '1.0:r1',
+      ),
+    );
+
+    final pending = Completer<List<PublicLegalDocument>>();
+    await tester.pumpWidget(
+      _testApp(_documents(), loadDocuments: () => pending.future),
+    );
+    await tester.pump();
+    expect(find.text('BIENVENUE SUR SPHOT'), findsNothing);
+
+    pending.complete(_documents(cguRevision: 2));
+    await tester.pumpAndSettle();
+    expect(find.text('BIENVENUE SUR SPHOT'), findsOneWidget);
+    expect(find.byType(CheckboxListTile), findsOneWidget);
   });
 
   testWidgets('nouvelle notice RGPD : information sans nouvelle case',
