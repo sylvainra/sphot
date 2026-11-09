@@ -1,0 +1,55 @@
+name: SPHOT - CGV Admin étape 05
+
+on:
+  push:
+    branches:
+      - feature/admin-cgv-subscription-step5-20261109
+    paths:
+      - .github/workflows/admin-cgv-step5-validation.yml
+      - lib/web/admin/pages/admin_subscription_panel.dart
+      - lib/web/admin/services/admin_cgv_live_service.dart
+      - lib/web/admin/widgets/admin_cgv_acceptance_section.dart
+      - test/admin_cgv_live_service_test.dart
+      - test/admin_cgv_acceptance_section_test.dart
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-validation:
+    name: Analyze, test, and compile Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout isolated feature branch
+        uses: actions/checkout@v4
+
+      - name: Install official Flutter stable SDK
+        run: |
+          git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version
+
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze changed Dart files
+        run: |
+          flutter analyze --no-pub \
+            lib/web/admin/pages/admin_subscription_panel.dart \
+            lib/web/admin/services/admin_cgv_live_service.dart \
+            lib/web/admin/widgets/admin_cgv_acceptance_section.dart \
+            test/admin_cgv_live_service_test.dart \
+            test/admin_cgv_acceptance_section_test.dart
+
+      - name: Test official document and version changes
+        if: success() || failure()
+        run: |
+          flutter test --no-pub \
+            test/admin_cgv_live_service_test.dart \
+            test/admin_cgv_acceptance_section_test.dart
+
+      - name: Compile Flutter Web without deployment
+        if: success() || failure()
+        run: flutter build web --release --no-pub -t lib/main.dart
