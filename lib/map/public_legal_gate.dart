@@ -333,6 +333,7 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
         widget.child,
         if (_stage != _PublicLegalStage.ready) ...[
           ModalBarrier(
+            key: const Key('public-legal-access-barrier'),
             color: _stage == _PublicLegalStage.loading && !_showLoadingCard
                 ? Colors.transparent
                 : const Color(0x99000000),

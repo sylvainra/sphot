@@ -197,12 +197,12 @@ void main() {
       find.text('Vérification des documents juridiques publiés…'),
       findsNothing,
     );
-    expect(find.byType(ModalBarrier), findsOneWidget);
+    expect(find.byKey(const Key('public-legal-access-barrier')), findsOneWidget);
     expect(find.text('CARTE SPHOT DE TEST'), findsOneWidget);
 
     pending.complete(_documents());
     await tester.pumpAndSettle();
-    expect(find.byType(ModalBarrier), findsNothing);
+    expect(find.byKey(const Key('public-legal-access-barrier')), findsNothing);
     expect(find.text('BIENVENUE SUR SPHOT'), findsNothing);
   });
 
