@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../widgets/adaptive_asset_image.dart';
 import '../../../services/published_commercial_quote_service.dart';
+import '../widgets/admin_cgv_acceptance_section.dart';
 import 'admin_quote_consultation.dart';
 import 'admin_quote_pdf_download.dart';
 
@@ -1570,11 +1571,7 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
           style: TextStyle(color: _blue, fontSize: 12,
             fontWeight: FontWeight.w900)),
         const SizedBox(height: 7),
-        const Text(
-          'Le document de CGV publié, sa version et l’acceptation '
-          'traçable restent à raccorder. Aucun accord n’est présumé.',
-          style: TextStyle(color: _grey, fontSize: 11, height: 1.35),
-        ),
+        const AdminCgvAcceptanceSection(),
         const SizedBox(height: 14),
         SizedBox(
           width: double.infinity, height: 44,
@@ -1593,8 +1590,8 @@ class _AdminSubscriptionPanelState extends State<AdminSubscriptionPanel> {
         ),
         const SizedBox(height: 7),
         const Text(
-          'Action désactivée pendant les tests : contrôle serveur, fiscalité '
-          'et CGV non finalisés. Aucune commande ni aucun paiement réel.',
+          'Action désactivée pendant les tests : contrôle serveur et fiscalité '
+          'non finalisés. Aucune commande ni aucun paiement réel.',
           style: TextStyle(color: _grey, fontSize: 11),
         ),
       ],
