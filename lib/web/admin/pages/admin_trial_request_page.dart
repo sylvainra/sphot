@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -113,6 +115,9 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   bool _privacyReadConfirmed = false;
   bool _rgpdAccepted = false;
   bool _legalLoading = true;
+  final List<StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>>
+      _legalDocumentSubscriptions = [];
+  int _legalLoadGeneration = 0;
 
   String? _trialRequestMessage;
   String? _createdRequestId;
@@ -188,10 +193,24 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     }
 
     _loadLegalDocuments();
+
+    // Les trois textes suivent les publications réalisées par le Super Admin.
+    for (final documentId in const ['cgu', 'privacyPolicy', 'rgpdNotice']) {
+      _legalDocumentSubscriptions.add(
+        FirebaseFirestore.instance
+            .collection('legalDocuments')
+            .doc(documentId)
+            .snapshots()
+            .listen((_) => _loadLegalDocuments(), onError: (Object _) {}),
+      );
+    }
   }
 
   @override
   void dispose() {
+    for (final subscription in _legalDocumentSubscriptions) {
+      subscription.cancel();
+    }
     _speech.stop();
     for (final controller in _controllers.values) {
       controller.dispose();
@@ -1107,6 +1126,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   }
 
   Future<void> _loadLegalDocuments() async {
+    final generation = ++_legalLoadGeneration;
     try {
       final firestore = FirebaseFirestore.instance;
 
@@ -1140,9 +1160,20 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
       final privacy = await loadLegalDoc('privacyPolicy');
       final rgpd = await loadLegalDoc('rgpdNotice');
 
-      if (!mounted) return;
+      if (!mounted || generation != _legalLoadGeneration) return;
 
       setState(() {
+        // Une nouvelle version publiée doit être de nouveau acceptée.
+        if (!_isCorrectionMode) {
+          bool changed(Map<String, dynamic>? previous, Map<String, dynamic> next) =>
+              previous != null &&
+              (previous['version'] != next['version'] ||
+                  previous['revision'] != next['revision']);
+          if (changed(_cguDoc, cgu)) _legalReadConfirmed = false;
+          if (changed(_privacyDoc, privacy)) _privacyReadConfirmed = false;
+          if (changed(_rgpdDoc, rgpd)) _rgpdAccepted = false;
+        }
+
         _cguDoc = cgu;
         _privacyDoc = privacy;
         _rgpdDoc = rgpd;
@@ -1154,7 +1185,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         _legalLoading = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _legalLoadGeneration) return;
 
       setState(() => _legalLoading = false);
 
@@ -3253,6 +3284,8 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
     final chapters = List<Map<String, dynamic>>.from(
       document?['chapters'] ?? [],
     );
+    final documentVersion = (document?['version'] ?? _sphotVersion).toString();
+    final documentRevision = document?['revision'];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -3344,7 +3377,9 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _sphotVersion,
+                    documentRevision is int
+                        ? '$documentVersion · Révision $documentRevision'
+                        : documentVersion,
                     style: const TextStyle(
                       color: adminColor,
                       fontSize: 13,
