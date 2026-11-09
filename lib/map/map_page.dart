@@ -2932,54 +2932,51 @@ Widget _buildBottomBar() {
       child: Row(
         children: List.generate(icons.length, (index) {
           return Expanded(
-            child: Tooltip(
-              message: labels[index],
-              child: Semantics(
-                label: labels[index],
-                button: true,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () {
-                    setState(() {
-                      _selectedBottomIndex = index;
-                      if (index != 2 && _isSearchPanelOpen) {
-                        _closeSearchPanel();
-                      }
-                    });
-
-                    if (index == 0) {
-                      _toggleFilterBar();
-                    } else if (index == 1) {
-                      _toggleMapStyleBar();
-                    } else if (index == 2) {
-                      _toggleSearchPanel();
-                    } else if (index == 3) {
-                      unawaited(_toggleFavoritesFilter());
-                    } else if (index == 4) {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const AppInfoPage(),
-                        ),
-                      );
-                    } else if (index == 5) {
-                      unawaited(_openLoginPage());
+            child: Semantics(
+              label: labels[index],
+              button: true,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  setState(() {
+                    _selectedBottomIndex = index;
+                    if (index != 2 && _isSearchPanelOpen) {
+                      _closeSearchPanel();
                     }
-                  },
-                  child: SizedBox(
-                    height: 48,
-                    width: double.infinity,
-                    child: Center(
-                      child: Icon(
-                        icons[index],
-                        size: 26,
-                        color: colors[index],
-                        shadows: const [
-                          Shadow(
-                            color: Colors.white,
-                            blurRadius: 3,
-                          ),
-                        ],
+                  });
+
+                  if (index == 0) {
+                    _toggleFilterBar();
+                  } else if (index == 1) {
+                    _toggleMapStyleBar();
+                  } else if (index == 2) {
+                    _toggleSearchPanel();
+                  } else if (index == 3) {
+                    unawaited(_toggleFavoritesFilter());
+                  } else if (index == 4) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const AppInfoPage(),
                       ),
+                    );
+                  } else if (index == 5) {
+                    unawaited(_openLoginPage());
+                  }
+                },
+                child: SizedBox(
+                  height: 48,
+                  width: double.infinity,
+                  child: Center(
+                    child: Icon(
+                      icons[index],
+                      size: 26,
+                      color: colors[index],
+                      shadows: const [
+                        Shadow(
+                          color: Colors.white,
+                          blurRadius: 3,
+                        ),
+                      ],
                     ),
                   ),
                 ),

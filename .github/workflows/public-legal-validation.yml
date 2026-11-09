@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - feature/public-legal-first-open-20261108
+      - feature/bottom-menu-tooltips-20261109
     paths:
       - .github/workflows/public-legal-validation.yml
       - lib/main.dart
+      - lib/map/map_page.dart
       - lib/map/public_legal_gate.dart
       - lib/services/public_legal_acceptance_service.dart
       - test/public_legal_acceptance_service_test.dart
@@ -44,6 +46,7 @@ jobs:
         run: |
           flutter analyze --no-pub \
             lib/main.dart \
+            lib/map/map_page.dart \
             lib/map/public_legal_gate.dart \
             lib/services/public_legal_acceptance_service.dart \
             test/public_legal_acceptance_service_test.dart \
