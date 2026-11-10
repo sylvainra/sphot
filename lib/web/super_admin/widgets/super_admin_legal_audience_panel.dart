@@ -19,27 +19,15 @@ class SuperAdminLegalAudiencePanel extends StatelessWidget {
   static const _audiences = <_LegalAudience>[
     _LegalAudience('GRAND PUBLIC', [
       _LegalSection('CGU', [_LegalTarget('CGU — GRAND PUBLIC', 'cgu')]),
-      _LegalSection('RGPD', [
-        _LegalTarget('NOTICE RGPD', 'rgpdNotice'),
-        _LegalTarget('POLITIQUE DE CONFIDENTIALITÉ', 'privacyPolicy'),
-      ]),
     ]),
     _LegalAudience('SPHOT ADMIN', [
       _LegalSection('CGU', [_LegalTarget('CGU COMMUNES', 'cgu')]),
       _LegalSection('CGV', [_LegalTarget('CGV — SPHOT ADMIN', 'adminCgv')]),
-      _LegalSection('RGPD', [
-        _LegalTarget('NOTICE RGPD', 'rgpdNotice'),
-        _LegalTarget('POLITIQUE DE CONFIDENTIALITÉ', 'privacyPolicy'),
-      ]),
     ]),
     _LegalAudience('SPHOT SAUVETEUR', [
       _LegalSection('CGU', [_LegalTarget('CGU — SPHOT SAUVETEUR', 'sauveteurCgu')]),
       _LegalSection('CHARTE', [
         _LegalTarget('CHARTE — SPHOT SAUVETEUR', 'sauveteurCharter'),
-      ]),
-      _LegalSection('RGPD', [
-        _LegalTarget('NOTICE RGPD', 'rgpdNotice'),
-        _LegalTarget('POLITIQUE DE CONFIDENTIALITÉ', 'privacyPolicy'),
       ]),
     ]),
     _LegalAudience('SPHOT PUBLICITAIRE', [
@@ -47,11 +35,12 @@ class SuperAdminLegalAudiencePanel extends StatelessWidget {
       _LegalSection('CGV', [
         _LegalTarget('CGV — SPHOT PUBLICITAIRE', 'advertiserCgv'),
       ]),
-      _LegalSection('RGPD', [
-        _LegalTarget('NOTICE RGPD', 'rgpdNotice'),
-        _LegalTarget('POLITIQUE DE CONFIDENTIALITÉ', 'privacyPolicy'),
-      ]),
     ]),
+    _LegalAudience('NOTICE RGPD', [],
+        commonDocument: _LegalTarget('NOTICE RGPD', 'rgpdNotice')),
+    _LegalAudience('POLITIQUE DE CONFIDENTIALITÉ', [],
+        commonDocument: _LegalTarget(
+            'POLITIQUE DE CONFIDENTIALITÉ', 'privacyPolicy')),
   ];
 
   @override
@@ -60,7 +49,7 @@ class SuperAdminLegalAudiencePanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          'Choisissez un public, puis un document. Chaque texte dispose de '
+          'Choisissez une rubrique juridique. Chaque document dispose de '
           'ses articles, de sa version et de son historique.',
           style: TextStyle(color: _blue, fontSize: 12, height: 1.4),
         ),
@@ -76,9 +65,10 @@ class SuperAdminLegalAudiencePanel extends StatelessWidget {
 }
 
 class _LegalAudience {
-  const _LegalAudience(this.name, this.sections);
+  const _LegalAudience(this.name, this.sections, {this.commonDocument});
   final String name;
   final List<_LegalSection> sections;
+  final _LegalTarget? commonDocument;
 }
 
 class _LegalSection {
@@ -135,6 +125,16 @@ class _LegalAudienceCardState extends State<_LegalAudienceCard> {
                   audienceName: widget.audience.name,
                 ),
               ),
+              if (widget.audience.commonDocument != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: _LegalDocumentCard(
+                    key: ValueKey(
+                        'common-${widget.audience.commonDocument!.documentId}'),
+                    title: widget.audience.commonDocument!.title,
+                    documentId: widget.audience.commonDocument!.documentId,
+                  ),
+                ),
             ]
           : const [],
     ),
