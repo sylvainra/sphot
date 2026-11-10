@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../map/map_page.dart';
 import '../../../services/admin_logo_storage_service.dart';
+import '../../../services/legal_published_version.dart';
 
 class AdminTrialRequestPage extends StatefulWidget {
   final String? proConnectUid;
@@ -1391,6 +1392,12 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             'rgpdAccepted': _rgpdAccepted,
             'acceptedDocuments': {
               'version': _sphotVersion,
+              'documentVersions': LegalPublishedVersion.acceptedSnapshot(
+                cgu: _cguDoc,
+                privacyPolicy: _privacyDoc,
+                rgpdNotice: _rgpdDoc,
+                fallback: _sphotVersion,
+              ),
               'publishedAt': _sphotPublishedAt,
               'acceptedAt': FieldValue.serverTimestamp(),
               'cgu': true,
@@ -3335,7 +3342,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Version SPHOT',
+                    'Version du document',
                     style: TextStyle(
                       color: redColor,
                       fontSize: 14,
@@ -3344,7 +3351,10 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _sphotVersion,
+                    LegalPublishedVersion.number(
+                      document,
+                      fallback: _sphotVersion,
+                    ),
                     style: const TextStyle(
                       color: adminColor,
                       fontSize: 13,

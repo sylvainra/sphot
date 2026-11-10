@@ -1,0 +1,46 @@
+"use strict";
+
+// Identifiants conformes à ceux présentés et enregistrés dans Flutter.
+/**
+ * Identifiant stable d'une version juridique publiée.
+ * @param {Object} document Document juridique Firestore.
+ * @param {string} fallback Version générale historique.
+ * @return {string} Identifiant version/révision.
+ */
+function versionId(document, fallback) {
+  const version = String(document?.version || "").trim() ||
+      String(fallback || "").trim();
+  const revision = document?.revision;
+  return Number.isSafeInteger(revision) && revision >= 0 ?
+    `${version}:r${revision}` : `${version}:historique`;
+}
+
+/**
+ * Versions publiées de chaque texte commun.
+ * @param {Object} documents Documents juridiques récupérés.
+ * @param {string} fallback Version générale historique.
+ * @return {Object} Versions associées aux identifiants de documents.
+ */
+function snapshot(documents, fallback) {
+  return {
+    cgu: versionId(documents.cgu, fallback),
+    privacyPolicy: versionId(documents.privacyPolicy, fallback),
+    rgpdNotice: versionId(documents.rgpdNotice, fallback),
+  };
+}
+
+// Les anciennes versions mobiles ne transmettent pas encore ce détail :
+// le serveur peut enregistrer la version réellement lue sans les bloquer.
+/**
+ * Vérifie les versions fournies par le client lorsqu'elles sont présentes.
+ * @param {Object|undefined|null} requested Versions transmises.
+ * @param {Object} current Versions actuellement publiées.
+ * @return {boolean} Vrai si les versions correspondent.
+ */
+function matchesRequested(requested, current) {
+  if (requested == null) return true;
+  if (typeof requested !== "object" || Array.isArray(requested)) return false;
+  return Object.keys(current).every((id) => requested[id] === current[id]);
+}
+
+module.exports = {versionId, snapshot, matchesRequested};

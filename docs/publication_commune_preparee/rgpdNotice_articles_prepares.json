@@ -1,0 +1,71 @@
+{
+  "documentId": "rgpdNotice",
+  "sourceVersion": "1.0",
+  "sourceFingerprint": "4b0815d28a8e9f46fb355695b5af61d7e99472ee8aeaca5080962274f64acb2a",
+  "updateCount": 6,
+  "status": "PREPARE_NON_PUBLIE",
+  "sourceArticles": [
+    {
+      "id": "01",
+      "title": "Responsable du traitement",
+      "content": "Conformément au Règlement (UE) 2016/679 (RGPD), le responsable du traitement des données personnelles collectées dans le cadre de l'utilisation de la plateforme SPHOT est l'éditeur de la plateforme.\n\nLe responsable du traitement détermine les finalités et les moyens des traitements réalisés afin d'assurer le fonctionnement, l'administration, la sécurité et le développement des services proposés par SPHOT.\n\nLe responsable du traitement veille à ce que les traitements de données personnelles soient effectués dans le respect des principes suivants :\n\nlicéité, loyauté et transparence ;\nlimitation des finalités ;\nminimisation des données ;\nexactitude des informations ;\nlimitation de la durée de conservation ;\nintégrité et confidentialité ;\nresponsabilité (« accountability »).\n\nLorsque certaines opérations sont réalisées par des prestataires techniques, ceux-ci interviennent exclusivement en qualité de sous-traitants au sens du RGPD et uniquement sur instruction du responsable du traitement."
+    },
+    {
+      "id": "02",
+      "title": "Données concernées",
+      "content": "Les traitements réalisés par SPHOT peuvent porter sur les catégories de données suivantes :\n\ndonnées d'identification des utilisateurs ;\ncoordonnées professionnelles ;\ninformations relatives aux collectivités, organismes gestionnaires et partenaires ;\ndonnées nécessaires à l'administration des SPHOTS ;\ninformations relatives aux postes de secours ;\ndonnées de connexion et journaux techniques ;\ninformations de facturation et de gestion des abonnements ;\ndonnées de communication avec le support.\n\nSPHOT veille à ne collecter que les données strictement nécessaires au fonctionnement des services proposés.\n\nAucune donnée sensible au sens du RGPD n'est collectée, sauf obligation légale ou nécessité particulière dûment justifiée et encadrée."
+    },
+    {
+      "id": "03",
+      "title": "Utilisation des données",
+      "content": "Les données personnelles sont utilisées exclusivement pour les finalités suivantes :\n\nassurer le fonctionnement de la plateforme ;\ngérer les comptes utilisateurs ;\nadministrer les SPHOTS et les postes de secours ;\nassurer la sécurité des services ;\ngérer les abonnements, la facturation et les relations contractuelles ;\nrépondre aux demandes des utilisateurs ;\nassurer le support technique ;\nproduire des statistiques anonymisées permettant d'améliorer les services.\n\nLes données personnelles ne sont jamais utilisées à des fins incompatibles avec celles pour lesquelles elles ont été collectées.\n\nSPHOT ne procède à aucune vente ni location de données personnelles à des tiers."
+    },
+    {
+      "id": "04",
+      "title": "Droits des personnes",
+      "content": "Toute personne concernée par un traitement de données réalisé par SPHOT dispose des droits prévus par le RGPD, notamment :\n\ndroit d'information ;\ndroit d'accès ;\ndroit de rectification ;\ndroit à l'effacement ;\ndroit à la limitation du traitement ;\ndroit d'opposition ;\ndroit à la portabilité des données lorsque celui-ci est applicable ;\ndroit de retirer son consentement lorsque le traitement repose sur celui-ci.\n\nLes demandes sont examinées dans les meilleurs délais et conformément aux dispositions du RGPD.\n\nLorsque cela est nécessaire, SPHOT peut demander des éléments complémentaires permettant de vérifier l'identité du demandeur avant de traiter sa demande."
+    },
+    {
+      "id": "05",
+      "title": "Demande de suppression",
+      "content": "Toute personne peut demander la suppression des données personnelles la concernant lorsque les conditions prévues par le RGPD sont réunies.\n\nLa demande peut être adressée à SPHOT par courrier électronique.\n\nAprès vérification de l'identité du demandeur, SPHOT procède à l'analyse de la demande et supprime les données concernées lorsqu'aucune obligation légale ou intérêt légitime ne justifie leur conservation.\n\nLorsque certaines données doivent être conservées afin de satisfaire à une obligation légale, comptable, fiscale ou à la défense des droits de SPHOT, seules les informations strictement nécessaires sont conservées pendant la durée prévue par la réglementation applicable."
+    },
+    {
+      "id": "06",
+      "title": "Contact RGPD",
+      "content": "Pour toute question relative à la protection des données personnelles ou pour exercer les droits prévus par le Règlement (UE) 2016/679 (RGPD), les utilisateurs peuvent contacter SPHOT à l'adresse suivante :\n\ncontact@sphot.app\n\nToute demande est traitée dans les meilleurs délais conformément aux dispositions du RGPD et de la législation française applicable.\n\nAfin de faciliter le traitement des demandes, il est recommandé de préciser :\n\nl'objet de la demande ;\nles coordonnées du demandeur ;\ntout élément permettant d'identifier le compte concerné.\n\nSi une réponse apportée par SPHOT ne satisfait pas le demandeur, celui-ci conserve la possibilité d'introduire une réclamation auprès de la Commission Nationale de l'Informatique et des Libertés (CNIL) ou de l'autorité de contrôle compétente de son pays de résidence."
+    }
+  ],
+  "articles": [
+    {
+      "id": "01",
+      "title": "Responsable du traitement",
+      "content": "Conformément au Règlement (UE) 2016/679 (RGPD), la qualité de responsable du traitement dépend de la finalité et des moyens essentiels de chaque opération sur les données personnelles.\n\nPour la gestion de ses propres services — notamment la création et la sécurisation des comptes, l'assistance, les relations contractuelles et la facturation — l'éditeur de SPHOT détermine les finalités et moyens des traitements qui lui incombent et assume les obligations correspondantes.\n\nPour la main courante professionnelle des postes de secours, les interventions et les informations internes que l'organisme gestionnaire décide de recueillir, cet organisme détermine les finalités, les habilitations et les règles de gestion relevant de sa responsabilité. SPHOT met à disposition l'outil technique de saisie, de transmission et d'hébergement selon les conditions applicables et les instructions de l'organisme responsable, sous réserve de l'analyse juridique effective des rôles de chacun.\n\nLa mise à disposition d'un logiciel ne constitue ni une certification des informations déclarées par les utilisateurs ni une validation par SPHOT de l'organisation de la surveillance. Chaque organisme et chaque utilisateur habilité demeure responsable des informations et décisions relevant de ses missions.\n\nLes principes de licéité, loyauté, transparence, limitation des finalités, minimisation, exactitude, limitation de conservation, intégrité, confidentialité et responsabilité s'appliquent à chaque traitement.\n\nLes prestataires techniques intervenant pour le compte d'un responsable du traitement doivent présenter les garanties appropriées et être encadrés conformément aux obligations qui leur sont applicables, notamment en matière de sous-traitance."
+    },
+    {
+      "id": "02",
+      "title": "Données concernées",
+      "content": "Selon les fonctionnalités utilisées et les habilitations du profil, les traitements peuvent porter sur :\n\n- les données d'identification des utilisateurs, leurs coordonnées et fonctions professionnelles ;\n- les renseignements concernant les collectivités, organismes gestionnaires et partenaires ;\n- les informations nécessaires à l'administration des SPHOTS et postes de secours, aux affectations, aux plannings et à la traçabilité des opérations ;\n- les informations de connexion, de sécurité, d'assistance, de contrat, d'abonnement et de facturation ;\n- les données opérationnelles saisies par des personnes habilitées dans la main courante professionnelle : événements du poste, interventions, observations, dates et auteurs des opérations ;\n- lorsque cela est nécessaire aux missions de secours et juridiquement autorisé, certaines données identifiant les personnes assistées et certaines informations relatives à leur état de santé ou à leur prise en charge.\n\nLes données de santé constituent des données sensibles au sens du RGPD. Leur saisie dans la main courante est limitée aux informations indispensables, aux personnes habilitées et aux finalités professionnelles autorisées. Elle doit être fondée sur une base juridique et, lorsque nécessaire, sur une exception applicable aux catégories particulières de données. Les détails d'une intervention, l'identité d'une victime et les informations de santé ne sont pas destinés à la diffusion auprès du grand public.\n\nLe responsable de chaque traitement veille à la minimisation, à la confidentialité, au contrôle des accès et à la limitation de la conservation. Le seul fait qu'un champ informatique existe n'autorise pas l'utilisateur à y inscrire des informations personnelles ou médicales non nécessaires."
+    },
+    {
+      "id": "03",
+      "title": "Utilisation des données",
+      "content": "Les données personnelles sont utilisées, selon le responsable du traitement concerné, pour les finalités suivantes :\n\nassurer le fonctionnement de la plateforme ;\ngérer les comptes utilisateurs ;\nadministrer les SPHOTS et les postes de secours ;\nassurer la sécurité des services ;\ngérer les abonnements, la facturation et les relations contractuelles ;\nrépondre aux demandes des utilisateurs ;\nassurer le support technique ;\nproduire des statistiques anonymisées permettant d'améliorer les services.\n\nLes données personnelles ne sont jamais utilisées à des fins incompatibles avec celles pour lesquelles elles ont été collectées.\n\nSPHOT ne procède à aucune vente ni location de données personnelles à des tiers.\n\nLa main courante professionnelle permet aux personnes habilitées de suivre les événements du poste, les opérations de surveillance et les interventions. Les finalités, les données autorisées, la consultation et les conditions de conservation relevant de cette activité sont déterminées par l’organisme gestionnaire responsable. SPHOT fournit l’outil technique selon les obligations applicables ; les informations individuelles ou de santé ne sont pas diffusées au grand public."
+    },
+    {
+      "id": "04",
+      "title": "Droits des personnes",
+      "content": "Toute personne concernée par un traitement de données réalisé au moyen de SPHOT dispose des droits prévus par le RGPD, notamment :\n\ndroit d'information ;\ndroit d'accès ;\ndroit de rectification ;\ndroit à l'effacement ;\ndroit à la limitation du traitement ;\ndroit d'opposition ;\ndroit à la portabilité des données lorsque celui-ci est applicable ;\ndroit de retirer son consentement lorsque le traitement repose sur celui-ci.\n\nLes demandes sont examinées dans les meilleurs délais et conformément aux dispositions du RGPD.\n\nLorsque cela est nécessaire, SPHOT peut demander des éléments complémentaires permettant de vérifier l'identité du demandeur avant de traiter sa demande.\n\nPour les données traitées sous la responsabilité d’un organisme gestionnaire, les demandes de droits sont examinées par cet organisme. SPHOT peut aider à leur transmission et à leur exécution technique sur instruction du responsable concerné. Les demandes portant sur les traitements propres à SPHOT sont examinées par son éditeur."
+    },
+    {
+      "id": "05",
+      "title": "Demande de suppression",
+      "content": "Toute personne concernée peut demander l'effacement de données personnelles lorsque les conditions prévues par le RGPD sont remplies. Ce droit connaît les limites prévues par la loi, notamment lorsqu'une conservation demeure nécessaire au respect d'une obligation légale, à l'archivage légalement requis ou à la constatation, à l'exercice ou à la défense de droits.\n\nPour les traitements relevant directement de l'éditeur de SPHOT, la demande peut être adressée à contact@sphot.app. SPHOT vérifie, si nécessaire, l'identité du demandeur et répond dans les délais réglementaires.\n\nLorsque la demande porte sur une donnée de la main courante ou sur un traitement dont la finalité relève de l'organisme gestionnaire du poste de secours, elle doit être examinée par cet organisme responsable. SPHOT peut faciliter la transmission sécurisée de la demande ou son exécution technique sur instruction de l'organisme compétent, sans se substituer à sa décision.\n\nLa suppression de l'espace courant de la main courante à l'échéance annuelle est distincte du droit individuel à l'effacement. Les éventuelles copies exportées, obligations d'archives et traces techniques suivent les règles et responsabilités qui leur sont propres."
+    },
+    {
+      "id": "06",
+      "title": "Contact RGPD",
+      "content": "Pour toute question relative à la protection des données personnelles ou pour exercer les droits prévus par le Règlement (UE) 2016/679 (RGPD), les utilisateurs peuvent contacter SPHOT à l'adresse suivante :\n\ncontact@sphot.app\n\nToute demande est traitée dans les meilleurs délais conformément aux dispositions du RGPD et de la législation française applicable.\n\nAfin de faciliter le traitement des demandes, il est recommandé de préciser :\n\nl'objet de la demande ;\nles coordonnées du demandeur ;\ntout élément permettant d'identifier le compte concerné.\n\nSi une réponse apportée par SPHOT ne satisfait pas le demandeur, celui-ci conserve la possibilité d'introduire une réclamation auprès de la Commission Nationale de l'Informatique et des Libertés (CNIL) ou de l'autorité de contrôle compétente de son pays de résidence.\n\nSi la demande concerne la main courante d’un poste de secours ou un traitement relevant d’une collectivité ou d’un organisme gestionnaire, SPHOT oriente le demandeur vers le responsable compétent et facilite, dans les limites de ses obligations, l’exercice de ses droits. Une demande concernant les traitements propres à SPHOT reste instruite par l’éditeur de la plateforme."
+    }
+  ]
+}

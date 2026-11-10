@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../../services/legal_published_version.dart';
 import '../../shared/web_colors.dart';
 import 'advertiser_cgv_policy.dart';
 import '../models/advertiser_phase_one_draft.dart';
@@ -55,6 +56,7 @@ class _AdvertiserLegalAcceptanceSectionState
   bool _representativeAccepted = false;
   bool _previousLegalAccepted = false;
   String _version = '1.0';
+  Map<String, String> _documentVersions = const {};
   String _legalPackPath = '';
   String? _error;
   String? _success;
@@ -148,11 +150,23 @@ class _AdvertiserLegalAcceptanceSectionState
       final acceptedVersion =
           (legalAcceptance['version'] ?? acceptedDocuments['version'] ?? '')
               .toString();
-      final restoreAcceptance = acceptedVersion == activeVersion;
+      final documentVersions = LegalPublishedVersion.acceptedSnapshot(
+        cgu: cgu,
+        privacyPolicy: privacy,
+        rgpdNotice: rgpd,
+        fallback: activeVersion,
+      );
+      final restoreAcceptance = acceptedVersion == activeVersion &&
+          LegalPublishedVersion.matchesRecordedSnapshot(
+            legalAcceptance['documentVersions'] ??
+                acceptedDocuments['documentVersions'],
+            documentVersions,
+          );
 
       if (!mounted) return;
       setState(() {
         _version = activeVersion;
+        _documentVersions = documentVersions;
         _legalPackPath = (metadataData['packPath'] ?? '').toString();
         _cguDocument = cgu;
         _privacyDocument = privacy;
@@ -235,10 +249,12 @@ class _AdvertiserLegalAcceptanceSectionState
           'advertiserCgv': true,
           'advertiserCgvVersion': _cgvVersion,
           'version': _version,
+          'documentVersions': _documentVersions,
           'acceptedAt': FieldValue.serverTimestamp(),
         },
         'legalAcceptance': <String, Object?>{
           'version': _version,
+          'documentVersions': _documentVersions,
           'packPath': _legalPackPath,
           'representativeDeclaration': true,
           'advertiserCgvVersion': _cgvVersion,
@@ -314,6 +330,7 @@ if (widget.draftOnly) {
       'legalAcceptance': legalRequested,
       if (legalRequested) ...{
         'legalVersion': _version,
+        'documentVersions': _documentVersions,
         'advertiserCgvVersion': _cgvVersion,
       },
     }),
@@ -476,7 +493,8 @@ _cguController.collapse();
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Version SPHOT ${documentVersion ?? _version}',
+                'Version du document '
+                '${documentVersion ?? LegalPublishedVersion.number(document, fallback: _version)}',
                 style: const TextStyle(
                   color: WebColors.red,
                   fontSize: 13,

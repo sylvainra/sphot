@@ -231,10 +231,13 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
   static const _blue = Color(0xFF213F8E);
   static const _red = Color(0xFFE52525);
 
-  // L'URL n'est renseignee qu'apres deploiement et validation de la fonction.
-  // Aucun effet de bord si elle n'est pas fournie lors de la compilation.
+  // La fonction de modification juridique est deja deployee. L'URL reste
+  // strictement verifiee par _editorEndpoint, et chaque operation requiert
+  // une authentification Super Admin validee cote serveur.
   static const _configuredEditorUrl = String.fromEnvironment(
-    'SPHOT_LEGAL_DOCUMENT_EDITOR_URL', defaultValue: '');
+    'SPHOT_LEGAL_DOCUMENT_EDITOR_URL',
+    defaultValue:
+        'https://us-central1-sphot-ab80b.cloudfunctions.net/manageSphotLegalDocumentEditing');
   static Uri? get _editorEndpoint {
     final uri = Uri.tryParse(_configuredEditorUrl.trim());
     if (uri == null || uri.scheme != 'https' || uri.hasPort ||
@@ -467,6 +470,45 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
     });
   }
 
+  /// Ouvre l'editeur sur le document partage. Si aucun brouillon n'existe,
+  /// le cree d'abord sur le serveur, sans toucher au document publie.
+  Future<void> _startArticleEdit(_LegalData data, _LegalArticle article) async {
+    if (_saving || _editorEndpoint == null || data.editorError != null ||
+        !data.initialPackPublished) {
+      return;
+    }
+    if (data.editorDraft != null) {
+      _choose(article);
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _message = null;
+    });
+    try {
+      await _editorRequest({
+        'action': 'create',
+        'documentId': widget.documentId,
+      });
+      if (!mounted) return;
+      setState(() {
+        _selectedArticleId = article.id;
+        _title.text = article.title;
+        _content.text = article.content;
+        _changeSummary.clear();
+        _message = 'Modification ouverte. La version publiée reste inchangée.';
+        _future = _load();
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _message = 'Édition non ouverte : $error');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   void _refresh() {
     setState(() {
       _selectedArticleId = null;
@@ -508,11 +550,6 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
     }
   }
 
-  Future<void> _createDraft() async {
-    await _runEdit({'action': 'create'},
-        'Brouillon privé créé. Aucun texte publié n’a été modifié.');
-  }
-
   Future<void> _discardDraft(_LegalData data) async {
     final draft = data.editorDraft;
     if (draft == null ||
@@ -520,18 +557,18 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
       return;
     }
     final confirmed = await _confirm(
-      'ABANDONNER LE BROUILLON ?',
-      'Le brouillon privé de ${widget.title} sera définitivement supprimé. '
+      'ANNULER LA MODIFICATION ?',
+      'Les modifications non publiées de ${widget.title} seront supprimées. '
       'Aucun document publié, aucune version juridique et aucune archive '
       'ne seront modifiés.',
-      'ABANDONNER LE BROUILLON',
+      'ANNULER LA MODIFICATION',
     );
     if (!confirmed || !mounted) return;
     await _runEdit({
       'action': 'discard',
       'confirm': true,
       'expectedDraftRevision': draft['draftRevision'],
-    }, 'Brouillon abandonné. Version publiée et historique inchangés.');
+    }, 'Modification annulée. Version publiée et historique inchangés.');
   }
 
   Future<void> _save(_LegalData data) async {
@@ -549,20 +586,20 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
       'title': _title.text.trim(),
       'content': _content.text.trim(),
       'changeSummary': _changeSummary.text.trim(),
-    }, 'Modification enregistrée dans le brouillon. Aucune publication.');
+    }, 'Modification enregistrée. Elle n’est pas encore publiée.');
   }
 
   Future<void> _validate(_LegalData data) async {
     final draft = data.editorDraft;
     if (draft == null || draft['status'] != 'draft') return;
-    final confirmed = await _confirm('VALIDER LE BROUILLON ?',
+    final confirmed = await _confirm('VALIDER LA MODIFICATION ?',
       'Le contenu de ${widget.title} sera marqué comme validé. '
       'Cette étape ne le publie pas et n’affecte aucun utilisateur.',
       'VALIDER');
     if (!confirmed || !mounted) return;
     await _runEdit({'action': 'validate', 'confirm': true,
       'expectedDraftRevision': draft['draftRevision']},
-      'Brouillon validé. Publication non effectuée.');
+      'Modification validée. Publication non effectuée.');
   }
 
   Future<void> _publish(_LegalData data) async {
@@ -584,12 +621,165 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
       'Nouvelle version publiée et archivée. Vérifiez les acceptations.');
   }
 
+  /// Importe les textes RGPD/PDC déjà revus dans le circuit sécurisé EXISTANT.
+  /// Aucune écriture directe Firestore depuis Flutter : le serveur réalise
+  /// successivement l'enregistrement, la validation, la publication et
+  /// l'archivage de la version précédente.
+  Future<void> _publishPreparedCommonArticles(_LegalData data) async {
+    if (_saving || data.editorDraft != null ||
+        !data.initialPackPublished || !data.publicationEnabled ||
+        data.editorError != null ||
+        (widget.documentId != 'rgpdNotice' &&
+         widget.documentId != 'privacyPolicy')) {
+      return;
+    }
+
+    try {
+      final source = await rootBundle.loadString(
+        'docs/publication_commune_preparee/'
+        '${widget.documentId}_articles_prepares.json',
+      );
+      final raw = jsonDecode(source);
+      if (raw is! Map) throw StateError('Corpus préparé invalide.');
+      final prepared = Map<String, dynamic>.from(raw);
+      final expectedCount = widget.documentId == 'rgpdNotice' ? 6 : 9;
+      if (prepared['documentId'] != widget.documentId ||
+          prepared['sourceVersion'] != data.version ||
+          prepared['status'] != 'PREPARE_NON_PUBLIE') {
+        throw StateError('Le document publié a changé : import interrompu.');
+      }
+      final original = _articlesFromList(prepared['sourceArticles']);
+      final proposed = _articlesFromList(prepared['articles']);
+      if (original.length != expectedCount ||
+          proposed.length != expectedCount ||
+          data.articles.length != expectedCount) {
+        throw StateError('Nombre d’articles inattendu : import interrompu.');
+      }
+      for (var index = 0; index < expectedCount; index++) {
+        final actual = data.articles[index];
+        final before = original[index];
+        final after = proposed[index];
+        if (actual.id != before.id || actual.title != before.title.trim() ||
+            actual.content != before.content.trim() ||
+            after.id != before.id || after.title != before.title.trim() ||
+            after.content.isEmpty) {
+          throw StateError('Source publiée différente à l’article ${before.id}. '
+              'Aucun import lancé.');
+        }
+      }
+      final changes = <_LegalArticle>[];
+      for (var index = 0; index < expectedCount; index++) {
+        if (proposed[index].content != original[index].content) {
+          changes.add(proposed[index]);
+        }
+      }
+      if (changes.isEmpty) {
+        if (mounted) setState(() => _message = 'Les articles sont déjà à jour.');
+        return;
+      }
+
+      final confirmed = await _confirm(
+        'PUBLIER ${widget.title} ?',
+        '${changes.length} articles seront actualisés dans le document '
+        'commun. Le service Super Admin enregistrera les changements, '
+        'validera la modification, publiera la nouvelle version puis '
+        'archivera la version précédente. Cette publication s’appliquera '
+        'aux parcours Grand Public, Admin, Sauveteur et Publicitaire '
+        'lors de leur prochain chargement.',
+        'IMPORTER ET PUBLIER',
+      );
+      if (!confirmed || !mounted) return;
+
+      setState(() { _saving = true; _message = null; });
+      var savedCount = 0;
+      try {
+        final created = await _editorRequest({
+          'action': 'create', 'documentId': widget.documentId,
+        });
+        final firstDraft = created['draft'];
+        if (firstDraft is! Map || firstDraft['status'] != 'draft' ||
+            firstDraft['draftRevision'] != 0) {
+          throw StateError('Une modification existe déjà sur ce document. '
+              'Elle doit être traitée séparément.');
+        }
+        var revision = 0;
+        final changeSummary = widget.documentId == 'rgpdNotice'
+            ? 'Actualisation RGPD : responsabilités des organismes, '
+                'main courante, données de santé et droits des personnes.'
+            : 'Actualisation de la confidentialité : finalités, '
+                'main courante, données sensibles et conservation annuelle.';
+        for (final article in changes) {
+          final saved = await _editorRequest({
+            'action': 'save',
+            'documentId': widget.documentId,
+            'expectedDraftRevision': revision,
+            'articleId': article.id,
+            'title': article.title,
+            'content': article.content,
+            'changeSummary': changeSummary,
+          });
+          final draft = saved['draft'];
+          if (draft is! Map || draft['status'] != 'draft' ||
+              draft['draftRevision'] != revision + 1) {
+            throw StateError('Enregistrement non confirmé pour '
+                'l’article ${article.id}.');
+          }
+          revision++;
+          savedCount++;
+        }
+        final validated = await _editorRequest({
+          'action': 'validate', 'documentId': widget.documentId,
+          'confirm': true, 'expectedDraftRevision': revision,
+        });
+        final finalDraft = validated['draft'];
+        final reviewedHash = finalDraft is Map
+            ? _string(finalDraft['reviewedHash']) : '';
+        if (finalDraft is! Map || finalDraft['status'] != 'validated' ||
+            reviewedHash.isEmpty) {
+          throw StateError('Validation serveur non confirmée.');
+        }
+        final published = await _editorRequest({
+          'action': 'publish', 'documentId': widget.documentId,
+          'confirm': true, 'expectedDraftRevision': revision,
+          'expectedHash': reviewedHash,
+        });
+        if (published['published'] != true) {
+          throw StateError('Publication non confirmée par le serveur.');
+        }
+        if (!mounted) return;
+        setState(() {
+          _selectedArticleId = null;
+          _future = _load();
+          _message = '${changes.length} articles publiés et version '
+              'précédente archivée avec succès.';
+        });
+      } catch (error) {
+        if (mounted) {
+          setState(() {
+            _future = _load();
+            _message = 'Import interrompu après $savedCount enregistrement(s) : '
+                '$error. La version publiée reste inchangée tant que '
+                'la publication n’a pas été confirmée.';
+          });
+        }
+      } finally {
+        if (mounted) setState(() => _saving = false);
+      }
+    } catch (error) {
+      if (mounted) setState(() => _message = 'Import impossible : $error');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<_LegalData>(
       future: _future,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        // Conserver le panneau deja affiche pendant le rafraichissement :
+        // remplacer l'ExpansionTile par une jauge le refermait a chaque
+        // creation, sauvegarde ou validation de brouillon.
+        if (snapshot.connectionState != ConnectionState.done &&
+            !snapshot.hasData) {
           return const Padding(padding: EdgeInsets.all(12),
               child: LinearProgressIndicator(color: _blue));
         }
@@ -612,7 +802,8 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
                 style: const TextStyle(color: _blue, fontWeight: FontWeight.w800,
                     fontSize: 12)),
             subtitle: Text(data.editorDraft != null
-                ? '${data.articles.length} articles · BROUILLON ${data.editorDraft!['status']}'
+                ? '${data.articles.length} articles · Modification '
+                    '${data.editorDraft!['status'] == 'validated' ? 'validée' : 'en cours'}'
                 : data.prepared
                     ? '${data.articles.length} articles · Texte final non publié'
                     : '${data.articles.length} articles · Version active ${data.version}',
@@ -633,8 +824,10 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
                     SphotLegalArticleMarkdown(markdown: article.content),
                     Align(alignment: Alignment.centerRight,
                       child: TextButton.icon(
-                        onPressed: _saving || data.editorDraft == null
-                            ? null : () => _choose(article),
+                        onPressed: _saving || _editorEndpoint == null ||
+                            data.editorError != null ||
+                            !data.initialPackPublished
+                            ? null : () => _startArticleEdit(data, article),
                         icon: const Icon(Icons.edit_outlined, size: 16),
                         label: const Text('MODIFIER CET ARTICLE'),
                       ),
@@ -651,6 +844,8 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
   }
 
   Widget _versionPanel(_LegalData data) {
+    final draftRevision = data.editorDraft?['draftRevision'];
+    final hasSavedChanges = draftRevision is int && draftRevision > 0;
     return Container(
       padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
@@ -677,12 +872,30 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
             ? 'Texte définitif préparé — publication non effectuée'
             : 'Texte actuellement enregistré dans Firestore',
             style: const TextStyle(color: _red, fontSize: 11)),
+        if ((widget.documentId == 'rgpdNotice' ||
+             widget.documentId == 'privacyPolicy') &&
+            data.initialPackPublished && data.publicationEnabled &&
+            data.editorError == null && data.editorDraft == null) ...[
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: _saving ? null : () =>
+                _publishPreparedCommonArticles(data),
+            icon: const Icon(Icons.system_update_alt_rounded),
+            label: const Text('IMPORTER ET PUBLIER LES ARTICLES À JOUR'),
+          ),
+        ],
         if (data.editorDraft != null) ...[
           const SizedBox(height: 8),
-          Text('Brouillon privé · état : ${data.editorDraft!['status']} · '
-              'révision de travail ${data.editorDraft!['draftRevision']}',
+          Text('Modification ${data.editorDraft!['status'] == 'validated' ? 'validée' : 'en cours'} '
+              '· enregistrement n° ${data.editorDraft!['draftRevision']} '
+              '· non publiée',
               style: const TextStyle(color: _blue, fontSize: 12,
                   fontWeight: FontWeight.w700)),
+          const SizedBox(height: 5),
+          const Text('Enregistrer conserve la modification ; valider la prépare. '
+              'Seule la publication met à jour les textes accessibles dans SPHOT '
+              'et archive la version précédente.',
+              style: TextStyle(color: _blue, fontSize: 11)),
           if (_string(data.editorDraft!['changeSummary']).isNotEmpty)
             Text('Dernière modification : ${data.editorDraft!['changeSummary']}',
                 style: const TextStyle(color: _blue, fontSize: 11)),
@@ -699,7 +912,7 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
   OutlinedButton.icon(
     onPressed: _saving ? null : () => _discardDraft(data),
     icon: const Icon(Icons.delete_outline, size: 16),
-    label: const Text('ABANDONNER LE BROUILLON',
+    label: const Text('ANNULER LA MODIFICATION',
       style: TextStyle(fontSize: 11)),
     style: OutlinedButton.styleFrom(
       foregroundColor: const Color(0xFFB42318),
@@ -722,7 +935,7 @@ if (_selectedArticleId != null && data.editorDraft != null && data.initialPackPu
           const SizedBox(height: 8),
           FilledButton.icon(onPressed: _saving ? null : () => _save(data),
               icon: const Icon(Icons.save_outlined),
-              label: const Text('ENREGISTRER DANS LE BROUILLON')),
+              label: const Text('ENREGISTRER LA MODIFICATION')),
         ],
         if (_editorEndpoint == null)
           const Padding(padding: EdgeInsets.only(top: 8),
@@ -734,20 +947,14 @@ if (_selectedArticleId != null && data.editorDraft != null && data.initialPackPu
             child: Text('Éditeur indisponible : ${data.editorError}',
                 style: const TextStyle(color: _red, fontSize: 11))),
         if (_editorEndpoint != null && data.editorError == null) ...[
-          const SizedBox(height: 10),
-          if (data.editorDraft == null)
-            OutlinedButton.icon(
-              onPressed: _saving || !data.initialPackPublished ? null : _createDraft,
-              icon: const Icon(Icons.note_add_outlined),
-              label: const Text('CRÉER UN BROUILLON DE CE DOCUMENT'),
-            ),
           if (data.editorDraft != null)
             Wrap(spacing: 8, runSpacing: 6, children: [
               OutlinedButton.icon(
-                onPressed: _saving || !data.initialPackPublished || data.editorDraft!['status'] != 'draft'
+                onPressed: _saving || !data.initialPackPublished ||
+                    !hasSavedChanges || data.editorDraft!['status'] != 'draft'
                     ? null : () => _validate(data),
                 icon: const Icon(Icons.verified_outlined),
-                label: const Text('VALIDER LE BROUILLON'),
+                label: const Text('VALIDER LA MODIFICATION'),
               ),
               FilledButton.icon(
                 onPressed: _saving || !data.publicationEnabled ||

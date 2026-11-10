@@ -31,6 +31,7 @@ const {registerAdvertiserRenewalEndpoint} =
 const {assignAuthorizedAdminQuoteNumber} =
     require("./admin_quote_numbering");
 const {getDownloadURL} = require("firebase-admin/storage");
+const legalDocumentVersions = require("./legal_document_versions");
 const nodemailer = require("nodemailer");
 const {
   shouldNotifyAdvertiserAssetChange,
@@ -5867,6 +5868,34 @@ exports.acceptSauveteurLegalTerms = onRequest(
           return;
         }
 
+        // Trace de chaque texte réellement publié au moment de l'acceptation.
+        // La version générale du corpus est conservée pour les anciens comptes.
+        const legalDocuments = admin.firestore().collection("legalDocuments");
+        const [cguDoc, privacyDoc, rgpdDoc] = await Promise.all([
+          legalDocuments.doc("cgu").get(),
+          legalDocuments.doc("privacyPolicy").get(),
+          legalDocuments.doc("rgpdNotice").get(),
+        ]);
+        if (!cguDoc.exists || !privacyDoc.exists || !rgpdDoc.exists) {
+          response.status(503).json({
+            success: false, error: "legal_document_unavailable",
+          });
+          return;
+        }
+        const documentVersions = legalDocumentVersions.snapshot({
+          cgu: cguDoc.data(),
+          privacyPolicy: privacyDoc.data(),
+          rgpdNotice: rgpdDoc.data(),
+        }, legalPack.version);
+        if (!legalDocumentVersions.matchesRequested(
+            request.body.documentVersions, documentVersions)) {
+          response.status(409).json({
+            success: false,
+            error: "legal_document_version_changed",
+          });
+          return;
+        }
+
         const requiredFlags = [
           request.body.cguAccepted === true,
           request.body.privacyAcknowledged === true,
@@ -5898,6 +5927,7 @@ exports.acceptSauveteurLegalTerms = onRequest(
           versionId: legalPack.versionId,
           revision: SAUVETEUR_LEGAL_ACCEPTANCE_REVISION,
           legalPackPath: legalPack.packPath,
+          documentVersions,
           acceptedAt,
           documents: {
             cgu: true,

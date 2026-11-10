@@ -11,6 +11,7 @@ List<PublicLegalDocument> _documents({
   int cguRevision = 1,
   int privacyRevision = 1,
   int rgpdRevision = 1,
+  String cguContent = 'Texte juridique de test.',
 }) {
   PublicLegalDocument document(String id, String title, int revision) {
     return PublicLegalDocument(
@@ -18,10 +19,10 @@ List<PublicLegalDocument> _documents({
       title: title,
       version: '1.0',
       revision: revision,
-      chapters: const [
+      chapters: [
         PublicLegalChapter(
           title: 'Article de démonstration',
-          content: 'Texte juridique de test.',
+          content: id == 'cgu' ? cguContent : 'Texte juridique de test.',
           order: 1,
         ),
       ],
@@ -141,7 +142,7 @@ void main() {
         find.widgetWithText(FilledButton, 'ACCEPTER ET CONTINUER');
     expect(tester.widget<FilledButton>(continueButton).onPressed, isNull);
 
-    await tester.tap(find.text('CGU — Grand public'));
+    await tester.tap(find.text('CGU'));
     await tester.pumpAndSettle();
     expect(find.text('Article de démonstration'), findsOneWidget);
     expect(find.text('Version 1.0 — révision 1'), findsOneWidget);
@@ -158,6 +159,38 @@ void main() {
 
     expect(find.text('BIENVENUE SUR SPHOT'), findsNothing);
     expect(find.text('CARTE SPHOT DE TEST'), findsOneWidget);
+  });
+
+  testWidgets('les CGU affichent le gras Markdown sans perdre la sélection',
+      (tester) async {
+    await tester.pumpWidget(_testApp(
+      _documents(cguContent: 'Texte **juridique** de test.'),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('CGU'));
+    await tester.pumpAndSettle();
+
+    final selectable = tester.widget<SelectableText>(
+      find.byType(SelectableText),
+    );
+    expect(selectable.textSpan?.toPlainText(), 'Texte juridique de test.');
+
+    final spans = <TextSpan>[];
+    void collect(InlineSpan span) {
+      if (span is! TextSpan) return;
+      spans.add(span);
+      for (final child in span.children ?? <InlineSpan>[]) {
+        collect(child);
+      }
+    }
+    collect(selectable.textSpan!);
+    expect(
+      spans.any((span) =>
+          span.text == 'juridique' &&
+          span.style?.fontWeight == FontWeight.w700),
+      isTrue,
+    );
   });
 
   testWidgets('visite suivante : accès direct à la carte', (tester) async {

@@ -4,9 +4,14 @@ import 'package:flutter/material.dart';
 /// les textes conserves dans Firestore ou les brouillons de travail.
 /// Le corpus actuel utilise principalement le gras et des listes.
 class SphotLegalArticleMarkdown extends StatelessWidget {
-  const SphotLegalArticleMarkdown({super.key, required this.markdown});
+  const SphotLegalArticleMarkdown({
+    super.key,
+    required this.markdown,
+    this.selectable = false,
+  });
 
   final String markdown;
+  final bool selectable;
 
   static final RegExp _inline = RegExp(
     r'\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`',
@@ -71,8 +76,12 @@ class SphotLegalArticleMarkdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final content = TextSpan(children: _articleSpans(markdown));
+    if (selectable) {
+      return SelectableText.rich(content);
+    }
     return Text.rich(
-      TextSpan(children: _articleSpans(markdown)),
+      content,
       style: const TextStyle(fontSize: 12, height: 1.45),
     );
   }

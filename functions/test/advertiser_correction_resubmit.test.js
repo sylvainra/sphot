@@ -47,6 +47,15 @@ function setup(overrides = {}, claims = {}) {
           if (ref.id === "advertiserCgv") {
             return {data: () => ({version: "3.0"})};
           }
+          if (ref.id === "cgu") {
+            return {exists: true, data: () => ({version: "2.0", revision: 2})};
+          }
+          if (ref.id === "privacyPolicy") {
+            return {exists: true, data: () => ({version: "1.0"})};
+          }
+          if (ref.id === "rgpdNotice") {
+            return {exists: true, data: () => ({version: "1.0"})};
+          }
           throw new Error("unknown collection " + ref.name);
         },
         update: (ref, update) => writes.push({ref, update}),
@@ -156,6 +165,26 @@ test("validations juridiques actuelles enregistrees cote serveur", async () => {
   assert.equal(writes.length, 1);
   assert.equal(writes[0].update.legalAcceptance.version, "2.0");
   assert.equal(writes[0].update.acceptedDocuments.advertiserCgvVersion, "3.0");
+  assert.deepEqual(writes[0].update.acceptedDocuments.documentVersions, {
+    cgu: "2.0:r2", privacyPolicy: "1.0:historique",
+    rgpdNotice: "1.0:historique",
+  });
+});
+
+test("refuse un texte modifie depuis sa lecture", async () => {
+  const {call, writes} = setup({correctionRequest: {
+    status: "changes_requested", scopes: ["legal"],
+  }});
+  const result = await call({
+    requestId: "request-12345", legalAcceptance: true,
+    legalVersion: "2.0", advertiserCgvVersion: "3.0",
+    documentVersions: {
+      cgu: "2.0:r2", privacyPolicy: "1.0:historique",
+      rgpdNotice: "0.9:historique",
+    },
+  });
+  assert.equal(result.code, 409);
+  assert.equal(writes.length, 0);
 });
 
 test("liste de rubriques invalide refusee", async () => {

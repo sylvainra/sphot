@@ -5,6 +5,7 @@
 const SCOPE_NAMES = new Set([
   "identity", "establishment", "location", "visual", "destination", "legal",
 ]);
+const legalDocumentVersions = require("./legal_document_versions");
 
 /**
  * Émet une réponse d'erreur sans divulguer les détails serveur.
@@ -36,7 +37,7 @@ function registerAdvertiserCorrectionResubmit({admin, onRequest}) {
         if (!/^[a-zA-Z0-9_-]{8,128}$/.test(requestId) ||
             Object.keys(body).some((key) => ![
               "requestId", "legalAcceptance", "legalVersion",
-              "advertiserCgvVersion",
+              "advertiserCgvVersion", "documentVersions",
             ].includes(key))) {
           responseError(response, 400, "Demande de transmission invalide.");
           return;
@@ -120,8 +121,12 @@ function registerAdvertiserCorrectionResubmit({admin, onRequest}) {
                   .doc("metadata");
               const cgvRef = db.collection("legalDocuments")
                   .doc("advertiserCgv");
+              const commonRefs = ["cgu", "privacyPolicy", "rgpdNotice"]
+                  .map((id) => db.collection("legalDocuments").doc(id));
               const metadataSnap = await transaction.get(metadataRef);
               const cgvSnap = await transaction.get(cgvRef);
+              const commonSnapshots = await Promise.all(commonRefs.map(
+                  (ref) => transaction.get(ref)));
               const metadata = metadataSnap.data() || {};
               const cgv = cgvSnap.data() || {};
               const currentVersion = String(metadata.legalVersion ||
@@ -130,14 +135,28 @@ function registerAdvertiserCorrectionResubmit({admin, onRequest}) {
               if (version !== currentVersion || cgvVersion !== currentCgv) {
                 return "legal_outdated";
               }
+              if (commonSnapshots.some((snapshot) => !snapshot.exists)) {
+                return "legal_outdated";
+              }
+              const documentVersions = legalDocumentVersions.snapshot({
+                cgu: commonSnapshots[0].data() || {},
+                privacyPolicy: commonSnapshots[1].data() || {},
+                rgpdNotice: commonSnapshots[2].data() || {},
+              }, currentVersion);
+              if (!legalDocumentVersions.matchesRequested(
+                  body.documentVersions, documentVersions)) {
+                return "legal_outdated";
+              }
               change.legalAcceptanceCompleted = true;
               change.acceptedDocuments = {
                 cgu: true, privacy: true, rgpd: true, advertiserCgv: true,
                 advertiserCgvVersion: currentCgv, version: currentVersion,
+                documentVersions,
                 acceptedAt: FieldValue.serverTimestamp(),
               };
               change.legalAcceptance = {
                 version: currentVersion,
+                documentVersions,
                 packPath: String(metadata.packPath || ""),
                 representativeDeclaration: true,
                 advertiserCgvVersion: currentCgv,

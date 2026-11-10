@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../../services/legal_published_version.dart';
 import 'sauveteur_access_info_page.dart';
 
 class SauveteurLegalAcceptancePage extends StatefulWidget {
@@ -45,6 +46,7 @@ class _SauveteurLegalAcceptancePageState
   Map<String, dynamic>? _rgpdDocument;
 
   String _legalVersion = '1.0';
+  Map<String, String> _documentVersions = const {};
   bool _loading = true;
   bool _submitting = false;
   String? _message;
@@ -110,13 +112,21 @@ class _SauveteurLegalAcceptancePageState
 
       if (!mounted) return;
 
+      final activeLegalVersion = (data['legalVersion'] ??
+              data['version'] ??
+              data['activeVersion'] ??
+              '1.0')
+          .toString();
+      final documentVersions = LegalPublishedVersion.acceptedSnapshot(
+        cgu: cgu,
+        privacyPolicy: privacy,
+        rgpdNotice: rgpd,
+        fallback: activeLegalVersion,
+      );
+
       setState(() {
-        _legalVersion = (
-          data['legalVersion'] ??
-          data['version'] ??
-          data['activeVersion'] ??
-          '1.0'
-        ).toString();
+        _legalVersion = activeLegalVersion;
+        _documentVersions = documentVersions;
         _cguDocument = cgu;
         _privacyDocument = privacy;
         _rgpdDocument = rgpd;
@@ -150,6 +160,7 @@ class _SauveteurLegalAcceptancePageState
         body: jsonEncode({
           'sauveteurSessionToken': widget.sauveteurSessionToken,
           'legalVersion': _legalVersion,
+          'documentVersions': _documentVersions,
           'cguAccepted': true,
           'privacyAcknowledged': true,
           'rgpdAcknowledged': true,
@@ -384,7 +395,8 @@ class _SauveteurLegalAcceptancePageState
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Version SPHOT $_legalVersion',
+                'Version du document '
+                '${LegalPublishedVersion.number(document, fallback: _legalVersion)}',
                 style: const TextStyle(
                   color: Color(0xFFEF4444),
                   fontSize: 11.5,

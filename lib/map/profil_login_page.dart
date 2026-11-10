@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/password_pilot.dart';
+import '../services/legal_published_version.dart';
 import '../pages/sauveteur/change_password_page.dart';
 import '../pages/sauveteur/sauveteur_legal_acceptance_page.dart';
 import '../pages/sauveteur/sauveteur_menu_page.dart';
@@ -602,7 +603,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
           .get();
 
       final metadata = metadataSnapshot.data() ?? {};
-      final version = (metadata['legalVersion'] ??
+      final globalVersion = (metadata['legalVersion'] ??
               metadata['version'] ??
               metadata['activeVersion'] ??
               '1.0')
@@ -623,6 +624,10 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
       if (!mounted) return;
 
       final document = documentSnapshot.data() ?? {};
+      final version = LegalPublishedVersion.number(
+        document,
+        fallback: globalVersion,
+      );
       final chapters =
           chaptersSnapshot.docs.map((chapter) => chapter.data()).toList();
 

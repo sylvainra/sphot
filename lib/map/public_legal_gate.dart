@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../services/public_legal_acceptance_service.dart';
+import '../web/super_admin/widgets/sphot_legal_article_markdown.dart';
 import '../widgets/fire_icon_assets.dart';
 
 /// Accueil juridique du grand public, commun à Flutter mobile et Flutter Web.
@@ -163,7 +164,10 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      SelectableText(chapter.content),
+                      SphotLegalArticleMarkdown(
+                        markdown: chapter.content,
+                        selectable: true,
+                      ),
                     ],
                   ),
                 ),
@@ -261,7 +265,7 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
                   padding: const EdgeInsets.all(8),
                   child: Column(
                     children: [
-                      _documentButton('cgu', Icons.description_outlined, 'CGU — Grand public'),
+                      _documentButton('cgu', Icons.description_outlined, 'CGU'),
                       _documentButton(
                         'privacyPolicy',
                         Icons.privacy_tip_outlined,
