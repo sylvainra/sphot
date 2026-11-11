@@ -73,7 +73,7 @@ class _AdvertiserLegalAcceptanceSectionState
       _locked || (_isCorrection && !widget.canEditLegal);
 
   bool get _canSubmit =>
-      _applicationCompleted &&
+      _applicationCompleted && !_loading &&
       ((_isCorrection && !widget.canEditLegal)
           ? _previousLegalAccepted
           : (_cguAccepted && _privacyAccepted && _rgpdAccepted &&
@@ -119,7 +119,10 @@ class _AdvertiserLegalAcceptanceSectionState
           .collection('legalDocuments')
           .doc('metadata')
           .get();
-      final cgu = await _loadLegalDocument('cgu');
+      final cgu = await _loadLegalDocument('advertiserCgu');
+      if (!LegalPublishedVersion.isPublishedDocument(cgu, chapterCount: 12)) {
+        throw StateError('CGU SPHOT PUBLICITAIRE non publiées ou incomplètes');
+      }
       final privacy = await _loadLegalDocument('privacyPolicy');
       final rgpd = await _loadLegalDocument('rgpdNotice');
       final cgvSnapshot = await firestore.collection('legalDocuments')
@@ -152,6 +155,7 @@ class _AdvertiserLegalAcceptanceSectionState
               .toString();
       final documentVersions = LegalPublishedVersion.acceptedSnapshot(
         cgu: cgu,
+        cguId: 'advertiserCgu',
         privacyPolicy: privacy,
         rgpdNotice: rgpd,
         fallback: activeVersion,
@@ -161,6 +165,7 @@ class _AdvertiserLegalAcceptanceSectionState
             legalAcceptance['documentVersions'] ??
                 acceptedDocuments['documentVersions'],
             documentVersions,
+            requireProof: true,
           );
 
       if (!mounted) return;
@@ -174,12 +179,14 @@ class _AdvertiserLegalAcceptanceSectionState
         _cgvDocument = cgvData;
         _cgvVersion = cgvVersion;
         _applicationCompleted = request['applicationCompleted'] == true;
-        _previousLegalAccepted = acceptedDocuments['cgu'] == true &&
+        _previousLegalAccepted = restoreAcceptance &&
+            acceptedDocuments['advertiserCgu'] == true &&
             acceptedDocuments['privacy'] == true &&
             acceptedDocuments['rgpd'] == true &&
             acceptedDocuments['advertiserCgv'] == true &&
             legalAcceptance['representativeDeclaration'] == true;
-        _cguAccepted = restoreAcceptance && acceptedDocuments['cgu'] == true;
+        _cguAccepted = restoreAcceptance &&
+            acceptedDocuments['advertiserCgu'] == true;
         _privacyAccepted =
             restoreAcceptance && acceptedDocuments['privacy'] == true;
         _rgpdAccepted = restoreAcceptance && acceptedDocuments['rgpd'] == true;
@@ -243,7 +250,7 @@ class _AdvertiserLegalAcceptanceSectionState
         'status': 'pending',
         'legalAcceptanceCompleted': true,
         'acceptedDocuments': <String, Object?>{
-          'cgu': true,
+          'advertiserCgu': true,
           'privacy': true,
           'rgpd': true,
           'advertiserCgv': true,
@@ -259,7 +266,7 @@ class _AdvertiserLegalAcceptanceSectionState
           'representativeDeclaration': true,
           'advertiserCgvVersion': _cgvVersion,
           'documents': <String, Object?>{
-            'cgu': true,
+            'advertiserCgu': true,
             'privacy': true,
             'rgpd': true,
             'advertiserCgv': true,
@@ -544,7 +551,7 @@ _cguController.collapse();
           title: 'Conditions Générales d’Utilisation',
           document: _cguDocument,
           accepted: _cguAccepted,
-          acceptanceText: 'J’ai lu et j’accepte les CGU de SPHOT.',
+          acceptanceText: 'J’ai lu et j’accepte les CGU SPHOT PUBLICITAIRE.',
           controller: _cguController,
           onChanged: (value) {
             setState(() => _cguAccepted = value ?? false);
