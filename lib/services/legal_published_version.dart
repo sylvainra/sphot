@@ -28,24 +28,51 @@ class LegalPublishedVersion {
     return '$version:historique';
   }
 
+  /// Retourne les versions des documents réellement présentés à ce profil.
+  /// Les anciens appels demeurent ceux des CGU Grand Public.
   static Map<String, String> acceptedSnapshot({
     required Map<String, dynamic>? cgu,
     required Map<String, dynamic>? privacyPolicy,
     required Map<String, dynamic>? rgpdNotice,
     required String fallback,
-  }) => <String, String>{
-    'cgu': identifier(cgu, fallback: fallback),
-    'privacyPolicy': identifier(privacyPolicy, fallback: fallback),
-    'rgpdNotice': identifier(rgpdNotice, fallback: fallback),
-  };
+    String cguId = 'cgu',
+    Map<String, dynamic>? charter,
+    String? charterId,
+  }) {
+    final result = <String, String>{
+      cguId: identifier(cgu, fallback: fallback),
+      'privacyPolicy': identifier(privacyPolicy, fallback: fallback),
+      'rgpdNotice': identifier(rgpdNotice, fallback: fallback),
+    };
+    if (charterId != null) {
+      if (charter == null) {
+        throw ArgumentError('Charte manquante pour $charterId');
+      }
+      result[charterId] = identifier(charter, fallback: fallback);
+    }
+    return result;
+  }
+
+  /// Un texte non publié ou incomplet ne peut pas être accepté.
+  static bool isPublishedDocument(
+    Map<String, dynamic>? document, {
+    required int chapterCount,
+  }) {
+    final chapters = document?['chapters'];
+    return document?['published'] == true &&
+        document?['testOnly'] != true &&
+        chapters is List &&
+        chapters.length == chapterCount;
+  }
 
   /// Les preuves anciennes ne comportaient que la version du corpus ; leur
   /// compatibilité est préservée. Pour les nouvelles, on vérifie chaque ID.
   static bool matchesRecordedSnapshot(
     Object? recorded,
-    Map<String, String> current,
-  ) {
-    if (recorded is! Map) return true;
+    Map<String, String> current, {
+    bool requireProof = false,
+  }) {
+    if (recorded is! Map) return !requireProof;
     for (final item in current.entries) {
       if (recorded[item.key] != item.value) return false;
     }
