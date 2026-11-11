@@ -21,7 +21,7 @@ class SuperAdminLegalAudiencePanel extends StatelessWidget {
       _LegalSection('CGU', [_LegalTarget('CGU — GRAND PUBLIC', 'cgu')]),
     ]),
     _LegalAudience('SPHOT ADMIN', [
-      _LegalSection('CGU', [_LegalTarget('CGU COMMUNES', 'cgu')]),
+      _LegalSection('CGU', [_LegalTarget('CGU — SPHOT ADMIN', 'adminCgu')]),
       _LegalSection('CGV', [_LegalTarget('CGV — SPHOT ADMIN', 'adminCgv')]),
     ]),
     _LegalAudience('SPHOT SAUVETEUR', [
@@ -31,7 +31,7 @@ class SuperAdminLegalAudiencePanel extends StatelessWidget {
       ]),
     ]),
     _LegalAudience('SPHOT PUBLICITAIRE', [
-      _LegalSection('CGU', [_LegalTarget('CGU COMMUNES', 'cgu')]),
+      _LegalSection('CGU', [_LegalTarget('CGU — SPHOT PUBLICITAIRE', 'advertiserCgu')]),
       _LegalSection('CGV', [
         _LegalTarget('CGV — SPHOT PUBLICITAIRE', 'advertiserCgv'),
       ]),
@@ -250,14 +250,17 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
     return uri;
   }
   static const _preparedIds = <String>{
-    'cgu', 'adminCgv', 'advertiserCgv', 'sauveteurCgu', 'sauveteurCharter',
+    'cgu', 'adminCgu', 'advertiserCgu', 'adminCgv', 'advertiserCgv',
+    'sauveteurCgu', 'sauveteurCharter',
   };
   static const _validatedAssets = <String, String>{
     'cgu': 'assets/legal/test_corpus/cgu_grand_public.md',
+    'adminCgu': 'assets/legal/prepublication_2026_11_11/cgu_admin.md',
+    'advertiserCgu': 'assets/legal/prepublication_2026_11_11/cgu_publicitaire.md',
     'adminCgv': 'assets/legal/test_corpus/cgv_admin.md',
     'advertiserCgv': 'assets/legal/test_corpus/cgv_publicitaire.md',
-    'sauveteurCgu': 'assets/legal/test_corpus/cgu_sauveteur.md',
-    'sauveteurCharter': 'assets/legal/test_corpus/charte_sauveteur.md',
+    'sauveteurCgu': 'assets/legal/prepublication_2026_11_11/cgu_sauveteur.md',
+    'sauveteurCharter': 'assets/legal/prepublication_2026_11_11/charte_sauveteur.md',
   };
 
   late Future<_LegalData> _future;

@@ -54,6 +54,7 @@ flutter:
   assets:
     - assets/data/spots.json
     - assets/legal/test_corpus/
+    - assets/legal/prepublication_2026_11_11/
     - docs/publication_commune_preparee/
     - data/icons/
     - data/images/

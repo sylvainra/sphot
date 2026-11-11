@@ -1,0 +1,93 @@
+# CGU — SPHOT SAUVETEUR
+
+## Article 1 — Objet et champ d’application
+
+Les présentes conditions générales d’utilisation (CGU) régissent l’accès à **SPHOT SAUVETEUR**, espace professionnel de SPHOT destiné aux sauveteurs et aux personnes habilitées à exercer des fonctions liées à la surveillance et à la sécurité des zones de baignade.
+
+SPHOT SAUVETEUR facilite la consultation, la saisie et la transmission des informations relatives aux postes de secours, selon les fonctions et les autorisations de chaque utilisateur. Ses outils comprennent notamment les informations de baignade, les drapeaux, les dangers, les observations de terrain, les plannings, les notifications et la main courante.
+
+L’accès est réservé aux utilisateurs disposant d’un compte personnel établi dans le cadre d’une organisation utilisant **SPHOT ADMIN**. Les présentes CGU s’appliquent quelle que soit la catégorie d’équipement compatible employée.
+
+Elles sont complétées par la **Charte d’utilisation professionnelle SPHOT SAUVETEUR**, qui expose les règles pratiques d’usage des fonctionnalités métier. La Politique de confidentialité et la Notice RGPD sont présentées séparément. L’accès professionnel exige l’acceptation des CGU et de la charte dans leurs versions applicables.
+
+## Article 2 — Accès au service, comptes et habilitations
+
+Le compte est créé et administré par SPHOT ADMIN dans le cadre des prérogatives de l’organisation concernée. Celle-ci veille à l’identification de l’utilisateur, à l’attribution de ses fonctions et postes de secours, à l’actualisation de ses habilitations et au retrait de ses accès lorsque ses missions prennent fin ou changent.
+
+Chaque compte est **personnel**. L’utilisateur préserve la confidentialité de ses identifiants, ne les partage pas, les utilise uniquement dans le cadre de ses fonctions et signale rapidement leur perte, leur compromission ou une utilisation suspecte. Il modifie son mot de passe lorsque la sécurité du compte le nécessite ou que le service le demande.
+
+Les droits varient selon le rôle, les affectations et l’état d’activation des services. Le mode **SPHOT ON** autorise, dans les limites de ces droits, la modification des informations opérationnelles réelles lorsque l’affectation est valide et que le service en temps réel est actif. Le mode **SPHOT OFF** maintient les seules fonctions accessibles sans autorisation d’écriture sur ces informations réelles. Ces modes décrivent les possibilités numériques de l’utilisateur ; ils ne constatent ni la présence ni l’absence de surveillance effective sur le terrain.
+
+**La rédaction manuelle des récits de la main courante, leur modification et leur suppression sont réservées au chef de poste et/ou à son adjoint habilités**, de même que la gestion du planning selon les droits attribués. Cette restriction **ne concerne pas les vérifications du matériel** : tous les sauveteurs affectés et habilités au poste peuvent procéder à ces vérifications et les faire enregistrer dans la main courante. Les autres droits de consultation et d’intervention restent limités aux fonctions et habilitations de chaque utilisateur ; les personnes institutionnelles autorisées consultent les seules données relevant de leurs missions.
+
+La création d’un compte ne vaut pas vérification ou certification des qualifications professionnelles de son titulaire par l’équipe SPHOT. La fin de l’accès n’entraîne pas nécessairement l’effacement immédiat des données professionnelles antérieurement enregistrées, dont le sort dépend des règles applicables à leur conservation.
+
+## Article 3 — Rôle de SPHOT et responsabilités professionnelles
+
+SPHOT SAUVETEUR est un outil de collecte, de consultation, de partage et de transmission d’informations. Il ne constitue ni un dispositif autonome de surveillance des baignades, ni un service de secours, ni une autorité de décision opérationnelle.
+
+Les décisions relatives aux drapeaux, aux conditions de baignade, aux dangers, à la surveillance et aux interventions relèvent des professionnels et autorités compétents, conformément aux procédures applicables. En toute circonstance, **la situation constatée sur place et les instructions des autorités compétentes prévalent** sur les informations numériques.
+
+Le sauveteur utilise le service dans les limites de ses fonctions ; il renseigne des informations pertinentes, exactes au regard de ses constatations et actualisées dans la mesure compatible avec ses missions. Il signale ou corrige les erreurs dont il a connaissance, distingue les faits observés des données rapportées et respecte la confidentialité des informations professionnelles. Aucune saisie informatique ne doit retarder une intervention urgente.
+
+SPHOT ADMIN gère les comptes, les affectations, les droits et les paramètres relevant de son organisation. L’équipe SPHOT assure l’exploitation et l’évolution de la plateforme, sans apprécier ni certifier la pertinence des décisions prises sur le terrain. Cette répartition n’exonère aucun acteur de ses propres obligations légales ou contractuelles. Le sauveteur ne répond pas automatiquement des décisions d’autrui ou des défaillances techniques qui ne lui sont pas imputables.
+
+## Article 4 — Informations professionnelles, main courante et confidentialité
+
+Les informations présentes dans SPHOT SAUVETEUR peuvent être saisies par un utilisateur habilité, fournies par l’organisme gestionnaire, issues d’un service externe ou produites automatiquement. Leur provenance et leur date doivent être prises en compte. Une information numérique ne vaut pas certification par SPHOT de la situation constatée sur le terrain.
+
+Selon la configuration et les droits du poste, certaines indications opérationnelles, notamment les drapeaux, l’état déclaré de baignade et les dangers, peuvent être diffusées au public. Un SPHOT demeure visible sur la carte indépendamment de l’accès aux fonctions en temps réel. Lorsque celles-ci sont indisponibles, l’affichage « Informations en temps réel indisponibles » ne permet de conclure ni à l’existence ni à l’absence d’une surveillance effective.
+
+La **main courante électronique SPHOT est un outil d’appui à la main courante physique du poste de secours ; elle ne la remplace pas**. Elle retrace les faits et événements enregistrés au cours de l’activité du poste, sans constituer un registre officiel exhaustif garanti par SPHOT. Les contenus professionnels de la main courante ne sont pas destinés à la consultation du grand public.
+
+Les changements de **position et de couleur du drapeau** sont inscrits automatiquement. **Tout sauveteur affecté et habilité au poste, qu’il soit simple sauveteur, adjoint ou chef de poste, peut effectuer et faire enregistrer les vérifications du matériel médical, du matériel de sauvetage terrestre et/ou aquatique et des moyens de communication.** Lorsqu’une vérification est effectivement réalisée, le service enregistre **sa réalisation déclarée, l’identité de son auteur, sa date et son heure**. Une vérification non réalisée ne doit pas être présentée comme accomplie. SPHOT enregistre l’information communiquée ; il n’effectue ni ne certifie matériellement le contrôle.
+
+**Seuls le chef de poste et/ou son adjoint habilités peuvent rédiger manuellement les faits du jour dans la main courante**, notamment les observations, incidents et interventions, dans une **rédaction libre et horodatée**. Ils déterminent le contenu de leurs récits selon les faits connus et leurs responsabilités professionnelles. SPHOT n’impose ni rédaction type ni mention systématique de catégories d’informations relatives à une victime. Les données personnelles ou de santé éventuellement relatées demeurent soumises aux règles de confidentialité, de nécessité et d’accès applicables. **Les vérifications du matériel restent ouvertes à tous les sauveteurs habilités et ne constituent pas une faculté générale de rédaction libre des récits.**
+
+**Le chef de poste et/ou son adjoint**, lorsqu’ils disposent des habilitations nécessaires et que les fonctions opérationnelles sont accessibles, peuvent modifier ou supprimer les inscriptions de la main courante électronique, y compris les inscriptions automatiques. Ces opérations sont tracées dans un **journal technique d’audit** comportant l’auteur, la date et les éléments antérieurs utiles à la compréhension de l’opération. La trace technique ne constitue pas une validation des récits par SPHOT.
+
+**SPHOT n’est que le vecteur technique de saisie, d’enregistrement et de transmission.** L’équipe SPHOT ne rédige, ne vérifie, ne corrige, ne modère et n’approuve pas les récits des professionnels. Les faits déclarés et leur contenu relèvent des auteurs et de leur organisme gestionnaire, selon leurs attributions et les règles applicables. Cette répartition ne dispense pas SPHOT de ses obligations propres de sécurité technique et de protection des données.
+
+L’accès aux récits, aux informations individuelles et aux données confidentielles est réservé aux utilisateurs et organismes effectivement habilités. Les notifications publiques et les affichages de sécurité ne doivent pas révéler les informations sensibles d’une intervention. Les notifications internes restent des moyens d’information complémentaires et ne constituent pas des dispositifs officiels d’alerte ou de secours.
+
+La main courante électronique du poste est **clôturée à 00 h 00 au début de la date de fermeture déclarée**. **L’ensemble de ses données conservées dans SPHOT, y compris les récits, les événements automatiques, les corrections, les inscriptions retirées et les journaux techniques d’audit correspondants, est supprimé le 1er janvier à 00 h 00 suivant l’année de surveillance concernée.** La main courante physique et les documents ou exports éventuellement conservés par l’organisme restent sous sa propre responsabilité.
+
+## Article 5 — Protection des données personnelles
+
+L’utilisation de SPHOT SAUVETEUR implique le traitement de données relatives notamment à l’identité et aux coordonnées professionnelles des utilisateurs, à leurs comptes, fonctions, affectations, habilitations, actions et historiques d’activité. La main courante peut également contenir des données concernant les personnes assistées ou impliquées dans une intervention, y compris, lorsque cela est nécessaire et juridiquement autorisé, des informations sensibles relatives à leur santé.
+
+Les traitements doivent poursuivre des finalités déterminées et reposer sur un fondement juridique approprié. La collecte doit être limitée à ce qui est nécessaire, l’accès réservé aux personnes habilitées et les mesures de sécurité adaptées à la sensibilité des informations. Les données personnelles ne deviennent pas publiques du seul fait de leur enregistrement dans SPHOT SAUVETEUR.
+
+La **Politique de confidentialité** et la **Notice RGPD** précisent, pour les traitements concernés, l’identité des responsables, les finalités et fondements juridiques, les destinataires, les durées de conservation ou leurs critères, les éventuels transferts de données et les droits des personnes. Les responsabilités respectives de l’exploitant SPHOT et des organismes gestionnaires dépendent des traitements réellement mis en œuvre et des règles applicables. Les demandes concernant SPHOT peuvent notamment être adressées à **contact@sphot.app**, sans préjudice des démarches relevant de l’organisation responsable du traitement.
+
+L’acceptation des présentes CGU ou de la charte ne vaut pas consentement général à tous les traitements de données. Lorsqu’un consentement spécifique est légalement requis, il est recueilli séparément. L’exercice des droits sur les données s’effectue dans les conditions et limites prévues par la réglementation applicable.
+
+## Article 6 — Équipements, disponibilité, sécurité et usages interdits
+
+SPHOT SAUVETEUR est accessible sur les équipements compatibles, notamment smartphones, tablettes et ordinateurs. L’organisation concernée choisit et entretient les appareils professionnels qu’elle met à disposition. Les tablettes renforcées peuvent convenir aux contraintes du terrain. Les fonctionnalités téléphoniques et logiciels tiers de secours, lorsqu’ils existent sur un appareil, demeurent distincts de SPHOT sauf intégration expressément prévue.
+
+Certaines fonctions dépendent de la disponibilité des réseaux, équipements, services et mises à jour. Des interruptions peuvent survenir. L’équipe SPHOT met en œuvre les mesures techniques et de sécurité appropriées dans le cadre de ses obligations, sans garantir une transmission instantanée en toutes circonstances. **SPHOT ne remplace pas les moyens officiels d’alerte ni les procédures de secours.** En cas d’indisponibilité, les professionnels poursuivent leurs missions par les moyens prévus par leur organisation.
+
+Les utilisateurs protègent leurs appareils et comptes, appliquent les mesures de sécurité appropriées et signalent les incidents. Il est interdit de contourner les habilitations, d’accéder volontairement à des données non autorisées, de divulguer des informations confidentielles, de falsifier des enregistrements, de perturber le service ou de l’utiliser à des fins étrangères aux missions professionnelles. Ces interdictions s’entendent sous réserve des usages légalement autorisés.
+
+Des mesures proportionnées de restriction ou de suspension peuvent être prises lorsqu’un risque de sécurité le justifie, dans le respect des compétences des organisations et des droits des personnes. Les présentes CGU n’écartent pas les obligations propres au fournisseur du service.
+
+## Article 7 — Propriété intellectuelle
+
+Les logiciels, interfaces, structures, textes, logos, marqueurs cartographiques et autres créations originales composant SPHOT sont protégés par les droits de propriété intellectuelle de leurs **titulaires légitimes**, dans la mesure prévue par la loi. L’accès à SPHOT SAUVETEUR n’accorde qu’un droit d’utilisation du service selon les présentes CGU et n’emporte aucune cession de propriété intellectuelle sur les éléments de la plateforme.
+
+Toute reproduction, adaptation, extraction ou exploitation non autorisée demeure soumise aux droits des titulaires, sous réserve des exceptions légales. Les informations et contenus professionnels renseignés par les organisations et utilisateurs restent distincts des créations de la plateforme ; leur saisie n’entraîne pas, à elle seule, la cession de droits éventuels à l’équipe SPHOT.
+
+Les titulaires des droits et, le cas échéant, les modalités de leur exploitation par l’entité chargée du service sont déterminés conformément à la situation juridique effective. Aucun transfert à une structure dépourvue de personnalité juridique n’est présumé.
+
+## Article 8 — Acceptation, évolution et dispositions finales
+
+Lors de sa première connexion et lorsque les conditions applicables le requièrent, l’utilisateur peut consulter distinctement les **CGU SPHOT SAUVETEUR**, la **Politique de confidentialité**, la **Notice RGPD** et la **Charte d’utilisation professionnelle SPHOT SAUVETEUR**. Les CGU et la charte sont acceptées au moyen de confirmations explicites et séparées. La prise de connaissance des documents relatifs aux données personnelles est distincte de tout consentement qui serait nécessaire pour un traitement particulier.
+
+Chaque acceptation est enregistrée avec le compte concerné, la référence et la version du document, ainsi que la date et l’heure de la validation. Les versions précédentes sont conservées de manière à pouvoir identifier les dispositions acceptées à une date donnée.
+
+Les CGU et la charte peuvent être modifiées et publiées indépendamment par **l’équipe SPHOT**, au moyen de son interface de gestion des documents juridiques. Chaque version publiée est identifiable et assortie d’une date d’entrée en vigueur. Une nouvelle version ne réécrit pas rétroactivement celles déjà acceptées. Lorsqu’une nouvelle acceptation est nécessaire, elle est demandée avant la poursuite de l’utilisation des fonctions concernées. Un refus peut empêcher cet accès, sans suppression automatique des enregistrements professionnels antérieurs.
+
+Pour les questions relatives aux présentes CGU, l’utilisateur peut contacter l’équipe SPHOT à **contact@sphot.app**. L’identité juridique de l’exploitant, les mentions qui en dépendent et les modalités de règlement des différends seront précisées lors de la publication définitive, conformément à la situation juridique et aux règles impératives applicables.
+
+---

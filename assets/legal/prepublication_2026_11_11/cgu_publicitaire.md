@@ -1,0 +1,132 @@
+# CGU — SPHOT PUBLICITAIRE
+
+## Article 1 — Objet et champ d’application
+
+Les présentes Conditions Générales d’Utilisation (ci-après « CGU ») définissent les règles d’accès et d’usage du portail **SPHOT PUBLICITAIRE**, interface professionnelle mise à disposition des annonceurs souhaitant préparer, demander, gérer ou suivre des campagnes de visibilité sur les espaces publicitaires de la plateforme SPHOT.
+
+**Le portail est réservé aux acteurs agissant dans un cadre professionnel ou pour le compte d’un organisme identifiable**, notamment les entreprises françaises ou étrangères, professionnels indépendants, associations, collectivités et autres organismes disposant d’une identité juridique ou professionnelle vérifiable. Un particulier agissant exclusivement à titre privé, sans activité professionnelle ni organisme identifiable, ne peut pas utiliser ce portail pour diffuser une campagne publicitaire.
+
+Pour l’application des présentes CGU :
+
+- **Annonceur** désigne le professionnel indépendant ou l’organisation identifiable qui utilise le portail publicitaire pour promouvoir ses produits, activités, services ou son identité, directement ou par l’intermédiaire d’un représentant habilité.
+- **Représentant habilité** désigne la personne qui accède au portail au nom et pour le compte de l’Annonceur, dans les limites des pouvoirs dont elle dispose.
+- **Campagne** désigne l’ensemble des contenus, paramètres de diffusion et emplacements publicitaires définis pour une opération de visibilité.
+- **Plateforme SPHOT** désigne les applications, le site Web et les services numériques SPHOT, y compris la carte et les fiches consultées par le Grand Public.
+
+Les présentes CGU organisent **l’utilisation du portail**. Les offres, prix, durées vendues, commandes, conditions de paiement, facturation et conséquences commerciales d’une modification ou d’une annulation relèvent des **CGV SPHOT PUBLICITAIRE** applicables et des documents contractuels valablement acceptés.
+
+La Politique de confidentialité et la Notice RGPD sont accessibles séparément et demeurent applicables aux traitements de données concernés. Le Grand Public conserve ses propres CGU de consultation gratuite.
+
+## Article 2 — Éligibilité, identité et représentation de l’Annonceur
+
+L’Annonceur fournit une identité professionnelle ou organisationnelle sincère, des coordonnées valides et les éléments permettant d’identifier son activité ou son organisme. Pour une structure française, il communique son **SIRET lorsqu’il est applicable ou requis dans son parcours** ; pour une structure étrangère, il fournit les **références officielles d’immatriculation ou d’identification équivalentes** prévues par le parcours concerné. Le représentant qui agit pour un tiers garantit disposer des pouvoirs nécessaires à cette utilisation et aux démarches qu’il accomplit.
+
+L’Annonceur veille à la cohérence de sa dénomination, de ses marques, de son activité déclarée et des informations accessibles au public. Il signale les changements significatifs concernant sa représentation, son identité commerciale ou ses coordonnées.
+
+La création d’un compte ou l’ouverture d’un accès technique ne constitue pas une vérification ou une approbation par SPHOT de l’activité, des qualifications, des licences, des autorisations professionnelles ou des allégations commerciales de l’Annonceur.
+
+## Article 3 — Comptes, authentification et habilitations
+
+L’utilisation des fonctions réservées du portail publicitaire suppose un compte et les moyens d’authentification prévus par le service. Les accès personnels ne sont pas partagés. L’Annonceur et ses représentants préservent la confidentialité de leurs identifiants, protègent leurs équipements et signalent toute suspicion d’utilisation non autorisée.
+
+Chaque représentant intervient dans le périmètre de l’Annonceur dont il dépend. L’accès à un compte, à une campagne ou à un dossier n’autorise ni la consultation ni la modification des données d’un autre Annonceur.
+
+Lorsque les fonctionnalités le permettent, l’Annonceur met à jour les habilitations de ses représentants et demande la désactivation des accès devenus inutiles. SPHOT peut appliquer les mesures de sécurité technique adaptées à la protection des comptes et de la plateforme, sans assumer la direction de l’activité commerciale de l’Annonceur.
+
+## Article 4 — Préparation et configuration des campagnes
+
+Le portail peut proposer plusieurs formes de visibilité, notamment **Carte SPHOT**, **Fiche SPHOT Premium** et **Pack Visibilité Totale**, selon le catalogue effectivement disponible au moment de la demande. L’Annonceur sélectionne les options proposées dans l’interface et vérifie les informations de son récapitulatif.
+
+Les paramètres d’une campagne peuvent comprendre son format, son périmètre géographique, sa durée, ses contenus, ses coordonnées de contact et ses éventuelles destinations externes. L’Annonceur est responsable des sélections qu’il confirme et de l’exactitude des informations qu’il communique.
+
+Le configurateur peut fournir des visualisations, des indications de rayon ou des estimations du nombre de SPHOTS susceptibles d’être couverts. Ces indications techniques ne constituent pas, à elles seules, une garantie de visibilité individuelle, de consultation, de résultat commercial ou d’emplacement exclusif.
+
+Le détail des prestations achetées, de leur calendrier et des engagements commerciaux résulte du récapitulatif contractuel et des **CGV PUBLICITAIRE**, non des seules fonctions de simulation du portail.
+
+## Article 5 — Paramètres de diffusion locale et nationale
+
+Pour une campagne **locale**, l’Annonceur peut positionner un point central de diffusion (« épicentre ») sur une carte et sélectionner un rayon parmi ceux effectivement proposés par le portail. Il lui appartient de vérifier la zone représentée, notamment lorsque le point est proche d’une limite géographique ou d’un littoral.
+
+Pour une campagne **nationale**, aucun épicentre local ni rayon local n’a à être sélectionné. Le périmètre applicable est celui de l’offre nationale présentée au moment de la demande.
+
+La carte interactive et son animation servent à représenter une zone de diffusion numérique. Elles ne garantissent pas qu’une personne déterminée verra la campagne ni qu’une fréquentation physique sera générée.
+
+Le rayon de diffusion et le niveau territorial définis pour une campagne payée demeurent fixés pendant la période achetée. Le choix d’un autre rayon relève d’une nouvelle souscription après l’échéance de la campagne, conformément aux conditions commerciales alors applicables. Les éventuelles demandes de modification du visuel ou de la position relèvent du circuit de traitement distinct prévu à cet effet et ne permettent pas, à elles seules, de modifier le rayon contractuel.
+
+Les présentes CGU ne fixent ni tarif, ni multiplicateur interne de prix, ni condition de remboursement.
+
+## Article 6 — Contenus publicitaires et responsabilité de leur auteur
+
+L’Annonceur demeure responsable des textes, noms commerciaux, descriptions, logos, photographies, illustrations, messages et affirmations qu’il fournit. Il vérifie leur exactitude, leur actualité, leur licéité et leur adéquation avec le produit, le service ou l’activité réellement proposés.
+
+Il déclare disposer des droits, autorisations et justificatifs nécessaires à la reproduction et à la diffusion des contenus transmis, y compris lorsqu’ils comportent des marques, des œuvres de tiers ou des personnes identifiables. Il lui appartient de respecter les règles propres à son secteur d’activité, aux produits réglementés et à la publicité destinée au public concerné.
+
+Sont notamment prohibés les contenus manifestement illicites, trompeurs ou usurpés, ceux qui portent atteinte aux droits de tiers, ainsi que ceux qui utilisent de manière mensongère la qualité d’autorité publique, de service de secours ou de gestionnaire d’un SPHOT.
+
+**SPHOT fournit l’interface technique de présentation et de diffusion ; il n’est pas l’auteur des messages publicitaires de l’Annonceur.** La disponibilité d’un espace publicitaire, une vérification administrative ou une mise en ligne ne constituent pas une certification de la véracité, de la qualité ou de la conformité de l’offre annoncée.
+
+Lorsqu’une publicité présente un manquement manifeste aux règles applicables, **l’équipe SPHOT peut demander sa correction ou, si nécessaire, suspendre sa diffusion**, dans le respect des dispositions légales et des CGV applicables. Cette intervention ciblée ne constitue ni une obligation de surveillance générale ni une mission de lecture ou de modération systématique de toutes les publicités.
+
+## Article 7 — Identification de la publicité et priorité des informations de sécurité
+
+**Chaque publicité doit être clairement identifiable comme telle et permettre au public d’identifier l’Annonceur pour le compte duquel elle est diffusée.** Les emplacements publicitaires doivent également être distingués des informations relatives à la surveillance, aux drapeaux, aux dangers, aux conditions de baignade et aux secours. Une publicité n’est ni une consigne officielle ni une recommandation de sécurité délivrée par SPHOT.
+
+Les contenus, visuels et liens de l’Annonceur ne doivent pas masquer, altérer ou rendre ambiguës les informations opérationnelles des fiches et de la carte. Ils ne doivent pas laisser croire qu’une baignade est surveillée, sûre ou certifiée par SPHOT du seul fait qu’un emplacement publicitaire y est associé.
+
+L’Annonceur ne peut utiliser les signes distinctifs des autorités, services de secours, collectivités ou gestionnaires que s’il dispose des droits et autorisations nécessaires, sans suggérer une affiliation ou un agrément inexistants.
+
+La présence d’une campagne près d’un SPHOT ne vaut pas partenariat avec son organisme gestionnaire et ne confère à l’Annonceur aucun pouvoir de modification des informations professionnelles publiées par ce gestionnaire.
+
+## Article 8 — Liens externes, destinations et communications commerciales
+
+Lorsque le format le permet, l’Annonceur peut fournir l’adresse d’un site, d’un service de réservation, d’un formulaire ou d’une autre destination externe. Il vérifie que cette destination est accessible, cohérente avec le message publicitaire et conforme aux règles qui s’appliquent à son activité.
+
+L’Annonceur demeure responsable du contenu, des transactions, des données recueillies et des engagements proposés sur les services externes qu’il exploite ou contrôle. Lorsqu’il renvoie vers un service tiers indépendant, il veille à ne pas présenter ce lien de manière trompeuse. L’exploitant du service tiers reste responsable de ses propres opérations, sans préjudice des obligations légales de l’Annonceur.
+
+Les personnes qui quittent SPHOT pour accéder à un site tiers sont soumises aux informations et conditions propres à ce service.
+
+L’existence d’un lien n’équivaut pas à une garantie par SPHOT de sa sécurité, de sa disponibilité ou de la qualité de ce qui y est proposé. L’Annonceur doit éviter toute redirection trompeuse, tout téléchargement nuisible et toute collecte de données incompatible avec les règles applicables.
+
+Les messages commerciaux transmis hors de la plateforme SPHOT par l’Annonceur relèvent de sa responsabilité propre, notamment pour les règles de prospection et de consentement qui lui sont applicables.
+
+## Article 9 — Gestion, mise à jour et suivi des campagnes
+
+L’Annonceur utilise les outils du portail pour préparer sa campagne, transmettre les éléments demandés, répondre aux éventuelles demandes de correction technique ou administrative et suivre les informations mises à sa disposition sur son dossier.
+
+Il signale les erreurs importantes, les liens devenus invalides et les éléments de campagne qu’il sait inexacts. Une modification de contenu ou de paramètre n’emporte pas automatiquement modification d’une offre achetée : les droits de diffusion et conditions commerciales correspondants relèvent du contrat et des CGV applicables.
+
+Selon les fonctionnalités effectivement ouvertes, des statistiques de visibilité ou de fréquentation **numérique** peuvent être présentées. Elles reflètent les mesures propres aux outils utilisés et ne constituent ni une garantie de vente, ni une certification de fréquentation physique d’un lieu, ni une preuve que tous les utilisateurs d’une zone géographique ont vu l’annonce.
+
+Les échanges relatifs à la facturation, aux commandes, aux renouvellements et aux réclamations commerciales restent soumis aux documents contractuels distincts. Les règles d’utilisation du portail ne créent pas, à elles seules, un engagement de paiement ou une commande.
+
+## Article 10 — Données personnelles et confidentialité
+
+L’Annonceur et ses représentants veillent à ne déposer dans les champs et supports publicitaires que les données nécessaires aux finalités annoncées. Ils ne publient pas d’informations confidentielles concernant des clients, des personnes secourues, des personnels de surveillance ou d’autres tiers sans fondement valable.
+
+Les données liées aux comptes, aux demandes, aux échanges, aux campagnes et à leur suivi sont traitées conformément à la **Politique de confidentialité** et à la **Notice RGPD** applicables, qui demeurent distinctes de ces CGU. L’acceptation de ces CGU n’emporte pas consentement général à des traitements facultatifs.
+
+Chaque acteur assume les obligations qui lui incombent pour les traitements qu’il détermine et met en œuvre. Lorsque le lien publicitaire conduit à un service externe exploité par l’Annonceur, les traitements effectués sur ce service relèvent des responsabilités qui lui sont propres.
+
+Les questions et demandes relatives aux données doivent être orientées vers l’interlocuteur compétent selon les documents d’information déjà publiés, sans priver les personnes des droits que leur reconnaît la réglementation.
+
+## Article 11 — Sécurité, disponibilité et propriété intellectuelle
+
+L’Annonceur utilise le portail loyalement et dans le cadre des habilitations attribuées. Il ne tente pas de contourner les contrôles d’accès, de récupérer des données de tiers, de perturber la plateforme, d’introduire du code nuisible ou de détourner les fonctionnalités de leur finalité. Ces restrictions s’entendent sous réserve des usages légalement autorisés.
+
+Les fonctions de diffusion peuvent être affectées par des interruptions de réseau, des opérations de maintenance, des difficultés techniques ou des services tiers. SPHOT met en œuvre les mesures raisonnablement nécessaires au fonctionnement et à la sécurité de ses services, sans garantir l’absence absolue d’incident. Les conséquences commerciales d’une indisponibilité sont appréciées selon les CGV et le droit applicable.
+
+Les éléments logiciels, graphiques, textuels et distinctifs de la plateforme SPHOT restent la propriété de leurs titulaires ou sont utilisés sous leurs licences. Le droit d’utiliser le portail ne confère aucun droit de reproduction ou d’exploitation autonome de ces éléments.
+
+Les créations publicitaires transmises par l’Annonceur demeurent soumises aux droits de leurs titulaires. L’Annonceur autorise les adaptations techniques nécessaires à leur affichage dans les emplacements prévus, sans transfert général de propriété intellectuelle. Les ressources fournies par des tiers conservent leurs propres règles d’utilisation.
+
+## Article 12 — Acceptation, versions, évolution et dispositions finales
+
+Avant l’accès aux fonctions professionnelles soumises aux présentes conditions, le représentant habilité doit pouvoir consulter et **accepter explicitement les CGU SPHOT PUBLICITAIRE dans leur version applicable**. La prise de connaissance de la Politique de confidentialité et de la Notice RGPD est distinguée des consentements particuliers éventuellement requis. Les CGV font l’objet des confirmations propres aux opérations commerciales concernées.
+
+L’acceptation des CGU est associée au compte concerné, au document précis, à sa version et à sa révision publiées ainsi qu’à la date et à l’heure de validation. Les anciennes versions et preuves d’acceptation doivent être conservées sans écraser ni modifier rétroactivement les enregistrements historiques.
+
+Les CGU peuvent évoluer avec les fonctionnalités, la sécurité et les obligations applicables. Chaque nouvelle version publiée est identifiable ; une nouvelle acceptation est sollicitée lorsque les conditions d’utilisation l’exigent, avant de poursuivre les fonctions professionnelles correspondantes.
+
+L’identité de l’exploitant et les informations légales applicables figurent dans les mentions légales distinctes. Les questions concernant ces CGU peuvent être adressées à **contact@sphot.app**. Les parties disposent des recours prévus par le droit applicable ; le droit français constitue le cadre de référence sous réserve des règles impératives et juridictions compétentes.
+
+---
