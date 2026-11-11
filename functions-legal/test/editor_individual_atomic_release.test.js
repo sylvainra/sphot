@@ -98,3 +98,29 @@ test("publication individuelle atomique : 1.2, archive, cinq textes et communs p
       expectedDraftRevision: 1, expectedHash: hash(f.after)}}),
     {httpStatus: 409});
 });
+
+test("nouvelles CGU ADMIN et PUBLICITAIRE : import approuvé et publication", async () => {
+  const f = fixture();
+  for (const [id, count] of [["adminCgu", 14], ["advertiserCgu", 12]]) {
+    const created = await action({admin: f.admin, token: f.token,
+      input: {action: "create", documentId: id}});
+    assert.equal(created.draft.chapters.length, count);
+    assert.equal(created.draft.draftRevision, 0);
+    const reviewed = await action({admin: f.admin, token: f.token,
+      input: {action: "validate", documentId: id, expectedDraftRevision: 0,
+        confirm: true}});
+    assert.equal(reviewed.draft.status, "validated");
+    const published = await action({admin: f.admin, token: f.token,
+      allowPublish: true, input: {action: "publish", documentId: id,
+        expectedDraftRevision: 0, expectedHash: hash(created.draft.chapters),
+        confirm: true}});
+    assert.equal(published.published, true);
+    assert.equal(f.docs.get(`legalDocuments/${id}`).published, true);
+    assert.equal(f.docs.get(`legalDocuments/${id}`).chapters.length, count);
+    assert.equal(f.docs.get(`legalDocuments/${id}/chapters/01`).isActive, true);
+  }
+  assert.equal(f.docs.get("legalDocuments/cgu").chapters.length, 1);
+  assert.equal(f.docs.get("legalDocuments/cgu").chapters[0].content,
+    "Texte officiel cgu");
+  assert.equal(f.docs.get("legalPacks/versions/items/1_3").commonDocuments.length, 4);
+});
