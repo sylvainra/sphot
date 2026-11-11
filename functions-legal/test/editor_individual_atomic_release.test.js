@@ -124,3 +124,27 @@ test("nouvelles CGU ADMIN et PUBLICITAIRE : import approuvé et publication", as
     "Texte officiel cgu");
   assert.equal(f.docs.get("legalPacks/versions/items/1_3").commonDocuments.length, 4);
 });
+
+test("mise à niveau de CGU SAUVETEUR existantes : historique conservé", async () => {
+  const f = fixture();
+  const created = await action({admin: f.admin, token: f.token,
+    input: {action: "create", documentId: "sauveteurCgu"}});
+  assert.equal(created.draft.chapters.length, 8);
+  const approved = await action({admin: f.admin, token: f.token,
+    input: {action: "validate", documentId: "sauveteurCgu",
+      expectedDraftRevision: 0, confirm: true}});
+  assert.equal(approved.draft.status, "validated");
+  const published = await action({admin: f.admin, token: f.token,
+    allowPublish: true, input: {action: "publish",
+      documentId: "sauveteurCgu", expectedDraftRevision: 0,
+      expectedHash: hash(created.draft.chapters), confirm: true}});
+  assert.equal(published.published, true);
+  assert.equal(f.docs.get("legalDocuments/sauveteurCgu").chapters.length, 8);
+  assert.equal(f.docs.get("legalVersions/sauveteurCgu_r00000000_legacy")
+      .chapters[0].content, "Texte officiel sauveteurCgu");
+  const reloaded = await action({admin: f.admin, token: f.token,
+    input: {action: "create", documentId: "sauveteurCgu"}});
+  assert.equal(reloaded.draft.chapters.length, 8);
+  assert.equal(f.docs.get("legalEditorialDrafts/sauveteurCgu").approvedImport,
+    false);
+});
