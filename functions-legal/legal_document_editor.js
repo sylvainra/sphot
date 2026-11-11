@@ -30,6 +30,8 @@ const INITIAL_IDS = new Set(initialPack.DOCUMENTS.map((s) => s.id));
 const SEEDED_CGU = Object.freeze({
   adminCgu: require("./legal_sources/adminCgu.json"),
   advertiserCgu: require("./legal_sources/advertiserCgu.json"),
+  sauveteurCgu: require("./legal_sources/sauveteurCgu.json"),
+  sauveteurCharter: require("./legal_sources/sauveteurCharter.json"),
 });
 function approvedSeed(id) {
   const seed = SEEDED_CGU[id];
@@ -194,7 +196,12 @@ async function action({admin, token, input, now = Date.now(), allowPublish = fal
       }
       const beforeInitial = !isInitialPublished(metadata);
       let rows = active.rows;
-      if (!active.exists && Object.hasOwn(SEEDED_CGU, spec.id)) {
+      // Première mise à niveau des textes métiers du lot historique.
+      // Ne jamais réinjecter le texte de novembre lors d'une future révision.
+      const approvedImport = Object.hasOwn(SEEDED_CGU, spec.id) &&
+        (!active.exists ||
+          clean((live.data() || {}).publicationSource) !== EDITOR_SOURCE);
+      if (approvedImport) {
         rows = approvedSeed(spec.id);
       }
       if (beforeInitial && INITIAL_IDS.has(spec.id)) {
@@ -208,6 +215,7 @@ async function action({admin, token, input, now = Date.now(), allowPublish = fal
         sourceHash: hash(rows), baseHash: active.hash,
         baseRevision: active.revision, baseVersion: active.version,
         sourcePendingInitialPublication: beforeInitial,
+        approvedImport,
         reviewedHash: "", reviewedByUid: null, reviewedAt: null,
         changeSummary: "", createdByUid: uid, createdAt: stamp(admin),
         updatedByUid: uid, updatedAt: stamp(admin)};
@@ -240,7 +248,7 @@ async function action({admin, token, input, now = Date.now(), allowPublish = fal
         return {draft: draftResult({...draft, ...updates})};
       }
       const initialSeed = Object.hasOwn(SEEDED_CGU, spec.id) &&
-        draft.baseRevision === -1 && draft.draftRevision === 0 &&
+        draft.approvedImport === true && draft.draftRevision === 0 &&
         hash(draft.chapters) === hash(approvedSeed(spec.id));
       if (!initialSeed &&
           (draft.draftRevision === 0 ||
@@ -290,7 +298,8 @@ async function action({admin, token, input, now = Date.now(), allowPublish = fal
     if (current.some((row) => {
       // Un texte nouveau non encore publié ne bloque pas les textes existants.
       // Il ne participe au corpus historique qu'une fois publié.
-      if (!row.exists && Object.hasOwn(SEEDED_CGU, row.id)) return false;
+      if (!row.exists && Object.hasOwn(SEEDED_CGU, row.id) &&
+          !INITIAL_IDS.has(row.id)) return false;
       return !row.exists || !canonical(row.rows).length ||
         (INITIAL_IDS.has(row.id) && !row.published) ||
         (Object.hasOwn(SEEDED_CGU, row.id) && !row.published);
