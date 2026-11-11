@@ -35,4 +35,54 @@ void main() {
       isTrue,
     );
   });
+
+test('CGU spécifiques et Charte SAUVETEUR disposent de preuves propres', () {
+    final versions = LegalPublishedVersion.acceptedSnapshot(
+      cgu: {'version': '1.2', 'revision': 3},
+      cguId: 'sauveteurCgu',
+      charter: {'version': '1.4', 'revision': 1},
+      charterId: 'sauveteurCharter',
+      privacyPolicy: {'version': '1.2'},
+      rgpdNotice: {'version': '1.2'},
+      fallback: '1.4',
+    );
+    expect(versions['sauveteurCgu'], '1.2:r3');
+    expect(versions['sauveteurCharter'], '1.4:r1');
+    expect(versions.containsKey('cgu'), isFalse);
+    expect(
+      LegalPublishedVersion.matchesRecordedSnapshot(
+        null, versions, requireProof: true,
+      ),
+      isFalse,
+    );
+    expect(
+      LegalPublishedVersion.matchesRecordedSnapshot(
+        {...versions}..remove('sauveteurCharter'),
+        versions,
+        requireProof: true,
+      ),
+      isFalse,
+    );
+  });
+
+  test('CGU non publiées ou incomplètes non acceptables', () {
+    expect(
+      LegalPublishedVersion.isPublishedDocument(
+        {'published': true, 'chapters': [1, 2]}, chapterCount: 2,
+      ),
+      isTrue,
+    );
+    expect(
+      LegalPublishedVersion.isPublishedDocument(
+        {'published': false, 'chapters': [1, 2]}, chapterCount: 2,
+      ),
+      isFalse,
+    );
+    expect(
+      LegalPublishedVersion.isPublishedDocument(
+        {'published': true, 'chapters': [1]}, chapterCount: 2,
+      ),
+      isFalse,
+    );
+  });
 }
