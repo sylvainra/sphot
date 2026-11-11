@@ -302,10 +302,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         data['trialRequest'] ?? {},
       );
 
-      final acceptedDocuments = Map<String, dynamic>.from(
-        trialRequest['acceptedDocuments'] ?? {},
-      );
-
       final administrativeTracking = Map<String, dynamic>.from(
         data['administrativeTracking'] ?? {},
       );
