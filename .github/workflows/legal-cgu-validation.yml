@@ -1,0 +1,73 @@
+name: SPHOT - Validation CGU par profil
+
+on:
+  push:
+    branches:
+      - feat/legal-cgu-profils-2026-11-11
+  pull_request:
+    paths:
+      - "assets/legal/**"
+      - "functions-legal/**"
+      - "functions/**"
+      - "lib/pages/sauveteur/sauveteur_legal_acceptance_page.dart"
+      - "lib/web/admin/pages/admin_trial_request_page.dart"
+      - "lib/web/advertiser/widgets/advertiser_legal_acceptance_section.dart"
+      - "lib/web/super_admin/widgets/super_admin_legal_audience_panel.dart"
+      - "lib/services/legal_published_version.dart"
+      - "test/legal_published_version_test.dart"
+      - ".github/workflows/legal-cgu-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  legal-node:
+    name: Cloud Functions - versions et historique
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Installer fonctions (sans déploiement)
+        run: npm --prefix functions ci
+      - name: Contrôle syntaxique des fonctions modifiées
+        run: |
+          node --check functions/index.js
+          node --check functions/advertiser_correction_resubmit.js
+          node --check functions/legal_document_versions.js
+      - name: Tests de versions des acceptations
+        run: node --test functions/test/legal_document_versions.test.js
+      - name: Installer éditeur juridique
+        run: npm --prefix functions-legal ci
+      - name: Tests de l'éditeur juridique
+        run: npm --prefix functions-legal test
+
+  flutter-legal:
+    name: Flutter - parcours des quatre profils
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer Flutter stable
+        run: |
+          git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version
+      - name: Installer dépendances Flutter
+        run: flutter pub get
+      - name: Analyser les fichiers modifiés
+        run: |
+          flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings \
+            lib/services/legal_published_version.dart \
+            lib/pages/sauveteur/sauveteur_legal_acceptance_page.dart \
+            lib/web/admin/pages/admin_trial_request_page.dart \
+            lib/web/advertiser/widgets/advertiser_legal_acceptance_section.dart \
+            lib/web/super_admin/widgets/super_admin_legal_audience_panel.dart \
+            test/legal_published_version_test.dart
+      - name: Tester les versions juridiques Flutter
+        run: flutter test --no-pub test/legal_published_version_test.dart
+      - name: Construire Web sans publier
+        run: flutter build web --release --no-pub -t lib/main.dart
