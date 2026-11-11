@@ -386,7 +386,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
       _legalReadConfirmed =
           trialRequest['legalReadConfirmed'] == true ||
-          acceptedDocuments['cgu'] == true;
+          acceptedDocuments['adminCgu'] == true;
 
       _privacyReadConfirmed =
           trialRequest['privacyReadConfirmed'] == true ||
@@ -530,6 +530,12 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
   }
 
   bool get _canSubmitTrialRequest {
+    if (_legalLoading ||
+        !LegalPublishedVersion.isPublishedDocument(
+          _cguDoc, chapterCount: 14,
+        )) {
+      return false;
+    }
     // En mode correction, on ne redemande pas la validation complète
     // du dossier initial : seuls les champs signalés par le Super Admin
     // doivent avoir été corrigés et être valides.
@@ -1137,7 +1143,10 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         };
       }
 
-      final cgu = await loadLegalDoc('cgu');
+      final cgu = await loadLegalDoc('adminCgu');
+      if (!LegalPublishedVersion.isPublishedDocument(cgu, chapterCount: 14)) {
+        throw StateError('CGU SPHOT ADMIN non publiées ou incomplètes');
+      }
       final privacy = await loadLegalDoc('privacyPolicy');
       final rgpd = await loadLegalDoc('rgpdNotice');
 
@@ -1394,13 +1403,14 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
               'version': _sphotVersion,
               'documentVersions': LegalPublishedVersion.acceptedSnapshot(
                 cgu: _cguDoc,
+                cguId: 'adminCgu',
                 privacyPolicy: _privacyDoc,
                 rgpdNotice: _rgpdDoc,
                 fallback: _sphotVersion,
               ),
               'publishedAt': _sphotPublishedAt,
               'acceptedAt': FieldValue.serverTimestamp(),
-              'cgu': true,
+              'adminCgu': true,
               'privacy': true,
               'rgpd': true,
             },
@@ -3429,10 +3439,10 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           const Center(child: CircularProgressIndicator())
         else ...[
           _legalDropdown(
-            title: 'Conditions Générales d’Utilisation',
+            title: 'Conditions Générales d’Utilisation — SPHOT ADMIN',
             document: _cguDoc,
             checked: _legalReadConfirmed,
-            checkText: 'J’ai lu et j’accepte les CGU de SPHOT.',
+            checkText: 'J’ai lu et j’accepte les CGU SPHOT ADMIN.',
             controller: _cguExpansionController,
             onChanged: (value) {
               setState(() {
