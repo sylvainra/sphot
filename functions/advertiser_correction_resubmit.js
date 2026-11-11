@@ -168,11 +168,44 @@ function registerAdvertiserCorrectionResubmit({admin, onRequest}) {
                 },
                 acceptedAt: FieldValue.serverTimestamp(),
               };
-            } else if (data.legalAcceptanceCompleted !== true ||
-                data.acceptedDocuments?.advertiserCgu !== true ||
-                !data.acceptedDocuments?.documentVersions?.advertiserCgu) {
-              // Les anciennes CGU Grand Public ne valent pas cet accord.
-              return "legal_mismatch";
+            } else {
+              const accepted = data.acceptedDocuments || {};
+              if (data.legalAcceptanceCompleted !== true ||
+                  accepted.advertiserCgu !== true ||
+                  !accepted.documentVersions?.advertiserCgu ||
+                  accepted.advertiserCgv !== true) {
+                // Les anciennes CGU Grand Public ne valent pas cet accord.
+                return "legal_mismatch";
+              }
+              const ids = ["advertiserCgu", "privacyPolicy", "rgpdNotice",
+                "advertiserCgv"];
+              const refs = ids.map((id) =>
+                db.collection("legalDocuments").doc(id));
+              const metaRef = db.collection("legalDocuments").doc("metadata");
+              const [currentMetadata, ...active] = await Promise.all([
+                transaction.get(metaRef),
+                ...refs.map((item) => transaction.get(item)),
+              ]);
+              if (active.some((snap) => !snap.exists) ||
+                  active[0].data()?.published !== true ||
+                  active[0].data()?.testOnly === true) {
+                return "legal_outdated";
+              }
+              const globalVersion = String(
+                  currentMetadata.data()?.legalVersion ||
+                  currentMetadata.data()?.version || "1.0");
+              const currentDocs = legalDocumentVersions.snapshot({
+                cgu: active[0].data(),
+                privacyPolicy: active[1].data(),
+                rgpdNotice: active[2].data(),
+              }, globalVersion, {cguId: "advertiserCgu"});
+              if (!legalDocumentVersions.matchesRequested(
+                  accepted.documentVersions, currentDocs,
+                  {required: true}) ||
+                  accepted.advertiserCgvVersion !==
+                    String(active[3].data()?.version || "1.0")) {
+                return "legal_outdated";
+              }
             }
             // Une retransmission est un nouvel événement de réception :
             // réarmer l'email déjà envoyé lors du dépôt initial.
