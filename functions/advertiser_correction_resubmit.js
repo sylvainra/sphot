@@ -121,7 +121,7 @@ function registerAdvertiserCorrectionResubmit({admin, onRequest}) {
                   .doc("metadata");
               const cgvRef = db.collection("legalDocuments")
                   .doc("advertiserCgv");
-              const commonRefs = ["cgu", "privacyPolicy", "rgpdNotice"]
+              const commonRefs = ["advertiserCgu", "privacyPolicy", "rgpdNotice"]
                   .map((id) => db.collection("legalDocuments").doc(id));
               const metadataSnap = await transaction.get(metadataRef);
               const cgvSnap = await transaction.get(cgvRef);
@@ -135,21 +135,24 @@ function registerAdvertiserCorrectionResubmit({admin, onRequest}) {
               if (version !== currentVersion || cgvVersion !== currentCgv) {
                 return "legal_outdated";
               }
-              if (commonSnapshots.some((snapshot) => !snapshot.exists)) {
+              if (commonSnapshots.some((snapshot) => !snapshot.exists) ||
+                  commonSnapshots[0].data()?.published !== true ||
+                  commonSnapshots[0].data()?.testOnly === true) {
                 return "legal_outdated";
               }
               const documentVersions = legalDocumentVersions.snapshot({
                 cgu: commonSnapshots[0].data() || {},
                 privacyPolicy: commonSnapshots[1].data() || {},
                 rgpdNotice: commonSnapshots[2].data() || {},
-              }, currentVersion);
+              }, currentVersion, {cguId: "advertiserCgu"});
               if (!legalDocumentVersions.matchesRequested(
-                  body.documentVersions, documentVersions)) {
+                  body.documentVersions, documentVersions,
+                  {required: true})) {
                 return "legal_outdated";
               }
               change.legalAcceptanceCompleted = true;
               change.acceptedDocuments = {
-                cgu: true, privacy: true, rgpd: true, advertiserCgv: true,
+                advertiserCgu: true, privacy: true, rgpd: true, advertiserCgv: true,
                 advertiserCgvVersion: currentCgv, version: currentVersion,
                 documentVersions,
                 acceptedAt: FieldValue.serverTimestamp(),
@@ -161,11 +164,14 @@ function registerAdvertiserCorrectionResubmit({admin, onRequest}) {
                 representativeDeclaration: true,
                 advertiserCgvVersion: currentCgv,
                 documents: {
-                  cgu: true, privacy: true, rgpd: true, advertiserCgv: true,
+                  advertiserCgu: true, privacy: true, rgpd: true, advertiserCgv: true,
                 },
                 acceptedAt: FieldValue.serverTimestamp(),
               };
-            } else if (data.legalAcceptanceCompleted !== true) {
+            } else if (data.legalAcceptanceCompleted !== true ||
+                data.acceptedDocuments?.advertiserCgu !== true ||
+                !data.acceptedDocuments?.documentVersions?.advertiserCgu) {
+              // Les anciennes CGU Grand Public ne valent pas cet accord.
               return "legal_mismatch";
             }
             // Une retransmission est un nouvel événement de réception :
