@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sphot/services/sphot_legal_text_normalization.dart';
+import 'package:bathing_spots_app/services/sphot_legal_text_normalization.dart';
 
 void main() {
   test('LF, CRLF et CR sont identiques sans modifier les mots', () {
