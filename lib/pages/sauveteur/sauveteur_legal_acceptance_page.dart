@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../services/legal_published_version.dart';
+import '../../web/super_admin/widgets/sphot_legal_article_markdown.dart';
 import 'sauveteur_access_info_page.dart';
 
 class SauveteurLegalAcceptancePage extends StatefulWidget {
@@ -391,14 +392,12 @@ class _SauveteurLegalAcceptancePageState
                           ),
                         ),
                       if (title.isNotEmpty) const SizedBox(height: 3),
-                      Text(
-                        body,
+                      DefaultTextStyle.merge(
                         style: const TextStyle(
                           color: Color(0xFF1F2937),
-                          fontSize: 11.5,
                           fontWeight: FontWeight.w600,
-                          height: 1.35,
                         ),
+                        child: SphotLegalArticleMarkdown(markdown: body),
                       ),
                     ],
                   ),
@@ -657,7 +656,7 @@ class _SauveteurLegalAcceptancePageState
                               children: [
                                 _legalDocument(
                                   title:
-                                      'CGU — SPHOT SAUVETEUR',
+                                      'CGU',
                                   document: _cguDocument,
                                   controller: _cguController,
                                   accepted: _cguAccepted,
@@ -670,7 +669,7 @@ class _SauveteurLegalAcceptancePageState
                                   },
                                 ),
                                 _legalDocument(
-                                  title: 'Charte professionnelle — SPHOT SAUVETEUR',
+                                  title: 'Charte professionnelle',
                                   document: _charterDocument,
                                   controller: _charterController,
                                   accepted: _charterAccepted,
