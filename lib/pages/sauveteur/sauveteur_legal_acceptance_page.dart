@@ -412,7 +412,7 @@ class _SauveteurLegalAcceptancePageState
               alignment: Alignment.centerLeft,
               child: Text(
                 'Version du document '
-                '${LegalPublishedVersion.number(document, fallback: _legalVersion)}',
+                '${LegalPublishedVersion.identifier(document, fallback: _legalVersion)}',
                 style: const TextStyle(
                   color: Color(0xFFEF4444),
                   fontSize: 11.5,
