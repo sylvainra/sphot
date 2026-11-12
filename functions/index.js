@@ -5807,13 +5807,11 @@ exports.getSauveteurSessionState = onRequest(
           return;
         }
 
-        const {context, accountData} = session;
-        const activeLegalPack = await activeLegalPackInfo();
-        const legalAcceptanceRequired =
-          !sauveteurLegalAcceptanceIsCurrent(
-              accountData,
-              activeLegalPack,
-          );
+        const {context, legalPack: activeLegalPack,
+          legalAcceptanceCurrent} = session;
+        // resolveSauveteurSession a déjà lu les versions publiées des
+        // CGU/Charte : ne pas les remplacer par le pack global sans détails.
+        const legalAcceptanceRequired = !legalAcceptanceCurrent;
 
         response.status(200).json({
           success: true,
