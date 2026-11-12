@@ -13,7 +13,7 @@ enum ProfessionalLegalAudience { admin, advertiser }
 /// Le portail reste sur le bon document publié, même après une mise à jour
 /// individuelle dans le dashboard Super Admin. Les brouillons ne sont jamais
 /// présentés et ne modifient pas les acceptations.
-class ProfessionalLegalGate extends StatelessWidget {
+class ProfessionalLegalGate extends StatefulWidget {
   const ProfessionalLegalGate({
     super.key,
     required this.audience,
@@ -23,23 +23,40 @@ class ProfessionalLegalGate extends StatelessWidget {
   final ProfessionalLegalAudience audience;
   final Widget child;
 
-  String get _documentId => audience == ProfessionalLegalAudience.admin
-      ? 'adminCgu'
-      : 'advertiserCgu';
+  @override
+  State<ProfessionalLegalGate> createState() =>
+      _ProfessionalLegalGateState();
+}
 
-  int get _chapterCount => audience == ProfessionalLegalAudience.admin
-      ? 14
-      : 12;
+class _ProfessionalLegalGateState extends State<ProfessionalLegalGate> {
+  late final Stream<DocumentSnapshot<Map<String, dynamic>>> _published;
 
-  String get _displayName => audience == ProfessionalLegalAudience.admin
-      ? 'SPHOT ADMIN'
-      : 'SPHOT PUBLICITAIRE';
+  String get _documentId =>
+      widget.audience == ProfessionalLegalAudience.admin
+          ? 'adminCgu'
+          : 'advertiserCgu';
+
+  int get _chapterCount =>
+      widget.audience == ProfessionalLegalAudience.admin ? 14 : 12;
+
+  String get _displayName =>
+      widget.audience == ProfessionalLegalAudience.admin
+          ? 'SPHOT ADMIN'
+          : 'SPHOT PUBLICITAIRE';
+
+  @override
+  void initState() {
+    super.initState();
+    // Une seule souscription pendant la vie du dashboard. La carte peut
+    // se reconstruire souvent sans provoquer de rechargement juridique.
+    _published = FirebaseFirestore.instance
+        .collection('legalDocuments').doc(_documentId).snapshots();
+  }
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('legalDocuments').doc(_documentId).snapshots(),
+      stream: _published,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return _GateMessage(
@@ -55,8 +72,7 @@ class ProfessionalLegalGate extends StatelessWidget {
         final data = snapshot.data!.data();
         if (data == null || data['published'] != true ||
             data['testOnly'] == true) {
-          // Avant la première publication, les accès existants sont préservés.
-          return child;
+          return widget.child;
         }
         if (!LegalPublishedVersion.isPublishedDocument(
               data,
@@ -81,7 +97,7 @@ class ProfessionalLegalGate extends StatelessWidget {
               .whereType<Map>()
               .map((part) => Map<String, dynamic>.from(part))
               .toList(),
-          child: child,
+          child: widget.child,
         );
       },
     );
