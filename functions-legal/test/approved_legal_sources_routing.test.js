@@ -6,6 +6,10 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "../..");
+
+// Sous Windows, Git peut extraire les Markdown avec CRLF alors que les
+// sources JSON approuvées contiennent LF. Seules les fins de ligne varient.
+const normalizeEndOfLines = (value) => value.replace(/\r\n?/g, "\n");
 const documents = [
   ["adminCgu", "cgu_admin.md", 14],
   ["advertiserCgu", "cgu_publicitaire.md", 12],
@@ -15,8 +19,8 @@ const documents = [
 
 test("les textes approuvés sont strictement identiques aux sources Firebase", () => {
   for (const [id, filename, expected] of documents) {
-    const markdown = fs.readFileSync(path.join(root,
-        "assets/legal/prepublication_2026_11_11", filename), "utf8");
+    const markdown = normalizeEndOfLines(fs.readFileSync(path.join(root,
+        "assets/legal/prepublication_2026_11_11", filename), "utf8"));
     const json = JSON.parse(fs.readFileSync(path.join(root,
         "functions-legal/legal_sources", id + ".json"), "utf8"));
     const headings = [...markdown.matchAll(/^##\s+(.+)$/gm)];
@@ -29,10 +33,18 @@ test("les textes approuvés sont strictement identiques aux sources Firebase", (
     }));
     assert.equal(rows.length, expected, id + " nombre de rubriques");
     assert.deepEqual(rows, json.chapters.map((c) => ({
-      id: c.id, title: c.title, content: c.content,
+      id: c.id, title: c.title,
+      content: normalizeEndOfLines(c.content),
     })), id + " correspondance exacte");
     assert.equal(json.status, "PREPUBLICATION_NON_PUBLIE");
   }
+});
+
+test("Windows CRLF et Unix LF ne changent pas le texte approuvé", () => {
+  const approved = "premier paragraphe\n\ndeuxième paragraphe";
+  const windows = "premier paragraphe\r\n\r\ndeuxième paragraphe";
+  assert.equal(normalizeEndOfLines(windows), approved);
+  assert.notEqual(normalizeEndOfLines(windows + " modifié"), approved);
 });
 
 test("les cinq documents sont branchés au bon acteur", () => {
