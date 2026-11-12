@@ -5674,6 +5674,10 @@ async function handleSauveteurLogin(request, response, pilot = false) {
     );
 
     const activeLegalPack = await activeLegalPackInfo();
+    // Dès la connexion, vérifier les versions individuelles publiées
+    // des CGU et de la Charte, pas uniquement la version globale.
+    activeLegalPack.documentVersions =
+        await activeSauveteurDocumentVersions(activeLegalPack.version);
     const legalAcceptanceRequired =
           !sauveteurLegalAcceptanceIsCurrent(data, activeLegalPack);
 
@@ -5807,13 +5811,11 @@ exports.getSauveteurSessionState = onRequest(
           return;
         }
 
-        const {context, accountData} = session;
-        const activeLegalPack = await activeLegalPackInfo();
-        const legalAcceptanceRequired =
-          !sauveteurLegalAcceptanceIsCurrent(
-              accountData,
-              activeLegalPack,
-          );
+        const {context, legalPack: activeLegalPack,
+          legalAcceptanceCurrent} = session;
+        // resolveSauveteurSession a déjà lu les versions publiées des
+        // CGU/Charte : ne pas les remplacer par le pack global sans détails.
+        const legalAcceptanceRequired = !legalAcceptanceCurrent;
 
         response.status(200).json({
           success: true,

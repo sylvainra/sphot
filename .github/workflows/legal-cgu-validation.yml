@@ -60,7 +60,7 @@ jobs:
           node --check functions/advertiser_correction_resubmit.js
           node --check functions/legal_document_versions.js
       - name: Tests de versions des acceptations
-        run: node --test functions/test/legal_document_versions.test.js
+        run: node --test functions/test/legal_document_versions.test.js functions/test/sauveteur_legal_propagation.test.js
       - name: Vérifier les deux codebases Firebase
         run: node -e "const f=require('./firebase.json'); if(!f.functions.some(x=>x.codebase==='legal'&&x.source==='functions-legal'))process.exit(1)"
       - name: Installer éditeur juridique
