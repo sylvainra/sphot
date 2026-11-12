@@ -10,6 +10,9 @@ on:
       - "functions-legal/**"
       - "functions/**"
       - "lib/map/profil_login_page.dart"
+      - "lib/web/shared/professional_legal_gate.dart"
+      - "lib/web/admin/pages/admin_dashboard_page.dart"
+      - "lib/web/advertiser/pages/advertiser_dashboard_page.dart"
       - "lib/pages/sauveteur/sauveteur_legal_acceptance_page.dart"
       - "firebase.json"
       - "lib/web/admin/pages/admin_trial_request_page.dart"
@@ -67,6 +70,9 @@ jobs:
           flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings \
             lib/services/legal_published_version.dart \
             lib/map/profil_login_page.dart \
+            lib/web/shared/professional_legal_gate.dart \
+            lib/web/admin/pages/admin_dashboard_page.dart \
+            lib/web/advertiser/pages/advertiser_dashboard_page.dart \
             lib/pages/sauveteur/sauveteur_legal_acceptance_page.dart \
             lib/web/admin/pages/admin_trial_request_page.dart \
             lib/web/advertiser/widgets/advertiser_legal_acceptance_section.dart \
