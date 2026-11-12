@@ -27,6 +27,22 @@ permissions:
   contents: read
 
 jobs:
+  legal-windows:
+    name: Windows - controle du corpus CGU et du module legal
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verifier les CGU et le module juridique sous Windows
+        run: |
+          npm --prefix functions-legal ci
+          if ($LASTEXITCODE -ne 0) { throw "Echec npm ci" }
+          npm --prefix functions-legal run check
+          if ($LASTEXITCODE -ne 0) { throw "Echec verification juridique Windows" }
+
   legal-node:
     name: Cloud Functions - versions et historique
     runs-on: ubuntu-latest
