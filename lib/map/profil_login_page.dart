@@ -96,6 +96,30 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
   bool get _hasSauveteur => _accountTypes.contains('SAUVETEUR');
   bool get _hasProfessionalAccount => _hasAdmin || _hasAdvertiser;
 
+  // Le lien CGU de connexion suit le profil choisi, pas les CGU communes.
+  // Avant identification, la référence Grand Public est explicite.
+  String get _loginCguDocumentId {
+    if (_selectedAudience == _LoginAudience.admin ||
+        (_hasAdmin && !_hasAdvertiser)) {
+      return 'adminCgu';
+    }
+    if (_selectedAudience == _LoginAudience.advertiser ||
+        (_hasAdvertiser && !_hasAdmin)) {
+      return 'advertiserCgu';
+    }
+    if (_hasSauveteur && !_hasProfessionalAccount) return 'sauveteurCgu';
+    return 'cgu';
+  }
+
+  String get _loginCguTitle {
+    switch (_loginCguDocumentId) {
+      case 'adminCgu': return 'CGU — SPHOT ADMIN';
+      case 'advertiserCgu': return 'CGU — SPHOT PUBLICITAIRE';
+      case 'sauveteurCgu': return 'CGU — SPHOT SAUVETEUR';
+      default: return 'CGU — GRAND PUBLIC';
+    }
+  }
+
   Future<void> _continueWithIdentifier() async {
     if (_isResolvingIdentity || _isLoggingIn) return;
 
@@ -614,6 +638,16 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
           .doc(documentId)
           .get();
 
+      final document = documentSnapshot.data() ?? {};
+      const publishedCguIds = {
+        'cgu', 'adminCgu', 'advertiserCgu',
+        'sauveteurCgu', 'sauveteurCharter',
+      };
+      if (publishedCguIds.contains(documentId) &&
+          (document['published'] != true || document['testOnly'] == true)) {
+        throw StateError('Ce document juridique n’est pas encore publié.');
+      }
+
       final chaptersSnapshot = await FirebaseFirestore.instance
           .collection('legalDocuments')
           .doc(documentId)
@@ -623,8 +657,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
 
       if (!mounted) return;
 
-      final document = documentSnapshot.data() ?? {};
-      final version = LegalPublishedVersion.number(
+      final version = LegalPublishedVersion.identifier(
         document,
         fallback: globalVersion,
       );
@@ -896,14 +929,27 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               onPressed: () => _showLegalDocument(
-                documentId: 'cgu',
-                title: 'Conditions Générales d’Utilisation',
+                documentId: _loginCguDocumentId,
+                title: _loginCguTitle,
               ),
-              child: const Text(
-                'Conditions Générales d’Utilisation',
-                style: linkStyle,
-              ),
+              child: Text(_loginCguTitle, style: linkStyle),
             ),
+            if (_loginCguDocumentId == 'sauveteurCgu') ...[
+              const Text('•',
+                  style: TextStyle(color: Colors.black54, fontSize: 12)),
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => _showLegalDocument(
+                  documentId: 'sauveteurCharter',
+                  title: 'Charte professionnelle — SPHOT SAUVETEUR',
+                ),
+                child: const Text('Charte SAUVETEUR', style: linkStyle),
+              ),
+            ],
             const Text(
               '•',
               style: TextStyle(color: Colors.black54, fontSize: 12),
