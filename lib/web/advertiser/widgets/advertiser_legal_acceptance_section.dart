@@ -501,7 +501,7 @@ _cguController.collapse();
               alignment: Alignment.centerLeft,
               child: Text(
                 'Version du document '
-                '${documentVersion ?? LegalPublishedVersion.number(document, fallback: _version)}',
+                '${documentVersion ?? LegalPublishedVersion.identifier(document, fallback: _version)}',
                 style: const TextStyle(
                   color: WebColors.red,
                   fontSize: 13,
