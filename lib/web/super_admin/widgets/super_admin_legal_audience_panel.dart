@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'sphot_legal_article_markdown.dart';
 
-/// Présentation unifiée des sept sources juridiques SPHOT.
+/// Présentation unifiée des neuf documents juridiques SPHOT.
 /// Les documents communs sont référencés, jamais recopiés par public.
 /// Edition des brouillons par une fonction serveur Super Admin uniquement.
 /// Aucun acces en ecriture directe aux documents juridiques depuis Flutter.
@@ -84,7 +84,7 @@ class _LegalTarget {
 }
 
 /// Construit les lectures Firestore uniquement après ouverture d'une rubrique.
-/// Les sept sources communes ne provoquent donc pas quinze chargements initiaux.
+/// Les documents n'entrainent pas de chargements initiaux inutiles.
 class _LegalAudienceCard extends StatefulWidget {
   const _LegalAudienceCard({super.key, required this.audience});
   final _LegalAudience audience;
@@ -375,7 +375,11 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
     final publishedFinal = liveData['published'] == true &&
         (publicationSource == 'legal_pack_five_documents_atomic_v1' ||
          publicationSource == 'sphot_legal_document_editor_v1');
-    if (_preparedIds.contains(widget.documentId) && !publishedFinal) {
+    final professionalUpgrade = _initialProfessionalSections.containsKey(
+      widget.documentId) &&
+        publicationSource != 'sphot_legal_document_editor_v1';
+    if (_preparedIds.contains(widget.documentId) &&
+        (!publishedFinal || professionalUpgrade)) {
       // Les documents préparés pour publication ne doivent pas être lus
       // directement dans Firestore : les règles prévues les protègent.
       // Les cinq fichiers embarqués ont déjà été rapprochés de leur corpus
