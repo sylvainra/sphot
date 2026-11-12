@@ -1,7 +1,7 @@
 /* eslint-disable max-len, require-jsdoc, valid-jsdoc, indent, brace-style, operator-linebreak, object-curly-spacing, comma-dangle */
 "use strict";
 
-// Edition versionnee des sept sources juridiques SPHOT.
+// Edition versionnee des sources juridiques SPHOT (CGU par profil).
 // Les brouillons editoriaux sont distincts des cinq textes consolides C4 :
 // une correction ne peut donc pas alterer leur publication initiale.
 // Aucune route n'est exportee sans SPHOT_ENABLE_LEGAL_DOCUMENT_EDITOR.
@@ -15,6 +15,8 @@ const INITIAL_SOURCE = "legal_pack_five_documents_atomic_v1";
 const EDITOR_DRAFTS = "legalEditorialDrafts";
 const SPECIFICATIONS = Object.freeze({
   cgu: "CGU — GRAND PUBLIC",
+  adminCgu: "CGU — SPHOT ADMIN",
+  advertiserCgu: "CGU — SPHOT PUBLICITAIRE",
   adminCgv: "CGV — SPHOT ADMIN",
   advertiserCgv: "CGV — SPHOT PUBLICITAIRE",
   sauveteurCgu: "CGU — SPHOT SAUVETEUR",
@@ -23,6 +25,23 @@ const SPECIFICATIONS = Object.freeze({
   privacyPolicy: "POLITIQUE DE CONFIDENTIALITÉ",
 });
 const INITIAL_IDS = new Set(initialPack.DOCUMENTS.map((s) => s.id));
+// Les deux nouvelles CGU sont importées uniquement depuis le corpus
+// approuvé. Aucun document n'est publié automatiquement.
+const SEEDED_CGU = Object.freeze({
+  adminCgu: require("./legal_sources/adminCgu.json"),
+  advertiserCgu: require("./legal_sources/advertiserCgu.json"),
+  sauveteurCgu: require("./legal_sources/sauveteurCgu.json"),
+  sauveteurCharter: require("./legal_sources/sauveteurCharter.json"),
+});
+function approvedSeed(id) {
+  const seed = SEEDED_CGU[id];
+  if (!seed || seed.documentId !== id ||
+      seed.status !== "PREPUBLICATION_NON_PUBLIE" ||
+      seed.approvedOn !== "2026-11-11") {
+    throw refuse(409, "SOURCE_CGU_NON_VALIDEE");
+  }
+  return canonical(seed.chapters);
+}
 const ORIGINS = ["https://sphot.app", "https://www.sphot.app",
   "http://127.0.0.1:5081", "http://localhost:5081",
   "https://sphot-ab80b.web.app", "https://sphot-ab80b.firebaseapp.com"];
@@ -177,6 +196,14 @@ async function action({admin, token, input, now = Date.now(), allowPublish = fal
       }
       const beforeInitial = !isInitialPublished(metadata);
       let rows = active.rows;
+      // Première mise à niveau des textes métiers du lot historique.
+      // Ne jamais réinjecter le texte de novembre lors d'une future révision.
+      const approvedImport = Object.hasOwn(SEEDED_CGU, spec.id) &&
+        (!active.exists ||
+          clean((live.data() || {}).publicationSource) !== EDITOR_SOURCE);
+      if (approvedImport) {
+        rows = approvedSeed(spec.id);
+      }
       if (beforeInitial && INITIAL_IDS.has(spec.id)) {
         const sourceSpec = initialPack.DOCUMENTS.find((s) => s.id === spec.id);
         const imported = await tx.get(db.collection("legalDocumentDrafts").doc(spec.id));
@@ -188,6 +215,7 @@ async function action({admin, token, input, now = Date.now(), allowPublish = fal
         sourceHash: hash(rows), baseHash: active.hash,
         baseRevision: active.revision, baseVersion: active.version,
         sourcePendingInitialPublication: beforeInitial,
+        approvedImport,
         reviewedHash: "", reviewedByUid: null, reviewedAt: null,
         changeSummary: "", createdByUid: uid, createdAt: stamp(admin),
         updatedByUid: uid, updatedAt: stamp(admin)};
@@ -219,7 +247,12 @@ async function action({admin, token, input, now = Date.now(), allowPublish = fal
         tx.update(editorRef, updates);
         return {draft: draftResult({...draft, ...updates})};
       }
-      if (draft.draftRevision === 0 || hash(draft.chapters) === draft.sourceHash) {
+      const initialSeed = Object.hasOwn(SEEDED_CGU, spec.id) &&
+        draft.approvedImport === true && draft.draftRevision === 0 &&
+        hash(draft.chapters) === hash(approvedSeed(spec.id));
+      if (!initialSeed &&
+          (draft.draftRevision === 0 ||
+            hash(draft.chapters) === draft.sourceHash)) {
         throw refuse(409, "AUCUN_CHANGEMENT_A_VALIDER");
       }
       const reviewedHash = hash(draft.chapters);
@@ -262,8 +295,15 @@ async function action({admin, token, input, now = Date.now(), allowPublish = fal
     const current = ids.map((id, i) => ({id, parent: snapshots[i * 2],
       chapters: snapshots[i * 2 + 1],
       ...initialPack.activeSnapshot(snapshots[i * 2], snapshots[i * 2 + 1])}));
-    if (current.some((row) => !row.exists || !canonical(row.rows).length ||
-        (INITIAL_IDS.has(row.id) && !row.published))) {
+    if (current.some((row) => {
+      // Un texte nouveau non encore publié ne bloque pas les textes existants.
+      // Il ne participe au corpus historique qu'une fois publié.
+      if (!row.exists && Object.hasOwn(SEEDED_CGU, row.id) &&
+          !INITIAL_IDS.has(row.id)) return false;
+      return !row.exists || !canonical(row.rows).length ||
+        (INITIAL_IDS.has(row.id) && !row.published) ||
+        (Object.hasOwn(SEEDED_CGU, row.id) && !row.published);
+    })) {
       throw refuse(409, "PACK_JURIDIQUE_INCOMPLET");
     }
     const prior = current.find((row) => row.id === spec.id);
@@ -295,10 +335,12 @@ async function action({admin, token, input, now = Date.now(), allowPublish = fal
       throw refuse(409, "HISTORIQUE_INCOHERENT_OU_VERSION_EXISTANTE");
     }
     const updated = current.map((row) => row.id === spec.id ?
-      {...row, rows: draft.chapters, revision, version: nextVersion} : row);
+      {...row, rows: draft.chapters, revision, version: nextVersion,
+        exists: true, published: true} : row);
     const publicDocuments = updated.filter((row) => INITIAL_IDS.has(row.id));
-    const commonDocuments = updated.filter((row) => !INITIAL_IDS.has(row.id));
-    if (!legacy.exists) {tx.create(oldRef, {
+    const commonDocuments = updated.filter((row) =>
+      !INITIAL_IDS.has(row.id) && row.exists && row.published);
+    if (prior.exists && !legacy.exists) {tx.create(oldRef, {
       documentId: spec.id, version: prior.version, revision: prior.revision,
       status: "Publié (archive)", chapters: prior.rows, fingerprint: prior.hash,
       archivedAt: stamp(admin), archivedByUid: uid, source: EDITOR_SOURCE,

@@ -69,5 +69,6 @@ test("publication individuelle manuelle activee sans variable d'environnement", 
   assert.ok(source.includes("allowPublish: true /* publication individuelle explicite uniquement */"));
   assert.ok(!source.includes("allowPublish: process.env."));
   assert.deepEqual(Object.keys(editor.SPECIFICATIONS).sort(),[
-    "cgu","adminCgv","advertiserCgv","sauveteurCgu","sauveteurCharter","rgpdNotice","privacyPolicy"].sort());
+    "cgu","adminCgu","advertiserCgu","adminCgv","advertiserCgv",
+    "sauveteurCgu","sauveteurCharter","rgpdNotice","privacyPolicy"].sort());
 });
