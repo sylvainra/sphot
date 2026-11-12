@@ -42,9 +42,9 @@ function mockResponse() {
   result.json = (val) => {result.body = val; return result;};
   return result;
 }
-test("paquet juridique : deux fonctions uniquement, initialise Firebase une fois", () => {
+test("paquet juridique : trois fonctions, initialise Firebase une seule fois", () => {
   const loaded = loadExport();
-  assert.deepEqual(Object.keys(loaded.exports).sort(), ["manageSphotLegalDocumentEditing", "manageSphotInitialLegalPack"].sort());
+  assert.deepEqual(Object.keys(loaded.exports).sort(), ["manageSphotLegalDocumentEditing", "manageSphotInitialLegalPack", "acceptSphotProfessionalLegal"].sort());
   assert.equal(loaded.initialized, 1);
   assert.equal(loaded.registeredOptions.region, "us-central1");
 });
