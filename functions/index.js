@@ -5674,6 +5674,10 @@ async function handleSauveteurLogin(request, response, pilot = false) {
     );
 
     const activeLegalPack = await activeLegalPackInfo();
+    // Dès la connexion, vérifier les versions individuelles publiées
+    // des CGU et de la Charte, pas uniquement la version globale.
+    activeLegalPack.documentVersions =
+        await activeSauveteurDocumentVersions(activeLegalPack.version);
     const legalAcceptanceRequired =
           !sauveteurLegalAcceptanceIsCurrent(data, activeLegalPack);
 
