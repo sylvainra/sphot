@@ -1,0 +1,45 @@
+name: SPHOT - Validation Dashboard juridique et Firebase
+
+on:
+  push:
+    branches:
+      - feat/legal-dashboard-firebase-20261112
+  pull_request:
+    paths:
+      - "functions-legal/**"
+      - "lib/web/super_admin/widgets/super_admin_legal_audience_panel.dart"
+      - "assets/legal/**"
+      - "pubspec.yaml"
+      - "firebase.json"
+      - ".github/workflows/legal-dashboard-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node-legal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm --prefix functions-legal ci
+      - run: npm --prefix functions-legal run check
+      - run: node -e "const x=require('./firebase.json');if(!x.functions.some(f=>f.codebase==='legal'&&f.source==='functions-legal'))process.exit(1)"
+
+  flutter-dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer Flutter stable
+        run: |
+          git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version
+      - run: flutter pub get
+      - run: flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings lib/web/super_admin/widgets/super_admin_legal_audience_panel.dart
+      - run: flutter build web --release --no-pub -t lib/main.dart
