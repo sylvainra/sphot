@@ -74,6 +74,17 @@ test("raccordement session : getSauveteurSessionState utilise les versions indiv
   assert.doesNotMatch(route, /await activeLegalPackInfo\(\)/);
 });
 
+test("raccordement connexion : loginSauveteur et pilot chargent les versions publiées", () => {
+  const begin = source.indexOf("async function handleSauveteurLogin(");
+  const end = source.indexOf("exports.loginSauveteur =", begin);
+  assert.ok(begin >= 0 && end > begin);
+  const route = source.slice(begin, end);
+  assert.match(route, /activeLegalPack\.documentVersions\s*=\s*await activeSauveteurDocumentVersions\(activeLegalPack\.version\)/);
+  assert.match(route, /sauveteurLegalAcceptanceIsCurrent\(data, activeLegalPack\)/);
+  assert.match(source.slice(end, end + 700),
+      /handleSauveteurLogin\(request, response\)/);
+});
+
 test("SAUVETEUR : chaque publication CGU ou Charte oblige la reacceptation", async () => {
   const f = fixture();
   const current = await f.funcs.activeSauveteurDocumentVersions("1.7");
