@@ -308,8 +308,8 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
     return articles;
   }
 
-  /// Repli local en lecture seule : les cinq fichiers correspondent aux
-  /// contenus déjà vérifiés. Ils ne remplacent jamais un document publié.
+  /// Repli local en lecture seule : corpus juridique validé.
+  /// L'enregistrement en brouillon passe uniquement par la fonction serveur.
   static Future<List<_LegalArticle>> _validatedBundle(String documentId) async {
     final path = _validatedAssets[documentId];
     if (path == null) return const [];
@@ -548,6 +548,81 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
       });
     } catch (error) {
       if (mounted) setState(() => _message = 'Opération non enregistrée : $error');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  static const _initialProfessionalSections = <String, int>{
+    'adminCgu': 14,
+    'advertiserCgu': 12,
+    'sauveteurCgu': 8,
+    'sauveteurCharter': 7,
+  };
+
+  /// Enregistre les textes approuvés dans Firestore via l'éditeur sécurisé :
+  /// legalEditorialDrafts/{documentId}, sans changer legalDocuments.
+  Future<void> _registerApprovedDraft(_LegalData data) async {
+    final expectedCount = _initialProfessionalSections[widget.documentId];
+    if (_saving || expectedCount == null ||
+        data.editorDraft != null || !data.initialPackPublished ||
+        data.editorError != null || _editorEndpoint == null ||
+        data.articles.length != expectedCount || !data.prepared) {
+      return;
+    }
+    final confirmed = await _confirm(
+      'ENREGISTRER DANS FIREBASE ?',
+      'Les $expectedCount articles ou rubriques approuvés de '
+      '${widget.title} seront enregistrés dans un brouillon juridique '
+      'Firestore, sans modifier la version actuellement publiée. '
+      'Vous pourrez ensuite les valider et les publier séparément.',
+      'ENREGISTRER LE BROUILLON',
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() { _saving = true; _message = null; });
+    try {
+      final created = await _editorRequest({
+        'action': 'create', 'documentId': widget.documentId,
+      });
+      final draft = created['draft'];
+      if (draft is! Map || draft['status'] != 'draft') {
+        throw StateError('Le service n’a pas confirmé le brouillon.');
+      }
+      final stored = _articlesFromList(draft['chapters']);
+      if (stored.length != expectedCount ||
+          stored.length != data.articles.length) {
+        throw StateError('Nombre d’articles enregistré différent du texte approuvé.');
+      }
+      for (var i = 0; i < stored.length; i++) {
+        if (stored[i].id != data.articles[i].id ||
+            stored[i].title != data.articles[i].title ||
+            stored[i].content != data.articles[i].content) {
+          throw StateError('Article ${stored[i].id} différent du texte approuvé.');
+        }
+      }
+      // Relecture serveur indépendante : vérifie que le brouillon a
+      // effectivement persisté dans Firebase après l'écriture.
+      final reloaded = await _editorRequest({
+        'action': 'status', 'documentId': widget.documentId,
+      });
+      final saved = reloaded['draft'];
+      if (saved is! Map || saved['status'] != 'draft' ||
+          _articlesFromList(saved['chapters']).length != expectedCount) {
+        throw StateError('Enregistrement Firestore non confirmé.');
+      }
+      if (!mounted) return;
+      setState(() {
+        _future = _load();
+        _selectedArticleId = null;
+        _message = 'Brouillon enregistré dans Firebase : '
+            '$expectedCount articles/rubriques. Non publié.';
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _message =
+          'Enregistrement dans Firebase non confirmé : $error');
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -849,6 +924,8 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
   Widget _versionPanel(_LegalData data) {
     final draftRevision = data.editorDraft?['draftRevision'];
     final hasSavedChanges = draftRevision is int && draftRevision > 0;
+    final approvedImport = _initialProfessionalSections.containsKey(widget.documentId) &&
+        data.editorDraft != null && data.prepared;
     return Container(
       padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
@@ -869,12 +946,24 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
         const SizedBox(height: 6),
         Text('Document : ${widget.title}',
             style: const TextStyle(color: _blue, fontSize: 12)),
-        Text('Version ${data.version} · Révision active ${data.revision}',
+        Text(data.prepared && data.editorDraft == null
+            ? 'Version de travail approuvée · pas encore publiée'
+            : 'Version publiée ${data.version} · Révision ${data.revision}',
             style: const TextStyle(color: _blue, fontSize: 12)),
         Text(data.prepared
             ? 'Texte définitif préparé — publication non effectuée'
             : 'Texte actuellement enregistré dans Firestore',
             style: const TextStyle(color: _red, fontSize: 11)),
+        if (_initialProfessionalSections.containsKey(widget.documentId) &&
+            data.prepared && data.editorDraft == null &&
+            data.initialPackPublished && data.editorError == null) ...[
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: _saving ? null : () => _registerApprovedDraft(data),
+            icon: const Icon(Icons.save_outlined),
+            label: const Text('ENREGISTRER DANS FIREBASE (BROUILLON)'),
+          ),
+        ],
         if ((widget.documentId == 'rgpdNotice' ||
              widget.documentId == 'privacyPolicy') &&
             data.initialPackPublished && data.publicationEnabled &&
@@ -954,7 +1043,8 @@ if (_selectedArticleId != null && data.editorDraft != null && data.initialPackPu
             Wrap(spacing: 8, runSpacing: 6, children: [
               OutlinedButton.icon(
                 onPressed: _saving || !data.initialPackPublished ||
-                    !hasSavedChanges || data.editorDraft!['status'] != 'draft'
+                    !(hasSavedChanges || approvedImport) ||
+                    data.editorDraft!['status'] != 'draft'
                     ? null : () => _validate(data),
                 icon: const Icon(Icons.verified_outlined),
                 label: const Text('VALIDER LA MODIFICATION'),
