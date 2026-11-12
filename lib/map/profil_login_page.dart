@@ -116,7 +116,7 @@ class _ProfilLoginPageState extends State<ProfilLoginPage> {
       case 'adminCgu': return 'CGU — SPHOT ADMIN';
       case 'advertiserCgu': return 'CGU — SPHOT PUBLICITAIRE';
       case 'sauveteurCgu': return 'CGU — SPHOT SAUVETEUR';
-      default: return 'CGU — GRAND PUBLIC';
+      default: return 'CGU';
     }
   }
 
