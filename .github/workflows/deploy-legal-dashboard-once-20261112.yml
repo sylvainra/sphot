@@ -1,0 +1,97 @@
+name: SPHOT - Deploiement cible Dashboard et fonctions juridiques
+
+on:
+  push:
+    paths:
+      - ".github/workflows/deploy-legal-dashboard-once-20261112.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sphot-production-legal-hosting
+  cancel-in-progress: false
+
+jobs:
+  deploy-legal-dashboard:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - name: Recuperer main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verifier le perimetre de livraison
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="c012b90d1af3a1c78c972d4fdfcff9f9aceaeb57"
+          EXPECTED=".github/workflows/deploy-legal-dashboard-once-20261112.yml"
+          git merge-base --is-ancestor "$BASE" HEAD
+          ACTUAL="$(git diff --name-only "$BASE" HEAD)"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Le code de production a change depuis la validation. Deploiement interrompu."
+            printf 'Changements inattendus : %s\n' "$ACTUAL"
+            exit 1
+          fi
+          node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('firebase.json','utf8'));if(!x.functions.some(f=>f.codebase==='legal'&&f.source==='functions-legal')||x.hosting.public!=='build/web')process.exit(1);"
+          echo "Perimetre conforme : Flutter Web et codebase Firebase legal seulement."
+
+      - name: Verifier authentification Firebase sans exposer les secrets
+        env:
+          FIREBASE_SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPHOT_AB80B }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${FIREBASE_SA_JSON:-}" ]; then
+            AUTHFILE="$RUNNER_TEMP/sphot-firebase-service-account.json"
+            printf '%s' "$FIREBASE_SA_JSON" > "$AUTHFILE"
+            chmod 600 "$AUTHFILE"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$AUTHFILE" >> "$GITHUB_ENV"
+            echo "Authentification Firebase par compte de service configuree."
+          elif [ -n "${FIREBASE_TOKEN:-}" ]; then
+            echo "FIREBASE_TOKEN=$FIREBASE_TOKEN" >> "$GITHUB_ENV"
+            echo "::warning::Authentification par jeton ancien format. Preferer un compte de service."
+          else
+            echo "::error::Aucun secret Firebase configure. Ajoutez FIREBASE_SERVICE_ACCOUNT_SPHOT_AB80B dans les secrets du depot, puis relancez ce workflow."
+            exit 2
+          fi
+
+      - name: Preparer Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Installer le service juridique
+        run: npm --prefix functions-legal ci
+
+      - name: Controler l'editeur juridique avant deploiement
+        run: npm --prefix functions-legal run check
+
+      - name: Installer Firebase CLI
+        run: npm install --global firebase-tools
+
+      - name: Installer Flutter stable
+        shell: bash
+        run: |
+          git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version
+
+      - name: Preparer Flutter Web
+        run: flutter pub get
+
+      - name: Compiler l'application Web principale
+        run: flutter build web --release --no-pub -t lib/main.dart
+
+      - name: Deployer UNIQUEMENT les fonctions legal et le Hosting principal
+        run: firebase deploy --project sphot-ab80b --only functions:legal,hosting --non-interactive
+
+      - name: Confirmer le perimetre deploye
+        run: |
+          echo "Deploiement demande : fonctions:legal et hosting."
+          echo "Aucune fonction du codebase default, aucune regle Firestore, aucun document juridique Firestore n'a ete deploye automatiquement."
