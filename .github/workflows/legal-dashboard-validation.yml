@@ -8,6 +8,8 @@ on:
     paths:
       - "functions-legal/**"
       - "lib/web/super_admin/widgets/super_admin_legal_audience_panel.dart"
+      - "lib/services/sphot_legal_text_normalization.dart"
+      - "test/legal_text_normalization_test.dart"
       - "assets/legal/**"
       - "pubspec.yaml"
       - "firebase.json"
@@ -41,5 +43,6 @@ jobs:
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/flutter/bin/flutter" --version
       - run: flutter pub get
-      - run: flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings lib/web/super_admin/widgets/super_admin_legal_audience_panel.dart
+      - run: flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings lib/web/super_admin/widgets/super_admin_legal_audience_panel.dart lib/services/sphot_legal_text_normalization.dart test/legal_text_normalization_test.dart
+      - run: flutter test --no-pub test/legal_text_normalization_test.dart
       - run: flutter build web --release --no-pub -t lib/main.dart
