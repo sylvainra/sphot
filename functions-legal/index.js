@@ -21,3 +21,8 @@ exports.manageSphotLegalDocumentEditing =
 exports.manageSphotInitialLegalPack =
   require("./legal_pack_gateway").register({admin, onRequest,
     reviewEnabled: true, publishEnabled: true});
+
+// Les comptes ADMIN et PUBLICITAIRE acceptent à nouveau uniquement
+// leurs CGU lorsque la révision correspondante est publiée.
+exports.acceptSphotProfessionalLegal =
+  require("./professional_legal_acceptance").register({admin, onRequest});
