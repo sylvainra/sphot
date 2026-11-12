@@ -3407,7 +3407,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    LegalPublishedVersion.number(
+                    LegalPublishedVersion.identifier(
                       document,
                       fallback: _sphotVersion,
                     ),
