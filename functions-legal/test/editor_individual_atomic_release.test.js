@@ -10,10 +10,12 @@ function fixture() {
   const docs = new Map();
   const clone = (x) => structuredClone(x);
   const k = (parts) => parts.join("/");
+  let generatedDocumentId = 0;
   const ref = (parts) => ({parts, path: k(parts), id: parts.at(-1),
+    get: async () => get(ref(parts)),
     collection: (c) => col([...parts, c])});
   const col = (parts) => ({parts, path: k(parts),
-    doc: (id) => ref([...parts, id])});
+    doc: (id) => ref([...parts, id || `auto-${++generatedDocumentId}`])});
   const get = (r) => {
     if (r.parts.length % 2 !== 0) {
       const prefix = `${k(r.parts)}/`;
