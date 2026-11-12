@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/advertiser_phase_one_draft.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../shared/professional_legal_gate.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
@@ -734,6 +735,18 @@ _detailScrollController.dispose();
 
   @override
   Widget build(BuildContext context) {
+    final dashboard = _buildDashboardContent(context);
+    // Les candidats annonceurs non encore approuvés conservent leur
+    // parcours d'inscription. Le portail commercial approuvé exige
+    // une acceptation à jour des CGU PUBLICITAIRE.
+    if (!widget.approvedAccess) return dashboard;
+    return ProfessionalLegalGate(
+      audience: ProfessionalLegalAudience.advertiser,
+      child: dashboard,
+    );
+  }
+
+  Widget _buildDashboardContent(BuildContext context) {
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
