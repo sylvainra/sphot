@@ -9,7 +9,9 @@ on:
       - "assets/legal/**"
       - "functions-legal/**"
       - "functions/**"
+      - "lib/map/profil_login_page.dart"
       - "lib/pages/sauveteur/sauveteur_legal_acceptance_page.dart"
+      - "firebase.json"
       - "lib/web/admin/pages/admin_trial_request_page.dart"
       - "lib/web/advertiser/widgets/advertiser_legal_acceptance_section.dart"
       - "lib/web/super_admin/widgets/super_admin_legal_audience_panel.dart"
@@ -40,6 +42,8 @@ jobs:
           node --check functions/legal_document_versions.js
       - name: Tests de versions des acceptations
         run: node --test functions/test/legal_document_versions.test.js
+      - name: Vérifier les deux codebases Firebase
+        run: node -e "const f=require('./firebase.json'); if(!f.functions.some(x=>x.codebase==='legal'&&x.source==='functions-legal'))process.exit(1)"
       - name: Installer éditeur juridique
         run: npm --prefix functions-legal ci
       - name: Tests de l'éditeur juridique
@@ -62,6 +66,7 @@ jobs:
         run: |
           flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings \
             lib/services/legal_published_version.dart \
+            lib/map/profil_login_page.dart \
             lib/pages/sauveteur/sauveteur_legal_acceptance_page.dart \
             lib/web/admin/pages/admin_trial_request_page.dart \
             lib/web/advertiser/widgets/advertiser_legal_acceptance_section.dart \
