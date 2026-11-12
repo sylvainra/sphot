@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'sphot_legal_article_markdown.dart';
+import '../../../services/sphot_legal_text_normalization.dart';
 
 /// Présentation unifiée des neuf documents juridiques SPHOT.
 /// Les documents communs sont référencés, jamais recopiés par public.
@@ -314,7 +315,9 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
   static Future<List<_LegalArticle>> _validatedBundle(String documentId) async {
     final path = _validatedAssets[documentId];
     if (path == null) return const [];
-    final markdown = await rootBundle.loadString(path);
+    final markdown = normalizeSphotLegalText(
+      await rootBundle.loadString(path),
+    );
     final headings = RegExp(r'^##\s+(.+)$', multiLine: true)
         .allMatches(markdown).toList();
     final result = <_LegalArticle>[];
@@ -566,6 +569,31 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
     'sauveteurCharter': 7,
   };
 
+  /// Signale seulement les différences de fond. CRLF et LF ne constituent
+  /// pas deux versions distinctes d'un même texte juridique.
+  static String? _approvedArticleDifference(
+    List<_LegalArticle> approved,
+    List<_LegalArticle> actual,
+  ) {
+    if (approved.length != actual.length) {
+      return 'nombre d’articles différent '
+          '(${actual.length} au lieu de ${approved.length})';
+    }
+    for (var i = 0; i < approved.length; i++) {
+      if (approved[i].id != actual[i].id) {
+        return 'identifiant de l’article ${approved[i].id} différent';
+      }
+      if (approved[i].title != actual[i].title) {
+        return 'titre de l’article ${approved[i].id} différent';
+      }
+      if (normalizeSphotLegalText(approved[i].content) !=
+          normalizeSphotLegalText(actual[i].content)) {
+        return 'contenu de l’article ${approved[i].id} différent';
+      }
+    }
+    return null;
+  }
+
   /// Enregistre les textes approuvés dans Firestore via l'éditeur sécurisé :
   /// legalEditorialDrafts/{documentId}, sans changer legalDocuments.
   Future<void> _registerApprovedDraft(_LegalData data) async {
@@ -596,16 +624,14 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
         throw StateError('Le service n’a pas confirmé le brouillon.');
       }
       final stored = _articlesFromList(draft['chapters']);
-      if (stored.length != expectedCount ||
-          stored.length != data.articles.length) {
-        throw StateError('Nombre d’articles enregistré différent du texte approuvé.');
+      if (stored.length != expectedCount) {
+        throw StateError('Nombre d’articles enregistré différent : '
+            '${stored.length} au lieu de $expectedCount.');
       }
-      for (var i = 0; i < stored.length; i++) {
-        if (stored[i].id != data.articles[i].id ||
-            stored[i].title != data.articles[i].title ||
-            stored[i].content != data.articles[i].content) {
-          throw StateError('Article ${stored[i].id} différent du texte approuvé.');
-        }
+      final difference = _approvedArticleDifference(data.articles, stored);
+      if (difference != null) {
+        throw StateError('Brouillon Firebase différent du texte approuvé : '
+            '$difference. Aucun brouillon existant n’a été écrasé.');
       }
       // Relecture serveur indépendante : vérifie que le brouillon a
       // effectivement persisté dans Firebase après l'écriture.
@@ -613,9 +639,17 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
         'action': 'status', 'documentId': widget.documentId,
       });
       final saved = reloaded['draft'];
-      if (saved is! Map || saved['status'] != 'draft' ||
-          _articlesFromList(saved['chapters']).length != expectedCount) {
+      if (saved is! Map || saved['status'] != 'draft') {
         throw StateError('Enregistrement Firestore non confirmé.');
+      }
+      final actual = _articlesFromList(saved['chapters']);
+      final savedDifference = _approvedArticleDifference(
+        data.articles, actual,
+      );
+      if (actual.length != expectedCount || savedDifference != null) {
+        throw StateError('La relecture Firebase diffère du texte approuvé : '
+            '${savedDifference ?? 'nombre d’articles différent'}. '
+            'Le brouillon existant est conservé.');
       }
       if (!mounted) return;
       setState(() {
@@ -626,8 +660,13 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
       });
     } catch (error) {
       if (mounted) {
-        setState(() => _message =
-          'Enregistrement dans Firebase non confirmé : $error');
+        setState(() {
+          // La création côté serveur peut avoir réussi avant un échec
+          // de comparaison. Relire le brouillon, sans le recréer ni l'effacer.
+          _future = _load();
+          _selectedArticleId = null;
+          _message = 'Contrôle du brouillon Firebase : $error';
+        });
       }
     } finally {
       if (mounted) setState(() => _saving = false);
