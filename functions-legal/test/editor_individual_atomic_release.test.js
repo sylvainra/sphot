@@ -244,3 +244,62 @@ test("cycle complet : modifier puis publier une CGU ADMIN/ANNONCEUR entraine une
   assert.equal(f.docs.get("legalDocuments/cgu").chapters[0].content,
     "Texte officiel cgu");
 });
+
+
+test("la modification des CGU d'un acteur ne fait pas revalider celles des autres", async () => {
+  const professional = require("../professional_legal_acceptance");
+  const f = fixture();
+  const actors = [
+    ["adminCgu", {uid: "indep-admin", adminUid: "indep-admin", role: "ADMIN"}],
+    ["advertiserCgu", {uid: "indep-adv", advertiserRequestId: "r1",
+      role: "ANNONCEUR"}],
+  ];
+
+  // Les deux documents doivent être déjà publiés et acceptés.
+  for (const [documentId, token] of actors) {
+    const initial = await action({admin: f.admin, token: f.token,
+      input: {action: "create", documentId}});
+    await action({admin: f.admin, token: f.token,
+      input: {action: "validate", documentId, confirm: true,
+        expectedDraftRevision: 0}});
+    await action({admin: f.admin, token: f.token, allowPublish: true,
+      input: {action: "publish", documentId, confirm: true,
+        expectedDraftRevision: 0, expectedHash: hash(initial.draft.chapters)}});
+    const status = await professional.action({admin: f.admin, token,
+      input: {action: "status"}});
+    await professional.action({admin: f.admin, token,
+      input: {action: "accept", versionId: status.versionId, accepted: true}});
+  }
+
+  const advertiserOriginal = (await professional.action({
+    admin: f.admin, token: actors[1][1], input: {action: "status"},
+  })).versionId;
+
+  // Publication de la CGU ADMIN uniquement.
+  const adminDraft = await action({admin: f.admin, token: f.token,
+    input: {action: "create", documentId: "adminCgu"}});
+  const changed = await action({admin: f.admin, token: f.token,
+    input: {action: "save", documentId: "adminCgu",
+      expectedDraftRevision: 0, articleId: "01",
+      title: adminDraft.draft.chapters[0].title,
+      content: adminDraft.draft.chapters[0].content + " TEST ADMIN",
+      changeSummary: "Isolation entre publics"}});
+  await action({admin: f.admin, token: f.token, input: {
+    action: "validate", documentId: "adminCgu",
+    expectedDraftRevision: 1, confirm: true,
+  }});
+  await action({admin: f.admin, token: f.token, allowPublish: true,
+    input: {action: "publish", documentId: "adminCgu",
+      expectedDraftRevision: 1, confirm: true,
+      expectedHash: hash(changed.draft.chapters)}});
+
+  const adminStatus = await professional.action({admin: f.admin,
+    token: actors[0][1], input: {action: "status"}});
+  const advertiserStatus = await professional.action({admin: f.admin,
+    token: actors[1][1], input: {action: "status"}});
+  assert.equal(adminStatus.required, true);
+  assert.equal(advertiserStatus.required, false);
+  assert.equal(advertiserStatus.versionId, advertiserOriginal);
+  assert.equal(f.docs.get("legalDocuments/cgu").chapters[0].content,
+    "Texte officiel cgu");
+});
