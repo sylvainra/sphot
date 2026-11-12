@@ -26,7 +26,9 @@ function activeProfile(token) {
   const role = clean(token?.role).toUpperCase();
   const profile = PROFILES[role];
   if (!profile || !clean(token?.uid) ||
-      token.uid !== clean(token?.[profile.claim])) {
+      !clean(token?.[profile.claim]) ||
+      (role === "ADMIN" &&
+        token.uid !== clean(token?.adminUid))) {
     throw fail(403, "PROFIL_PROFESSIONNEL_NON_AUTORISE");
   }
   return {role, ...profile, uid: token.uid};
