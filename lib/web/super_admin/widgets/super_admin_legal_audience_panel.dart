@@ -201,7 +201,7 @@ class _LegalArticle {
 
 class _LegalData {
   const _LegalData({required this.articles, required this.version,
-    required this.revision, required this.prepared,
+    required this.revision, required this.prepared, required this.published,
     required this.history, required this.updatedAt,
     required this.editorDraft, required this.initialPackPublished,
     required this.publicationEnabled, required this.editorError});
@@ -209,6 +209,7 @@ class _LegalData {
   final String version;
   final int revision;
   final bool prepared;
+  final bool published;
   final List<Map<String, dynamic>> history;
   final DateTime? updatedAt;
   final Map<String, dynamic>? editorDraft;
@@ -457,6 +458,7 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
       version: version.isEmpty ? '1.0' : version,
       revision: revision,
       prepared: prepared,
+      published: liveData['published'] == true,
       history: history,
       editorDraft: editorDraft,
       initialPackPublished: initialPackPublished,
@@ -950,8 +952,8 @@ class _LegalDocumentCardState extends State<_LegalDocumentCard> {
         const SizedBox(height: 6),
         Text('Document : ${widget.title}',
             style: const TextStyle(color: _blue, fontSize: 12)),
-        Text(data.prepared && data.editorDraft == null
-            ? 'Version de travail approuvée · pas encore publiée'
+        Text(!data.published
+            ? 'Aucune version publiée · texte préparé pour Firebase'
             : 'Version publiée ${data.version} · Révision ${data.revision}',
             style: const TextStyle(color: _blue, fontSize: 12)),
         Text(data.prepared
