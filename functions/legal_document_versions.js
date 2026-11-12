@@ -21,12 +21,17 @@ function versionId(document, fallback) {
  * @param {string} fallback Version générale historique.
  * @return {Object} Versions associées aux identifiants de documents.
  */
-function snapshot(documents, fallback) {
-  return {
-    cgu: versionId(documents.cgu, fallback),
+function snapshot(documents, fallback, options = {}) {
+  const cguId = options.cguId || "cgu";
+  const result = {
+    [cguId]: versionId(documents.cgu, fallback),
     privacyPolicy: versionId(documents.privacyPolicy, fallback),
     rgpdNotice: versionId(documents.rgpdNotice, fallback),
   };
+  if (options.charterId) {
+    result[options.charterId] = versionId(documents.charter, fallback);
+  }
+  return result;
 }
 
 // Les anciennes versions mobiles ne transmettent pas encore ce détail :
@@ -37,8 +42,8 @@ function snapshot(documents, fallback) {
  * @param {Object} current Versions actuellement publiées.
  * @return {boolean} Vrai si les versions correspondent.
  */
-function matchesRequested(requested, current) {
-  if (requested == null) return true;
+function matchesRequested(requested, current, options = {}) {
+  if (requested == null) return options.required !== true;
   if (typeof requested !== "object" || Array.isArray(requested)) return false;
   return Object.keys(current).every((id) => requested[id] === current[id]);
 }

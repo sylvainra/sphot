@@ -302,10 +302,6 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         data['trialRequest'] ?? {},
       );
 
-      final acceptedDocuments = Map<String, dynamic>.from(
-        trialRequest['acceptedDocuments'] ?? {},
-      );
-
       final administrativeTracking = Map<String, dynamic>.from(
         data['administrativeTracking'] ?? {},
       );
@@ -384,17 +380,10 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
       _certifyRepresentative = trialRequest['certifyRepresentative'] == true;
 
-      _legalReadConfirmed =
-          trialRequest['legalReadConfirmed'] == true ||
-          acceptedDocuments['cgu'] == true;
-
-      _privacyReadConfirmed =
-          trialRequest['privacyReadConfirmed'] == true ||
-          acceptedDocuments['privacy'] == true;
-
-      _rgpdAccepted =
-          trialRequest['rgpdAccepted'] == true ||
-          acceptedDocuments['rgpd'] == true;
+      // Les anciennes confirmations des CGU communes ne suffisent pas.
+      _legalReadConfirmed = false;
+      _privacyReadConfirmed = false;
+      _rgpdAccepted = false;
       _acceptTerms = true;
 
       _institutionalContacts
@@ -405,6 +394,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
 
       setState(() {
         _originalRequestData = data;
+        _restoreAdminCorrectionAcceptances();
 
         _correctionRequestNumber = (data['requestNumber'] ?? requestId)
             .toString();
@@ -529,12 +519,52 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         _villeComplete;
   }
 
+
+  Map<String, dynamic> get _previousAdminAcceptedDocuments {
+    final trial = _originalRequestData['trialRequest'];
+    if (trial is! Map) return <String, dynamic>{};
+    final accepted = trial['acceptedDocuments'];
+    return accepted is Map
+        ? Map<String, dynamic>.from(accepted)
+        : <String, dynamic>{};
+  }
+
+  void _restoreAdminCorrectionAcceptances() {
+    if (!_isCorrectionMode || _originalRequestData.isEmpty ||
+        _cguDoc == null || _privacyDoc == null || _rgpdDoc == null) {
+      return;
+    }
+    final accepted = _previousAdminAcceptedDocuments;
+    final current = LegalPublishedVersion.acceptedSnapshot(
+      cgu: _cguDoc,
+      cguId: 'adminCgu',
+      privacyPolicy: _privacyDoc,
+      rgpdNotice: _rgpdDoc,
+      fallback: _sphotVersion,
+    );
+    final valid = LegalPublishedVersion.matchesRecordedSnapshot(
+      accepted['documentVersions'], current, requireProof: true,
+    );
+    _legalReadConfirmed = valid && accepted['adminCgu'] == true;
+    _privacyReadConfirmed = valid && accepted['privacy'] == true;
+    _rgpdAccepted = valid && accepted['rgpd'] == true;
+  }
+
   bool get _canSubmitTrialRequest {
+    if (_legalLoading ||
+        !LegalPublishedVersion.isPublishedDocument(
+          _cguDoc, chapterCount: 14,
+        )) {
+      return false;
+    }
     // En mode correction, on ne redemande pas la validation complète
     // du dossier initial : seuls les champs signalés par le Super Admin
     // doivent avoir été corrigés et être valides.
     if (_isCorrectionMode) {
-      return _allRequestedCorrectionsCompleted;
+      return _allRequestedCorrectionsCompleted &&
+          _legalReadConfirmed &&
+          _privacyReadConfirmed &&
+          _rgpdAccepted;
     }
 
     // Première demande d'accès.
@@ -1137,7 +1167,10 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         };
       }
 
-      final cgu = await loadLegalDoc('cgu');
+      final cgu = await loadLegalDoc('adminCgu');
+      if (!LegalPublishedVersion.isPublishedDocument(cgu, chapterCount: 14)) {
+        throw StateError('CGU SPHOT ADMIN non publiées ou incomplètes');
+      }
       final privacy = await loadLegalDoc('privacyPolicy');
       final rgpd = await loadLegalDoc('rgpdNotice');
 
@@ -1151,6 +1184,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
         _sphotVersion = (metadataData['version'] ?? '1.0').toString();
         _sphotPublishedAt = metadataData['publishedAt'];
         _sphotChangeLog = (metadataData['changeLog'] ?? '').toString();
+        _restoreAdminCorrectionAcceptances();
 
         _legalLoading = false;
       });
@@ -1278,13 +1312,34 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
             'villeLng': _toDouble(_value('villeLng')),
           },
 
-          'trialRequest.certifyRepresentative': _certifyRepresentative,
-
-          'trialRequest.legalReadConfirmed': _legalReadConfirmed,
-
-          'trialRequest.privacyReadConfirmed': _privacyReadConfirmed,
-
-          'trialRequest.rgpdAccepted': _rgpdAccepted,
+          // Conserver l'acceptation précédente avant toute actualisation.
+          'trialRequest': {
+            'certifyRepresentative': _certifyRepresentative,
+            'legalReadConfirmed': _legalReadConfirmed,
+            'privacyReadConfirmed': _privacyReadConfirmed,
+            'rgpdAccepted': _rgpdAccepted,
+            'acceptedDocuments': {
+              'version': _sphotVersion,
+              'documentVersions': LegalPublishedVersion.acceptedSnapshot(
+                cgu: _cguDoc,
+                cguId: 'adminCgu',
+                privacyPolicy: _privacyDoc,
+                rgpdNotice: _rgpdDoc,
+                fallback: _sphotVersion,
+              ),
+              'acceptedAt': FieldValue.serverTimestamp(),
+              'adminCgu': true,
+              'privacy': true,
+              'rgpd': true,
+            },
+            if (_previousAdminAcceptedDocuments.isNotEmpty)
+              'legalAcceptanceHistory': FieldValue.arrayUnion([
+                {
+                  'previousDocuments': _previousAdminAcceptedDocuments,
+                  'supersededAt': Timestamp.now(),
+                },
+              ]),
+          },
 
           'status': 'pending',
           'accessPhase': 'awaiting_approval',
@@ -1394,13 +1449,14 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
               'version': _sphotVersion,
               'documentVersions': LegalPublishedVersion.acceptedSnapshot(
                 cgu: _cguDoc,
+                cguId: 'adminCgu',
                 privacyPolicy: _privacyDoc,
                 rgpdNotice: _rgpdDoc,
                 fallback: _sphotVersion,
               ),
               'publishedAt': _sphotPublishedAt,
               'acceptedAt': FieldValue.serverTimestamp(),
-              'cgu': true,
+              'adminCgu': true,
               'privacy': true,
               'rgpd': true,
             },
@@ -3351,7 +3407,7 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    LegalPublishedVersion.number(
+                    LegalPublishedVersion.identifier(
                       document,
                       fallback: _sphotVersion,
                     ),
@@ -3429,10 +3485,10 @@ class _AdminTrialRequestPageState extends State<AdminTrialRequestPage> {
           const Center(child: CircularProgressIndicator())
         else ...[
           _legalDropdown(
-            title: 'Conditions Générales d’Utilisation',
+            title: 'Conditions Générales d’Utilisation — SPHOT ADMIN',
             document: _cguDoc,
             checked: _legalReadConfirmed,
-            checkText: 'J’ai lu et j’accepte les CGU de SPHOT.',
+            checkText: 'J’ai lu et j’accepte les CGU SPHOT ADMIN.',
             controller: _cguExpansionController,
             onChanged: (value) {
               setState(() {

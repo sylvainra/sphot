@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js",
-    "check": "node --check index.js && node --check legal_pack_gateway.js && node --check legal_admin_publication.js && node --check legal_pack_publication.js && node --check legal_document_editor.js && node --test test/*.test.js"
+    "check": "node --check index.js && node --check legal_pack_gateway.js && node --check legal_admin_publication.js && node --check legal_pack_publication.js && node --check legal_document_editor.js && node --check professional_legal_acceptance.js && node --test test/*.test.js"
   },
   "dependencies": {
     "firebase-admin": "14.5.0",

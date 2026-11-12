@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -37,14 +39,33 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
   bool _saving = false;
   bool _showLoadingCard = false;
   String? _error;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      _publicationSubscription;
+  int _legalLoadRequest = 0;
 
   @override
   void initState() {
     super.initState();
     _loadCurrentDocuments();
+    if (widget.loadDocuments == null) {
+      // Toute publication juridique met à jour la version globale.
+      // On relit les CGU Grand Public/Notices sans prendre les brouillons.
+      _publicationSubscription = FirebaseFirestore.instance
+          .collection('legalDocuments').doc('metadata')
+          .snapshots().skip(1).listen((_) {
+        if (mounted && !_saving) _loadCurrentDocuments();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _publicationSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadCurrentDocuments() async {
+    final requestId = ++_legalLoadRequest;
     setState(() {
       _stage = _PublicLegalStage.loading;
       _showLoadingCard = false;
@@ -55,7 +76,7 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
     try {
       final alreadyAccepted =
           await _acceptanceService.hasRecordedCguAcceptance();
-      if (!mounted) return;
+      if (!mounted || requestId != _legalLoadRequest) return;
       setState(() => _showLoadingCard = !alreadyAccepted);
 
       final loaded = await (widget.loadDocuments?.call() ?? Future.wait([
@@ -74,7 +95,7 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
       );
       final decision = await _acceptanceService.accessDecision(versions);
 
-      if (!mounted) return;
+      if (!mounted || requestId != _legalLoadRequest) return;
       setState(() {
         _documents = documents;
         _versions = versions;
@@ -86,7 +107,7 @@ class _PublicLegalGateState extends State<PublicLegalGate> {
         };
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || requestId != _legalLoadRequest) return;
       setState(() {
         _stage = _PublicLegalStage.error;
         _error = 'Impossible de charger les documents juridiques pour le moment. '

@@ -5389,6 +5389,8 @@ async function resolveSauveteurSession(token) {
   );
 
   const legalPack = await activeLegalPackInfo();
+  legalPack.documentVersions =
+      await activeSauveteurDocumentVersions(legalPack.version);
   const legalAcceptanceCurrent =
     sauveteurLegalAcceptanceIsCurrent(accountData, legalPack);
 
@@ -5431,8 +5433,38 @@ async function activeLegalPackInfo() {
   };
 }
 
-const SAUVETEUR_LEGAL_ACCEPTANCE_REVISION = "2";
-const SAUVETEUR_BACKEND_REVISION = "2026-09-23-r4";
+/**
+ * Révisions effectivement publiées des textes du sauveteur.
+ * La version globale ne doit pas faire revalider une CGU ADMIN ou annonceur
+ * à un sauveteur. Le repli prépublication conserve les anciens accords.
+ */
+async function activeSauveteurDocumentVersions(fallback) {
+  const ids = ["sauveteurCgu", "sauveteurCharter",
+    "privacyPolicy", "rgpdNotice"];
+  const documents = admin.firestore().collection("legalDocuments");
+  const snapshots = await Promise.all(
+      ids.map((id) => documents.doc(id).get()));
+  const cgu = snapshots[0].data() || {};
+  const charter = snapshots[1].data() || {};
+  if (cgu.published !== true || charter.published !== true ||
+      cgu.testOnly === true || charter.testOnly === true ||
+      !Array.isArray(cgu.chapters) || cgu.chapters.length !== 8 ||
+      !Array.isArray(charter.chapters) ||
+      charter.chapters.length !== 7) {
+    return null;
+  }
+  const versions = {};
+  for (let i = 0; i < ids.length; i++) {
+    const document = snapshots[i].data() || {};
+    if (!snapshots[i].exists || document.published !== true ||
+        document.testOnly === true) return null;
+    versions[ids[i]] = legalDocumentVersions.versionId(document, fallback);
+  }
+  return versions;
+}
+
+const SAUVETEUR_LEGAL_ACCEPTANCE_REVISION = "3";
+const SAUVETEUR_BACKEND_REVISION = "2026-11-11-r5";
 
 /**
  * Vérifie que l'acceptation Sauveteur correspond au pack juridique actif.
@@ -5444,45 +5476,33 @@ const SAUVETEUR_BACKEND_REVISION = "2026-09-23-r4";
 function sauveteurLegalAcceptanceIsCurrent(accountData, legalPack) {
   const acceptance = accountData.legalAcceptance || {};
   const documents = acceptance.documents || {};
+  const versions = acceptance.documentVersions || {};
   const operationalRules = acceptance.operationalRules || {};
-
-  const isCurrentRevision =
-    acceptance.revision === SAUVETEUR_LEGAL_ACCEPTANCE_REVISION;
-
-  /*
-   * Compatibilité avec les validations r2 déjà enregistrées
-   * avant le correctif :
-   * l'API exigeait bien ces deux confirmations dans la requête, mais omettait
-   * de les recopier dans operationalRules. Elles peuvent donc être considérées
-   * comme acquises pour une validation r2 issue de ce parcours précis.
-   */
-  const legacyR2Acceptance =
-    isCurrentRevision &&
-    acceptance.source === "sphot_sauveteur_access_validation";
-
-  const transmissionRoleAcknowledged =
-    operationalRules.sphotTransmissionRoleAcknowledged === true ||
-    (legacyR2Acceptance &&
-      operationalRules.sphotTransmissionRoleAcknowledged == null);
-
-  const professionalDecisionResponsibilityAccepted =
-    operationalRules.professionalDecisionResponsibilityAccepted === true ||
-    (legacyR2Acceptance &&
-      operationalRules.professionalDecisionResponsibilityAccepted == null);
-
-  return acceptance.accepted === true &&
-    acceptance.version === legalPack.version &&
-    isCurrentRevision &&
-    documents.cgu === true &&
+  const baseRules = acceptance.accepted === true &&
     documents.privacy === true &&
     documents.rgpd === true &&
     operationalRules.publicOperationalDiffusionAcknowledged === true &&
     operationalRules.institutionalReadAcknowledged === true &&
     operationalRules.personalAccountUseAccepted === true &&
-    transmissionRoleAcknowledged &&
-    professionalDecisionResponsibilityAccepted;
-}
+    operationalRules.sphotTransmissionRoleAcknowledged === true &&
+    operationalRules.professionalDecisionResponsibilityAccepted === true;
+  if (!baseRules) return false;
 
+  if (!legalPack.documentVersions) {
+    // Tant que les nouveaux textes ne sont pas tous publiés, les anciens
+    // sauveteurs ne sont pas bloqués par une charte encore en brouillon.
+    return acceptance.version === legalPack.version &&
+      (documents.cgu === true ||
+       (documents.sauveteurCgu === true &&
+        documents.sauveteurCharter === true));
+  }
+
+  const current = legalPack.documentVersions;
+  return acceptance.revision === SAUVETEUR_LEGAL_ACCEPTANCE_REVISION &&
+    documents.sauveteurCgu === true &&
+    documents.sauveteurCharter === true &&
+    Object.keys(current).every((id) => versions[id] === current[id]);
+}
 /**
  * Résout un identifiant de connexion SPHOT sans demander le mot de passe.
  *
@@ -5871,12 +5891,18 @@ exports.acceptSauveteurLegalTerms = onRequest(
         // Trace de chaque texte réellement publié au moment de l'acceptation.
         // La version générale du corpus est conservée pour les anciens comptes.
         const legalDocuments = admin.firestore().collection("legalDocuments");
-        const [cguDoc, privacyDoc, rgpdDoc] = await Promise.all([
-          legalDocuments.doc("cgu").get(),
+        const [cguDoc, charterDoc, privacyDoc, rgpdDoc] = await Promise.all([
+          legalDocuments.doc("sauveteurCgu").get(),
+          legalDocuments.doc("sauveteurCharter").get(),
           legalDocuments.doc("privacyPolicy").get(),
           legalDocuments.doc("rgpdNotice").get(),
         ]);
-        if (!cguDoc.exists || !privacyDoc.exists || !rgpdDoc.exists) {
+        if (!cguDoc.exists || !charterDoc.exists ||
+            !privacyDoc.exists || !rgpdDoc.exists ||
+            cguDoc.data()?.published !== true ||
+            charterDoc.data()?.published !== true ||
+            cguDoc.data()?.testOnly === true ||
+            charterDoc.data()?.testOnly === true) {
           response.status(503).json({
             success: false, error: "legal_document_unavailable",
           });
@@ -5884,11 +5910,16 @@ exports.acceptSauveteurLegalTerms = onRequest(
         }
         const documentVersions = legalDocumentVersions.snapshot({
           cgu: cguDoc.data(),
+          charter: charterDoc.data(),
           privacyPolicy: privacyDoc.data(),
           rgpdNotice: rgpdDoc.data(),
-        }, legalPack.version);
+        }, legalPack.version, {
+          cguId: "sauveteurCgu",
+          charterId: "sauveteurCharter",
+        });
         if (!legalDocumentVersions.matchesRequested(
-            request.body.documentVersions, documentVersions)) {
+            request.body.documentVersions, documentVersions,
+            {required: true})) {
           response.status(409).json({
             success: false,
             error: "legal_document_version_changed",
@@ -5898,6 +5929,7 @@ exports.acceptSauveteurLegalTerms = onRequest(
 
         const requiredFlags = [
           request.body.cguAccepted === true,
+          request.body.charterAccepted === true,
           request.body.privacyAcknowledged === true,
           request.body.rgpdAcknowledged === true,
           request.body.publicOperationalDiffusionAcknowledged === true,
@@ -5930,7 +5962,8 @@ exports.acceptSauveteurLegalTerms = onRequest(
           documentVersions,
           acceptedAt,
           documents: {
-            cgu: true,
+            sauveteurCgu: true,
+            sauveteurCharter: true,
             privacy: true,
             rgpd: true,
           },

@@ -37,11 +37,13 @@ class SauveteurLegalAcceptancePage extends StatefulWidget {
 class _SauveteurLegalAcceptancePageState
     extends State<SauveteurLegalAcceptancePage> {
   final ExpansionTileController _cguController = ExpansionTileController();
+  final ExpansionTileController _charterController = ExpansionTileController();
   final ExpansionTileController _privacyController =
       ExpansionTileController();
   final ExpansionTileController _rgpdController = ExpansionTileController();
 
   Map<String, dynamic>? _cguDocument;
+  Map<String, dynamic>? _charterDocument;
   Map<String, dynamic>? _privacyDocument;
   Map<String, dynamic>? _rgpdDocument;
 
@@ -52,6 +54,7 @@ class _SauveteurLegalAcceptancePageState
   String? _message;
 
   bool _cguAccepted = false;
+  bool _charterAccepted = false;
   bool _privacyAcknowledged = false;
   bool _rgpdAcknowledged = false;
   bool _publicOperationalDiffusionAcknowledged = false;
@@ -62,6 +65,7 @@ class _SauveteurLegalAcceptancePageState
 
   bool get _canSubmit =>
       _cguAccepted &&
+      _charterAccepted &&
       _privacyAcknowledged &&
       _rgpdAcknowledged &&
       _publicOperationalDiffusionAcknowledged &&
@@ -106,7 +110,14 @@ class _SauveteurLegalAcceptancePageState
 
       final data = metadata.data() ?? <String, dynamic>{};
 
-      final cgu = await _loadDocument('cgu');
+      final cgu = await _loadDocument('sauveteurCgu');
+      final charter = await _loadDocument('sauveteurCharter');
+      if (!LegalPublishedVersion.isPublishedDocument(cgu, chapterCount: 8) ||
+          !LegalPublishedVersion.isPublishedDocument(
+            charter, chapterCount: 7,
+          )) {
+        throw StateError('CGU ou charte SPHOT SAUVETEUR non publiées');
+      }
       final privacy = await _loadDocument('privacyPolicy');
       final rgpd = await _loadDocument('rgpdNotice');
 
@@ -119,6 +130,9 @@ class _SauveteurLegalAcceptancePageState
           .toString();
       final documentVersions = LegalPublishedVersion.acceptedSnapshot(
         cgu: cgu,
+        cguId: 'sauveteurCgu',
+        charter: charter,
+        charterId: 'sauveteurCharter',
         privacyPolicy: privacy,
         rgpdNotice: rgpd,
         fallback: activeLegalVersion,
@@ -128,6 +142,7 @@ class _SauveteurLegalAcceptancePageState
         _legalVersion = activeLegalVersion;
         _documentVersions = documentVersions;
         _cguDocument = cgu;
+        _charterDocument = charter;
         _privacyDocument = privacy;
         _rgpdDocument = rgpd;
         _loading = false;
@@ -162,6 +177,7 @@ class _SauveteurLegalAcceptancePageState
           'legalVersion': _legalVersion,
           'documentVersions': _documentVersions,
           'cguAccepted': true,
+          'charterAccepted': true,
           'privacyAcknowledged': true,
           'rgpdAcknowledged': true,
           'publicOperationalDiffusionAcknowledged': true,
@@ -396,7 +412,7 @@ class _SauveteurLegalAcceptancePageState
               alignment: Alignment.centerLeft,
               child: Text(
                 'Version du document '
-                '${LegalPublishedVersion.number(document, fallback: _legalVersion)}',
+                '${LegalPublishedVersion.identifier(document, fallback: _legalVersion)}',
                 style: const TextStyle(
                   color: Color(0xFFEF4444),
                   fontSize: 11.5,
@@ -641,15 +657,28 @@ class _SauveteurLegalAcceptancePageState
                               children: [
                                 _legalDocument(
                                   title:
-                                      'Conditions Générales d’Utilisation',
+                                      'CGU — SPHOT SAUVETEUR',
                                   document: _cguDocument,
                                   controller: _cguController,
                                   accepted: _cguAccepted,
                                   acceptanceText:
-                                      'J’ai lu et j’accepte les CGU de SPHOT.',
+                                      'J’ai lu et j’accepte les CGU SPHOT SAUVETEUR.',
                                   onChanged: (value) {
                                     setState(() {
                                       _cguAccepted = value ?? false;
+                                    });
+                                  },
+                                ),
+                                _legalDocument(
+                                  title: 'Charte professionnelle — SPHOT SAUVETEUR',
+                                  document: _charterDocument,
+                                  controller: _charterController,
+                                  accepted: _charterAccepted,
+                                  acceptanceText:
+                                      'J’ai lu et j’accepte la Charte professionnelle SPHOT SAUVETEUR.',
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _charterAccepted = value ?? false;
                                     });
                                   },
                                 ),
