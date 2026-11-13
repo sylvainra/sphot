@@ -12,6 +12,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import 'widgets/sauveteur_styled_dropdown.dart';
+import 'sauveteur_verification_author.dart';
 
 class SauveteurMainCourantePage extends StatefulWidget {
   final Color profileColor;
@@ -2822,7 +2823,11 @@ class _SauveteurMainCourantePageState
       final category = _materialVerificationCategory(entry);
       final time = _verificationTime(entry).replaceAll(':', 'h');
       final body = _materialVerificationBody(entry);
-      return '$category — $time\n$body';
+      final author = sauveteurVerificationAuthor(
+        entry,
+        personnel: _presenceCandidates,
+      );
+      return '$category — $time\nAuteur : $author\n$body';
     }).join('\n\n');
 
     return <String, dynamic>{
@@ -2886,6 +2891,10 @@ class _SauveteurMainCourantePageState
                   final category =
                       _materialVerificationCategory(entry);
                   final body = _materialVerificationBody(entry);
+                  final author = sauveteurVerificationAuthor(
+                    entry,
+                    personnel: _presenceCandidates,
+                  );
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 11),
@@ -2925,6 +2934,16 @@ class _SauveteurMainCourantePageState
                                 ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Auteur : $author',
+                            style: const TextStyle(
+                              color: Color(0xFF1E3A8A),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              height: 1.25,
+                            ),
                           ),
                           if (body.isNotEmpty) ...[
                             const SizedBox(height: 6),
