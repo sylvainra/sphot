@@ -32,6 +32,8 @@ const {assignAuthorizedAdminQuoteNumber} =
     require("./admin_quote_numbering");
 const {getDownloadURL} = require("firebase-admin/storage");
 const legalDocumentVersions = require("./legal_document_versions");
+const {validateMaterialVerification} =
+    require("./sauveteur_material_verification");
 const nodemailer = require("nodemailer");
 const {
   shouldNotifyAdvertiserAssetChange,
@@ -7811,6 +7813,98 @@ function sanitizeMainCouranteInterventionZones(rawZones) {
           .filter((value) => allowed.has(value)),
   )];
 }
+
+/**
+ * Une vérification de matériel est une inscription factuelle, distincte
+ * des récits libres de la main courante réservés au chef et à l'adjoint.
+ * Authentification, habilitation du poste et état SPHOT ON sont obligatoires.
+ */
+exports.recordSauveteurMaterialVerification = onRequest(
+    {cpu: 1, memory: "256MiB"},
+    async (request, response) => {
+      response.set("Access-Control-Allow-Origin", "*");
+      response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      response.set("Access-Control-Allow-Headers", "Content-Type");
+
+      if (request.method === "OPTIONS") {
+        response.status(204).send("");
+        return;
+      }
+      if (request.method !== "POST") {
+        response.status(405).json({success: false});
+        return;
+      }
+
+      try {
+        const body = request.body || {};
+        const session = await resolveSauveteurSession(
+            body.sauveteurSessionToken,
+        );
+        if (!session) {
+          response.status(401).json({
+            success: false, error: "invalid_session",
+          });
+          return;
+        }
+        if (!session.legalAcceptanceCurrent) {
+          response.status(403).json({
+            success: false, error: "legal_acceptance_required",
+          });
+          return;
+        }
+
+        const {context} = session;
+        const spotId = (body.spotId || "").toString().trim();
+        if (context.sphotMode !== "ON" ||
+            !context.realtimeSpotIds.includes(spotId)) {
+          response.status(403).json({
+            success: false, error: "sphot_off",
+          });
+          return;
+        }
+
+        const verification = validateMaterialVerification(body);
+        if (!verification) {
+          response.status(400).json({
+            success: false, error: "invalid_material_verification",
+          });
+          return;
+        }
+
+        const entryReference = admin.firestore()
+            .collection("territoires")
+            .doc(context.territoireId)
+            .collection("spots")
+            .doc(spotId)
+            .collection("mainCourante")
+            .doc();
+        await entryReference.set({
+          type: "Vérifications",
+          verificationCategory: verification.category,
+          description: verification.description,
+          actionTaken: "",
+          visibility: "operational",
+          source: "material_verification",
+          occurredAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdBy: {
+            sauveteurId: context.sauveteurId,
+            login: session.login,
+            role: context.userRole,
+          },
+          immutableOriginal: true,
+        });
+
+        response.status(200).json({
+          success: true,
+          entryId: entryReference.id,
+        });
+      } catch (error) {
+        console.error("Erreur vérification matériel sauveteur:", error);
+        response.status(500).json({success: false});
+      }
+    },
+);
 
 exports.addSauveteurMainCouranteEntry = onRequest(
     {
