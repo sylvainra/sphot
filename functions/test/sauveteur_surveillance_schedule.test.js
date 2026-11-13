@@ -69,8 +69,9 @@ test("prend en compte le changement d'heure français", () => {
   );
   assert.equal(window.open, true);
   assert.equal(window.closesAt.toISOString(), "2026-03-29T17:00:00.000Z");
-  assert.equal(localClock(new Date("2026-03-29T09:00:00Z"), "Europe/Paris").hour,
-      11);
+  const clock = localClock(new Date("2026-03-29T09:00:00Z"),
+      "Europe/Paris");
+  assert.equal(clock.hour, 11);
 });
 
 test("ne traite pas un horaire absent comme une autorisation", () => {
