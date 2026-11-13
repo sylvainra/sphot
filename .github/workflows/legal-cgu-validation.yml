@@ -18,6 +18,8 @@ on:
       - "lib/pages/sauveteur/sauveteur_materiel_verification_page.dart"
       - "lib/pages/sauveteur/sauveteur_materiel_category_verification_page.dart"
       - "lib/pages/sauveteur/sauveteur_main_courante.dart"
+      - "lib/pages/sauveteur/sauveteur_verification_author.dart"
+      - "test/sauveteur_verification_author_test.dart"
       - "test/sauveteur_verification_feedback_test.dart"
       - "firebase.json"
       - "lib/web/admin/pages/admin_trial_request_page.dart"
@@ -103,13 +105,16 @@ jobs:
             lib/pages/sauveteur/sauveteur_materiel_verification_page.dart \
             lib/pages/sauveteur/sauveteur_materiel_category_verification_page.dart \
             lib/pages/sauveteur/sauveteur_main_courante.dart \
+            lib/pages/sauveteur/sauveteur_verification_author.dart \
+            test/sauveteur_verification_author_test.dart \
             test/sauveteur_verification_feedback_test.dart \
+            test/sauveteur_verification_author_test.dart \
             lib/web/admin/pages/admin_trial_request_page.dart \
             lib/web/advertiser/widgets/advertiser_legal_acceptance_section.dart \
             lib/web/super_admin/widgets/super_admin_legal_audience_panel.dart \
             test/legal_published_version_test.dart \
             test/admin_legal_placement_test.dart
       - name: Tester les versions juridiques Flutter
-        run: flutter test --no-pub test/legal_published_version_test.dart test/admin_legal_placement_test.dart test/sauveteur_verification_feedback_test.dart
+        run: flutter test --no-pub test/legal_published_version_test.dart test/admin_legal_placement_test.dart test/sauveteur_verification_feedback_test.dart test/sauveteur_verification_author_test.dart
       - name: Construire Web sans publier
         run: flutter build web --release --no-pub -t lib/main.dart
