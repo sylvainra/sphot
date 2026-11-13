@@ -236,6 +236,351 @@ class _PublishedProfessionalLegalGateState
     }
   }
 
+
+  static const _blue = Color(0xFF1E3A8A);
+  static const _darkBlue = Color(0xFF12295E);
+  static const _orange = Color(0xFFF59E0B);
+
+  Widget _articleCard(int index, Map<String, dynamic> chapter) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFD5DFEF), width: 1.2),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+          splashColor: _blue.withOpacity(0.07),
+        ),
+        child: ExpansionTile(
+          key: PageStorageKey<String>(
+            'professional-legal-' + widget.documentId + '-' +
+                index.toString(),
+          ),
+          tilePadding: const EdgeInsets.fromLTRB(16, 5, 14, 5),
+          childrenPadding: const EdgeInsets.fromLTRB(20, 4, 20, 22),
+          iconColor: _blue,
+          collapsedIconColor: _blue,
+          leading: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF0FC),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: const Icon(
+              Icons.description_outlined,
+              color: _blue,
+              size: 21,
+            ),
+          ),
+          title: Text(
+            (chapter['title'] ?? '').toString(),
+            style: const TextStyle(
+              color: _darkBlue,
+              fontSize: 15.5,
+              fontWeight: FontWeight.w800,
+              height: 1.35,
+            ),
+          ),
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: SphotLegalArticleMarkdown(
+                markdown: (chapter['content'] ?? '').toString(),
+                style: const TextStyle(
+                  color: Color(0xFF25334A),
+                  fontSize: 15.5,
+                  height: 1.65,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _legalHeader(bool compact) {
+    final heading = Column(
+      crossAxisAlignment: compact
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'CONDITIONS GÉNÉRALES D’UTILISATION',
+          textAlign: compact ? TextAlign.center : TextAlign.left,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: compact ? 18 : 23,
+            fontWeight: FontWeight.w900,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          widget.displayName,
+          textAlign: compact ? TextAlign.center : TextAlign.left,
+          style: const TextStyle(
+            color: _orange,
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+        compact ? 18 : 30,
+        compact ? 16 : 22,
+        compact ? 18 : 30,
+        compact ? 16 : 22,
+      ),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_blue, _darkBlue],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border(bottom: BorderSide(color: _orange, width: 3)),
+      ),
+      child: compact
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'data/icons/title.png',
+                  height: 50,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 9),
+                heading,
+              ],
+            )
+          : Row(
+              children: [
+                Image.asset(
+                  'data/icons/title.png',
+                  width: 178,
+                  height: 65,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(width: 26),
+                Expanded(child: heading),
+              ],
+            ),
+    );
+  }
+
+  Widget _legalFooter(bool compact) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        compact ? 14 : 24,
+        11,
+        compact ? 14 : 24,
+        compact ? 14 : 20,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: Color(0xFFD5DFEF), width: 1.3),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            onTap: _submitting
+                ? null
+                : () => setState(() => _acknowledged = !_acknowledged),
+            borderRadius: BorderRadius.circular(10),
+            child: Row(
+              children: [
+                Checkbox(
+                  value: _acknowledged,
+                  activeColor: _blue,
+                  onChanged: _submitting
+                      ? null
+                      : (checked) => setState(
+                          () => _acknowledged = checked ?? false,
+                        ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    'J’ai lu et j’accepte les CGU ' + widget.displayName +
+                        ', version ' + widget.versionId + '.',
+                    style: const TextStyle(
+                      color: _darkBlue,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 9),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: !_acknowledged || _submitting ? null : _accept,
+              icon: _submitting
+                  ? const SizedBox(
+                      width: 19,
+                      height: 19,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : const Icon(Icons.verified_user_rounded, size: 21),
+              label: Text(
+                _submitting
+                    ? 'ENREGISTREMENT EN COURS…'
+                    : 'ACCEPTER ET CONTINUER',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _blue,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: const Color(0xFFD5DCE9),
+                disabledForegroundColor: const Color(0xFF637087),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _legalReview(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF2F6FD),
+      body: SizedBox.expand(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              'data/images/map_background.jpg',
+              fit: BoxFit.cover,
+            ),
+            const ColoredBox(color: Color(0xEAF4F7FC)),
+            SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 680;
+                  final margin = compact ? 12.0 : 24.0;
+                  final width = constraints.maxWidth > 988
+                      ? 940.0
+                      : constraints.maxWidth - 2 * margin;
+                  final height = constraints.maxHeight > 860
+                      ? 820.0
+                      : constraints.maxHeight - (compact ? 16 : 30);
+
+                  return Center(
+                    child: SizedBox(
+                      width: width,
+                      height: height,
+                      child: Container(
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7F9FE),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: _blue, width: 1.8),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x220B234B),
+                              blurRadius: 28,
+                              offset: Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            _legalHeader(compact),
+                            Container(
+                              width: double.infinity,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: compact ? 16 : 26,
+                                vertical: 13,
+                              ),
+                              color: const Color(0xFFEAF0FC),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.info_outline_rounded,
+                                    color: _blue,
+                                    size: 23,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'Version publiée ' + widget.versionId +
+                                          ' — ' +
+                                          widget.chapters.length.toString() +
+                                          ' articles. Les CGU ont été mises '
+                                          'à jour. Leur acceptation est '
+                                          'nécessaire pour poursuivre.',
+                                      style: const TextStyle(
+                                        color: _darkBlue,
+                                        fontSize: 14,
+                                        height: 1.45,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: Scrollbar(
+                                child: ListView.builder(
+                                  padding: EdgeInsets.fromLTRB(
+                                    compact ? 12 : 24,
+                                    18,
+                                    compact ? 12 : 24,
+                                    16,
+                                  ),
+                                  itemCount: widget.chapters.length,
+                                  itemBuilder: (context, index) =>
+                                      _articleCard(
+                                    index,
+                                    widget.chapters[index],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            _legalFooter(compact),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -245,74 +590,16 @@ class _PublishedProfessionalLegalGateState
     }
     if (_error != null) {
       return _GateMessage(
-        title: 'Vérification des CGU $_error',
+        title: 'Vérification des CGU ' + _error!,
         detail: 'La version publiée est conservée. '
             'Aucune acceptation n’a été enregistrée.',
         onRetry: _check,
       );
     }
     if (!_required) return widget.child;
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F6FA),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 860),
-          child: ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              Text('CONDITIONS GÉNÉRALES D’UTILISATION — '
-                  '${widget.displayName}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF1E3A8A),
-                    fontSize: 23,
-                  )),
-              const SizedBox(height: 8),
-              Text('Version publiée ${widget.versionId}. '
-                  'Les CGU ont été mises à jour depuis le portail '
-                  'Super Admin. Leur acceptation est nécessaire '
-                  'pour poursuivre.'),
-              const SizedBox(height: 16),
-              ...widget.chapters.map((chapter) => Card(
-                margin: const EdgeInsets.only(bottom: 6),
-                child: ExpansionTile(
-                  title: Text(
-                    (chapter['title'] ?? '').toString(),
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  childrenPadding: const EdgeInsets.all(16),
-                  children: [
-                    SphotLegalArticleMarkdown(
-                      markdown: (chapter['content'] ?? '').toString(),
-                    ),
-                  ],
-                ),
-              )),
-              const SizedBox(height: 14),
-              CheckboxListTile(
-                controlAffinity: ListTileControlAffinity.leading,
-                value: _acknowledged,
-                onChanged: (checked) => setState(
-                  () => _acknowledged = checked ?? false,
-                ),
-                title: Text('J’ai lu et j’accepte les CGU '
-                    '${widget.displayName}, version '
-                    '${widget.versionId}.'),
-              ),
-              const SizedBox(height: 8),
-              FilledButton(
-                onPressed: !_acknowledged || _submitting ? null : _accept,
-                child: Text(_submitting
-                    ? 'ENREGISTREMENT…'
-                    : 'ACCEPTER ET CONTINUER'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return _legalReview(context);
   }
+
 }
 
 class _GateMessage extends StatelessWidget {
