@@ -10,6 +10,12 @@ const legalDocumentVersions = require("../legal_document_versions");
 // initialiser Firebase Admin ni déployer les fonctions métier.
 const source = fs.readFileSync(
     path.join(__dirname, "../index.js"), "utf8");
+/**
+ * Extrait une fonction du backend pour les tests.
+ * @param {string} name Nom de la fonction.
+ * @param {boolean} isAsync Nature asynchrone.
+ * @return {string} Code de la fonction.
+ */
 function extract(name, isAsync = false) {
   const declaration = (isAsync ? "async " : "") + "function " + name + "(";
   const start = source.indexOf(declaration);
@@ -19,15 +25,21 @@ function extract(name, isAsync = false) {
   return source.slice(start, end + 2);
 }
 
+/**
+ * Prepare les donnees simulees.
+ * @return {Object} Donnees de test.
+ */
 function fixture() {
   const documents = {
     sauveteurCgu: {published: true, testOnly: false, version: "1.5",
       revision: 1, chapters: Array.from({length: 8}, (_, index) => ({
-        id: String(index + 1).padStart(2, "0"), content: "CGU", title: "Article",
+        id: String(index + 1).padStart(2, "0"),
+        content: "CGU", title: "Article",
       }))},
     sauveteurCharter: {published: true, testOnly: false, version: "1.4",
       revision: 1, chapters: Array.from({length: 7}, (_, index) => ({
-        id: String(index + 1).padStart(2, "0"), content: "Charte", title: "Rubrique",
+        id: String(index + 1).padStart(2, "0"),
+        content: "Charte", title: "Rubrique",
       }))},
     privacyPolicy: {published: true, version: "1.2", revision: 0},
     rgpdNotice: {published: true, version: "1.3", revision: 0},
@@ -63,7 +75,7 @@ function fixture() {
   return {documents, funcs, account};
 }
 
-test("raccordement session : getSauveteurSessionState utilise les versions individuelles", () => {
+test("session : controle des versions individuelles", () => {
   const begin = source.indexOf("exports.getSauveteurSessionState =");
   const end = source.indexOf("exports.acceptSauveteurLegalTerms =", begin);
   assert.ok(begin >= 0 && end > begin);
@@ -74,18 +86,23 @@ test("raccordement session : getSauveteurSessionState utilise les versions indiv
   assert.doesNotMatch(route, /await activeLegalPackInfo\(\)/);
 });
 
-test("raccordement connexion : loginSauveteur et pilot chargent les versions publiées", () => {
+test("connexion : versions individuelles chargees", () => {
   const begin = source.indexOf("async function handleSauveteurLogin(");
   const end = source.indexOf("exports.loginSauveteur =", begin);
   assert.ok(begin >= 0 && end > begin);
   const route = source.slice(begin, end);
-  assert.match(route, /activeLegalPack\.documentVersions\s*=\s*await activeSauveteurDocumentVersions\(activeLegalPack\.version\)/);
-  assert.match(route, /sauveteurLegalAcceptanceIsCurrent\(data, activeLegalPack\)/);
+  const loginVersions = new RegExp(
+      String.raw`activeLegalPack\.documentVersions\s*=\s*await ` +
+      String.raw`activeSauveteurDocumentVersions\(activeLegalPack\.version\)`);
+  assert.match(route, loginVersions);
+  const acceptanceCheck =
+      /sauveteurLegalAcceptanceIsCurrent\(data, activeLegalPack\)/;
+  assert.match(route, acceptanceCheck);
   assert.match(source.slice(end, end + 700),
       /handleSauveteurLogin\(request, response\)/);
 });
 
-test("SAUVETEUR : chaque publication CGU ou Charte oblige la reacceptation", async () => {
+test("SAUVETEUR : nouvelle CGU ou Charte exige reacceptation", async () => {
   const f = fixture();
   const current = await f.funcs.activeSauveteurDocumentVersions("1.7");
   assert.equal(current.sauveteurCgu, "1.5:r1");
@@ -127,7 +144,7 @@ test("SAUVETEUR : chaque publication CGU ou Charte oblige la reacceptation", asy
   assert.equal(accepted(nextCgu), true);
 });
 
-test("SAUVETEUR : une Charte non publiée ne peut pas être imposée", async () => {
+test("SAUVETEUR : Charte non publiee non imposee", async () => {
   const f = fixture();
   f.documents.sauveteurCharter.published = false;
   const versions = await f.funcs.activeSauveteurDocumentVersions("1.7");
