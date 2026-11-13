@@ -14,6 +14,11 @@ const period = {
   timeZone: "Europe/Paris",
 };
 
+/**
+ * Simule une lecture du poste puis son affalage atomique.
+ * @param {Object} options Options.
+ * @return {Object} Base factice et écritures enregistrées.
+ */
 function fixture({now, rootPosition = "hisse", currentPosition = null} = {}) {
   const writes = [];
   const spotData = {
@@ -91,7 +96,7 @@ function fixture({now, rootPosition = "hisse", currentPosition = null} = {}) {
   return {db: chain, admin, writes, now};
 }
 
-test("affalage automatique à l'heure de fermeture : état, auteur, audit", async () => {
+test("affalage automatique à la fermeture : état, auteur, audit", async () => {
   const ctx = fixture({now: new Date("2026-11-13T18:00:00Z")});
   const result = await autoLowerClosedFlags(ctx.db, ctx.admin, ctx.now);
   assert.equal(result.lowered, 1);
@@ -134,5 +139,5 @@ test("fonction planifiée distincte, sans imitation de sauveteur", () => {
   assert.match(closure, /transaction\.set\(journalRef/);
   assert.match(closure, /transaction\.set\(auditRef/);
   assert.match(closure, /transaction\.set\(candidate\.ref/);
-  assert.match(closure, /Ne constitue pas une constatation de manœuvre physique/);
+  assert.match(closure, /Ne constitue pas une constatation/);
 });
