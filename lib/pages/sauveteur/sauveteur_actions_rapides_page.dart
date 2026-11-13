@@ -728,6 +728,11 @@ class _SauveteurActionsRapidesPageState
             onVerticalDragEnd: (_) {
               unawaited(_persistFlagState());
             },
+            onVerticalDragCancel: () {
+              if (mounted && !_flagWriteInProgress) {
+                setState(_restoreConfirmedFlagState);
+              }
+            },
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -998,6 +1003,7 @@ class _SauveteurActionsRapidesPageState
                                               label: 'Vert',
                                               color: const Color(0xFF22C55E),
                                               selected: flagColor == 'Vert',
+                                              enabled: _canChangeFlagColor,
                                               onTap: () {
                                                 _changeFlagColor('Vert');
                                               },
@@ -1009,6 +1015,7 @@ class _SauveteurActionsRapidesPageState
                                               label: 'Jaune',
                                               color: const Color(0xFFFDE047),
                                               selected: flagColor == 'Jaune',
+                                              enabled: _canChangeFlagColor,
                                               onTap: () {
                                                 _changeFlagColor('Jaune');
                                               },
@@ -1020,6 +1027,7 @@ class _SauveteurActionsRapidesPageState
                                               label: 'Rouge',
                                               color: const Color(0xFFEF4444),
                                               selected: flagColor == 'Rouge',
+                                              enabled: _canChangeFlagColor,
                                               onTap: () {
                                                 _changeFlagColor('Rouge');
                                               },
@@ -1542,24 +1550,27 @@ class _FlagColorButton extends StatelessWidget {
   final String label;
   final Color color;
   final bool selected;
+  final bool enabled;
   final VoidCallback onTap;
 
   const _FlagColorButton({
     required this.label,
     required this.color,
     required this.selected,
+    required this.enabled,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      // Même désactivé, le tap explique pourquoi la couleur est bloquée.
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         width: double.infinity,
         decoration: BoxDecoration(
-          color: color,
+          color: enabled ? color : Color.lerp(color, Colors.grey, 0.50)!,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: selected ? Colors.black : Colors.transparent,
