@@ -7475,7 +7475,8 @@ exports.updateSauveteurLiveState = onRequest(
           const spotSnapshot = await transaction.get(spotReference);
           const previousSpot = spotSnapshot.data() || {};
           const previousLiveFlag = previousSpot.liveFlag || {};
-          const auditReference = db.collection("sauveteurOperationalAudit").doc();
+          const auditReference = db
+              .collection("sauveteurOperationalAudit").doc();
 
           const territoireSpotReference = db
               .collection("territoires")
