@@ -8,10 +8,13 @@ class SphotLegalArticleMarkdown extends StatelessWidget {
     super.key,
     required this.markdown,
     this.selectable = false,
+    this.style,
   });
 
   final String markdown;
   final bool selectable;
+  // Style facultatif : le rendu historique reste inchangé ailleurs.
+  final TextStyle? style;
 
   static final RegExp _inline = RegExp(
     r'\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`',
@@ -77,12 +80,11 @@ class SphotLegalArticleMarkdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = TextSpan(children: _articleSpans(markdown));
+    final effectiveStyle = style ??
+        const TextStyle(fontSize: 12, height: 1.45);
     if (selectable) {
-      return SelectableText.rich(content);
+      return SelectableText.rich(content, style: effectiveStyle);
     }
-    return Text.rich(
-      content,
-      style: const TextStyle(fontSize: 12, height: 1.45),
-    );
+    return Text.rich(content, style: effectiveStyle);
   }
 }
