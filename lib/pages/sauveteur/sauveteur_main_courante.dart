@@ -2249,6 +2249,10 @@ class _SauveteurMainCourantePageState
           ? Map<String, dynamic>.from(entry['createdBy'] as Map)
           : <String, dynamic>{};
       final role = (createdBy['role'] ?? '').toString().trim();
+      final author = sauveteurVerificationAuthor(
+        entry,
+        personnel: _presenceCandidates,
+      );
       final action = (entry['actionTaken'] ?? '').toString().trim();
       final visibility = (entry['visibility'] ?? 'operational').toString();
       final restricted = visibility == 'restricted';
@@ -2375,10 +2379,10 @@ class _SauveteurMainCourantePageState
                 ),
               ),
             ],
-            if (role.isNotEmpty) ...[
+            if (author != 'Non renseigné' || role.isNotEmpty) ...[
               pw.SizedBox(height: 5),
               pw.Text(
-                'Saisi par : $role',
+                'Auteur : $author${role.isEmpty ? '' : ' — $role'}',
                 style: const pw.TextStyle(
                   fontSize: 7.5,
                   color: PdfColors.grey700,
@@ -3035,6 +3039,10 @@ class _SauveteurMainCourantePageState
         ? Map<String, dynamic>.from(entry['createdBy'] as Map)
         : <String, dynamic>{};
     final role = (createdBy['role'] ?? '').toString();
+    final author = sauveteurVerificationAuthor(
+      entry,
+      personnel: _presenceCandidates,
+    );
     final visibility = (entry['visibility'] ?? 'operational').toString();
     final source = (entry['source'] ?? '').toString().trim();
     final automatic = source.startsWith('automatic_');
@@ -3246,10 +3254,10 @@ class _SauveteurMainCourantePageState
                     ),
                   ),
                 ],
-                if (role.isNotEmpty) ...[
+                if (author != 'Non renseigné' || role.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'Saisi par : $role',
+                    'Auteur : $author${role.isEmpty ? '' : ' — $role'}',
                     style: const TextStyle(
                       color: Colors.black54,
                       fontSize: 10,
