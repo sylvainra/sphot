@@ -904,7 +904,7 @@ class _SauveteurActionsRapidesPageState
         final double messagesHeight =
             (_loadingSpots ? 14.0 : 0.0) +
             (!_loadingSpots && postesSecoursCommune.isEmpty ? 38.0 : 0.0) +
-            (_liveStatusMessage != null ? 26.0 : 0.0);
+            (_liveStatusMessage != null ? 42.0 : 0.0);
         final double bandeauHeight =
             ((pageConstraints.maxHeight - espacesFixes - messagesHeight) / 7)
                 .clamp(48.0, 120.0)
