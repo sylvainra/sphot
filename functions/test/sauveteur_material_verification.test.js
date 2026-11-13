@@ -163,10 +163,20 @@ function verificationEndpointFixture(options = {}) {
       const response = {
         statusCode: 200,
         result: null,
-        set() { return this; },
-        status(code) { this.statusCode = code; return this; },
-        json(value) { this.result = value; return this; },
-        send() { return this; },
+        set() {
+          return this;
+        },
+        status(code) {
+          this.statusCode = code;
+          return this;
+        },
+        json(value) {
+          this.result = value;
+          return this;
+        },
+        send() {
+          return this;
+        },
       };
       const body = {
         sauveteurSessionToken: "session-test",
@@ -182,7 +192,7 @@ function verificationEndpointFixture(options = {}) {
   };
 }
 
-test("un sauveteur non chef peut enregistrer plusieurs vérifications", async () => {
+test("un sauveteur simple peut enregistrer plusieurs contrôles", async () => {
   const harness = verificationEndpointFixture({supervisor: false});
   const first = await harness.invoke({createdBy: {login: "faux"}});
   const second = await harness.invoke();
