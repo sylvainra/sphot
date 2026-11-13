@@ -107,3 +107,114 @@ test("les changements de drapeau sont inscrits avec l'auteur", () => {
   assert.match(live, /login: session\.login/);
   assert.match(live, /serverTimestamp\(\)/);
 });
+
+// Exécute le véritable gestionnaire Cloud Functions avec Firebase simulé.
+const vm = require("node:vm");
+
+/**
+ * Prépare un appel HTTP au endpoint exact de functions/index.js.
+ * @param {Object} options Simulation du compte et du poste.
+ * @return {Object} Méthode invoke et écritures capturées.
+ */
+function verificationEndpointFixture(options = {}) {
+  const writes = [];
+  const context = {
+    sphotMode: options.mode || "ON",
+    realtimeSpotIds: options.assigned === false ? [] : ["poste-test"],
+    territoireId: "territoire-test",
+    sauveteurId: "sauveteur-test",
+    userRole: "SAUVETEUR",
+    canManageRestrictedOperationalData: options.supervisor === true,
+  };
+  const firestore = () => ({
+    collection: (name) => {
+      assert.equal(name, "territoires");
+      return {doc: () => ({
+        collection: () => ({doc: () => ({
+          collection: () => ({doc: () => ({
+            id: "entry-" + (writes.length + 1),
+            set: async (data) => writes.push(data),
+          })}),
+        })}),
+      })};
+    },
+  });
+  firestore.FieldValue = {serverTimestamp: () => "SERVER_TIMESTAMP"};
+  const sandbox = {
+    exports: {},
+    onRequest: (_options, handler) => handler,
+    admin: {firestore},
+    validateMaterialVerification,
+    resolveSauveteurSession: async () => options.authenticated === false ?
+      null : {
+        login: "sauveteur-test",
+        legalAcceptanceCurrent: options.accepted !== false,
+        context,
+      },
+    console,
+  };
+  vm.runInNewContext(
+      "exports.recordSauveteurMaterialVerification =" + recordRoute,
+      sandbox);
+
+  return {
+    writes,
+    invoke: async (overrides = {}) => {
+      const response = {
+        statusCode: 200,
+        result: null,
+        set() { return this; },
+        status(code) { this.statusCode = code; return this; },
+        json(value) { this.result = value; return this; },
+        send() { return this; },
+      };
+      const body = {
+        sauveteurSessionToken: "session-test",
+        spotId: "poste-test",
+        verificationCategory: "medical",
+        description: "Catégorie : Secours\nContrôle : OK",
+        ...overrides,
+      };
+      await sandbox.exports.recordSauveteurMaterialVerification(
+          {method: "POST", body}, response);
+      return response;
+    },
+  };
+}
+
+test("un sauveteur non chef peut enregistrer plusieurs vérifications", async () => {
+  const harness = verificationEndpointFixture({supervisor: false});
+  const first = await harness.invoke({createdBy: {login: "faux"}});
+  const second = await harness.invoke();
+  assert.equal(first.statusCode, 200);
+  assert.equal(second.statusCode, 200);
+  assert.equal(harness.writes.length, 2);
+  assert.equal(harness.writes[0].createdBy.login, "sauveteur-test");
+  assert.equal(harness.writes[0].occurredAt, "SERVER_TIMESTAMP");
+  assert.equal(harness.writes[0].verificationCategory, "medical");
+  assert.equal(harness.writes[0].type, "Vérifications");
+});
+
+test("session absente, accord manquant et poste interdit refusés", async () => {
+  const cases = [
+    [{authenticated: false}, 401],
+    [{accepted: false}, 403],
+    [{mode: "OFF"}, 403],
+    [{assigned: false}, 403],
+  ];
+  for (const [options, expectedStatus] of cases) {
+    const harness = verificationEndpointFixture(options);
+    const response = await harness.invoke();
+    assert.equal(response.statusCode, expectedStatus);
+    assert.equal(harness.writes.length, 0);
+  }
+});
+
+test("le endpoint refuse une fausse catégorie matériel", async () => {
+  const harness = verificationEndpointFixture();
+  const response = await harness.invoke({
+    verificationCategory: "intervention",
+  });
+  assert.equal(response.statusCode, 400);
+  assert.equal(harness.writes.length, 0);
+});
