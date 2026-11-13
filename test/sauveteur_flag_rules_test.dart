@@ -40,8 +40,8 @@ void main() {
         File('lib/pages/sauveteur/sauveteur_main_courante.dart')
             .readAsStringSync();
     expect(source.contains('sauveteurVerificationAuthor('), isTrue);
-    expect(source.contains("Auteur : $author"), isTrue);
-    expect(source.contains('Saisi par : $role'), isFalse);
+    expect(source.contains(r'Auteur : $author'), isTrue);
+    expect(source.contains(r'Saisi par : $role'), isFalse);
   });
 
   test('Les périodes Admin sont liées par identifiant stable au poste', () {
