@@ -1,6 +1,7 @@
 const {sendSphotMail} = require("./sphot_email_design");
 const {evaluateFlagTransition} = require("./sauveteur_flag_transition");
 const {surveillanceWindow} = require("./sauveteur_surveillance_schedule");
+const {autoLowerClosedFlags} = require("./sauveteur_flag_auto_lower");
 const {setGlobalOptions} = require("firebase-functions");
 const {defineString} = require("firebase-functions/params");
 const {onRequest} = require("firebase-functions/v2/https");
@@ -7311,6 +7312,27 @@ exports.updateInstitutionalMainCourantePreferences = onRequest(
         );
         response.status(500).json({success: false});
       }
+    },
+);
+
+/**
+ * Vérifie à chaque minute les drapeaux numériques hissés et affale ceux
+ * dont les horaires de surveillance Admin sont terminés.
+ * Fonction distincte du hissage manuel et sans session sauveteur.
+ */
+exports.autoLowerSauveteurFlags = onSchedule(
+    {
+      schedule: "* * * * *",
+      timeZone: "Etc/UTC",
+      region: "us-central1",
+      cpu: 1,
+      memory: "256MiB",
+      timeoutSeconds: 540,
+      maxInstances: 1,
+    },
+    async () => {
+      const results = await autoLowerClosedFlags(admin.firestore(), admin);
+      console.log("Affalages automatiques SPHOT:", results);
     },
 );
 
