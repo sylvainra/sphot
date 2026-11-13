@@ -14,6 +14,9 @@ on:
       - "lib/web/admin/pages/admin_dashboard_page.dart"
       - "lib/web/advertiser/pages/advertiser_dashboard_page.dart"
       - "lib/pages/sauveteur/sauveteur_legal_acceptance_page.dart"
+      - "lib/pages/sauveteur/sauveteur_access_info_page.dart"
+      - "lib/pages/sauveteur/sauveteur_materiel_verification_page.dart"
+      - "lib/pages/sauveteur/sauveteur_materiel_category_verification_page.dart"
       - "firebase.json"
       - "lib/web/admin/pages/admin_trial_request_page.dart"
       - "lib/web/advertiser/widgets/advertiser_legal_acceptance_section.dart"
@@ -54,13 +57,16 @@ jobs:
           node-version: "22"
       - name: Installer fonctions (sans déploiement)
         run: npm --prefix functions ci
+      - name: Analyse ESLint des fonctions
+        run: npm --prefix functions run lint
       - name: Contrôle syntaxique des fonctions modifiées
         run: |
           node --check functions/index.js
           node --check functions/advertiser_correction_resubmit.js
           node --check functions/legal_document_versions.js
+          node --check functions/sauveteur_material_verification.js
       - name: Tests de versions des acceptations
-        run: node --test functions/test/legal_document_versions.test.js functions/test/sauveteur_legal_propagation.test.js
+        run: node --test functions/test/legal_document_versions.test.js functions/test/sauveteur_legal_propagation.test.js functions/test/sauveteur_material_verification.test.js
       - name: Vérifier les deux codebases Firebase
         run: node -e "const f=require('./firebase.json'); if(!f.functions.some(x=>x.codebase==='legal'&&x.source==='functions-legal'))process.exit(1)"
       - name: Installer éditeur juridique
@@ -90,6 +96,9 @@ jobs:
             lib/web/admin/pages/admin_dashboard_page.dart \
             lib/web/advertiser/pages/advertiser_dashboard_page.dart \
             lib/pages/sauveteur/sauveteur_legal_acceptance_page.dart \
+            lib/pages/sauveteur/sauveteur_access_info_page.dart \
+            lib/pages/sauveteur/sauveteur_materiel_verification_page.dart \
+            lib/pages/sauveteur/sauveteur_materiel_category_verification_page.dart \
             lib/web/admin/pages/admin_trial_request_page.dart \
             lib/web/advertiser/widgets/advertiser_legal_acceptance_section.dart \
             lib/web/super_admin/widgets/super_admin_legal_audience_panel.dart \
