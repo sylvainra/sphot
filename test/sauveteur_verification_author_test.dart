@@ -83,8 +83,8 @@ void main() {
     final source =
         File('lib/pages/sauveteur/sauveteur_main_courante.dart')
             .readAsStringSync();
-    expect(source.contains("'Auteur : $author'"), isTrue);
-    expect(source.contains('Auteur : $author\\n$body'), isTrue);
+    expect(source.contains(r"'Auteur : $author'"), isTrue);
+    expect(source.contains(r'Auteur : $author\n$body'), isTrue);
     expect(
       source.split('sauveteurVerificationAuthor(').length - 1,
       2,
