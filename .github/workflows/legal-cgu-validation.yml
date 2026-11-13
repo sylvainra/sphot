@@ -106,7 +106,6 @@ jobs:
             lib/pages/sauveteur/sauveteur_materiel_category_verification_page.dart \
             lib/pages/sauveteur/sauveteur_main_courante.dart \
             lib/pages/sauveteur/sauveteur_verification_author.dart \
-            test/sauveteur_verification_author_test.dart \
             test/sauveteur_verification_feedback_test.dart \
             test/sauveteur_verification_author_test.dart \
             lib/web/admin/pages/admin_trial_request_page.dart \
