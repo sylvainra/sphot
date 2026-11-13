@@ -121,8 +121,9 @@ function registerAdvertiserCorrectionResubmit({admin, onRequest}) {
                   .doc("metadata");
               const cgvRef = db.collection("legalDocuments")
                   .doc("advertiserCgv");
-              const commonRefs = ["advertiserCgu", "privacyPolicy", "rgpdNotice"]
-                  .map((id) => db.collection("legalDocuments").doc(id));
+              const commonRefs = [
+                "advertiserCgu", "privacyPolicy", "rgpdNotice",
+              ].map((id) => db.collection("legalDocuments").doc(id));
               const metadataSnap = await transaction.get(metadataRef);
               const cgvSnap = await transaction.get(cgvRef);
               const commonSnapshots = await Promise.all(commonRefs.map(
@@ -152,7 +153,8 @@ function registerAdvertiserCorrectionResubmit({admin, onRequest}) {
               }
               change.legalAcceptanceCompleted = true;
               change.acceptedDocuments = {
-                advertiserCgu: true, privacy: true, rgpd: true, advertiserCgv: true,
+                advertiserCgu: true, privacy: true, rgpd: true,
+                advertiserCgv: true,
                 advertiserCgvVersion: currentCgv, version: currentVersion,
                 documentVersions,
                 acceptedAt: FieldValue.serverTimestamp(),
@@ -164,7 +166,8 @@ function registerAdvertiserCorrectionResubmit({admin, onRequest}) {
                 representativeDeclaration: true,
                 advertiserCgvVersion: currentCgv,
                 documents: {
-                  advertiserCgu: true, privacy: true, rgpd: true, advertiserCgv: true,
+                  advertiserCgu: true, privacy: true, rgpd: true,
+                  advertiserCgv: true,
                 },
                 acceptedAt: FieldValue.serverTimestamp(),
               };

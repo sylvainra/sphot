@@ -183,16 +183,14 @@ class _SauveteurMaterielVerificationPageState
       final response = await http.post(
         Uri.parse(
           'https://us-central1-sphot-ab80b.cloudfunctions.net/'
-          'addSauveteurMainCouranteEntry',
+          'recordSauveteurMaterialVerification',
         ),
         headers: const {'Content-Type': 'application/json'},
         body: jsonEncode({
           'sauveteurSessionToken': widget.sauveteurSessionToken,
           'spotId': spotId,
-          'type': 'Vérifications',
+          'verificationCategory': 'medical',
           'description': lines.join('\n'),
-          'actionTaken': '',
-          'visibility': 'operational',
         }),
       );
 

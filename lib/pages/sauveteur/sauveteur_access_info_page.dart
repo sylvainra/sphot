@@ -276,6 +276,40 @@ class SauveteurAccessInfoPage extends StatelessWidget {
                             ],
                           ),
                           _section(
+                            title: 'VÉRIFICATIONS ET DRAPEAUX',
+                            icon: Icons.fact_check_rounded,
+                            color: green,
+                            children: [
+                              _line(
+                                'Tout sauveteur SPHOT ON affecté et habilité '
+                                'au poste peut renseigner les vérifications '
+                                'du matériel médical, de phonie, de '
+                                'sauvetage terrestre et aquatique.',
+                                strong: true,
+                              ),
+                              _line(
+                                'Chaque vérification est inscrite séparément '
+                                'dans la main courante, avec son auteur, '
+                                'sa date et son heure. Plusieurs contrôles '
+                                'peuvent être enregistrés le même jour.',
+                              ),
+                              _line(
+                                'Tout sauveteur SPHOT ON habilité peut '
+                                'hisser, affaler et changer le drapeau '
+                                'suivant les décisions de terrain. '
+                                'Ces changements sont horodatés et '
+                                'attribués à leur auteur.',
+                              ),
+                              _line(
+                                'Seuls le chef de poste et son adjoint '
+                                'habilités peuvent modifier ou supprimer '
+                                'les inscriptions de vérification et de '
+                                'drapeau, avec conservation de la trace '
+                                'technique de correction.',
+                              ),
+                            ],
+                          ),
+                          _section(
                             title: 'MAIN COURANTE ET DROITS DE REGARD',
                             icon: Icons.menu_book_rounded,
                             color: purple,
