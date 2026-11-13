@@ -1358,10 +1358,36 @@ class _SauveteurMainCourantePageState
       if (!mounted) return;
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        String errorCode = '';
+        try {
+          final failure = jsonDecode(response.body);
+          if (failure is Map && failure['error'] is String) {
+            final candidate = (failure['error'] as String).trim();
+            if (RegExp(r'^[a-zA-Z0-9_]{1,80}$').hasMatch(candidate)) {
+              errorCode = candidate;
+            }
+          }
+        } catch (_) {
+          // Une erreur HTTP peut être non JSON.
+        }
+        const explanations = <String, String>{
+          'invalid_session': 'Session expirée : reconnectez-vous.',
+          'legal_acceptance_required':
+              'Acceptation juridique à renouveler.',
+          'main_courante_not_available':
+              'Droits temps réel non reconnus pour ce poste.',
+          'insufficient_role':
+              'Le serveur refuse la lecture à ce profil.',
+        };
+        final explanation = explanations[errorCode] ??
+            'Le service de lecture a refusé la demande.';
+        final diagnostic = errorCode.isNotEmpty ? ' - $errorCode' : '';
+        debugPrint('Lecture main courante : HTTP '
+            '${response.statusCode}$diagnostic');
         setState(() {
           _entries = [];
-          _statusMessage =
-              'La main courante réelle n’est pas accessible actuellement.';
+          _statusMessage = '$explanation '
+              '(HTTP ${response.statusCode}$diagnostic)';
         });
         return;
       }
