@@ -62,7 +62,8 @@ function evaluateFlagTransition(previous, next) {
   }
   if (oldPosition !== newPosition) {
     journalLines.push(
-        `Position du drapeau : ${oldPosition || "Non renseignée"} → ${newPosition}`,
+        `Position du drapeau : ${oldPosition || "Non renseignée"}` +
+        ` → ${newPosition}`,
     );
   }
 
