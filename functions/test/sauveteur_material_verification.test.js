@@ -86,7 +86,7 @@ test("la rédaction libre reste réservée au chef et à l'adjoint", () => {
       /if \(!context\.canManageRestrictedOperationalData\)/);
 });
 
-test("corrections et suppressions conservent leur audit et leurs droits", () => {
+test("modification et suppression : droits et audit", () => {
   const edit = source.split(
       "exports.updateSauveteurMainCouranteEntry =")[1]
       .split("exports.deleteSauveteurMainCouranteEntry =")[0];
