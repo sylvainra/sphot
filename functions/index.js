@@ -5439,6 +5439,8 @@ async function activeLegalPackInfo() {
  * Révisions effectivement publiées des textes du sauveteur.
  * La version globale ne doit pas faire revalider une CGU ADMIN ou annonceur
  * à un sauveteur. Le repli prépublication conserve les anciens accords.
+ * @param {string} fallback Version globale de repli.
+ * @return {Promise<Object|null>} Versions publiees ou null.
  */
 async function activeSauveteurDocumentVersions(fallback) {
   const ids = ["sauveteurCgu", "sauveteurCharter",
