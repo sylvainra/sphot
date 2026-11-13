@@ -413,6 +413,16 @@ class _SauveteurActionsRapidesPageState
           case 'invalid_flag_state':
             _liveStatusMessage = 'État du drapeau non reconnu par le serveur.';
             break;
+          case 'surveillance_closed':
+            _liveStatusMessage =
+                'Hissage refusé : le poste est hors des horaires '
+                'de surveillance définis par SPHOT Admin.';
+            break;
+          case 'surveillance_schedule_missing':
+            _liveStatusMessage =
+                'Hissage refusé : aucune période de surveillance '
+                'valide n’est attribuée à ce poste.';
+            break;
           default:
             _liveStatusMessage =
                 'Enregistrement refusé (HTTP ${response.statusCode}'
@@ -470,7 +480,13 @@ class _SauveteurActionsRapidesPageState
     if (!mounted) return;
     setState(() {
       _flagWriteInProgress = false;
-      if (!saved) {
+      if (saved) {
+        // Le serveur vient de confirmer une écriture sur ce poste.
+        _confirmedFlagColor = flagColor;
+        _confirmedFlagPosition = flagPosition;
+        _confirmedPurpleFlagActive = purpleFlagActive;
+        _confirmedWindsockActive = windsockActive;
+      } else {
         _restoreConfirmedFlagState();
       }
     });
