@@ -23,6 +23,7 @@ on:
       - "lib/web/super_admin/widgets/super_admin_legal_audience_panel.dart"
       - "lib/services/legal_published_version.dart"
       - "test/legal_published_version_test.dart"
+      - "test/admin_legal_placement_test.dart"
       - ".github/workflows/legal-cgu-validation.yml"
   workflow_dispatch:
 
@@ -102,8 +103,9 @@ jobs:
             lib/web/admin/pages/admin_trial_request_page.dart \
             lib/web/advertiser/widgets/advertiser_legal_acceptance_section.dart \
             lib/web/super_admin/widgets/super_admin_legal_audience_panel.dart \
-            test/legal_published_version_test.dart
+            test/legal_published_version_test.dart \
+            test/admin_legal_placement_test.dart
       - name: Tester les versions juridiques Flutter
-        run: flutter test --no-pub test/legal_published_version_test.dart
+        run: flutter test --no-pub test/legal_published_version_test.dart test/admin_legal_placement_test.dart
       - name: Construire Web sans publier
         run: flutter build web --release --no-pub -t lib/main.dart
