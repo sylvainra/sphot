@@ -20,6 +20,7 @@ function versionId(document, fallback) {
  * @param {Object} documents Documents juridiques récupérés.
  * @param {string} fallback Version générale historique.
  * @return {Object} Versions associées aux identifiants de documents.
+ * @param {Object} options Identifiants propres au profil.
  */
 function snapshot(documents, fallback, options = {}) {
   const cguId = options.cguId || "cgu";
@@ -41,6 +42,7 @@ function snapshot(documents, fallback, options = {}) {
  * @param {Object|undefined|null} requested Versions transmises.
  * @param {Object} current Versions actuellement publiées.
  * @return {boolean} Vrai si les versions correspondent.
+ * @param {Object} options Options du controle strict.
  */
 function matchesRequested(requested, current, options = {}) {
   if (requested == null) return options.required !== true;
