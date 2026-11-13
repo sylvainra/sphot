@@ -42,6 +42,30 @@ class _SauveteurActionsRapidesPageState
   String flagColor = 'Vert';
   String flagPosition = 'Hissé';
   String status = 'Baignade surveillée';
+
+  // Dernier état constaté sur Firestore, distinct de l'animation locale.
+  String _confirmedFlagColor = 'Vert';
+  String _confirmedFlagPosition = 'Hissé';
+  bool _confirmedPurpleFlagActive = false;
+  bool _confirmedWindsockActive = false;
+  bool _liveFlagLoaded = false;
+  bool _flagWriteInProgress = false;
+
+  bool get _canChangeFlagColor =>
+      widget.isSphotOn &&
+      _liveFlagLoaded &&
+      !_flagWriteInProgress &&
+      _confirmedFlagPosition == 'Affalé';
+
+  void _restoreConfirmedFlagState() {
+    flagColor = _confirmedFlagColor;
+    flagPosition = _confirmedFlagPosition;
+    purpleFlagActive = _confirmedPurpleFlagActive;
+    windsockActive = _confirmedWindsockActive;
+    status = flagPosition == 'Affalé'
+        ? 'Baignade non surveillée temporairement'
+        : _statusForFlagColor(flagColor);
+  }
   bool purpleFlagActive = false;
   bool windsockActive = false;
 
@@ -167,6 +191,7 @@ class _SauveteurActionsRapidesPageState
   }
 
   Future<void> _selectSpot(Map<String, String> poste) async {
+    if (_flagWriteInProgress) return;
     await _liveSubscription?.cancel();
     _liveSubscription = null;
 
@@ -179,6 +204,16 @@ class _SauveteurActionsRapidesPageState
       typeSphot = poste['typeSphot'] ?? 'Poste de secours';
       _liveWriteBlocked = false;
       _liveStatusMessage = null;
+      _liveFlagLoaded = false;
+      _confirmedFlagColor = 'Vert';
+      _confirmedFlagPosition = 'Hissé';
+      _confirmedPurpleFlagActive = false;
+      _confirmedWindsockActive = false;
+      flagColor = 'Vert';
+      flagPosition = 'Hissé';
+      status = _statusForFlagColor(flagColor);
+      purpleFlagActive = false;
+      windsockActive = false;
 
       if (!widget.isSphotOn) {
         flagColor = 'Vert';
@@ -235,14 +270,16 @@ class _SauveteurActionsRapidesPageState
       final rawDangers = data['dangers'];
 
       setState(() {
-        if (nextColor != null) flagColor = nextColor;
-        if (nextPosition != null) flagPosition = nextPosition;
-        purpleFlagActive = nextPurpleFlagActive;
-        windsockActive = nextWindsockActive;
+        if (nextColor != null) _confirmedFlagColor = nextColor;
+        if (nextPosition != null) _confirmedFlagPosition = nextPosition;
+        _confirmedPurpleFlagActive = nextPurpleFlagActive;
+        _confirmedWindsockActive = nextWindsockActive;
+        _liveFlagLoaded = true;
 
-        status = flagPosition == 'Affalé'
-            ? 'Baignade non surveillée temporairement'
-            : _statusForFlagColor(flagColor);
+        // Ne pas effacer la prévisualisation pendant une sauvegarde.
+        if (!_flagWriteInProgress) {
+          _restoreConfirmedFlagState();
+        }
 
         if (rawDangers is Iterable) {
           final values = rawDangers.map((value) => value.toString()).toList();
@@ -328,11 +365,19 @@ class _SauveteurActionsRapidesPageState
       if (!mounted) return false;
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        setState(() {
-          _liveWriteBlocked = false;
-          _liveStatusMessage = null;
-        });
-        return true;
+        bool confirmed = false;
+        try {
+          final result = jsonDecode(response.body);
+          confirmed = result is Map<String, dynamic> &&
+              result['success'] == true;
+        } catch (_) {}
+        if (confirmed) {
+          setState(() {
+            _liveWriteBlocked = false;
+            _liveStatusMessage = null;
+          });
+          return true;
+        }
       }
 
       String errorCode = '';
@@ -346,10 +391,34 @@ class _SauveteurActionsRapidesPageState
       setState(() {
         _liveWriteBlocked = errorCode == 'sphot_off' ||
             errorCode == 'spot_not_assigned';
-        _liveStatusMessage = _liveWriteBlocked
-            ? 'SPHOT OFF — cette action reste locale et ne modifie pas '
-                'le poste réel.'
-            : 'La modification opérationnelle n’a pas pu être enregistrée.';
+        switch (errorCode) {
+          case 'flag_color_requires_lowered':
+            _liveStatusMessage =
+                'Changement refusé : affalez d’abord le drapeau, '
+                'puis choisissez sa couleur avant de le hisser.';
+            break;
+          case 'sphot_off':
+          case 'spot_not_assigned':
+            _liveStatusMessage =
+                'Accès temps réel refusé : SPHOT OFF ou poste non autorisé.';
+            break;
+          case 'invalid_session':
+            _liveStatusMessage =
+                'Session expirée ou invalide : reconnectez-vous.';
+            break;
+          case 'legal_acceptance_required':
+            _liveStatusMessage =
+                'Validation juridique requise : reconnectez-vous.';
+            break;
+          case 'invalid_flag_state':
+            _liveStatusMessage = 'État du drapeau non reconnu par le serveur.';
+            break;
+          default:
+            _liveStatusMessage =
+                'Enregistrement refusé (HTTP ${response.statusCode}'
+                '${errorCode.isEmpty ? '' : ' — $errorCode'}). '
+                'État du drapeau restauré.';
+        }
       });
 
       return false;
@@ -365,11 +434,30 @@ class _SauveteurActionsRapidesPageState
   }
 
   Future<void> _persistFlagState() async {
+    if (_flagWriteInProgress) return;
+    if (!widget.isSphotOn || !_liveFlagLoaded) {
+      setState(() {
+        _restoreConfirmedFlagState();
+        _liveStatusMessage = !widget.isSphotOn
+            ? 'SPHOT OFF : aucun changement réel de drapeau enregistré.'
+            : 'Chargement de l’état réel du drapeau en cours.';
+      });
+      return;
+    }
+
+    if (flagColor == _confirmedFlagColor &&
+        flagPosition == _confirmedFlagPosition &&
+        purpleFlagActive == _confirmedPurpleFlagActive &&
+        windsockActive == _confirmedWindsockActive) {
+      return;
+    }
+
     final currentStatus = flagPosition == 'Affalé'
         ? 'Baignade non surveillée temporairement'
         : _statusForFlagColor(flagColor);
 
-    await _persistLiveChanges({
+    setState(() => _flagWriteInProgress = true);
+    final saved = await _persistLiveChanges({
       'liveFlag': {
         'flagColor': _flagColorValue(flagColor),
         'flagPosition': _flagPositionValue(flagPosition),
@@ -378,49 +466,71 @@ class _SauveteurActionsRapidesPageState
       },
       'statutBaignade': currentStatus,
     });
+
+    if (!mounted) return;
+    setState(() {
+      _flagWriteInProgress = false;
+      if (!saved) {
+        _restoreConfirmedFlagState();
+      }
+    });
   }
 
   Future<void> _togglePurpleFlag() async {
-    setState(() {
-      purpleFlagActive = !purpleFlagActive;
-    });
-
+    if (_flagWriteInProgress) return;
+    setState(() => purpleFlagActive = !purpleFlagActive);
     await _persistFlagState();
   }
 
   Future<void> _toggleWindsock() async {
-    setState(() {
-      windsockActive = !windsockActive;
-    });
-
+    if (_flagWriteInProgress) return;
+    setState(() => windsockActive = !windsockActive);
     await _persistFlagState();
   }
 
   Future<void> _changeFlagColor(String color) async {
-    setState(() {
-      flagColor = color;
-      if (flagPosition != 'Affalé') {
-        status = _statusForFlagColor(color);
-      }
-    });
-
+    if (color == flagColor || _flagWriteInProgress) return;
+    if (!_canChangeFlagColor) {
+      setState(() {
+        _liveStatusMessage = !_liveFlagLoaded
+            ? 'Chargement de l’état réel du drapeau en cours.'
+            : 'Pour changer de couleur, affalez d’abord le drapeau.';
+      });
+      return;
+    }
+    setState(() => flagColor = color);
     await _persistFlagState();
   }
 
   Future<void> updateFlagPosition(String position) async {
+    if (_flagWriteInProgress) return;
+    if (!_liveFlagLoaded || !widget.isSphotOn) {
+      setState(() {
+        _restoreConfirmedFlagState();
+        _liveStatusMessage = !widget.isSphotOn
+            ? 'SPHOT OFF : impossible de modifier le drapeau réel.'
+            : 'Chargement de l’état réel du drapeau en cours.';
+      });
+      return;
+    }
+    if (position == _confirmedFlagPosition) {
+      setState(_restoreConfirmedFlagState);
+      return;
+    }
     setState(() {
       flagPosition = position;
       status = position == 'Affalé'
           ? 'Baignade non surveillée temporairement'
           : _statusForFlagColor(flagColor);
     });
-
     await _persistFlagState();
   }
 
   void _previewFlagPosition(String position) {
-    if (flagPosition == position) return;
-
+    if (_flagWriteInProgress || !_liveFlagLoaded ||
+        !widget.isSphotOn || flagPosition == position) {
+      return;
+    }
     setState(() {
       flagPosition = position;
       status = position == 'Affalé'
