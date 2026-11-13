@@ -1,5 +1,6 @@
 const {sendSphotMail} = require("./sphot_email_design");
 const {evaluateFlagTransition} = require("./sauveteur_flag_transition");
+const {surveillanceWindow} = require("./sauveteur_surveillance_schedule");
 const {setGlobalOptions} = require("firebase-functions");
 const {defineString} = require("firebase-functions/params");
 const {onRequest} = require("firebase-functions/v2/https");
@@ -7454,6 +7455,11 @@ exports.updateSauveteurLiveState = onRequest(
           const previousLiveFlag = previousSpot.liveFlag || {};
           const auditReference = db.collection("sauveteurOperationalAudit").doc();
 
+          const territoireSpotReference = db
+              .collection("territoires")
+              .doc(context.territoireId)
+              .collection("spots")
+              .doc(spotId);
           const nextLiveFlag = sanitizedChanges.liveFlag;
           const flagTransition = nextLiveFlag === undefined ?
             null : evaluateFlagTransition(previousLiveFlag, nextLiveFlag);
@@ -7462,6 +7468,38 @@ exports.updateSauveteurLiveState = onRequest(
             rejected.httpStatus =
               flagTransition.error === "invalid_flag_state" ? 400 : 409;
             throw rejected;
+          }
+
+          let territorySpot = {};
+          if (flagTransition &&
+              (flagTransition.flagWasRaised ||
+               flagTransition.flagWasLowered)) {
+            const territorySpotSnapshot =
+              await transaction.get(territoireSpotReference);
+            territorySpot = territorySpotSnapshot.data() || {};
+          }
+
+          if (flagTransition && flagTransition.flagWasRaised) {
+            const periodsSnapshot = await transaction.get(
+                db.collection("territoires")
+                    .doc(context.territoireId)
+                    .collection("periodesSurveillance"),
+            );
+            const periods = periodsSnapshot.docs.map((period) => ({
+              id: period.id,
+              ...period.data(),
+            }));
+            const schedule = surveillanceWindow(
+                territorySpot, periods, new Date(),
+            );
+            if (!schedule.open) {
+              const denied = new Error(
+                  schedule.configured ?
+                    "surveillance_closed" : "surveillance_schedule_missing",
+              );
+              denied.httpStatus = 409;
+              throw denied;
+            }
           }
 
           const flagJournalLines =
@@ -7477,24 +7515,12 @@ exports.updateSauveteurLiveState = onRequest(
           let operationalAlertMessage = "";
 
           if (flagWasLowered || flagWasRaised) {
-            let spotLabel = spotId;
-            try {
-              const territorySpotSnapshot = await db
-                  .collection("territoires")
-                  .doc(context.territoireId)
-                  .collection("spots")
-                  .doc(spotId)
-                  .get();
-              const territorySpot = territorySpotSnapshot.data() || {};
-              spotLabel = (
-                territorySpot.nomSecours ||
-                territorySpot.nomSphot ||
-                territorySpot.idSphot ||
-                spotId
-              ).toString().trim();
-            } catch (_) {
-              // Le numéro technique du poste reste exploitable en secours.
-            }
+            const spotLabel = (
+              territorySpot.nomSecours ||
+              territorySpot.nomSphot ||
+              territorySpot.idSphot ||
+              spotId
+            ).toString().trim();
 
             if (flagWasLowered) {
               const loweringTime = formatFrenchOperationalTime(new Date());
@@ -7617,7 +7643,9 @@ exports.updateSauveteurLiveState = onRequest(
       } catch (error) {
         if (error.httpStatus &&
             (error.message === "invalid_flag_state" ||
-             error.message === "flag_color_requires_lowered")) {
+             error.message === "flag_color_requires_lowered" ||
+             error.message === "surveillance_closed" ||
+             error.message === "surveillance_schedule_missing")) {
           response.status(error.httpStatus).json({
             success: false,
             error: error.message,
