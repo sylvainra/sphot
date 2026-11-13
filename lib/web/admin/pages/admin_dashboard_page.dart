@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../../shared/professional_legal_gate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../models/advertising_pricing_config.dart';
@@ -15193,13 +15192,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  // L'accord aux CGU ADMIN est recueilli lors de la demande d'accès.
+  // Les conditions de vente sont présentées au parcours de commande.
+  // La connexion quotidienne ne doit pas exiger une nouvelle acceptation.
   @override
-  Widget build(BuildContext context) {
-    return ProfessionalLegalGate(
-      audience: ProfessionalLegalAudience.admin,
-      child: _buildDashboardContent(context),
-    );
-  }
+  Widget build(BuildContext context) => _buildDashboardContent(context);
 
   Widget _buildDashboardContent(BuildContext context) {
     return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
