@@ -33,6 +33,7 @@ class _SauveteurMaterielVerificationPageState
     extends State<SauveteurMaterielVerificationPage> {
   static const _blue = Color(0xFF1E3A8A);
   static const _green = Color(0xFF15803D);
+  static const _red = Color(0xFFDC2626);
   static const _orange = Color(0xFFF59E0B);
 
   final TextEditingController _oxygenMainController =
@@ -45,6 +46,8 @@ class _SauveteurMaterielVerificationPageState
   String? _spotLabel;
   bool _loading = true;
   bool _saving = false;
+  // Réinitialisé à chaque nouvelle ouverture de ce formulaire.
+  bool _saved = false;
   String? _message;
 
   bool _aspiratorWorking = true;
@@ -124,6 +127,7 @@ class _SauveteurMaterielVerificationPageState
   String _status(bool value) => value ? 'OK' : 'À CONTRÔLER';
 
   Future<void> _saveVerification() async {
+    if (_saving || _saved) return;
     final spotId = _selectedSpotId?.trim();
 
     if (!_isSphotOn) {
@@ -196,9 +200,20 @@ class _SauveteurMaterielVerificationPageState
 
       if (!mounted) return;
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
+      // Le rouge signifie que Firestore a confirmé une nouvelle écriture.
+      // Une simple réponse HTTP 2xx ne suffit pas.
+      final isHttpSuccess =
+          response.statusCode >= 200 && response.statusCode < 300;
+      final decoded = isHttpSuccess ? jsonDecode(response.body) : null;
+      final confirmed = isHttpSuccess &&
+          decoded is Map<String, dynamic> &&
+          decoded['success'] == true &&
+          (decoded['entryId'] ?? '').toString().trim().isNotEmpty;
+
+      if (confirmed) {
         setState(() {
-          _message = 'Vérification enregistrée dans la MAIN COURANTE.';
+          _saved = true;
+          _message = null;
         });
       } else {
         setState(() {
@@ -528,22 +543,33 @@ class _SauveteurMaterielVerificationPageState
                                     width: double.infinity,
                                     height: 44,
                                     child: ElevatedButton.icon(
-                                      onPressed:
-                                          _saving ? null : _saveVerification,
-                                      icon: const Icon(
-                                        Icons.fact_check_outlined,
+                                      onPressed: _saving || _saved
+                                          ? null
+                                          : _saveVerification,
+                                      icon: Icon(
+                                        _saved
+                                            ? Icons.check_circle_rounded
+                                            : Icons.fact_check_outlined,
                                       ),
                                       label: Text(
-                                        _saving
-                                            ? 'ENREGISTREMENT...'
-                                            : 'ENREGISTRER LA VÉRIFICATION',
+                                        _saved
+                                            ? 'VÉRIFICATION ENREGISTRÉE'
+                                            : _saving
+                                                ? 'ENREGISTREMENT...'
+                                                : 'ENREGISTRER LA VÉRIFICATION',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w900,
                                         ),
                                       ),
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: _blue,
+                                        backgroundColor: _saved ? _red : _blue,
                                         foregroundColor: Colors.white,
+                                        disabledBackgroundColor: _saved
+                                            ? _red
+                                            : const Color(0xFFCBD5E1),
+                                        disabledForegroundColor: _saved
+                                            ? Colors.white
+                                            : const Color(0xFF637087),
                                       ),
                                     ),
                                   ),
