@@ -56,12 +56,12 @@ function localToInstant(clock, timeZone) {
 }
 
 /**
- * Heure de surveillance Admin : HH:mm, end > start (même journée).
+ * Heure Admin : format HH:mm ou ancien HHhmm, même journée.
  * @param {*} input Chaîne Firestore.
  * @return {?number} Minute depuis minuit.
  */
 function minutes(input) {
-  const match = /^(\d{2}):(\d{2})$/.exec(
+  const match = /^(\d{1,2})[:hH](\d{2})$/.exec(
       (input || "").toString().trim(),
   );
   if (!match) return null;
