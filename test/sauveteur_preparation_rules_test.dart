@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:sphot/models/flag_state.dart';
+import 'package:bathing_spots_app/models/flag_state.dart';
 
 void main() {
   Map<String, dynamic> spot({
